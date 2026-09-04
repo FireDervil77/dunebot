@@ -53,10 +53,24 @@ class NavigationManager {
             if (nextRange < 1000) nextRange = 1000;
             
             // === SAFETY CHECK ===
-            // Falls die Berechnung trotzdem >= 9000 ergibt (sollte nicht passieren)
-            // → Nutze 8000 als "Notfall-Range" vor dem Superadmin
-            if (nextRange >= 90000) {
-                Logger.warn(`[NavigationManager] Berechnete Range ${nextRange} >= 9000 - nutze Fallback 8000`);
+            //
+            // **Hier stand `>= 90000`** — ein Tippfehler, gemeint waren 9000.
+            // Er hat nie ausgeloest, und deshalb bekam ab dem achten Plugin
+            // JEDES die 9000: Die Abfrage oben blendet alles ab 9000 aus, das
+            // Maximum blieb bei 8000 stehen, und `Math.ceil(8001/1000)*1000`
+            // ergibt jedes Mal wieder 9000. Am 2026-09-04 standen fuenf
+            // Hauptmenuepunkte auf demselben Wert; welcher oben stand,
+            // entschied dann der Uebersetzungsschluessel im `ORDER BY`.
+            //
+            // Der Rueckfall auf 8000 loest das nicht, er verschiebt es nur —
+            // deshalb ist es jetzt ein Fehler im Protokoll und keine Warnung.
+            // **Der Weg hier ist seit dem 2026-09-04 ohnehin unbenutzt**: Alle
+            // zehn Plugins nennen ihren Platz selbst. Wer neu dazukommt, soll
+            // das auch tun, statt eine Nummer aus der Schlange zu ziehen.
+            if (nextRange >= 9000) {
+                Logger.error('[NavigationManager] Kein freier Platz unter 9000 — '
+                    + `Rueckfall auf 8000, und das kollidiert. Das Plugin muss `
+                    + 'seinen `order` selbst angeben (siehe scripts/check-navigationsordnung.js).');
                 nextRange = 8000;
             }
             

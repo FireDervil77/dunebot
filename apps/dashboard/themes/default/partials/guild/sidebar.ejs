@@ -15,7 +15,15 @@
   const _navItems = (typeof guildNav !== 'undefined' && guildNav && guildNav.length) ? guildNav : [];
   const _aktiv    = typeof activeMenu === 'string' ? activeMenu : '';
 
-  const _nachOrdnung = (a, b) => (a.sort_order || a.order || 0) - (b.sort_order || b.order || 0);
+  // **Mit Zweitkriterium** (2026-09-04). Bei gleichem Wert gab dieser
+  // Vergleich 0 zurueck und ueberliess die Reihenfolge der Datenbank. Die ist
+  // durch das `ORDER BY … , title` zwar bestimmt, aber der Titel ist ein
+  // Uebersetzungsschluessel — "welcher Punkt steht oben" haengt dann daran,
+  // wie der Schluessel heisst. Hier wird es wenigstens sichtbar entschieden.
+  const _nachOrdnung = (a, b) => {
+    const _wert = (x) => Number(x.sort_order ?? x.order ?? 0);
+    return (_wert(a) - _wert(b)) || String(a.title || '').localeCompare(String(b.title || ''));
+  };
 
   const _u = (typeof locals !== 'undefined' && locals.user) ? locals.user : (typeof user !== 'undefined' ? user : null);
   const _istSystemNutzer = _u && (_u.isOwner === true || _u.hasSystemAccess === true);

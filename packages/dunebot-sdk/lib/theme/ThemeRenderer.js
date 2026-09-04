@@ -24,6 +24,9 @@ class ThemeRenderer {
      * @param {string} view - View-Pfad
      * @param {Object} data - Zusätzliche View-Daten
      */
+    /** Views, fuer die die `settings`-Kollision schon gemeldet wurde. */
+    static _gemeldet = new Set();
+
     async renderView(res, view, data = {}) {
         const Logger = ServiceManager.get('Logger');
 
@@ -118,6 +121,61 @@ class ThemeRenderer {
                 layout: res.locals.layout,
                 hasEnabledPlugins: !!viewData.enabledPlugins
             });
+
+            // ================================================================
+            // Der Name `settings` gehoert Express — und EJS haengt daran
+            // ================================================================
+            //
+            // Express legt seine eigenen Einstellungen als `settings` in die
+            // Renderdaten (`app.locals.settings = app.settings`). EJS liest
+            // daraus die View-Wurzeln fuer **verschachtelte** Includes, und
+            // zwar ausschliesslich von dort:
+            //
+            //     node_modules/ejs/lib/ejs.js:467
+            //         if (data.settings.views) { opts.views = data.settings.views; }
+            //     node_modules/ejs/lib/ejs.js:181
+            //         if (!includePath && Array.isArray(views)) { … }
+            //         if (!includePath) throw 'Could not find the include file'
+            //
+            // Wer eine eigene Variable `settings` uebergibt — vier Plugins tun
+            // das auf ihren Einstellungsseiten — ueberschreibt damit Express'
+            // Objekt. `data.settings.views` ist dann undefiniert, `opts.views`
+            // bleibt leer, und **jeder verschachtelte Include stuerzt ab**.
+            //
+            // Aufgefallen ist es erst am 2026-09-04: Bis zum 2026-08-29 trug
+            // jedes Plugin seinen Seitenkopf als eigenes Markup, ohne
+            // verschachtelten Include. Der gemeinsame `shared/seitenkopf` hat
+            // die Falle nicht gebaut, er ist nur hineingetreten.
+            //
+            // **Zurueckgegeben wird unsichtbar.** Die drei Schluessel haengen
+            // sich als nicht aufzaehlbare Eigenschaften an das Objekt des
+            // Plugins: Die Ansicht sieht ihre Daten unveraendert, `for…in` und
+            // `JSON.stringify` auch, und EJS findet, was es braucht.
+            //
+            // Das ist eine Reparatur, keine Loesung. Die Loesung waere, dass
+            // eine Ansicht ihre Daten nicht im selben Namensraum bekommt wie
+            // der Renderer seine Einstellungen — vermerkt fuer den tieferen
+            // Durchgang am Theming.
+            const expressEinstellungen = this.manager.app.settings;
+            const fremd = res.locals.settings;
+            if (fremd && fremd !== expressEinstellungen && typeof fremd === 'object') {
+                for (const schluessel of ['views', 'view cache', 'view options']) {
+                    if (!(schluessel in fremd)) {
+                        Object.defineProperty(fremd, schluessel, {
+                            value: expressEinstellungen[schluessel],
+                            enumerable: false,
+                            configurable: true
+                        });
+                    }
+                }
+                if (!ThemeRenderer._gemeldet.has(view)) {
+                    ThemeRenderer._gemeldet.add(view);
+                    Logger.warn(`[ThemeRenderer] "${view}" uebergibt eine eigene `
+                        + 'Variable `settings` und verdeckt damit die von Express. '
+                        + 'Die View-Wurzeln wurden nachgereicht; der Name sollte '
+                        + 'trotzdem wechseln.');
+                }
+            }
 
             // 6. Plugin-Name erkennen (für Plugin-View-Fallback)
             const pluginName = data.pluginName || res.locals.pluginName || null;

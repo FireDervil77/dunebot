@@ -1195,7 +1195,14 @@ class GameserverPlugin extends DashboardPlugin {
                 title: 'gameserver:NAV.GAMESERVER',
                 url: `/guild/${guildId}/plugins/gameserver`,
                 icon: 'fa-solid fa-server',
-                order: null, // Auto-Range (nächste 1000er-Range nach Core)
+                // **Fester Platz in der Seitenleiste** (2026-09-04).
+                //
+                // Hier stand `order: null` mit dem Vermerk "Auto-Range". Genau
+                // das war das Problem: Die Auto-Range ist die naechste freie
+                // 1000er-Stufe, also die, die sich aus der Reihenfolge der
+                // REGISTRIERUNG ergibt und nicht aus dem Plugin. Nach einem
+                // Neustart in anderer Reihenfolge stand der Punkt woanders.
+                order: 4500,
                 type: navigationManager.menuTypes.MAIN,
                 capability: 'GAMESERVER.VIEW', // Gameserver-Zugriff
                 visible: true,

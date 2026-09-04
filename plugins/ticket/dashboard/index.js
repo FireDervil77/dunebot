@@ -166,7 +166,20 @@ class TicketPlugin extends DashboardPlugin {
                 title: 'ticket:NAV.TICKET',
                 url: basis,
                 icon: 'fa-solid fa-ticket',
-                order: null,
+                // **Fester Platz in der Seitenleiste** (2026-09-04).
+                //
+                // Hier stand `order: null`. Der NavigationManager vergab dann
+                // die naechste freie 1000er-Stufe — also die, die sich aus der
+                // Reihenfolge der REGISTRIERUNG ergibt, nicht aus dem Plugin.
+                // Wer sich zuerst eintrug, stand oben; nach einem Neustart in
+                // anderer Reihenfolge stand er woanders. Und weil die Abfrage
+                // alles ab 9000 ausblendet, bekamen ab dem achten Plugin ALLE
+                // die 9000 — fuenf Punkte mit demselben Wert, deren Reihenfolge
+                // dann der Uebersetzungsschluessel entschied.
+                //
+                // Die Zahlen sind der heutige Stand, eingefroren, in
+                // 500er-Schritten: unter 9000 ist Platz fuer alle zehn.
+                order: 8500,
                 type: haupt,
                 capability: 'TICKET.VIEW',
                 visible: true,

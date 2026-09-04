@@ -904,6 +904,11 @@ body.layout-boxed {
        Es macht die Leiste zum Scrollbehälter, und das darin klebende Menü
        hätte dann nichts mehr, worin es kleben könnte — es würde still zu
        einem gewöhnlichen Block. Die Rundung malt der Hintergrund selbst mit. */
+    /* **Zwei Scrollbalken, und einer davon war Tablers.** Die Regel
+       `.navbar-vertical.navbar-expand-lg { overflow-y: scroll }` galt weiter;
+       zusammen mit dem scrollenden Inhalt darin ergab das zwei Leisten
+       nebeneinander. Hier scrollt der Inhalt, nicht der Rahmen. */
+    overflow: hidden;
     border-radius: var(--fb-radius-blatt) 0 0 var(--fb-radius-blatt);
     min-height: 0;
   }
