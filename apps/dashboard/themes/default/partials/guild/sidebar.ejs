@@ -162,7 +162,20 @@
                     <% } %>
                     <% punkte.forEach(kind => { %>
                       <a class="dropdown-item <%= _aktiv === kind.url ? 'active' : '' %>" href="<%= kind.url %>">
-                        <%= tr(kind.title, kind.title) %>
+                        <span class="nav-punkt__text"><%= tr(kind.title, kind.title) %></span>
+                        <%# ---- Zaehler am Menuepunkt (P10) --------------------
+                            Kommt aus `base.middleware.js`: Plugins, die einen
+                            `navigationZaehler(guildId)` mitbringen, liefern ihn
+                            dort; wer keinen hat, kostet nichts.
+
+                            **Auf `undefined` geprueft, nicht auf Wahrheit.**
+                            `if (kind.zaehler)` haette die Null verschluckt —
+                            und "Meine Befehle 0" ist genau der Fall, den der
+                            Entwurf zeigt. Eine Null ist eine Auskunft: Es gibt
+                            die Sache, sie ist nur leer. %>
+                        <% if (kind.zaehler !== undefined && kind.zaehler !== null) { %>
+                          <span class="nav-zaehler"><%= kind.zaehler %></span>
+                        <% } %>
                       </a>
                     <% }); %>
                     <% _ersteGruppe = false; %>

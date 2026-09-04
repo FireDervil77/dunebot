@@ -245,6 +245,54 @@ pruefe('F · auch bei abweichender Schreibweise der Adresse',
     'Die Adressen unterscheiden sich nur in der Schreibweise — der Eintrag steht doppelt.');
 
 // =====================================================
+// 2c. Zaehler am Menuepunkt (P10)
+// =====================================================
+//
+// **Die Null ist der ganze Punkt.** Der Entwurf zeigt "Meine Befehle 0" — es
+// gibt die Sache, sie ist nur leer. Ein `if (kind.zaehler)` haette genau das
+// verschluckt und nur die Punkte mit Inhalt beziffert; ein Menuepunkt ohne
+// Zahl saehe dann aus wie einer ohne Zaehler.
+//
+// Geprueft wird deshalb an einer 0, nicht an einer 5.
+
+console.log('\nZaehler am Menuepunkt');
+
+const zaehlerAus = (guildNav) => {
+    const html = ejs.render(vorlage, { ...grund, guildNav }, { filename: VORLAGE });
+    return [...html.matchAll(/nav-zaehler">([^<]*)</g)].map(m => m[1].trim());
+};
+
+const mitZahl = (title, url, wert) =>
+    ({ title, url, abschnitt: null, sort_order: 10, icon: 'fa-solid fa-circle', zaehler: wert });
+
+pruefe('G · eine 0 wird angezeigt, nicht verschluckt',
+    zaehlerAus(gruppe([mitZahl('Befehle', '/s/b', 0)])).join('|') === '0',
+    'Der Menuepunkt sieht sonst aus wie einer, der gar keinen Zaehler hat.');
+
+pruefe('G · eine gewoehnliche Zahl kommt durch',
+    zaehlerAus(gruppe([mitZahl('Kanaele', '/s/k', 2)])).join('|') === '2');
+
+pruefe('G · ohne Zaehler steht dort nichts',
+    zaehlerAus(gruppe([p('Kanaele', '/s/k', null, 10)])).length === 0,
+    'Ein leerer Zaehler-Kasten an jedem Punkt waere schlimmer als keiner.');
+
+// Und die Kette dahinter: Wer liefert, wer traegt ein.
+const mw = ohneKommentare(lies('apps/dashboard/middlewares/context/base.middleware.js'));
+pruefe('Die Navigation laesst die Zaehler nachtragen',
+    /await zaehlerNachtragen\(/.test(mw),
+    'Die Funktion steht da, wird aber nie gerufen — dieselbe Falle wie bei `guild.css`.');
+pruefe('Der Wert wird auf Zahl geprueft, nicht auf Wahrheit',
+    /Number\.isFinite\(Number\(wert\)\)/.test(mw),
+    'Eine Wahrheitspruefung wirft die 0 weg, bevor die Ansicht sie sieht.');
+pruefe('Ein kaputter Zaehler nimmt die Navigation nicht mit',
+    /catch \(err\)[\s\S]{0,200}Zaehler von/.test(mw),
+    'Ohne `try` faellt die ganze Seitenleiste aus, wenn eine Abfrage klemmt.');
+
+const streamingIndex = ohneKommentare(lies('plugins/streaming/dashboard/index.js'));
+pruefe('streaming liefert einen Zaehler',
+    /async navigationZaehler\(guildId\)/.test(streamingIndex));
+
+// =====================================================
 // 3. Jeder gesetzte Abschnitt ist uebersetzt
 // =====================================================
 //

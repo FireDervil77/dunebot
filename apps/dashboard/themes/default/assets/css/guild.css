@@ -868,11 +868,24 @@ body.layout-boxed {
 
      15rem ist nicht geraten, sondern aus Tablers eigener Regel übernommen:
      `.navbar-vertical.navbar-expand-lg { width: 15rem }`. */
+  /* **Feste Höhe, kein `min-height`** — und das ist die Entscheidung, an der
+     die haftende Kopfleiste hängt.
+
+     Ein Rasterfeld ist der umschließende Block seines Kindes. Die Kopfleiste
+     liegt in Zeile 1, und die ist `auto` hoch — also genau so hoch wie sie
+     selbst. `position: sticky` hat darin keinen Weg, den es zurücklegen
+     könnte, und wird still zu einem gewöhnlichen Block. Vorher hing sie an
+     `.page` und klebte; das Raster hat ihr das genommen, ohne dass etwas
+     kaputtging.
+
+     Statt sie zurückzubiegen: das Blatt wird ein Rahmen von Fensterhöhe, und
+     gescrollt wird darin. Seitenleiste und Kopfleiste stehen, der Inhalt
+     läuft — so verhält sich auch der Entwurf. */
   .layout-boxed .page {
     display: grid;
     grid-template-columns: 15rem minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
-    min-height: calc(100vh - 3rem);
+    height: calc(100vh - 3rem);
     box-shadow: var(--fb-shadow-hoch);
   }
 
@@ -892,23 +905,29 @@ body.layout-boxed {
        hätte dann nichts mehr, worin es kleben könnte — es würde still zu
        einem gewöhnlichen Block. Die Rundung malt der Hintergrund selbst mit. */
     border-radius: var(--fb-radius-blatt) 0 0 var(--fb-radius-blatt);
+    min-height: 0;
   }
 
   /* Die Leiste bleibt voll hoch (dunkle Fläche bis unten), ihr Inhalt läuft
      mit. Sonst müsste man bei dreizehn Plugins nach oben scrollen, um das
      Menü zu erreichen. */
+  /* Die Leiste hat jetzt selbst Fensterhöhe; ihr Inhalt scrollt darin, wenn
+     dreizehn Plugins nicht hineinpassen. `sticky` braucht es nicht mehr. */
   .page > .navbar-vertical > .container-fluid {
-    position: sticky;
-    top: 0;
-    max-height: 100vh;
+    height: 100%;
     overflow-y: auto;
   }
 
   .page > header.navbar { grid-column: 2; grid-row: 1; }
 
+  /* Der Inhalt ist ab hier der Scrollbereich der Seite. Das Fenster selbst
+     scrollt nicht mehr — deshalb steht die Kopfleiste darüber fest, ohne
+     `sticky` zu brauchen. */
   .page > .page-wrapper {
     grid-column: 2;
     grid-row: 2;
+    min-height: 0;
+    overflow-y: auto;
     background: var(--fb-body-bg);
     border-radius: 0 0 var(--fb-radius-blatt) 0;
   }
@@ -933,4 +952,40 @@ body.layout-boxed {
     margin-left: 0;
     margin-right: 0;
   }
+}
+
+/* --- Zähler am Menüpunkt (P10) ------------------------------------------ */
+/*
+   Wie in der Vorlage: die Zahl rechts am Rand, in fester Schrittweite, damit
+   ein- und zweistellige Werte untereinander an derselben Stelle stehen.
+
+   Die Beschriftung nimmt den Rest — sonst schöbe ein langer Menüname die Zahl
+   aus der Zeile.
+*/
+
+.dropdown-item .nav-punkt__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nav-zaehler {
+  flex: none;
+  margin-left: 0.5rem;
+  font-family: var(--fb-font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1;
+  padding: 0.18rem 0.4rem;
+  border-radius: 5px;
+  color: var(--fb-sidebar-text);
+  background: color-mix(in srgb, var(--fb-sidebar-text) 16%, transparent);
+}
+
+/* Nur die Punkte MIT Zähler werden zur Flex-Zeile — sonst verlören alle
+   anderen Menüeinträge ihre Zeilenumbrüche. */
+.navbar-vertical .dropdown-item:has(.nav-zaehler) {
+  display: flex;
+  align-items: center;
 }

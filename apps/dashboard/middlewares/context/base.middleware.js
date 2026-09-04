@@ -23,6 +23,64 @@ function istGueltigeGuildId(wert) {
  * @param {import('express').Response} res
  * @param {import('express').NextFunction} next
  */
+/**
+ * Zaehler an die Menuepunkte haengen (P10, Baustelle 84).
+ *
+ * ## Der Vertrag
+ *
+ * Ein Plugin darf `navigationZaehler(guildId)` mitbringen und gibt
+ * `{ '<url>': <zahl> }` zurueck. Wer die Methode nicht hat, wird nicht
+ * gefragt — heute ist das genau ein Plugin, und damit kostet der ganze
+ * Mechanismus **eine** Abfrage je Seitenaufruf.
+ *
+ * Das war die offene Frage an P10: Ein Haken, den alle vierzehn Plugins
+ * bedienen muessten, haette vierzehn Abfragen gekostet, fuer Zahlen, die in
+ * eingeklappten Menues niemand sieht. So zahlt nur, wer etwas zu zeigen hat.
+ *
+ * ## Ein kaputter Zaehler darf die Navigation nicht mitnehmen
+ *
+ * Deshalb je Plugin abgefangen und protokolliert: Wer eine Seitenleiste ohne
+ * Zahlen bekommt, kann weiterarbeiten; wer gar keine bekommt, nicht.
+ *
+ * ## Die Null ist eine Auskunft
+ *
+ * `Number.isFinite` statt einer Wahrheitspruefung — sonst faellt die 0 heraus,
+ * und genau die zeigt der Entwurf ("Meine Befehle 0"). `sidebar.ejs` prueft
+ * aus demselben Grund auf `undefined` und nicht auf Wahrheit.
+ *
+ * @param {Array}  menue    Die fertige, rechtegefilterte Navigation
+ * @param {string} guildId  Discord-Guild-ID
+ * @param {Object} pluginManager
+ * @param {Object} Logger
+ */
+async function zaehlerNachtragen(menue, guildId, pluginManager, Logger) {
+    if (!Array.isArray(menue) || menue.length === 0) return;
+
+    const anbieter = (pluginManager?.plugins || [])
+        .filter((p) => typeof p?.navigationZaehler === "function");
+    if (anbieter.length === 0) return;
+
+    const zahlen = new Map();
+    for (const plugin of anbieter) {
+        try {
+            const eigene = await plugin.navigationZaehler(guildId);
+            for (const [url, wert] of Object.entries(eigene || {})) {
+                if (Number.isFinite(Number(wert))) zahlen.set(url, Number(wert));
+            }
+        } catch (err) {
+            Logger.error(`[Navigation] Zaehler von ${plugin.name} fehlgeschlagen`, err);
+        }
+    }
+    if (zahlen.size === 0) return;
+
+    for (const punkt of menue) {
+        if (zahlen.has(punkt.url)) punkt.zaehler = zahlen.get(punkt.url);
+        for (const kind of punkt.subItems || []) {
+            if (zahlen.has(kind.url)) kind.zaehler = zahlen.get(kind.url);
+        }
+    }
+}
+
 module.exports = async (req, res, next) => {
     // aus dem ServiceManager bereit stellen
     const Logger = ServiceManager.get('Logger');
@@ -474,11 +532,10 @@ module.exports = async (req, res, next) => {
                 if ((isGuildRoute || isAdminRoute2) && navGuildId2) {
                     Logger.debug(`[Navigation] Starte Navigation-Load für Guild ${navGuildId2}`);
 
-                    // DIREKTE DB-ABFRAGE zur Prüfung
-                    const testQuery = await dbService.query(
-                        "SELECT * FROM guild_nav_items WHERE guildid = ? AND (type = 'main' OR type = 'widget') AND visible = 1",
-                        [navGuildId2]
-                    );
+                    // **Hier stand ein `SELECT *` "zur Pruefung"** (2026-09-04
+                    // entfernt). Sein Ergebnis wurde nie gelesen — die Abfrage
+                    // lief bei jedem Guild-Seitenaufruf und holte alle
+                    // Navigationszeilen der Guild ins Nichts.
 
                     // Navigation laden (MIT Permission-Filterung!)
                     const userId = res.locals.user?.id || null;
@@ -503,6 +560,9 @@ module.exports = async (req, res, next) => {
                     } else {
                         res.locals.guildNav = mainMenu;
                     }
+
+                    await zaehlerNachtragen(res.locals.guildNav, navGuildId2,
+                                            pluginManager, Logger);
 
                 } else {
                     res.locals.guildNav = [];

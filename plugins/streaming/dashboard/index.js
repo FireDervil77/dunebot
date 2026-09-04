@@ -429,6 +429,27 @@ class StreamingDashboardPlugin extends DashboardPlugin {
         await this._registerNavigation(guildId);
     }
 
+    /**
+     * Zaehler fuer die Seitenleiste (P10).
+     *
+     * Der Vertrag steht in `apps/dashboard/middlewares/context/base.middleware.js`:
+     * `{ '<url>': <zahl> }`, und gefragt wird nur, wer die Methode hat.
+     *
+     * **Nur "Kanaele" bekommt eine Zahl**, und das ist keine Sparsamkeit,
+     * sondern der Bestand: Nachgesehen, welche Tabellen es gibt — es gibt
+     * keine fuer Befehle. Der Entwurf zeigt dort "Meine Befehle 0"; eine 0
+     * aus einer Tabelle, die es nicht gibt, waere eine erfundene Auskunft.
+     * Die Zahl kommt, wenn die Befehle kommen (Stufe 15).
+     *
+     * @param {string} guildId Discord-Guild-ID
+     * @returns {Promise<Object>} Zaehler je Menue-Adresse
+     */
+    async navigationZaehler(guildId) {
+        const { anzahlStreamer } = require('../shared/models');
+        const basis = `/guild/${guildId}/plugins/streaming`;
+        return { [`${basis}/streamer`]: await anzahlStreamer(guildId) };
+    }
+
     async _registerNavigation(guildId) {
         const Logger = ServiceManager.get('Logger');
         const navigationManager = ServiceManager.get('navigationManager');
