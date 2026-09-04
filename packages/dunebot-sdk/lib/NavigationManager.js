@@ -178,7 +178,7 @@ class NavigationManager {
             
             // Alle bestehenden Navigations-Items für dieses Plugin in dieser Guild laden
             const existing = await dbService.query(
-                "SELECT url, parent, type FROM guild_nav_items WHERE plugin = ? AND guildId = ?",
+                "SELECT id, url, parent, type, sort_order, title, icon, abschnitt, capability FROM guild_nav_items WHERE plugin = ? AND guildId = ?",
                 [pluginName, guildId]
             );
             
@@ -186,6 +186,58 @@ class NavigationManager {
             const existingKeys = new Set(
                 existing.map(item => `${item.type}|${item.parent || 'NULL'}|${item.url}`)
             );
+            const existingByKey = new Map(
+                existing.map(item => [`${item.type}|${item.parent || 'NULL'}|${item.url}`, item])
+            );
+
+            // ================================================================
+            // Bestehende Punkte nachziehen — "überspringen" hiess bisher
+            // "einfrieren"
+            // ================================================================
+            //
+            // Ein Punkt, den es schon gibt, wurde uebersprungen. Damit war
+            // alles, was das Plugin an ihm erklaert — Platz, Aufschrift,
+            // Symbol, Abschnitt, Recht — nach dem ersten Anlegen unveraenderlich.
+            //
+            // Am 2026-09-04 gemessen: Zehn Plugins bekamen feste Plaetze, und
+            // in der Tabelle stand danach trotzdem `gameserver` auf 5000
+            // (Zeile vom 20. August) statt auf 4500 — und kollidierte mit
+            // `automod`, das neu angelegt worden war.
+            //
+            // **`sort_order` nur, wenn das Plugin ihn AUSDRUECKLICH nennt.**
+            // Wer `order: null` schreibt, bekommt die Nummer beim Anlegen
+            // zugeteilt; die bei jedem Start neu zu berechnen hiesse, den Punkt
+            // bei jedem Start woanders hinzustellen. Was erklaert ist, gewinnt.
+            // Was offen gelassen wurde, bleibt.
+            const nachzuziehen = [];
+            for (const item of navItems) {
+                const key = `${item.type || this.menuTypes.MAIN}|${item.parent || 'NULL'}|${item.url || item.path}`;
+                const alt = existingByKey.get(key);
+                if (!alt) continue;
+
+                const felder = {};
+                if (item.title      != null && item.title      !== alt.title)      felder.title = item.title;
+                if (item.icon       != null && item.icon       !== alt.icon)       felder.icon = item.icon;
+                if (item.abschnitt  !== undefined && (item.abschnitt || null) !== alt.abschnitt) felder.abschnitt = item.abschnitt || null;
+                if (item.capability != null && item.capability !== alt.capability) felder.capability = item.capability;
+
+                const erklaert = Number(item.order);
+                if (Number.isFinite(erklaert) && erklaert >= 1000 && erklaert !== Number(alt.sort_order)) {
+                    felder.sort_order = erklaert;
+                }
+                if (Object.keys(felder).length) nachzuziehen.push([alt.id, felder]);
+            }
+
+            for (const [id, felder] of nachzuziehen) {
+                const spalten = Object.keys(felder);
+                await dbService.query(
+                    `UPDATE guild_nav_items SET ${spalten.map(s => `\`${s}\` = ?`).join(', ')} WHERE id = ?`,
+                    [...spalten.map(s => felder[s]), id]
+                );
+            }
+            if (nachzuziehen.length) {
+                Logger.debug(`[NavigationManager] ${nachzuziehen.length} bestehende Punkte von ${pluginName} nachgezogen`);
+            }
             
             // Nur neue Items filtern (die noch nicht existieren)
             const newItems = navItems.filter(item => {

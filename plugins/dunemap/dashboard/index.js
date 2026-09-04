@@ -980,7 +980,12 @@ class DuneMapPlugin extends DashboardPlugin {
                 title: 'dunemap:NAV.DUNEMAP',
                 path: `/guild/${guildId}/plugins/dunemap`,
                 icon: 'fa-solid fa-map',
-                order: null,
+                // **Fester Platz** (2026-09-04) — vorher `order: null`, und damit
+                // die naechste freie Stufe aus der Reihenfolge der Registrierung.
+                // In zwei Guilds landete der Punkt dadurch auf 1000, dem Platz
+                // des Kern-Dashboards. 3500 liegt zwischen dem Kern (bis 3000)
+                // und den uebrigen Plugins (ab 4000).
+                order: 3500,
                 type: 'main',
                 visible: true,
                 capability: 'DUNEMAP.VIEW' // ✅ UPPERCASE!
