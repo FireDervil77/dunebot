@@ -22,7 +22,12 @@
 <head>
     <%- includePartial('guild/header') %>
 </head>
-<body>
+<%# `layout-boxed` ist Tablers eigene Klasse fuer das eingefasste Blatt: Sie
+    zentriert `.page`, begrenzt die Breite und gibt ihr Rand, Rundung und
+    Flaeche. Was sie NICHT kennt, ist die Seitenleiste — die ergaenzt
+    `guild.css`. Nachgezaehlt: Tabler hat genau zwei Layout-Klassen,
+    `layout-boxed` und `layout-fluid`, und keine Vorlage fuer beides. %>
+<body class="layout-boxed">
 
 <a href="#content" class="visually-hidden skip-link">Zum Inhalt springen</a>
 

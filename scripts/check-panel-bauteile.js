@@ -259,9 +259,37 @@ pruefe('Zwischen `.page` und der Seitenleiste steht kein weiteres Element',
     + '`.page > .navbar-vertical` greift dann nicht mehr.');
 
 const blattCss = ohneKommentare(lies(CSS));
+
+pruefe('Der `body` traegt Tablers `layout-boxed`',
+    /<body[^>]*class="[^"]*\blayout-boxed\b/.test(layout),
+    'Ohne die Klasse gibt es kein Blatt — Zentrierung, Breite, Rand und '
+    + 'Rundung kommen von Tabler und haengen alle daran.');
+
 pruefe('Tablers `position: fixed` an der Seitenleiste ist zurueckgenommen',
     /\.page > \.navbar-vertical\s*\{[^}]*position:\s*static/.test(blattCss),
     'Ohne das klebt die Leiste am Fensterrand, neben dem Kasten.');
+
+// **Der Versatz an den Geschwistern — der Fehler, den ein Bild gefunden hat.**
+//
+// Tabler haelt den Platz fuer die fixierte Leiste nicht an `.page` frei,
+// sondern an allem, was HINTER ihr steht:
+//
+//     .navbar-expand-lg.navbar-vertical ~ .navbar,
+//     .navbar-expand-lg.navbar-vertical ~ .page-wrapper { margin-left: 15rem }
+//
+// Drei Klassen. Der erste Anlauf schrieb `margin-left: 0` an
+// `.page > .page-wrapper` — zwei Klassen, und damit wirkungslos. Kopfleiste
+// und Inhalt standen 240px zu weit rechts, im Raster ein zweites Mal.
+//
+// Geprueft wird der Selektor MIT seiner Spezifitaet: `.navbar-expand-lg` muss
+// darin vorkommen, sonst gewinnt er nicht.
+for (const geschwister of ['header\\.navbar', '\\.page-wrapper']) {
+    const muster = new RegExp(
+        `\\.page > \\.navbar-vertical\\.navbar-expand-lg ~ ${geschwister}`);
+    pruefe(`Der 15rem-Versatz ist zurueckgenommen (${geschwister.replace(/\\/g, '')})`,
+        muster.test(blattCss),
+        'Ohne `.navbar-expand-lg` im Selektor bleibt Tablers Regel staerker.');
+}
 
 /**
  * Dateien, die bewusst NICHT geladen werden.
