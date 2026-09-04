@@ -149,10 +149,28 @@
 }
 
 /* ── Fussleiste der Einstellungskarte ───────────────────────────────────── */
+/*
+   **Sie klebt unten** (2026-09-04). Der Knopf erscheint erst, wenn sich etwas
+   geaendert hat — „erst zaehlen, dann speichern", und das bleibt richtig. Nur
+   erschien er bisher am ENDE der Karte: In der fachlichen Hoehe stehen dort
+   alle Einstellungen des Pakets untereinander, und wer oben ein Feld aendert,
+   sieht unten nichts. Gemeldet als „es gibt keinen Knopf zum Speichern" — und
+   genau so fuehlt es sich an, wenn man ihn nie zu Gesicht bekommt.
+
+   Der eigene Hintergrund ist noetig, weil die Leiste sonst ueber dem Text
+   liegt, der unter ihr durchlaeuft. `z-index` haelt sie ueber den Feldern.
+*/
 .fb-fuss {
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--fb-border);
   font-size: 13px;
+
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  padding-bottom: 14px;
+  margin-bottom: -14px;
+  background: var(--fb-surface-bg);
 }
 
 /* ── Spielauswahl beim Anlegen (Artboard 5a) ────────────────────────────── */
