@@ -974,7 +974,18 @@ class GameserverPlugin extends DashboardPlugin {
             );
             
             // 2. Crash-Log speichern
-            const crashTime = timestamp ? timestamp / 1000 : Date.now() / 1000;
+            //
+            // **Der Daemon schickt SEKUNDEN.** Hier stand `timestamp / 1000` —
+            // ein zweites Teilen, und jeder Absturz landete im Januar 1970.
+            // Am 2026-09-05 an den beiden Zeilen von Server 182 gesehen:
+            // gespeichert 1970-01-21T16:49:26, gemeint 2026-09-05T00:09:26.
+            //
+            // Geraten wird die Einheit nicht, sie wird erkannt: Ein Wert ueber
+            // 1e11 kann keine Sekundenzahl sein (das waere das Jahr 5138), also
+            // sind es Millisekunden. So bleibt die Stelle richtig, falls ein
+            // spaeterer Daemon die andere Einheit schickt.
+            const roh = Number(timestamp) || (Date.now() / 1000);
+            const crashTime = roh > 1e11 ? roh / 1000 : roh;
             await dbService.query(
                 `INSERT INTO gameserver_crash_logs 
                  (server_id, daemon_id, error_message, timestamp) 
