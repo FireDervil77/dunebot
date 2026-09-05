@@ -321,13 +321,27 @@ async function auswerten(kanal) {
         rest: zerlegt.rest
     };
 
-    const text = zeile.art === 'fertig'
+    const roh = zeile.art === 'fertig'
         ? (FERTIG[zeile.wort] ? FERTIG[zeile.wort].antwort(kontext) : null)
         : fuellen(zeile.antwort, kontext);
 
+    // **Derselbe Aufraeumer wie bei der Live-Ansage, und aus zwei Gruenden.**
+    //
+    // Der erste ist das Eingabefeld: Es ist ein `<textarea>` und laedt zu
+    // mehreren Zeilen ein — der Twitch-Chat kennt aber keine. Am 2026-09-05
+    // ging der erste echte `!regeln` mit vier `\r\n` hinaus, und was Twitch
+    // damit macht, ist nirgends zugesagt. Sich darauf zu verlassen waere eine
+    // Wette.
+    //
+    // Der zweite sind die Loecher, die leere Platzhalter hinterlassen:
+    // `{spiel} ({titel})` wird offline zu `spielt  ()`. Genau dafuer gibt es
+    // `saubern` seit der Live-Ansage — ein zweiter Aufraeumer daneben waere
+    // dieselbe Naht noch einmal.
+    const text = require('../ausgabe/chatansage').saubern(roh || '');
+
     // Ein leerer Satz ist kein Satz — dieselbe Regel wie bei der Live-Ansage.
     // Twitch wiese ihn ab, und der Fehlertext waere kryptisch.
-    if (!text || !String(text).trim()) {
+    if (!text) {
         return `${PRAEFIX}${zeile.wort}: die Antwort ist leer`;
     }
 
@@ -335,7 +349,7 @@ async function auswerten(kanal) {
     // koennte ein dauerhaft fehlschlagender Befehl beliebig oft anlaufen.
     zuletzt.set(zeile.id, jetzt);
 
-    const gesendet = await senden(streamer, String(text).slice(0, 500));
+    const gesendet = await senden(streamer, text.slice(0, 500));
 
     // Summe ohne Person. Sie steht bewusst NACH dem Senden: Ein Befehl, der
     // nicht hinausging, wurde nicht benutzt.

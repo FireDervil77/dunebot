@@ -321,8 +321,26 @@ console.log('\nEigene Befehle fuellen ihre Platzhalter');
 
     neuAufsetzen([{ wort: 'shoutout', antwort: 'Schaut bei {rest} vorbei!' }]);
     await befehle.auswerten(nachricht('!shoutout'));
-    pruefe(mitschrift.gesendet[0]?.text === 'Schaut bei  vorbei!',
-        'ohne Argument bleibt die Stelle leer', mitschrift.gesendet[0]?.text);
+    pruefe(mitschrift.gesendet[0]?.text === 'Schaut bei vorbei!',
+        'ohne Argument bleibt kein doppeltes Leerzeichen stehen', mitschrift.gesendet[0]?.text);
+
+    // --- Der Chat ist einzeilig, das Eingabefeld nicht ---------------------
+    // Ein `<textarea>` laedt zu Listen ein; Twitch kennt keine Zeilen. Was es
+    // mit einem `\n` macht, ist nirgends zugesagt — also gehen keine hinaus.
+    neuAufsetzen([{ wort: 'regeln', antwort: '- nett sein\r\n- zuhoeren\r\n- Spass haben' }]);
+    await befehle.auswerten(nachricht('!regeln'));
+    {
+        const t = mitschrift.gesendet[0]?.text || '';
+        pruefe(!/[\r\n]/.test(t), 'kein Zeilenumbruch geht in den Chat hinaus', JSON.stringify(t));
+        pruefe(/zuhoeren/.test(t) && /Spass haben/.test(t),
+            'und es geht dabei nichts vom Text verloren', t);
+    }
+
+    // Leerraum am Rand darf den Satz nicht laenger aussehen lassen als er ist.
+    neuAufsetzen([{ wort: 'x', antwort: '   Hallo    Welt   ' }]);
+    await befehle.auswerten(nachricht('!x'));
+    pruefe(mitschrift.gesendet[0]?.text === 'Hallo Welt',
+        'mehrfacher Leerraum wird zu einem', JSON.stringify(mitschrift.gesendet[0]?.text));
 
     neuAufsetzen([{ wort: 'lang', antwort: 'x'.repeat(900) }]);
     await befehle.auswerten(nachricht('!lang'));
