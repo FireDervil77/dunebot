@@ -42,6 +42,21 @@
  * `zustand`: 'entwurf' (nichts davon steht) oder 'halb' (ein Teil laeuft
  * bereits woanders).
  *
+ * `gebaut`: Ist es gebaut, steht hier das Datum — und der Eintrag wird **nicht
+ * mehr gerendert**. Der Router ueberspringt ihn, die Seite hat eine eigene
+ * Route.
+ *
+ * **Warum der Eintrag dann nicht geloescht wird.** Er ist der Bauplan, gegen
+ * den geliefert wurde: was die Seite koennen sollte, was schon lag, was
+ * fehlte. Ihn zu entfernen hiesse, den Massstab wegzuwerfen, sobald man ihn
+ * erfuellt hat — und beim naechsten Zweifel („war das ueberhaupt gemeint?")
+ * steht nichts mehr da. Streichen heisst vergessen; hier wird umetikettiert.
+ *
+ * Der Preis ist ehrlich zu nennen: Diese Eintraege liest niemand mehr. Sie
+ * sind Text fuer Menschen, nicht Daten fuer den Router - und `namen()` gibt
+ * sie weiterhin aus, damit der Router sie ueberspringen KANN statt sie nicht
+ * zu kennen.
+ *
  * **Kein `recht` hier.** Es stand kurz in dieser Tabelle und wurde wieder
  * entfernt: Ein Recht, das aus Daten kommt, ist am Router nicht mehr ablesbar
  * — `scripts/check-streaming-rechte.js` hat es prompt als fehlend gemeldet.
@@ -50,6 +65,7 @@
 const SEITEN = {
 
     befehle: {
+        gebaut: '2026-09-05',   // Stufe 15 — eigene Route, eigene Ansicht
         icon: 'fa-solid fa-terminal',
         titel: 'Meine Befehle',
         untertitel: 'Was der Bot antwortet, wenn jemand etwas in deinen Chat tippt',
@@ -115,6 +131,7 @@ const SEITEN = {
     },
 
     ansagen: {
+        gebaut: '2026-09-05',   // P6 — Timer-Ansagen, eigene Route, eigene Ansicht
         icon: 'fa-solid fa-clock',
         titel: 'Meine Ansagen',
         untertitel: 'Was der Bot von sich aus in deinen Chat schreibt — unter deinem Namen',

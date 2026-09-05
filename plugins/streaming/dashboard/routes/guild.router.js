@@ -192,10 +192,11 @@ router.get('/', requirePermission('STREAMING.VIEW'), async (req, res) => {
 // Alle fuenf Entwurfsseiten gehoeren dem Kanalinhaber, also tragen alle
 // dasselbe Recht.
 require('../entwuerfe').namen()
-    // `befehle` ist seit Stufe 15 keine Entwurfsseite mehr — eigene Route
-    // weiter unten. Der Eintrag bleibt in `entwuerfe.js` stehen, weil er die
-    // Beschreibung und den Hinweis traegt, die dort gepflegt werden.
-    .filter(name => name !== 'befehle')
+    // **Gebaute Seiten haben eigene Routen — der Entwurf wird uebersprungen.**
+    // Die Liste steht nicht hier, sondern am Eintrag selbst (`gebaut`): Ein
+    // Name mehr in einem `!==`-Vergleich waere die zweite Stelle, an der
+    // dasselbe entschieden wird, und die zweite vergisst man.
+    .filter(name => !require('../entwuerfe').seite(name).gebaut)
     .forEach((name) => {
     const daten = require('../entwuerfe').seite(name);
 
@@ -615,6 +616,89 @@ router.post('/befehle/:id/entfernen', requirePermission('STREAMING.CHAT.MANAGE')
         return res.redirect(`${zurueck}?${getroffen ? 'ok=entfernt' : 'fehler=weg'}`);
     } catch (error) {
         ServiceManager.get('Logger').error('[Streaming] Befehl entfernen', error);
+        return res.redirect(`${zurueck}?fehler=technisch`);
+    }
+});
+
+// =====================================================
+// Meine Ansagen (P6) — was der Bot von sich aus sagt
+// =====================================================
+
+/** @returns {Object} Ansagenmodul */
+function ansagenModul() {
+    return require('../kern/ansagen');
+}
+
+router.get('/ansagen', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const tr = makeTranslator(req, res);
+    try {
+        // Dieselbe Tuer wie bei den Befehlen: Ansagen gehen in den eigenen
+        // Chat, und den gibt es nur in der Heim-Guild.
+        if (!await require('../kern/heimguild').istHeim(guildId)) {
+            return res.redirect(`/guild/${guildId}/plugins/streaming`);
+        }
+
+        const [zeilen, kanaele] = await Promise.all([
+            ansagenModul().alleFuerGuild(guildId),
+            require('../kern/heimguild').kanaeleDerGuild(guildId)
+        ]);
+
+        await renderView(res, 'guild/streaming-ansagen', {
+            tr, guildId, kanaele, ansagen: zeilen,
+            GRENZEN: {
+                intervallMin: ansagenModul().INTERVALL_MIN,
+                intervallMax: ansagenModul().INTERVALL_MAX,
+                zeilenMax:    ansagenModul().ZEILEN_MAX
+            },
+            PLATZHALTER: require('../../shared/vorlagen').PLATZHALTER_CHAT,
+            vorWieLange,
+            meldung: req.query.ok || null,
+            fehler: req.query.fehler || null
+        });
+    } catch (error) {
+        return renderFehler(res, error, 'Die Ansagen konnten nicht geladen werden');
+    }
+});
+
+router.post('/ansagen', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const zurueck = `/guild/${guildId}/plugins/streaming/ansagen`;
+    try {
+        const ergebnis = await ansagenModul().anlegen(
+            guildId, await heimKanalId(guildId), req.body, res.locals.user?.id);
+        return res.redirect(`${zurueck}?${ergebnis.ok ? 'ok=neu' : 'fehler=' + ergebnis.grund}`);
+    } catch (error) {
+        ServiceManager.get('Logger').error('[Streaming] Ansage anlegen', error);
+        return res.redirect(`${zurueck}?fehler=technisch`);
+    }
+});
+
+router.post('/ansagen/:id', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const zurueck = `/guild/${guildId}/plugins/streaming/ansagen`;
+    try {
+        const ergebnis = await ansagenModul().aendern(req.params.id, guildId, {
+            text:           req.body.text,
+            intervall_min:  req.body.intervall_min,
+            mindest_zeilen: req.body.mindest_zeilen,
+            aktiv:          req.body.aktiv ? 1 : 0
+        });
+        return res.redirect(`${zurueck}?${ergebnis.ok ? 'ok=gespeichert' : 'fehler=' + (ergebnis.grund || 'weg')}`);
+    } catch (error) {
+        ServiceManager.get('Logger').error('[Streaming] Ansage aendern', error);
+        return res.redirect(`${zurueck}?fehler=technisch`);
+    }
+});
+
+router.post('/ansagen/:id/entfernen', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const zurueck = `/guild/${guildId}/plugins/streaming/ansagen`;
+    try {
+        const getroffen = await ansagenModul().entfernen(req.params.id, guildId);
+        return res.redirect(`${zurueck}?${getroffen ? 'ok=entfernt' : 'fehler=weg'}`);
+    } catch (error) {
+        ServiceManager.get('Logger').error('[Streaming] Ansage entfernen', error);
         return res.redirect(`${zurueck}?fehler=technisch`);
     }
 });

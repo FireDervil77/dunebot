@@ -271,8 +271,43 @@ async function chatAnsageSenden(auftrag) {
     const s = zeilen[0];
     if (!s) return { ok: false, fehler: 'Der Kanal ist nicht mehr eingetragen', endgueltig: true };
 
-    // Der Schalter. Zwischen Vormerken und jetzt umgelegt heisst: nicht senden.
-    if (!Number(s.chat_ansage_an)) {
+    // **Zwei Absender, ein Weg (P6).** Ohne `ansage_id` ist es die Live-Ansage
+    // aus `chat_ansage_text`; mit ihr eine Timer-Ansage aus
+    // `streaming_announcements`. Alles danach - Inhaber, Schluessel, Fuellen,
+    // die drei Arten zu scheitern - ist fuer beide dasselbe, und genau deshalb
+    // steht es hier nur einmal. Ein zweiter Sender daneben waere die Naht, an
+    // der am 2026-09-05 schon `s.plattform` und `{spiel}` haengengeblieben
+    // sind.
+    let vorlage = s.chat_ansage_text;
+    let ansageZeile = null;
+
+    if (nutzlast.ansage_id) {
+        const ansagen = await db().query(
+            'SELECT id, text, aktiv FROM streaming_announcements WHERE id = ?',
+            [nutzlast.ansage_id]);
+        ansageZeile = ansagen[0];
+
+        // Zwischen Vormerken und jetzt geloescht: kein Fehler, sondern eine
+        // Entscheidung des Streamers.
+        if (!ansageZeile) {
+            return { ok: true, fehler: null, endgueltig: true, hinweis: 'Ansage inzwischen geloescht' };
+        }
+        if (!Number(ansageZeile.aktiv)) {
+            return { ok: true, fehler: null, endgueltig: true, hinweis: 'Ansage inzwischen abgeschaltet' };
+        }
+
+        // **Leer heisst hier nicht „nimm den Standard".** `chatansage.ansage`
+        // faellt bei leerer Vorlage auf `VORGABE_CHAT` zurueck - richtig fuer
+        // die Live-Ansage, falsch hier: Der Chat bekaeme alle 25 Minuten
+        // „Ich bin jetzt live!" zu lesen.
+        if (!String(ansageZeile.text || '').trim()) {
+            return { ok: false, fehler: 'Die Ansage hat keinen Text', endgueltig: true };
+        }
+        vorlage = ansageZeile.text;
+
+    } else if (!Number(s.chat_ansage_an)) {
+        // Der Schalter der Live-Ansage. Zwischen Vormerken und jetzt umgelegt
+        // heisst: nicht senden.
         return { ok: true, fehler: null, endgueltig: true, hinweis: 'Ansage inzwischen abgeschaltet' };
     }
 
@@ -290,7 +325,7 @@ async function chatAnsageSenden(auftrag) {
     const text = chatansage.ansage({
         streamer: s,
         zustand: { titel: s.titel, kategorie: s.kategorie },
-        vorlage: s.chat_ansage_text
+        vorlage
     });
 
     // Ein leerer Satz ist kein Satz. Er entsteht, wenn die Vorlage aus nichts
@@ -329,9 +364,21 @@ async function chatAnsageSenden(auftrag) {
         return { ok: false, fehler: `Twitch hat die Ansage nicht zugestellt: ${ergebnis.grund}`, endgueltig: true };
     }
 
+    // **Die Summe steht NACH dem Senden**, wie bei den Befehlen: Eine Ansage,
+    // die nicht hinausging, wurde nicht gesagt. `zuletzt_am` dagegen wurde
+    // schon beim Vormerken gesetzt - sonst liefe eine abgelehnte Ansage im
+    // Minutentakt wieder an.
+    if (ansageZeile) {
+        await db().query(
+            'UPDATE streaming_announcements SET gesendet_anzahl = gesendet_anzahl + 1 WHERE id = ?',
+            [ansageZeile.id]);
+    }
+
     return {
         ok: true, fehler: null, endgueltig: false,
-        hinweis: nutzlast.probe ? 'Probe im Chat gesendet' : 'Ansage im Chat gesendet'
+        hinweis: nutzlast.probe ? 'Probe im Chat gesendet'
+               : ansageZeile ? 'Timer-Ansage im Chat gesendet'
+               : 'Ansage im Chat gesendet'
     };
 }
 

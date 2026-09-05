@@ -868,6 +868,17 @@ function starten() {
     uhren.push(setInterval(() => posteingangLauf().catch(() => {}), TAKT_MS));
     uhren.push(setInterval(() => anreicherungsLauf().catch(() => {}), ANREICHERN_MS));
     uhren.push(setInterval(() => tagesLauf().catch(() => {}), TAG_MS));
+
+    // **Die Timer-Ansagen (P6).** Eigener Takt statt im Posteingangslauf
+    // mitzulaufen: Der Posteingang schlaegt alle 5 Sekunden an, Ansagen werden
+    // in Minuten gerechnet. Ihn mitzubenutzen hiesse, zwoelfmal je Minute eine
+    // Frage zu stellen, deren Antwort sich fruehestens nach fuenf Minuten
+    // aendern kann.
+    //
+    // `.catch` wie bei den anderen: Ein Lauf, der stolpert, darf die Uhr nicht
+    // anhalten - sonst bliebe es nach dem ersten Fehler fuer immer still.
+    uhren.push(setInterval(() => ansagenLauf().catch(() => {}), ansagen().LAUF_MS));
+
     uhren.forEach(u => u.unref?.());
 
     // **Einmal beim Start, aber nicht sofort.** Ein Abgleich in der ersten
@@ -879,7 +890,43 @@ function starten() {
     uhren.push(ersterLauf);
 
     log().info(`[Streaming] Takt gestartet (Posteingang ${TAKT_MS / 1000} s, ` +
-        `Anreicherung ${ANREICHERN_MS / 1000} s, Abgleich alle ${TAG_MS / 3600000} h)`);
+        `Anreicherung ${ANREICHERN_MS / 1000} s, Ansagen ${ansagen().LAUF_MS / 1000} s, ` +
+        `Abgleich alle ${TAG_MS / 3600000} h)`);
+}
+
+/**
+ * Das Ansagenmodul, spaet geholt.
+ *
+ * Es zieht den Conduit nach sich; ein `require` am Kopf machte den Takt von
+ * der Leitung abhaengig - und der Takt laeuft auch dann, wenn sie steht.
+ *
+ * @returns {Object} Ansagenmodul
+ */
+function ansagen() {
+    return require('./ansagen');
+}
+
+/** Ueberlappungsschutz: Ein Lauf, der haengt, darf sich nicht stapeln. */
+let ansagenLaeuft = false;
+
+/**
+ * Ein Durchgang der Timer-Ansagen.
+ *
+ * **Der Riegel ist nicht theoretisch.** Der Lauf fragt die Datenbank und legt
+ * Auftraege an; bei einer langsamen Verbindung kann er laenger dauern als eine
+ * Minute. Zwei Laeufe zugleich saehen dieselbe faellige Ansage und legten sie
+ * doppelt in den Ausgang - im Chat stuende sie zweimal.
+ *
+ * @returns {Promise<void>}
+ */
+async function ansagenLauf() {
+    if (ansagenLaeuft) return;
+    ansagenLaeuft = true;
+    try {
+        await ansagen().lauf();
+    } finally {
+        ansagenLaeuft = false;
+    }
 }
 
 /**
@@ -962,4 +1009,4 @@ function anhalten() {
     uhren = [];
 }
 
-module.exports = { TAKT_MS, ANREICHERN_MS, ANSAGE_WARTEN_MS, TAG_MS, alsDatum, starten, anhalten, posteingangLauf, anreicherungsLauf, tagesLauf, rollenAuffaechern, chatAnsageVormerken, verarbeiten };
+module.exports = { TAKT_MS, ANREICHERN_MS, ANSAGE_WARTEN_MS, TAG_MS, alsDatum, starten, anhalten, posteingangLauf, anreicherungsLauf, ansagenLauf, tagesLauf, rollenAuffaechern, chatAnsageVormerken, verarbeiten };

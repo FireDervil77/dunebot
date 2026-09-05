@@ -1,0 +1,257 @@
+<%
+/**
+ * Meine Ansagen (P6) — was der Bot von sich aus in den Chat schreibt.
+ *
+ * **Die Seite hat zwei Teile, und der erste ist keine Attrappe.** Die
+ * Live-Ansage steht schon und wird woanders bedient („Mein Kanal"); hier steht
+ * nur der Verweis darauf. Was auf dieser Seite gebaut wird, sind die
+ * Timer-Ansagen — die Sorte, die während des Streams wiederkehrt.
+ *
+ * Erwartet: ansagen, kanaele, GRENZEN, PLATZHALTER, vorWieLange, meldung, fehler
+ */
+const darfAendern = typeof hasPermission === 'function' && hasPermission('STREAMING.CHAT.MANAGE');
+
+const fehlerTexte = {
+  text:        'Ohne Text hätte die Ansage nichts zu sagen.',
+  zu_lang:     'Der Twitch-Chat nimmt höchstens 500 Zeichen.',
+  platzhalter: 'Da steht ein Platzhalter, den es nicht gibt — er stünde wörtlich im Chat.',
+  nur_discord: '{rolle} und {dauer} gehen nur in Discord, nicht im Twitch-Chat.',
+  intervall:   `Der Abstand muss zwischen ${GRENZEN.intervallMin} und ${GRENZEN.intervallMax} Minuten liegen.`,
+  zeilen:      `Die Zahl der Chatzeilen muss zwischen 0 und ${GRENZEN.zeilenMax} liegen.`,
+  kanal:       'Zu dieser Guild gehört kein Kanal, in dessen Chat der Bot schreiben dürfte.',
+  weg:         'Diese Ansage gibt es nicht mehr.',
+  technisch:   'Das hat technisch nicht geklappt. Der Grund steht im Protokoll.'
+};
+const meldungen = {
+  neu:         'Ansage angelegt. Sie geht beim nächsten Stream hinaus.',
+  gespeichert: 'Gespeichert.',
+  entfernt:    'Ansage entfernt.'
+};
+%>
+
+<%- include('partials/streaming-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-clock',
+  titel: 'Meine Ansagen',
+  beschreibung: 'Was der Bot von sich aus in deinen Chat schreibt — unter deinem Namen.',
+  aktion: darfAendern
+    ? '<button class="btn btn-primary" type="button" data-bs-toggle="collapse" '
+      + 'data-bs-target="#ansage-anlegen">Ansage anlegen</button>'
+    : ''
+}) %>
+
+<% if (meldung && meldungen[meldung]) { %>
+  <div class="alert alert-success"><%= meldungen[meldung] %></div>
+<% } %>
+<% if (fehler) { %>
+  <div class="alert alert-danger"><%= fehlerTexte[fehler] || fehlerTexte.technisch %></div>
+<% } %>
+
+<div class="row row-cards">
+
+  <%# ── Wann eine Ansage wirklich hinausgeht ──────────────────────────────
+      Steht oben, weil es die häufigste Rückfrage beantwortet: „Warum kommt
+      nichts?" Vier Bedingungen, und drei davon kann der Streamer sehen. %>
+  <div class="col-12">
+    <div class="erklaerkarte">
+      <h3>Wann eine Ansage hinausgeht</h3>
+      <p>
+        Nur <b>während du sendest</b> — in einen leeren Chat schreibt der Bot nichts.
+        Dann, wenn seit der letzten Ansage <b>genug Zeit</b> vergangen ist und
+        <b>genug im Chat los war</b>. Die zweite Bedingung ist der Unterschied zwischen
+        einem Bot und einem Automaten: Steht die Zahl auf 0, redet er auch in die Stille.
+      </p>
+      <p>
+        Läuft mehr als eine Ansage gleichzeitig ab, geht <b>eine pro Durchgang</b> hinaus —
+        die, die am längsten nicht dran war. Sonst käme ein Block auf einmal.
+      </p>
+    </div>
+  </div>
+
+  <%# ── Die Live-Ansage: steht schon, wird woanders bedient ─────────────── %>
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body d-flex flex-wrap align-items-center gap-3">
+        <span class="kartensymbol kartensymbol--steht"><i class="fa-solid fa-tower-broadcast"></i></span>
+        <div class="flex-fill">
+          <strong>Wenn ich live gehe</strong>
+          <div class="text-secondary">
+            Die einmalige Ansage zum Streamstart gibt es schon — sie wird unter
+            „Mein Kanal“ eingestellt, weil sie zum Kanal gehört und nicht zu dieser Liste.
+          </div>
+        </div>
+        <a class="btn btn-sm" href="/guild/<%= guildId %>/plugins/streaming/chatbot">Mein Kanal</a>
+      </div>
+    </div>
+  </div>
+
+  <%# ── Anlegen ──────────────────────────────────────────────────────────── %>
+  <% if (darfAendern) { %>
+    <div class="col-12 collapse <%= (ansagen || []).length ? '' : 'show' %>" id="ansage-anlegen">
+      <div class="card">
+        <div class="card-header">
+          <div class="kartenkopf">
+            <span class="kartensymbol"><i class="fa-solid fa-plus"></i></span>
+            <div class="kartenkopf__text">
+              <h3 class="kartenkopf__titel">Ansage anlegen</h3>
+              <div class="kartenkopf__satz">
+                Dein Discord, dein YouTube, deine Regeln — was während des Streams
+                wiederkehren soll.
+              </div>
+            </div>
+          </div>
+        </div>
+        <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/ansagen">
+          <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+          <div class="card-body">
+            <div class="zeilen">
+
+              <div class="zeile">
+                <div class="zeile__bez">Text</div>
+                <div>
+                  <textarea class="form-control" name="text" rows="2" required maxlength="500"
+                            placeholder="Komm auf meinen Discord: …"></textarea>
+                  <%# Aus `PLATZHALTER_CHAT` von `shared/vorlagen.js` — dieselbe
+                      Liste, die auch die Live-Ansage prüft. Eine Kopie hier wäre
+                      beim nächsten neuen Platzhalter still veraltet. %>
+                  <div class="chips mt-2">
+                    <% PLATZHALTER.forEach(p => { %>
+                      <span class="chip mono" title="<%= p.bedeutung %>"><%= p.name %></span>
+                    <% }); %>
+                  </div>
+                  <div class="text-secondary small mt-1">
+                    <i class="fa-solid fa-circle-info me-1"></i>
+                    Eine Chatnachricht ist <b>eine Zeile</b> — Umbrüche werden zu Leerzeichen.
+                  </div>
+                </div>
+              </div>
+
+              <div class="zeile">
+                <div class="zeile__bez">Abstand</div>
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                  <div class="input-group" style="max-width:10rem">
+                    <input type="number" class="form-control" name="intervall_min"
+                           min="<%= GRENZEN.intervallMin %>" max="<%= GRENZEN.intervallMax %>"
+                           step="1" value="25" required>
+                    <span class="input-group-text">Min.</span>
+                  </div>
+                  <span class="text-secondary small">
+                    Mindestens <%= GRENZEN.intervallMin %> Minuten — der Bot schreibt mit
+                    einem Konto in alle Kanäle, und Twitch zählt das zusammen.
+                  </span>
+                </div>
+              </div>
+
+              <div class="zeile">
+                <div class="zeile__bez">Nur wenn was los ist</div>
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                  <div class="input-group" style="max-width:10rem">
+                    <input type="number" class="form-control" name="mindest_zeilen"
+                           min="0" max="<%= GRENZEN.zeilenMax %>" step="1" value="0" required>
+                    <span class="input-group-text">Zeilen</span>
+                  </div>
+                  <span class="text-secondary small">
+                    So viele Chatnachrichten müssen seit der letzten Ansage gekommen sein.
+                    <b>0</b> heißt: immer.
+                  </span>
+                </div>
+              </div>
+
+            </div>
+          </div>
+          <div class="card-footer text-end">
+            <button type="submit" class="btn btn-primary">Anlegen</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  <% } %>
+
+  <%# ── Die Liste ────────────────────────────────────────────────────────── %>
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <div class="kartenkopf">
+          <span class="kartensymbol"><i class="fa-solid fa-repeat"></i></span>
+          <div class="kartenkopf__text">
+            <h3 class="kartenkopf__titel">Timer-Ansagen</h3>
+            <div class="kartenkopf__satz">Was während des Streams wiederkehrt.</div>
+          </div>
+        </div>
+      </div>
+
+      <% if (!(ansagen || []).length) { %>
+        <div class="card-body">
+          <%- include('shared/leerzustand', {
+                icon:  'fa-solid fa-clock',
+                titel: 'Noch keine Ansage',
+                text:  'Leg eine an — etwa einen Hinweis auf deinen Discord alle 25 Minuten. '
+                     + 'Sie geht nur hinaus, während du sendest.'
+              }) %>
+        </div>
+      <% } else { %>
+        <div class="card-body">
+          <div class="zeilen">
+            <% ansagen.forEach(a => { %>
+              <%# Ein Formular JE ANSAGE — dieselbe Begründung wie bei den
+                  Befehlen: Ein gemeinsames schickte beim Speichern der einen
+                  die Felder der anderen mit. %>
+              <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/ansagen/<%= a.id %>"
+                    class="zeile">
+                <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+                <div class="zeile__bez">
+                  <span class="chip mono"><%= a.intervall_min %> Min.</span>
+                  <small>
+                    <%= a.gesendet_anzahl %>× gesendet<%
+                      %><% if (a.zuletzt_am) { %>, zuletzt <%= vorWieLange(a.zuletzt_am) %><% } %>
+                  </small>
+                </div>
+                <div>
+                  <textarea class="form-control" name="text" rows="2" maxlength="500"
+                            <%= darfAendern ? '' : 'disabled' %>><%= a.text || '' %></textarea>
+
+                  <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+                    <div class="input-group input-group-sm" style="max-width:9rem">
+                      <input type="number" class="form-control" name="intervall_min"
+                             min="<%= GRENZEN.intervallMin %>" max="<%= GRENZEN.intervallMax %>"
+                             step="1" value="<%= a.intervall_min %>"
+                             <%= darfAendern ? '' : 'disabled' %>>
+                      <span class="input-group-text">Min.</span>
+                    </div>
+
+                    <div class="input-group input-group-sm" style="max-width:10rem">
+                      <input type="number" class="form-control" name="mindest_zeilen"
+                             min="0" max="<%= GRENZEN.zeilenMax %>" step="1"
+                             value="<%= a.mindest_zeilen %>"
+                             <%= darfAendern ? '' : 'disabled' %>>
+                      <span class="input-group-text">Zeilen</span>
+                    </div>
+
+                    <label class="form-check form-switch mb-0">
+                      <input type="checkbox" class="form-check-input" name="aktiv" value="1"
+                             <%= a.aktiv ? 'checked' : '' %> <%= darfAendern ? '' : 'disabled' %>>
+                      <span class="form-check-label">an</span>
+                    </label>
+
+                    <% if (darfAendern) { %>
+                      <button type="submit" class="btn btn-sm btn-primary ms-auto">Speichern</button>
+                    <% } %>
+                  </div>
+                </div>
+              </form>
+
+              <% if (darfAendern) { %>
+                <form method="POST" class="text-end"
+                      action="/guild/<%= guildId %>/plugins/streaming/ansagen/<%= a.id %>/entfernen"
+                      onsubmit="return confirm('Diese Ansage entfernen?');">
+                  <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+                  <button type="submit" class="btn btn-sm btn-ghost-danger">Entfernen</button>
+                </form>
+              <% } %>
+            <% }); %>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
