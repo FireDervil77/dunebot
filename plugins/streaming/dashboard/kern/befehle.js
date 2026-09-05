@@ -159,12 +159,27 @@ function darf(wer, kanal) {
  * @returns {string} gefuellter Text
  */
 function fuellen(vorlage, k) {
+    // **Was nur waehrend des Streams gilt, verschwindet danach.** `{spiel}` und
+    // `{titel}` kamen bis zum 2026-09-05 unbesehen aus `streaming_state` - und
+    // die Tabelle behaelt den letzten Stand, sie leert ihn nicht. Wer offline
+    // einen Befehl tippte, las die Kategorie von gestern als die von jetzt.
+    //
+    // Das ist die Sorte Auskunft, die schlimmer ist als keine: Sie sieht
+    // richtig aus. Der fertige `!spiel` fragt `live` seit jeher ab, `{uptime}`
+    // auch - nur diese beiden nicht. Zwei Wege, eine Frage, verschiedene
+    // Antwort; dieselbe Naht wie zwischen `gewuenschteArten` und `zieleFuer`.
+    //
+    // Leer statt falsch: Ein `Ich spiele {spiel}` liest sich offline dann
+    // unfertig. Das sieht der Streamer und kann es aendern - eine erfundene
+    // Kategorie sieht niemand.
+    const imStream = (wert) => (k.live ? (wert || '') : '');
+
     return String(vorlage || '')
         .replace(/\{streamer\}/g, k.streamer || '')
         .replace(/\{absender\}/g, k.absender || '')
-        .replace(/\{spiel\}/g, k.kategorie || '')
-        .replace(/\{titel\}/g, k.titel || '')
-        .replace(/\{uptime\}/g, k.live ? dauerText(k.seitMs) : '');
+        .replace(/\{spiel\}/g,    imStream(k.kategorie))
+        .replace(/\{titel\}/g,    imStream(k.titel))
+        .replace(/\{uptime\}/g,   imStream(dauerText(k.seitMs)));
 }
 
 /**

@@ -186,7 +186,12 @@ function neuAufsetzen(zeilen = [], live = true, begonnenVorMs = 8100000) {
         id: 1, plattform: 'twitch', login: 'firedervil', anzeigename: 'FireDervil', kanal_id: 'k1',
         heim_guild_id: 'g1', ist_live: live ? 1 : 0,
         titel: 'Erster Versuch', kategorie: 'Astro Colony',
-        begonnen_am: live ? new Date(Date.now() - begonnenVorMs) : null
+        // **Auch offline steht hier ein Datum.** `streaming_state` behaelt den
+        // letzten Stand, statt ihn zu leeren - am 2026-09-05 an der echten
+        // Tabelle nachgesehen: `ist_live` 0, `begonnen_am` von gestern. Eine
+        // Attrappe, die hier `null` setzte, waere nachsichtiger als die
+        // Datenbank und liesse ein vergessenes `k.live` durchgehen.
+        begonnen_am: new Date(Date.now() - begonnenVorMs)
     }];
     daten.befehle = zeilen.map((z, i) => ({
         id: ++idBasis, guild_id: 'g1', streamer_id: 1, aktiv: 1,
@@ -258,6 +263,31 @@ console.log('\nEigene Befehle fuellen ihre Platzhalter');
     pruefe(mitschrift.gesendet[0]?.text === 'Sieh {erfunden} an.',
         'ein erfundener Platzhalter bleibt stehen, statt leer zu verschwinden',
         mitschrift.gesendet[0]?.text);
+
+    // **Was nur im Stream gilt, verschwindet danach — auch in eigenen Texten.**
+    // `streaming_state` behaelt Titel und Kategorie; wer sie offline einsetzt,
+    // liest den letzten Stream als den laufenden. Die Attrappe traegt deshalb
+    // beides weiterhin, damit hier wirklich `k.live` geprueft wird und nicht
+    // eine leere Zeile.
+    neuAufsetzen([{ wort: 'jetzt', antwort: '{streamer} spielt {spiel} ({titel}) seit {uptime}.' }], false);
+    await befehle.auswerten(nachricht('!jetzt'));
+    {
+        const t = mitschrift.gesendet[0]?.text || '';
+        pruefe(!/Astro Colony/.test(t), 'offline nennt {spiel} nicht die Kategorie von gestern', t);
+        pruefe(!/Erster Versuch/.test(t), 'offline nennt {titel} nicht den Titel von gestern', t);
+        pruefe(!/Stunde|Minute/.test(t), 'und {uptime} keine Dauer', t);
+        pruefe(/FireDervil/.test(t), 'der Kanalname bleibt — er haengt nicht am Stream', t);
+    }
+
+    // Die Gegenprobe im selben Atemzug: live muessen sie dastehen. Sonst waere
+    // "offline leer" auch dann erfuellt, wenn sie nie etwas lieferten.
+    neuAufsetzen([{ wort: 'jetzt', antwort: '{spiel} ({titel}) seit {uptime}.' }], true);
+    await befehle.auswerten(nachricht('!jetzt'));
+    {
+        const t = mitschrift.gesendet[0]?.text || '';
+        pruefe(/Astro Colony/.test(t) && /Erster Versuch/.test(t) && /Stunde/.test(t),
+            'live stehen alle drei da', t);
+    }
 
     neuAufsetzen([{ wort: 'lang', antwort: 'x'.repeat(900) }]);
     await befehle.auswerten(nachricht('!lang'));
