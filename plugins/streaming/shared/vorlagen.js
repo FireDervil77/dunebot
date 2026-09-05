@@ -122,16 +122,28 @@ function pruefeVorlage(text) {
  *
  * Leer ist ausdruecklich in Ordnung - das heisst "nimm den Standard".
  *
+ * **`zusaetzlich` sind die eigenen Textbausteine des Streamers.** Sie kommen
+ * als Parameter herein und nicht aus der Datenbank, damit diese Datei bleibt,
+ * was sie ist: Werte herein, Urteil heraus, ohne Anschluss. Wer sie weglaesst,
+ * bekommt die alte Pruefung - und genau das will die Live-Ansage an den
+ * Stellen, an denen noch keine Bausteine geladen sind.
+ *
  * @param {string} text Vorlage
+ * @param {Array<string>|Set<string>} [zusaetzlich] Eigene Namen, ohne Klammern
  * @returns {string|null} 'zu_lang' | 'platzhalter' | 'nur_discord' | null
  */
-function pruefeChatVorlage(text) {
+function pruefeChatVorlage(text, zusaetzlich = []) {
     const t = String(text || '');
     if (t.length > CHAT_MAX) return 'zu_lang';
 
     const erlaubt = new Set(PLATZHALTER_CHAT.map(p => p.name));
+    for (const name of zusaetzlich) erlaubt.add(`{${String(name).toLowerCase()}}`);
+
     const alle    = new Set(PLATZHALTER.map(p => p.name));
-    const benutzt = t.match(/\{[a-z_]+\}/gi) || [];
+    // Ziffern und Bindestrich gehoeren dazu, seit es eigene Bausteine gibt -
+    // sonst faende dieser Ausdruck `{youtube2}` gar nicht erst und liesse ihn
+    // ungeprueft durch.
+    const benutzt = t.match(/\{[a-z0-9_-]+\}/gi) || [];
 
     for (const b of benutzt) {
         const name = b.toLowerCase();

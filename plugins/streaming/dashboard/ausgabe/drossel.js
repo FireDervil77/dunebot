@@ -322,10 +322,18 @@ async function chatAnsageSenden(auftrag) {
         return { ok: false, fehler: 'Die Kontoverknuepfung des Kanalinhabers fehlt', endgueltig: true };
     }
 
+    // **Die eigenen Textbausteine gelten auch hier.** Die Karte auf der
+    // Befehlsseite sagt „in Befehlen UND in Ansagen" zu - und eine Zusage, die
+    // nur an einer Stelle stimmt, ist die halbe Auskunft, gegen die dieses
+    // Haus schreibt.
+    const eigene = await require('../kern/bausteine')
+        .werteFuer(s.heim_guild_id, s.id);
+
     const text = chatansage.ansage({
         streamer: s,
         zustand: { titel: s.titel, kategorie: s.kategorie },
-        vorlage
+        vorlage,
+        eigene
     });
 
     // Ein leerer Satz ist kein Satz. Er entsteht, wenn die Vorlage aus nichts

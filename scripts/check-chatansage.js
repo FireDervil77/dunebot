@@ -112,6 +112,8 @@ function weltZuruecksetzen() {
             chat_ansage_an: 1, chat_ansage_text: null,
             titel: 'Rust mit Freunden', kategorie: 'Rust'
         },
+        // Die eigenen Textbausteine dieser Guild (seit 2026-09-05)
+        bausteine: [],
         // Wem gehoert der Kanal
         inhaber: '544578232704565262',
         // Hat er die Zusage erteilt? null = widerrufen oder nie erteilt
@@ -186,6 +188,12 @@ const dbAttrappe = {
         if (flach.startsWith('INSERT INTO streaming_outbox')) {
             welt.vorgemerkt.push({ sql: flach, werte });
             return { affectedRows: 1, insertId: 99 };
+        }
+
+        // --- Die eigenen Textbausteine (2026-09-05) ------------------------
+        // Sie gelten seit heute auch in Ansagen, nicht nur in Befehlen.
+        if (flach.startsWith('SELECT name, wert, streamer_id FROM streaming_variables')) {
+            return (welt.bausteine || []).map(b => ({ ...b, streamer_id: b.streamer_id ?? null }));
         }
 
         throw new Error(`Attrappe kennt diese Abfrage nicht: ${flach.slice(0, 90)}`);
@@ -271,6 +279,40 @@ pruefe(welt.gesendet[0]?.text === 'Wir sind live! Rust mit Freunden',
     'mit dem gefuellten Text', `bekommen: "${welt.gesendet[0]?.text}"`);
 pruefe(welt.beansprucht === 1, 'und der Auftrag wurde vorher beansprucht',
     'ohne Beanspruchung koennte ein zweiter Lauf dieselbe Zeile ein zweites Mal senden');
+
+// ---------------------------------------------------------------------
+console.log('\n3b. EIGENE TEXTBAUSTEINE gelten auch hier');
+// ---------------------------------------------------------------------
+//
+// **Die Karte auf der Befehlsseite sagt „in Befehlen UND in Ansagen" zu.**
+// Eine Zusage, die nur an einer Stelle stimmt, ist die halbe Auskunft — also
+// wird sie hier gemessen und nicht behauptet.
+
+weltZuruecksetzen();
+welt.streamer.chat_ansage_text = 'Wir sind live! Komm rein: {discord}';
+welt.bausteine = [{ name: 'discord', wert: 'https://discord.gg/abc', streamer_id: null }];
+await drossel.chatAnsageSenden(auftrag());
+pruefe(welt.gesendet[0]?.text === 'Wir sind live! Komm rein: https://discord.gg/abc',
+    'ein eigener Baustein wird auch in der Ansage eingesetzt',
+    `bekommen: "${welt.gesendet[0]?.text}"`);
+
+// Und die Reihenfolge stimmt: Ein Baustein darf einen eingebauten enthalten.
+weltZuruecksetzen();
+welt.streamer.chat_ansage_text = '{gruss}';
+welt.bausteine = [{ name: 'gruss', wert: 'Hallo, hier ist {streamer}!', streamer_id: null }];
+await drossel.chatAnsageSenden(auftrag());
+pruefe(welt.gesendet[0]?.text === 'Hallo, hier ist FireDervil!',
+    'und er darf einen eingebauten Platzhalter enthalten',
+    `bekommen: "${welt.gesendet[0]?.text}"`);
+
+// Umgekehrt nicht: Ein eingebauter Name laesst sich nicht verdecken.
+weltZuruecksetzen();
+welt.streamer.chat_ansage_text = 'Kategorie: {kategorie}';
+welt.bausteine = [{ name: 'kategorie', wert: 'GEKAPERT', streamer_id: null }];
+await drossel.chatAnsageSenden(auftrag());
+pruefe(welt.gesendet[0]?.text === 'Kategorie: Rust',
+    'ein eingebauter Name laesst sich nicht durch einen Baustein verdecken',
+    `bekommen: "${welt.gesendet[0]?.text}"`);
 
 // ---------------------------------------------------------------------
 console.log('\n4. ZUSAGE 1 aus 17.5: es muss DASTEHEN');

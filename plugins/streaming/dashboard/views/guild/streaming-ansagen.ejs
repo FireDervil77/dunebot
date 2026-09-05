@@ -118,10 +118,19 @@ const meldungen = {
                     <% PLATZHALTER.forEach(p => { %>
                       <span class="chip mono" title="<%= p.bedeutung %>"><%= p.name %></span>
                     <% }); %>
+                    <%# Die eigenen Bausteine gelten hier genauso wie in Befehlen —
+                        also stehen sie auch hier, statt dass man sie sich merkt. %>
+                    <% (bausteine || []).forEach(b => { %>
+                      <span class="chip mono" title="Eigener Baustein: <%= b.wert %>">{<%= b.name %>}</span>
+                    <% }); %>
                   </div>
                   <div class="text-secondary small mt-1">
                     <i class="fa-solid fa-circle-info me-1"></i>
                     Eine Chatnachricht ist <b>eine Zeile</b> — Umbrüche werden zu Leerzeichen.
+                    <% if (!(bausteine || []).length) { %>
+                      Eigene Bausteine wie <code>{discord}</code> legst du auf der Seite
+                      <a href="/guild/<%= guildId %>/plugins/streaming/befehle">Meine Befehle</a> an.
+                    <% } %>
                   </div>
                 </div>
               </div>

@@ -116,16 +116,21 @@ function zeilenJetzt(kanalId) {
  * Reine Rechnung: keine Datenbank, vollstaendig durchspielbar.
  *
  * @param {Object} felder `{ text, intervall_min, mindest_zeilen }`
+ * @param {Array<string>} [eigeneNamen] Textbausteine dieser Guild
  * @returns {string|null} Grund oder null
  */
-function pruefe(felder) {
+function pruefe(felder, eigeneNamen = []) {
     const text = String(felder?.text || '').trim();
     if (!text) return 'text';
 
     // `pruefeChatVorlage` kennt drei Faelle: zu_lang, platzhalter, nur_discord.
     // Sie werden durchgereicht statt zu einem zusammengefasst - der Streamer
     // soll wissen, WAS an seinem Text nicht geht.
-    const vorlagenfehler = vorlagen.pruefeChatVorlage(text);
+    //
+    // Die eigenen Bausteine kommen als Namen herein: Ohne sie waere
+    // `{discord}` „ein Platzhalter, den es nicht gibt" - und die Ansage liesse
+    // sich nicht speichern, obwohl sie funktioniert haette.
+    const vorlagenfehler = vorlagen.pruefeChatVorlage(text, eigeneNamen);
     if (vorlagenfehler) return vorlagenfehler;
 
     const takt = Number(felder?.intervall_min);
@@ -137,6 +142,19 @@ function pruefe(felder) {
     if (!Number.isFinite(zeilen) || zeilen < 0 || zeilen > ZEILEN_MAX) return 'zeilen';
 
     return null;
+}
+
+/**
+ * Die Namen der eigenen Textbausteine dieser Guild.
+ *
+ * Spaet geholt, weil `kern/bausteine` das Befehlsmodul nach sich zieht.
+ *
+ * @param {string} guildId Guild
+ * @returns {Promise<Array<string>>} Namen ohne Klammern
+ */
+async function eigeneNamen(guildId) {
+    const zeilen = await require('./bausteine').alleFuerGuild(guildId);
+    return zeilen.map(z => z.name);
 }
 
 /**
@@ -167,7 +185,7 @@ async function alleFuerGuild(guildId) {
  * @returns {Promise<{ok: boolean, grund?: string}>} Ergebnis
  */
 async function anlegen(guildId, streamerId, felder, von = null) {
-    const grund = pruefe(felder);
+    const grund = pruefe(felder, await eigeneNamen(guildId));
     if (grund) return { ok: false, grund };
 
     // **Der Kanal muss zu dieser Guild gehoeren.** Die Kennung aus dem
@@ -201,7 +219,7 @@ async function anlegen(guildId, streamerId, felder, von = null) {
  * @returns {Promise<{ok: boolean, grund?: string}>} Ergebnis
  */
 async function aendern(id, guildId, felder) {
-    const grund = pruefe(felder);
+    const grund = pruefe(felder, await eigeneNamen(guildId));
     if (grund) return { ok: false, grund };
 
     const ergebnis = await db().query(`

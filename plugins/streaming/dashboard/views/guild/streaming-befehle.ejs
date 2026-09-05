@@ -33,9 +33,21 @@ const fehlerTexte = {
 };
 const meldungen = {
   neu:         'Befehl angelegt. Er antwortet ab sofort.',
+  baustein:    'Baustein angelegt. Du kannst ihn ab sofort in jedem Text benutzen.',
   gespeichert: 'Gespeichert.',
-  entfernt:    'Befehl entfernt.'
+  entfernt:    'Entfernt.'
 };
+
+// Bausteinfehler tragen ein `b_`, weil beide Formulare auf dieser Seite landen
+// und `doppelt` sonst den falschen Satz zeigte.
+Object.assign(fehlerTexte, {
+  b_name:    'Ein Name darf nur Buchstaben, Ziffern, Bindestrich und Unterstrich enthalten — höchstens 32 Zeichen.',
+  b_belegt:  'Diesen Namen gibt es schon als eingebauten Platzhalter. Er würde ihn verdecken.',
+  b_wert:    'Ohne Wert wäre der Baustein leer.',
+  b_zu_lang: 'Ein Baustein kann nicht länger sein als eine Chatnachricht (500 Zeichen).',
+  b_doppelt: 'Diesen Baustein gibt es hier schon.',
+  b_weg:     'Diesen Baustein gibt es nicht mehr.'
+});
 %>
 
 <%- include('partials/streaming-kopf', {
@@ -109,6 +121,11 @@ const meldungen = {
                 <div class="chips mt-2">
                   <% PLATZHALTER.forEach(p => { %>
                     <span class="chip mono" title="<%= p.bedeutung %>"><%= p.name %></span>
+                  <% }); %>
+                  <%# Die eigenen dahinter, damit sichtbar ist, was zur Verfügung
+                      steht — sonst müsste man sie sich merken. %>
+                  <% (bausteine || []).forEach(b => { %>
+                    <span class="chip mono" title="Eigener Baustein: <%= b.wert %>">{<%= b.name %>}</span>
                   <% }); %>
                 </div>
                 <% const nurLive = PLATZHALTER.filter(p => p.nurLive); %>
@@ -287,6 +304,95 @@ const meldungen = {
             <% }); %>
           </div>
         </div>
+      <% } %>
+    </div>
+  </div>
+
+  <%# ── Eigene Textbausteine ──────────────────────────────────────────────
+      Sie gelten auch für Ansagen, stehen aber hier: dort, wo man den Text
+      schreibt, in dem sie vorkommen. Ein eigener Menüpunkt für eine Handvoll
+      Name-Wert-Paare wäre mehr Gliederung als Inhalt. %>
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <div class="kartenkopf">
+          <span class="kartensymbol"><i class="fa-solid fa-puzzle-piece"></i></span>
+          <div class="kartenkopf__text">
+            <h3 class="kartenkopf__titel">Eigene Textbausteine</h3>
+            <div class="kartenkopf__satz">
+              Einmal setzen, überall benutzen — in Befehlen <b>und</b> in Ansagen.
+              Ändert sich deine Einladung, änderst du sie an einer Stelle.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <% if (!(bausteine || []).length) { %>
+          <%- include('shared/leerzustand', {
+                icon:  'fa-solid fa-puzzle-piece',
+                titel: 'Noch kein Baustein',
+                text:  'Leg einen an — etwa {discord} mit deiner Einladungsadresse. '
+                     + 'Danach kannst du ihn in jeder Antwort und jeder Ansage schreiben.'
+              }) %>
+        <% } else { %>
+          <div class="zeilen">
+            <% bausteine.forEach(b => { %>
+              <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/bausteine/<%= b.id %>"
+                    class="zeile">
+                <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+                <div class="zeile__bez"><code>{<%= b.name %>}</code></div>
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                  <input type="text" class="form-control" name="wert" maxlength="500"
+                         style="min-width:16rem" value="<%= b.wert %>"
+                         <%= darfAendern ? '' : 'disabled' %>>
+                  <% if (darfAendern) { %>
+                    <button type="submit" class="btn btn-sm btn-primary">Speichern</button>
+                  <% } %>
+                </div>
+              </form>
+              <% if (darfAendern) { %>
+                <form method="POST" class="text-end"
+                      action="/guild/<%= guildId %>/plugins/streaming/bausteine/<%= b.id %>/entfernen"
+                      onsubmit="return confirm('{<%= b.name %>} entfernen? Texte, die ihn benutzen, zeigen ihn danach wörtlich.');">
+                  <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+                  <button type="submit" class="btn btn-sm btn-ghost-danger">Entfernen</button>
+                </form>
+              <% } %>
+            <% }); %>
+          </div>
+        <% } %>
+      </div>
+
+      <% if (darfAendern) { %>
+        <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/bausteine">
+          <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+          <div class="card-footer">
+            <div class="d-flex flex-wrap align-items-end gap-2">
+              <div>
+                <label class="form-label">Name</label>
+                <div class="input-group" style="max-width:14rem">
+                  <span class="input-group-text">{</span>
+                  <input type="text" class="form-control" name="name" required
+                         maxlength="32" pattern="\{?[A-Za-z0-9_-]{1,32}\}?" placeholder="discord">
+                  <span class="input-group-text">}</span>
+                </div>
+              </div>
+              <div class="flex-fill" style="min-width:14rem">
+                <label class="form-label">Wert</label>
+                <input type="text" class="form-control" name="wert" required
+                       maxlength="500" placeholder="https://discord.gg/…">
+              </div>
+              <button type="submit" class="btn btn-primary">Baustein anlegen</button>
+            </div>
+            <%# Der häufigste Fehlversuch: einen eingebauten Namen überschreiben.
+                Er wird abgewiesen — hier steht warum, bevor es passiert. %>
+            <div class="text-secondary small mt-2">
+              Eingebaute Namen sind vergeben — <code>{spiel}</code>, <code>{rest}</code>
+              und die anderen oben lassen sich nicht überschreiben.
+            </div>
+          </div>
+        </form>
       <% } %>
     </div>
   </div>

@@ -62,7 +62,8 @@ const welt = {
                 heim_guild_id: 'g1' },
     live: true,
     guildLaeuft: true,
-    zeilen: 0          // was der Conduit gezaehlt hat
+    zeilen: 0,         // was der Conduit gezaehlt hat
+    bausteine: []      // eigene Textbausteine dieser Guild
 };
 const mitschrift = { auftraege: [], schreibzugriffe: [], unbekannt: [] };
 
@@ -125,6 +126,15 @@ ServiceManager.register('dbService', {
                 .filter(a => String(a.guild_id) === String(w[0]))
                 .map(a => Object.fromEntries(
                     spalten.map(k => [k, { ...a, ...welt.streamer, id: a.id }[k]])));
+        }
+
+        // --- Die eigenen Textbausteine ------------------------------------
+        // `anlegen`/`aendern` fragen sie, damit `{discord}` in einer Ansage
+        // nicht als "Platzhalter, den es nicht gibt" abgewiesen wird.
+        if (/^SELECT .* FROM streaming_variables/.test(s)) {
+            const spalten = spaltenAus(s);
+            return (welt.bausteine || []).map(b =>
+                Object.fromEntries(spalten.map(k => [k, b[k]])));
         }
 
         // --- anlegen(): gehoert der Kanal dieser Guild? --------------------
@@ -217,6 +227,7 @@ function neuAufsetzen(liste = [], welche = {}) {
     welt.guildLaeuft = welche.guildLaeuft !== undefined ? welche.guildLaeuft : true;
     welt.zeilen = welche.zeilen !== undefined ? welche.zeilen : 0;
     welt.streamer.heim_guild_id = welche.heim !== undefined ? welche.heim : 'g1';
+    welt.bausteine = welche.bausteine || [];
     mitschrift.auftraege = []; mitschrift.schreibzugriffe = []; mitschrift.unbekannt = [];
     ansagen.vergessen();
 }
@@ -243,6 +254,31 @@ console.log('\nDie Eingabe wird geprueft, bevor etwas gespeichert wird');
         'null Zeilen ist dagegen gueltig — es heisst „immer"');
     pruefe(ansagen.pruefe({ text: 'Ich spiele {kategorie}', intervall_min: 5, mindest_zeilen: 3 }) === null,
         'ein erlaubter Platzhalter an der Untergrenze geht durch');
+}
+
+console.log('\nEigene Textbausteine gelten auch im Ansagetext');
+{
+    // **Das Paar ist der Punkt.** Ohne die Bausteinnamen waere `{discord}` ein
+    // „Platzhalter, den es nicht gibt" — und eine Ansage, die im Chat
+    // funktioniert haette, liesse sich nicht speichern.
+    neuAufsetzen([], { bausteine: [{ name: 'discord', wert: 'https://x' }] });
+    const mit = await ansagen.anlegen('g1', 1,
+        { text: 'Komm rein: {discord}', intervall_min: 25, mindest_zeilen: 0 });
+    pruefe(mit.ok === true, 'mit dem Baustein wird der Text angenommen', JSON.stringify(mit));
+
+    neuAufsetzen([], { bausteine: [] });
+    const ohne = await ansagen.anlegen('g1', 1,
+        { text: 'Komm rein: {discord}', intervall_min: 25, mindest_zeilen: 0 });
+    pruefe(ohne.grund === 'platzhalter',
+        'ohne ihn bleibt es ein erfundener Name — und wird abgewiesen', JSON.stringify(ohne));
+
+    // Und der erweiterte Ausdruck findet auch Namen mit Ziffer: Vorher hiess er
+    // `\{[a-z_]+\}` und liess `{youtube2}` ungeprueft durch.
+    neuAufsetzen([], { bausteine: [] });
+    const mitZiffer = await ansagen.anlegen('g1', 1,
+        { text: 'Da: {youtube2}', intervall_min: 25, mindest_zeilen: 0 });
+    pruefe(mitZiffer.grund === 'platzhalter',
+        'ein erfundener Name mit Ziffer faellt jetzt auch auf', JSON.stringify(mitZiffer));
 }
 
 console.log('\nWas NICHT hinausgeht');

@@ -527,13 +527,14 @@ async function befehlsSeite(req, res, meldung, fehler) {
         return res.redirect(`/guild/${guildId}/plugins/streaming`);
     }
 
-    const [zeilen, kanaele] = await Promise.all([
+    const [zeilen, kanaele, bausteine] = await Promise.all([
         befehlsModul().alleFuerGuild(guildId),
-        heimguild.kanaeleDerGuild(guildId)
+        heimguild.kanaeleDerGuild(guildId),
+        require('../kern/bausteine').alleFuerGuild(guildId)
     ]);
 
     await renderView(res, 'guild/streaming-befehle', {
-        tr, guildId, kanaele,
+        tr, guildId, kanaele, bausteine,
         eigene: zeilen.filter(z => z.art !== 'fertig'),
         fertigZeilen: zeilen.filter(z => z.art === 'fertig'),
         FERTIG: befehlsModul().FERTIG,
@@ -621,6 +622,61 @@ router.post('/befehle/:id/entfernen', requirePermission('STREAMING.CHAT.MANAGE')
 });
 
 // =====================================================
+// Eigene Textbausteine — `{discord}` einmal setzen
+// =====================================================
+//
+// **Sie stehen auf der Befehlsseite, nicht auf einer eigenen.** Sie gelten
+// zwar auch fuer Ansagen, aber ein Menuepunkt fuer eine Handvoll Name-Wert-
+// Paare waere mehr Gliederung als Inhalt — und sie gehoeren dorthin, wo man
+// den Text schreibt, in dem sie vorkommen.
+
+/** @returns {Object} Bausteinmodul */
+function bausteinModul() {
+    return require('../kern/bausteine');
+}
+
+router.post('/bausteine', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const zurueck = `/guild/${guildId}/plugins/streaming/befehle`;
+    try {
+        const ergebnis = await bausteinModul().anlegen(
+            guildId, await heimKanalId(guildId), req.body, res.locals.user?.id);
+        // **Eigenes Praefix.** Beide Formulare landen auf derselben Seite, und
+        // `doppelt` heisst beim Befehl „das Wort gibt es schon", beim Baustein
+        // „den Namen gibt es schon". Ein gemeinsamer Schluessel zeigte den
+        // falschen Satz.
+        return res.redirect(`${zurueck}?${ergebnis.ok ? 'ok=baustein' : 'fehler=b_' + ergebnis.grund}`);
+    } catch (error) {
+        ServiceManager.get('Logger').error('[Streaming] Baustein anlegen', error);
+        return res.redirect(`${zurueck}?fehler=technisch`);
+    }
+});
+
+router.post('/bausteine/:id', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const zurueck = `/guild/${guildId}/plugins/streaming/befehle`;
+    try {
+        const ergebnis = await bausteinModul().aendern(req.params.id, guildId, req.body);
+        return res.redirect(`${zurueck}?${ergebnis.ok ? 'ok=gespeichert' : 'fehler=b_' + (ergebnis.grund || 'weg')}`);
+    } catch (error) {
+        ServiceManager.get('Logger').error('[Streaming] Baustein aendern', error);
+        return res.redirect(`${zurueck}?fehler=technisch`);
+    }
+});
+
+router.post('/bausteine/:id/entfernen', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const zurueck = `/guild/${guildId}/plugins/streaming/befehle`;
+    try {
+        const getroffen = await bausteinModul().entfernen(req.params.id, guildId);
+        return res.redirect(`${zurueck}?${getroffen ? 'ok=entfernt' : 'fehler=weg'}`);
+    } catch (error) {
+        ServiceManager.get('Logger').error('[Streaming] Baustein entfernen', error);
+        return res.redirect(`${zurueck}?fehler=technisch`);
+    }
+});
+
+// =====================================================
 // Meine Ansagen (P6) — was der Bot von sich aus sagt
 // =====================================================
 
@@ -639,13 +695,14 @@ router.get('/ansagen', requirePermission('STREAMING.CHAT.MANAGE'), async (req, r
             return res.redirect(`/guild/${guildId}/plugins/streaming`);
         }
 
-        const [zeilen, kanaele] = await Promise.all([
+        const [zeilen, kanaele, bausteine] = await Promise.all([
             ansagenModul().alleFuerGuild(guildId),
-            require('../kern/heimguild').kanaeleDerGuild(guildId)
+            require('../kern/heimguild').kanaeleDerGuild(guildId),
+            require('../kern/bausteine').alleFuerGuild(guildId)
         ]);
 
         await renderView(res, 'guild/streaming-ansagen', {
-            tr, guildId, kanaele, ansagen: zeilen,
+            tr, guildId, kanaele, ansagen: zeilen, bausteine,
             GRENZEN: {
                 intervallMin: ansagenModul().INTERVALL_MIN,
                 intervallMax: ansagenModul().INTERVALL_MAX,

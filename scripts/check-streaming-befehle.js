@@ -46,8 +46,18 @@ function spaltenAus(sql) {
 }
 
 // --- Attrappen -----------------------------------------------------------
-const daten = { streamer: [], befehle: [] };
-const mitschrift = { schreibzugriffe: [], gesendet: [], unbekannt: [] };
+const daten = { streamer: [], befehle: [], bausteine: [] };
+const mitschrift = { schreibzugriffe: [], gesendet: [], unbekannt: [], bausteinAbfragen: 0 };
+
+/**
+ * Unbekannte Abfragen ueber den GANZEN Lauf.
+ *
+ * **`mitschrift.unbekannt` wird von `neuAufsetzen` geleert** - die
+ * Schlusspruefung sah damit nur den letzten Fall. Am 2026-09-05 kam eine neue
+ * Abfrage (`streaming_variables`) dazu, lief in jedem Fall ins Leere, und der
+ * Waechter meldete 61 von 61. Diese Liste wird nie geleert.
+ */
+const nieGeleert = [];
 
 ServiceManager.register('Logger', {
     info: () => {}, debug: () => {}, warn: () => {}, error: () => {}, success: () => {}
@@ -68,6 +78,17 @@ ServiceManager.register('dbService', {
             return daten.streamer
                 .filter(x => String(x.kanal_id) === String(w[0]))
                 .map(x => Object.fromEntries(spalten.map(k => [k, x[k]])));
+        }
+        if (s.startsWith('SELECT name, wert, streamer_id FROM streaming_variables')) {
+            mitschrift.bausteinAbfragen++;
+            const spalten = spaltenAus(s);
+            // Wie die echte Abfrage: Kanalzeile vor Guildzeile.
+            return (daten.bausteine || [])
+                .filter(b => String(b.guild_id) === String(w[0])
+                          && (b.streamer_id === w[1] || b.streamer_id === null))
+                .filter(b => w.length <= 2 || w.slice(2).includes(b.name))
+                .sort((a, b) => (a.streamer_id === null ? 1 : 0) - (b.streamer_id === null ? 1 : 0))
+                .map(b => Object.fromEntries(spalten.map(k => [k, b[k]])));
         }
         if (s.startsWith('SELECT id, wort, art, antwort, wer, abkuehlung_s')) {
             return daten.befehle.filter(x =>
@@ -128,6 +149,7 @@ ServiceManager.register('dbService', {
             return [];
         }
         mitschrift.unbekannt.push(s.slice(0, 70));
+        nieGeleert.push(s.slice(0, 70));
         return [];
     }
 });
@@ -181,7 +203,8 @@ const befehle = require(path.join(WURZEL, 'plugins/streaming/dashboard/kern/befe
  */
 let idBasis = 0;
 
-function neuAufsetzen(zeilen = [], live = true, begonnenVorMs = 8100000) {
+function neuAufsetzen(zeilen = [], live = true, begonnenVorMs = 8100000, bausteine = []) {
+    daten.bausteine = bausteine.map(b => ({ guild_id: 'g1', streamer_id: 1, ...b }));
     daten.streamer = [{
         id: 1, plattform: 'twitch', login: 'firedervil', anzeigename: 'FireDervil', kanal_id: 'k1',
         heim_guild_id: 'g1', ist_live: live ? 1 : 0,
@@ -198,6 +221,7 @@ function neuAufsetzen(zeilen = [], live = true, begonnenVorMs = 8100000) {
         art: 'eigen', wer: 'alle', abkuehlung_s: 0, antwort: null, ...z
     }));
     mitschrift.schreibzugriffe = []; mitschrift.gesendet = []; mitschrift.unbekannt = [];
+    mitschrift.bausteinAbfragen = 0;
 }
 
 const nachricht = (text, extra = {}) => ({
@@ -353,6 +377,84 @@ console.log('\nEigene Befehle fuellen ihre Platzhalter');
     pruefe(mitschrift.gesendet.length === 0, 'ein leerer Satz wird gar nicht erst gesendet');
 }
 
+console.log('\nEigene Textbausteine');
+{
+    const bausteine = require(path.join(WURZEL, 'plugins/streaming/dashboard/kern/bausteine.js'));
+
+    // --- Was gespeichert werden darf ---------------------------------------
+    pruefe(bausteine.pruefe({ name: 'discord', wert: 'https://x' }) === null,
+        'ein gewoehnlicher Name geht durch');
+    pruefe(bausteine.pruefe({ name: '{discord}', wert: 'https://x' }) === null,
+        'die Klammern darf man mittippen — sie gehoeren der Schreibweise');
+    pruefe(bausteine.pruefe({ name: 'mein name', wert: 'x' }) === 'name',
+        'ein Leerzeichen im Namen waere im Text nicht wiederzufinden');
+    pruefe(bausteine.pruefe({ name: 'spiel', wert: 'x' }) === 'belegt',
+        'ein eingebauter Name ist vergeben — sonst verdeckt der eigene ihn');
+    pruefe(bausteine.pruefe({ name: 'rest', wert: 'x' }) === 'belegt',
+        'auch {rest} — es ist eingebaut, steht aber nicht in der sichtbaren Liste');
+    pruefe(bausteine.pruefe({ name: '3', wert: 'x' }) === 'belegt',
+        'und {3}, obwohl nur {1} auf der Seite steht');
+    pruefe(bausteine.pruefe({ name: 'discord', wert: '  ' }) === 'wert',
+        'ohne Wert waere der Baustein leer');
+    pruefe(bausteine.pruefe({ name: 'discord', wert: 'x'.repeat(501) }) === 'zu_lang',
+        'laenger als eine Chatnachricht kann kein Baustein sein');
+
+    // --- Was im Chat daraus wird -------------------------------------------
+    neuAufsetzen([{ wort: 'discord', antwort: 'Komm rein: {discord}' }], true, 8100000,
+        [{ id: 1, name: 'discord', wert: 'https://discord.gg/abc' }]);
+    await befehle.auswerten(nachricht('!discord'));
+    pruefe(mitschrift.gesendet[0]?.text === 'Komm rein: https://discord.gg/abc',
+        'der eigene Baustein wird eingesetzt', mitschrift.gesendet[0]?.text);
+
+    // Bausteine kommen VOR den eingebauten — also darf einer sie enthalten.
+    neuAufsetzen([{ wort: 'gruss', antwort: '{gruss}' }], true, 8100000,
+        [{ id: 1, name: 'gruss', wert: 'Hallo {absender}, hier ist {streamer}!' }]);
+    await befehle.auswerten(nachricht('!gruss'));
+    pruefe(mitschrift.gesendet[0]?.text === 'Hallo Anna, hier ist FireDervil!',
+        'ein Baustein darf eingebaute Platzhalter enthalten', mitschrift.gesendet[0]?.text);
+
+    // **Genau ein Durchgang.** `{a}` mit dem Wert `{a}` liefe sonst endlos.
+    neuAufsetzen([{ wort: 'x', antwort: '{a}' }], true, 8100000,
+        [{ id: 1, name: 'a', wert: 'siehe {a}' }]);
+    await befehle.auswerten(nachricht('!x'));
+    pruefe(mitschrift.gesendet[0]?.text === 'siehe {a}',
+        'ein Baustein, der sich selbst nennt, laeuft nicht im Kreis',
+        mitschrift.gesendet[0]?.text);
+
+    // Die Kanalzeile gewinnt gegen die Zeile der ganzen Guild.
+    neuAufsetzen([{ wort: 'x', antwort: '{ort}' }], true, 8100000, [
+        { id: 1, name: 'ort', wert: 'fuer alle',  streamer_id: null },
+        { id: 2, name: 'ort', wert: 'fuer diesen Kanal', streamer_id: 1 }
+    ]);
+    await befehle.auswerten(nachricht('!x'));
+    pruefe(mitschrift.gesendet[0]?.text === 'fuer diesen Kanal',
+        'die Zeile des Kanals gewinnt gegen die der Guild', mitschrift.gesendet[0]?.text);
+
+    // **Kein Zuschauer erschleicht sich einen Baustein.** Argumente kommen
+    // zuletzt — der eingesetzte Text wird nicht noch einmal angesehen.
+    neuAufsetzen([{ wort: 'echo', antwort: 'Du sagst: {rest}' }], true, 8100000,
+        [{ id: 1, name: 'geheim', wert: 'NICHTFUERALLE' }]);
+    await befehle.auswerten(nachricht('!echo {geheim}'));
+    pruefe(mitschrift.gesendet[0]?.text === 'Du sagst: {geheim}',
+        'ein Zuschauer kann keinen fremden Baustein hervorlocken',
+        mitschrift.gesendet[0]?.text);
+
+    // Und die Abfrage laeuft nur, wenn der Text sie braucht.
+    neuAufsetzen([{ wort: 'x', antwort: 'Hallo {absender}, {streamer} spielt {spiel}.' }]);
+    await befehle.auswerten(nachricht('!x'));
+    pruefe(mitschrift.bausteinAbfragen === 0,
+        'ohne fremden Namen im Text wird die Tabelle gar nicht erst gefragt',
+        String(mitschrift.bausteinAbfragen));
+
+    neuAufsetzen([{ wort: 'x', antwort: 'Da: {irgendwas}' }]);
+    await befehle.auswerten(nachricht('!x'));
+    pruefe(mitschrift.bausteinAbfragen === 1,
+        'mit einem fremden Namen genau einmal', String(mitschrift.bausteinAbfragen));
+    pruefe(mitschrift.gesendet[0]?.text === 'Da: {irgendwas}',
+        'und ein Name ohne Baustein bleibt stehen, statt leer zu verschwinden',
+        mitschrift.gesendet[0]?.text);
+}
+
 console.log('\nDie Liste der Platzhalter ist ein Vertrag, keine Behauptung');
 {
     // **Behauptet die Liste etwas, das `fuellen` nicht kann?** Die Seite
@@ -491,8 +593,9 @@ console.log('\nAbwaehlen schaltet ab, es loescht nicht');
 }
 
 console.log('\nDie Attrappe hat alles verstanden');
-pruefe(mitschrift.unbekannt.length === 0, 'keine unbekannte Abfrage still mit `[]` beantwortet',
-    mitschrift.unbekannt.length ? [...new Set(mitschrift.unbekannt)].join(' | ') : '');
+pruefe(nieGeleert.length === 0,
+    'keine unbekannte Abfrage still mit `[]` beantwortet — ueber den ganzen Lauf',
+    nieGeleert.length ? [...new Set(nieGeleert)].join(' | ') : '');
 
 console.log(abweichungen === 0
     ? `\nErgebnis: ${faelle} Pruefungen, 0 Abweichungen.\n`

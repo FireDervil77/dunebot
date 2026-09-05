@@ -90,15 +90,27 @@ function saubern(text) {
  * @param {Object} daten.streamer { plattform, login, anzeigename }
  * @param {Object} [daten.zustand] { titel, kategorie }
  * @param {string} [daten.vorlage] Reintext mit Platzhaltern; leer = Vorgabe
+ * @param {Map<string,string>|Object} [daten.eigene] Eigene Textbausteine
  * @returns {string} die fertige Zeile, hoechstens `CHAT_MAX` Zeichen
  */
-function ansage({ streamer, zustand = {}, vorlage = null }) {
+function ansage({ streamer, zustand = {}, vorlage = null, eigene = null }) {
     const name = streamer.anzeigename || streamer.login;
+
+    // **Die eigenen zuerst, die eingebauten danach.** `parsePlaceholders`
+    // arbeitet `extra` in der Reihenfolge der Schluessel ab; damit darf ein
+    // Baustein einen eingebauten Platzhalter enthalten ("Hallo {streamer}!").
+    // Dieselbe Reihenfolge wie im Befehlsweg, und aus demselben Grund.
+    //
+    // Umgekehrt kann kein Baustein einen eingebauten verdecken: Gleiche Namen
+    // wuerden hier ueberschrieben - und beim Speichern gar nicht erst
+    // angenommen (`bausteine.pruefe` -> 'belegt').
+    const eigeneWerte = eigene instanceof Map ? Object.fromEntries(eigene) : (eigene || {});
 
     const gefuellt = parsePlaceholders(
         String(vorlage || '').trim() || VORGABE_CHAT,
         {
             extra: {
+                ...eigeneWerte,
                 streamer: name,
                 titel: zustand.titel || '',
                 kategorie: zustand.kategorie || '',

@@ -211,7 +211,7 @@ function fuellen(vorlage, k) {
     // Kategorie sieht niemand.
     const imStream = (wert) => (k.live ? (wert || '') : '');
 
-    return String(vorlage || '')
+    return eigeneEinsetzen(String(vorlage || ''), k.eigene)
         .replace(/\{streamer\}/g, k.streamer || '')
         .replace(/\{absender\}/g, k.absender || '')
         .replace(/\{spiel\}/g,    imStream(k.kategorie))
@@ -237,6 +237,40 @@ function fuellen(vorlage, k) {
  */
 function woerter(rest) {
     return String(rest || '').split(/\s+/).filter(Boolean);
+}
+
+/**
+ * Die eigenen Textbausteine des Streamers einsetzen.
+ *
+ * **Zuerst, und genau EINMAL.**
+ *
+ * *Zuerst*, damit ein Baustein eingebaute Platzhalter enthalten darf: Wer
+ * `{gruss}` auf „Hallo {absender}!" setzt, bekommt den Absender - die
+ * eingebauten laufen ja danach.
+ *
+ * *Einmal*, weil der Weg sonst im Kreis liefe. `{a}` mit dem Wert `"{a}"`
+ * ersetzte sich endlos, und der Auswerter haenge an einer Chatnachricht fest,
+ * die jemand aus Versehen so eingetragen hat. Ein Baustein, der einen anderen
+ * nennt, bleibt deshalb woertlich stehen - sichtbar, statt still gefaehrlich.
+ *
+ * Die Maskierung ist von `dunebot-core/lib/PlaceholderParser` uebernommen:
+ * Der Name landet als Muster in einem regulaeren Ausdruck, und ein `.` darin
+ * duerfte nicht „irgendein Zeichen" heissen. Warum die Funktion selbst nicht
+ * benutzt wird, steht im Kopf von `kern/bausteine`.
+ *
+ * @param {string} text Vorlage
+ * @param {Map<string, string>|null} eigene Name auf Wert
+ * @returns {string} Text mit eingesetzten Bausteinen
+ */
+function eigeneEinsetzen(text, eigene) {
+    if (!eigene || !eigene.size) return text;
+
+    let ergebnis = text;
+    for (const [name, wert] of eigene) {
+        const maskiert = String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        ergebnis = ergebnis.replace(new RegExp(`\\{${maskiert}\\}`, 'g'), String(wert ?? ''));
+    }
+    return ergebnis;
 }
 
 /**
@@ -310,7 +344,17 @@ async function auswerten(kanal) {
     const kuehl = Math.max(0, Number(zeile.abkuehlung_s) || 0) * 1000;
     if (jetzt - letzte < kuehl) return `${PRAEFIX}${zeile.wort}: noch in der Abkuehlung`;
 
+    // **Die Abfrage nur, wenn der Text sie braucht.** Fast jede Antwort kommt
+    // mit den eingebauten Platzhaltern aus; eine dritte Abfrage je Befehl waere
+    // der Preis dafuer, dass jemand `!regeln` tippt.
+    const bausteine = require('./bausteine');
+    const fremde = zeile.art === 'fertig' ? [] : bausteine.fremdeNamenIn(zeile.antwort);
+    const eigene = fremde.length
+        ? await bausteine.werteFuer(streamer.heim_guild_id, streamer.id, fremde)
+        : null;
+
     const kontext = {
+        eigene,
         streamer: streamer.anzeigename || streamer.login,
         absender: kanal.absender,
         live: Boolean(streamer.ist_live),
