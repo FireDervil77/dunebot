@@ -285,7 +285,7 @@ function eigeneEinsetzen(text, eigene) {
  */
 async function befehleFuer(guildId, streamerId) {
     return await db().query(`
-        SELECT id, wort, art, antwort, wer, abkuehlung_s
+        SELECT id, wort, art, antwort, zaehler_name, wer, abkuehlung_s
           FROM streaming_commands
          WHERE guild_id = ? AND aktiv = 1 AND (streamer_id = ? OR streamer_id IS NULL)
          ORDER BY streamer_id IS NULL ASC
@@ -344,11 +344,29 @@ async function auswerten(kanal) {
     const kuehl = Math.max(0, Number(zeile.abkuehlung_s) || 0) * 1000;
     if (jetzt - letzte < kuehl) return `${PRAEFIX}${zeile.wort}: noch in der Abkuehlung`;
 
+    const bausteine = require('./bausteine');
+
+    // **Erst hochzaehlen, dann lesen.** Sonst nennt die Antwort den Stand von
+    // vorher - `!tode` sagte "3", nachdem er auf 4 gestellt hat, und der
+    // Streamer haelt den Zaehler fuer kaputt.
+    //
+    // Es steht NACH der Abkuehlung und nach der Rechtepruefung: Wer nicht darf
+    // oder zu schnell tippt, zaehlt auch nicht hoch.
+    if (zeile.zaehler_name) {
+        await bausteine.hochzaehlen(
+            streamer.heim_guild_id, streamer.id, zeile.zaehler_name);
+    }
+
     // **Die Abfrage nur, wenn der Text sie braucht.** Fast jede Antwort kommt
     // mit den eingebauten Platzhaltern aus; eine dritte Abfrage je Befehl waere
     // der Preis dafuer, dass jemand `!regeln` tippt.
-    const bausteine = require('./bausteine');
+    //
+    // Der Zaehlername kommt immer mit, auch wenn er nicht im Text steht: Ein
+    // Befehl darf hochzaehlen, ohne die Zahl zu nennen.
     const fremde = zeile.art === 'fertig' ? [] : bausteine.fremdeNamenIn(zeile.antwort);
+    if (zeile.zaehler_name && !fremde.includes(zeile.zaehler_name)) {
+        fremde.push(zeile.zaehler_name);
+    }
     const eigene = fremde.length
         ? await bausteine.werteFuer(streamer.heim_guild_id, streamer.id, fremde)
         : null;
@@ -484,9 +502,10 @@ async function anlegen(guildId, streamerId, f, userId) {
     try {
         await db().query(
             `INSERT INTO streaming_commands
-               (guild_id, streamer_id, wort, art, antwort, wer, abkuehlung_s, angelegt_von)
-             VALUES (?, ?, ?, 'eigen', ?, ?, ?, ?)`,
+               (guild_id, streamer_id, wort, art, antwort, zaehler_name, wer, abkuehlung_s, angelegt_von)
+             VALUES (?, ?, ?, 'eigen', ?, ?, ?, ?, ?)`,
             [guildId, streamerId, wort, String(f.antwort).slice(0, 500),
+             zaehlerName(f.zaehler_name),
              RANG[f.wer] === undefined ? 'alle' : f.wer,
              Math.max(0, Math.min(3600, Number(f.abkuehlung_s) || 0)), userId || null]);
         return { ok: true, grund: null };
@@ -513,13 +532,30 @@ async function anlegen(guildId, streamerId, f, userId) {
 async function aendern(id, guildId, f) {
     const ergebnis = await db().query(
         `UPDATE streaming_commands
-            SET antwort = ?, wer = ?, abkuehlung_s = ?, aktiv = ?
+            SET antwort = ?, zaehler_name = ?, wer = ?, abkuehlung_s = ?, aktiv = ?
           WHERE id = ? AND guild_id = ?`,
         [f.antwort === undefined ? null : String(f.antwort).slice(0, 500),
+         zaehlerName(f.zaehler_name),
          RANG[f.wer] === undefined ? 'alle' : f.wer,
          Math.max(0, Math.min(3600, Number(f.abkuehlung_s) || 0)),
          f.aktiv ? 1 : 0, Number(id), guildId]);
     return Boolean(ergebnis?.affectedRows);
+}
+
+/**
+ * Den Zaehlernamen herrichten, den ein Befehl hochzaehlt.
+ *
+ * **Leer heisst `null`, nicht `''`.** Eine leere Zeichenkette waere ein Name,
+ * den `hochzaehlen` suchen wuerde - jede Benutzung eine Abfrage ins Leere. Und
+ * die Bedingung `if (zeile.zaehler_name)` traefe auf `''` nicht zu, auf ein
+ * einzelnes Leerzeichen aber schon.
+ *
+ * @param {string|undefined} roh Eingabe aus dem Formular
+ * @returns {string|null} Name ohne Klammern, klein - oder null
+ */
+function zaehlerName(roh) {
+    const name = String(roh || '').trim().replace(/^\{|\}$/g, '').toLowerCase();
+    return /^[a-z0-9_-]{1,32}$/.test(name) ? name : null;
 }
 
 /**

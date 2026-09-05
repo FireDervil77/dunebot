@@ -192,8 +192,14 @@ const dbAttrappe = {
 
         // --- Die eigenen Textbausteine (2026-09-05) ------------------------
         // Sie gelten seit heute auch in Ansagen, nicht nur in Befehlen.
-        if (flach.startsWith('SELECT name, wert, streamer_id FROM streaming_variables')) {
-            return (welt.bausteine || []).map(b => ({ ...b, streamer_id: b.streamer_id ?? null }));
+        // Am Tabellennamen erkannt, nicht an der Spaltenliste: Die waechst mit
+        // jeder Erweiterung, und genau daran ist diese Attrappe am 2026-09-05
+        // zweimal blind geworden (erst `art`/`zahl`, davor `plattform`).
+        if (/FROM streaming_variables/.test(flach)) {
+            return (welt.bausteine || []).map(b => ({
+                art: 'text', wert: '', zahl: 0, ...b,
+                streamer_id: b.streamer_id ?? null
+            }));
         }
 
         throw new Error(`Attrappe kennt diese Abfrage nicht: ${flach.slice(0, 90)}`);
@@ -312,6 +318,14 @@ welt.bausteine = [{ name: 'kategorie', wert: 'GEKAPERT', streamer_id: null }];
 await drossel.chatAnsageSenden(auftrag());
 pruefe(welt.gesendet[0]?.text === 'Kategorie: Rust',
     'ein eingebauter Name laesst sich nicht durch einen Baustein verdecken',
+    `bekommen: "${welt.gesendet[0]?.text}"`);
+
+weltZuruecksetzen();
+welt.streamer.chat_ansage_text = 'Bisher {tode} Tode.';
+welt.bausteine = [{ name: 'tode', art: 'zaehler', zahl: 42, streamer_id: null }];
+await drossel.chatAnsageSenden(auftrag());
+pruefe(welt.gesendet[0]?.text === 'Bisher 42 Tode.',
+    'ein Zaehler wird zu seiner Zahl — auch in der Ansage',
     `bekommen: "${welt.gesendet[0]?.text}"`);
 
 // ---------------------------------------------------------------------

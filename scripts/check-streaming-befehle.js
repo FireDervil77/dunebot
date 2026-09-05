@@ -79,7 +79,7 @@ ServiceManager.register('dbService', {
                 .filter(x => String(x.kanal_id) === String(w[0]))
                 .map(x => Object.fromEntries(spalten.map(k => [k, x[k]])));
         }
-        if (s.startsWith('SELECT name, wert, streamer_id FROM streaming_variables')) {
+        if (/^SELECT name, art, wert, zahl, streamer_id FROM streaming_variables/.test(s)) {
             mitschrift.bausteinAbfragen++;
             const spalten = spaltenAus(s);
             // Wie die echte Abfrage: Kanalzeile vor Guildzeile.
@@ -90,7 +90,27 @@ ServiceManager.register('dbService', {
                 .sort((a, b) => (a.streamer_id === null ? 1 : 0) - (b.streamer_id === null ? 1 : 0))
                 .map(b => Object.fromEntries(spalten.map(k => [k, b[k]])));
         }
-        if (s.startsWith('SELECT id, wort, art, antwort, wer, abkuehlung_s')) {
+
+        // --- hochzaehlen() -------------------------------------------------
+        if (/^UPDATE streaming_variables SET zahl = zahl \+ 1/.test(s)) {
+            mitschrift.schreibzugriffe.push({ sql: s, werte: w });
+            // **Die Bedingungen greifen nur, wenn die Abfrage sie stellt.**
+            const fragtArt   = s.includes("art = 'zaehler'");
+            const fragtGuild = s.includes('guild_id = ?');
+            const treffer = (daten.bausteine || [])
+                .filter(b => (!fragtGuild || String(b.guild_id) === String(w[0]))
+                          && b.name === w[1]
+                          && (!fragtArt || b.art === 'zaehler')
+                          && (b.streamer_id === w[2] || b.streamer_id === null))
+                .sort((a, b) => (a.streamer_id === null ? 1 : 0) - (b.streamer_id === null ? 1 : 0))[0];
+            if (!treffer) return { affectedRows: 0 };
+            treffer.zahl = Number(treffer.zahl || 0) + 1;
+            return { affectedRows: 1 };
+        }
+        // Nicht mehr an der vollen Spaltenliste festgemacht: Sie waechst mit
+        // jeder Erweiterung, und die Attrappe wurde am 2026-09-05 zweimal
+        // daran blind. Der Tabellenname traegt die Erkennung.
+        if (/^SELECT .* FROM streaming_commands WHERE guild_id/.test(s)) {
             return daten.befehle.filter(x =>
                 String(x.guild_id) === String(w[0]) &&
                 x.aktiv !== 0 &&
@@ -101,8 +121,32 @@ ServiceManager.register('dbService', {
             if (daten.befehle.some(z => z.guild_id === w[0] && z.wort === w[2])) {
                 const e = new Error('Duplicate'); e.code = 'ER_DUP_ENTRY'; throw e;
             }
-            daten.befehle.push({ id: ++idBasis, guild_id: w[0], streamer_id: w[1], wort: w[2],
-                art: 'eigen', antwort: w[3], wer: w[4], abkuehlung_s: w[5], aktiv: 1 });
+            // **Die Werte werden ueber die Spaltenliste zugeordnet, nicht ueber
+            // ihre Position.** Vorher stand hier `wer: w[4]` — als das
+            // Zaehlerfeld dazukam, landete der Zaehlername in `wer`, und kein
+            // Test merkte es, weil keiner `wer` nach dem Anlegen ansieht.
+            // Spalten UND Werte paaren: In `VALUES (?, ?, ?, 'eigen', ?, …)`
+            // steht fuer `art` ein Literal, kein Platzhalter. Wer nur die
+            // Spalten durchzaehlt, verschiebt ab dort alles um eins.
+            const namen = (/\(([^)]*)\)\s*VALUES/i.exec(s)?.[1] || '')
+                .split(',').map(x => x.trim());
+            const stellen = (/VALUES\s*\(([^)]*)\)/i.exec(s)?.[1] || '')
+                .split(',').map(x => x.trim());
+            const zu = {};
+            let n = 0;
+            namen.forEach((spalte, i) => {
+                zu[spalte] = stellen[i] === '?' ? w[n++] : stellen[i].replace(/^'|'$/g, '');
+            });
+
+            if (daten.befehle.some(z => z.guild_id === zu.guild_id && z.wort === zu.wort)) {
+                const e = new Error('Duplicate'); e.code = 'ER_DUP_ENTRY'; throw e;
+            }
+            daten.befehle.push({
+                id: ++idBasis, art: 'eigen', aktiv: 1, benutzt_anzahl: 0,
+                guild_id: zu.guild_id, streamer_id: zu.streamer_id, wort: zu.wort,
+                antwort: zu.antwort, zaehler_name: zu.zaehler_name ?? null,
+                wer: zu.wer, abkuehlung_s: zu.abkuehlung_s
+            });
             return [];
         }
         if (s.startsWith('INSERT INTO streaming_commands (guild_id, streamer_id, wort, art, aktiv)')) {
@@ -135,9 +179,15 @@ ServiceManager.register('dbService', {
             // Dieselbe Regel wie beim DELETE: Der Filter haengt daran, ob die
             // Abfrage die Bedingung wirklich stellt.
             const fragtNachGuild = s.includes('guild_id = ?');
+            // **Die letzten beiden Werte sind `id` und `guild_id`** — so ist
+            // das `WHERE` gebaut. Feste Positionen (w[4], w[5]) hingen an der
+            // Zahl der gesetzten Spalten und brachen, sobald eine dazukam;
+            // am 2026-09-05 beim Zaehlerfeld genau so passiert.
+            const kennung = Number(w[w.length - 2]);
+            const guild = String(w[w.length - 1]);
             const z = daten.befehle.find(x =>
-                x.id === Number(w[4])
-                && (!fragtNachGuild || String(x.guild_id) === String(w[5])));
+                x.id === kennung
+                && (!fragtNachGuild || String(x.guild_id) === guild));
             if (!z) return { affectedRows: 0 };
             Object.assign(z, { antwort: w[0], wer: w[1], abkuehlung_s: w[2], aktiv: w[3] });
             return { affectedRows: 1 };
@@ -204,7 +254,7 @@ const befehle = require(path.join(WURZEL, 'plugins/streaming/dashboard/kern/befe
 let idBasis = 0;
 
 function neuAufsetzen(zeilen = [], live = true, begonnenVorMs = 8100000, bausteine = []) {
-    daten.bausteine = bausteine.map(b => ({ guild_id: 'g1', streamer_id: 1, ...b }));
+    daten.bausteine = bausteine.map(b => ({ guild_id: 'g1', streamer_id: 1, art: 'text', wert: '', zahl: 0, ...b }));
     daten.streamer = [{
         id: 1, plattform: 'twitch', login: 'firedervil', anzeigename: 'FireDervil', kanal_id: 'k1',
         heim_guild_id: 'g1', ist_live: live ? 1 : 0,
@@ -453,6 +503,77 @@ console.log('\nEigene Textbausteine');
     pruefe(mitschrift.gesendet[0]?.text === 'Da: {irgendwas}',
         'und ein Name ohne Baustein bleibt stehen, statt leer zu verschwinden',
         mitschrift.gesendet[0]?.text);
+}
+
+console.log('\nZaehler');
+{
+    const bausteine = require(path.join(WURZEL, 'plugins/streaming/dashboard/kern/bausteine.js'));
+
+    pruefe(bausteine.pruefe({ name: 'tode', art: 'zaehler', zahl: 0 }) === null,
+        'ein Zaehler darf bei 0 anfangen — die uebliche Zahl');
+    pruefe(bausteine.pruefe({ name: 'tode', art: 'zaehler', zahl: -1 }) === 'zahl',
+        'unter null gibt es nicht');
+    pruefe(bausteine.pruefe({ name: 'tode', art: 'zaehler', zahl: 1.5 }) === 'zahl',
+        'und halbe Tode auch nicht');
+    pruefe(bausteine.pruefe({ name: 'spiel', art: 'zaehler', zahl: 0 }) === 'belegt',
+        'ein eingebauter Name bleibt auch fuer Zaehler vergeben');
+
+    // --- Der Normalfall ---------------------------------------------------
+    neuAufsetzen([{ wort: 'tode', antwort: 'Schon {tode} mal gestorben.', zaehler_name: 'tode' }],
+        true, 8100000, [{ id: 1, name: 'tode', art: 'zaehler', zahl: 3 }]);
+    await befehle.auswerten(nachricht('!tode'));
+    pruefe(mitschrift.gesendet[0]?.text === 'Schon 4 mal gestorben.',
+        'die Antwort nennt den NEUEN Stand, nicht den alten',
+        mitschrift.gesendet[0]?.text);
+    pruefe(daten.bausteine[0].zahl === 4, 'und in der Zeile steht er auch',
+        String(daten.bausteine[0].zahl));
+
+    // Hochzaehlen ohne ihn zu nennen — der Befehl darf schweigen und zaehlen.
+    neuAufsetzen([{ wort: 'tot', antwort: 'Autsch.', zaehler_name: 'tode' }],
+        true, 8100000, [{ id: 1, name: 'tode', art: 'zaehler', zahl: 10 }]);
+    await befehle.auswerten(nachricht('!tot'));
+    pruefe(mitschrift.gesendet[0]?.text === 'Autsch.', 'der Text bleibt, wie er ist');
+    pruefe(daten.bausteine[0].zahl === 11,
+        'und es wird trotzdem hochgezaehlt', String(daten.bausteine[0].zahl));
+
+    // --- Wann NICHT hochgezaehlt wird -------------------------------------
+    neuAufsetzen([{ wort: 'tode', antwort: '{tode}', wer: 'moderator', zaehler_name: 'tode' }],
+        true, 8100000, [{ id: 1, name: 'tode', art: 'zaehler', zahl: 7 }]);
+    await befehle.auswerten(nachricht('!tode'));
+    pruefe(daten.bausteine[0].zahl === 7,
+        'wer nicht darf, zaehlt auch nicht hoch', String(daten.bausteine[0].zahl));
+
+    neuAufsetzen([{ wort: 'tode', antwort: '{tode}', abkuehlung_s: 30, zaehler_name: 'tode' }],
+        true, 8100000, [{ id: 1, name: 'tode', art: 'zaehler', zahl: 0 }]);
+    await befehle.auswerten(nachricht('!tode'));
+    await befehle.auswerten(nachricht('!tode'));
+    pruefe(daten.bausteine[0].zahl === 1,
+        'und der zweite Aufruf in der Abkuehlung ebenso wenig',
+        String(daten.bausteine[0].zahl));
+
+    // --- Ein Textbaustein ist kein Zaehler --------------------------------
+    // **Der Fall, den `art = 'zaehler'` in der Abfrage verhindert.** Ohne ihn
+    // erhoehte `hochzaehlen` die `zahl` eines Textbausteins — unsichtbar, weil
+    // sie dort niemand liest, aber die Bedingung waere weg.
+    neuAufsetzen([{ wort: 'x', antwort: 'da', zaehler_name: 'discord' }],
+        true, 8100000, [{ id: 1, name: 'discord', art: 'text', wert: 'https://x', zahl: 0 }]);
+    await befehle.auswerten(nachricht('!x'));
+    pruefe(daten.bausteine[0].zahl === 0,
+        'ein Textbaustein wird nicht hochgezaehlt, auch wenn der Name stimmt',
+        String(daten.bausteine[0].zahl));
+    pruefe(mitschrift.gesendet.length === 1,
+        'und der Befehl antwortet trotzdem — ein fehlender Zaehler ist kein Fehler');
+
+    // --- Die Kanalzeile gewinnt auch beim Hochzaehlen ----------------------
+    neuAufsetzen([{ wort: 'tode', antwort: '{tode}', zaehler_name: 'tode' }],
+        true, 8100000, [
+            { id: 1, name: 'tode', art: 'zaehler', zahl: 100, streamer_id: null },
+            { id: 2, name: 'tode', art: 'zaehler', zahl: 5,   streamer_id: 1 }
+        ]);
+    await befehle.auswerten(nachricht('!tode'));
+    pruefe(daten.bausteine[1].zahl === 6 && daten.bausteine[0].zahl === 100,
+        'die Zeile des Kanals wird erhoeht, nicht die der Guild',
+        `Guild ${daten.bausteine[0].zahl}, Kanal ${daten.bausteine[1].zahl}`);
 }
 
 console.log('\nDie Liste der Platzhalter ist ein Vertrag, keine Behauptung');

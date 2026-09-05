@@ -598,6 +598,7 @@ router.post('/befehle/:id', requirePermission('STREAMING.CHAT.MANAGE'), async (r
     try {
         const getroffen = await befehlsModul().aendern(req.params.id, guildId, {
             antwort: req.body.antwort,
+            zaehler_name: req.body.zaehler_name,
             wer: req.body.wer,
             abkuehlung_s: req.body.abkuehlung_s,
             aktiv: req.body.aktiv ? 1 : 0

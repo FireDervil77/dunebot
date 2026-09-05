@@ -75,6 +75,16 @@ function pruefe(felder) {
     if (!NAME_FORM.test(name)) return 'name';
     if (vergebeneNamen().has(name)) return 'belegt';
 
+    if (String(felder?.art || 'text') === 'zaehler') {
+        // **Ein Zaehler hat keinen Text, sondern einen Startwert.** Ihn hier
+        // wie einen Baustein auf "nicht leer" zu pruefen wuerde `0` abweisen -
+        // und `0` ist der uebliche Anfang.
+        const zahl = Number(felder?.zahl ?? 0);
+        if (!Number.isFinite(zahl) || !Number.isInteger(zahl)) return 'zahl';
+        if (zahl < 0 || zahl > 1_000_000_000) return 'zahl';
+        return null;
+    }
+
     const wert = String(felder?.wert || '').trim();
     if (!wert) return 'wert';
     if (wert.length > WERT_MAX) return 'zu_lang';
@@ -122,7 +132,7 @@ function fremdeNamenIn(text) {
  * @returns {Promise<Map<string, string>>} Name auf Wert
  */
 async function werteFuer(guildId, streamerId, namen = null) {
-    let sql = `SELECT name, wert, streamer_id
+    let sql = `SELECT name, art, wert, zahl, streamer_id
                  FROM streaming_variables
                 WHERE guild_id = ? AND (streamer_id = ? OR streamer_id IS NULL)`;
     const werte = [String(guildId), Number(streamerId)];
@@ -136,9 +146,41 @@ async function werteFuer(guildId, streamerId, namen = null) {
     const zeilen = await db().query(sql, werte);
     const karte = new Map();
     for (const z of zeilen) {
-        if (!karte.has(z.name)) karte.set(z.name, z.wert);
+        // Ein Zaehler wird zu seiner Zahl, ein Baustein zu seinem Text. Nach
+        // aussen ist beides dasselbe: ein Name, der zu einer Zeichenkette wird.
+        if (!karte.has(z.name)) {
+            karte.set(z.name, z.art === 'zaehler' ? String(Number(z.zahl) || 0) : z.wert);
+        }
     }
     return karte;
+}
+
+/**
+ * Einen Zaehler um eins erhoehen.
+ *
+ * **Die Datenbank rechnet, nicht wir.** Ein `SELECT` gefolgt von `zahl + 1`
+ * verloere jeden zweiten Klick, wenn zwei Zuschauer den Befehl gleichzeitig
+ * tippen - der zweite schriebe den Wert des ersten zurueck. `zahl = zahl + 1`
+ * ist eine einzige Anweisung und kann das nicht.
+ *
+ * `ORDER BY streamer_id IS NULL ASC LIMIT 1` trifft dieselbe Zeile, die auch
+ * `werteFuer` gewinnen laesst: die des Kanals vor der der ganzen Guild.
+ *
+ * @param {string} guildId Guild
+ * @param {number} streamerId Kanal
+ * @param {string} name Zaehlername ohne Klammern
+ * @returns {Promise<boolean>} ob einer getroffen wurde
+ */
+async function hochzaehlen(guildId, streamerId, name) {
+    const ergebnis = await db().query(`
+        UPDATE streaming_variables
+           SET zahl = zahl + 1
+         WHERE guild_id = ? AND name = ? AND art = 'zaehler'
+           AND (streamer_id = ? OR streamer_id IS NULL)
+         ORDER BY streamer_id IS NULL ASC
+         LIMIT 1
+    `, [String(guildId), String(name).toLowerCase(), Number(streamerId)]);
+    return Boolean(ergebnis?.affectedRows);
 }
 
 /**
@@ -149,7 +191,7 @@ async function werteFuer(guildId, streamerId, namen = null) {
  */
 async function alleFuerGuild(guildId) {
     return await db().query(`
-        SELECT id, streamer_id, name, wert, angelegt_am, geaendert_am
+        SELECT id, streamer_id, name, art, wert, zahl, angelegt_am, geaendert_am
           FROM streaming_variables
          WHERE guild_id = ?
          ORDER BY name ASC
@@ -170,11 +212,14 @@ async function anlegen(guildId, streamerId, felder, von = null) {
     if (grund) return { ok: false, grund };
 
     try {
+        const art = String(felder.art || 'text') === 'zaehler' ? 'zaehler' : 'text';
         await db().query(`
-            INSERT INTO streaming_variables (guild_id, streamer_id, name, wert, angelegt_von)
-            VALUES (?, ?, ?, ?, ?)
-        `, [String(guildId), Number(streamerId), nameHerrichten(felder.name),
-            String(felder.wert).trim(), von]);
+            INSERT INTO streaming_variables
+                   (guild_id, streamer_id, name, art, wert, zahl, angelegt_von)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        `, [String(guildId), Number(streamerId), nameHerrichten(felder.name), art,
+            art === 'zaehler' ? '' : String(felder.wert).trim(),
+            art === 'zaehler' ? Number(felder.zahl ?? 0) : 0, von]);
         return { ok: true };
     } catch (fehler) {
         // **Am Schluessel, nicht an einer Vorabfrage.** Zwischen "gibt es
@@ -199,6 +244,25 @@ async function anlegen(guildId, streamerId, felder, von = null) {
  * @returns {Promise<{ok: boolean, grund?: string}>} Ergebnis
  */
 async function aendern(id, guildId, felder) {
+    // **Die Art kommt aus der Zeile, nicht aus dem Formular.** Sonst koennte
+    // ein manipuliertes Formular aus einem Zaehler einen Baustein machen - und
+    // der Stand waere weg, ohne dass es jemand wollte.
+    const zeilen = await db().query(
+        'SELECT art FROM streaming_variables WHERE id = ? AND guild_id = ?',
+        [Number(id), String(guildId)]);
+    if (!zeilen.length) return { ok: false, grund: 'weg' };
+
+    if (zeilen[0].art === 'zaehler') {
+        const zahl = Number(felder?.zahl);
+        if (!Number.isInteger(zahl) || zahl < 0 || zahl > 1_000_000_000) {
+            return { ok: false, grund: 'zahl' };
+        }
+        const ergebnis = await db().query(
+            'UPDATE streaming_variables SET zahl = ? WHERE id = ? AND guild_id = ?',
+            [zahl, Number(id), String(guildId)]);
+        return { ok: Boolean(ergebnis?.affectedRows) };
+    }
+
     const wert = String(felder?.wert || '').trim();
     if (!wert) return { ok: false, grund: 'wert' };
     if (wert.length > WERT_MAX) return { ok: false, grund: 'zu_lang' };
@@ -227,5 +291,5 @@ async function entfernen(id, guildId) {
 module.exports = {
     NAME_FORM, WERT_MAX,
     pruefe, nameHerrichten, vergebeneNamen, fremdeNamenIn,
-    werteFuer, alleFuerGuild, anlegen, aendern, entfernen
+    werteFuer, hochzaehlen, alleFuerGuild, anlegen, aendern, entfernen
 };
