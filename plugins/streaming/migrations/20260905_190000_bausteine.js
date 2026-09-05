@@ -72,7 +72,11 @@ module.exports = {
 
                 -- Einen Namen kann es je Guild und Kanal nur einmal geben.
                 -- Ohne diesen Schluessel entstuenden zwei Zeilen fuer
-                -- `{discord}`, und welche gilt, entschiede die Sortierung.
+                -- {discord}, und welche gilt, entschiede die Sortierung.
+                -- (Ohne Schraegstriche drumherum: Ein Backtick in diesem
+                --  Kommentar schliesst das JS-Template-Literal und die Datei
+                --  laesst sich nicht mehr laden. Am 2026-09-05 zweimal
+                --  passiert, siehe scripts/check-migrationen.js.)
                 UNIQUE KEY uniq_name (guild_id, streamer_id, name),
                 KEY idx_guild (guild_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
