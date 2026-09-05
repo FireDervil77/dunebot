@@ -128,10 +128,13 @@ function zustand() {
  * ein zweiter Anbieter passte nie hinein
  * (`scripts/check-streaming-schichten.js`).
  *
- * **Was der Uebersetzer bewusst NICHT liefert:** den Text der Nachricht und
- * wer sie geschrieben hat (bei Twitch `message.text` und `chatter_user_*`).
- * Wer das spaeter braucht, baut es mit einer Rechtsgrundlage und einer
- * Aufbewahrungsfrist, nicht nebenbei in einem Zaehler.
+ * **Text und Absender kommen seit Stufe 15 mit** (2026-09-05). Hier stand
+ * vorher, der Uebersetzer liefere sie bewusst nicht — „wer das spaeter
+ * braucht, baut es mit einer Rechtsgrundlage und einer Aufbewahrungsfrist,
+ * nicht nebenbei in einem Zaehler". Der Satz bleibt richtig; die
+ * Aufbewahrungsfrist ist **null**. Der Befehlsauswerter liest den Text,
+ * antwortet und vergisst ihn — gezaehlt wird weiterhin nur die Menge, und
+ * gespeichert wird von der Nachricht gar nichts.
  *
  * @param {Object} nutz Der Nutzteil der Nachricht
  * @returns {void}
@@ -145,6 +148,29 @@ function chatGezaehlt(nutz) {
     eintrag.anzahl++;
     eintrag.letzte = new Date();
     chat.set(kanal.kanalId, eintrag);
+
+    // **Nicht erwartet und nicht abgewartet.** Der Auswerter fragt die
+    // Datenbank und ruft Twitch — beides dauert laenger als die naechste
+    // Chatnachricht auf sich warten laesst. Wer hier `await` schriebe, machte
+    // aus dem Empfang eine Warteschlange und verpasste `session_keepalive`.
+    //
+    // Und er darf die Leitung nicht mitreissen: Ein kaputter Befehl ist ein
+    // Protokolleintrag, kein Grund, den Empfang zu beenden.
+    befehle().auswerten(kanal)
+        .then((was) => { if (was) log().debug(`[Streaming/Befehle] ${was}`); })
+        .catch((err) => log().error('[Streaming/Befehle] Auswertung fehlgeschlagen', err));
+}
+
+/**
+ * Der Auswerter, spaet geholt.
+ *
+ * `kern/befehle` zieht den Verbindungsspeicher und die Plattform nach sich; ein
+ * `require` am Kopf dieser Datei machte den Eingang von der Ausgabe abhaengig.
+ *
+ * @returns {Object} Befehlsmodul
+ */
+function befehle() {
+    return require('../kern/befehle');
 }
 
 /**

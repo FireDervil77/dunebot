@@ -78,25 +78,37 @@ const SEITEN = {
         ],
 
         vorhanden: [
-            { was: 'Der Bot liest im Chat mit', wo: 'conduit.chatGezaehlt()' },
-            { was: 'Der Bot kann senden (seit 13c)', wo: 'twitch.chatSenden()' },
-            { was: 'Die Heim-Guild ist bekannt', wo: 'heimguild.istHeim()' }
+            { was: 'Der Auswerter (seit Stufe 15)', wo: 'kern/befehle.auswerten()' },
+            { was: 'Die Tabelle für eigene Befehle', wo: 'streaming_commands' },
+            { was: 'Fertige Befehle', wo: '!uptime, !spiel, !befehle' },
+            { was: 'Der Bot kann senden (seit 13c)', wo: 'twitch.chatSenden()' }
         ],
 
         fehlt: [
-            { was: 'Der Auswerter',
-              warum: 'Der Empfang <b>zählt</b> Nachrichten heute nur — er reicht den Text nicht weiter. '
-                   + 'Es fehlt die Stelle, die aus „!uptime“ eine Antwort macht.' },
-            { was: 'Ein Ort für eigene Befehle',
-              warum: 'Tabelle, Ansicht, Rechte. Überschaubar, sobald die Rechtsfrage steht.' }
+            { was: 'Diese Seite',
+              warum: 'Die Maschine läuft, der Ort zum Einrichten fehlt noch — Liste, Formular, '
+                   + 'Rechte. Bis dahin steht kein Befehl in der Tabelle, und der Auswerter '
+                   + 'antwortet auf nichts.' }
         ],
 
-        sperre: {
-            titel: 'Erst die Rechtsfrage, dann der Baukasten',
-            text: 'Ein Befehlsauswerter liest Nachrichten fremder Menschen. Solange nicht geklärt ist, '
-                + '<b>ob, wie lange und wofür</b> das zulässig ist, wird nichts gespeichert — die '
-                + 'Entscheidung aus 13a gilt weiter und wird nicht nebenbei in einem Befehlsbaukasten '
-                + 'aufgeweicht. Heute nimmt der Empfang nur die Kanalkennung mit: kein Text, kein Absender.'
+        // **Die Sperre ist aufgelöst** (2026-09-05, Entscheidung des Betreibers).
+        //
+        // Hier stand „Erst die Rechtsfrage, dann der Baukasten — ein
+        // Befehlsauswerter liest Nachrichten fremder Menschen". Der Einwand des
+        // Betreibers trifft: Zwischen Twitch und dem Streamer besteht die
+        // Autorisierung bereits; wir bauen die nutzbare Plattform darauf, wie
+        // Wizebot und Nightbot es auch tun.
+        //
+        // Und was die Sperre wirklich schützte, war das SPEICHERN. Das passiert
+        // nicht: Der Auswerter sieht den Text im Arbeitsspeicher, antwortet und
+        // vergisst ihn. `streaming_commands` hat für Text und Absender keine
+        // Spalte, und `scripts/check-streaming-befehle.js` prüft beides — an
+        // Werten, die sonst nirgends vorkommen.
+        hinweis: {
+            titel: 'Was gespeichert wird — und was nicht',
+            text: 'In die Tabelle kommt nur, was <b>du</b> schreibst: dein Wort und deine Antwort. '
+                + 'Vom Chat wird nichts aufbewahrt — kein Text, kein Absender. Gezählt wird eine '
+                + 'Summe ohne Person: <i>wie oft</i> ein Befehl benutzt wurde, nicht von wem.'
         },
 
         verweise: [{ text: 'Mein Kanal', url: 'chatbot' }]

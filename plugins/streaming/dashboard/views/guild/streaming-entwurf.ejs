@@ -153,6 +153,26 @@ const basis = `/guild/${guildId}/plugins/streaming`;
     </div>
   <% } %>
 
+  <%# ---- Ein Hinweis, der keine Sperre ist ---------------------------------
+      Unterschied mit Absicht: Eine `sperre` haelt auf, ein `hinweis` erklaert.
+      Der Befehlsbaukasten hatte bis zum 2026-09-05 eine Sperre („erst die
+      Rechtsfrage"); aufgeloest ist sie nicht verschwunden, sondern zu dem
+      geworden, was von ihr bleibt — die Zusage, was gespeichert wird. Gelb
+      waere dafuer falsch. %>
+  <% if (seite.hinweis) { %>
+    <div class="col-12">
+      <div class="alert alert-info" role="alert">
+        <div class="d-flex">
+          <div class="me-3"><i class="fa-solid fa-circle-info"></i></div>
+          <div>
+            <h4 class="alert-title"><%= seite.hinweis.titel %></h4>
+            <div class="text-secondary"><%- seite.hinweis.text %></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% } %>
+
   <%# ---- Wohin es von hier weitergeht ------------------------------------- %>
   <% if ((seite.verweise || []).length) { %>
     <div class="col-12">

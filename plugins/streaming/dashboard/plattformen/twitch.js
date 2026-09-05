@@ -460,9 +460,33 @@ async function chatAbonnieren(kanalId, botKontoId, conduitId) {
 function chatAus(koerper) {
     const e = koerper?.event;
     if (!e || !e.broadcaster_user_id) return null;
+
+    // **Text und Absender kommen seit Stufe 15 mit** (2026-09-05).
+    //
+    // Bis dahin liess der Uebersetzer beides bewusst weg, mit der Begruendung
+    // "wer das braucht, baut es mit einer Rechtsgrundlage und einer
+    // Aufbewahrungsfrist, nicht nebenbei in einem Zaehler". Der Satz bleibt
+    // richtig — nur ist die Aufbewahrungsfrist hier **null**: Der Auswerter
+    // liest den Text, antwortet und vergisst ihn. Gespeichert wird nichts
+    // davon, und `streaming_commands` hat fuer beides gar keine Spalte.
+    //
+    // Die Abzeichen sind Twitchs Wort fuer "wer darf was". Sie werden HIER
+    // uebersetzt und nicht im Kern verglichen — sonst zoege sich `set_id`
+    // durch das ganze Plugin (`scripts/check-streaming-schichten.js`).
+    const abzeichen = new Set((Array.isArray(e.badges) ? e.badges : [])
+        .map(b => String(b?.set_id || '')));
+
     return {
         kanalId: String(e.broadcaster_user_id),
-        kanalName: e.broadcaster_user_name || e.broadcaster_user_login || null
+        kanalName: e.broadcaster_user_name || e.broadcaster_user_login || null,
+
+        text: typeof e.message?.text === 'string' ? e.message.text : null,
+        absender: e.chatter_user_name || e.chatter_user_login || null,
+        absenderId: e.chatter_user_id ? String(e.chatter_user_id) : null,
+
+        istInhaber:   abzeichen.has('broadcaster'),
+        istModerator: abzeichen.has('moderator'),
+        istAbonnent:  abzeichen.has('subscriber') || abzeichen.has('founder')
     };
 }
 
