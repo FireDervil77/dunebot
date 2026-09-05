@@ -205,7 +205,11 @@ async function auswerten(kanal) {
     // Erst jetzt wird die Datenbank gefragt. Bei jeder Chatnachricht eine
     // Abfrage waere der Preis dafuer, dass jemand "hallo" schreibt.
     const streamer = (await db().query(
-        `SELECT s.id, s.login, s.anzeigename, s.kanal_id, s.heim_guild_id,
+        // `s.plattform` sieht ueberfluessig aus - der Chat kommt schliesslich
+        // von Twitch. Es ist aber der Parameter, mit dem `kanalInhaber` sucht,
+        // und eine fehlende Spalte ist in JS kein Fehler, sondern `undefined`.
+        // Am 2026-09-05 hat mysql2 daran den ersten echten `!uptime` zerlegt.
+        `SELECT s.id, s.plattform, s.login, s.anzeigename, s.kanal_id, s.heim_guild_id,
                 z.ist_live, z.titel, z.kategorie, z.begonnen_am
            FROM streaming_streamers s
            LEFT JOIN streaming_state z ON z.streamer_id = s.id

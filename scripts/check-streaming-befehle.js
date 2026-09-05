@@ -26,6 +26,25 @@ function pruefe(gut, text, zusatz = '') {
     console.log(`  ${gut ? '✓' : '✗'} ${text}${zusatz ? '  — ' + zusatz : ''}`);
 }
 
+/**
+ * Welche Spalten erfragt ein SELECT?
+ *
+ * Tabellenkuerzel (`s.`, `z.`) und `AS`-Namen fallen weg — uebrig bleibt, wie
+ * das Feld in der Zeile heisst, die mysql2 zurueckgibt.
+ *
+ * @param {string} sql Abfrage in einer Zeile
+ * @returns {Array<string>} Feldnamen
+ */
+function spaltenAus(sql) {
+    const teil = /^SELECT\s+(.*?)\s+FROM\s/i.exec(sql);
+    if (!teil) return [];
+    return teil[1].split(',').map(roh => {
+        const alias = /\s+AS\s+([A-Za-z0-9_]+)\s*$/i.exec(roh);
+        if (alias) return alias[1];
+        return roh.trim().replace(/^[A-Za-z0-9_]+\./, '');
+    }).filter(Boolean);
+}
+
 // --- Attrappen -----------------------------------------------------------
 const daten = { streamer: [], befehle: [] };
 const mitschrift = { schreibzugriffe: [], gesendet: [], unbekannt: [] };
@@ -37,8 +56,18 @@ ServiceManager.register('dbService', {
     async query(sql, w = []) {
         const s = String(sql).replace(/\s+/g, ' ').trim();
 
-        if (s.startsWith('SELECT s.id, s.login, s.anzeigename, s.kanal_id, s.heim_guild_id')) {
-            return daten.streamer.filter(x => String(x.kanal_id) === String(w[0]));
+        if (/^SELECT .* FROM streaming_streamers s\b/.test(s)) {
+            // **Die Attrappe gibt zurueck, was die Abfrage erfragt — nicht,
+            // was der Fall vorbereitet hat.** Vorher lieferte sie die ganze
+            // Zeile, egal welche Spalten dastanden. Deshalb blieb am
+            // 2026-09-05 gruen, dass `s.plattform` in der Abfrage fehlte:
+            // `kanalInhaber` bekam `undefined`, und mysql2 hat den ersten
+            // echten `!uptime` damit zerlegt. Eine Attrappe, die grosszuegiger
+            // ist als die Datenbank, prueft nichts — sie beruhigt.
+            const spalten = spaltenAus(s);
+            return daten.streamer
+                .filter(x => String(x.kanal_id) === String(w[0]))
+                .map(x => Object.fromEntries(spalten.map(k => [k, x[k]])));
         }
         if (s.startsWith('SELECT id, wort, art, antwort, wer, abkuehlung_s')) {
             return daten.befehle.filter(x =>
@@ -121,7 +150,23 @@ require.cache[vsPfad] = { id: vsPfad, filename: vsPfad, loaded: true, exports: {
 const abPfad = require.resolve(path.join(WURZEL, 'plugins/streaming/dashboard/kern/abonnenten.js'));
 const echteAb = require(abPfad);
 require.cache[abPfad].exports = Object.assign({}, echteAb, {
-    async kanalInhaber() { return 'nutzer-1'; }
+    /**
+     * **Sie prueft, was ihr gegeben wird.** Der echte `kanalInhaber` sucht mit
+     * `plattform` UND `kanal_id`; fehlt eine davon, ist der Bindewert
+     * `undefined` und mysql2 wirft. Eine Attrappe, die das Argument gar nicht
+     * ansieht, macht diesen Fehler unsichtbar — und genau so ist er in die
+     * Anlage gekommen.
+     */
+    async kanalInhaber(streamer) {
+        for (const feld of ['plattform', 'kanal_id']) {
+            if (streamer?.[feld] === undefined || streamer?.[feld] === null) {
+                throw new Error(
+                    `kanalInhaber ohne \`${feld}\` gerufen — mysql2 wuerde hier werfen `
+                    + '("Bind parameters must not contain undefined")');
+            }
+        }
+        return 'nutzer-1';
+    }
 });
 
 const befehle = require(path.join(WURZEL, 'plugins/streaming/dashboard/kern/befehle.js'));
@@ -138,7 +183,7 @@ let idBasis = 0;
 
 function neuAufsetzen(zeilen = [], live = true, begonnenVorMs = 8100000) {
     daten.streamer = [{
-        id: 1, login: 'firedervil', anzeigename: 'FireDervil', kanal_id: 'k1',
+        id: 1, plattform: 'twitch', login: 'firedervil', anzeigename: 'FireDervil', kanal_id: 'k1',
         heim_guild_id: 'g1', ist_live: live ? 1 : 0,
         titel: 'Erster Versuch', kategorie: 'Astro Colony',
         begonnen_am: live ? new Date(Date.now() - begonnenVorMs) : null
