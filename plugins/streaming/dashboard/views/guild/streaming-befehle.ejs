@@ -1,0 +1,280 @@
+<%
+/**
+ * Meine Befehle (Stufe 15) — nach dem Entwurf.
+ *
+ * Zwei Karten, wie gezeichnet: erst die fertigen (anschalten reicht), dann die
+ * eigenen (Wort, Antwort, wer darf).
+ *
+ * **`!discord` steht nicht bei den fertigen**, obwohl der Entwurf ihn dort
+ * zeigt. Die Anlage kennt die Einladungsadresse einer Guild nicht, und sie zu
+ * erfinden wäre schlimmer als sie wegzulassen. Er ist als Vorschlag im
+ * Anlegen-Formular hinterlegt — der Streamer setzt seinen Link ein.
+ *
+ * Erwartet: eigene, fertigZeilen, FERTIG, PRAEFIX, kanaele, vorWieLange
+ */
+const darfAendern = typeof hasPermission === 'function' && hasPermission('STREAMING.CHAT.MANAGE');
+const anFertig = new Set((fertigZeilen || []).filter(z => z.aktiv).map(z => z.wort));
+const zahlFertig = new Map((fertigZeilen || []).map(z => [z.wort, z.benutzt_anzahl]));
+
+const WER = [
+  ['alle',      'alle'],
+  ['abonnent',  'Abonnenten'],
+  ['moderator', 'Moderatoren'],
+  ['inhaber',   'nur ich']
+];
+
+const fehlerTexte = {
+  wort:      'Das Wort darf nur Buchstaben, Ziffern, Bindestrich und Unterstrich enthalten — höchstens 32 Zeichen.',
+  antwort:   'Ohne Antwort hätte der Befehl nichts zu sagen.',
+  doppelt:   'Dieses Wort gibt es hier schon.',
+  belegt:    'So heißt bereits ein fertiger Befehl.',
+  weg:       'Diesen Befehl gibt es nicht mehr.',
+  technisch: 'Das hat technisch nicht geklappt. Der Grund steht im Protokoll.'
+};
+const meldungen = {
+  neu:         'Befehl angelegt. Er antwortet ab sofort.',
+  gespeichert: 'Gespeichert.',
+  entfernt:    'Befehl entfernt.'
+};
+%>
+
+<%- include('partials/streaming-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-terminal',
+  titel: 'Meine Befehle',
+  beschreibung: 'Was der Bot antwortet, wenn jemand etwas in deinen Chat tippt.',
+  aktion: darfAendern
+    ? '<button class="btn btn-primary" type="button" data-bs-toggle="collapse" '
+      + 'data-bs-target="#befehl-anlegen">Befehl anlegen</button>'
+    : ''
+}) %>
+
+<% if (meldung && meldungen[meldung]) { %>
+  <div class="alert alert-success"><%= meldungen[meldung] %></div>
+<% } %>
+<% if (fehler) { %>
+  <div class="alert alert-danger"><%= fehlerTexte[fehler] || fehlerTexte.technisch %></div>
+<% } %>
+
+<div class="row row-cards">
+
+  <%# ── Anlegen: ein Knopf, kein Dauerformular ─────────────────────────── %>
+  <div class="col-12 collapse <%= (eigene || []).length ? '' : 'show' %>" id="befehl-anlegen">
+    <div class="card">
+      <div class="card-header">
+        <div class="kartenkopf">
+          <span class="kartensymbol"><i class="fa-solid fa-plus"></i></span>
+          <div class="kartenkopf__text">
+            <h3 class="kartenkopf__titel">Eigenen Befehl anlegen</h3>
+            <div class="kartenkopf__satz">
+              Du gibst das Wort vor — etwa <code><%= PRAEFIX %>regeln</code> —
+              und den Text, mit dem der Bot antwortet.
+            </div>
+          </div>
+        </div>
+      </div>
+      <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/befehle">
+        <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+        <div class="card-body">
+          <div class="zeilen">
+            <div class="zeile">
+              <div class="zeile__bez">
+                Wort
+                <small>ohne <%= PRAEFIX %>, kleingeschrieben</small>
+              </div>
+              <div>
+                <div class="input-group">
+                  <span class="input-group-text"><%= PRAEFIX %></span>
+                  <input type="text" class="form-control" name="wort" required
+                         maxlength="32" pattern="[A-Za-z0-9_-]{1,32}"
+                         placeholder="regeln" autocomplete="off">
+                </div>
+                <div class="zeile__hilfe">
+                  Häufig: <code>regeln</code>, <code>discord</code>, <code>social</code>,
+                  <code>spenden</code>. <strong><%= PRAEFIX %>discord</strong> ist bewusst
+                  kein fertiger Befehl — deine Einladungsadresse kennt nur du.
+                </div>
+              </div>
+            </div>
+
+            <div class="zeile">
+              <div class="zeile__bez">Antwort</div>
+              <div>
+                <textarea class="form-control" name="antwort" rows="2" required
+                          maxlength="500" placeholder="Sei nett zueinander."></textarea>
+                <div class="chips mt-2">
+                  <span class="chip mono" title="Dein Kanalname">{streamer}</span>
+                  <span class="chip mono" title="Wer den Befehl getippt hat">{absender}</span>
+                  <span class="chip mono" title="Die laufende Kategorie">{spiel}</span>
+                  <span class="chip mono" title="Der Streamtitel">{titel}</span>
+                  <span class="chip mono" title="Wie lange der Stream läuft">{uptime}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="zeile">
+              <div class="zeile__bez">Wer darf</div>
+              <div>
+                <select class="form-select" name="wer">
+                  <% WER.forEach(w => { %><option value="<%= w[0] %>"><%= w[1] %></option><% }); %>
+                </select>
+              </div>
+            </div>
+
+            <div class="zeile">
+              <div class="zeile__bez">
+                Abkühlung
+                <small>Sekunden zwischen zwei Antworten</small>
+              </div>
+              <div>
+                <input type="number" class="form-control" style="max-width:8rem"
+                       name="abkuehlung_s" min="0" max="3600" step="1" value="5">
+                <div class="zeile__hilfe">
+                  Ohne sie macht ein einzelner Zuschauer aus einem Befehl eine Textwand.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card-footer text-end">
+          <button type="submit" class="btn btn-primary">Anlegen</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <%# ── Fertige Befehle ──────────────────────────────────────────────────── %>
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <div class="kartenkopf">
+          <span class="kartensymbol"><i class="fa-solid fa-bolt"></i></span>
+          <div class="kartenkopf__text">
+            <h3 class="kartenkopf__titel">Fertige Befehle</h3>
+            <div class="kartenkopf__satz">Anschalten reicht — der Text kommt aus dem System.</div>
+          </div>
+        </div>
+      </div>
+      <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/befehle/fertig">
+        <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+        <div class="card-body">
+          <div class="zeilen">
+            <% Object.keys(FERTIG).forEach(wort => { %>
+              <div class="zeile">
+                <div class="zeile__bez">
+                  <code><%= PRAEFIX %><%= wort %></code>
+                  <small><%= FERTIG[wort].beschreibung %></small>
+                </div>
+                <div>
+                  <label class="form-check form-switch">
+                    <input type="checkbox" class="form-check-input" name="fertig" value="<%= wort %>"
+                           <%= anFertig.has(wort) ? 'checked' : '' %>
+                           <%= darfAendern ? '' : 'disabled' %>>
+                    <span class="form-check-label">an</span>
+                  </label>
+                  <% if (zahlFertig.get(wort)) { %>
+                    <div class="zeile__hilfe"><%= zahlFertig.get(wort) %>× benutzt</div>
+                  <% } %>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+        </div>
+        <% if (darfAendern) { %>
+          <div class="card-footer text-end">
+            <button type="submit" class="btn btn-primary">Speichern</button>
+          </div>
+        <% } %>
+      </form>
+    </div>
+  </div>
+
+  <%# ── Eigene Befehle ───────────────────────────────────────────────────── %>
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <div class="kartenkopf">
+          <span class="kartensymbol"><i class="fa-solid fa-pen"></i></span>
+          <div class="kartenkopf__text">
+            <h3 class="kartenkopf__titel">Eigene Befehle</h3>
+            <div class="kartenkopf__satz">Ein Wort, eine Antwort, und wer ihn benutzen darf.</div>
+          </div>
+        </div>
+      </div>
+
+      <% if (!(eigene || []).length) { %>
+        <div class="card-body">
+          <%- include('shared/leerzustand', {
+                icon:  'fa-solid fa-terminal',
+                titel: 'Noch kein eigener Befehl',
+                text:  'Leg einen an: Du gibst das Wort vor — etwa ' + PRAEFIX + 'regeln — '
+                     + 'und den Text, mit dem der Bot antwortet.'
+              }) %>
+        </div>
+      <% } else { %>
+        <div class="card-body">
+          <div class="zeilen">
+            <% eigene.forEach(b => { %>
+              <%# Ein Formular JE BEFEHL. Ein gemeinsames haette beim Speichern
+                  des einen die Felder der anderen mitgeschickt — und wer eine
+                  Antwort leert, haette alle geleert. %>
+              <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/befehle/<%= b.id %>"
+                    class="zeile">
+                <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+                <div class="zeile__bez">
+                  <code><%= PRAEFIX %><%= b.wort %></code>
+                  <small>
+                    <%= b.benutzt_anzahl %>× benutzt<%
+                      %><% if (b.benutzt_am) { %>, zuletzt <%= vorWieLange(b.benutzt_am) %><% } %>
+                  </small>
+                </div>
+                <div>
+                  <textarea class="form-control" name="antwort" rows="2" maxlength="500"
+                            <%= darfAendern ? '' : 'disabled' %>><%= b.antwort || '' %></textarea>
+
+                  <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+                    <select class="form-select form-select-sm" style="max-width:11rem" name="wer"
+                            <%= darfAendern ? '' : 'disabled' %>>
+                      <% WER.forEach(w => { %>
+                        <option value="<%= w[0] %>" <%= b.wer === w[0] ? 'selected' : '' %>><%= w[1] %></option>
+                      <% }); %>
+                    </select>
+
+                    <div class="input-group input-group-sm" style="max-width:9rem">
+                      <input type="number" class="form-control" name="abkuehlung_s"
+                             min="0" max="3600" step="1" value="<%= b.abkuehlung_s %>"
+                             <%= darfAendern ? '' : 'disabled' %>>
+                      <span class="input-group-text">s</span>
+                    </div>
+
+                    <label class="form-check form-switch mb-0">
+                      <input type="checkbox" class="form-check-input" name="aktiv" value="1"
+                             <%= b.aktiv ? 'checked' : '' %> <%= darfAendern ? '' : 'disabled' %>>
+                      <span class="form-check-label">an</span>
+                    </label>
+
+                    <% if (darfAendern) { %>
+                      <button type="submit" class="btn btn-sm btn-primary ms-auto">Speichern</button>
+                    <% } %>
+                  </div>
+                </div>
+              </form>
+
+              <% if (darfAendern) { %>
+                <%# Das Entfernen steht in einem EIGENEN Formular — verschachtelt
+                    ginge es nicht, und im selben Formular waere ein zweiter
+                    Absendeknopf neben "Speichern" eine Falle. %>
+                <form method="POST" class="text-end"
+                      action="/guild/<%= guildId %>/plugins/streaming/befehle/<%= b.id %>/entfernen"
+                      onsubmit="return confirm('<%= PRAEFIX %><%= b.wort %> entfernen?');">
+                  <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+                  <button type="submit" class="btn btn-sm btn-ghost-danger">Entfernen</button>
+                </form>
+              <% } %>
+            <% }); %>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>

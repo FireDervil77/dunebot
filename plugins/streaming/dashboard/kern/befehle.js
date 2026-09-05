@@ -301,8 +301,133 @@ async function senden(streamer, text) {
     return { ok: true, grund: null };
 }
 
+// =====================================================
+// Verwaltung — was die Seite braucht
+// =====================================================
+//
+// **Die Guild-Kennung steht in JEDER Abfrage**, auch bei `id`-Zugriffen. Eine
+// Kennung aus der Adresse ist eine Behauptung des Aufrufers; ohne das `AND
+// guild_id = ?` koennte eine Guild die Befehle einer anderen aendern, und die
+// Rechtepruefung am Router saehe trotzdem richtig aus.
+
+/**
+ * Alle Befehle einer Guild — auch die abgeschalteten.
+ *
+ * @param {string} guildId Discord-Guild-ID
+ * @returns {Promise<Array<Object>>} Zeilen
+ */
+async function alleFuerGuild(guildId) {
+    return await db().query(
+        `SELECT id, streamer_id, wort, art, antwort, wer, abkuehlung_s, aktiv,
+                benutzt_anzahl, benutzt_am
+           FROM streaming_commands
+          WHERE guild_id = ?
+          ORDER BY art DESC, wort ASC`, [guildId]);
+}
+
+/**
+ * Einen eigenen Befehl anlegen.
+ *
+ * @param {string} guildId Discord-Guild-ID
+ * @param {number|null} streamerId Kanal, oder null fuer alle der Guild
+ * @param {Object} f Felder
+ * @param {string} userId Wer ihn anlegt
+ * @returns {Promise<{ok: boolean, grund: string|null}>} Ergebnis
+ */
+async function anlegen(guildId, streamerId, f, userId) {
+    const wort = String(f.wort || '').trim().replace(/^!+/, '').toLowerCase();
+    if (!/^[a-z0-9_-]{1,32}$/.test(wort)) {
+        return { ok: false, grund: 'wort' };
+    }
+    if (FERTIG[wort]) {
+        // Ein eigener Befehl darf nicht heissen wie ein fertiger — sonst
+        // entschiede die Sortierung, welcher antwortet.
+        return { ok: false, grund: 'belegt' };
+    }
+    if (!String(f.antwort || '').trim()) return { ok: false, grund: 'antwort' };
+
+    try {
+        await db().query(
+            `INSERT INTO streaming_commands
+               (guild_id, streamer_id, wort, art, antwort, wer, abkuehlung_s, angelegt_von)
+             VALUES (?, ?, ?, 'eigen', ?, ?, ?, ?)`,
+            [guildId, streamerId, wort, String(f.antwort).slice(0, 500),
+             RANG[f.wer] === undefined ? 'alle' : f.wer,
+             Math.max(0, Math.min(3600, Number(f.abkuehlung_s) || 0)), userId || null]);
+        return { ok: true, grund: null };
+    } catch (err) {
+        // Der eindeutige Schluessel ist die Wahrheit, nicht eine Vorabfrage:
+        // Zwischen "gibt es schon?" und `INSERT` passt ein zweiter Aufruf.
+        if (String(err?.code) === 'ER_DUP_ENTRY') return { ok: false, grund: 'doppelt' };
+        throw err;
+    }
+}
+
+/**
+ * Einen Befehl aendern.
+ *
+ * Das Wort bleibt, wie es ist — es umzubenennen waere ein anderer Befehl, und
+ * die Zuschauer haetten den alten im Kopf. Wer ihn anders nennen will, legt
+ * einen neuen an.
+ *
+ * @param {number} id Befehl
+ * @param {string} guildId Discord-Guild-ID
+ * @param {Object} f Felder
+ * @returns {Promise<boolean>} true, wenn eine Zeile getroffen wurde
+ */
+async function aendern(id, guildId, f) {
+    const ergebnis = await db().query(
+        `UPDATE streaming_commands
+            SET antwort = ?, wer = ?, abkuehlung_s = ?, aktiv = ?
+          WHERE id = ? AND guild_id = ?`,
+        [f.antwort === undefined ? null : String(f.antwort).slice(0, 500),
+         RANG[f.wer] === undefined ? 'alle' : f.wer,
+         Math.max(0, Math.min(3600, Number(f.abkuehlung_s) || 0)),
+         f.aktiv ? 1 : 0, Number(id), guildId]);
+    return Boolean(ergebnis?.affectedRows);
+}
+
+/**
+ * Einen Befehl entfernen.
+ *
+ * @param {number} id Befehl
+ * @param {string} guildId Discord-Guild-ID
+ * @returns {Promise<boolean>} true, wenn eine Zeile getroffen wurde
+ */
+async function entfernen(id, guildId) {
+    const ergebnis = await db().query(
+        'DELETE FROM streaming_commands WHERE id = ? AND guild_id = ?', [Number(id), guildId]);
+    return Boolean(ergebnis?.affectedRows);
+}
+
+/**
+ * Die fertigen Befehle einer Guild auf eine Auswahl bringen.
+ *
+ * **Abwaehlen schaltet ab, es loescht nicht.** Ein fertiger Befehl traegt keine
+ * Eingabe des Streamers, aber seine Benutzungszahl — und die ist eine Auskunft,
+ * die beim Wiedereinschalten nicht bei null anfangen soll.
+ *
+ * @param {string} guildId Discord-Guild-ID
+ * @param {number|null} streamerId Kanal
+ * @param {Array<string>} gewaehlt Worte
+ * @returns {Promise<void>}
+ */
+async function fertigSetzen(guildId, streamerId, gewaehlt) {
+    const will = new Set((gewaehlt || []).filter(w => FERTIG[w]));
+
+    for (const wort of Object.keys(FERTIG)) {
+        const an = will.has(wort) ? 1 : 0;
+        await db().query(
+            `INSERT INTO streaming_commands (guild_id, streamer_id, wort, art, aktiv)
+             VALUES (?, ?, ?, 'fertig', ?)
+             ON DUPLICATE KEY UPDATE aktiv = VALUES(aktiv), art = 'fertig'`,
+            [guildId, streamerId, wort, an]);
+    }
+}
+
 module.exports = {
     PRAEFIX, FERTIG, RANG,
+    alleFuerGuild, anlegen, aendern, entfernen, fertigSetzen,
     zerlegen, darf, fuellen, dauerText,
     befehleFuer, auswerten
 };

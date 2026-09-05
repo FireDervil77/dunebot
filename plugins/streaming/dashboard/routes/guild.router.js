@@ -191,7 +191,12 @@ router.get('/', requirePermission('STREAMING.VIEW'), async (req, res) => {
 //
 // Alle fuenf Entwurfsseiten gehoeren dem Kanalinhaber, also tragen alle
 // dasselbe Recht.
-require('../entwuerfe').namen().forEach((name) => {
+require('../entwuerfe').namen()
+    // `befehle` ist seit Stufe 15 keine Entwurfsseite mehr — eigene Route
+    // weiter unten. Der Eintrag bleibt in `entwuerfe.js` stehen, weil er die
+    // Beschreibung und den Hinweis traegt, die dort gepflegt werden.
+    .filter(name => name !== 'befehle')
+    .forEach((name) => {
     const daten = require('../entwuerfe').seite(name);
 
     router.get(`/${name}`, requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
@@ -504,6 +509,114 @@ async function zielSeite(seite, req, res) {
         return renderFehler(res, error, 'Die Seite konnte nicht geladen werden');
     }
 }
+
+// =====================================================
+// Meine Befehle (Stufe 15)
+// =====================================================
+//
+// **Nur in der Heim-Guild.** Ein Kanal hat genau eine; dort richtet sein
+// Inhaber die Befehle ein. Ohne diese Schranke koennte jede Guild, die den
+// Kanal beobachtet, in seinen Chat schreiben lassen.
+async function befehlsSeite(req, res, meldung, fehler) {
+    const guildId = res.locals.guildId;
+    const tr = makeTranslator(req, res);
+
+    const heimguild = require('../kern/heimguild');
+    if (!await heimguild.istHeim(guildId)) {
+        return res.redirect(`/guild/${guildId}/plugins/streaming`);
+    }
+
+    const [zeilen, kanaele] = await Promise.all([
+        befehlsModul().alleFuerGuild(guildId),
+        heimguild.kanaeleDerGuild(guildId)
+    ]);
+
+    await renderView(res, 'guild/streaming-befehle', {
+        tr, guildId, kanaele,
+        eigene: zeilen.filter(z => z.art !== 'fertig'),
+        fertigZeilen: zeilen.filter(z => z.art === 'fertig'),
+        FERTIG: befehlsModul().FERTIG,
+        PRAEFIX: befehlsModul().PRAEFIX,
+        vorWieLange,
+        meldung: meldung || req.query.ok || null,
+        fehler: fehler || req.query.fehler || null
+    });
+}
+
+/** @returns {Object} Befehlsmodul */
+function befehlsModul() {
+    return require('../kern/befehle');
+}
+
+router.get('/befehle', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
+    try {
+        return await befehlsSeite(req, res);
+    } catch (error) {
+        return renderFehler(res, error, 'Die Befehle konnten nicht geladen werden');
+    }
+});
+
+/** Der erste Kanal der Heim-Guild — heute gibt es genau einen. */
+async function heimKanalId(guildId) {
+    const kanaele = await require('../kern/heimguild').kanaeleDerGuild(guildId);
+    return kanaele.length ? kanaele[0].id : null;
+}
+
+router.post('/befehle', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const zurueck = `/guild/${guildId}/plugins/streaming/befehle`;
+    try {
+        const ergebnis = await befehlsModul().anlegen(
+            guildId, await heimKanalId(guildId), req.body, res.locals.user?.id);
+        return res.redirect(`${zurueck}?${ergebnis.ok ? 'ok=neu' : 'fehler=' + ergebnis.grund}`);
+    } catch (error) {
+        ServiceManager.get('Logger').error('[Streaming] Befehl anlegen', error);
+        return res.redirect(`${zurueck}?fehler=technisch`);
+    }
+});
+
+router.post('/befehle/fertig', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const zurueck = `/guild/${guildId}/plugins/streaming/befehle`;
+    try {
+        const roh = req.body.fertig;
+        const gewaehlt = Array.isArray(roh) ? roh : (roh ? [roh] : []);
+        await befehlsModul().fertigSetzen(guildId, await heimKanalId(guildId), gewaehlt);
+        return res.redirect(`${zurueck}?ok=gespeichert`);
+    } catch (error) {
+        ServiceManager.get('Logger').error('[Streaming] Fertige Befehle setzen', error);
+        return res.redirect(`${zurueck}?fehler=technisch`);
+    }
+});
+
+router.post('/befehle/:id', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const zurueck = `/guild/${guildId}/plugins/streaming/befehle`;
+    try {
+        const getroffen = await befehlsModul().aendern(req.params.id, guildId, {
+            antwort: req.body.antwort,
+            wer: req.body.wer,
+            abkuehlung_s: req.body.abkuehlung_s,
+            aktiv: req.body.aktiv ? 1 : 0
+        });
+        return res.redirect(`${zurueck}?${getroffen ? 'ok=gespeichert' : 'fehler=weg'}`);
+    } catch (error) {
+        ServiceManager.get('Logger').error('[Streaming] Befehl aendern', error);
+        return res.redirect(`${zurueck}?fehler=technisch`);
+    }
+});
+
+router.post('/befehle/:id/entfernen', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const zurueck = `/guild/${guildId}/plugins/streaming/befehle`;
+    try {
+        const getroffen = await befehlsModul().entfernen(req.params.id, guildId);
+        return res.redirect(`${zurueck}?${getroffen ? 'ok=entfernt' : 'fehler=weg'}`);
+    } catch (error) {
+        ServiceManager.get('Logger').error('[Streaming] Befehl entfernen', error);
+        return res.redirect(`${zurueck}?fehler=technisch`);
+    }
+});
 
 // =====================================================
 // Ereignisse — die Vorgabe dieser Guild

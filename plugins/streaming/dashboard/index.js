@@ -447,7 +447,24 @@ class StreamingDashboardPlugin extends DashboardPlugin {
     async navigationZaehler(guildId) {
         const { anzahlStreamer } = require('../shared/models');
         const basis = `/guild/${guildId}/plugins/streaming`;
-        return { [`${basis}/streamer`]: await anzahlStreamer(guildId) };
+
+        // **"Meine Befehle" bekommt seine Zahl seit Stufe 15.** Vorher stand
+        // hier die Begruendung, es gebe keine Tabelle dafuer und eine 0 aus
+        // einer Tabelle, die es nicht gibt, waere eine erfundene Auskunft. Die
+        // Tabelle gibt es jetzt — und die 0 ist die Auskunft, die der Entwurf
+        // zeigt: Es gibt die Sache, sie ist nur leer.
+        //
+        // In einer Guild, die kein Heim eines Kanals ist, stehen dort keine
+        // Zeilen. Die 0 stimmt dort also auch, ohne dass es einen Sonderfall
+        // braucht.
+        const zeilen = await ServiceManager.get('dbService').query(
+            'SELECT COUNT(*) AS anzahl FROM streaming_commands WHERE guild_id = ? AND aktiv = 1',
+            [guildId]);
+
+        return {
+            [`${basis}/streamer`]: await anzahlStreamer(guildId),
+            [`${basis}/befehle`]: Number(zeilen[0]?.anzahl || 0)
+        };
     }
 
     async _registerNavigation(guildId) {

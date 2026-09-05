@@ -46,6 +46,52 @@ ServiceManager.register('dbService', {
                 x.aktiv !== 0 &&
                 (x.streamer_id === w[1] || x.streamer_id === null || x.streamer_id === undefined));
         }
+        if (s.startsWith('INSERT INTO streaming_commands (guild_id, streamer_id, wort, art, antwort')) {
+            mitschrift.schreibzugriffe.push({ sql: s, werte: w });
+            if (daten.befehle.some(z => z.guild_id === w[0] && z.wort === w[2])) {
+                const e = new Error('Duplicate'); e.code = 'ER_DUP_ENTRY'; throw e;
+            }
+            daten.befehle.push({ id: ++idBasis, guild_id: w[0], streamer_id: w[1], wort: w[2],
+                art: 'eigen', antwort: w[3], wer: w[4], abkuehlung_s: w[5], aktiv: 1 });
+            return [];
+        }
+        if (s.startsWith('INSERT INTO streaming_commands (guild_id, streamer_id, wort, art, aktiv)')) {
+            mitschrift.schreibzugriffe.push({ sql: s, werte: w });
+            const da = daten.befehle.find(z => z.guild_id === w[0] && z.wort === w[2]);
+            if (da) { da.aktiv = w[3]; da.art = 'fertig'; }
+            else daten.befehle.push({ id: ++idBasis, guild_id: w[0], streamer_id: w[1],
+                wort: w[2], art: 'fertig', aktiv: w[3], wer: 'alle', abkuehlung_s: 0 });
+            return [];
+        }
+        if (s.startsWith('DELETE FROM streaming_commands')) {
+            mitschrift.schreibzugriffe.push({ sql: s, werte: w });
+            // **Die Attrappe bildet die Abgrenzung nicht nach, sie prueft sie.**
+            // Stuende hier schlicht der Vergleich, bliebe der Fall "eine fremde
+            // Guild loescht nichts" auch dann gruen, wenn der Code das
+            // `AND guild_id = ?` verliert — die Werte kaemen ja weiterhin mit.
+            // Genau das ist beim ersten Anlauf passiert.
+            const fragtNachGuild = s.includes('guild_id = ?');
+            const vorher = daten.befehle.length;
+            daten.befehle = daten.befehle.filter(z =>
+                !(z.id === Number(w[0])
+                  && (!fragtNachGuild || String(z.guild_id) === String(w[1]))));
+            return { affectedRows: vorher - daten.befehle.length };
+        }
+        if (s.startsWith('SELECT id, streamer_id, wort, art, antwort, wer, abkuehlung_s, aktiv')) {
+            return daten.befehle.filter(z => String(z.guild_id) === String(w[0]));
+        }
+        if (s.startsWith('UPDATE streaming_commands SET antwort')) {
+            mitschrift.schreibzugriffe.push({ sql: s, werte: w });
+            // Dieselbe Regel wie beim DELETE: Der Filter haengt daran, ob die
+            // Abfrage die Bedingung wirklich stellt.
+            const fragtNachGuild = s.includes('guild_id = ?');
+            const z = daten.befehle.find(x =>
+                x.id === Number(w[4])
+                && (!fragtNachGuild || String(x.guild_id) === String(w[5])));
+            if (!z) return { affectedRows: 0 };
+            Object.assign(z, { antwort: w[0], wer: w[1], abkuehlung_s: w[2], aktiv: w[3] });
+            return { affectedRows: 1 };
+        }
         if (s.startsWith('UPDATE streaming_commands')) {
             // **Jeder Schreibzugriff wird mitgeschrieben, samt Werten.** Genau
             // hier wuerde ein spaeter eingebauter Text landen.
@@ -237,6 +283,55 @@ console.log('\nVon der Nachricht geht nichts in die Datenbank');
     const tabelle = (mig.match(/CREATE TABLE streaming_commands \(([\s\S]*?)\) ENGINE/) || [])[1] || '';
     pruefe(!/absender|chatter|nachricht_text|verlauf/i.test(tabelle.replace(/--[^\n]*/g, '')),
         'die Tabelle hat keine Spalte, in die so etwas passte');
+}
+
+console.log('\nAnlegen prueft, bevor es schreibt');
+{
+    neuAufsetzen([]);
+    pruefe((await befehle.anlegen('g1', 1, { wort: '!!', antwort: 'x' })).grund === 'wort',
+        'ein Wort aus Sonderzeichen wird abgelehnt');
+    pruefe((await befehle.anlegen('g1', 1, { wort: 'regeln', antwort: '  ' })).grund === 'antwort',
+        'ohne Antwort haette der Befehl nichts zu sagen');
+    pruefe((await befehle.anlegen('g1', 1, { wort: 'uptime', antwort: 'x' })).grund === 'belegt',
+        'ein eigener Befehl darf nicht heissen wie ein fertiger');
+    pruefe((await befehle.anlegen('g1', 1, { wort: '!Regeln', antwort: 'ok' })).ok === true,
+        'das Praefix und Grossbuchstaben werden abgeraeumt statt abgelehnt');
+    pruefe((await befehle.anlegen('g1', 1, { wort: 'regeln', antwort: 'nochmal' })).grund === 'doppelt',
+        'dasselbe Wort ein zweites Mal faellt am Schluessel, nicht an einer Vorabfrage');
+}
+
+console.log('\nEine Guild fasst nur ihre eigenen Befehle an');
+{
+    // **Die Kennung aus der Adresse ist eine Behauptung.** Ohne `AND guild_id`
+    // koennte eine Guild die Befehle einer anderen aendern, und die
+    // Rechtepruefung am Router saehe trotzdem richtig aus.
+    neuAufsetzen([]);
+    await befehle.anlegen('g1', 1, { wort: 'meins', antwort: 'A' });
+    const id = daten.befehle[0].id;
+
+    pruefe(await befehle.aendern(id, 'g2', { antwort: 'gekapert' }) === false,
+        'eine fremde Guild aendert nichts');
+    pruefe(daten.befehle[0].antwort === 'A', 'und der Text steht unveraendert da',
+        daten.befehle[0].antwort);
+    pruefe(await befehle.entfernen(id, 'g2') === false, 'und loescht auch nichts');
+    pruefe(daten.befehle.length === 1, 'die Zeile ist noch da');
+    pruefe(await befehle.aendern(id, 'g1', { antwort: 'B', wer: 'alle' }) === true,
+        'die eigene Guild darf');
+}
+
+console.log('\nAbwaehlen schaltet ab, es loescht nicht');
+{
+    neuAufsetzen([]);
+    await befehle.fertigSetzen('g1', 1, ['uptime', 'spiel']);
+    const vorher = daten.befehle.length;
+    daten.befehle.find(z => z.wort === 'uptime').benutzt_anzahl = 42;
+
+    await befehle.fertigSetzen('g1', 1, ['spiel']);
+    const uptime = daten.befehle.find(z => z.wort === 'uptime');
+    pruefe(daten.befehle.length === vorher, 'die Zeile bleibt stehen', String(daten.befehle.length));
+    pruefe(Number(uptime.aktiv) === 0, 'sie ist nur abgeschaltet');
+    pruefe(uptime.benutzt_anzahl === 42,
+        'und die Benutzungszahl faengt beim Wiedereinschalten nicht bei null an');
 }
 
 console.log('\nDie Attrappe hat alles verstanden');
