@@ -67,6 +67,31 @@ const FERTIG = {
     }
 };
 
+/**
+ * Die Platzhalter, die eine eigene Antwort kennt.
+ *
+ * **Ein Vertrag, wie `shared/vorlagen.js` ihn fuer die Ankuendigung fuehrt** —
+ * und aus demselben Grund: Die Seite rendert ihre Bausteine aus dieser Liste,
+ * statt sie danebenzuschreiben. Eine handgepflegte Liste in der Vorlage waere
+ * beim naechsten neuen Platzhalter still veraltet, und man saehe es erst im
+ * Chat. Der Modulkopf hat das schon versprochen, bevor es stimmte.
+ *
+ * `nurLive` heisst: steht offline leer da. Das ist keine Panne, sondern die
+ * Entscheidung vom 2026-09-05 (siehe `fuellen`) — leer statt vom letzten Mal.
+ *
+ * `{2}`..`{9}` fehlen mit Absicht: Sie funktionieren, aber neun Bausteine
+ * nebeneinander sind eine Wand, keine Hilfe. Der Text an `{1}` nennt sie.
+ */
+const PLATZHALTER = [
+    { name: '{streamer}', bedeutung: 'Dein Kanalname' },
+    { name: '{absender}', bedeutung: 'Wer den Befehl getippt hat' },
+    { name: '{spiel}',    bedeutung: 'Die laufende Kategorie',  nurLive: true },
+    { name: '{titel}',    bedeutung: 'Der Streamtitel',         nurLive: true },
+    { name: '{uptime}',   bedeutung: 'Wie lange der Stream laeuft', nurLive: true },
+    { name: '{rest}',     bedeutung: 'Alles, was hinter dem Befehl steht' },
+    { name: '{1}',        bedeutung: 'Das erste Wort dahinter — {2}, {3} … gehen auch' }
+];
+
 /** Wer einen Befehl benutzen darf — von eng nach weit. */
 const RANG = { inhaber: 3, moderator: 2, abonnent: 1, alle: 0 };
 
@@ -154,6 +179,18 @@ function darf(wer, kanal) {
  * Unbekannte Platzhalter bleiben **stehen**. Sie leer zu ersetzen saehe aus wie
  * ein Tippfehler des Streamers — so sieht er, dass er einen erfunden hat.
  *
+ * ## Die Reihenfolge ist eine Sicherheitsfrage, kein Geschmack
+ *
+ * Die Argumente werden **zuletzt** eingesetzt, und das muss so bleiben. Sie
+ * sind das einzige, was ein beliebiger Zuschauer bestimmt: Wer `!gruss {spiel}`
+ * tippt, faende seinen Text sonst als Platzhalter wieder und liesse den Bot
+ * Dinge sagen, die der Streamer nie eingestellt hat. Zuletzt eingesetzt bleibt
+ * `{spiel}` aus fremder Hand schlicht `{spiel}` — sichtbar und harmlos.
+ *
+ * Der `{absender}` ist zwar auch fremd, aber Twitch laesst in Anzeigenamen nur
+ * Buchstaben, Ziffern und Unterstriche zu; geschweifte Klammern kommen dort
+ * nicht vor.
+ *
  * @param {string} vorlage Text des Streamers
  * @param {Object} k Kontext
  * @returns {string} gefuellter Text
@@ -179,7 +216,27 @@ function fuellen(vorlage, k) {
         .replace(/\{absender\}/g, k.absender || '')
         .replace(/\{spiel\}/g,    imStream(k.kategorie))
         .replace(/\{titel\}/g,    imStream(k.titel))
-        .replace(/\{uptime\}/g,   imStream(dauerText(k.seitMs)));
+        .replace(/\{uptime\}/g,   imStream(dauerText(k.seitMs)))
+
+        // --- ab hier fremde Eingabe, siehe Kopf -------------------------
+        // `{rest}` ist alles hinter dem Wort, `{1}`..`{9}` die einzelnen
+        // Woerter darin. Beides wurde von `zerlegen` schon immer getrennt und
+        // bis zum 2026-09-05 weggeworfen.
+        //
+        // Fehlt ein Wort, wird der Platzhalter leer - nicht stehengelassen.
+        // Er ist ja bekannt; stehen bleibt nur, was wir nicht kennen.
+        .replace(/\{rest\}/g, k.rest || '')
+        .replace(/\{([1-9])\}/g, (_, n) => woerter(k.rest)[Number(n) - 1] || '');
+}
+
+/**
+ * Die Woerter hinter dem Befehl.
+ *
+ * @param {string} rest Text hinter dem Befehlswort
+ * @returns {Array<string>} Woerter ohne Leerraum
+ */
+function woerter(rest) {
+    return String(rest || '').split(/\s+/).filter(Boolean);
 }
 
 /**
@@ -260,7 +317,8 @@ async function auswerten(kanal) {
         titel: streamer.titel,
         kategorie: streamer.kategorie,
         seitMs: streamer.begonnen_am ? jetzt - new Date(streamer.begonnen_am).getTime() : 0,
-        woerter: zeilen.map(z => z.wort)
+        woerter: zeilen.map(z => z.wort),
+        rest: zerlegt.rest
     };
 
     const text = zeile.art === 'fertig'
@@ -445,7 +503,7 @@ async function fertigSetzen(guildId, streamerId, gewaehlt) {
 }
 
 module.exports = {
-    PRAEFIX, FERTIG, RANG,
+    PRAEFIX, FERTIG, RANG, PLATZHALTER,
     alleFuerGuild, anlegen, aendern, entfernen, fertigSetzen,
     zerlegen, darf, fuellen, dauerText,
     befehleFuer, auswerten

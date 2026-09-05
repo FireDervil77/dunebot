@@ -102,13 +102,26 @@ const meldungen = {
               <div>
                 <textarea class="form-control" name="antwort" rows="2" required
                           maxlength="500" placeholder="Sei nett zueinander."></textarea>
+                <%# **Aus der Liste des Moduls, nicht danebengeschrieben.**
+                    `PLATZHALTER` ist der Vertrag; eine Kopie hier waere beim
+                    naechsten neuen Baustein still veraltet, und man saehe es
+                    erst im Chat. %>
                 <div class="chips mt-2">
-                  <span class="chip mono" title="Dein Kanalname">{streamer}</span>
-                  <span class="chip mono" title="Wer den Befehl getippt hat">{absender}</span>
-                  <span class="chip mono" title="Die laufende Kategorie">{spiel}</span>
-                  <span class="chip mono" title="Der Streamtitel">{titel}</span>
-                  <span class="chip mono" title="Wie lange der Stream läuft">{uptime}</span>
+                  <% PLATZHALTER.forEach(p => { %>
+                    <span class="chip mono" title="<%= p.bedeutung %>"><%= p.name %></span>
+                  <% }); %>
                 </div>
+                <% const nurLive = PLATZHALTER.filter(p => p.nurLive); %>
+                <% if (nurLive.length) { %>
+                  <div class="text-secondary small mt-1">
+                    <i class="fa-solid fa-circle-info me-1"></i>
+                    <%= nurLive.map(p => p.name).join(', ') %>
+                    <%= nurLive.length === 1 ? 'bleibt' : 'bleiben' %> leer, solange du nicht
+                    sendest. Bau den Satz so, dass er auch dann trägt —
+                    <span class="mono">Läuft seit {uptime}</span> statt bloß
+                    <span class="mono">{uptime}</span>.
+                  </div>
+                <% } %>
               </div>
             </div>
 

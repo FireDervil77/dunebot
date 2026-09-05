@@ -289,6 +289,41 @@ console.log('\nEigene Befehle fuellen ihre Platzhalter');
             'live stehen alle drei da', t);
     }
 
+    // --- Argumente: was der Zuschauer hinter den Befehl schreibt ---------
+    neuAufsetzen([{ wort: 'shoutout', antwort: 'Schaut bei {rest} vorbei!' }]);
+    await befehle.auswerten(nachricht('!shoutout Anna und Bert'));
+    pruefe(mitschrift.gesendet[0]?.text === 'Schaut bei Anna und Bert vorbei!',
+        '{rest} ist alles hinter dem Wort', mitschrift.gesendet[0]?.text);
+
+    neuAufsetzen([{ wort: 'gegen', antwort: '{1} gegen {2}.' }]);
+    await befehle.auswerten(nachricht('!gegen Anna Bert'));
+    pruefe(mitschrift.gesendet[0]?.text === 'Anna gegen Bert.',
+        '{1} und {2} sind die einzelnen Woerter', mitschrift.gesendet[0]?.text);
+
+    neuAufsetzen([{ wort: 'gegen', antwort: 'A:{1} B:{2} Rest:{rest}.' }]);
+    await befehle.auswerten(nachricht('!gegen Anna'));
+    pruefe(mitschrift.gesendet[0]?.text === 'A:Anna B: Rest:Anna.',
+        'ein fehlendes Argument wird leer, nicht stehengelassen', mitschrift.gesendet[0]?.text);
+
+    // **Der Fall, um den es sicherheitshalber geht.** Die Argumente sind das
+    // einzige an der Antwort, das ein beliebiger Zuschauer bestimmt. Wuerden
+    // sie vor den Platzhaltern eingesetzt, koennte er sich seine eigenen
+    // bauen und den Bot Dinge sagen lassen, die der Streamer nie einstellte.
+    neuAufsetzen([{ wort: 'echo', antwort: 'Du sagst: {rest}' }]);
+    await befehle.auswerten(nachricht('!echo {spiel} und {streamer}'));
+    {
+        const t = mitschrift.gesendet[0]?.text || '';
+        pruefe(t === 'Du sagst: {spiel} und {streamer}',
+            'ein Zuschauer kann sich keinen Platzhalter erschleichen', t);
+        pruefe(!/Astro Colony/.test(t) && !/FireDervil/.test(t),
+            'weder Kategorie noch Kanalname sickern durch fremde Eingabe durch', t);
+    }
+
+    neuAufsetzen([{ wort: 'shoutout', antwort: 'Schaut bei {rest} vorbei!' }]);
+    await befehle.auswerten(nachricht('!shoutout'));
+    pruefe(mitschrift.gesendet[0]?.text === 'Schaut bei  vorbei!',
+        'ohne Argument bleibt die Stelle leer', mitschrift.gesendet[0]?.text);
+
     neuAufsetzen([{ wort: 'lang', antwort: 'x'.repeat(900) }]);
     await befehle.auswerten(nachricht('!lang'));
     pruefe((mitschrift.gesendet[0]?.text || '').length === 500,
@@ -298,6 +333,34 @@ console.log('\nEigene Befehle fuellen ihre Platzhalter');
     neuAufsetzen([{ wort: 'leer', antwort: '   ' }]);
     await befehle.auswerten(nachricht('!leer'));
     pruefe(mitschrift.gesendet.length === 0, 'ein leerer Satz wird gar nicht erst gesendet');
+}
+
+console.log('\nDie Liste der Platzhalter ist ein Vertrag, keine Behauptung');
+{
+    // **Behauptet die Liste etwas, das `fuellen` nicht kann?** Die Seite
+    // rendert ihre Bausteine aus `PLATZHALTER`. Ein Name, den nur die Liste
+    // kennt, stuende woertlich im Chat — und der Streamer haette ihn brav von
+    // der Seite abgeschrieben. Genau diese Naht hatte `shared/vorlagen.js`
+    // schon benannt; hier wird sie gemessen.
+    const namen = befehle.PLATZHALTER.map(p => p.name);
+    neuAufsetzen([{ wort: 'alles', antwort: namen.join(' ') }], true);
+    await befehle.auswerten(nachricht('!alles Anna Bert'));
+    const t = mitschrift.gesendet[0]?.text || '';
+    const uebrig = namen.filter(n => t.includes(n));
+    pruefe(uebrig.length === 0,
+        'jeder Baustein der Liste wird auch wirklich ersetzt',
+        uebrig.length ? 'stehengeblieben: ' + uebrig.join(' ') : t);
+
+    // Und die Gegenrichtung: Die Vorlage darf keine eigene Liste fuehren.
+    const vorlage = require('fs').readFileSync(path.join(WURZEL,
+        'plugins/streaming/dashboard/views/guild/streaming-befehle.ejs'), 'utf8');
+    pruefe(/PLATZHALTER\.forEach/.test(vorlage),
+        'die Seite rendert aus der Liste, statt sie danebenzuschreiben');
+
+    const chips = vorlage.match(/<span class="chip mono"[^>]*>\{[a-z0-9]+\}<\/span>/gi) || [];
+    pruefe(chips.length === 0,
+        'und fuehrt keinen fest eingetippten Baustein mehr',
+        chips.join(' '));
 }
 
 console.log('\nDie Abkuehlung haelt');

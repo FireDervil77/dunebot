@@ -537,6 +537,7 @@ async function befehlsSeite(req, res, meldung, fehler) {
         fertigZeilen: zeilen.filter(z => z.art === 'fertig'),
         FERTIG: befehlsModul().FERTIG,
         PRAEFIX: befehlsModul().PRAEFIX,
+        PLATZHALTER: befehlsModul().PLATZHALTER,
         vorWieLange,
         meldung: meldung || req.query.ok || null,
         fehler: fehler || req.query.fehler || null
