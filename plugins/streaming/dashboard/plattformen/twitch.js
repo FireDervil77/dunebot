@@ -1293,6 +1293,107 @@ async function chatSenden(kanalId, text, zugang) {
  * @param {Object} koerper Zustellung
  * @returns {{kontoId: string, kontoName: string|null, stufe: string|null, geschenkt: boolean}|null} Person
  */
+/**
+ * Die Follower eines Kanals (P7).
+ *
+ * **Nichts davon wird gespeichert.** Entschieden am 2026-09-03: „die Frage nach
+ * den Daten wuerde ich per Request machen, also dann wenn man sie braucht."
+ * Das kostet Kontingent und Wartezeit und spart die Frage, wie lange etwas bei
+ * uns liegt. Fuer eine Seite, die man nach dem Stream aufruft, ist das der
+ * richtige Tausch.
+ *
+ * **401 heisst nicht „keine Follower".** Dieselbe Klemme wie bei
+ * `abonnentenLesen`: Ein abgelaufener Schluessel saehe sonst aus wie ein Kanal,
+ * dem niemand folgt. Hier zeigt die Seite dann „die Zusage fehlt" statt einer
+ * Null, die nach einem Misserfolg des Streamers aussieht.
+ *
+ * Braucht `moderator:read:followers` vom Kanalinhaber.
+ *
+ * @param {string} kanalId Twitch-Kanalkennung
+ * @param {string} zugang Zugangsschluessel des Kanalinhabers
+ * @param {number} [grenze] Wie viele Namen hoechstens (die Gesamtzahl kommt immer)
+ * @returns {Promise<{ok: boolean, abgelehnt: boolean, gesamt: number, folger: Array<Object>}>} Ergebnis
+ */
+async function folgerLesen(kanalId, zugang, grenze = 20) {
+    const daten = await zugangsdaten('TWITCH');
+    if (!daten.clientId) return { ok: false, abgelehnt: false, gesamt: 0, folger: [] };
+
+    // `first` bestimmt, wie viele Namen kommen; `total` liefert Twitch immer
+    // mit, unabhaengig davon. Wir holen deshalb genau eine Seite - eine
+    // Rangliste der letzten Zwanzig braucht keine Blaetterschleife ueber
+    // Tausende.
+    const abfrage = new URLSearchParams({
+        broadcaster_id: String(kanalId),
+        first: String(Math.max(1, Math.min(100, Number(grenze) || 20)))
+    });
+
+    const antwort = await fetch(`${HELIX}/channels/followers?${abfrage}`, {
+        headers: { 'Client-Id': daten.clientId, Authorization: `Bearer ${zugang}` }
+    });
+
+    if (antwort.status === 401) return { ok: false, abgelehnt: true, gesamt: 0, folger: [] };
+    if (!antwort.ok) return { ok: false, abgelehnt: false, gesamt: 0, folger: [] };
+
+    const d = await antwort.json();
+    return {
+        ok: true,
+        abgelehnt: false,
+        gesamt: Number(d.total) || 0,
+        folger: (d.data || []).map(f => ({
+            kontoId: String(f.user_id),
+            login: f.user_login,
+            name: f.user_name || f.user_login,
+            seit: f.followed_at || null
+        }))
+    };
+}
+
+/**
+ * Die Bits-Rangliste eines Kanals (P7).
+ *
+ * **Der Kanal steckt im Schluessel, nicht in der Abfrage.** Twitch leitet den
+ * Sender aus dem Zugangsschluessel ab; ein `broadcaster_id` gibt es hier nicht.
+ * Deshalb steht `kanalId` auch nicht in der Parameterliste - ein Feld, das
+ * nichts bewirkt, waere eine Behauptung.
+ *
+ * Braucht `bits:read` vom Kanalinhaber.
+ *
+ * @param {string} zugang Zugangsschluessel des Kanalinhabers
+ * @param {string} [zeitraum] 'all' | 'day' | 'week' | 'month' | 'year'
+ * @param {number} [anzahl] Wie viele Plaetze
+ * @returns {Promise<{ok: boolean, abgelehnt: boolean, plaetze: Array<Object>}>} Ergebnis
+ */
+async function bitsRanglisteLesen(zugang, zeitraum = 'all', anzahl = 10) {
+    const daten = await zugangsdaten('TWITCH');
+    if (!daten.clientId) return { ok: false, abgelehnt: false, plaetze: [] };
+
+    const erlaubt = new Set(['all', 'day', 'week', 'month', 'year']);
+    const abfrage = new URLSearchParams({
+        count: String(Math.max(1, Math.min(100, Number(anzahl) || 10))),
+        period: erlaubt.has(zeitraum) ? zeitraum : 'all'
+    });
+
+    const antwort = await fetch(`${HELIX}/bits/leaderboard?${abfrage}`, {
+        headers: { 'Client-Id': daten.clientId, Authorization: `Bearer ${zugang}` }
+    });
+
+    if (antwort.status === 401) return { ok: false, abgelehnt: true, plaetze: [] };
+    if (!antwort.ok) return { ok: false, abgelehnt: false, plaetze: [] };
+
+    const d = await antwort.json();
+    return {
+        ok: true,
+        abgelehnt: false,
+        plaetze: (d.data || []).map(b => ({
+            kontoId: String(b.user_id),
+            login: b.user_login,
+            name: b.user_name || b.user_login,
+            platz: Number(b.rank) || 0,
+            punkte: Number(b.score) || 0
+        }))
+    };
+}
+
 function abonnentAus(koerper) {
     const e = koerper?.event;
     if (!e || !e.user_id) return null;
@@ -1380,6 +1481,7 @@ module.exports = {
     tauschen, erneuern, pruefen,
     EREIGNISSE_ABO, EREIGNISSE_MELDER, typenVon,
     abonnentenLesen, abonnentAus, melderAus,
+    folgerLesen, bitsRanglisteLesen,
     moderierteKanaele,
     chatSenden,
     conduitSichern, shardSetzen,

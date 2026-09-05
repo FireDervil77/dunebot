@@ -1,0 +1,251 @@
+<%
+/**
+ * Statistik (P7) — Twitchs eigene Listen, bei jedem Aufruf frisch geholt.
+ *
+ * **Jede Karte trägt ihren eigenen Zustand.** Drei Abfragen, drei Zusagen,
+ * drei Arten zu scheitern — ein gemeinsames „hat nicht geklappt" wäre die
+ * halbe Auskunft: Der Streamer sähe nicht, dass seine Follower da sind und nur
+ * die Bits fehlen.
+ *
+ * Erwartet: bericht, ZUSTAND, vorWieLange
+ */
+const zustandsTexte = {
+  [ZUSTAND.ABGELEHNT]:  'Dafür fehlt die Zusage — oder sie wurde widerrufen.',
+  [ZUSTAND.FEHLER]:     'Twitch hat gerade nicht geantwortet. Der Grund steht im Protokoll.',
+  [ZUSTAND.KEIN_KANAL]: 'Für diese Guild ist kein Kanal als Heim gesetzt.'
+};
+
+/**
+ * Eine Karte, deren Inhalt scheitern kann.
+ *
+ * @param {Object} teil Ein Abschnitt des Berichts
+ * @returns {string|null} Der Hinweis, oder null wenn alles ging
+ */
+const hinweis = (teil) => teil.zustand === ZUSTAND.OK ? null
+  : (zustandsTexte[teil.zustand] || zustandsTexte[ZUSTAND.FEHLER]);
+
+const dauer = (von, bis) => {
+  if (!von) return null;
+  const ms = (bis ? new Date(bis) : new Date()) - new Date(von);
+  const min = Math.max(0, Math.floor(ms / 60000));
+  const std = Math.floor(min / 60);
+  return std ? `${std} h ${min % 60} min` : `${min} min`;
+};
+%>
+
+<%- include('partials/streaming-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-chart-line',
+  titel: 'Statistik',
+  beschreibung: 'Wie der Stream lief — aus Twitchs eigenen Listen.'
+}) %>
+
+<div class="row row-cards">
+
+  <%# ── Woher die Zahlen kommen ───────────────────────────────────────────
+      Steht oben, weil es die Frage beantwortet, die diese Seite aufwirft:
+      „Was wisst ihr über meine Zuschauer?" Antwort: nichts, was wir nicht in
+      diesem Augenblick bei Twitch geholt haben. %>
+  <div class="col-12">
+    <div class="erklaerkarte">
+      <h3>Diese Seite speichert nichts</h3>
+      <p>
+        Alles hier kommt <b>in diesem Augenblick</b> von Twitch — dieselben Listen, die
+        auch dein Twitch-Dashboard zeigt. Wir legen davon keine Kopie an; wenn du die
+        Seite schließt, ist nichts davon bei uns geblieben.
+      </p>
+      <p>
+        Deshalb dauert das Laden auch kurz, und deshalb steht hier <b>kein Verlauf</b>:
+        Was Twitch nicht führt — wer wie oft da war, wer wie viel geschrieben hat —
+        müssten wir mitschreiben, und genau das tun wir nicht.
+      </p>
+    </div>
+  </div>
+
+  <%# ── Der letzte Stream ─────────────────────────────────────────────────── %>
+  <% if (bericht.letzterStream) { %>
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header">
+          <div class="kartenkopf">
+            <span class="kartensymbol"><i class="fa-solid fa-stopwatch"></i></span>
+            <div class="kartenkopf__text">
+              <h3 class="kartenkopf__titel">
+                <%= bericht.letzterStream.ist_live ? 'Läuft gerade' : 'Der letzte Stream' %>
+              </h3>
+              <div class="kartenkopf__satz">Aus unserer eigenen Zeile — nicht von Twitch geholt.</div>
+            </div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="zeilen">
+            <div class="zeile">
+              <div class="zeile__bez">Titel</div>
+              <div><%= bericht.letzterStream.titel || '— nicht gesetzt —' %></div>
+            </div>
+            <div class="zeile">
+              <div class="zeile__bez">Kategorie</div>
+              <div><%= bericht.letzterStream.kategorie || '— nicht gesetzt —' %></div>
+            </div>
+            <div class="zeile">
+              <div class="zeile__bez">Begonnen</div>
+              <div>
+                <% if (bericht.letzterStream.begonnen_am) { %>
+                  <%= vorWieLange(bericht.letzterStream.begonnen_am) %>
+                  <% const d = dauer(bericht.letzterStream.begonnen_am, bericht.letzterStream.beendet_am); %>
+                  <% if (d) { %><small>— <%= d %></small><% } %>
+                <% } else { %>—<% } %>
+              </div>
+            </div>
+            <div class="zeile">
+              <div class="zeile__bez">
+                Zuschauer
+                <small>zuletzt gemeldet</small>
+              </div>
+              <div><%= bericht.letzterStream.zuschauer ?? '—' %></div>
+            </div>
+          </div>
+          <%# Die ehrliche Grenze, an der Stelle wo sie auffällt. %>
+          <div class="text-secondary small mt-2">
+            <i class="fa-solid fa-circle-info me-1"></i>
+            Das ist <b>ein</b> Stream, kein Verlauf — die Zeile wird beim nächsten Start
+            überschrieben. Eine Bilanz über mehrere Streams bräuchte eine eigene Tabelle.
+          </div>
+        </div>
+      </div>
+    </div>
+  <% } %>
+
+  <%# ── Follower ──────────────────────────────────────────────────────────── %>
+  <div class="col-12 col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <div class="kartenkopf">
+          <span class="kartensymbol"><i class="fa-solid fa-user-plus"></i></span>
+          <div class="kartenkopf__text">
+            <h3 class="kartenkopf__titel">
+              Follower
+              <% if (bericht.folger.zustand === ZUSTAND.OK) { %>
+                <span class="chip mono"><%= bericht.folger.gesamt %></span>
+              <% } %>
+            </h3>
+            <div class="kartenkopf__satz">Die zuletzt hinzugekommenen.</div>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <% if (hinweis(bericht.folger)) { %>
+          <div class="alert alert-warning mb-0"><%= hinweis(bericht.folger) %></div>
+        <% } else if (!bericht.folger.liste.length) { %>
+          <%- include('shared/leerzustand', {
+                icon: 'fa-solid fa-user-plus', titel: 'Noch niemand',
+                text: 'Sobald dir jemand folgt, steht er hier.' }) %>
+        <% } else { %>
+          <div class="zeilen">
+            <% bericht.folger.liste.forEach(f => { %>
+              <div class="zeile">
+                <div class="zeile__bez"><%= f.name %></div>
+                <div><%= f.seit ? vorWieLange(f.seit) : '' %></div>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <%# ── Abonnenten ────────────────────────────────────────────────────────── %>
+  <div class="col-12 col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <div class="kartenkopf">
+          <span class="kartensymbol"><i class="fa-solid fa-star"></i></span>
+          <div class="kartenkopf__text">
+            <h3 class="kartenkopf__titel">
+              Abonnenten
+              <% if (bericht.abos.zustand === ZUSTAND.OK) { %>
+                <span class="chip mono"><%= bericht.abos.gesamt %></span>
+              <% } %>
+            </h3>
+            <div class="kartenkopf__satz">Ohne dich — Twitch führt dich in der eigenen Liste.</div>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <% if (hinweis(bericht.abos)) { %>
+          <div class="alert alert-warning mb-0"><%= hinweis(bericht.abos) %></div>
+        <% } else if (!bericht.abos.liste.length) { %>
+          <%- include('shared/leerzustand', {
+                icon: 'fa-solid fa-star', titel: 'Noch keine Abonnenten',
+                text: 'Sobald dich jemand abonniert, steht er hier.' }) %>
+        <% } else { %>
+          <div class="zeilen">
+            <% bericht.abos.liste.forEach(a => { %>
+              <div class="zeile">
+                <div class="zeile__bez"><%= a.kontoName || a.kontoId %></div>
+                <div>
+                  <% if (a.stufe) { %><span class="chip">Stufe <%= String(a.stufe).replace('000','') %></span><% } %>
+                  <% if (a.geschenkt) { %><span class="chip">geschenkt</span><% } %>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <%# ── Bits-Rangliste ────────────────────────────────────────────────────── %>
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <div class="kartenkopf">
+          <span class="kartensymbol"><i class="fa-solid fa-ranking-star"></i></span>
+          <div class="kartenkopf__text">
+            <h3 class="kartenkopf__titel">Bits-Rangliste</h3>
+            <div class="kartenkopf__satz">
+              Kommt fertig von Twitch, mit Rang und Punktzahl — wir rechnen nichts aus.
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <% if (hinweis(bericht.bits)) { %>
+          <div class="alert alert-warning mb-0"><%= hinweis(bericht.bits) %></div>
+        <% } else if (!bericht.bits.plaetze.length) { %>
+          <%- include('shared/leerzustand', {
+                icon: 'fa-solid fa-ranking-star', titel: 'Noch keine Bits',
+                text: 'Sobald jemand Bits schickt, entsteht bei Twitch eine Rangliste.' }) %>
+        <% } else { %>
+          <div class="zeilen">
+            <% bericht.bits.plaetze.forEach(b => { %>
+              <div class="zeile">
+                <div class="zeile__bez">
+                  <span class="chip mono"><%= b.platz %></span>
+                  <%= b.name %>
+                </div>
+                <div><%= b.punkte.toLocaleString('de-DE') %> Bits</div>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <%# ── Was hier (noch) nicht steht ───────────────────────────────────────── %>
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body">
+        <div class="text-secondary small">
+          <b>Noch nicht dabei:</b> Raids — die Ereignisse laufen durch den Posteingang und
+          werden nach der Verarbeitung nicht aufbewahrt. Und eine Bilanz über mehrere
+          Streams, die eine eigene Tabelle bräuchte. Beides ist im Bauplan vermerkt,
+          damit es nicht als vorhanden gilt.
+          <span class="ms-2">Geholt: <%= vorWieLange(bericht.geholt_am) %></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>

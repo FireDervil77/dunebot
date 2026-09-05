@@ -287,6 +287,7 @@ const SEITEN = {
     },
 
     statistik: {
+        gebaut: '2026-09-05',   // P7 — eigene Route, eigene Ansicht
         icon: 'fa-solid fa-chart-line',
         titel: 'Statistik',
         untertitel: 'Wie der Stream lief — aus Twitchs eigenen Listen',

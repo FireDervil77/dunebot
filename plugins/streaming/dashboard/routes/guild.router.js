@@ -623,6 +623,34 @@ router.post('/befehle/:id/entfernen', requirePermission('STREAMING.CHAT.MANAGE')
 });
 
 // =====================================================
+// Statistik (P7) — Twitchs eigene Listen, per Request
+// =====================================================
+
+router.get('/statistik', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const tr = makeTranslator(req, res);
+    try {
+        // **Dieselbe Tuer wie Befehle und Ansagen, und dasselbe Recht.** Die
+        // Seite zeigt Namen von Zuschauern (Follower, Bits-Rangliste) — das ist
+        // naeher an „meinen Chatbot verwalten" als an „das Plugin ansehen".
+        // `STREAMING.VIEW` haette sie jedem geoeffnet, der die Ziele sehen darf.
+        if (!await require('../kern/heimguild').istHeim(guildId)) {
+            return res.redirect(`/guild/${guildId}/plugins/streaming`);
+        }
+
+        const bericht = await require('../kern/statistik').holen(guildId);
+
+        await renderView(res, 'guild/streaming-statistik', {
+            tr, guildId, bericht,
+            ZUSTAND: require('../kern/statistik').ZUSTAND,
+            vorWieLange
+        });
+    } catch (error) {
+        return renderFehler(res, error, 'Die Statistik konnte nicht geladen werden');
+    }
+});
+
+// =====================================================
 // Eigene Textbausteine — `{discord}` einmal setzen
 // =====================================================
 //
