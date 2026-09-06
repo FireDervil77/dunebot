@@ -1467,6 +1467,56 @@ async function clipErstellen(kanalId, zugang) {
 }
 
 /**
+ * Was fuer ein Kanal ist das - gewoehnlich, Affiliate oder Partner?
+ *
+ * **Gebaut, weil eine allgemeine Warnung den Streamer raten laesst.** Auf der
+ * Mitmachen-Seite stand „Twitch erlaubt Umfragen nur Affiliates und Partnern" -
+ * ein Satz, den jeder erst auf sich selbst anwenden muss. Der Betreiber am
+ * 2026-09-06: fuenf Follower, noch kein Affiliate. Mit diesem Aufruf steht dort
+ * kein Merksatz mehr, sondern eine Aussage ueber SEINEN Kanal - und sobald er
+ * Affiliate wird, verschwindet sie von allein.
+ *
+ * **Kein eigener Scope.** `broadcaster_type` ist oeffentlich; jeder gueltige
+ * Schluessel genuegt. Deshalb kann die Seite die Frage auch dann beantworten,
+ * wenn die Umfragen-Zusage fehlt - und genau dann ist sie am nuetzlichsten.
+ *
+ * @param {string} kanalId Twitch-Kanalkennung
+ * @param {string} zugang Irgendein gueltiger Zugangsschluessel
+ * @returns {Promise<{ok: boolean, abgelehnt: boolean, art: string|null, grund: string|null}>} Ergebnis
+ */
+async function kanalArtLesen(kanalId, zugang) {
+    const leer = { ok: false, abgelehnt: false, art: null };
+
+    const daten = await zugangsdaten('TWITCH');
+    if (!daten.clientId) return { ...leer, grund: 'Die Zugangsdaten der Anwendung fehlen' };
+
+    const antwort = await fetch(`${HELIX}/users?id=${encodeURIComponent(String(kanalId))}`, {
+        headers: { 'Client-Id': daten.clientId, Authorization: `Bearer ${zugang}` }
+    });
+
+    if (antwort.status === 401) {
+        return { ...leer, abgelehnt: true, grund: 'Der Schluessel wird von Twitch abgelehnt' };
+    }
+
+    let json = null;
+    try { json = await antwort.json(); } catch { /* leer ist auch eine Antwort */ }
+    if (!antwort.ok) return { ...leer, grund: json?.message || `HTTP ${antwort.status}` };
+
+    const nutzer = json?.data?.[0] || null;
+    if (!nutzer) return { ...leer, grund: 'Twitch kennt diesen Kanal nicht' };
+
+    // **Der leere Text ist die Antwort, nicht ihr Fehlen.** Twitch schickt fuer
+    // einen gewoehnlichen Kanal `broadcaster_type: ""`. Das auf `null` abzubilden
+    // hiesse „wir wissen es nicht" - und die Seite saehe dann genauso aus wie
+    // bei einem Netzfehler.
+    const roh = String(nutzer.broadcaster_type || '').toLowerCase();
+    return {
+        ok: true, abgelehnt: false, grund: null,
+        art: roh === 'partner' ? 'partner' : roh === 'affiliate' ? 'affiliate' : 'normal'
+    };
+}
+
+/**
  * Eine Umfrage aus Twitchs Antwort in unsere Form bringen.
  *
  * **`votes` enthaelt die Punktestimmen schon.** Twitch fuehrt
@@ -1761,6 +1811,7 @@ module.exports = {
     abonnentenLesen, abonnentAus, melderAus,
     folgerLesen, bitsRanglisteLesen,
     clipErstellen, umfragenLesen, umfrageStarten, umfrageBeenden, umfrageAus,
+    kanalArtLesen,
     moderierteKanaele,
     chatSenden,
     conduitSichern, shardSetzen,

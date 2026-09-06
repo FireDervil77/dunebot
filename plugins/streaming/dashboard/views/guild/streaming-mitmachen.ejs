@@ -182,12 +182,42 @@ const befehlsseite = `/guild/${guildId}/plugins/streaming/befehle`;
           </div>
         </div>
 
-        <%# **Die Voraussetzung, die nicht bei uns liegt.** Ohne diesen Satz
-            sähe Twitchs Absage aus wie ein Fehler von uns. %>
+        <%# **Die Voraussetzung, die nicht bei uns liegt — und wir sehen nach,
+            statt sie dir zu merken zu geben.** Hier stand bis zum 2026-09-06 ein
+            allgemeiner Merksatz, den jeder erst auf sich selbst anwenden musste.
+            `broadcaster_type` ist öffentlich; jetzt steht da eine Aussage über
+            DEINEN Kanal, und sobald du Affiliate wirst, verschwindet sie. %>
+        <div class="zeilen">
+          <div class="zeile">
+            <div class="zeile__bez">Dein Kanal bei Twitch</div>
+            <div>
+              <% if (bericht.kanalArt === 'partner') { %>
+                <span class="chip">Partner</span>
+              <% } else if (bericht.kanalArt === 'affiliate') { %>
+                <span class="chip">Affiliate</span>
+              <% } else if (bericht.kanalArt === 'normal') { %>
+                <span class="chip">gewöhnlicher Kanal</span>
+              <% } else { %>
+                <span class="chip">nicht feststellbar</span>
+              <% } %>
+            </div>
+          </div>
+        </div>
+
         <div class="text-secondary small mt-2">
-          <i class="fa-solid fa-triangle-exclamation me-1"></i>
-          Twitch erlaubt Umfragen nur <b>Affiliates und Partnern</b>. Ohne diesen Status
-          weist Twitch das Anlegen ab — das ist ihre Grenze, nicht unsere.
+          <% if (bericht.kanalArt === 'normal') { %>
+            <i class="fa-solid fa-triangle-exclamation me-1"></i>
+            <b>Umfragen gibt es erst ab Affiliate.</b> Twitch weist das Anlegen bis dahin ab —
+            das ist ihre Grenze, nicht unsere. Alles hier bleibt stehen und funktioniert an
+            dem Tag, an dem du den Status bekommst; du musst nichts erneut einrichten.
+          <% } else if (bericht.kanalArt) { %>
+            <i class="fa-solid fa-circle-check me-1"></i>
+            Umfragen sind für deinen Kanal freigeschaltet.
+          <% } else { %>
+            <i class="fa-solid fa-circle-info me-1"></i>
+            Ob dein Kanal Umfragen darf, konnten wir gerade nicht bei Twitch nachsehen.
+            Twitch erlaubt sie nur <b>Affiliates und Partnern</b>.
+          <% } %>
         </div>
       </div>
     </div>
@@ -252,7 +282,13 @@ const befehlsseite = `/guild/${guildId}/plugins/streaming/befehle`;
     <% } %>
 
     <%# ── Eine neue Umfrage ─────────────────────────────────────────────── %>
-    <% if (darfAendern && !bericht.umfragen.laufend && bericht.zusagen.umfragen.zustand === STAND.JA) { %>
+    <%# **Kein Formular, das sicher abgewiesen würde.** Ein gewöhnlicher Kanal
+        bekäme auf „Umfrage starten" nur Twitchs Absage — und ein Formular, das
+        nicht speichern kann, ist eine Attrappe. Bei `null` (nicht feststellbar)
+        steht es dagegen da: Dann ist die Absage eine Vermutung, kein Wissen. %>
+    <% if (darfAendern && !bericht.umfragen.laufend
+           && bericht.zusagen.umfragen.zustand === STAND.JA
+           && bericht.kanalArt !== 'normal') { %>
       <div class="col-12">
         <div class="card">
           <div class="card-header">

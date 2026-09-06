@@ -122,6 +122,8 @@ async function zustand(guildId) {
         kanal: null,
         zusagen: {},
         befehle: {},
+        // 'partner' | 'affiliate' | 'normal' | null (nicht feststellbar)
+        kanalArt: null,
         umfragen: { zustand: ZUSTAND.KEIN_KANAL, laufend: null, frueher: [] }
     };
 
@@ -152,6 +154,17 @@ async function zustand(guildId) {
         return bericht;
     }
 
+    const twitch = require('../plattformen/twitch');
+
+    // **Die Kanalart zuerst, und ausdruecklich VOR der Zusagenschranke.**
+    // `broadcaster_type` ist oeffentlich und braucht keinen Scope - gerade wer
+    // die Umfragen-Zusage NICHT erteilt hat, soll lesen koennen, ob sie ihm
+    // ueberhaupt etwas naetzte. Ein Fehlschlag hier laesst `null` stehen, und
+    // die Seite faellt auf den allgemeinen Satz zurueck.
+    const art = await mitSchluessel(z => twitch.kanalArtLesen(kanal.kanal_id, z))
+        .catch(err => { log().error('[Streaming/Mitmachen] Kanalart', err); return null; });
+    bericht.kanalArt = art?.ok ? art.art : null;
+
     // **Ohne Zusage wird nicht gefragt.** Ein Aufruf, von dem wir wissen, dass
     // er mit 401 endet, kostet Kontingent und traegt zur Antwort nichts bei -
     // und `mitZugang` wuerde dabei einen Widerruf vermerken, den es nie gab.
@@ -159,8 +172,6 @@ async function zustand(guildId) {
         bericht.umfragen = { zustand: ZUSTAND.ABGELEHNT, laufend: null, frueher: [] };
         return bericht;
     }
-
-    const twitch = require('../plattformen/twitch');
     const ergebnis = await mitSchluessel(
         z => twitch.umfragenLesen(kanal.kanal_id, z, RUECKBLICK))
         .catch(err => { log().error('[Streaming/Mitmachen] Umfragen', err); return null; });

@@ -72,6 +72,8 @@ function neuAufsetzen(welche = {}) {
         : { ok: true, abgelehnt: false, grund: null, umfragen: [UMFRAGE_LAEUFT, UMFRAGE_ALT] };
     welt.start = welche.start !== undefined ? welche.start
         : { ok: true, abgelehnt: false, umfrage: UMFRAGE_LAEUFT, grund: null };
+    welt.art = welche.art !== undefined ? welche.art
+        : { ok: true, abgelehnt: false, art: 'affiliate', grund: null };
 
     mitschrift.abfragen = []; mitschrift.schreibzugriffe = [];
     mitschrift.unbekannt = []; mitschrift.twitch = [];
@@ -172,6 +174,12 @@ ersetzen('plugins/streaming/dashboard/plattformen/twitch.js', {
         mitschrift.twitch.push({ was: 'umfrageBeenden', id: String(id), verbergen });
         return { ok: true, abgelehnt: false, umfrage: null, grund: null };
     },
+    async kanalArtLesen(kanalId, zugang) {
+        if (!kanalId) throw new Error('kanalArtLesen ohne `kanalId` gerufen');
+        if (!zugang)  throw new Error('kanalArtLesen ohne Schluessel gerufen');
+        mitschrift.twitch.push({ was: 'kanalArtLesen', kanalId: String(kanalId) });
+        return welt.art;
+    },
     async clipErstellen(kanalId, zugang) {
         if (!kanalId) throw new Error('clipErstellen ohne `kanalId` gerufen');
         if (!zugang)  throw new Error('clipErstellen ohne Schluessel gerufen');
@@ -225,9 +233,28 @@ console.log('\nOhne Zusage wird Twitch gar nicht erst gefragt');
         'die fehlende Zusage steht als solche da');
     pruefe(b.umfragen.zustand === mitmachen.ZUSTAND.ABGELEHNT,
         'die Umfragen-Karte meldet „abgelehnt"', b.umfragen.zustand);
-    pruefe(mitschrift.twitch.length === 0,
-        'und Twitch wurde ueberhaupt nicht gefragt',
-        mitschrift.twitch.map(t => t.was).join(', '));
+    // **Genau eine Ausnahme, und sie steht hier namentlich.** `kanalArtLesen`
+    // fragt `broadcaster_type` ab — oeffentlich, ohne Scope, und gerade fuer
+    // den, der die Zusage NICHT erteilt hat, die nuetzlichste Auskunft
+    // („Umfragen gibt es erst ab Affiliate"). Ein pauschales „ausser dem einen"
+    // waere ein stilles continue; die Liste nennt jeden Namen und seinen Grund.
+    const OHNE_ZUSAGE_ERLAUBT = {
+        kanalArtLesen: 'oeffentlich, braucht keinen Scope — beantwortet, ob die Zusage ueberhaupt etwas naetzte'
+    };
+    const verboten = mitschrift.twitch.filter(t => !OHNE_ZUSAGE_ERLAUBT[t.was]);
+    pruefe(verboten.length === 0,
+        'und kein Aufruf, der die Zusage braucht, geht hinaus',
+        verboten.map(t => t.was).join(', '));
+    // **Die Liste darf nicht verwaisen.** Ein Eintrag, dessen Aufruf es nicht
+    // mehr gibt, ist eine stehengebliebene Erlaubnis — und die naechste
+    // Funktion mit demselben Namen kaeme ungeprueft durch. Hier stand zuerst
+    // ein Haken, der gar nicht fallen konnte; das ist Dekoration, keine
+    // Pruefung.
+    const ungenutzt = Object.keys(OHNE_ZUSAGE_ERLAUBT)
+        .filter(name => !mitschrift.twitch.some(t => t.was === name));
+    pruefe(ungenutzt.length === 0,
+        'und jede Ausnahme in der Liste wird auch wirklich gebraucht',
+        ungenutzt.join(', '));
 }
 
 console.log('\nJede Zusage steht fuer sich');
@@ -369,6 +396,32 @@ console.log('\nDer Befehlsstand kommt aus der Tabelle, nicht aus dem Code');
         JSON.stringify(b.befehle.clip));
     pruefe(b.befehle.umfrage === null,
         'und ein Befehl ohne Zeile heisst „noch nicht eingerichtet", nicht „an"');
+}
+
+console.log('\nDie Kanalart wird gelesen, nicht vermutet');
+{
+    neuAufsetzen({ art: { ok: true, abgelehnt: false, art: 'normal', grund: null } });
+    const b = await mitmachen.zustand('g1');
+    pruefe(b.kanalArt === 'normal',
+        'ein gewoehnlicher Kanal wird als solcher gemeldet', String(b.kanalArt));
+
+    // **Der Fall, um den es geht** (2026-09-06): Wer die Umfragen-Zusage NICHT
+    // erteilt hat, soll trotzdem lesen koennen, ob sie ihm ueberhaupt etwas
+    // naetzte. `broadcaster_type` ist oeffentlich und braucht keinen Scope.
+    neuAufsetzen({ scopes: 'user:write:chat',
+                   art: { ok: true, abgelehnt: false, art: 'normal', grund: null } });
+    const c = await mitmachen.zustand('g1');
+    pruefe(c.kanalArt === 'normal',
+        'auch ohne Umfragen-Zusage — der Aufruf braucht keinen Scope', String(c.kanalArt));
+    pruefe(mitschrift.twitch.filter(t => t.was === 'umfragenLesen').length === 0,
+        'und die Umfragen selbst werden trotzdem nicht abgefragt');
+
+    // Ein Fehlschlag darf nicht wie „gewoehnlicher Kanal" aussehen — sonst
+    // stuende auf der Seite „du bist kein Affiliate", weil das Netz klemmte.
+    neuAufsetzen({ art: { ok: false, abgelehnt: false, art: null, grund: 'kaputt' } });
+    const d = await mitmachen.zustand('g1');
+    pruefe(d.kanalArt === null,
+        'ein Fehlschlag heisst „unbekannt", nicht „normal"', String(d.kanalArt));
 }
 
 console.log('\nDie Attrappe hat alles verstanden');
