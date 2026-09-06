@@ -167,6 +167,35 @@ class StreamingDashboardPlugin extends DashboardPlugin {
                         scopes: ['user:write:chat']
                     },
 
+                    // **Zwei Zusagen fuer P9, und beide einzeln.** Wer nur
+                    // clippen lassen will, soll keine Umfragen freigeben
+                    // muessen - dieselbe Regel wie bei Bits und Followern.
+                    // Eine Sammelzusage waere fuer uns bequemer und fuer ihn
+                    // schlechter.
+                    clip: {
+                        label: 'Clips schneiden',
+                        hinweis: 'Nötig, damit !clip in deinem Chat einen Clip aus den letzten Sekunden '
+                               + 'schneidet. Der Clip entsteht auf Twitch und gehört dir; wir behalten '
+                               + 'davon nichts — nur die Adresse geht einmal in den Chat.',
+                        scopes: ['clips:edit']
+                    },
+
+                    // **`channel:manage:polls` allein, nicht zusaetzlich
+                    // `channel:read:polls`.** Twitch laesst das Lesen mit der
+                    // Verwaltungszusage zu; die zweite waere eine Zeile mehr
+                    // im Dialog, die nichts freischaltet.
+                    //
+                    // ⚠ Twitch erlaubt Umfragen nur Affiliates und Partnern.
+                    // Das steht im Hinweis, weil die Absage sonst wie ein
+                    // Fehler von uns aussieht.
+                    umfragen: {
+                        label: 'Umfragen starten und ansehen',
+                        hinweis: 'Nötig, damit du Twitch-Umfragen aus dem Panel starten, ihren Stand sehen '
+                               + 'und sie beenden kannst. Twitch erlaubt Umfragen nur Affiliates und '
+                               + 'Partnern — ohne diesen Status weist Twitch sie ab, nicht wir.',
+                        scopes: ['channel:manage:polls']
+                    },
+
                     // **Die einzige Zusage, die nicht einem Menschen gehört**
                     // (Stufe 13a). Hier stimmt unser eigenes Bot-Konto zu, und
                     // zwar genau einmal — Twitch: *„only needed to be

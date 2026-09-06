@@ -198,24 +198,84 @@ console.log('\nDie Nachbarschaft');
 // Ein Bestaetigungsdialog rettet das nicht: Wer den Knopf trifft, den er
 // treffen wollte, klickt den Dialog weg. Die Trennung muss raeumlich sein.
 // ---------------------------------------------------------------------------
-melde('Das Loeschen steht allein in seiner Fusszeile', (() => {
-    const ansicht = fs.readFileSync(
-        path.join(WURZEL, 'dashboard/views/guild/streaming-ziele.ejs'), 'utf8');
+// **Zwei Sorten Loeschung, zwei Massstaebe — und der Unterschied ist begruendet.**
+//
+// Die Regel las bis zum 2026-09-06 nur `streaming-ziele.ejs`. Das Loeschen ist
+// beim Neuschnitt (P4/P11) nach `streaming-kanal.ejs` gewandert; seitdem meldete
+// sie „Formular zum Entfernen nicht gefunden", und die Schutzregel war
+// ungemessen. Ein fester Dateiname war der Fehler.
+//
+// Beim Verbreitern auf alle Ansichten kam heraus, dass es ZWEI Bauformen gibt:
+//
+//   kartenweit   Das Loeschen hat eine eigene Karte mit eigener Fusszeile
+//                („Diesen Kanal nicht mehr verfolgen"). Folge: Twitch-Abos
+//                werden abbestellt, andere Guilds koennen mitbetroffen sein.
+//                → Massstab wie gehabt: in dieser Fusszeile steht GENAU EIN
+//                  Formular. Das war der Fehler vom 2026-08-25.
+//
+//   zeilenweise  Ein kleiner Knopf an einer Zeile (ein Befehl, eine Ansage).
+//                Folge: ein Text, den der Streamer neu tippen kann.
+//                → Massstab: ein EIGENES Formular (kein zweiter Absendeknopf im
+//                  selben) und eine Rueckfrage.
+//
+// Beide anhand der Fusszeile zu messen war ein Messfehler, kein Befund: Zeilen
+// haben keine Fusszeile, und `lastIndexOf('card-footer')` griff rueckwaerts in
+// eine fremde Karte — drei Fehlalarme in Seiten, die in Ordnung sind. Ein
+// Waechter, der Wolf ruft, ist schlimmer als keiner.
+melde('Das Loeschen sitzt nicht neben einer alltaeglichen Handlung', (() => {
+    const ordner = path.join(WURZEL, 'dashboard/views/guild');
+    const funde = [];
+    let kartenweit = 0, zeilenweise = 0;
 
-    const stelle = ansicht.indexOf('/entfernen"');
-    if (stelle < 0) return ['Formular zum Entfernen nicht gefunden'];
+    for (const name of fs.readdirSync(ordner).filter(n => n.endsWith('.ejs'))) {
+        const ansicht = fs.readFileSync(path.join(ordner, name), 'utf8');
 
-    // Rueckwaerts bis zur oeffnenden Fusszeile, vorwaerts bis zu ihrem Ende.
-    const anfang = ansicht.lastIndexOf('card-footer', stelle);
-    if (anfang < 0) return ['Formular zum Entfernen steht in keiner card-footer'];
+        for (let stelle = ansicht.indexOf('/entfernen"'); stelle >= 0;
+                 stelle = ansicht.indexOf('/entfernen"', stelle + 1)) {
 
-    const naechsteFusszeile = ansicht.indexOf('card-footer', stelle);
-    const block = ansicht.slice(anfang, naechsteFusszeile > 0 ? naechsteFusszeile : ansicht.length);
+            const formAnfang = ansicht.lastIndexOf('<form', stelle);
+            const formEnde = ansicht.indexOf('</form>', stelle);
+            const formular = ansicht.slice(formAnfang, formEnde < 0 ? ansicht.length : formEnde);
 
-    const formulare = (block.match(/<form\b/g) || []).length;
-    return formulare === 1
-        ? []
-        : [`in der Fusszeile des Loeschens stehen ${formulare} Formulare — eine zerstoerende Handlung darf nicht neben einer alltaeglichen sitzen`];
+            const fussAnfang = ansicht.lastIndexOf('card-footer', stelle);
+            // Steht zwischen der Fusszeile und dem Loeschen schon ein `</form>`
+            // ohne oeffnendes Gegenstueck, gehoert die Fusszeile einer anderen
+            // Karte — dann ist es eine Zeile, keine Fusszeile.
+            const dazwischen = fussAnfang < 0 ? '' : ansicht.slice(fussAnfang, formAnfang);
+            const inFusszeile = fussAnfang >= 0
+                && (dazwischen.match(/<form\b/g) || []).length
+                   >= (dazwischen.match(/<\/form>/g) || []).length;
+
+            if (inFusszeile) {
+                kartenweit++;
+                const naechste = ansicht.indexOf('card-footer', stelle);
+                const block = ansicht.slice(fussAnfang, naechste > 0 ? naechste : ansicht.length);
+                const formulare = (block.match(/<form\b/g) || []).length;
+                if (formulare !== 1) {
+                    funde.push(`${name}: in der Fusszeile des Loeschens stehen ${formulare} Formulare `
+                        + '— eine zerstoerende Handlung darf nicht neben einer alltaeglichen sitzen');
+                }
+                continue;
+            }
+
+            zeilenweise++;
+            const knoepfe = (formular.match(/type="submit"/g) || []).length;
+            if (knoepfe !== 1) {
+                funde.push(`${name}: das Entfernen teilt sich ein Formular mit ${knoepfe - 1} `
+                    + 'weiteren Absendeknopf/-knoepfen — ein Fehlgriff traefe das Loeschen');
+            }
+            if (!/onsubmit="return confirm/.test(formular)) {
+                funde.push(`${name}: das zeilenweise Entfernen fragt nicht nach`);
+            }
+        }
+    }
+
+    // **Nichts gefunden ist kein Erfolg.** Genau so ist diese Regel stumm
+    // geworden. Haette sie den Nichtfund als „in Ordnung" gebucht, staende sie
+    // heute gruen da und schuetzte nichts.
+    if (!kartenweit) funde.push('keine kartenweite Loeschung gefunden — die Regel misst ihren eigentlichen Fall nicht mehr');
+    if (!zeilenweise) funde.push('keine zeilenweise Loeschung gefunden — die zweite Haelfte misst nichts');
+    return funde;
 })());
 
 console.log(verstoesse === 0

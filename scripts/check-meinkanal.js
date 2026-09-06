@@ -184,6 +184,13 @@ pruefe(/pagination/.test(modFn),
     'ab 101 moderierten Kanaelen fehlten sonst welche - lautlos');
 
 const meinkanalQuelle = lies('plugins/streaming/dashboard/kern/meinkanal.js');
+
+// **Seit dem 2026-09-05 steht das Nachsehen in einer zweiten Datei.** P9 fragt
+// dieselbe Frage fuer `clips:edit` und `channel:manage:polls`; das Lesen des
+// Schluessels ist deshalb nach `kern/zusagen` gewandert. Diese Pruefung ist
+// mitgewandert, statt milder zu werden - sonst haette ein Umzug genuegt, um
+// eine Regel loszuwerden.
+const zusagenQuelle = lies('plugins/streaming/dashboard/kern/zusagen.js');
 pruefe(/mitBetreiberZugang/.test(meinkanalQuelle) && !/mitZugang\(/.test(meinkanalQuelle),
     'meinkanal nimmt den Anlagen-Schluessel, nie den des Streamers',
     'der Streamer erteilt fuer diese Anzeige nichts');
@@ -199,22 +206,28 @@ pruefe(/mitBetreiberZugang/.test(meinkanalQuelle) && !/mitZugang\(/.test(meinkan
 // Jetzt traegt jede erlaubte Stelle ihren Grund. `nein` ist zulaessig, wo die
 // Antwort **gelesen** wurde und leer war - nie, wo eine Abfrage klemmte.
 const ERLAUBTES_NEIN = [
-    ['Bot in meinem Chat',
+    ['meinkanal', 'Bot in meinem Chat',
      'Die Liste der moderierten Kanaele kam an und der Kanal stand nicht darin.'],
-    ['Chatbot verwaltet in',
+    ['meinkanal', 'Chatbot verwaltet in',
      '`heim_guild_id` wurde gelesen und war NULL - noch niemand hat gewaehlt.'],
 
-    // Stufe 13c. Alle drei lesen und finden nichts - keiner von ihnen ist ein
+    // Stufe 13c. Alle lesen und finden nichts - keiner von ihnen ist ein
     // Abbruch. Was hier klemmen kann (`zusageLesen` wirft), endet einen
     // Zweig weiter oben bei `unbekannt`.
-    ['Zu diesem Kanal ist kein Konto verknuepft.',
+    ['meinkanal', 'Zu diesem Kanal ist kein Konto verknuepft.',
      '`kanalInhaber` wurde gefragt und gab NULL - dann gibt es niemanden, der erlauben koennte.'],
-    ['if (!zusage) return { zustand: \'nein\'',
+    ['meinkanal', 'Chatbot schreibt unter meinem Namen',
+     'Die Zeile im Profil gibt weiter, was `darfSchreiben` gelesen hat.'],
+
+    // **Umgezogen am 2026-09-05**, nicht gestrichen. Diese drei standen bis
+    // dahin in `darfSchreiben`; sie tun dasselbe wie vorher, nur fuer jeden
+    // Scope statt fuer einen.
+    ['zusagen', 'if (!userId) return alle(STAND.NEIN, null);',
+     'Es wurde niemand gefragt, weil es niemanden gibt - kein verknuepftes Konto.'],
+    ['zusagen', 'if (!zusage) return alle(STAND.NEIN, null);',
      '`user_connection_grants` wurde gelesen und war leer - nie erteilt oder widerrufen.'],
-    ['scopes.includes(SCHREIB_SCOPE) ? \'ja\' : \'nein\'',
-     'Der Schluessel kam an und traegt `user:write:chat` nicht - das ist gelesen, nicht geraten.'],
-    ['Chatbot schreibt unter meinem Namen',
-     'Die Zeile im Profil gibt weiter, was `darfSchreiben` gelesen hat.']
+    ['zusagen', 'erteilt.has(s) ? STAND.JA : STAND.NEIN',
+     'Der Schluessel kam an und traegt den Scope nicht - das ist gelesen, nicht geraten.']
 ];
 
 // **Auch das Ternaer zaehlt mit** (gefunden am 2026-08-30).
@@ -224,13 +237,21 @@ const ERLAUBTES_NEIN = [
 // sie war fuer die Zaehlung unsichtbar. Die Regel haette also eine neue
 // `nein`-Stelle durchgelassen, sobald jemand sie als Ternaer schreibt; genau
 // die Bauform, die man waehlt, wenn es kurz werden soll.
-const neinStellen = (ohneKommentareJs(meinkanalQuelle).match(/'nein'/g) || []).length;
+// **Die zwei Dateien werden verschieden gezaehlt, und das ist kein Schlendrian.**
+// `meinkanal` schreibt `'nein'` woertlich hin; `kern/zusagen` hat dafuer eine
+// benannte Konstante. Dort das Literal zu zaehlen faende **eine** Stelle - die
+// Deklaration - und uebersaehe alle drei Entscheidungen. Gezaehlt wird deshalb,
+// was an der jeweiligen Stelle die Entscheidung TRAEGT.
+const neinStellen =
+    (ohneKommentareJs(meinkanalQuelle).match(/'nein'/g) || []).length
+  + (ohneKommentareJs(zusagenQuelle).match(/STAND\.NEIN/g) || []).length;
 pruefe(neinStellen === ERLAUBTES_NEIN.length,
     `jede \`nein\`-Stelle steht mit Grund in der Liste (${neinStellen} im Code, ${ERLAUBTES_NEIN.length} eingetragen)`,
     'jede weitere waere ein Abbruchgrund, der sich als Tatsache ausgibt — eintragen oder auf `unbekannt` aendern');
 
-for (const [label, grund] of ERLAUBTES_NEIN) {
-    pruefe(meinkanalQuelle.includes(label), `„${label}" gibt es noch`, grund);
+for (const [woher, label, grund] of ERLAUBTES_NEIN) {
+    const quelle = woher === 'zusagen' ? zusagenQuelle : meinkanalQuelle;
+    pruefe(quelle.includes(label), `„${label}" gibt es noch (${woher})`, grund);
 }
 
 // **Und die Regel, die wirklich zaehlt:** In keinem `catch` steht `nein`. Wer

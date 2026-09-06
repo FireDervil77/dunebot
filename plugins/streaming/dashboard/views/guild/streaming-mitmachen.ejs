@@ -1,0 +1,391 @@
+<%
+/**
+ * Mitmachen (P9) — was Zuschauer aus dem Chat heraus auslösen können.
+ *
+ * **Zwei von vier Punkten sind gebaut, und die Seite sagt das selbst.** Clip
+ * und Umfrage gehören Twitch: Wir lösen aus und lesen den Stand, gespeichert
+ * wird nichts. Verlosung und Musikwunsch fehlen — nicht vergessen, sondern
+ * gemessen und zurückgestellt; der Grund steht unten auf der Seite, nicht in
+ * einer Fußnote.
+ *
+ * Erwartet: bericht, ZUSTAND, STAND, vorWieLange, meldung, fehler
+ */
+const darfAendern = typeof hasPermission === 'function' && hasPermission('STREAMING.CHAT.MANAGE');
+
+const WER = {
+  alle: 'alle', abonnent: 'Abonnenten', moderator: 'Moderatoren', inhaber: 'nur ich'
+};
+
+const fehlerTexte = {
+  frage:      'Ohne Frage gibt es nichts abzustimmen.',
+  antworten:  'Eine Umfrage braucht mindestens zwei Antworten.',
+  kein_kanal: 'Zu dieser Guild gehört kein Twitch-Kanal.',
+  technisch:  'Das hat technisch nicht geklappt. Der Grund steht im Protokoll.'
+};
+const meldungen = {
+  gestartet: 'Die Umfrage läuft — sie erscheint jetzt in deinem Stream.',
+  beendet:   'Die Umfrage ist beendet.',
+  verborgen: 'Die Umfrage ist abgebrochen; das Ergebnis wird nicht gezeigt.'
+};
+
+/**
+ * Was eine Karte sagt, wenn ihr Inhalt nicht kommen konnte.
+ *
+ * @param {string} zustand Einer aus ZUSTAND
+ * @returns {string|null} Hinweis, oder null wenn alles ging
+ */
+const hinweis = (zustand) => ({
+  [ZUSTAND.ABGELEHNT]:  'Dafür fehlt die Erlaubnis — oder sie wurde widerrufen.',
+  [ZUSTAND.FEHLER]:     'Twitch hat gerade nicht geantwortet. Der Grund steht im Protokoll.',
+  [ZUSTAND.KEIN_KANAL]: 'Für diese Guild ist kein Kanal als Heim gesetzt.'
+}[zustand] || null);
+
+/**
+ * Die Zeile über einen der beiden Befehle.
+ *
+ * @param {Object|null} zeile Aus `streaming_commands`, oder null
+ * @returns {string} Satz
+ */
+const befehlSatz = (zeile) => {
+  if (!zeile) return 'Noch nicht eingerichtet.';
+  if (!zeile.aktiv) return 'Eingerichtet, aber abgeschaltet.';
+  return `An — für ${WER[zeile.wer] || zeile.wer}, Abkühlung ${zeile.abkuehlung_s} s.`;
+};
+
+const anteil = (a, gesamt) => (gesamt > 0 ? Math.round((a.stimmen / gesamt) * 100) : 0);
+const verbindungen = `/guild/${guildId}/profile/verbindungen`;
+const befehlsseite = `/guild/${guildId}/plugins/streaming/befehle`;
+%>
+
+<%- include('partials/streaming-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-hand-sparkles',
+  titel: 'Mitmachen',
+  beschreibung: 'Was deine Zuschauer aus dem Chat heraus auslösen können.'
+}) %>
+
+<% if (meldung && meldungen[meldung]) { %>
+  <div class="alert alert-success"><%= meldungen[meldung] %></div>
+<% } %>
+<% if (fehler) { %>
+  <div class="alert alert-danger"><%= fehlerTexte[fehler] || fehler %></div>
+<% } %>
+
+<div class="row row-cards">
+
+  <%# ── Woher das kommt und was hier bleibt ───────────────────────────────
+      Dieselbe Frage wie auf der Statistik-Seite, deshalb dieselbe Antwort an
+      derselben Stelle: oben, bevor sie jemand stellt. %>
+  <div class="col-12">
+    <div class="erklaerkarte">
+      <h3>Beides gehört Twitch — wir lösen nur aus</h3>
+      <p>
+        Ein Clip liegt auf <b>Twitchs</b> Servern, eine Umfrage läuft in <b>Twitchs</b>
+        Oberfläche. Wir schneiden nichts selbst und zählen keine Stimmen; wir schicken
+        den Auftrag und lesen den Stand. <b>Gespeichert wird davon nichts</b> — schließt
+        du die Seite, ist nichts davon bei uns geblieben.
+      </p>
+      <p>
+        Deshalb steht hier auch <b>kein Verlauf</b> deiner Umfragen: Was du siehst, sind
+        die letzten, die Twitch selbst noch führt.
+      </p>
+    </div>
+  </div>
+
+  <%# ── Clip ──────────────────────────────────────────────────────────────── %>
+  <div class="col-12 col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <div class="kartenkopf">
+          <span class="kartensymbol"><i class="fa-solid fa-scissors"></i></span>
+          <div class="kartenkopf__text">
+            <h3 class="kartenkopf__titel">Clip</h3>
+            <div class="kartenkopf__satz">
+              <code>!clip</code> schneidet die letzten Sekunden mit und schreibt die Adresse in den Chat.
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="zeilen">
+          <div class="zeile">
+            <div class="zeile__bez">Deine Erlaubnis</div>
+            <div>
+              <% if (bericht.zusagen.clip.zustand === STAND.JA) { %>
+                <span class="chip">erteilt</span>
+              <% } else if (bericht.zusagen.clip.zustand === STAND.UNBEKANNT) { %>
+                <span class="chip">nicht lesbar</span>
+                <div class="zeile__hilfe"><%= bericht.zusagen.clip.grund %></div>
+              <% } else { %>
+                <a href="<%= verbindungen %>" class="btn btn-warning btn-sm">
+                  <i class="fa-solid fa-key me-1"></i> Clips schneiden erlauben
+                </a>
+              <% } %>
+            </div>
+          </div>
+          <div class="zeile">
+            <div class="zeile__bez">Der Befehl</div>
+            <div>
+              <%= befehlSatz(bericht.befehle.clip) %>
+              <div class="zeile__hilfe">
+                Eingerichtet wird er auf <a href="<%= befehlsseite %>">Meine Befehle</a> —
+                dort steht auch, wer ihn benutzen darf.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="text-secondary small mt-2">
+          <i class="fa-solid fa-circle-info me-1"></i>
+          Nur <b>während du sendest</b> — offline gibt es nichts zu schneiden, und der Bot
+          sagt das im Chat, statt Twitch danach zu fragen. Der fertige Clip braucht ein
+          paar Sekunden; die Adresse geht sofort hinaus und führt kurz noch ins Leere.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%# ── Umfrage: Zustand und laufende ─────────────────────────────────────── %>
+  <div class="col-12 col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <div class="kartenkopf">
+          <span class="kartensymbol"><i class="fa-solid fa-square-poll-vertical"></i></span>
+          <div class="kartenkopf__text">
+            <h3 class="kartenkopf__titel">Umfrage</h3>
+            <div class="kartenkopf__satz">
+              Twitchs eigene Umfragen — <code>!umfrage</code> sagt im Chat, wie sie steht.
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="zeilen">
+          <div class="zeile">
+            <div class="zeile__bez">Deine Erlaubnis</div>
+            <div>
+              <% if (bericht.zusagen.umfragen.zustand === STAND.JA) { %>
+                <span class="chip">erteilt</span>
+              <% } else if (bericht.zusagen.umfragen.zustand === STAND.UNBEKANNT) { %>
+                <span class="chip">nicht lesbar</span>
+                <div class="zeile__hilfe"><%= bericht.zusagen.umfragen.grund %></div>
+              <% } else { %>
+                <a href="<%= verbindungen %>" class="btn btn-warning btn-sm">
+                  <i class="fa-solid fa-key me-1"></i> Umfragen erlauben
+                </a>
+              <% } %>
+            </div>
+          </div>
+          <div class="zeile">
+            <div class="zeile__bez">Der Befehl</div>
+            <div><%= befehlSatz(bericht.befehle.umfrage) %></div>
+          </div>
+        </div>
+
+        <%# **Die Voraussetzung, die nicht bei uns liegt.** Ohne diesen Satz
+            sähe Twitchs Absage aus wie ein Fehler von uns. %>
+        <div class="text-secondary small mt-2">
+          <i class="fa-solid fa-triangle-exclamation me-1"></i>
+          Twitch erlaubt Umfragen nur <b>Affiliates und Partnern</b>. Ohne diesen Status
+          weist Twitch das Anlegen ab — das ist ihre Grenze, nicht unsere.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%# ── Die laufende Umfrage ──────────────────────────────────────────────── %>
+  <% if (hinweis(bericht.umfragen.zustand)) { %>
+    <div class="col-12">
+      <div class="card"><div class="card-body">
+        <div class="alert alert-warning mb-0"><%= hinweis(bericht.umfragen.zustand) %></div>
+      </div></div>
+    </div>
+  <% } else { %>
+
+    <% if (bericht.umfragen.laufend) { const u = bericht.umfragen.laufend; %>
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header">
+            <div class="kartenkopf">
+              <span class="kartensymbol"><i class="fa-solid fa-play"></i></span>
+              <div class="kartenkopf__text">
+                <h3 class="kartenkopf__titel">Läuft gerade: <%= u.frage %></h3>
+                <div class="kartenkopf__satz">
+                  <%= u.gesamt %> Stimmen<% if (u.punkteAbstimmung) { %> ·
+                  <%= u.punkteProStimme %> Kanalpunkte je Zusatzstimme<% } %>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="zeilen">
+              <% u.antworten.forEach(a => { %>
+                <div class="zeile">
+                  <div class="zeile__bez"><%= a.titel %></div>
+                  <div>
+                    <span class="chip mono"><%= a.stimmen %></span>
+                    <small><%= anteil(a, u.gesamt) %>&nbsp;%</small>
+                  </div>
+                </div>
+              <% }); %>
+            </div>
+          </div>
+          <% if (darfAendern) { %>
+            <div class="card-footer d-flex gap-2 justify-content-end">
+              <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/mitmachen/umfrage/beenden">
+                <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+                <input type="hidden" name="umfrage_id" value="<%= u.id %>">
+                <%# **Zwei Knöpfe, weil Twitch zwei Arten kennt.** Beenden zeigt
+                    das Ergebnis, Abbrechen nimmt es aus der Oberfläche — wer
+                    sich vertippt hat, will das Zweite. %>
+                <button class="btn btn-outline-secondary" type="submit" name="verbergen" value="1">
+                  Abbrechen
+                </button>
+                <button class="btn btn-primary ms-2" type="submit" name="verbergen" value="0">
+                  Beenden und Ergebnis zeigen
+                </button>
+              </form>
+            </div>
+          <% } %>
+        </div>
+      </div>
+    <% } %>
+
+    <%# ── Eine neue Umfrage ─────────────────────────────────────────────── %>
+    <% if (darfAendern && !bericht.umfragen.laufend && bericht.zusagen.umfragen.zustand === STAND.JA) { %>
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header">
+            <div class="kartenkopf">
+              <span class="kartensymbol"><i class="fa-solid fa-plus"></i></span>
+              <div class="kartenkopf__text">
+                <h3 class="kartenkopf__titel">Neue Umfrage</h3>
+                <div class="kartenkopf__satz">Sie erscheint sofort in deinem Stream.</div>
+              </div>
+            </div>
+          </div>
+          <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/mitmachen/umfrage">
+            <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+            <div class="card-body">
+              <div class="mb-3">
+                <label class="form-label">Frage</label>
+                <%# 60 Zeichen ist Twitchs Grenze, nicht unsere Wahl. Ein Feld,
+                    das mehr annimmt, ließe den Streamer zweimal tippen. %>
+                <input type="text" class="form-control" name="frage" maxlength="60" required
+                       placeholder="Welches Spiel als nächstes?">
+              </div>
+
+              <label class="form-label">Antworten <small>(mindestens zwei, höchstens fünf)</small></label>
+              <% [0,1,2,3,4].forEach(i => { %>
+                <input type="text" class="form-control mb-2" name="antworten[]" maxlength="25"
+                       placeholder="<%= i < 2 ? 'Antwort ' + (i+1) : 'Antwort ' + (i+1) + ' — optional' %>"
+                       <%= i < 2 ? 'required' : '' %>>
+              <% }); %>
+
+              <div class="row g-2 mt-1">
+                <div class="col-12 col-md-6">
+                  <label class="form-label">Dauer</label>
+                  <select class="form-select" name="dauer_s">
+                    <option value="30">30 Sekunden</option>
+                    <option value="60" selected>1 Minute</option>
+                    <option value="120">2 Minuten</option>
+                    <option value="300">5 Minuten</option>
+                    <option value="600">10 Minuten</option>
+                    <option value="1800">30 Minuten</option>
+                  </select>
+                </div>
+                <div class="col-12 col-md-6">
+                  <label class="form-label">Kanalpunkte je Zusatzstimme</label>
+                  <input type="number" class="form-control" name="punkteProStimme"
+                         min="0" max="1000000" value="0">
+                  <div class="zeile__hilfe">0 heißt: keine Abstimmung mit Kanalpunkten.</div>
+                </div>
+              </div>
+            </div>
+            <div class="card-footer text-end">
+              <button type="submit" class="btn btn-primary">Umfrage starten</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    <% } %>
+
+    <%# ── Die letzten ───────────────────────────────────────────────────── %>
+    <% if (bericht.umfragen.frueher.length) { %>
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header">
+            <div class="kartenkopf">
+              <span class="kartensymbol"><i class="fa-solid fa-clock-rotate-left"></i></span>
+              <div class="kartenkopf__text">
+                <h3 class="kartenkopf__titel">Zuletzt</h3>
+                <div class="kartenkopf__satz">
+                  Was Twitch noch führt — von uns kommt nichts dazu.
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="zeilen">
+              <% bericht.umfragen.frueher.forEach(u => { %>
+                <div class="zeile">
+                  <div class="zeile__bez">
+                    <%= u.frage %>
+                    <small><%= u.beendet_am ? vorWieLange(u.beendet_am) : '' %></small>
+                  </div>
+                  <div>
+                    <% u.antworten.forEach(a => { %>
+                      <span class="chip"><%= a.titel %>: <%= a.stimmen %></span>
+                    <% }); %>
+                  </div>
+                </div>
+              <% }); %>
+            </div>
+          </div>
+        </div>
+      </div>
+    <% } %>
+  <% } %>
+
+  <%# ── Was hier bewusst NICHT steht ──────────────────────────────────────
+      Gemessen am 2026-09-05, nicht vermutet. Der Entwurf nennt vier Punkte;
+      zwei davon hängen an einem fremden Plugin, das um Discord herum gebaut
+      ist — dieselbe Form wie beim Chat-Schutz. %>
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <div class="kartenkopf">
+          <span class="kartensymbol"><i class="fa-solid fa-hourglass-half"></i></span>
+          <div class="kartenkopf__text">
+            <h3 class="kartenkopf__titel">Noch nicht dabei: Verlosung und Musikwunsch</h3>
+            <div class="kartenkopf__satz">Nicht vergessen — gemessen und zurückgestellt.</div>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <p class="text-secondary mb-2">
+          Beides <b>gibt es schon</b> — für Discord. Es fehlt nicht die Funktion, sondern
+          der Chat als zweiter Eingang zu ihr. Und der ist teurer, als er aussieht:
+        </p>
+        <pre class="mb-2" style="white-space:pre-wrap"><code>GiveawayManager.addEntry(giveawayId, userId)   sieht nach reinen Kennungen aus
+  └─ checkRequirements()  Zeile 2:  guild.members.fetch(userId)
+                          Zeile 3:  if (!member) return 'member_not_found'</code></pre>
+        <p class="text-secondary mb-0">
+          Ein Twitch-Zuschauer ohne Discord-Konto scheitert dort <b>nicht an einer Regel,
+          sondern an der Verrohrung</b> — bevor irgendeine Bedingung geprüft wird. Das ist
+          ein eigener Bauabschnitt, kein Anbau an diese Seite. Beim Musik-Plugin kommt
+          hinzu, dass „streamsichere Musik“ bisher <b>vollständig ungeprüft</b> ist.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <div class="card"><div class="card-body">
+      <div class="text-secondary small">
+        Geholt: <%= vorWieLange(bericht.geholt_am) %>
+      </div>
+    </div></div>
+  </div>
+
+</div>

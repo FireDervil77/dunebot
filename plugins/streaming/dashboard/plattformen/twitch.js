@@ -1283,17 +1283,6 @@ async function chatSenden(kanalId, text, zugang) {
 }
 
 /**
- * Aus einem Abo-Ereignis die beteiligte Person herausziehen.
- *
- * **Beim Verschenken ist es nicht der Schenkende.** `channel.subscribe` traegt
- * bei einem Geschenk `is_gift: true` und im `user_id` den **Beschenkten** —
- * und der soll die Rolle bekommen. Wer hier den Schenkenden nimmt, gibt die
- * Rolle einer Person, die selbst gar nicht abonniert hat.
- *
- * @param {Object} koerper Zustellung
- * @returns {{kontoId: string, kontoName: string|null, stufe: string|null, geschenkt: boolean}|null} Person
- */
-/**
  * Die Follower eines Kanals (P7).
  *
  * **Nichts davon wird gespeichert.** Entschieden am 2026-09-03: „die Frage nach
@@ -1394,6 +1383,295 @@ async function bitsRanglisteLesen(zugang, zeitraum = 'all', anzahl = 10) {
     };
 }
 
+
+// =====================================================
+// Mitmachen (P9) - Clips und Umfragen
+// =====================================================
+//
+// **Beides gehoert Twitch, nicht uns.** Ein Clip liegt auf Twitchs Servern,
+// eine Umfrage laeuft in Twitchs Oberflaeche - wir loesen sie aus und lesen
+// den Stand. Gespeichert wird davon nichts, dieselbe Entscheidung wie bei der
+// Statistik (2026-09-03: „per Request, also dann wenn man sie braucht").
+//
+// ⚠ **Aus der Dokumentation gebaut, in Produktion noch nicht gelaufen.** Die
+// Formen unten stehen so in Twitchs API-Referenz; ob sie im Ernstfall genau so
+// antwortet, zeigt der erste echte Aufruf. Das ist keine Floskel - am
+// 2026-09-05 hat eine fehlende Spalte den ersten echten `!uptime` zerlegt,
+// waehrend 44 Pruefungen gruen meldeten.
+
+/**
+ * Einen Clip aus den letzten Sekunden des laufenden Streams schneiden.
+ *
+ * **Der Kanal muss live sein.** Twitch antwortet sonst mit 404 - und zwar
+ * nicht, weil die Adresse falsch waere, sondern weil es nichts zu schneiden
+ * gibt. Der Text kommt deshalb durch, statt gedeutet zu werden.
+ *
+ * **Der Clip braucht ein paar Sekunden.** Twitch nimmt den Auftrag mit 202 an
+ * und verarbeitet ihn danach; die oeffentliche Adresse fuehrt in dieser Zeit
+ * ins Leere. Wir geben sie trotzdem sofort heraus - so machen es Nightbot und
+ * StreamElements auch, und die Alternative waere, die Chatantwort um mehrere
+ * Sekunden zu verzoegern, ohne eine Zusage darauf zu haben, dass es dann
+ * reicht.
+ *
+ * Braucht `clips:edit` vom Kanalinhaber.
+ *
+ * @param {string} kanalId Twitch-Kanalkennung
+ * @param {string} zugang Zugangsschluessel des Kanalinhabers
+ * @returns {Promise<{ok: boolean, abgelehnt: boolean, id: string|null, url: string|null, bearbeitenUrl: string|null, grund: string|null}>} Ergebnis
+ */
+async function clipErstellen(kanalId, zugang) {
+    const leer = { ok: false, abgelehnt: false, id: null, url: null, bearbeitenUrl: null };
+
+    const daten = await zugangsdaten('TWITCH');
+    if (!daten.clientId) return { ...leer, grund: 'Die Zugangsdaten der Anwendung fehlen' };
+
+    // `has_delay=false`: Der Clip endet dort, wo der Stream gerade steht, nicht
+    // dort, wo ihn die Zuschauer sehen. Der Streamer weiss, was er clippen
+    // will, im Augenblick des Tippens - nicht 20 Sekunden davor.
+    const abfrage = new URLSearchParams({
+        broadcaster_id: String(kanalId),
+        has_delay: 'false'
+    });
+
+    const antwort = await fetch(`${HELIX}/clips?${abfrage}`, {
+        method: 'POST',
+        headers: { 'Client-Id': daten.clientId, Authorization: `Bearer ${zugang}` }
+    });
+
+    if (antwort.status === 401) {
+        return { ...leer, abgelehnt: true, grund: 'Der Schluessel wird von Twitch abgelehnt' };
+    }
+
+    let json = null;
+    try { json = await antwort.json(); } catch { /* 202 darf leer sein */ }
+
+    if (!antwort.ok) {
+        return { ...leer, grund: json?.message || `HTTP ${antwort.status}` };
+    }
+
+    const clip = json?.data?.[0] || null;
+    if (!clip?.id) {
+        // Ein 202 ohne Kennung ist kein Erfolg, den man weitersagen kann - die
+        // Adresse waere geraten. Lieber melden, dass nichts ankam.
+        return { ...leer, grund: 'Twitch hat keine Clip-Kennung geliefert' };
+    }
+
+    return {
+        ok: true,
+        abgelehnt: false,
+        id: String(clip.id),
+        url: `https://clips.twitch.tv/${clip.id}`,
+        bearbeitenUrl: clip.edit_url || null,
+        grund: null
+    };
+}
+
+/**
+ * Eine Umfrage aus Twitchs Antwort in unsere Form bringen.
+ *
+ * **`votes` enthaelt die Punktestimmen schon.** Twitch fuehrt
+ * `channel_points_votes` zusaetzlich aus, nicht daneben; wer beide addiert,
+ * zaehlt doppelt.
+ *
+ * @param {Object} u Rohe Umfrage
+ * @returns {Object} Umfrage
+ */
+function umfrageAus(u) {
+    const antworten = (u.choices || []).map(c => ({
+        id: String(c.id),
+        titel: c.title,
+        stimmen: Number(c.votes) || 0,
+        punkteStimmen: Number(c.channel_points_votes) || 0
+    }));
+
+    return {
+        id: String(u.id),
+        frage: u.title,
+        // ACTIVE | COMPLETED | TERMINATED | ARCHIVED | MODERATED | INVALID
+        zustand: String(u.status || '').toUpperCase(),
+        laeuft: String(u.status || '').toUpperCase() === 'ACTIVE',
+        dauer_s: Number(u.duration) || 0,
+        begonnen_am: u.started_at || null,
+        beendet_am: u.ended_at || null,
+        punkteAbstimmung: Boolean(u.channel_points_voting_enabled),
+        punkteProStimme: Number(u.channel_points_per_vote) || 0,
+        antworten,
+        gesamt: antworten.reduce((s, a) => s + a.stimmen, 0)
+    };
+}
+
+/**
+ * Die letzten Umfragen eines Kanals - die laufende steht vorn.
+ *
+ * Braucht `channel:read:polls` oder `channel:manage:polls`. Wir erbitten nur
+ * das zweite: Wer eine Umfrage starten darf, darf sie auch lesen, und zwei
+ * Zusagen fuer eine Sache waeren ein Dialog mit einer Zeile zu viel.
+ *
+ * @param {string} kanalId Twitch-Kanalkennung
+ * @param {string} zugang Zugangsschluessel des Kanalinhabers
+ * @param {number} [anzahl] Wie viele
+ * @returns {Promise<{ok: boolean, abgelehnt: boolean, umfragen: Array<Object>, grund: string|null}>} Ergebnis
+ */
+async function umfragenLesen(kanalId, zugang, anzahl = 5) {
+    const leer = { ok: false, abgelehnt: false, umfragen: [] };
+
+    const daten = await zugangsdaten('TWITCH');
+    if (!daten.clientId) return { ...leer, grund: 'Die Zugangsdaten der Anwendung fehlen' };
+
+    const abfrage = new URLSearchParams({
+        broadcaster_id: String(kanalId),
+        first: String(Math.max(1, Math.min(20, Number(anzahl) || 5)))
+    });
+
+    const antwort = await fetch(`${HELIX}/polls?${abfrage}`, {
+        headers: { 'Client-Id': daten.clientId, Authorization: `Bearer ${zugang}` }
+    });
+
+    if (antwort.status === 401) {
+        return { ...leer, abgelehnt: true, grund: 'Der Schluessel wird von Twitch abgelehnt' };
+    }
+
+    let json = null;
+    try { json = await antwort.json(); } catch { /* leer ist auch eine Antwort */ }
+    if (!antwort.ok) return { ...leer, grund: json?.message || `HTTP ${antwort.status}` };
+
+    return {
+        ok: true, abgelehnt: false, grund: null,
+        umfragen: (json?.data || []).map(umfrageAus)
+    };
+}
+
+/**
+ * Eine Umfrage starten.
+ *
+ * **Die Grenzen sind Twitchs, nicht unsere** - Frage 60 Zeichen, Antworten je
+ * 25, zwei bis fuenf davon, Dauer 15 bis 1800 Sekunden. Sie stehen hier
+ * trotzdem: Ein Formular, das 80 Zeichen annimmt und dann eine Fehlermeldung
+ * von Twitch zeigt, hat den Streamer zweimal tippen lassen.
+ *
+ * **Bits-Abstimmung gibt es nicht mehr.** Twitch hat sie abgeschaltet; die
+ * Felder stehen noch in der Antwort und sind immer aus. Ein Schalter dafuer
+ * waere ein Versprechen, das die Plattform nicht mehr einloest.
+ *
+ * ⚠ **Nur fuer Affiliates und Partner.** Twitch weist die Anlage eines
+ * gewoehnlichen Kanals ab. Das steht auch auf der Seite - sonst laese sich der
+ * Fehler wie ein Fehler von uns.
+ *
+ * Braucht `channel:manage:polls` vom Kanalinhaber.
+ *
+ * @param {string} kanalId Twitch-Kanalkennung
+ * @param {string} zugang Zugangsschluessel des Kanalinhabers
+ * @param {{frage: string, antworten: Array<string>, dauer_s: number, punkteProStimme: number}} f Felder
+ * @returns {Promise<{ok: boolean, abgelehnt: boolean, umfrage: Object|null, grund: string|null}>} Ergebnis
+ */
+async function umfrageStarten(kanalId, zugang, f) {
+    const leer = { ok: false, abgelehnt: false, umfrage: null };
+
+    const daten = await zugangsdaten('TWITCH');
+    if (!daten.clientId) return { ...leer, grund: 'Die Zugangsdaten der Anwendung fehlen' };
+
+    const koerper = {
+        broadcaster_id: String(kanalId),
+        title: String(f.frage || '').slice(0, 60),
+        choices: (f.antworten || [])
+            .map(t => String(t || '').trim())
+            .filter(Boolean)
+            .slice(0, 5)
+            .map(t => ({ title: t.slice(0, 25) })),
+        duration: Math.max(15, Math.min(1800, Number(f.dauer_s) || 60))
+    };
+
+    // **Punkte nur, wenn ein Preis gesetzt ist.** Twitch weist ein
+    // `channel_points_voting_enabled: true` mit Preis 0 ab, und ein Preis ohne
+    // den Schalter bliebe wirkungslos - zwei Felder, die nur zusammen stimmen.
+    const preis = Math.max(0, Math.min(1000000, Number(f.punkteProStimme) || 0));
+    if (preis > 0) {
+        koerper.channel_points_voting_enabled = true;
+        koerper.channel_points_per_vote = preis;
+    }
+
+    const antwort = await fetch(`${HELIX}/polls`, {
+        method: 'POST',
+        headers: {
+            'Client-Id': daten.clientId,
+            Authorization: `Bearer ${zugang}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(koerper)
+    });
+
+    if (antwort.status === 401) {
+        return { ...leer, abgelehnt: true, grund: 'Der Schluessel wird von Twitch abgelehnt' };
+    }
+
+    let json = null;
+    try { json = await antwort.json(); } catch { /* leer ist auch eine Antwort */ }
+    if (!antwort.ok) return { ...leer, grund: json?.message || `HTTP ${antwort.status}` };
+
+    const u = json?.data?.[0] || null;
+    return u
+        ? { ok: true, abgelehnt: false, umfrage: umfrageAus(u), grund: null }
+        : { ...leer, grund: 'Twitch hat keine Umfrage zurueckgegeben' };
+}
+
+/**
+ * Eine laufende Umfrage beenden.
+ *
+ * Zwei Arten, und der Unterschied ist sichtbar: `TERMINATED` beendet sie und
+ * **zeigt das Ergebnis**, `ARCHIVED` beendet sie und nimmt es aus der
+ * Oberflaeche. Wer abbricht, weil er sich vertippt hat, will das Zweite.
+ *
+ * Braucht `channel:manage:polls` vom Kanalinhaber.
+ *
+ * @param {string} kanalId Twitch-Kanalkennung
+ * @param {string} zugang Zugangsschluessel des Kanalinhabers
+ * @param {string} umfrageId Welche
+ * @param {boolean} [verbergen] true = archivieren statt Ergebnis zeigen
+ * @returns {Promise<{ok: boolean, abgelehnt: boolean, umfrage: Object|null, grund: string|null}>} Ergebnis
+ */
+async function umfrageBeenden(kanalId, zugang, umfrageId, verbergen = false) {
+    const leer = { ok: false, abgelehnt: false, umfrage: null };
+
+    const daten = await zugangsdaten('TWITCH');
+    if (!daten.clientId) return { ...leer, grund: 'Die Zugangsdaten der Anwendung fehlen' };
+
+    const antwort = await fetch(`${HELIX}/polls`, {
+        method: 'PATCH',
+        headers: {
+            'Client-Id': daten.clientId,
+            Authorization: `Bearer ${zugang}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            broadcaster_id: String(kanalId),
+            id: String(umfrageId),
+            status: verbergen ? 'ARCHIVED' : 'TERMINATED'
+        })
+    });
+
+    if (antwort.status === 401) {
+        return { ...leer, abgelehnt: true, grund: 'Der Schluessel wird von Twitch abgelehnt' };
+    }
+
+    let json = null;
+    try { json = await antwort.json(); } catch { /* leer ist auch eine Antwort */ }
+    if (!antwort.ok) return { ...leer, grund: json?.message || `HTTP ${antwort.status}` };
+
+    const u = json?.data?.[0] || null;
+    return { ok: true, abgelehnt: false, umfrage: u ? umfrageAus(u) : null, grund: null };
+}
+
+/**
+ * Aus einem Abo-Ereignis die beteiligte Person herausziehen.
+ *
+ * **Beim Verschenken ist es nicht der Schenkende.** `channel.subscribe` traegt
+ * bei einem Geschenk `is_gift: true` und im `user_id` den **Beschenkten** —
+ * und der soll die Rolle bekommen. Wer hier den Schenkenden nimmt, gibt die
+ * Rolle einer Person, die selbst gar nicht abonniert hat.
+ *
+ * @param {Object} koerper Zustellung
+ * @returns {{kontoId: string, kontoName: string|null, stufe: string|null, geschenkt: boolean}|null} Person
+ */
 function abonnentAus(koerper) {
     const e = koerper?.event;
     if (!e || !e.user_id) return null;
@@ -1482,6 +1760,7 @@ module.exports = {
     EREIGNISSE_ABO, EREIGNISSE_MELDER, typenVon,
     abonnentenLesen, abonnentAus, melderAus,
     folgerLesen, bitsRanglisteLesen,
+    clipErstellen, umfragenLesen, umfrageStarten, umfrageBeenden, umfrageAus,
     moderierteKanaele,
     chatSenden,
     conduitSichern, shardSetzen,

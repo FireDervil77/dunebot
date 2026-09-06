@@ -67,19 +67,11 @@ function log() {
     return ServiceManager.get('Logger');
 }
 
-/**
- * Ein Zustand je Quelle - und was er dem Streamer sagt.
- *
- * `abgelehnt` ist ausdruecklich NICHT `fehler`: Es heisst, dass die Zusage
- * fehlt oder widerrufen wurde, und das ist eine Entscheidung des Streamers,
- * keine Stoerung (17.5, Punkt 3).
- */
-const ZUSTAND = {
-    OK:         'ok',
-    ABGELEHNT:  'abgelehnt',
-    FEHLER:     'fehler',
-    KEIN_KANAL: 'kein_kanal'
-};
+// **Herausgezogen am 2026-09-05.** `ZUSTAND` und `deuten` standen hier, bis
+// die Mitmachen-Seite dieselbe Unterscheidung brauchte. Sie stehen jetzt in
+// `kern/auskunft`; diese Datei gibt `ZUSTAND` weiterhin aus, damit Ansicht und
+// Waechter nicht von einem Umzug wissen muessen, der sie nichts angeht.
+const { ZUSTAND, deuten } = require('./auskunft');
 
 /**
  * Alles holen, was die Seite zeigt.
@@ -184,25 +176,5 @@ async function holen(guildId) {
     return bericht;
 }
 
-/**
- * Ein Antwortpaket in einen Zustand plus Werte uebersetzen.
- *
- * Drei Faelle, und jeder liest sich anders auf der Seite:
- *
- *   `null`            gar keine Zusage mehr - der Streamer hat widerrufen
- *   `abgelehnt`       Twitch hat den Schluessel abgewiesen (401)
- *   `!ok`             etwas anderes ging schief
- *
- * @param {Object|null} ergebnis Was die Plattform lieferte
- * @param {Function} werte Wie die Nutzlast herausgezogen wird
- * @param {Object} leer Was bei Misserfolg dasteht
- * @returns {Object} `{ zustand, …werte }`
- */
-function deuten(ergebnis, werte, leer) {
-    if (!ergebnis) return { zustand: ZUSTAND.ABGELEHNT, ...leer };
-    if (ergebnis.abgelehnt) return { zustand: ZUSTAND.ABGELEHNT, ...leer };
-    if (!ergebnis.ok) return { zustand: ZUSTAND.FEHLER, ...leer };
-    return { zustand: ZUSTAND.OK, ...werte(ergebnis) };
-}
 
 module.exports = { ZUSTAND, holen, deuten };

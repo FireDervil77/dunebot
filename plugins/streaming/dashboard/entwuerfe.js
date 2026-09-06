@@ -233,6 +233,17 @@ const SEITEN = {
     },
 
     mitmachen: {
+        // **Gebaut am 2026-09-06 — aber nur zur Haelfte, und das steht auf der
+        // Seite selbst.** Clip und Umfrage sind fertig; Verlosung und
+        // Musikwunsch wurden gemessen und zurueckgestellt: `addEntry` sieht nach
+        // reinen Kennungen aus, aber `checkRequirements` ruft in Zeile 2
+        // `guild.members.fetch(userId)` und gibt sonst `member_not_found`. Ein
+        // Twitch-Zuschauer ohne Discord-Konto scheitert dort nicht an einer
+        // Regel, sondern an der Verrohrung.
+        //
+        // Der Eintrag bleibt trotzdem stehen: Er ist der Bauplan, gegen den
+        // geliefert wurde — und die zwei fehlenden Punkte sind daran ablesbar.
+        gebaut: '2026-09-06',
         icon: 'fa-solid fa-hand-sparkles',
         titel: 'Mitmachen',
         untertitel: 'Was deine Zuschauer aus dem Chat heraus auslösen können',

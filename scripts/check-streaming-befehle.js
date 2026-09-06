@@ -47,7 +47,19 @@ function spaltenAus(sql) {
 
 // --- Attrappen -----------------------------------------------------------
 const daten = { streamer: [], befehle: [], bausteine: [] };
-const mitschrift = { schreibzugriffe: [], gesendet: [], unbekannt: [], bausteinAbfragen: 0 };
+const mitschrift = { schreibzugriffe: [], gesendet: [], unbekannt: [], bausteinAbfragen: 0,
+                     clips: [], umfrageAbfragen: [] };
+
+/**
+ * Was Twitch auf die wirkenden Befehle antwortet (P9).
+ *
+ * Steht neben `daten`, weil es nichts von uns ist: `daten` sind unsere Zeilen,
+ * `welt` ist die Gegenseite.
+ */
+const welt = {
+    clip: { ok: true, abgelehnt: false, id: 'ClipX', url: 'https://clips.twitch.tv/ClipX', grund: null },
+    umfragen: { ok: true, abgelehnt: false, umfragen: [], grund: null }
+};
 
 /**
  * Unbekannte Abfragen ueber den GANZEN Lauf.
@@ -116,18 +128,22 @@ ServiceManager.register('dbService', {
                 x.aktiv !== 0 &&
                 (x.streamer_id === w[1] || x.streamer_id === null || x.streamer_id === undefined));
         }
-        if (s.startsWith('INSERT INTO streaming_commands (guild_id, streamer_id, wort, art, antwort')) {
+        // **Ein Eingang fuer beide INSERTs, und keiner haengt mehr an der
+        // Spaltenliste.** Bis zum 2026-09-05 standen hier zwei `startsWith`
+        // ueber die vollstaendige Liste. Als `fertigSetzen` um `wer` und
+        // `abkuehlung_s` wuchs, traf der zweite nicht mehr — die Abfrage fiel
+        // durch, `daten.befehle` blieb leer und der Fall stuerzte ab.
+        //
+        // Das war der freundliche Ausgang. Bei einer Abfrage, deren Ergebnis
+        // niemand sofort liest, waere derselbe Bruch gruen geblieben; genau so
+        // ist es beim Zaehlerfeld dreimal passiert.
+        if (/^INSERT INTO streaming_commands\b/i.test(s)) {
             mitschrift.schreibzugriffe.push({ sql: s, werte: w });
-            if (daten.befehle.some(z => z.guild_id === w[0] && z.wort === w[2])) {
-                const e = new Error('Duplicate'); e.code = 'ER_DUP_ENTRY'; throw e;
-            }
-            // **Die Werte werden ueber die Spaltenliste zugeordnet, nicht ueber
-            // ihre Position.** Vorher stand hier `wer: w[4]` — als das
-            // Zaehlerfeld dazukam, landete der Zaehlername in `wer`, und kein
-            // Test merkte es, weil keiner `wer` nach dem Anlegen ansieht.
-            // Spalten UND Werte paaren: In `VALUES (?, ?, ?, 'eigen', ?, …)`
-            // steht fuer `art` ein Literal, kein Platzhalter. Wer nur die
-            // Spalten durchzaehlt, verschiebt ab dort alles um eins.
+
+            // **Spalten UND Werte paaren, nicht nur Spalten zaehlen.** In
+            // `VALUES (?, ?, ?, 'eigen', ?, …)` steht fuer `art` ein Literal,
+            // kein Platzhalter — wer nur die Spalten durchzaehlt, verschiebt ab
+            // dort alles um eins.
             const namen = (/\(([^)]*)\)\s*VALUES/i.exec(s)?.[1] || '')
                 .split(',').map(x => x.trim());
             const stellen = (/VALUES\s*\(([^)]*)\)/i.exec(s)?.[1] || '')
@@ -138,23 +154,44 @@ ServiceManager.register('dbService', {
                 zu[spalte] = stellen[i] === '?' ? w[n++] : stellen[i].replace(/^'|'$/g, '');
             });
 
-            if (daten.befehle.some(z => z.guild_id === zu.guild_id && z.wort === zu.wort)) {
-                const e = new Error('Duplicate'); e.code = 'ER_DUP_ENTRY'; throw e;
+            const da = daten.befehle.find(z =>
+                String(z.guild_id) === String(zu.guild_id) && z.wort === zu.wort);
+
+            // **`ON DUPLICATE KEY UPDATE` trennt die beiden Aufrufer**, nicht
+            // ihre Spaltenliste. Die waechst; dieses Stueck Grammatik nicht.
+            if (/ON DUPLICATE KEY UPDATE/i.test(s)) {
+                if (da) {
+                    // **Der UPDATE-Teil wird GELESEN, nicht nachgebildet.**
+                    //
+                    // Hier stand zuerst `da.aktiv = …; da.art = 'fertig';` —
+                    // die Wirkung von Hand nachgeschrieben. Die Gegenprobe hat
+                    // es sofort entlarvt: Ein eingebautes `wer = VALUES(wer)`
+                    // haette die Einstellung des Streamers bei jedem Speichern
+                    // zurueckgedreht, und alle 107 Pruefungen blieben gruen.
+                    //
+                    // Jetzt bestimmt die Abfrage, was passiert. Wer eine Spalte
+                    // hinzufuegt, sieht sie hier wirken — und der Test, der sie
+                    // verbietet, faellt.
+                    const klausel = /ON DUPLICATE KEY UPDATE\s+(.+)$/i.exec(s)?.[1] || '';
+                    for (const zuweisung of klausel.split(',')) {
+                        const teile = zuweisung.split('=');
+                        const spalte = (teile.shift() || '').trim();
+                        const wert = teile.join('=').trim();
+                        if (!spalte) continue;
+                        const ausWerten = /^VALUES\s*\((.+)\)$/i.exec(wert);
+                        da[spalte] = ausWerten ? zu[ausWerten[1].trim()]
+                                               : wert.replace(/^'|'$/g, '');
+                    }
+                } else {
+                    daten.befehle.push({ id: ++idBasis, benutzt_anzahl: 0, ...zu });
+                }
+                return [];
             }
+
+            if (da) { const e = new Error('Duplicate'); e.code = 'ER_DUP_ENTRY'; throw e; }
             daten.befehle.push({
-                id: ++idBasis, art: 'eigen', aktiv: 1, benutzt_anzahl: 0,
-                guild_id: zu.guild_id, streamer_id: zu.streamer_id, wort: zu.wort,
-                antwort: zu.antwort, zaehler_name: zu.zaehler_name ?? null,
-                wer: zu.wer, abkuehlung_s: zu.abkuehlung_s
+                id: ++idBasis, aktiv: 1, benutzt_anzahl: 0, zaehler_name: null, ...zu
             });
-            return [];
-        }
-        if (s.startsWith('INSERT INTO streaming_commands (guild_id, streamer_id, wort, art, aktiv)')) {
-            mitschrift.schreibzugriffe.push({ sql: s, werte: w });
-            const da = daten.befehle.find(z => z.guild_id === w[0] && z.wort === w[2]);
-            if (da) { da.aktiv = w[3]; da.art = 'fertig'; }
-            else daten.befehle.push({ id: ++idBasis, guild_id: w[0], streamer_id: w[1],
-                wort: w[2], art: 'fertig', aktiv: w[3], wer: 'alle', abkuehlung_s: 0 });
             return [];
         }
         if (s.startsWith('DELETE FROM streaming_commands')) {
@@ -211,6 +248,24 @@ require.cache[twitchPfad].exports = Object.assign({}, echterTwitch, {
     async chatSenden(kanalId, text) {
         mitschrift.gesendet.push({ kanalId: String(kanalId), text: String(text) });
         return { ok: true, grund: null };
+    },
+
+    // **Beide pruefen ihre Argumente** (P9). Der echte Aufruf schickt
+    // `broadcaster_id` und den Schluessel an Twitch; fehlt eines, antwortet
+    // Twitch mit 400 oder 401 — eine Attrappe, die das Argument nicht ansieht,
+    // liesse genau diesen Fehler durch. Am 2026-09-05 ist er auf diesem Weg in
+    // die Anlage gekommen.
+    async clipErstellen(kanalId, zugang) {
+        if (!kanalId) throw new Error('clipErstellen ohne `kanalId` gerufen');
+        if (!zugang)  throw new Error('clipErstellen ohne Schluessel gerufen');
+        mitschrift.clips.push({ kanalId: String(kanalId) });
+        return welt.clip;
+    },
+    async umfragenLesen(kanalId, zugang, anzahl) {
+        if (!kanalId) throw new Error('umfragenLesen ohne `kanalId` gerufen');
+        if (!zugang)  throw new Error('umfragenLesen ohne Schluessel gerufen');
+        mitschrift.umfrageAbfragen.push({ kanalId: String(kanalId), anzahl });
+        return welt.umfragen;
     }
 });
 
@@ -272,6 +327,10 @@ function neuAufsetzen(zeilen = [], live = true, begonnenVorMs = 8100000, baustei
     }));
     mitschrift.schreibzugriffe = []; mitschrift.gesendet = []; mitschrift.unbekannt = [];
     mitschrift.bausteinAbfragen = 0;
+    mitschrift.clips = []; mitschrift.umfrageAbfragen = [];
+    welt.clip = { ok: true, abgelehnt: false, id: 'ClipX',
+                  url: 'https://clips.twitch.tv/ClipX', grund: null };
+    welt.umfragen = { ok: true, abgelehnt: false, umfragen: [], grund: null };
 }
 
 const nachricht = (text, extra = {}) => ({
@@ -711,6 +770,151 @@ console.log('\nAbwaehlen schaltet ab, es loescht nicht');
     pruefe(Number(uptime.aktiv) === 0, 'sie ist nur abgeschaltet');
     pruefe(uptime.benutzt_anzahl === 42,
         'und die Benutzungszahl faengt beim Wiedereinschalten nicht bei null an');
+}
+
+console.log('\nEin fertiger Befehl darf jetzt etwas BEWIRKEN (P9)');
+{
+    // **Der Vertrag hat sich geaendert**: `tun` ist asynchron. Ein vergessenes
+    // `await` faellt hier auf und nirgends sonst — im Chat stuende dann
+    // `[object Promise]`, und Twitch nimmt das anstandslos entgegen.
+    neuAufsetzen([{ wort: 'clip', art: 'fertig', abkuehlung_s: 0 },
+                  { wort: 'umfrage', art: 'fertig', abkuehlung_s: 0 }]);
+
+    await befehle.auswerten(nachricht('!clip', { istModerator: true }));
+    const gesagt = mitschrift.gesendet.at(-1)?.text || '';
+
+    pruefe(!/\[object Promise\]/.test(gesagt),
+        'die Antwort ist ein Satz, kein unaufgeloestes Versprechen', gesagt);
+    pruefe(gesagt.includes('https://clips.twitch.tv/ClipX'),
+        'der Clip geht mit seiner Adresse in den Chat', gesagt);
+    pruefe(mitschrift.clips.length === 1,
+        'und Twitch wurde genau einmal gefragt', String(mitschrift.clips.length));
+}
+
+console.log('\nOffline wird gar nicht erst geschnitten');
+{
+    // **Der teure Aufruf unterbleibt**, statt in Twitchs 404 zu laufen. Das
+    // ist nicht Hoeflichkeit: `mitZugang` vermerkt bei einer Abfuhr einen
+    // Widerruf, den es hier nie gab.
+    neuAufsetzen([{ wort: 'clip', art: 'fertig', abkuehlung_s: 0 }], false);
+    await befehle.auswerten(nachricht('!clip', { istModerator: true }));
+
+    const gesagt = mitschrift.gesendet.at(-1)?.text || '';
+    pruefe(/nicht live/i.test(gesagt), 'der Chat bekommt den Grund in seiner Sprache', gesagt);
+    pruefe(mitschrift.clips.length === 0,
+        'und Twitch wurde ueberhaupt nicht gefragt', String(mitschrift.clips.length));
+}
+
+console.log('\nEine Abfuhr von Twitch bleibt im Protokoll');
+{
+    neuAufsetzen([{ wort: 'clip', art: 'fertig', abkuehlung_s: 0 }]);
+    welt.clip = { ok: false, abgelehnt: true, id: null, url: null,
+                  grund: 'Der Schluessel wird von Twitch abgelehnt' };
+
+    await befehle.auswerten(nachricht('!clip', { istModerator: true }));
+    const gesagt = mitschrift.gesendet.at(-1)?.text || '';
+
+    pruefe(/nicht freigeschaltet/i.test(gesagt),
+        'im Chat steht ein Satz fuer Zuschauer', gesagt);
+    pruefe(!/Schluessel/i.test(gesagt),
+        'und NICHT der Grund, der den Streamer angeht — der steht im Protokoll', gesagt);
+}
+
+console.log('\nWer nicht darf, loest auch nichts aus');
+{
+    // **Die wichtigste Reihenfolge dieser Datei.** Rechtepruefung und
+    // Abkuehlung stehen vor der Wirkung; stuenden sie danach, koennte jeder
+    // Zuschauer Clips schneiden lassen und die Absage kaeme hinterher.
+    neuAufsetzen([{ wort: 'clip', art: 'fertig', wer: 'moderator', abkuehlung_s: 0 }]);
+    await befehle.auswerten(nachricht('!clip'));   // gewoehnlicher Zuschauer
+
+    pruefe(mitschrift.clips.length === 0,
+        'ein gewoehnlicher Zuschauer laesst keinen Clip schneiden',
+        String(mitschrift.clips.length));
+    pruefe(mitschrift.gesendet.length === 0, 'und es geht auch keine Absage in den Chat');
+}
+
+console.log('\n!umfrage sagt den Stand, oder dass keine laeuft');
+{
+    neuAufsetzen([{ wort: 'umfrage', art: 'fertig', abkuehlung_s: 0 }]);
+    await befehle.auswerten(nachricht('!umfrage'));
+    pruefe(/keine Umfrage/i.test(mitschrift.gesendet.at(-1)?.text || ''),
+        'ohne laufende Umfrage steht das da', mitschrift.gesendet.at(-1)?.text);
+
+    neuAufsetzen([{ wort: 'umfrage', art: 'fertig', abkuehlung_s: 0 }]);
+    welt.umfragen = { ok: true, abgelehnt: false, grund: null, umfragen: [
+        { id: 'u1', frage: 'Welches Spiel?', laeuft: true, gesamt: 7,
+          antworten: [{ titel: 'Astro', stimmen: 5 }, { titel: 'Satisfactory', stimmen: 2 }] },
+        { id: 'u0', frage: 'Alte Frage', laeuft: false, gesamt: 0, antworten: [] }
+    ] };
+    await befehle.auswerten(nachricht('!umfrage'));
+    const stand = mitschrift.gesendet.at(-1)?.text || '';
+
+    pruefe(stand.includes('Welches Spiel?') && stand.includes('Astro: 5'),
+        'mit laufender Umfrage stehen Frage und Zaehlung da', stand);
+    pruefe(!stand.includes('Alte Frage'),
+        'die beendete von vorhin wird nicht mitgezaehlt', stand);
+}
+
+console.log('\nEin Fehler in `tun` reisst die Auswertung nicht mit');
+{
+    // Kein echter Befehl kann das ausloesen — deshalb ein Eintrag auf Zeit.
+    // Ohne diesen Fall waere der Fangkorb in `fertigAntwort` unbelegt, und
+    // unbenutzte Mechanik versagt beim ersten Einsatz lautlos.
+    befehle.FERTIG.pruefwort = {
+        beschreibung: 'Nur fuer diese Pruefung.',
+        tun: async () => { throw new Error('Twitch ist weg'); }
+    };
+    try {
+        neuAufsetzen([{ wort: 'pruefwort', art: 'fertig', abkuehlung_s: 0 }]);
+        const bericht = await befehle.auswerten(nachricht('!pruefwort'));
+        pruefe(typeof bericht === 'string', 'die Auswertung laeuft zu Ende', String(bericht));
+        pruefe(/nicht geklappt/i.test(mitschrift.gesendet.at(-1)?.text || ''),
+            'und der Zuschauer bekommt einen Satz statt Schweigen',
+            mitschrift.gesendet.at(-1)?.text);
+    } finally {
+        delete befehle.FERTIG.pruefwort;
+    }
+}
+
+console.log('\nAnfangswerte sind keine Vorgaben');
+{
+    neuAufsetzen([]);
+    await befehle.fertigSetzen('g1', 1, ['clip']);
+    const clip = daten.befehle.find(z => z.wort === 'clip');
+
+    pruefe(clip?.wer === 'moderator',
+        'ein Befehl, der etwas bewirkt, faengt eng an', String(clip?.wer));
+    pruefe(Number(clip?.abkuehlung_s) === 60,
+        'und mit einer Abkuehlung, die zu ihm passt', String(clip?.abkuehlung_s));
+
+    // **Der eigentliche Punkt.** Der Streamer macht ihn auf; danach schaltet er
+    // einen ganz anderen Befehl um. Wuerde `fertigSetzen` `wer` mitschreiben,
+    // stuende hier wieder `moderator` — und niemand wuesste, warum.
+    clip.wer = 'alle';
+    await befehle.fertigSetzen('g1', 1, ['clip', 'uptime']);
+    pruefe(daten.befehle.find(z => z.wort === 'clip')?.wer === 'alle',
+        'ein spaeteres Speichern dreht seine Einstellung NICHT zurueck',
+        String(daten.befehle.find(z => z.wort === 'clip')?.wer));
+}
+
+console.log('\nDer Streamer darf `!clip` aufmachen');
+{
+    neuAufsetzen([]);
+    await befehle.fertigSetzen('g1', 1, ['clip']);
+    await befehle.fertigSetzen('g1', 1, ['clip'], { clip: 'alle' });
+    pruefe(daten.befehle.find(z => z.wort === 'clip')?.wer === 'alle',
+        'was im Formular steht, gilt',
+        String(daten.befehle.find(z => z.wort === 'clip')?.wer));
+
+    // **Aus einem verpfuschten Feld darf kein offener Befehl werden.** Ein
+    // `RANG['']` ist `undefined`; wer das auf 'alle' biegt, macht aus einem
+    // Fehler eine Erlaubnis.
+    await befehle.fertigSetzen('g1', 1, ['clip'], { clip: 'inhaber' });
+    await befehle.fertigSetzen('g1', 1, ['clip'], { clip: 'erfunden' });
+    pruefe(daten.befehle.find(z => z.wort === 'clip')?.wer === 'inhaber',
+        'ein unbekannter Rang aendert nichts, statt aufzumachen',
+        String(daten.befehle.find(z => z.wort === 'clip')?.wer));
 }
 
 console.log('\nDie Attrappe hat alles verstanden');

@@ -584,7 +584,11 @@ router.post('/befehle/fertig', requirePermission('STREAMING.CHAT.MANAGE'), async
     try {
         const roh = req.body.fertig;
         const gewaehlt = Array.isArray(roh) ? roh : (roh ? [roh] : []);
-        await befehlsModul().fertigSetzen(guildId, await heimKanalId(guildId), gewaehlt);
+        // `req.body.wer` ist eine Karte Wort → Rang (Express liest `wer[clip]`
+        // dank `extended: true` als Objekt). Was darin unbekannt ist, verwirft
+        // `fertigSetzen` — die Pruefung steht dort, wo geschrieben wird.
+        await befehlsModul().fertigSetzen(
+            guildId, await heimKanalId(guildId), gewaehlt, req.body.wer || {});
         return res.redirect(`${zurueck}?ok=gespeichert`);
     } catch (error) {
         ServiceManager.get('Logger').error('[Streaming] Fertige Befehle setzen', error);
@@ -647,6 +651,95 @@ router.get('/statistik', requirePermission('STREAMING.CHAT.MANAGE'), async (req,
         });
     } catch (error) {
         return renderFehler(res, error, 'Die Statistik konnte nicht geladen werden');
+    }
+});
+
+// =====================================================
+// Mitmachen (P9) — Clip und Umfrage
+// =====================================================
+//
+// **Dasselbe Recht und dieselbe Tuer wie Statistik und Befehle.** Wer hier
+// drueckt, laesst unter dem Namen des Streamers einen Clip schneiden oder eine
+// Umfrage in seinem Stream erscheinen — das ist „meinen Chatbot verwalten",
+// nicht „das Plugin ansehen".
+
+/** @returns {Object} Mitmachen-Modul */
+function mitmachModul() {
+    return require('../kern/mitmachen');
+}
+
+router.get('/mitmachen', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const tr = makeTranslator(req, res);
+    try {
+        if (!await require('../kern/heimguild').istHeim(guildId)) {
+            return res.redirect(`/guild/${guildId}/plugins/streaming`);
+        }
+
+        const bericht = await mitmachModul().zustand(guildId);
+
+        await renderView(res, 'guild/streaming-mitmachen', {
+            tr, guildId, bericht,
+            ZUSTAND: mitmachModul().ZUSTAND,
+            STAND: require('../kern/zusagen').STAND,
+            vorWieLange,
+            meldung: req.query.ok || null,
+            fehler: req.query.fehler || null
+        });
+    } catch (error) {
+        return renderFehler(res, error, 'Die Mitmachen-Seite konnte nicht geladen werden');
+    }
+});
+
+router.post('/mitmachen/umfrage', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const zurueck = `/guild/${guildId}/plugins/streaming/mitmachen`;
+    try {
+        const ergebnis = await mitmachModul().umfrageStarten(guildId, {
+            frage: req.body.frage,
+            // **`antworten[]` im Formular heisst hier `antworten`** — nachgemessen,
+            // nicht angenommen: `qs.parse('antworten[]=a&antworten[]=b')` gibt
+            // `{antworten: ['a','b']}`, und die eckigen Klammern erzwingen das
+            // Feld auch bei einer einzigen Antwort. Ein Rueckfall auf
+            // `req.body['antworten[]']` stand hier kurz und waere toter Code
+            // gewesen, der aussieht wie Vorsicht.
+            //
+            // Leere Felder sind erlaubt und werden im Kern verworfen: Wer die
+            // dritte Zeile leer laesst und die vierte fuellt, meint drei
+            // Antworten, nicht vier.
+            antworten: req.body.antworten,
+            dauer_s: req.body.dauer_s,
+            punkteProStimme: req.body.punkteProStimme
+        });
+
+        // **Twitchs Text wird durchgereicht, nicht gedeutet.** „Umfragen gibt es
+        // erst ab Affiliate" ist eine Auskunft, die der Streamer braucht;
+        // „technisch nicht geklappt" schickte ihn auf die Suche.
+        return res.redirect(`${zurueck}?${ergebnis.ok
+            ? 'ok=gestartet'
+            : 'fehler=' + encodeURIComponent(ergebnis.grund || 'technisch')}`);
+    } catch (error) {
+        ServiceManager.get('Logger').error('[Streaming] Umfrage starten', error);
+        return res.redirect(`${zurueck}?fehler=technisch`);
+    }
+});
+
+router.post('/mitmachen/umfrage/beenden', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const zurueck = `/guild/${guildId}/plugins/streaming/mitmachen`;
+    try {
+        // Der Knopf traegt `verbergen` als '1' oder '0' — Abbrechen nimmt das
+        // Ergebnis aus der Oberflaeche, Beenden zeigt es.
+        const verbergen = String(req.body.verbergen) === '1';
+        const ergebnis = await mitmachModul().umfrageBeenden(
+            guildId, req.body.umfrage_id, verbergen);
+
+        return res.redirect(`${zurueck}?${ergebnis.ok
+            ? 'ok=' + (verbergen ? 'verborgen' : 'beendet')
+            : 'fehler=' + encodeURIComponent(ergebnis.grund || 'technisch')}`);
+    } catch (error) {
+        ServiceManager.get('Logger').error('[Streaming] Umfrage beenden', error);
+        return res.redirect(`${zurueck}?fehler=technisch`);
     }
 });
 

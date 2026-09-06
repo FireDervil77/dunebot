@@ -137,8 +137,21 @@ for (const pl of PLUGINS) {
     pruefe(html.includes(`data-${pl}-basis="/guild/42/plugins/${pl}"`),
         `${pl}: traegt data-${pl}-basis`,
         'die Seitenskripte lesen genau diesen Namen — ein gemeinsamer machte sie blind');
-    pruefe(/class="page-pretitle"/.test(html) && /class="page-title"/.test(html),
-        `${pl}: Vortitel und Titel stehen da`);
+    pruefe(/class="page-title"/.test(html), `${pl}: der Titel steht da`);
+
+    // **Der Vortitel ist keine Pflicht mehr — er haengt am Plugin.** Bis zum
+    // 2026-09-04 verlangte diese Zeile ihn von allen; an dem Tag hat
+    // `streaming` ihn bewusst abgelegt (klein „STREAMING" ueber jeder Seite,
+    // waehrend links im Menue ohnehin „Streaming" hervorgehoben ist — zwei
+    // Antworten auf eine Frage, die niemand stellt).
+    //
+    // Der Waechter blieb rot stehen, und das ist die schlechteste Lage von
+    // allen: Eine Abweichung, die keine ist, laesst man kuenftig auch dann
+    // stehen, wenn eine echte danebentritt. Gemessen wird deshalb, was das
+    // Plugin selbst verlangt — nicht, was 2026-08-29 alle taten.
+    const willVortitel = !/vortitel:\s*null/.test(lies(rel));
+    pruefe(/class="page-pretitle"/.test(html) === willVortitel,
+        `${pl}: Vortitel ${willVortitel ? 'steht da' : 'fehlt — wie sein Kopf es sagt'}`);
 }
 
 // ---------------------------------------------------------------------

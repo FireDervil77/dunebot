@@ -42,9 +42,33 @@ const PRAEFIX = '!';
 /**
  * Die fertigen Befehle.
  *
- * Der Schluessel ist das Wort, `antwort` eine Funktion ueber den Zustand.
- * Wer einen neuen fertigen Befehl will, schreibt ihn hier hin — und
- * `scripts/check-streaming-befehle.js` haelt Liste und Ansicht zusammen.
+ * Der Schluessel ist das Wort. Wer einen neuen will, schreibt ihn hier hin —
+ * und `scripts/check-streaming-befehle.js` haelt Liste und Ansicht zusammen.
+ *
+ * ## Zwei Sorten, seit P9
+ *
+ *   `antwort(k)`   gibt einen Satz zurueck. Rein, schnell, ohne Aussenwelt —
+ *                  alles, was die Anlage ohnehin weiss.
+ *   `tun(k)`       darf **etwas bewirken** und ist deshalb asynchron: `!clip`
+ *                  schneidet bei Twitch, `!umfrage` fragt dort nach.
+ *
+ * **Warum das nicht dasselbe Feld ist.** Eine Funktion, die manchmal ein
+ * Versprechen zurueckgibt und manchmal einen Satz, laedt zum vergessenen
+ * `await` ein — und der faellt nicht auf: Im Chat stuende dann
+ * `[object Promise]`. Zwei Namen trennen „rechnet" von „wirkt", und der
+ * Auswerter sieht am Feld, was er zu erwarten hat.
+ *
+ * ## Die drei Felder daneben
+ *
+ *   `zusage`         Welche Erlaubnis der Kanalinhaber erteilt haben muss.
+ *                    Nur zur Anzeige — der Befehl prueft sie nicht vorab,
+ *                    Twitch antwortet ohnehin mit 401, und eine zweite
+ *                    Pruefung waere eine zweite Wahrheit.
+ *   `wer`            Der **Anfangswert** von `streaming_commands.wer`, nicht
+ *                    die Regel. Ein Befehl, der etwas bewirkt, faengt eng an;
+ *                    aufmachen kann der Streamer ihn auf der Befehlsseite.
+ *   `abkuehlung_s`   Ebenso ein Anfangswert. `!clip` schneidet einen echten
+ *                    Clip - fuenf Sekunden Abstand waeren hier zu wenig.
  */
 const FERTIG = {
     uptime: {
@@ -64,8 +88,80 @@ const FERTIG = {
         antwort: (k) => k.woerter.length
             ? `Verfügbar: ${k.woerter.map(w => PRAEFIX + w).join(' ')}`
             : 'Hier sind noch keine Befehle eingerichtet.'
+    },
+
+    // **Der erste Befehl, der etwas bewirkt** (P9, 2026-09-05). Bis hierher
+    // haben alle nur erzaehlt, was die Anlage ohnehin wusste.
+    clip: {
+        beschreibung: 'Schneidet einen Clip aus den letzten Sekunden.',
+        zusage: 'clip',
+        wer: 'moderator',
+        abkuehlung_s: 60,
+        tun: async (k) => {
+            // **Offline gibt es nichts zu schneiden**, und Twitch sagt das mit
+            // einer 404. Die vorher abzufangen ist kein doppelter Boden,
+            // sondern ein Satz, den ein Zuschauer versteht — die Antwort von
+            // Twitch laese sich wie eine Stoerung.
+            if (!k.live) return `${k.streamer} ist gerade nicht live — davon lässt sich kein Clip schneiden.`;
+
+            const ergebnis = await require('./mitmachen').clipSchneiden(k.streamerZeile);
+            if (ergebnis.ok) return `Clip: ${ergebnis.url}`;
+
+            // **Der Grund geht ins Protokoll, nicht in den Chat.** Dort sitzen
+            // Zuschauer; „Der Schluessel wird von Twitch abgelehnt" ist eine
+            // Auskunft fuer den Streamer, und die steht auf seiner Seite.
+            log().warn(`[Streaming] ${PRAEFIX}clip gescheitert: ${ergebnis.grund}`);
+            return ergebnis.abgelehnt
+                ? 'Clips sind für diesen Kanal nicht freigeschaltet.'
+                : 'Der Clip hat gerade nicht geklappt.';
+        }
+    },
+
+    umfrage: {
+        beschreibung: 'Sagt, welche Umfrage gerade läuft und wie sie steht.',
+        zusage: 'umfragen',
+        wer: 'alle',
+        abkuehlung_s: 30,
+        tun: async (k) => {
+            const stand = await require('./mitmachen').umfrageStand(k.streamerZeile);
+            if (!stand.ok) {
+                log().warn(`[Streaming] ${PRAEFIX}umfrage gescheitert: ${stand.grund}`);
+                return 'Der Stand der Umfrage ist gerade nicht abrufbar.';
+            }
+            if (!stand.umfrage) return 'Gerade läuft keine Umfrage.';
+
+            const u = stand.umfrage;
+            const stimmen = u.antworten.map(a => `${a.titel}: ${a.stimmen}`).join(' · ');
+            return `${u.frage} — ${stimmen} (${u.gesamt} Stimmen)`;
+        }
     }
 };
+
+/**
+ * Die Antwort eines fertigen Befehls holen.
+ *
+ * **Der Fangkorb sitzt hier und nicht im Aufrufer.** `tun` redet mit Twitch;
+ * ein Netzfehler dort darf die Auswertung einer Chatnachricht nicht abbrechen
+ * lassen — der naechste Befehl waere sonst mit betroffen.
+ *
+ * @param {string} wort Befehlswort
+ * @param {Object} k Kontext
+ * @returns {Promise<string|null>} Antworttext
+ */
+async function fertigAntwort(wort, k) {
+    const eintrag = FERTIG[wort];
+    if (!eintrag) return null;
+    if (!eintrag.tun) return eintrag.antwort(k);
+
+    try {
+        return await eintrag.tun(k);
+    } catch (err) {
+        log().error(`[Streaming] ${PRAEFIX}${wort} ist unerwartet gescheitert`, err);
+        // Ein Satz, kein Schweigen: Wer getippt hat, soll nicht raten, ob der
+        // Bot ihn ueberhaupt gehoert hat.
+        return 'Das hat gerade nicht geklappt.';
+    }
+}
 
 /**
  * Die Platzhalter, die eine eigene Antwort kennt.
@@ -373,6 +469,14 @@ async function auswerten(kanal) {
 
     const kontext = {
         eigene,
+
+        // **Die ganze Zeile, nicht nur der Name.** `tun` braucht `kanal_id`
+        // und `plattform`, um bei Twitch etwas auszuloesen. Sie heisst
+        // ausdruecklich nicht `kanal`: So heisst in dieser Datei die
+        // uebersetzte Chatnachricht (`darf(wer, kanal)`), und zwei Dinge mit
+        // einem Namen sind der Anfang eines langen Nachmittags.
+        streamerZeile: streamer,
+
         streamer: streamer.anzeigename || streamer.login,
         absender: kanal.absender,
         live: Boolean(streamer.ist_live),
@@ -384,7 +488,7 @@ async function auswerten(kanal) {
     };
 
     const roh = zeile.art === 'fertig'
-        ? (FERTIG[zeile.wort] ? FERTIG[zeile.wort].antwort(kontext) : null)
+        ? await fertigAntwort(zeile.wort, kontext)
         : fuellen(zeile.antwort, kontext);
 
     // **Derselbe Aufraeumer wie bei der Live-Ansage, und aus zwei Gruenden.**
@@ -578,27 +682,55 @@ async function entfernen(id, guildId) {
  * Eingabe des Streamers, aber seine Benutzungszahl — und die ist eine Auskunft,
  * die beim Wiedereinschalten nicht bei null anfangen soll.
  *
+ * ## `wer` kommt mit, `abkuehlung_s` nicht
+ *
+ * Seit P9 bewirkt ein fertiger Befehl etwas (`!clip`), und damit wird „wer darf
+ * das" zu einer echten Frage — sie gehoert dem Streamer, nicht uns. Sie steht
+ * deshalb im Formular.
+ *
+ * Die **Abkuehlung** steht dort bewusst nicht: Sie haengt nicht am Geschmack,
+ * sondern daran, was der Befehl ausloest. Die 60 Sekunden von `!clip` sind
+ * Twitchs Takt, keine Vorliebe.
+ *
  * @param {string} guildId Discord-Guild-ID
  * @param {number|null} streamerId Kanal
  * @param {Array<string>} gewaehlt Worte
+ * @param {Object<string, string>} [wer] Je Wort der verlangte Rang
  * @returns {Promise<void>}
  */
-async function fertigSetzen(guildId, streamerId, gewaehlt) {
+async function fertigSetzen(guildId, streamerId, gewaehlt, wer = {}) {
     const will = new Set((gewaehlt || []).filter(w => FERTIG[w]));
 
     for (const wort of Object.keys(FERTIG)) {
         const an = will.has(wort) ? 1 : 0;
+
+        // **`wer` und `abkuehlung_s` stehen im INSERT, nicht im UPDATE.** Sie
+        // sind Anfangswerte: Beim ersten Anschalten gelten die aus `FERTIG`,
+        // danach gehoert die Zeile dem Streamer. Sie bei jedem Speichern
+        // mitzuschreiben hiesse, seine Einstellung stillschweigend
+        // zurueckzudrehen — und zwar genau dann, wenn er einen ganz anderen
+        // Befehl umschaltet.
+        const vorgabe = FERTIG[wort];
+
+        // **Das Formular gewinnt, wenn es etwas sagt — sonst gilt die Vorgabe.**
+        // Ein unbekannter Rang wird nicht auf 'alle' gebogen, sondern ignoriert:
+        // Aus einem verpfuschten Formularfeld darf kein aufgemachter Befehl
+        // werden, und `!clip` steht sonst plotzlich jedem offen.
+        const gewuenscht = wer && RANG[wer[wort]] !== undefined ? wer[wort] : null;
+
         await db().query(
-            `INSERT INTO streaming_commands (guild_id, streamer_id, wort, art, aktiv)
-             VALUES (?, ?, ?, 'fertig', ?)
-             ON DUPLICATE KEY UPDATE aktiv = VALUES(aktiv), art = 'fertig'`,
-            [guildId, streamerId, wort, an]);
+            `INSERT INTO streaming_commands (guild_id, streamer_id, wort, art, aktiv, wer, abkuehlung_s)
+             VALUES (?, ?, ?, 'fertig', ?, ?, ?)
+             ON DUPLICATE KEY UPDATE aktiv = VALUES(aktiv), art = 'fertig'${gewuenscht ? ', wer = VALUES(wer)' : ''}`,
+            [guildId, streamerId, wort, an,
+             gewuenscht || (RANG[vorgabe.wer] === undefined ? 'alle' : vorgabe.wer),
+             Math.max(0, Math.min(3600, Number(vorgabe.abkuehlung_s) || 5))]);
     }
 }
 
 module.exports = {
     PRAEFIX, FERTIG, RANG, PLATZHALTER,
     alleFuerGuild, anlegen, aendern, entfernen, fertigSetzen,
-    zerlegen, darf, fuellen, dauerText,
+    zerlegen, darf, fuellen, dauerText, fertigAntwort,
     befehleFuer, auswerten
 };

@@ -70,6 +70,34 @@ function melde(art, text, tun = '') {
     const abonnenten = require('../plugins/streaming/dashboard/kern/abonnenten');
     const twitch     = require('../plugins/streaming/dashboard/plattformen/twitch');
 
+    // **Ohne diesen Eintrag kann das Skript nicht erneuern — und log dann.**
+    //
+    // Gefunden am 2026-09-06: Schritt 6 meldete „Twitch lehnt den Zugang ab
+    // (401) → Die Zusage neu erteilen". Nachgemessen an der Zusage stimmte
+    // davon nichts: `fehlertext` war NULL, `geaendert_am` unberuehrt, der
+    // Erneuerungsschluessel vorhanden — nur `laeuft_ab_am` lag elf Stunden
+    // zurueck.
+    //
+    // Der Grund steht in `mitZugang`: Bei 401 erneuert es ueber
+    // `VerbindungsRegistry.get(plattform).erneuern`. Im Dashboard traegt das
+    // Streaming-Plugin den Anbieter beim Start ein; dieses Skript laedt das
+    // Plugin nicht, die Registry blieb leer, und `mitZugang` gab die Abfuhr
+    // unerneuert zurueck.
+    //
+    // Der Rat war damit **falsch und teuer**: Der Betreiber haette einen
+    // OAuth-Durchlauf wiederholt, den er nicht braucht. Ein abgelaufener
+    // Zugangsschluessel ist der Normalfall — er wird beim naechsten Gebrauch
+    // erneuert, und genau das soll dieses Skript ja messen.
+    const { VerbindungsRegistry } = require('../node_modules/dunebot-sdk');
+    VerbindungsRegistry.register('twitch', {
+        label: 'Twitch',
+        autorisierUrl: twitch.verknuepfungsUrl,
+        identitaet: twitch.verknuepfteIdentitaet,
+        tauschen: twitch.tauschen,
+        erneuern: twitch.erneuern,
+        pruefen: twitch.pruefen
+    });
+
     // ---------------------------------------------------------------
     console.log('\n1. Ist der Umzug durch?');
     // ---------------------------------------------------------------
@@ -175,8 +203,10 @@ function melde(art, text, tun = '') {
 
         if (!ergebnis) { melde('stop', 'kein Zugang — Zusage nicht lesbar'); continue; }
         if (ergebnis.abgelehnt) {
-            melde('stop', 'Twitch lehnt den Zugang ab (401)',
-                'Die Zusage neu erteilen');
+            // Hier ist wirklich erneuert worden (siehe oben) und Twitch hat
+            // trotzdem abgelehnt. Erst DANN stimmt der Rat.
+            melde('stop', 'Twitch lehnt den Zugang auch nach dem Erneuern ab (401)',
+                'Die Zusage neu erteilen — widerrufen, Passwort geaendert oder App getrennt');
             continue;
         }
         if (!ergebnis.ok) {

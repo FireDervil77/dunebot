@@ -69,19 +69,15 @@ const SCHREIB_ZUSAGE = 'chatschreiben';
  * @returns {Promise<{zustand: string, grund: string|null}>} Auskunft
  */
 async function darfSchreiben(userId) {
+    // **Der eigene Satz bleibt hier.** "Zu diesem Kanal ist kein Konto
+    // verknuepft" ist die Sprache DIESER Seite; `kern/zusagen` weiss nichts
+    // von Kanaelen und soll es auch nicht.
     if (!userId) return { zustand: 'nein', grund: 'Zu diesem Kanal ist kein Konto verknuepft.' };
 
-    let zusage;
-    try {
-        zusage = await Verbindungsspeicher.zusageLesen(userId, 'twitch');
-    } catch (err) {
-        return { zustand: 'unbekannt', grund: `Die Berechtigungen sind gerade nicht lesbar (${err.message}).` };
-    }
-
-    if (!zusage) return { zustand: 'nein', grund: null };
-
-    const scopes = String(zusage.scopes || '').split(' ').filter(Boolean);
-    return { zustand: scopes.includes(SCHREIB_SCOPE) ? 'ja' : 'nein', grund: null };
+    // Das Nachsehen selbst steht seit dem 2026-09-05 in `kern/zusagen` - P9
+    // fragt dieselbe Frage fuer zwei weitere Scopes, und zwei Kopien derselben
+    // zehn Zeilen waeren zwei Wahrheiten ueber denselben Schluessel.
+    return await require('./zusagen').standFuer(userId, SCHREIB_SCOPE);
 }
 
 /**
