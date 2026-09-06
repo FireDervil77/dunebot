@@ -129,15 +129,6 @@ for (const pfad of pfade) {
 
     console.log(`\n${slug}`);
 
-    if (!gefordert.length) {
-        // **Kein stilles Ueberspringen.** Ein Paket ohne Erklaerung ist nicht
-        // geprueft, und das gehoert gezaehlt statt verschwiegen.
-        ohneErklaerung++;
-        console.log('  · nennt keine os_packages — hier ist nichts zu pruefen, '
-                  + 'aber auch nichts zugesichert');
-        continue;
-    }
-
     const adresse = bildAdresse(paket);
     if (!adresse) {
         pruefe(false, 'das Paket nennt ein Image', 'ohne image.ref laeuft der Server im alten Image');
@@ -177,6 +168,21 @@ for (const pfad of pfade) {
                 gleich ? '' : 'der Tag ist weitergewandert — das Paket haengt am alten Stand '
                             + 'und muss neu angeheftet werden');
         }
+    }
+
+    if (!gefordert.length) {
+        // **Kein stilles Ueberspringen.** Ein Paket ohne Erklaerung ist nicht
+        // geprueft, und das gehoert gezaehlt statt verschwiegen.
+        //
+        // Die Frische oben gilt trotzdem — sie haengt nicht an den
+        // Abhaengigkeiten. Genau daran ist diese Pruefung beim ersten Anlauf
+        // vorbeigelaufen: Sie stand HINTER dieser Schranke, und
+        // `astro-colony-proton` (das keine os_packages nennt) zeigte
+        // unbemerkt auf ein Image, dessen Tag laengst weitergewandert war.
+        ohneErklaerung++;
+        console.log('  · nennt keine os_packages — dazu ist nichts zu pruefen '
+                  + 'und nichts zugesichert');
+        continue;
     }
 
     const { da, fehlt } = imBild(adresse, gefordert);
