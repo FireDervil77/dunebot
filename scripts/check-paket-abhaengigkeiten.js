@@ -151,6 +151,34 @@ for (const pfad of pfade) {
         continue;
     }
 
+    // **Zeigen Digest und Tag auf dasselbe Image?**
+    //
+    // Ein Paket nennt beides. Der Daemon nimmt den Digest; der Tag ist nur ein
+    // Zeiger und kann wandern - `bauen.sh` benutzt Kalenderfassungen
+    // (`2026.09`), und die wird innerhalb eines Monats mehr als einmal gebaut.
+    // Danach zeigt der Tag auf das neue Image und der Digest im Paket auf das
+    // alte. Beide sind fuer sich gueltig, der Server startet, und die
+    // Verbesserung, wegen der gebaut wurde, ist nicht drin.
+    //
+    // Das faellt sonst nirgends auf: Das alte Image liegt ja noch da.
+    if (paket.image.digest && paket.image.tag) {
+        const perTag = `${paket.image.ref}:${paket.image.tag}`;
+        let gleich = null;
+        try {
+            const roh = execFileSync('docker', ['image', 'inspect', perTag,
+                '--format', '{{range .RepoDigests}}{{.}} {{end}}'],
+                { encoding: 'utf8', timeout: 30000 });
+            gleich = roh.includes(paket.image.digest);
+        } catch { /* Tag lokal unbekannt - dazu sagt diese Pruefung nichts */ }
+
+        if (gleich !== null) {
+            pruefe(gleich,
+                `Digest und Tag \`${paket.image.tag}\` zeigen auf dasselbe Image`,
+                gleich ? '' : 'der Tag ist weitergewandert — das Paket haengt am alten Stand '
+                            + 'und muss neu angeheftet werden');
+        }
+    }
+
     const { da, fehlt } = imBild(adresse, gefordert);
     pruefe(fehlt.length === 0,
         `das Image bringt alle ${gefordert.length} geforderten Pakete mit`,

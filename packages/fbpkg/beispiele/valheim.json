@@ -3,7 +3,7 @@
   "identity": {
     "slug": "valheim",
     "name": "Valheim",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "author": "firenetworks",
     "category": "survival",
     "description": {
@@ -18,9 +18,9 @@
   },
   "image": {
     "ref": "registry.firenetworks.de/fb/steamcmd",
-    "tag": "2026.08",
-    "digest": "sha256:f84d7ea2c2e97570cda050d939e4bd4466a63656caa66b130eb008e22c9f3733",
-    "pinned_at": "2026-08-18",
+    "tag": "2026.09",
+    "digest": "sha256:bcfed753c9f0cb3bbedcea72a91ec746c39297ec98f79de2b7ec3d2b65962a37",
+    "pinned_at": "2026-09-06",
     "platform": "linux",
     "arch": [
       "amd64"
@@ -542,7 +542,7 @@
       "content: BepInEx wird heute über ein zweites Addon abgebildet (valheim-bepinex). Nach B.12 gehört der Lader als Inhalt hierher.",
       "commands.players.ban: bannedlist.txt und das Eintragsformat [Plattform]_[Kennung] sind durch die offizielle Dokumentation belegt (siehe referenz/valheim.json). Am laufenden Server ist beides weiterhin ungeprüft — Doku ist kein Nachweis.",
       "commands.players.ban: Die Datei liegt im Speicherverzeichnis. Wird -savedir gesetzt, wandert sie mit — dann greift ein fester Pfad ins Leere.",
-      "requirements.os_packages: aus dem offiziellen Wiki uebernommen (valheim.fandom.com/wiki/Dedicated_servers). Ob sie im Laufzeit-Image schon stecken, ist nicht gemessen — Doku ist kein Nachweis."
+      "requirements.os_packages: GEMESSEN am 2026-09-06, der offene Punkt ist eingeloest. Am angehefteten Image nachgezaehlt (dpkg-query): libatomic1 und libc6 waren drin, libpulse fehlte vollstaendig — dpkg 0 Treffer, ldconfig 0 Treffer. Unity holt libpulse zur Laufzeit per dlopen, weshalb ldd sie nie zeigte. Das Wiki nennt libpulse-dev, weil es fuer Entwicklungsmaschinen geschrieben ist; im Laufzeit-Image genuegt libpulse0 (liefert libpulse.so.0 und libpulse-simple.so.0). Nachgehalten wird das jetzt von scripts/check-paket-abhaengigkeiten.js, nicht mehr von dieser Zeile."
     ]
   },
   "requirements": {
