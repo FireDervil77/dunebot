@@ -3,7 +3,7 @@
   "identity": {
     "slug": "valheim",
     "name": "Valheim",
-    "version": "1.0.6",
+    "version": "1.0.7",
     "author": "firenetworks",
     "category": "survival",
     "description": {
@@ -19,7 +19,7 @@
   "image": {
     "ref": "registry.firenetworks.de/fb/steamcmd",
     "tag": "2026.09",
-    "digest": "sha256:bcfed753c9f0cb3bbedcea72a91ec746c39297ec98f79de2b7ec3d2b65962a37",
+    "digest": "sha256:c6d2fda4f695062d4cf9535358a1fce0bc2e87d51b568c00684f46cd02130364",
     "pinned_at": "2026-09-06",
     "platform": "linux",
     "arch": [
@@ -260,7 +260,7 @@
       ],
       "takes_effect": "new_world",
       "risk": "progress",
-      "role": "owner"
+      "role": "player"
     },
     {
       "key": "public_listing",
@@ -542,6 +542,8 @@
       "content: BepInEx wird heute über ein zweites Addon abgebildet (valheim-bepinex). Nach B.12 gehört der Lader als Inhalt hierher.",
       "commands.players.ban: bannedlist.txt und das Eintragsformat [Plattform]_[Kennung] sind durch die offizielle Dokumentation belegt (siehe referenz/valheim.json). Am laufenden Server ist beides weiterhin ungeprüft — Doku ist kein Nachweis.",
       "commands.players.ban: Die Datei liegt im Speicherverzeichnis. Wird -savedir gesetzt, wandert sie mit — dann greift ein fester Pfad ins Leere.",
+      "world_seed: GIBT ES NICHT als Startparameter — gemessen am 2026-09-06 an assembly_valheim.dll. Valheim kennt genau diese Parameter: -backuplong -backups -backupshort -console -crossplay -instanceid -joincode -logfile -modifier -name -password -port -preset -public -resetmodifiers -savedir -saveinterval -setkey -world. Kein -seed. Was an \"seed\" in der Assembly steht, sind Konsolenbefehle (printseeds, nextseed) und Logtexte. Der Seed entsteht beim Anlegen der Welt und liegt danach in der .fwl-Datei; ein bestimmter Seed geht nur, indem man die Welt anderswo mit ihm erzeugt und beide Dateien (.fwl und .db) hochlaedt. Das ist eine Dateiablage, keine Einstellung.",
+      "start_args: -preset, -modifier, -setkey und -resetmodifiers sind in der Assembly belegt und hier NICHT angeboten. Sie greifen laut Doku nur beim ERSTEN Erzeugen einer Welt. Waeren die naechsten Kandidaten fuer die Einstellungskarte.",
       "requirements.os_packages: GEMESSEN am 2026-09-06, der offene Punkt ist eingeloest. Am angehefteten Image nachgezaehlt (dpkg-query): libatomic1 und libc6 waren drin, libpulse fehlte vollstaendig — dpkg 0 Treffer, ldconfig 0 Treffer. Unity holt libpulse zur Laufzeit per dlopen, weshalb ldd sie nie zeigte. Das Wiki nennt libpulse-dev, weil es fuer Entwicklungsmaschinen geschrieben ist; im Laufzeit-Image genuegt libpulse0 (liefert libpulse.so.0 und libpulse-simple.so.0). Nachgehalten wird das jetzt von scripts/check-paket-abhaengigkeiten.js, nicht mehr von dieser Zeile."
     ]
   },
