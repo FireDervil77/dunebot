@@ -548,6 +548,7 @@
   "requirements": {
     "os_packages": [
       "libpulse0",
+      "libpulse-mainloop-glib0",
       "libatomic1",
       "libc6"
     ]
