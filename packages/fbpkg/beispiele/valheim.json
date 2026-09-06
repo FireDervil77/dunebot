@@ -547,7 +547,7 @@
   },
   "requirements": {
     "os_packages": [
-      "libpulse-dev",
+      "libpulse0",
       "libatomic1",
       "libc6"
     ]
