@@ -3,7 +3,7 @@
   "identity": {
     "slug": "valheim",
     "name": "Valheim",
-    "version": "1.0.7",
+    "version": "1.0.8",
     "author": "firenetworks",
     "category": "survival",
     "description": {
@@ -158,6 +158,65 @@
         "form": "-crossplay",
         "from": "setting:crossplay",
         "when": "true"
+      },
+      {
+        "key": "preset",
+        "form": [
+          "-preset",
+          "{{value}}"
+        ],
+        "from": "setting:world_preset",
+        "when": "not_empty"
+      },
+      {
+        "key": "mod_combat",
+        "form": [
+          "-modifier",
+          "combat",
+          "{{value}}"
+        ],
+        "from": "setting:mod_combat",
+        "when": "not_empty"
+      },
+      {
+        "key": "mod_deathpenalty",
+        "form": [
+          "-modifier",
+          "deathpenalty",
+          "{{value}}"
+        ],
+        "from": "setting:mod_deathpenalty",
+        "when": "not_empty"
+      },
+      {
+        "key": "mod_resources",
+        "form": [
+          "-modifier",
+          "resources",
+          "{{value}}"
+        ],
+        "from": "setting:mod_resources",
+        "when": "not_empty"
+      },
+      {
+        "key": "mod_raids",
+        "form": [
+          "-modifier",
+          "raids",
+          "{{value}}"
+        ],
+        "from": "setting:mod_raids",
+        "when": "not_empty"
+      },
+      {
+        "key": "mod_portals",
+        "form": [
+          "-modifier",
+          "portals",
+          "{{value}}"
+        ],
+        "from": "setting:mod_portals",
+        "when": "not_empty"
       }
     ],
     "extra_args": {
@@ -469,6 +528,401 @@
       "takes_effect": "restart",
       "risk": "progress",
       "role": "expert"
+    },
+    {
+      "key": "world_preset",
+      "group": "world",
+      "name": {
+        "de": "Weltvorgabe",
+        "en": "World preset"
+      },
+      "description": {
+        "de": "Setzt alle Modifikatoren auf einen Satz. Die Einzelwerte darunter überschreiben ihn — sie stehen in der Startzeile dahinter und gewinnen deshalb.",
+        "en": "Sets all modifiers at once. The individual values below override it — they come later on the command line and therefore win."
+      },
+      "type": "choice",
+      "default": "",
+      "choices": [
+        {
+          "value": "",
+          "name": {
+            "de": "Nicht setzen (Vorgabe des Spiels)",
+            "en": "Leave unset (game default)"
+          },
+          "default": true
+        },
+        {
+          "value": "normal",
+          "name": {
+            "de": "Normal",
+            "en": "Normal"
+          }
+        },
+        {
+          "value": "casual",
+          "name": {
+            "de": "Entspannt",
+            "en": "Casual"
+          }
+        },
+        {
+          "value": "easy",
+          "name": {
+            "de": "Leicht",
+            "en": "Easy"
+          }
+        },
+        {
+          "value": "hard",
+          "name": {
+            "de": "Schwer",
+            "en": "Hard"
+          }
+        },
+        {
+          "value": "hardcore",
+          "name": {
+            "de": "Hardcore",
+            "en": "Hardcore"
+          }
+        },
+        {
+          "value": "immersive",
+          "name": {
+            "de": "Immersiv",
+            "en": "Immersive"
+          }
+        },
+        {
+          "value": "hammer",
+          "name": {
+            "de": "Hammer (Baumodus)",
+            "en": "Hammer (building)"
+          }
+        }
+      ],
+      "apply": [
+        {
+          "target": "arg"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "owner"
+    },
+    {
+      "key": "mod_combat",
+      "group": "world",
+      "name": {
+        "de": "Kampf",
+        "en": "Combat"
+      },
+      "description": {
+        "de": "Wie hart die Gegner zuschlagen.",
+        "en": "How hard enemies hit."
+      },
+      "type": "choice",
+      "default": "",
+      "choices": [
+        {
+          "value": "",
+          "name": {
+            "de": "Nicht setzen (Vorgabe des Spiels)",
+            "en": "Leave unset (game default)"
+          },
+          "default": true
+        },
+        {
+          "value": "veryeasy",
+          "name": {
+            "de": "Sehr leicht",
+            "en": "Very easy"
+          }
+        },
+        {
+          "value": "easy",
+          "name": {
+            "de": "Leicht",
+            "en": "Easy"
+          }
+        },
+        {
+          "value": "hard",
+          "name": {
+            "de": "Schwer",
+            "en": "Hard"
+          }
+        },
+        {
+          "value": "veryhard",
+          "name": {
+            "de": "Sehr schwer",
+            "en": "Very hard"
+          }
+        }
+      ],
+      "apply": [
+        {
+          "target": "arg"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "owner"
+    },
+    {
+      "key": "mod_deathpenalty",
+      "group": "world",
+      "name": {
+        "de": "Todesstrafe",
+        "en": "Death penalty"
+      },
+      "description": {
+        "de": "Was beim Sterben verloren geht — von „nichts“ bis Hardcore.",
+        "en": "What you lose on death — from nothing to hardcore."
+      },
+      "type": "choice",
+      "default": "",
+      "choices": [
+        {
+          "value": "",
+          "name": {
+            "de": "Nicht setzen (Vorgabe des Spiels)",
+            "en": "Leave unset (game default)"
+          },
+          "default": true
+        },
+        {
+          "value": "casual",
+          "name": {
+            "de": "Nichts verlieren",
+            "en": "Casual"
+          }
+        },
+        {
+          "value": "veryeasy",
+          "name": {
+            "de": "Sehr wenig",
+            "en": "Very easy"
+          }
+        },
+        {
+          "value": "easy",
+          "name": {
+            "de": "Wenig",
+            "en": "Easy"
+          }
+        },
+        {
+          "value": "hard",
+          "name": {
+            "de": "Viel",
+            "en": "Hard"
+          }
+        },
+        {
+          "value": "hardcore",
+          "name": {
+            "de": "Hardcore",
+            "en": "Hardcore"
+          }
+        }
+      ],
+      "apply": [
+        {
+          "target": "arg"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "owner"
+    },
+    {
+      "key": "mod_resources",
+      "group": "world",
+      "name": {
+        "de": "Rohstoffe",
+        "en": "Resources"
+      },
+      "description": {
+        "de": "Wie viel Beute Gegner und Vorkommen hergeben.",
+        "en": "How much loot enemies and nodes yield."
+      },
+      "type": "choice",
+      "default": "",
+      "choices": [
+        {
+          "value": "",
+          "name": {
+            "de": "Nicht setzen (Vorgabe des Spiels)",
+            "en": "Leave unset (game default)"
+          },
+          "default": true
+        },
+        {
+          "value": "muchless",
+          "name": {
+            "de": "Viel weniger",
+            "en": "Much less"
+          }
+        },
+        {
+          "value": "less",
+          "name": {
+            "de": "Weniger",
+            "en": "Less"
+          }
+        },
+        {
+          "value": "more",
+          "name": {
+            "de": "Mehr",
+            "en": "More"
+          }
+        },
+        {
+          "value": "muchmore",
+          "name": {
+            "de": "Viel mehr",
+            "en": "Much more"
+          }
+        },
+        {
+          "value": "most",
+          "name": {
+            "de": "Am meisten",
+            "en": "Most"
+          }
+        }
+      ],
+      "apply": [
+        {
+          "target": "arg"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "owner"
+    },
+    {
+      "key": "mod_raids",
+      "group": "world",
+      "name": {
+        "de": "Überfälle",
+        "en": "Raids"
+      },
+      "description": {
+        "de": "Wie oft Angriffe auf die Basis vorkommen. „Keine“ schaltet sie ab.",
+        "en": "How often base attacks happen. „None“ disables them."
+      },
+      "type": "choice",
+      "default": "",
+      "choices": [
+        {
+          "value": "",
+          "name": {
+            "de": "Nicht setzen (Vorgabe des Spiels)",
+            "en": "Leave unset (game default)"
+          },
+          "default": true
+        },
+        {
+          "value": "none",
+          "name": {
+            "de": "Keine",
+            "en": "None"
+          }
+        },
+        {
+          "value": "muchless",
+          "name": {
+            "de": "Viel seltener",
+            "en": "Much less"
+          }
+        },
+        {
+          "value": "less",
+          "name": {
+            "de": "Seltener",
+            "en": "Less"
+          }
+        },
+        {
+          "value": "more",
+          "name": {
+            "de": "Häufiger",
+            "en": "More"
+          }
+        },
+        {
+          "value": "muchmore",
+          "name": {
+            "de": "Viel häufiger",
+            "en": "Much more"
+          }
+        }
+      ],
+      "apply": [
+        {
+          "target": "arg"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "owner"
+    },
+    {
+      "key": "mod_portals",
+      "group": "world",
+      "name": {
+        "de": "Portale",
+        "en": "Portals"
+      },
+      "description": {
+        "de": "Ob Erze durch Portale dürfen. „Entspannt“ erlaubt alles, „Sehr schwer“ schaltet Portale ganz ab.",
+        "en": "Whether ores may pass portals. „Casual“ allows everything, „Very hard“ disables portals."
+      },
+      "type": "choice",
+      "default": "",
+      "choices": [
+        {
+          "value": "",
+          "name": {
+            "de": "Nicht setzen (Vorgabe des Spiels)",
+            "en": "Leave unset (game default)"
+          },
+          "default": true
+        },
+        {
+          "value": "casual",
+          "name": {
+            "de": "Alles erlaubt",
+            "en": "Everything allowed"
+          }
+        },
+        {
+          "value": "hard",
+          "name": {
+            "de": "Eingeschränkt",
+            "en": "Restricted"
+          }
+        },
+        {
+          "value": "veryhard",
+          "name": {
+            "de": "Keine Portale",
+            "en": "No portals"
+          }
+        }
+      ],
+      "apply": [
+        {
+          "target": "arg"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "owner"
     }
   ],
   "commands": {
@@ -543,7 +997,7 @@
       "commands.players.ban: bannedlist.txt und das Eintragsformat [Plattform]_[Kennung] sind durch die offizielle Dokumentation belegt (siehe referenz/valheim.json). Am laufenden Server ist beides weiterhin ungeprüft — Doku ist kein Nachweis.",
       "commands.players.ban: Die Datei liegt im Speicherverzeichnis. Wird -savedir gesetzt, wandert sie mit — dann greift ein fester Pfad ins Leere.",
       "world_seed: GIBT ES NICHT als Startparameter — gemessen am 2026-09-06 an assembly_valheim.dll. Valheim kennt genau diese Parameter: -backuplong -backups -backupshort -console -crossplay -instanceid -joincode -logfile -modifier -name -password -port -preset -public -resetmodifiers -savedir -saveinterval -setkey -world. Kein -seed. Was an \"seed\" in der Assembly steht, sind Konsolenbefehle (printseeds, nextseed) und Logtexte. Der Seed entsteht beim Anlegen der Welt und liegt danach in der .fwl-Datei; ein bestimmter Seed geht nur, indem man die Welt anderswo mit ihm erzeugt und beide Dateien (.fwl und .db) hochlaedt. Das ist eine Dateiablage, keine Einstellung.",
-      "start_args: -preset, -modifier, -setkey und -resetmodifiers sind in der Assembly belegt und hier NICHT angeboten. Sie greifen laut Doku nur beim ERSTEN Erzeugen einer Welt. Waeren die naechsten Kandidaten fuer die Einstellungskarte.",
+      "start_args: -preset, -modifier und -setkey — GEMESSEN am 2026-09-06 am laufenden Server, nicht aus der Doku uebernommen. Preset und die fuenf Modifikatoren sind jetzt als Einstellung gebaut (fachliche Hoehe). Die Referenz sagte nach Nodecraft, sie wirkten NUR beim ersten Erzeugen einer Welt; das ist WIDERLEGT: Lauf 1 erzeugte die Welt mit -preset hard, Lauf 2 lud dieselbe Welt mit -preset casual, und das Spiel meldete \"Setting world modifier preset: casual\" — nach dem Laden ruehrt nichts es mehr an. Deshalb takes_effect: restart, nicht new_world. Erlaubte Werte ebenfalls gemessen, mit Gegenprobe: Presets normal|casual|easy|hard|hardcore|immersive|hammer (veryeasy und ein erfundener Wert wurden LAUT abgelehnt). Modifikatoren: combat veryeasy|easy|hard|veryhard, deathpenalty casual|veryeasy|easy|hard|hardcore, resources muchless|less|more|muchmore|most, raids none|muchless|less|more|muchmore, portals casual|hard|veryhard. \"normal\" ist bei den Einzelwerten KEIN Wert, sondern das Nichtsetzen. ⚠ Ein ungueltiger Einzelwert wird STILL verworfen — keine Meldung im Log. Deshalb Auswahlfelder und kein Textfeld. Offen bleibt -setkey (globale Schluessel) und -resetmodifiers.",
       "requirements.os_packages: GEMESSEN am 2026-09-06, der offene Punkt ist eingeloest. Am angehefteten Image nachgezaehlt (dpkg-query): libatomic1 und libc6 waren drin, libpulse fehlte vollstaendig — dpkg 0 Treffer, ldconfig 0 Treffer. Unity holt libpulse zur Laufzeit per dlopen, weshalb ldd sie nie zeigte. Das Wiki nennt libpulse-dev, weil es fuer Entwicklungsmaschinen geschrieben ist; im Laufzeit-Image genuegt libpulse0 (liefert libpulse.so.0 und libpulse-simple.so.0). Nachgehalten wird das jetzt von scripts/check-paket-abhaengigkeiten.js, nicht mehr von dieser Zeile."
     ]
   },
