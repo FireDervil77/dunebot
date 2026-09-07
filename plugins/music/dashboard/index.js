@@ -75,8 +75,23 @@ class MusicDashboardPlugin extends DashboardPlugin {
      */
     _ablageAnmelden() {
         const Logger = ServiceManager.get('Logger');
+        const path = require('path');
         const { MusicFiles } = require('../shared/models');
         const { pfadFuer, typFuer } = require('../shared/dateien');
+
+        /**
+         * Der Anzeigename einer Datei.
+         *
+         * **Ohne Endung.** `originalname` ist ein Dateiname; im Twitch-Chat und
+         * in einer Warteschlange liest niemand `.mp3` mit, und bei sechs Titeln
+         * sind das dreissig Zeichen, die anderswo fehlen. Gesucht wird weiterhin
+         * ueber den vollen Namen - wer ".mp3" tippt, findet trotzdem etwas.
+         */
+        const anzeigename = (name) => {
+            const roh = String(name || '');
+            const ohne = roh.slice(0, roh.length - path.extname(roh).length);
+            return ohne.trim() || roh;
+        };
 
         try {
             MusikablageRegistry.register('music', {
@@ -86,14 +101,14 @@ class MusicDashboardPlugin extends DashboardPlugin {
                     const zeilen = await MusicFiles.fuerStream(guildId, begriff || null);
                     return zeilen.map(z => ({
                         id: z.id,
-                        titel: z.originalname,
+                        titel: anzeigename(z.originalname),
                         dauerSek: z.dauer_sek ?? null
                     }));
                 },
 
                 stueck: async (guildId, id) => {
                     const z = await MusicFiles.fuerStreamEine(guildId, id);
-                    return z ? { id: z.id, titel: z.originalname, dauerSek: z.dauer_sek ?? null } : null;
+                    return z ? { id: z.id, titel: anzeigename(z.originalname), dauerSek: z.dauer_sek ?? null } : null;
                 },
 
                 tonquelle: async (guildId, id) => {

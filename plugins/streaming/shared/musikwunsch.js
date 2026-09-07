@@ -538,6 +538,32 @@ async function naechster(guildId, wie = {}) {
 }
 
 /**
+ * Die freigegebene Ablage als Chatzeile - oder nur ihre Groesse.
+ *
+ * **Eine Liste, die nicht passt, wird nicht gekuerzt, sondern gezaehlt.** Eine
+ * abgeschnittene Aufzaehlung sieht vollstaendig aus, und der Zuschauer haelt
+ * fuer nicht vorhanden, was nur nicht mehr hineinpasste. Die Zahl ist in dem
+ * Fall die ehrlichere Auskunft; gefunden wird ohnehin ueber die Suche.
+ *
+ * Die Grenze ist 380 Zeichen, nicht 500: Der Aufrufer setzt noch einen
+ * Vorspann davor ("Das habe ich hier nicht. Da ist: ..."), und Twitch nimmt
+ * insgesamt 500.
+ *
+ * @param {string} guildId Guild
+ * @returns {Promise<{anzahl: number, text: string|null}>} Text nur, wenn er passt
+ */
+async function ablageAufzaehlen(guildId) {
+    const quelle = ablage();
+    if (!quelle) return { anzahl: 0, text: null };
+
+    const alle = await quelle.suchen(guildId, null);
+    if (!alle.length) return { anzahl: 0, text: null };
+
+    const text = alle.map(t => t.titel).join(' · ');
+    return { anzahl: alle.length, text: text.length <= 380 ? text : null };
+}
+
+/**
  * Die ganze freigegebene Ablage einreihen, in zufaelliger Reihenfolge.
  *
  * **Der Weg, eine Warteschlange zu fuellen, ohne sich sechsmal selbst etwas zu
@@ -692,7 +718,7 @@ function stimmeAbgeben(guildId, absenderId) {
 module.exports = {
     zustand, schluesselNeu, guildZuSchluessel, playerGesehen,
     warteschlange, aktueller, wuenschen, springen, leeren, aufraeumen,
-    abspielen, naechster, nachlegen, endlosSchalten, ablageEinreihen,
+    abspielen, naechster, nachlegen, endlosSchalten, ablageEinreihen, ablageAufzaehlen,
     stimmeAbgeben, stimmenVergessen,
     ablage,
     AUFBEWAHRUNG_TAGE, NOETIGE_STIMMEN

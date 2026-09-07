@@ -217,8 +217,23 @@ const FERTIG = {
             // Jeder Grund bekommt seinen eigenen Satz. Ein gemeinsames
             // "hat nicht geklappt" liesse den Zuschauer raten, ob er sich
             // vertippt hat oder ob die Anlage streikt.
-            if (e.grund === 'kein_begriff')  return `Sag dazu, was du hoeren willst: ${PRAEFIX}request <Titel>`;
-            if (e.grund === 'nicht_gefunden') return 'Das habe ich hier nicht.';
+            // **Ohne Angabe wird aufgezaehlt, statt nach einer zu fragen.**
+            // Frage des Betreibers: "zeigt er denn dann auch dem benutzer die
+            // titel an, die er waehlen kann?" - bis hierher nicht, und ein
+            // Zuschauer, der die Ablage nicht kennt, kann nur raten. Dieselbe
+            // Antwort hilft auch nach einem Fehlgriff weiter.
+            if (e.grund === 'kein_begriff' || e.grund === 'nicht_gefunden') {
+                const liste = await musik.ablageAufzaehlen(k.streamerZeile.heim_guild_id);
+                const vorspann = e.grund === 'nicht_gefunden' ? 'Das habe ich hier nicht. ' : '';
+
+                if (!liste.anzahl) return `${vorspann}Es ist noch nichts freigegeben.`;
+                if (liste.text)   return `${vorspann}Da ist: ${liste.text}`;
+
+                // Zu viele fuer eine Chatzeile: die Zahl ist die ehrliche
+                // Auskunft, eine abgeschnittene Liste saehe vollstaendig aus.
+                return `${vorspann}${liste.anzahl} Titel da — such mit `
+                     + `${PRAEFIX}request <Teil des Namens>.`;
+            }
             if (e.grund === 'keine_ablage') {
                 log().warn(`[Streaming] ${PRAEFIX}request: keine Musikablage eingetragen`);
                 return 'Musikwuensche sind gerade nicht moeglich.';

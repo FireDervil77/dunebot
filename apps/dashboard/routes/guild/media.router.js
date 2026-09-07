@@ -18,6 +18,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const { ServiceManager } = require('dunebot-core');
+const { richtigstellen } = require('../../helpers/Dateiname');
 
 // ── Erlaubte MIME-Types, und die Endung, unter der wir speichern ──
 // SVG ist bewusst nicht dabei: Eine SVG ist ausfuehrbares XML, und `/uploads/media`
@@ -237,12 +238,14 @@ router.post('/api/upload', requirePermission('CORE.MEDIA.UPLOAD'), (req, res, ne
             const result = await dbService.query(
                 `INSERT INTO guild_media (guild_id, uploaded_by, filename, stored_name, mime_type, file_size, width, height, folder)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [guildId, userId, file.originalname, file.filename, file.mimetype, file.size, width, height, folder]
+                // Wie im Musik-Upload: multer liest latin1, Browser senden UTF-8.
+                [guildId, userId, richtigstellen(file.originalname), file.filename,
+                 file.mimetype, file.size, width, height, folder]
             );
 
             results.push({
                 id: result.insertId,
-                filename: file.originalname,
+                filename: richtigstellen(file.originalname),
                 stored_name: file.filename,
                 mime_type: file.mimetype,
                 file_size: file.size,

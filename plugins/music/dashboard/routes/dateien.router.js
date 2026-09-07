@@ -32,6 +32,7 @@ const { requirePermission } = require('../../../../apps/dashboard/middlewares/pe
 const { MusicFiles, MusicSettings } = require('../../shared/models');
 const { guildVerzeichnis, pfadFuer, ERLAUBTE_TYPEN, ERLAUBTE_ENDUNGEN } = require('../../shared/dateien');
 const { makeTranslator, renderView, renderFehler, auspacken, angemeldeterNutzer } = require('./_shared');
+const { richtigstellen } = require('../../../../apps/dashboard/helpers/Dateiname');
 
 /**
  * Groesste Datei, die wir ueberhaupt annehmen - unabhaengig von der Guild-Quota.
@@ -178,7 +179,9 @@ router.post('/upload', requirePermission('MUSIC.FILES.UPLOAD'), (req, res) => {
             // steht dort nichts. Deshalb hier und nicht weiter oben.
             const id = await MusicFiles.anlegen(guildId, {
                 dateiname: req.file.filename,
-                originalname: req.file.originalname,
+                // multer liest den Namen als latin1, Browser schicken UTF-8 -
+                // ohne das steht `LÃVI` in der Ablage statt `LÄVI`.
+                originalname: richtigstellen(req.file.originalname),
                 herkunft: (req.body?.herkunft || '').trim().slice(0, 255) || null,
                 fuerStream: req.body?.fuer_stream === '1' || req.body?.fuer_stream === 'true',
                 groesseBytes: req.file.size,
