@@ -130,6 +130,13 @@ module.exports = async (interaction) => {
             });
         }
 
+        if (result.error === 'nur_stream') {
+            return interaction.followUp({
+                content: guild.getT('giveaways:JOIN_NUR_STREAM'),
+                ephemeral: true,
+            });
+        }
+
         if (result.error) {
             return interaction.followUp({
                 content: guild.getT('giveaways:JOIN_ERROR'),

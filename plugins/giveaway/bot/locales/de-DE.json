@@ -113,6 +113,8 @@
     "ANNOUNCE_NO_WINNER": "Keine gültigen Teilnehmer — es konnte kein Gewinner ermittelt werden.",
 
     "JOIN_BLACKLISTED": "❌ Du bist für Giveaways auf diesem Server gesperrt.",
+
+    "JOIN_NUR_STREAM": "❌ Bei dieser Verlosung wird nur im Stream mitgemacht — nicht hier im Discord.",
     "JOIN_ACCOUNT_TOO_YOUNG": "❌ Dein Account muss mindestens **{days} Tage** alt sein.",
     "JOIN_SERVER_TOO_YOUNG": "❌ Du musst seit mindestens **{days} Tagen** auf dem Server sein.",
     "JOIN_REQUIREMENT_FAILED": "❌ Du erfüllst nicht alle Teilnahmebedingungen.",

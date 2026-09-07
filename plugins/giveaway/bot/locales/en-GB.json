@@ -113,6 +113,8 @@
     "ANNOUNCE_NO_WINNER": "No valid entries — no winner could be determined.",
 
     "JOIN_BLACKLISTED": "❌ You are blacklisted from giveaways on this server.",
+
+    "JOIN_NUR_STREAM": "❌ This giveaway is entered from the stream only — not here on Discord.",
     "JOIN_ACCOUNT_TOO_YOUNG": "❌ Your account must be at least **{days} days** old.",
     "JOIN_SERVER_TOO_YOUNG": "❌ You must be a server member for at least **{days} days**.",
     "JOIN_REQUIREMENT_FAILED": "❌ You do not meet all entry requirements.",

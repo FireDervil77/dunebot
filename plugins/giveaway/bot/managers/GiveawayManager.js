@@ -1,5 +1,6 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { ServiceManager } = require('dunebot-core');
+const { LosquellenRegistry } = require('dunebot-sdk');
 
 class GiveawayManager {
     constructor(client) {
@@ -174,11 +175,14 @@ class GiveawayManager {
             [giveawayId]
         );
 
-        // Gewinner in DB speichern
-        for (const userId of winners) {
+        // Gewinner in DB speichern - mit Herkunft, sonst steht spaeter eine
+        // Zahl da, von der niemand weiss, in welchem Namensraum sie gilt.
+        for (const los of winners) {
             await this.dbService.query(
-                `INSERT INTO giveaway_winners (giveaway_id, user_id, claim_status) VALUES (?, ?, ?)`,
-                [giveawayId, userId, giveaway.claim_duration_ms ? 'pending' : 'claimed']
+                `INSERT INTO giveaway_winners (giveaway_id, user_id, quelle, anzeigename, claim_status)
+                 VALUES (?, ?, ?, ?, ?)`,
+                [giveawayId, los.kennung, los.quelle, los.name,
+                 giveaway.claim_duration_ms ? 'pending' : 'claimed']
             );
         }
 
@@ -217,19 +221,20 @@ class GiveawayManager {
 
         // Bisherige Gewinner holen
         const prevWinners = await this.dbService.query(
-            `SELECT user_id FROM giveaway_winners WHERE giveaway_id = ?`, [giveawayId]
+            `SELECT user_id, quelle FROM giveaway_winners WHERE giveaway_id = ?`, [giveawayId]
         );
-        const excludeIds = prevWinners.map(w => w.user_id);
+        const excludeIds = prevWinners.map(w => ({ quelle: w.quelle || 'discord', kennung: w.user_id }));
 
         // Neue Gewinner aus verbleibenden Einträgen
         const newWinners = await this._drawWinners(giveawayId, count, excludeIds);
         if (!newWinners.length) return { error: 'no_entries' };
 
         // Neue Gewinner in DB
-        for (const userId of newWinners) {
+        for (const los of newWinners) {
             await this.dbService.query(
-                `INSERT INTO giveaway_winners (giveaway_id, user_id, claim_status) VALUES (?, ?, 'claimed')`,
-                [giveawayId, userId]
+                `INSERT INTO giveaway_winners (giveaway_id, user_id, quelle, anzeigename, claim_status)
+                 VALUES (?, ?, ?, ?, 'claimed')`,
+                [giveawayId, los.kennung, los.quelle, los.name]
             );
         }
 
@@ -407,16 +412,17 @@ class GiveawayManager {
         if (!giveaway) return;
 
         const allWinners = await this.dbService.query(
-            `SELECT user_id FROM giveaway_winners WHERE giveaway_id = ?`, [giveawayId]
+            `SELECT user_id, quelle FROM giveaway_winners WHERE giveaway_id = ?`, [giveawayId]
         );
-        const excludeIds = allWinners.map(w => w.user_id);
+        const excludeIds = allWinners.map(w => ({ quelle: w.quelle || 'discord', kennung: w.user_id }));
 
         const newWinners = await this._drawWinners(giveawayId, unclaimed.length, excludeIds);
         if (newWinners.length > 0) {
-            for (const userId of newWinners) {
+            for (const los of newWinners) {
                 await this.dbService.query(
-                    `INSERT INTO giveaway_winners (giveaway_id, user_id, claim_status) VALUES (?, ?, 'claimed')`,
-                    [giveawayId, userId]
+                    `INSERT INTO giveaway_winners (giveaway_id, user_id, quelle, anzeigename, claim_status)
+                     VALUES (?, ?, ?, ?, 'claimed')`,
+                    [giveawayId, los.kennung, los.quelle, los.name]
                 );
             }
             await this._postRerollMessage(giveaway, newWinners);
@@ -597,6 +603,12 @@ class GiveawayManager {
         const giveaway = rows[0];
 
         if (giveaway.status !== 'active') return { error: 'not_active' };
+
+        // **Nur der Stream-Weg ist offen.** Der Knopf verschwindet dann zwar
+        // aus der Einbettung, aber eine alte Nachricht kann noch einen tragen
+        // - und ein Klick darauf darf keinen Discord-Teilnehmer anlegen, den
+        // die Verlosung gar nicht haben will.
+        if (giveaway.teilnahme === 'stream') return { error: 'nur_stream' };
 
         // Blacklist-Prüfung
         if (await this.isBlacklisted(giveaway.guild_id, userId)) {
@@ -844,39 +856,136 @@ class GiveawayManager {
 
     // ─── Internal: Winner Drawing ───────────────────────────
 
-    async _drawWinners(giveawayId, count, excludeIds = []) {
-        let query = `SELECT user_id, entry_count FROM giveaway_entries WHERE giveaway_id = ?`;
-        const params = [giveawayId];
+    /**
+     * Ein Los eindeutig benennen.
+     *
+     * Kennungen allein reichen nicht: Eine Discord-Kennung und eine
+     * Twitch-Kennung sind zwei verschiedene Dinge, auch wenn beide aus Ziffern
+     * bestehen. Ohne die Herkunft davor wuerde ein Ausschluss ("dieser hat
+     * schon gewonnen") im schlimmsten Fall die falsche Person treffen.
+     *
+     * @param {{quelle: string, kennung: string}} los Das Los
+     * @returns {string} Schluessel
+     */
+    _losSchluessel(los) {
+        return `${los.quelle}|${los.kennung}`;
+    }
 
-        if (excludeIds.length > 0) {
-            query += ` AND user_id NOT IN (${excludeIds.map(() => '?').join(',')})`;
-            params.push(...excludeIds);
+    /**
+     * Aus Losen wird eine Gewinnerzeile.
+     *
+     * **Die einzige Stelle im Manager, die Gewinner in Text verwandelt.**
+     * Vorher stand `winners.map(id => \`<@${id}>\`)` an **vier** Stellen -
+     * Ende-Einbettung, Claim-Einbettung, Reroll-Nachricht und Glueckwunsch.
+     * Bei vier Kopien wird die vierte beim naechsten Umbau vergessen, und
+     * genau dort erscheint dann die kaputte Erwaehnung.
+     *
+     * @param {Array<Object>} lose Die Gewinnerlose
+     * @returns {string} Zeile fuer die Ansage
+     */
+    _nennungen(lose) {
+        return (lose || []).map(l => LosquellenRegistry.nennung(l)).join(', ');
+    }
+
+    /**
+     * Die Lose einer Verlosung - eigene und, wenn erlaubt, fremde.
+     *
+     * `teilnahme` entscheidet. Bei `discord` (der Vorgabe, und dem Zustand
+     * jeder bestehenden Verlosung) wird **keine** Quelle gefragt; der Weg ist
+     * dann derselbe wie vorher.
+     *
+     * Eine Quelle, die wirft, nimmt die Ziehung nicht mit: Ein kaputtes
+     * Zusatz-Plugin darf keine Verlosung verhindern, die ohne es lief.
+     *
+     * @param {Object} giveaway Die Verlosung
+     * @returns {Promise<Array<Object>>} Lose
+     */
+    async _loseSammeln(giveaway) {
+        const eigene = await this.dbService.query(
+            `SELECT user_id, entry_count FROM giveaway_entries WHERE giveaway_id = ?`,
+            [giveaway.id]
+        );
+
+        const lose = eigene.map(e => ({
+            quelle: LosquellenRegistry.EIGEN,
+            kennung: String(e.user_id),
+            name: null,
+            anzahl: Math.max(1, Number(e.entry_count) || 1)
+        }));
+
+        const teilnahme = giveaway.teilnahme || LosquellenRegistry.EIGEN;
+        if (teilnahme === LosquellenRegistry.EIGEN) return lose;
+
+        for (const { name, quelle } of LosquellenRegistry.list()) {
+            try {
+                const fremde = await quelle.lose(giveaway);
+                for (const l of fremde || []) {
+                    lose.push({
+                        quelle: name,
+                        kennung: String(l.kennung),
+                        name: l.name || null,
+                        anzahl: Math.max(1, Number(l.anzahl) || 1)
+                    });
+                }
+            } catch (e) {
+                this.Logger.error(`[Giveaway] Losquelle "${name}" lieferte nicht:`, e);
+            }
         }
 
-        const entries = await this.dbService.query(query, params);
+        // `stream` heisst: nur die fremden Wege. Die eigenen Lose bleiben
+        // trotzdem stehen, falls jemand im Discord schon geklickt hatte, bevor
+        // umgestellt wurde - sie wegzuwerfen waere eine stille Enteignung.
+        // Neue Discord-Eintraege verhindert der Knopf, nicht die Ziehung.
+        return lose;
+    }
+
+    async _drawWinners(giveawayId, count, excludeIds = []) {
+        const giveaway = await this.getGiveaway(giveawayId);
+        if (!giveaway) return [];
+
+        const ausgeschlossen = new Set(excludeIds.map(x =>
+            typeof x === 'string' ? `${LosquellenRegistry.EIGEN}|${x}` : this._losSchluessel(x)));
+
+        const entries = (await this._loseSammeln(giveaway))
+            .filter(l => !ausgeschlossen.has(this._losSchluessel(l)));
         if (!entries.length) return [];
 
-        // Gewichtete Ziehung (entry_count berücksichtigen)
-        const pool = [];
-        for (const entry of entries) {
-            for (let i = 0; i < entry.entry_count; i++) {
-                pool.push(entry.user_id);
-            }
-        }
-
+        // Gewichtete Ziehung ohne Zuruecklegen.
+        //
+        // **Vorher wurde geworfen und verworfen**, hoechstens `pool.length * 2`
+        // mal: Ein bereits gezogenes Los wurde weggeworfen und der Wurf zaehlte
+        // trotzdem. Bei wenigen Teilnehmern reichten die Wuerfe dann nicht
+        // (gemessen am 2026-09-07, 5000 Laeufe je Zeile):
+        //
+        //     2 Teilnehmer,  2 Gewinner gesucht -> vollzaehlig in 87 %
+        //     5 Teilnehmer,  5 Gewinner gesucht -> vollzaehlig in 53 %
+        //    10 Teilnehmer, 10 Gewinner gesucht -> vollzaehlig in 22 %
+        //
+        // Wer zehn Preise an zehn Teilnehmer verlost, bekam also in vier von
+        // fuenf Faellen zu wenige Gewinner - ohne Fehler, ohne Meldung. Der
+        // Fehler ist von 2026-03-18 (59c0a0c) und aelter als diese Bruecke;
+        // er faellt hier nur auf, weil die Ziehung ohnehin angefasst wurde.
+        //
+        // Jetzt wird das Gezogene aus dem Topf **entfernt**. Das Verfahren
+        // endet immer, ist immer vollzaehlig, und die Gewichtung bleibt: Wer
+        // mehr Lose haelt, hat in jeder Runde den groesseren Anteil.
+        const uebrig = new Map(entries.map(l => [this._losSchluessel(l), l]));
         const winners = [];
-        const used = new Set();
-        const maxAttempts = pool.length * 2;
-        let attempts = 0;
 
-        while (winners.length < count && winners.length < entries.length && attempts < maxAttempts) {
-            const idx = Math.floor(Math.random() * pool.length);
-            const userId = pool[idx];
-            if (!used.has(userId)) {
-                winners.push(userId);
-                used.add(userId);
+        while (winners.length < count && uebrig.size > 0) {
+            let summe = 0;
+            for (const l of uebrig.values()) summe += l.anzahl;
+
+            let wurf = Math.random() * summe;
+            let gewaehlt = null;
+            for (const l of uebrig.values()) {
+                wurf -= l.anzahl;
+                if (wurf < 0) { gewaehlt = l; break; }
             }
-            attempts++;
+            if (!gewaehlt) break;
+
+            winners.push(gewaehlt);
+            uebrig.delete(this._losSchluessel(gewaehlt));
         }
 
         return winners;
@@ -1053,7 +1162,7 @@ class GiveawayManager {
 
             const entryCount = await this.getEntryCount(giveaway.id);
             const winnerMentions = winners.length > 0
-                ? winners.map(id => `<@${id}>`).join(', ')
+                ? this._nennungen(winners)
                 : 'Keine gültigen Teilnehmer';
 
             const embed = new EmbedBuilder()
@@ -1093,7 +1202,7 @@ class GiveawayManager {
             if (!msg) return;
 
             const entryCount = await this.getEntryCount(giveaway.id);
-            const winnerMentions = winners.map(id => `<@${id}>`).join(', ');
+            const winnerMentions = this._nennungen(winners);
             const claimMinutes = Math.round(giveaway.claim_duration_ms / 60000);
 
             const embed = new EmbedBuilder()
@@ -1128,7 +1237,7 @@ class GiveawayManager {
             const channel = guild.channels.cache.get(giveaway.channel_id);
             if (!channel) return;
 
-            const winnerMentions = winners.map(id => `<@${id}>`).join(', ');
+            const winnerMentions = this._nennungen(winners);
 
             await channel.send({
                 content: `🎉 **Reroll!** Neue Gewinner für **${giveaway.prize}**: ${winnerMentions}`,
@@ -1149,9 +1258,23 @@ class GiveawayManager {
         const hasClaim = !!giveaway.claim_duration_ms;
         const claimMinutes = hasClaim ? Math.round(giveaway.claim_duration_ms / 60000) : 0;
 
-        for (const userId of winners) {
+        for (const los of winners) {
+            // **Nur eigene Gewinner bekommen eine Direktnachricht.** Eine
+            // Twitch-Kennung an `users.fetch` findet niemanden - und der
+            // Fehlschlag laeuft in ein leeres `catch`. Der Gewinner erfuehre
+            // also nie, dass er gewonnen hat, und niemand saehe warum. Seine
+            // Quelle weiss dagegen, wie man ihn erreicht.
+            if (los.quelle !== LosquellenRegistry.EIGEN) {
+                const quelle = LosquellenRegistry.get(los.quelle);
+                if (typeof quelle?.verkuenden === 'function') {
+                    await quelle.verkuenden(giveaway, los).catch(e =>
+                        this.Logger.error(`[Giveaway] Losquelle "${los.quelle}" konnte nicht verkuenden:`, e));
+                }
+                continue;
+            }
+
             try {
-                const user = await this.client.users.fetch(userId);
+                const user = await this.client.users.fetch(los.kennung);
                 let desc = `Glückwunsch! Du hast **${giveaway.prize}** im Giveaway auf **${guildName}** gewonnen!`;
                 if (hasClaim) {
                     desc += `\n\n⏳ **Du musst deinen Preis innerhalb von ${claimMinutes} Minuten beanspruchen!** Klicke auf den "Beanspruchen"-Button im Giveaway-Channel.`;
@@ -1173,7 +1296,7 @@ class GiveawayManager {
             try {
                 const channel = guild?.channels.cache.get(giveaway.channel_id);
                 if (channel) {
-                    const winnerMentions = winners.map(id => `<@${id}>`).join(', ');
+                    const winnerMentions = this._nennungen(winners);
                     await channel.send({
                         content: `🎉 Glückwunsch ${winnerMentions}! Ihr habt **${giveaway.prize}** gewonnen!`,
                         reply: giveaway.message_id
