@@ -145,6 +145,32 @@ class MusicFiles {
     }
 
     /**
+     * **Eine** freigegebene Datei, ueber ihre Kennung.
+     *
+     * `fuerStream()` sucht nach Namen; der Player und die Warteschlange kennen
+     * dagegen die Kennung. **Der Filter `fuer_stream = 1` steht hier genauso**,
+     * und das ist der ganze Punkt: Eine Abfrage nach `id` ohne ihn waere der
+     * zweite Weg, gegen den die Ablage gebaut ist - eine einmal freigegebene
+     * und danach gesperrte Datei liefe sonst weiter, weil ihre Kennung ja schon
+     * in der Warteschlange steht.
+     *
+     * `guild_id` steht mit in der Bedingung, damit eine fremde Kennung nicht
+     * die Datei einer anderen Guild liefert.
+     *
+     * @param {string} guildId Guild
+     * @param {number} id Datensatz-ID
+     * @returns {Promise<Object|null>} Die Datei oder null
+     */
+    static async fuerStreamEine(guildId, id) {
+        const dbService = ServiceManager.get('dbService');
+        const zeilen = await dbService.query(
+            `SELECT * FROM music_files WHERE id = ? AND guild_id = ? AND fuer_stream = 1 LIMIT 1`,
+            [Number(id), guildId]
+        );
+        return zeilen?.[0] || null;
+    }
+
+    /**
      * Merken, dass die Datei gerade gespielt wurde.
      *
      * Traegt die Aufbewahrung: Was laeuft, wird nicht weggeraeumt. Ein

@@ -75,10 +75,46 @@ const ERLAUBTE_TYPEN = [
 /** Endungen, die dazu passen - fuer den Fall, dass der Typ nicht mitkommt. */
 const ERLAUBTE_ENDUNGEN = ['.mp3', '.ogg', '.opus', '.wav', '.flac', '.m4a', '.aac', '.webm'];
 
+/**
+ * Endung -> MIME-Typ, zum Ausliefern an einen Browser.
+ *
+ * Beim Hochladen reicht "Typ **oder** Endung" (Browser melden bei exotischen
+ * Formaten gern `application/octet-stream`). Beim Ausliefern reicht das nicht:
+ * Ein `<audio>`-Element spielt nichts, dessen Typ es nicht kennt, und
+ * `application/octet-stream` bietet der Browser zum Herunterladen an. Der
+ * gespeicherte Typ ist dafuer keine Grundlage - er kam vom hochladenden
+ * Browser.
+ *
+ * Deshalb entscheidet die Endung, und die haben wir selbst vergeben.
+ */
+const TYP_JE_ENDUNG = {
+    '.mp3':  'audio/mpeg',
+    '.ogg':  'audio/ogg',
+    '.opus': 'audio/ogg',
+    '.wav':  'audio/wav',
+    '.flac': 'audio/flac',
+    '.m4a':  'audio/mp4',
+    '.aac':  'audio/aac',
+    '.webm': 'audio/webm'
+};
+
+/**
+ * Welcher MIME-Typ gehoert zu diesem Dateinamen?
+ *
+ * @param {string} dateiname Name auf der Platte
+ * @returns {string|null} MIME-Typ, oder null bei unbekannter Endung
+ */
+function typFuer(dateiname) {
+    const endung = path.extname(String(dateiname || '')).toLowerCase();
+    return TYP_JE_ENDUNG[endung] || null;
+}
+
 module.exports = {
     basisVerzeichnis,
     guildVerzeichnis,
     pfadFuer,
+    typFuer,
     ERLAUBTE_TYPEN,
-    ERLAUBTE_ENDUNGEN
+    ERLAUBTE_ENDUNGEN,
+    TYP_JE_ENDUNG
 };

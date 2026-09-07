@@ -16,7 +16,7 @@
  * @author FireBot Team
  */
 
-const { DashboardPlugin, VersionHelper } = require('dunebot-sdk');
+const { DashboardPlugin, VersionHelper, MusikablageRegistry } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
 
 class MusicDashboardPlugin extends DashboardPlugin {
@@ -48,9 +48,81 @@ class MusicDashboardPlugin extends DashboardPlugin {
 
         this._registerAssets();
         this._setupRoutes();
+        this._ablageAnmelden();
 
         Logger.success('[Musik] Dashboard-Plugin aktiviert');
         return true;
+    }
+
+    /**
+     * Die Ablage freigegebener Tondateien anmelden.
+     *
+     * **Dieses Plugin erfaehrt dabei nicht, wer sie liest.** Es traegt sich an
+     * einer Stelle im SDK ein wie an einem schwarzen Brett; heute fragt der
+     * Musikwunsch aus dem Twitch-Chat nach, morgen vielleicht etwas anderes.
+     * `music` kennt den Namen `streaming` nicht und soll ihn nicht kennen - es
+     * spielt seit jeher in Discord-Sprachkanaelen und muss das weiter tun, auch
+     * wenn es das Streaming-Plugin auf einer Anlage gar nicht gibt.
+     *
+     * **Alle drei Funktionen tragen den Freigabefilter.** `fuerStream` und
+     * `fuerStreamEine` fragen `fuer_stream = 1` ab; `tonquelle` geht ueber
+     * `fuerStreamEine` und nicht an ihm vorbei. Eine Datei, deren Freigabe
+     * zurueckgenommen wurde, verschwindet damit auch aus einer Warteschlange,
+     * in der ihre Kennung schon steht - der Player bekommt `null` und
+     * ueberspringt sie.
+     *
+     * @private
+     */
+    _ablageAnmelden() {
+        const Logger = ServiceManager.get('Logger');
+        const { MusicFiles } = require('../shared/models');
+        const { pfadFuer, typFuer } = require('../shared/dateien');
+
+        try {
+            MusikablageRegistry.register('music', {
+                label: 'Eigene Dateien',
+
+                suchen: async (guildId, begriff) => {
+                    const zeilen = await MusicFiles.fuerStream(guildId, begriff || null);
+                    return zeilen.map(z => ({
+                        id: z.id,
+                        titel: z.originalname,
+                        dauerSek: z.dauer_sek ?? null
+                    }));
+                },
+
+                stueck: async (guildId, id) => {
+                    const z = await MusicFiles.fuerStreamEine(guildId, id);
+                    return z ? { id: z.id, titel: z.originalname, dauerSek: z.dauer_sek ?? null } : null;
+                },
+
+                tonquelle: async (guildId, id) => {
+                    const z = await MusicFiles.fuerStreamEine(guildId, id);
+                    if (!z) return null;
+
+                    // `pfadFuer` gibt null zurueck, wenn der Name aus dem
+                    // Guild-Verzeichnis ausbrechen wuerde. Ein Datenbankeintrag
+                    // ist kein Beweis - deshalb steht die Pruefung auch hier im
+                    // Weg und nicht nur beim Ablegen.
+                    const pfad = pfadFuer(guildId, z.dateiname);
+                    const typ = typFuer(z.dateiname);
+                    if (!pfad || !typ) return null;
+
+                    return { pfad, typ, groesseBytes: z.groesse_bytes ?? null };
+                },
+
+                verfuegbar: async (guildId) => {
+                    const zeilen = await MusicFiles.fuerStream(guildId);
+                    return zeilen.length > 0;
+                }
+            });
+
+            Logger.info('[Musik] Ablage angemeldet: freigegebene Tondateien');
+        } catch (fehler) {
+            // Melden, nicht ausweichen: Ohne die Eintragung findet der
+            // Musikwunsch spaeter nichts und niemand saehe, warum.
+            Logger.error('[Musik] Ablage konnte nicht angemeldet werden:', fehler);
+        }
     }
 
     /**
