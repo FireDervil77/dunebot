@@ -2,11 +2,12 @@
 /**
  * Mitmachen (P9) — was Zuschauer aus dem Chat heraus auslösen können.
  *
- * **Zwei von vier Punkten sind gebaut, und die Seite sagt das selbst.** Clip
+ * **Drei von vier Punkten sind gebaut, und die Seite sagt das selbst.** Clip
  * und Umfrage gehören Twitch: Wir lösen aus und lesen den Stand, gespeichert
- * wird nichts. Verlosung und Musikwunsch fehlen — nicht vergessen, sondern
- * gemessen und zurückgestellt; der Grund steht unten auf der Seite, nicht in
- * einer Fußnote.
+ * wird nichts. Die **Verlosung** gehört einem anderen Plugin — angelegt wird
+ * sie dort, hier steht nur, was davon im Chat ankommt; ein zweiter Ort zum
+ * Einstellen wäre eine zweite Wahrheit. Der **Musikwunsch** fehlt weiter, und
+ * sein Grund steht auf der Seite, nicht in einer Fußnote.
  *
  * Erwartet: bericht, ZUSTAND, STAND, vorWieLange, meldung, fehler
  */
@@ -49,7 +50,13 @@ const hinweis = (zustand) => ({
 const befehlSatz = (zeile) => {
   if (!zeile) return 'Noch nicht eingerichtet.';
   if (!zeile.aktiv) return 'Eingerichtet, aber abgeschaltet.';
-  return `An — für ${WER[zeile.wer] || zeile.wer}, Abkühlung ${zeile.abkuehlung_s} s.`;
+  // **Keine Abkühlung ist eine Aussage, keine Null.** `!los` steht bewusst auf
+  // 0, weil die Abkühlung je Befehl gilt und nicht je Zuschauer — „Abkühlung
+  // 0 s“ läse sich wie ein vergessenes Feld.
+  const wer = WER[zeile.wer] || zeile.wer;
+  return Number(zeile.abkuehlung_s) > 0
+    ? `An — für ${wer}, Abkühlung ${zeile.abkuehlung_s} s.`
+    : `An — für ${wer}, ohne Abkühlung.`;
 };
 
 const anteil = (a, gesamt) => (gesamt > 0 ? Math.round((a.stimmen / gesamt) * 100) : 0);
@@ -78,7 +85,7 @@ const befehlsseite = `/guild/${guildId}/plugins/streaming/befehle`;
       derselben Stelle: oben, bevor sie jemand stellt. %>
   <div class="col-12">
     <div class="erklaerkarte">
-      <h3>Beides gehört Twitch — wir lösen nur aus</h3>
+      <h3>Nichts davon gehört uns — wir lösen nur aus</h3>
       <p>
         Ein Clip liegt auf <b>Twitchs</b> Servern, eine Umfrage läuft in <b>Twitchs</b>
         Oberfläche. Wir schneiden nichts selbst und zählen keine Stimmen; wir schicken
@@ -88,6 +95,12 @@ const befehlsseite = `/guild/${guildId}/plugins/streaming/befehle`;
       <p>
         Deshalb steht hier auch <b>kein Verlauf</b> deiner Umfragen: Was du siehst, sind
         die letzten, die Twitch selbst noch führt.
+      </p>
+      <p>
+        Die <b>Verlosung</b> gehört dem Verlosungs-Plugin. Angelegt wird sie dort, samt
+        Preis, Dauer und Bedingungen; hier steht nur, was davon gerade im Chat ankommt.
+        Ein zweiter Ort zum Einstellen wäre eine zweite Wahrheit — und welche gälte,
+        entschiede die Reihenfolge des Klickens.
       </p>
     </div>
   </div>
@@ -383,34 +396,124 @@ const befehlsseite = `/guild/${guildId}/plugins/streaming/befehle`;
     <% } %>
   <% } %>
 
-  <%# ── Was hier bewusst NICHT steht ──────────────────────────────────────
-      Gemessen am 2026-09-05, nicht vermutet. Der Entwurf nennt vier Punkte;
-      zwei davon hängen an einem fremden Plugin, das um Discord herum gebaut
-      ist — dieselbe Form wie beim Chat-Schutz. %>
-  <div class="col-12">
-    <div class="card">
+  <%# ── Verlosung ─────────────────────────────────────────────────────────
+      Gebaut am 2026-09-07. Angelegt wird sie weiter im Verlosungs-Plugin;
+      diese Karte zeigt nur, was daraus im Chat ankommt — ein zweiter Ort zum
+      Einstellen wäre eine zweite Wahrheit. %>
+  <div class="col-12 col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <div class="kartenkopf">
+          <span class="kartensymbol"><i class="fa-solid fa-gift"></i></span>
+          <div class="kartenkopf__text">
+            <h3 class="kartenkopf__titel">Verlosung</h3>
+            <div class="kartenkopf__satz">
+              <code>!los</code> trägt einen Zuschauer in die laufende Verlosung ein.
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <% if (!bericht.verlosung.moeglich) { %>
+          <div class="zeilen">
+            <div class="zeile">
+              <div class="zeile__bez">Verlosungen</div>
+              <div>
+                <span class="chip">nicht eingerichtet</span>
+                <div class="zeile__hilfe">
+                  Dafür muss das Plugin <b>Verlosungen</b> für diesen Server aktiv sein.
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="mt-2">
+            <a href="/guild/<%= guildId %>/plugins" class="btn btn-outline-primary btn-sm">
+              <i class="fa-solid fa-plug me-1"></i> Plugins öffnen
+            </a>
+          </div>
+        <% } else { %>
+          <div class="zeilen">
+            <div class="zeile">
+              <div class="zeile__bez">Gerade offen</div>
+              <div>
+                <% if (bericht.verlosung.offen) { %>
+                  <b><%= bericht.verlosung.offen.preis %></b>
+                  <span class="chip ms-1"><%= bericht.verlosung.lose %>
+                    <%= bericht.verlosung.lose === 1 ? 'Los' : 'Lose' %> aus dem Chat</span>
+                  <% if ((bericht.verlosung.offen.bedingungen || []).length) { %>
+                    <div class="zeile__hilfe">
+                      Mit Bedingung — wer sie nicht erfüllt, bekommt im Chat den Grund gesagt.
+                    </div>
+                  <% } %>
+                <% } else { %>
+                  <span class="chip">keine</span>
+                  <div class="zeile__hilfe">
+                    Es läuft keine Verlosung, bei der im <b>Stream</b> mitgemacht werden kann.
+                    Der Weg wird beim Anlegen eingestellt.
+                  </div>
+                <% } %>
+              </div>
+            </div>
+            <div class="zeile">
+              <div class="zeile__bez">Der Befehl</div>
+              <div>
+                <%= befehlSatz(bericht.befehle.los) %>
+                <div class="zeile__hilfe">
+                  Eingerichtet wird er auf <a href="<%= befehlsseite %>">Meine Befehle</a>.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-2">
+            <a href="/guild/<%= guildId %>/plugins/giveaway" class="btn btn-outline-primary btn-sm">
+              <i class="fa-solid fa-gift me-1"></i> Verlosungen öffnen
+            </a>
+          </div>
+        <% } %>
+
+        <div class="text-secondary small mt-2">
+          <i class="fa-solid fa-circle-info me-1"></i>
+          Ein Zuschauer im Chat braucht <b>kein Discord-Konto</b>. Seine Lose liegen
+          getrennt von den Discord-Teilnehmern — er nimmt dort keinen Platz ein, für den
+          das System nicht gemacht ist. Gewinnt er, wird er <b>im Chat</b> genannt.
+          <code>!los</code> antwortet gesammelt, nicht bei jedem Klick: Sonst schriebe der
+          Bot bei fünfzig Zuschauern fünfzig Zeilen.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%# ── Musikwunsch: der letzte offene Punkt ──────────────────────────────
+      Er steht weiter hier, weil ein Streichen ihn vergessen ließe. Der Grund
+      ist ein anderer als bei der Verlosung — nicht die Verrohrung, sondern
+      eine Frage, die niemand beantwortet hat. %>
+  <div class="col-12 col-lg-6">
+    <div class="card h-100">
       <div class="card-header">
         <div class="kartenkopf">
           <span class="kartensymbol"><i class="fa-solid fa-hourglass-half"></i></span>
           <div class="kartenkopf__text">
-            <h3 class="kartenkopf__titel">Noch nicht dabei: Verlosung und Musikwunsch</h3>
-            <div class="kartenkopf__satz">Nicht vergessen — gemessen und zurückgestellt.</div>
+            <h3 class="kartenkopf__titel">Musikwunsch</h3>
+            <div class="kartenkopf__satz">Noch nicht dabei — und der Grund hat sich geändert.</div>
           </div>
         </div>
       </div>
       <div class="card-body">
         <p class="text-secondary mb-2">
-          Beides <b>gibt es schon</b> — für Discord. Es fehlt nicht die Funktion, sondern
-          der Chat als zweiter Eingang zu ihr. Und der ist teurer, als er aussieht:
+          Die Verlosung war bis zum 2026-09-07 mit demselben Satz hier gelistet: zu teuer,
+          weil <code>addEntry</code> über <code>guild.members.fetch</code> läuft. Das hat
+          sich als <b>halb falsch</b> herausgestellt — <code>checkRequirements</code>
+          steigt vorher aus, wenn eine Verlosung keine Bedingungen hat. Die Verrohrung
+          war also nie das Hindernis; sie steht jetzt links.
         </p>
-        <pre class="mb-2" style="white-space:pre-wrap"><code>GiveawayManager.addEntry(giveawayId, userId)   sieht nach reinen Kennungen aus
-  └─ checkRequirements()  Zeile 2:  guild.members.fetch(userId)
-                          Zeile 3:  if (!member) return 'member_not_found'</code></pre>
         <p class="text-secondary mb-0">
-          Ein Twitch-Zuschauer ohne Discord-Konto scheitert dort <b>nicht an einer Regel,
-          sondern an der Verrohrung</b> — bevor irgendeine Bedingung geprüft wird. Das ist
-          ein eigener Bauabschnitt, kein Anbau an diese Seite. Beim Musik-Plugin kommt
-          hinzu, dass „streamsichere Musik“ bisher <b>vollständig ungeprüft</b> ist.
+          Beim Musikwunsch ist es etwas anderes, und das lässt sich nicht wegbauen:
+          Ein Wunsch im Discord landet in einem <b>privaten Sprachkanal</b>, derselbe
+          Wunsch im Stream geht an ein Publikum. Ob das Musik-Plugin zwischen Quellen
+          unterscheiden kann, wie eine Positivliste gepflegt würde, ob es brauchbare
+          Quellen gibt — <b>ungeprüft ist bisher alles daran</b>. Das ist eine
+          Entscheidung, kein Bauschritt.
         </p>
       </div>
     </div>

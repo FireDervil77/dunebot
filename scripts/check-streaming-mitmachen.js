@@ -74,6 +74,7 @@ function neuAufsetzen(welche = {}) {
         : { ok: true, abgelehnt: false, umfrage: UMFRAGE_LAEUFT, grund: null };
     welt.art = welche.art !== undefined ? welche.art
         : { ok: true, abgelehnt: false, art: 'affiliate', grund: null };
+    welt.lose = welche.lose !== undefined ? welche.lose : 0;
 
     mitschrift.abfragen = []; mitschrift.schreibzugriffe = [];
     mitschrift.unbekannt = []; mitschrift.twitch = [];
@@ -93,6 +94,12 @@ ServiceManager.register('dbService', {
         if (/^(INSERT|UPDATE|DELETE|REPLACE)\b/i.test(s)) {
             mitschrift.schreibzugriffe.push({ sql: s, werte: w });
             return { affectedRows: 1 };
+        }
+
+        // Die Lose aus dem Chat - `verlosungsstand` zaehlt sie, sobald eine
+        // Verlosung offen ist.
+        if (/^SELECT COUNT\(\*\) AS n FROM streaming_lose/.test(s)) {
+            return [{ n: welt.lose }];
         }
 
         if (/^SELECT .* FROM streaming_streamers WHERE heim_guild_id/.test(s)) {
@@ -396,6 +403,18 @@ console.log('\nDer Befehlsstand kommt aus der Tabelle, nicht aus dem Code');
         JSON.stringify(b.befehle.clip));
     pruefe(b.befehle.umfrage === null,
         'und ein Befehl ohne Zeile heisst „noch nicht eingerichtet", nicht „an"');
+
+    // **`!los` muss im Stand auftauchen, obwohl er keine Zusage hat.**
+    // `befehlsstand` filterte bis zum 2026-09-07 auf `zusage` - also auf die
+    // Befehle, die bei Twitch etwas ausloesen. `!los` loest dort nichts aus,
+    // es haengt an einem anderen Plugin. Ohne `braucht` im Filter zeigte die
+    // Verlosungskarte dauerhaft „Noch nicht eingerichtet", egal was in der
+    // Tabelle steht - eine Karte, die ihren eigenen Befehl nicht kennt.
+    neuAufsetzen({ befehle: [{ wort: 'los', aktiv: 1, wer: 'alle', abkuehlung_s: 0 }] });
+    const c = await mitmachen.zustand('g1');
+    pruefe(c.befehle.los?.aktiv === true,
+        '`!los` steht im Befehlsstand, obwohl er keine Zusage braucht',
+        JSON.stringify(c.befehle.los));
 }
 
 console.log('\nDie Kanalart wird gelesen, nicht vermutet');
@@ -422,6 +441,50 @@ console.log('\nDie Kanalart wird gelesen, nicht vermutet');
     const d = await mitmachen.zustand('g1');
     pruefe(d.kanalArt === null,
         'ein Fehlschlag heisst „unbekannt", nicht „normal"', String(d.kanalArt));
+}
+
+console.log('\nDie Verlosung: „gibt es nicht" und „gerade keine" sind zwei Saetze');
+{
+    const { LosquellenRegistry } = require('dunebot-sdk');
+
+    // --- Kein Dienst: das Verlosungs-Plugin gibt es hier nicht ------------
+    neuAufsetzen({});
+    LosquellenRegistry.leeren();
+    let b = await mitmachen.zustand('g1');
+    pruefe(b.verlosung.moeglich === false,
+        'ohne eingetragenen Dienst gibt es hier keine Verlosungen');
+
+    // --- Dienst da, aber nichts offen -------------------------------------
+    neuAufsetzen({});
+    LosquellenRegistry.dienstSetzen({ offeneVerlosung: async () => null });
+    b = await mitmachen.zustand('g1');
+    pruefe(b.verlosung.moeglich === true && b.verlosung.offen === null,
+        'mit Dienst, aber ohne laufende: moeglich ja, offen nein',
+        JSON.stringify(b.verlosung));
+
+    // --- Eine laeuft ------------------------------------------------------
+    neuAufsetzen({ lose: 3 });
+    LosquellenRegistry.dienstSetzen({
+        offeneVerlosung: async () => ({ id: 7, preis: 'Ein Spiel', endet_am: new Date(), bedingungen: [] })
+    });
+    b = await mitmachen.zustand('g1');
+    pruefe(b.verlosung.offen?.preis === 'Ein Spiel', 'die laufende Verlosung wird genannt');
+    pruefe(b.verlosung.lose === 3, 'und ihre Lose aus dem Chat gezaehlt', String(b.verlosung.lose));
+
+    // --- Ein kaputtes Nachbarplugin ---------------------------------------
+    //
+    // **Die Seite darf davon nicht mitgerissen werden.** Sie zeigt Clip und
+    // Umfrage, die mit der Verlosung nichts zu tun haben; ein Wurf hier
+    // machte aus einer halben Auskunft gar keine.
+    neuAufsetzen({});
+    LosquellenRegistry.dienstSetzen({
+        offeneVerlosung: async () => { throw new Error('Verlosungs-Plugin kaputt'); }
+    });
+    b = await mitmachen.zustand('g1');
+    pruefe(b.verlosung.moeglich === false, 'ein werfender Dienst nimmt die Seite nicht mit');
+    pruefe(b.kanalArt !== undefined, 'und der Rest der Seite steht weiter');
+
+    LosquellenRegistry.leeren();
 }
 
 console.log('\nDie Attrappe hat alles verstanden');

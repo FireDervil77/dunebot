@@ -131,7 +131,11 @@ async function zustand(guildId) {
         befehle: {},
         // 'partner' | 'affiliate' | 'normal' | null (nicht feststellbar)
         kanalArt: null,
-        umfragen: { zustand: ZUSTAND.KEIN_KANAL, laufend: null, frueher: [] }
+        umfragen: { zustand: ZUSTAND.KEIN_KANAL, laufend: null, frueher: [] },
+
+        // Die Verlosung liegt in einem anderen Plugin; hier steht nur, ob es
+        // sie gibt und was gerade laeuft.
+        verlosung: { moeglich: false, offen: null, lose: 0 }
     };
 
     const { kanal, inhaber, mitSchluessel } = await kanalUndSchluessel(guildId);
@@ -154,6 +158,7 @@ async function zustand(guildId) {
     // zweiter Schalter fuer dieselbe Zeile waere eine zweite Wahrheit, und
     // welcher gilt, entschiede die Reihenfolge des Klickens.
     bericht.befehle = await befehlsstand(guildId, kanal ? kanal.id : null);
+    bericht.verlosung = await verlosungsstand(guildId);
 
     if (!kanal) return bericht;
     if (!inhaber) {
@@ -206,8 +211,14 @@ async function zustand(guildId) {
  * @returns {Promise<Object<string, Object|null>>} Je Wort eine Zeile oder null
  */
 async function befehlsstand(guildId, streamerId) {
-    const worte = Object.keys(require('./befehle').FERTIG)
-        .filter(w => require('./befehle').FERTIG[w].zusage);
+    // **Die Befehle, um die es auf dieser Seite geht.** Das waren bis zum
+    // 2026-09-07 die mit einer `zusage` - also die, die bei Twitch etwas
+    // ausloesen. `!los` loest bei Twitch nichts aus und braucht deshalb keine;
+    // es haengt an einem anderen Plugin. Ohne `braucht` in dieser Zeile waere
+    // die Verlosungskarte gebaut worden und haette den Zustand ihres eigenen
+    // Befehls nicht gekannt.
+    const FERTIG = require('./befehle').FERTIG;
+    const worte = Object.keys(FERTIG).filter(w => FERTIG[w].zusage || FERTIG[w].braucht);
 
     const zeilen = await ServiceManager.get('dbService').query(
         `SELECT wort, aktiv, wer, abkuehlung_s
@@ -359,6 +370,36 @@ const LOS_ANTWORT_ABSTAND_MS = 15_000;
 
 /** @type {Map<number, {letzteMs: number, neue: number}>} */
 const losTakt = new Map();
+
+/**
+ * Was diese Guild an Verlosungen hat.
+ *
+ * **Ohne Wissen ueber das andere Plugin.** Steht kein Dienst in der Registry,
+ * gibt es das Verlosungs-Plugin auf dieser Anlage nicht; liefert
+ * `offeneVerlosung` nichts, laeuft gerade keine, die den Stream-Weg zulaesst.
+ * Der Unterschied zwischen beidem ist das, was der Streamer hier lesen soll -
+ * „gibt es nicht" schickt ihn auf die Plugin-Seite, „gerade keine" nicht.
+ *
+ * @param {string} guildId Guild
+ * @returns {Promise<{moeglich: boolean, offen: Object|null, lose: number}>} Stand
+ */
+async function verlosungsstand(guildId) {
+    const { LosquellenRegistry } = require('dunebot-sdk');
+    const dienst = LosquellenRegistry.dienst();
+    if (!dienst) return { moeglich: false, offen: null, lose: 0 };
+
+    try {
+        const offen = await dienst.offeneVerlosung(guildId);
+        if (!offen) return { moeglich: true, offen: null, lose: 0 };
+
+        const lose = require('../../shared/lose');
+        return { moeglich: true, offen, lose: await lose.zaehlen(offen.id) };
+    } catch (err) {
+        // Ein kaputtes Nachbarplugin darf diese Seite nicht mitnehmen.
+        log().error('[Streaming/Mitmachen] Verlosung', err);
+        return { moeglich: false, offen: null, lose: 0 };
+    }
+}
 
 /**
  * Beim laufenden Gewinnspiel mitmachen.
