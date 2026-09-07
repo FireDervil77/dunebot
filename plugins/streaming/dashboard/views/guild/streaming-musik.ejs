@@ -52,6 +52,37 @@
           Der Ton kommt aus der Browserquelle — Discord wird dafür nicht gebraucht.
         </p>
 
+        <%#
+          Diese drei Häkchen stehen hier und nicht in einer Doku: Sie
+          entscheiden, ob überhaupt etwas zu hören ist, und man sieht ihnen
+          das nicht an. Ohne das erste läuft der Ton am Mixer vorbei; mit den
+          anderen beiden bricht die Wiedergabe bei jedem Szenenwechsel ab.
+        %>
+        <div class="mb-3">
+          <div class="fw-bold mb-1">Drei Häkchen in der OBS-Maske</div>
+          <ul class="mb-1">
+            <li>
+              <strong>„Audio über OBS steuern" → an.</strong>
+              Sonst geht der Ton direkt ans Desktop-Gerät, statt einen eigenen
+              Kanal im Audiomixer zu bekommen — ohne eigenen Regler und ohne
+              Stummschaltung.
+            </li>
+            <li>
+              <strong>„Quelle beenden, wenn nicht sichtbar" → aus.</strong>
+              Sonst hört die Musik bei jedem Szenenwechsel auf und der Titel
+              beginnt danach von vorn.
+            </li>
+            <li>
+              <strong>„Browser aktualisieren, wenn Szene aktiv wird" → aus.</strong>
+              Dasselbe Ergebnis auf anderem Weg.
+            </li>
+          </ul>
+          <div class="text-secondary">
+            Die Lautstärke regelst du danach im Audiomixer — dort liegt die
+            Quelle als eigener Kanal neben Mikrofon und Spiel.
+          </div>
+        </div>
+
         <div class="input-group mb-2">
           <input type="text" class="form-control font-monospace" id="musik-adresse"
                  value="<%= adresse %>" readonly>
