@@ -80,31 +80,6 @@ const befehlsseite = `/guild/${guildId}/plugins/streaming/befehle`;
 
 <div class="row row-cards">
 
-  <%# ── Woher das kommt und was hier bleibt ───────────────────────────────
-      Dieselbe Frage wie auf der Statistik-Seite, deshalb dieselbe Antwort an
-      derselben Stelle: oben, bevor sie jemand stellt. %>
-  <div class="col-12">
-    <div class="erklaerkarte">
-      <h3>Nichts davon gehört uns — wir lösen nur aus</h3>
-      <p>
-        Ein Clip liegt auf <b>Twitchs</b> Servern, eine Umfrage läuft in <b>Twitchs</b>
-        Oberfläche. Wir schneiden nichts selbst und zählen keine Stimmen; wir schicken
-        den Auftrag und lesen den Stand. <b>Gespeichert wird davon nichts</b> — schließt
-        du die Seite, ist nichts davon bei uns geblieben.
-      </p>
-      <p>
-        Deshalb steht hier auch <b>kein Verlauf</b> deiner Umfragen: Was du siehst, sind
-        die letzten, die Twitch selbst noch führt.
-      </p>
-      <p>
-        Die <b>Verlosung</b> gehört dem Verlosungs-Plugin. Angelegt wird sie dort, samt
-        Preis, Dauer und Bedingungen; hier steht nur, was davon gerade im Chat ankommt.
-        Ein zweiter Ort zum Einstellen wäre eine zweite Wahrheit — und welche gälte,
-        entschiede die Reihenfolge des Klickens.
-      </p>
-    </div>
-  </div>
-
   <%# ── Clip ──────────────────────────────────────────────────────────────── %>
   <div class="col-12 col-lg-6">
     <div class="card h-100">
@@ -516,6 +491,40 @@ const befehlsseite = `/guild/${guildId}/plugins/streaming/befehle`;
           Entscheidung, kein Bauschritt.
         </p>
       </div>
+    </div>
+  </div>
+
+  <%# ── Woher das kommt und was hier bleibt ───────────────────────────────
+      **Steht bewusst UNTEN, seit dem 2026-09-07.** Auf der Statistik-Seite
+      steht dieselbe Antwort oben, und das war hier zuerst auch so. Der
+      Betreiber hat es umgedreht, mit dem Einwand im Gepäck: „ja ich verstehe
+      deinen einwand. drunter wird meistens überlesen. aber zieht das Design
+      unschön auseinander."
+
+      Der Unterschied zur Statistik-Seite ist die Zahl der Karten. Dort steht
+      der Text vor EINER Fläche und führt in sie hinein; hier drängt er sich
+      zwischen Kopf und vier Karten und schiebt das Raster nach unten, bevor
+      irgendetwas Bedienbares zu sehen ist. Eine Erklärung, für die man erst
+      scrollen muss, ist teurer als eine, die man überliest. %>
+  <div class="col-12">
+    <div class="erklaerkarte">
+      <h3>Nichts davon gehört uns — wir lösen nur aus</h3>
+      <p>
+        Ein Clip liegt auf <b>Twitchs</b> Servern, eine Umfrage läuft in <b>Twitchs</b>
+        Oberfläche. Wir schneiden nichts selbst und zählen keine Stimmen; wir schicken
+        den Auftrag und lesen den Stand. <b>Gespeichert wird davon nichts</b> — schließt
+        du die Seite, ist nichts davon bei uns geblieben.
+      </p>
+      <p>
+        Deshalb steht hier auch <b>kein Verlauf</b> deiner Umfragen: Was du siehst, sind
+        die letzten, die Twitch selbst noch führt.
+      </p>
+      <p>
+        Die <b>Verlosung</b> gehört dem Verlosungs-Plugin. Angelegt wird sie dort, samt
+        Preis, Dauer und Bedingungen; hier steht nur, was davon gerade im Chat ankommt.
+        Ein zweiter Ort zum Einstellen wäre eine zweite Wahrheit — und welche gälte,
+        entschiede die Reihenfolge des Klickens.
+      </p>
     </div>
   </div>
 
