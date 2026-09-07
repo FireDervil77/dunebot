@@ -136,7 +136,8 @@
           <% } %>
         </div>
 
-        <form method="post" action="/guild/<%= guildId %>/plugins/streaming/musik/abspielen">
+        <form method="post" action="/guild/<%= guildId %>/plugins/streaming/musik/abspielen"
+              class="mb-3">
           <input type="hidden" name="an" value="<%= aktiv ? '0' : '1' %>">
           <button class="btn <%= aktiv ? 'btn-outline-secondary' : 'btn-primary' %>" type="submit">
             <i class="fa-solid <%= aktiv ? 'fa-pause' : 'fa-play' %> me-1"></i>
@@ -145,6 +146,30 @@
           <span class="text-secondary ms-2">
             <%= aktiv ? 'Wiedergabe ist an.' : 'Wiedergabe ist angehalten.' %>
           </span>
+        </form>
+
+        <%#
+          An/Aus, also ein Schalter und kein Kästchen — Hausregel.
+          Er schickt sich selbst ab: Ein Schalter, neben dem noch ein
+          Speichern-Knopf steht, lässt offen, ob er schon gilt.
+        %>
+        <form method="post" action="/guild/<%= guildId %>/plugins/streaming/musik/endlos"
+              id="endlos-form">
+          <input type="hidden" name="an" value="<%= endlos ? '0' : '1' %>">
+          <label class="form-check form-switch mb-1">
+            <input class="form-check-input" type="checkbox" <%= endlos ? 'checked' : '' %>
+                   onchange="document.getElementById('endlos-form').submit();">
+            <span class="form-check-label">Endlos weiterspielen</span>
+          </label>
+          <div class="form-hint">
+            <% if (endlos) { %>
+              Ist die Warteschlange leer, läuft ein zufälliger freigegebener
+              Titel weiter — nicht zweimal derselbe hintereinander.
+            <% } else { %>
+              Es läuft nur, was jemand mit <code>!request</code> wünscht.
+              Danach ist Stille.
+            <% } %>
+          </div>
         </form>
       </div>
     </div>

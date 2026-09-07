@@ -351,6 +351,53 @@ async function abspielen(guildId, an) {
 }
 
 /**
+ * Einen Titel aus der Ablage nachlegen, wenn niemand etwas wuenscht.
+ *
+ * **Nur im Endlosmodus**, und nur aus derselben freigegebenen Ablage, aus der
+ * auch `!request` sucht - ein zweiter Weg an `fuerStream()` vorbei waere genau
+ * das Loch, gegen das die ganze Ablage gebaut ist.
+ *
+ * **Zufaellig, aber nicht derselbe wie eben.** Bei sechs Titeln trifft reiner
+ * Zufall im Schnitt jeden sechsten Griff denselben - und zweimal hintereinander
+ * dasselbe Lied klingt nach Fehler, nicht nach Zufall. Bei nur einem
+ * freigegebenen Titel bleibt es zwangslaeufig derselbe; dann ist die
+ * Wiederholung die einzige moegliche Antwort und keine Panne.
+ *
+ * `gewuenscht_von` bleibt NULL: Das hat niemand gewuenscht, und ein erfundener
+ * Name waere eine Behauptung ueber eine Person.
+ *
+ * @param {string} guildId Guild
+ * @param {number|null} nichtDatei Datei, die gerade lief
+ * @returns {Promise<boolean>} true, wenn etwas nachgelegt wurde
+ */
+async function nachlegen(guildId, nichtDatei) {
+    const quelle = ablage();
+    if (!quelle) return false;
+
+    const alle = await quelle.suchen(guildId, null);
+    if (!alle.length) return false;
+
+    const auswahl = alle.length > 1 && nichtDatei
+        ? alle.filter(t => String(t.id) !== String(nichtDatei))
+        : alle;
+    const stueck = auswahl[Math.floor(Math.random() * auswahl.length)];
+    if (!stueck) return false;
+
+    const naechste = await db().query(
+        'SELECT COALESCE(MAX(position), 0) + 1 AS pos FROM streaming_music_queue WHERE guild_id = ?',
+        [guildId]);
+
+    await db().query(
+        `INSERT INTO streaming_music_queue
+            (guild_id, streamer_id, datei_id, titel, dauer_sek, position, gewuenscht_von)
+         VALUES (?, NULL, ?, ?, ?, ?, NULL)`,
+        [guildId, stueck.id, stueck.titel, stueck.dauerSek || null,
+         Number(naechste?.[0]?.pos || 1)]);
+
+    return true;
+}
+
+/**
  * Wie weit ist der laufende Titel schon?
  *
  * **Damit ein Szenenwechsel den Titel nicht von vorn anfangen laesst.** OBS
@@ -438,9 +485,25 @@ async function naechster(guildId, wie = {}) {
         // Nicht mehr lieferbar - dann gilt dasselbe wie beim Weiterruecken.
     }
 
+    // Was gerade lief - damit der Endlosmodus nicht zweimal dasselbe nachlegt.
+    const vorher = await aktueller(guildId);
+
     let uebersprungen = 0;
+    let nachgelegt = false;
     for (let versuch = 0; versuch < 25; versuch++) {
-        const e = await springen(guildId, +1);
+        let e = await springen(guildId, +1);
+
+        // **Endlosmodus: einmal nachlegen, dann noch einmal versuchen.**
+        // Einmal je Aufruf und nicht in der Schleife - sonst fuellte ein
+        // Ablauf, in dem nichts abspielbar ist, die Warteschlange in einem
+        // Rutsch mit 25 Zeilen.
+        if (!e.ok && z.endlos && !nachgelegt) {
+            nachgelegt = true;
+            if (await nachlegen(guildId, vorher?.datei_id || null)) {
+                e = await springen(guildId, +1);
+            }
+        }
+
         if (!e.ok) return { spielen: false, grund: 'nichts_mehr', uebersprungen };
 
         const zeile = await aktueller(guildId);
@@ -468,6 +531,21 @@ async function naechster(guildId, wie = {}) {
     log().error(`[Streaming] 25 Musikwuensche in Folge nicht lieferbar (Guild ${guildId}) - `
               + 'die Warteschlange zeigt auf Dateien, die es nicht mehr gibt.');
     return { spielen: false, grund: 'nur_tote_zeilen', uebersprungen };
+}
+
+/**
+ * Den Endlosmodus schalten.
+ *
+ * @param {string} guildId Guild
+ * @param {boolean} an true = weiterspielen, wenn niemand wuenscht
+ * @returns {Promise<boolean>} Der neue Stand
+ */
+async function endlosSchalten(guildId, an) {
+    await zustand(guildId);
+    await db().query(
+        'UPDATE streaming_music_state SET endlos = ? WHERE guild_id = ?',
+        [an ? 1 : 0, guildId]);
+    return Boolean(an);
 }
 
 /**
@@ -561,7 +639,7 @@ function stimmeAbgeben(guildId, absenderId) {
 module.exports = {
     zustand, schluesselNeu, guildZuSchluessel, playerGesehen,
     warteschlange, aktueller, wuenschen, springen, leeren, aufraeumen,
-    abspielen, naechster,
+    abspielen, naechster, nachlegen, endlosSchalten,
     stimmeAbgeben, stimmenVergessen,
     ablage,
     AUFBEWAHRUNG_TAGE, NOETIGE_STIMMEN

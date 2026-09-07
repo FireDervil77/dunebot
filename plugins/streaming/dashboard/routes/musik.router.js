@@ -88,6 +88,7 @@ router.get('/', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => 
             tr, guildId,
             adresse: playerAdresse(req, zustand.schluessel),
             aktiv: Boolean(zustand.aktiv),
+            endlos: Boolean(zustand.endlos),
             player: playerStand(zustand.player_gesehen),
             laeuft, offen, freigegeben,
             hatAblage: Boolean(ablage),
@@ -132,6 +133,29 @@ router.post('/abspielen', requirePermission('STREAMING.CHAT.MANAGE'), async (req
         return res.redirect(`${basis}?ok=${encodeURIComponent(an ? 'Läuft.' : 'Angehalten.')}`);
     } catch (error) {
         ServiceManager.get('Logger').error('[Streaming] Wiedergabe nicht schaltbar:', error);
+        return res.redirect(`${basis}?fehler=${encodeURIComponent('Das hat nicht geklappt.')}`);
+    }
+});
+
+/**
+ * Den Endlosmodus schalten.
+ *
+ * Bewusst **nur hier und nicht im Chat**: Ob ungefragt Musik laeuft, ist eine
+ * Entscheidung des Streamers ueber seinen Stream, kein Griff, den ein
+ * Moderator zwischendurch tut.
+ */
+router.post('/endlos', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const basis = `/guild/${guildId}/plugins/streaming/musik`;
+
+    try {
+        const an = req.body?.an === '1';
+        await musik.endlosSchalten(guildId, an);
+        return res.redirect(`${basis}?ok=${encodeURIComponent(
+            an ? 'Endlos an — es läuft weiter, auch ohne Wünsche.'
+               : 'Endlos aus — es läuft nur noch, was gewünscht wird.')}`);
+    } catch (error) {
+        ServiceManager.get('Logger').error('[Streaming] Endlosmodus nicht schaltbar:', error);
         return res.redirect(`${basis}?fehler=${encodeURIComponent('Das hat nicht geklappt.')}`);
     }
 });
