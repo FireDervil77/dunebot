@@ -131,6 +131,77 @@ function nennung(los) {
     return los.name || String(los.kennung);
 }
 
+// ---------------------------------------------------------------------------
+// Die Gegenrichtung: wer haelt ueberhaupt Verlosungen?
+// ---------------------------------------------------------------------------
+
+/**
+ * Bis hierher ging es nur um die Ziehung: Das Verlosungs-Plugin fragt, wer ihm
+ * Lose liefert. Der Weg **hinein** braucht die andere Richtung - `!los` im
+ * Twitch-Chat muss wissen, welche Verlosung gerade offen ist.
+ *
+ * Der naheliegende Weg waere gewesen, dass das Streaming-Plugin `giveaways`
+ * abfragt. Das waere eine fremde Tabelle: Ihr Aufbau gehoert einem anderen
+ * Plugin, ihre Kollation muss nicht zur eigenen passen, und ohne das Plugin
+ * gibt es sie gar nicht.
+ *
+ * Stattdessen traegt das Verlosungs-Plugin **sich selbst** hier ein. Damit
+ * beantwortet die Registry nebenbei die Frage, die dieses ganze Vorhaben
+ * ausgeloest hat: **Ist das andere Plugin da?** Ist es geladen, steht der
+ * Dienst hier. Ist es das nicht, steht hier nichts - und das ist die Antwort,
+ * ohne dass jemand einen Namen raten muss.
+ *
+ * Ob es fuer **diese Guild** eingeschaltet ist, weiss der Dienst selbst am
+ * besten; er prueft es in `offeneVerlosung`.
+ */
+
+/**
+ * @typedef {Object} Verlosungsdienst
+ * @property {Function} offeneVerlosung async (guildId) => {id, preis, endet_am}|null
+ */
+
+/** @type {Verlosungsdienst|null} */
+let dienstEintrag = null;
+
+/**
+ * Den Verlosungsdienst eintragen.
+ *
+ * @param {Verlosungsdienst} dienst Der Dienst
+ * @returns {boolean} true, wenn eingetragen
+ */
+function dienstSetzen(dienst) {
+    if (typeof dienst?.offeneVerlosung !== 'function') {
+        throw new Error('LosquellenRegistry: Verlosungsdienst ohne "offeneVerlosung"');
+    }
+    dienstEintrag = dienst;
+    return true;
+}
+
+/**
+ * Den Dienst wieder herausnehmen - beim Abschalten des Plugins.
+ *
+ * **Ohne das waere der Eintrag eine Behauptung.** Er sagt "es gibt hier
+ * Verlosungen"; bleibt er nach dem Abschalten stehen, fragt das Streaming-
+ * Plugin weiter nach und bekommt jedes Mal `null` - also dieselbe Antwort wie
+ * bei einer Guild ohne laufende Verlosung. Der Unterschied zwischen "gerade
+ * keine" und "gibt es hier gar nicht" waere weg, und der Zuschauer bekaeme im
+ * Chat den falschen Satz.
+ *
+ * @returns {boolean} true, wenn etwas entfernt wurde
+ */
+function dienstEntfernen() {
+    const hatte = dienstEintrag !== null;
+    dienstEintrag = null;
+    return hatte;
+}
+
+/**
+ * @returns {Verlosungsdienst|null} der Dienst, oder null wenn es keinen gibt
+ */
+function dienst() {
+    return dienstEintrag;
+}
+
 /**
  * Alles vergessen. Nur fuer Tests.
  *
@@ -138,6 +209,10 @@ function nennung(los) {
  */
 function leeren() {
     quellen.clear();
+    dienstEintrag = null;
 }
 
-module.exports = { register, unregister, get, list, nennung, leeren, NAME_MUSTER, EIGEN };
+module.exports = {
+    register, unregister, get, list, nennung, leeren, NAME_MUSTER, EIGEN,
+    dienstSetzen, dienstEntfernen, dienst
+};

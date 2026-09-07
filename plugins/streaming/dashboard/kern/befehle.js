@@ -134,8 +134,104 @@ const FERTIG = {
             const stimmen = u.antworten.map(a => `${a.titel}: ${a.stimmen}`).join(' · ');
             return `${u.frage} — ${stimmen} (${u.gesamt} Stimmen)`;
         }
+    },
+
+    // **Der erste Befehl, der ein anderes Plugin braucht** (2026-09-07).
+    //
+    // `abkuehlung_s: 0` ist hier kein Versehen. Die Abkuehlung gilt je
+    // Befehlszeile und nicht je Zuschauer - fuenf Sekunden hiessen: ein
+    // Zuschauer alle fuenf Sekunden kommt herein, alle anderen nicht, und
+    // niemand merkt warum. Gebuendelt wird stattdessen die **Antwort**, in
+    // `mitmachen.losZiehen`.
+    //
+    // Kein `zusage`: `!los` loest bei Twitch nichts aus, es schreibt nur in
+    // den Chat - und das kann der Kanal ohnehin, sonst gaebe es hier gar
+    // keine Befehle.
+    los: {
+        beschreibung: 'Beim laufenden Gewinnspiel mitmachen.',
+        wer: 'alle',
+        abkuehlung_s: 0,
+        braucht: { plugin: 'giveaway', name: 'Verlosungen' },
+        tun: (k) => require('./mitmachen').losZiehen(k)
     }
 };
+
+/**
+ * Braucht dieser Befehl ein anderes Plugin, und ist es da?
+ *
+ * **Eine Funktion, zwei Aufrufer** - und das ist der ganze Zweck. Die
+ * Befehlsseite fragt sie, um den Schalter auszugrauen; der Auswerter fragt sie,
+ * bevor er den Befehl ausfuehrt. Ohne den zweiten Aufrufer gaebe es eine
+ * Luecke, die niemand sieht: Wer `!los` einschaltet, waehrend das
+ * Verlosungs-Plugin an ist, und es danach abschaltet, haette einen aktiven
+ * Befehl, der in ein Plugin greift, das es nicht mehr gibt. `aktiv = 1` in
+ * `streaming_commands` weiss davon nichts.
+ *
+ * Bewusst **kein** Haken im anderen Plugin, der hier aufraeumt: Das
+ * Verlosungs-Plugin darf den Namen "streaming" nicht kennen. Nachsehen statt
+ * benachrichtigen laesst die Abhaengigkeit in die richtige Richtung zeigen.
+ *
+ * @param {string} guildId Guild
+ * @param {string} wort Befehlswort
+ * @returns {Promise<{ok: boolean, grund: string|null, braucht: Object|null}>} Stand
+ */
+async function verfuegbar(guildId, wort) {
+    const braucht = FERTIG[wort]?.braucht || null;
+    if (!braucht) return { ok: true, grund: null, braucht: null };
+
+    // **`has` und nicht `get`.** `ServiceManager.get` wirft bei einem
+    // unbekannten Dienst (`ServiceManager.js:24`), es gibt kein `null` zurueck
+    // - ein `if (!dienst)` dahinter waere toter Code, und der Wurf landete auf
+    // der Befehlsseite als Fehlerseite. Genau so stand es hier im ersten
+    // Entwurf.
+    if (!ServiceManager.has('pluginManager')) {
+        // Ohne Auskunft nicht raten. "Verfuegbar" waere die bequeme Annahme
+        // und die falsche: Der Befehl liefe dann ins Leere.
+        return { ok: false, grund: `${braucht.name} lassen sich gerade nicht pruefen.`, braucht };
+    }
+    const pluginManager = ServiceManager.get('pluginManager');
+
+    const an = await pluginManager.isPluginEnabledForGuild(braucht.plugin, guildId);
+    return an
+        ? { ok: true, grund: null, braucht }
+        : { ok: false, grund: `Dafür muss das Plugin „${braucht.name}" aktiv sein.`, braucht };
+}
+
+/**
+ * Der Stand aller eingebauten Befehle, die etwas brauchen.
+ *
+ * @param {string} guildId Guild
+ * @returns {Promise<Object>} Wort -> Stand
+ */
+async function verfuegbarkeiten(guildId) {
+    const stand = {};
+    for (const wort of Object.keys(FERTIG)) {
+        stand[wort] = await verfuegbar(guildId, wort);
+    }
+    return stand;
+}
+
+/**
+ * Die Abkuehlung, mit der ein fertiger Befehl in die Welt kommt.
+ *
+ * **`|| 5` verschluckt eine gewollte 0.** Genau so stand es hier bis zum
+ * 2026-09-07: `Number(vorgabe.abkuehlung_s) || 5`. `!los` traegt `0`, weil die
+ * Abkuehlung je Befehlszeile gilt und nicht je Zuschauer - fuenf Sekunden
+ * hiessen, dass bei einem Gewinnspiel ein Zuschauer alle fuenf Sekunden
+ * hereinkommt und alle anderen nicht. Der Anfangswert wird nur beim ersten
+ * Anschalten geschrieben; er waere also nie wieder korrigiert worden.
+ *
+ * Gefunden hat das der Waechter, nicht ich: Der Befehl war richtig erklaert
+ * und wurde falsch angelegt.
+ *
+ * @param {Object} vorgabe Eintrag aus FERTIG
+ * @returns {number} Sekunden
+ */
+function anfangsAbkuehlung(vorgabe) {
+    const roh = Number(vorgabe?.abkuehlung_s);
+    const wert = Number.isFinite(roh) ? roh : 5;
+    return Math.max(0, Math.min(3600, wert));
+}
 
 /**
  * Die Antwort eines fertigen Befehls holen.
@@ -151,6 +247,16 @@ const FERTIG = {
 async function fertigAntwort(wort, k) {
     const eintrag = FERTIG[wort];
     if (!eintrag) return null;
+
+    if (eintrag.braucht) {
+        const stand = await verfuegbar(k.streamerZeile?.heim_guild_id, wort);
+        if (!stand.ok) {
+            // Der Zuschauer bekommt einen Satz, keine Stille: Ein Befehl, der
+            // in der Liste steht und schweigt, sieht aus wie ein kaputter Bot.
+            return `${eintrag.braucht.name} sind hier gerade nicht eingerichtet.`;
+        }
+    }
+
     if (!eintrag.tun) return eintrag.antwort(k);
 
     try {
@@ -479,6 +585,14 @@ async function auswerten(kanal) {
 
         streamer: streamer.anzeigename || streamer.login,
         absender: kanal.absender,
+
+        // **Die Kennung, nicht nur der Name.** Ein Anzeigename bei Twitch ist
+        // aenderbar; wer sein Los daran haengt, verliert es beim naechsten
+        // Namenswechsel. `istAbonnent` kommt aus den Abzeichen der Nachricht
+        // selbst - dafuer braucht es keine Abfrage.
+        absenderId: kanal.absenderId,
+        istAbonnent: Boolean(kanal.istAbonnent),
+
         live: Boolean(streamer.ist_live),
         titel: streamer.titel,
         kategorie: streamer.kategorie,
@@ -699,6 +813,16 @@ async function entfernen(id, guildId) {
  * @returns {Promise<void>}
  */
 async function fertigSetzen(guildId, streamerId, gewaehlt, wer = {}) {
+    // **Was nicht da ist, laesst sich nicht einschalten.** Der Schalter ist auf
+    // der Seite schon ausgegraut; das hier ist die Stelle, die es auch dann
+    // haelt, wenn jemand das Formular selbst zusammensetzt.
+    const erlaubt = [];
+    for (const wort of gewaehlt || []) {
+        const stand = await verfuegbar(guildId, wort);
+        if (stand.ok) erlaubt.push(wort);
+    }
+    gewaehlt = erlaubt;
+
     const will = new Set((gewaehlt || []).filter(w => FERTIG[w]));
 
     for (const wort of Object.keys(FERTIG)) {
@@ -724,7 +848,7 @@ async function fertigSetzen(guildId, streamerId, gewaehlt, wer = {}) {
              ON DUPLICATE KEY UPDATE aktiv = VALUES(aktiv), art = 'fertig'${gewuenscht ? ', wer = VALUES(wer)' : ''}`,
             [guildId, streamerId, wort, an,
              gewuenscht || (RANG[vorgabe.wer] === undefined ? 'alle' : vorgabe.wer),
-             Math.max(0, Math.min(3600, Number(vorgabe.abkuehlung_s) || 5))]);
+             anfangsAbkuehlung(vorgabe)]);
     }
 }
 
@@ -732,5 +856,5 @@ module.exports = {
     PRAEFIX, FERTIG, RANG, PLATZHALTER,
     alleFuerGuild, anlegen, aendern, entfernen, fertigSetzen,
     zerlegen, darf, fuellen, dauerText, fertigAntwort,
-    befehleFuer, auswerten
+    befehleFuer, auswerten, verfuegbar, verfuegbarkeiten
 };

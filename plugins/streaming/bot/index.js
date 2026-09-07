@@ -35,6 +35,12 @@ class StreamingBotPlugin extends BotPlugin {
      * @param {Object} client Discord-Client
      */
     async onEnable(client) {
+        // **Hier haengt sich Twitch an die Verlosung.** Die Ziehung laeuft im
+        // Bot, also muss der Eintrag im Bot stehen. Das Verlosungs-Plugin
+        // erfaehrt dadurch nie den Namen "streaming" - es fragt nur, wer ihm
+        // Lose liefert. Ist dieses Plugin aus, fragt es ins Leere und zieht
+        // wie eh und je.
+        require('../shared/lose').anmelden();
         ServiceManager.get('Logger').success('[Streaming] Bot-Plugin aktiviert');
     }
 
@@ -42,6 +48,10 @@ class StreamingBotPlugin extends BotPlugin {
      * @param {Object} client Discord-Client
      */
     async onDisable(client) {
+        // Der Eintrag muss weg. Bliebe er stehen, zoege die Verlosung weiter
+        // Lose aus einem Plugin, das gar nicht mehr laeuft - und der Gewinner
+        // erfuehre nie davon, weil niemand mehr in den Chat schreibt.
+        require('../shared/lose').abmelden();
         ServiceManager.get('Logger').info('[Streaming] Bot-Plugin deaktiviert');
     }
 }

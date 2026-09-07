@@ -527,14 +527,15 @@ async function befehlsSeite(req, res, meldung, fehler) {
         return res.redirect(`/guild/${guildId}/plugins/streaming`);
     }
 
-    const [zeilen, kanaele, bausteine] = await Promise.all([
+    const [zeilen, kanaele, bausteine, verfuegbar] = await Promise.all([
         befehlsModul().alleFuerGuild(guildId),
         heimguild.kanaeleDerGuild(guildId),
-        require('../kern/bausteine').alleFuerGuild(guildId)
+        require('../kern/bausteine').alleFuerGuild(guildId),
+        befehlsModul().verfuegbarkeiten(guildId)
     ]);
 
     await renderView(res, 'guild/streaming-befehle', {
-        tr, guildId, kanaele, bausteine,
+        tr, guildId, kanaele, bausteine, verfuegbar,
         eigene: zeilen.filter(z => z.art !== 'fertig'),
         fertigZeilen: zeilen.filter(z => z.art === 'fertig'),
         FERTIG: befehlsModul().FERTIG,

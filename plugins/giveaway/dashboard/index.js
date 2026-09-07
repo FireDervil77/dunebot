@@ -8,7 +8,7 @@
  * @author FireBot Team
  */
 
-const { DashboardPlugin, VersionHelper } = require('dunebot-sdk');
+const { DashboardPlugin, VersionHelper, LosquellenRegistry } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
 
 class GiveawayDashboardPlugin extends DashboardPlugin {
@@ -41,6 +41,11 @@ class GiveawayDashboardPlugin extends DashboardPlugin {
         this.app = app;
         this._registerAssets();
         this._setupRoutes();
+
+        // **Hier wird das Plugin fuer andere sichtbar.** Steht dieser Eintrag,
+        // gibt es Verlosungen auf dieser Anlage; steht er nicht, gibt es keine
+        // - und wer fragt, braucht dafuer keinen Plugin-Namen zu raten.
+        LosquellenRegistry.dienstSetzen(require('./verlosungsdienst'));
 
         Logger.success('[Giveaway] Dashboard-Plugin aktiviert');
         return true;
@@ -92,6 +97,10 @@ class GiveawayDashboardPlugin extends DashboardPlugin {
     }
 
     async onDisable() {
+        // Der Eintrag muss weg, sonst behauptet die Registry weiter, es gaebe
+        // hier Verlosungen - und der Chat antwortete "gerade keine offen"
+        // statt "gibt es hier nicht".
+        LosquellenRegistry.dienstEntfernen();
         ServiceManager.get('Logger').info('[Giveaway] Dashboard-Plugin deaktiviert');
         return true;
     }

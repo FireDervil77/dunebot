@@ -46,7 +46,7 @@ function spaltenAus(sql) {
 }
 
 // --- Attrappen -----------------------------------------------------------
-const daten = { streamer: [], befehle: [], bausteine: [] };
+const daten = { streamer: [], befehle: [], bausteine: [], lose: new Map() };
 const mitschrift = { schreibzugriffe: [], gesendet: [], unbekannt: [], bausteinAbfragen: 0,
                      clips: [], umfrageAbfragen: [] };
 
@@ -57,6 +57,10 @@ const mitschrift = { schreibzugriffe: [], gesendet: [], unbekannt: [], bausteinA
  * `welt` ist die Gegenseite.
  */
 const welt = {
+    // Was das Verlosungs-Plugin sagt. `null` heisst "keine offen"; ist
+    // `plugin` false, gibt es das Plugin fuer diese Guild gar nicht.
+    verlosung: { plugin: true, offen: null },
+
     clip: { ok: true, abgelehnt: false, id: 'ClipX', url: 'https://clips.twitch.tv/ClipX', grund: null },
     umfragen: { ok: true, abgelehnt: false, umfragen: [], grund: null }
 };
@@ -77,6 +81,21 @@ ServiceManager.register('Logger', {
 ServiceManager.register('dbService', {
     async query(sql, w = []) {
         const s = String(sql).replace(/\s+/g, ' ').trim();
+
+        // --- Lose aus dem Chat (2026-09-07) --------------------------------
+        if (/^INSERT INTO streaming_lose/.test(s)) {
+            const schluessel = `${w[0]}|${w[3]}`;
+            if (daten.lose.has(schluessel)) {
+                const e = new Error('Duplicate entry');
+                e.code = 'ER_DUP_ENTRY';
+                throw e;
+            }
+            daten.lose.set(schluessel, { verlosung_id: w[0], guild_id: w[1], streamer_id: w[2], konto_id: w[3], konto_name: w[4] });
+            return { affectedRows: 1 };
+        }
+        if (/^SELECT COUNT\(\*\) AS n FROM streaming_lose/.test(s)) {
+            return [{ n: [...daten.lose.values()].filter(l => String(l.verlosung_id) === String(w[0])).length }];
+        }
 
         if (/^SELECT .* FROM streaming_streamers s\b/.test(s)) {
             // **Die Attrappe gibt zurueck, was die Abfrage erfragt — nicht,
@@ -953,6 +972,135 @@ console.log('\nZaehlen und Anzeigen sind zwei Befehle — und das reicht');
     await befehle.auswerten(nachricht('!tot'));
     pruefe(zahl() === 2, 'ein gewoehnlicher Zuschauer setzt den Zaehler nicht hoch',
         String(zahl()));
+}
+
+console.log('\n!los braucht ein anderes Plugin — und sagt das');
+{
+    const { LosquellenRegistry } = require('dunebot-sdk');
+    ServiceManager.register('pluginManager', {
+        isPluginEnabledForGuild: async () => welt.verlosung.plugin
+    });
+
+    daten.befehle.length = 0;
+    daten.befehle.push({ id: 90, guild_id: 'g1', streamer_id: null, wort: 'los',
+                         art: 'fertig', antwort: null, wer: 'alle', abkuehlung_s: 0, aktiv: 1 });
+
+    // --- Das Plugin ist fuer diese Guild aus ---------------------------
+    welt.verlosung.plugin = false;
+    LosquellenRegistry.leeren();
+    mitschrift.gesendet.length = 0;
+    await befehle.auswerten(nachricht('!los'));
+    pruefe(/nicht eingerichtet/.test(mitschrift.gesendet.at(-1)?.text || ''),
+        'ist das Plugin aus, sagt der Chat das — statt zu schweigen',
+        mitschrift.gesendet.at(-1)?.text);
+
+    const stand = await befehle.verfuegbarkeiten('g1');
+    pruefe(stand.los.ok === false, 'und der Schalter auf der Seite ist aus');
+    pruefe(stand.uptime.ok === true, 'Befehle ohne Abhaengigkeit bleiben davon unberuehrt');
+
+    // Einschalten darf man ihn dann auch nicht — auch nicht am Formular vorbei.
+    //
+    // `fertigSetzen` schreibt fuer JEDES Wort eine Zeile, auch fuer die
+    // abgewaehlten; der erste Entwurf dieses Falls suchte deshalb nach "kein
+    // Schreibzugriff mit 'los'" und lief rot, obwohl der Code stimmte. Was
+    // zaehlt, ist der Wert: `aktiv` muss 0 sein.
+    mitschrift.schreibzugriffe.length = 0;
+    await befehle.fertigSetzen('g1', 1, ['los']);
+    const losZeile = mitschrift.schreibzugriffe.find(z => z.werte?.[2] === 'los');
+    pruefe(losZeile && losZeile.werte[3] === 0,
+        'und einschalten laesst er sich auch nicht',
+        losZeile ? `aktiv = ${losZeile.werte[3]}` : 'gar nicht geschrieben');
+
+    // Die Attrappe hat den Befehl damit wirklich abgeschaltet — fuer die
+    // naechsten Faelle wieder anschalten, sonst pruefen sie nichts mehr.
+    daten.befehle.find(b => b.wort === 'los').aktiv = 1;
+
+    // --- Plugin an, aber keine Verlosung offen -------------------------
+    welt.verlosung.plugin = true;
+    LosquellenRegistry.dienstSetzen({ offeneVerlosung: async () => welt.verlosung.offen });
+    mitschrift.gesendet.length = 0;
+    await befehle.auswerten(nachricht('!los'));
+    pruefe(/kein Gewinnspiel/.test(mitschrift.gesendet.at(-1)?.text || ''),
+        'ohne laufende Verlosung sagt er das', mitschrift.gesendet.at(-1)?.text);
+
+    // --- Eine Verlosung laeuft -----------------------------------------
+    welt.verlosung.offen = { id: 7, preis: 'Ein Spiel', endet_am: new Date(Date.now() + 3600e3), nurAbonnenten: false };
+    daten.lose.clear();
+    require('../plugins/streaming/dashboard/kern/mitmachen').taktLeeren();
+    mitschrift.gesendet.length = 0;
+
+    await befehle.auswerten(nachricht('!los'));
+    pruefe(daten.lose.size === 1, 'der Zuschauer bekommt ein Los');
+    pruefe([...daten.lose.values()][0].konto_id === '9',
+        'eingetragen wird die KENNUNG, nicht der Anzeigename',
+        String([...daten.lose.values()][0].konto_id));
+
+    // Zweimal tippen ist kein Fehler, sondern die Regel.
+    await befehle.auswerten(nachricht('!los'));
+    pruefe(daten.lose.size === 1, 'zweimal tippen gibt kein zweites Los');
+
+    // --- Die Antwort ist gebuendelt, das Eintragen nicht ----------------
+    const vorher = mitschrift.gesendet.length;
+    for (let i = 0; i < 20; i++) {
+        await befehle.auswerten(nachricht('!los', { absender: `Z${i}`, absenderId: String(1000 + i) }));
+    }
+    pruefe(daten.lose.size === 21, 'alle zwanzig kommen herein — die Abkuehlung sperrt niemanden aus',
+        `${daten.lose.size} Lose`);
+    pruefe(mitschrift.gesendet.length - vorher === 0,
+        'aber der Chat bekommt davon keine zwanzig Zeilen',
+        `${mitschrift.gesendet.length - vorher} Zeilen`);
+
+    // **Und die Abkuehlung, mit der er in die Welt kommt.**
+    //
+    // Der Fall darueber prueft das NICHT: `abkuehlung_s` in `FERTIG` ist nur
+    // der Anfangswert, gemessen wird zur Laufzeit `zeile.abkuehlung_s` aus der
+    // Datenbank - und die Attrappenzeile trug ohnehin 0. Aufgefallen bei der
+    // Gegenprobe: `abkuehlung_s: 5` in `FERTIG` liess alles gruen.
+    //
+    // Der Anfangswert ist hier aber die ganze Sicherung. Die Abkuehlung gilt
+    // je Befehlszeile und nicht je Zuschauer; jede Sekunde darin sperrt echte
+    // Zuschauer aus, und geaendert wird sie danach nie wieder (`fertigSetzen`
+    // schreibt sie nur beim INSERT).
+    pruefe(befehle.FERTIG.los.abkuehlung_s === 0,
+        '!los kommt ohne Abkuehlung in die Welt — sie wuerde Zuschauer aussperren',
+        `${befehle.FERTIG.los.abkuehlung_s} s`);
+
+    mitschrift.schreibzugriffe.length = 0;
+    await befehle.fertigSetzen('g2', 1, []);
+    const neuZeile = mitschrift.schreibzugriffe.find(z => z.werte?.[2] === 'los');
+    pruefe(neuZeile && neuZeile.werte[5] === 0,
+        'und genau diese 0 landet auch in der Datenbank',
+        neuZeile ? `abkuehlung_s = ${neuZeile.werte[5]}` : 'nicht geschrieben');
+
+    // --- Nur Abonnenten -------------------------------------------------
+    welt.verlosung.offen.nurAbonnenten = true;
+    daten.lose.clear();
+    require('../plugins/streaming/dashboard/kern/mitmachen').taktLeeren();
+    mitschrift.gesendet.length = 0;
+
+    await befehle.auswerten(nachricht('!los', { absenderId: '55', istAbonnent: false }));
+    pruefe(daten.lose.size === 0, 'ein Nichtabonnent bekommt kein Los');
+    pruefe(/nur Abonnenten/.test(mitschrift.gesendet.at(-1)?.text || ''),
+        'und erfaehrt warum', mitschrift.gesendet.at(-1)?.text);
+
+    require('../plugins/streaming/dashboard/kern/mitmachen').taktLeeren();
+    await befehle.auswerten(nachricht('!los', { absenderId: '56', istAbonnent: true }));
+    pruefe(daten.lose.size === 1, 'ein Abonnent schon');
+
+    LosquellenRegistry.leeren();
+}
+
+console.log('\nKein abhaengiger Befehl bleibt ungeprueft');
+{
+    // **Die Liste haelt sich selbst aktuell.** Ohne diesen Fall waere der
+    // naechste Befehl mit `braucht` still ungeprueft: Der Waechter bliebe
+    // gruen, weil er ihn gar nicht kennt.
+    const geprueft = new Set(['los']);
+    const abhaengig = Object.keys(befehle.FERTIG).filter(w => befehle.FERTIG[w].braucht);
+    const fehlend = abhaengig.filter(w => !geprueft.has(w));
+    pruefe(fehlend.length === 0,
+        'jeder Befehl mit `braucht` hat hier oben einen Fall',
+        fehlend.length ? fehlend.join(', ') : `${abhaengig.length} geprueft`);
 }
 
 console.log('\nDie Attrappe hat alles verstanden');

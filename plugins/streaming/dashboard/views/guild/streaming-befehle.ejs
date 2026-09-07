@@ -247,6 +247,19 @@ Object.assign(fehlerTexte, {
                       braucht deine Erlaubnis — siehe <b>Mitmachen</b>
                     </div>
                   <% } %>
+                  <%# Ein Befehl, der ein anderes Plugin braucht, sagt das hier —
+                      und der Schalter bleibt aus, solange es fehlt. Der Knopf
+                      führt dorthin, statt den Streamer suchen zu lassen. %>
+                  <% if (!(verfuegbar[wort] || {}).ok) { %>
+                    <div class="zeile__hilfe text-warning">
+                      <i class="fa-solid fa-plug-circle-xmark me-1"></i>
+                      <%= verfuegbar[wort].grund %>
+                      <% if (verfuegbar[wort].braucht) { %>
+                        <a href="/guild/<%= guildId %>/plugins"
+                           class="ms-1">Plugins öffnen</a>
+                      <% } %>
+                    </div>
+                  <% } %>
                 </div>
                 <div class="d-flex flex-wrap align-items-center justify-content-end gap-2">
                   <%# **Wer darf** — seit P9 eine echte Frage: `!clip` schneidet
@@ -265,7 +278,7 @@ Object.assign(fehlerTexte, {
                   <label class="form-check form-switch mb-0">
                     <input type="checkbox" class="form-check-input" name="fertig" value="<%= wort %>"
                            <%= anFertig.has(wort) ? 'checked' : '' %>
-                           <%= darfAendern ? '' : 'disabled' %>>
+                           <%= (darfAendern && (verfuegbar[wort] || {}).ok) ? '' : 'disabled' %>>
                     <span class="form-check-label">an</span>
                   </label>
 

@@ -11,21 +11,28 @@
  * wie bei der Statistik (2026-09-03: „per Request, also dann wenn man sie
  * braucht").
  *
- * **Nicht gebaut: Verlosung und Musikwunsch.** Nicht vergessen, sondern
- * gemessen und zurueckgestellt (2026-09-05):
+ * **Gebaut: Verlosung** (2026-09-07). Sie war am 2026-09-05 zurueckgestellt,
+ * weil `GiveawayManager.addEntry` ueber `checkRequirements` in
+ * `guild.members.fetch(userId)` laeuft und ein Twitch-Zuschauer dort nichts
+ * hat. Zwei Dinge haben das aufgeloest:
  *
- *     GiveawayManager.addEntry(giveawayId, userId)   sieht nach reinen Kennungen aus
- *       └─ checkRequirements()  Zeile 2:  guild.members.fetch(userId)
- *                              Zeile 3:  if (!member) return 'member_not_found'
- *       └─ _updateEmbedActive() schreibt in eine Discord-Nachricht
- *       laeuft im Bot-Vorgang (this.client), nicht im Dashboard
+ * Erstens die Entscheidung des Betreibers: **Twitch nimmt keine Plaetze ein,
+ * fuer die das System nicht gemacht ist.** Die Lose liegen in
+ * `streaming_lose`, nicht in `giveaway_entries`; `addEntry` wird gar nicht
+ * gerufen, und die Discord-Bedingungen gelten fuer den Discord-Weg.
  *
- * Ein Twitch-Zuschauer ohne Discord-Konto scheitert dort **nicht an einer
- * Regel, sondern an der Verrohrung** - in der zweiten Zeile, bevor irgendeine
- * Bedingung geprueft wird. Das ist dieselbe Form wie bei P8 (automods
- * 472-Zeilen-Funktion ueber dem Discord-Nachrichtenobjekt): Es fehlt die
- * Stelle, an der man „diese Person, dieses Los" ohne Discord sagen koennte.
- * Beides ist eine eigene Stufe, kein Anbau an diese Datei.
+ * Zweitens eine Messung, die meine eigene Notiz oben widerlegt hat:
+ * `checkRequirements` ruft `guild.members.fetch` **nicht** in Zeile 2. Es
+ * steigt vorher aus:
+ *
+ *     const requirements = await this.getRequirements(giveawayId);
+ *     if (!requirements.length) return { passed: true };   // vor jedem Discord-Zugriff
+ *
+ * Der Sperrgrund galt also nur fuer Verlosungen **mit** Bedingungen.
+ *
+ * **Nicht gebaut: Musikwunsch.** Der bleibt zurueckgestellt - dort ist die
+ * offene Frage nicht die Verrohrung, sondern was im Stream ueberhaupt laufen
+ * darf.
  *
  * ## ⚠ Aus der Dokumentation gebaut, in Produktion noch nicht gelaufen
  *
@@ -329,7 +336,117 @@ async function umfrageBeenden(guildId, umfrageId, verbergen) {
                        : { ok: false, grund: ergebnis.grund || 'Twitch hat abgelehnt' };
 }
 
+// ---------------------------------------------------------------------------
+// Verlosung: mitmachen aus dem Chat
+// ---------------------------------------------------------------------------
+
+/**
+ * Wie oft `!los` hoechstens antwortet, je Kanal.
+ *
+ * **Eintragen und Antworten sind zwei verschiedene Takte**, und das ist der
+ * Kern dieses Befehls. Die Abkuehlung in `befehle.js` gilt je Befehlszeile,
+ * nicht je Zuschauer (`zuletzt.get(zeile.id)`) - bei `!los` mit 5 Sekunden
+ * kaeme also **ein Zuschauer alle fuenf Sekunden** durch, und die anderen
+ * bekaemen nichts, ohne dass jemand merkt warum.
+ *
+ * Deshalb steht `!los` auf Abkuehlung 0: Eintragen darf jeder, sofort. Die
+ * Antwort dagegen wird hier gebuendelt - sonst antwortete der Bot bei
+ * fuenfzig Zuschauern fuenfzigmal und liefe in Twitchs eigene Ratengrenze.
+ *
+ * Dieselbe Form wie beim Melder, der Follower 60 Sekunden sammelt.
+ */
+const LOS_ANTWORT_ABSTAND_MS = 15_000;
+
+/** @type {Map<number, {letzteMs: number, neue: number}>} */
+const losTakt = new Map();
+
+/**
+ * Beim laufenden Gewinnspiel mitmachen.
+ *
+ * Antwortet **nicht immer**: Ein leerer Rueckgabewert erzeugt keine Chatzeile
+ * (`befehle.js`, "Ein leerer Satz ist kein Satz"). Eingetragen wird trotzdem.
+ *
+ * @param {Object} k Befehlskontext
+ * @returns {Promise<string>} Antwort oder '' fuer Schweigen
+ */
+async function losZiehen(k) {
+    const { LosquellenRegistry } = require('dunebot-sdk');
+    const lose = require('../../shared/lose');
+
+    // **Steht hier kein Dienst, gibt es das Verlosungs-Plugin nicht.** Das ist
+    // etwas anderes als "gerade laeuft keine Verlosung", und der Zuschauer
+    // soll den Unterschied hoeren.
+    const dienst = LosquellenRegistry.dienst();
+    if (!dienst) return 'Gewinnspiele gibt es auf diesem Server nicht.';
+
+    const streamer = k.streamerZeile;
+    if (!streamer?.heim_guild_id) return 'Für diesen Kanal ist kein Server hinterlegt.';
+
+    if (!k.absenderId) {
+        // Ohne Kennung kein Los: Ein Anzeigename ist aenderbar, und zwei
+        // Zuschauer koennen nacheinander denselben tragen.
+        log().warn('[Streaming] !los ohne Absenderkennung — Los nicht eingetragen');
+        return '';
+    }
+
+    const verlosung = await dienst.offeneVerlosung(streamer.heim_guild_id);
+    if (!verlosung) return 'Gerade läuft kein Gewinnspiel.';
+
+    if (verlosung.nurAbonnenten && !k.istAbonnent) {
+        // Der Takt gilt auch hier: Sonst koennte ein Nichtabonnent den Chat
+        // mit Absagen fuellen, indem er den Befehl wiederholt.
+        return takt(streamer.id, 0, () => 'Bei diesem Gewinnspiel machen nur Abonnenten mit.');
+    }
+
+    const ergebnis = await lose.eintragen({
+        verlosungId: verlosung.id,
+        guildId: streamer.heim_guild_id,
+        streamerId: streamer.id,
+        kontoId: k.absenderId,
+        kontoName: k.absender || null
+    });
+
+    return await takt(streamer.id, ergebnis.schon ? 0 : 1, async () => {
+        const anzahl = await lose.zaehlen(verlosung.id);
+        return `Mitgemacht — ${anzahl} ${anzahl === 1 ? 'Los' : 'Lose'} im Topf für: ${verlosung.preis}`;
+    });
+}
+
+/**
+ * Antworten buendeln.
+ *
+ * @param {number} streamerId Kanal
+ * @param {number} neue Wie viele Lose dieser Aufruf hinzugefuegt hat
+ * @param {Function} satz Erzeugt die Antwort, nur wenn sie hinausgeht
+ * @returns {Promise<string>} Antwort oder ''
+ */
+async function takt(streamerId, neue, satz) {
+    const jetzt = Date.now();
+    const stand = losTakt.get(streamerId) || { letzteMs: 0, neue: 0 };
+    stand.neue += neue;
+
+    if (jetzt - stand.letzteMs < LOS_ANTWORT_ABSTAND_MS) {
+        losTakt.set(streamerId, stand);
+        return '';
+    }
+
+    stand.letzteMs = jetzt;
+    stand.neue = 0;
+    losTakt.set(streamerId, stand);
+    return await satz();
+}
+
+/**
+ * Nur fuer Tests: den Takt vergessen.
+ *
+ * @returns {void}
+ */
+function taktLeeren() {
+    losTakt.clear();
+}
+
 module.exports = {
+    losZiehen, taktLeeren, LOS_ANTWORT_ABSTAND_MS,
     ZUSTAND, ZUSAGEN, RUECKBLICK,
     zustand, befehlsstand,
     clipSchneiden, umfrageStand,

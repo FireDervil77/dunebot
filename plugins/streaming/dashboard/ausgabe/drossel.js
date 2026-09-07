@@ -31,7 +31,7 @@ const twitch = require('../plattformen/twitch');
 const abonnenten = require('../kern/abonnenten');
 const Verbindungsspeicher = require('../../../../apps/dashboard/helpers/Verbindungsspeicher');
 const modelle = require('../../shared/models');
-const { vorlageWaehlen, VORGABE_LIVE, VORGABE_RUECKSCHAU } = require('../../shared/vorlagen');
+const { vorlageWaehlen, VORGABE_LIVE, VORGABE_RUECKSCHAU, CHAT_MAX } = require('../../shared/vorlagen');
 const { inhaltsStand } = require('../kern/entscheidung');
 const { melden } = require('../../shared/signale');
 const kanalstau = require('./kanalstau');
@@ -329,7 +329,20 @@ async function chatAnsageSenden(auftrag) {
     let vorlage = s.chat_ansage_text;
     let ansageZeile = null;
 
-    if (nutzlast.ansage_id) {
+    // **Der dritte Absender: fertiger Text** (P9, 2026-09-07). Er kommt aus
+    // dem Bot - die Ziehung einer Verlosung laeuft dort, der Weg in den
+    // Twitch-Chat liegt hier. Der Bot legt eine Zeile in den Ausgang, statt
+    // sich eine zweite Leitung zu bauen.
+    //
+    // Ein Freitext geht **ungefuellt** hinaus: Er ist schon ein fertiger Satz,
+    // und ein `{spiel}` darin waere vom Gewinnernamen, nicht von einer
+    // Vorlage. Er umgeht auch den Schalter der Live-Ansage - der gehoert zu
+    // "Ich bin jetzt live", nicht zu "X hat gewonnen".
+    const freitext = String(nutzlast.text || '').trim();
+
+    if (freitext) {
+        // nichts vorzubereiten
+    } else if (nutzlast.ansage_id) {
         const ansagen = await db().query(
             'SELECT id, text, aktiv FROM streaming_announcements WHERE id = ?',
             [nutzlast.ansage_id]);
@@ -377,12 +390,14 @@ async function chatAnsageSenden(auftrag) {
     const eigene = await require('../kern/bausteine')
         .werteFuer(s.heim_guild_id, s.id);
 
-    const text = chatansage.ansage({
-        streamer: s,
-        zustand: { titel: s.titel, kategorie: s.kategorie },
-        vorlage,
-        eigene
-    });
+    const text = freitext
+        ? freitext.slice(0, CHAT_MAX)
+        : chatansage.ansage({
+            streamer: s,
+            zustand: { titel: s.titel, kategorie: s.kategorie },
+            vorlage,
+            eigene
+        });
 
     // Ein leerer Satz ist kein Satz. Er entsteht, wenn die Vorlage aus nichts
     // als Platzhaltern besteht und keiner davon gefuellt werden konnte -
