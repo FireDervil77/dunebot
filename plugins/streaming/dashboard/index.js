@@ -387,10 +387,15 @@ class StreamingDashboardPlugin extends DashboardPlugin {
     _setupRoutes() {
         const Logger = ServiceManager.get('Logger');
 
+        // **Vor dem Seiten-Router.** Der faengt mit '/' alles, was danach
+        // kommt - eine spaeter eingehaengte Unterseite bekaeme nie eine
+        // Anfrage zu sehen.
+        this.guildRouter.use('/musik', require('./routes/musik.router'));
+
         // Seiten-Router zuletzt: er faengt mit '/' auch die Startseite
         this.guildRouter.use('/', require('./routes/guild.router'));
 
-        Logger.info('[Streaming] Routen registriert (1 Router)');
+        Logger.info('[Streaming] Routen registriert (2 Router)');
     }
 
     /**
@@ -710,7 +715,12 @@ class StreamingDashboardPlugin extends DashboardPlugin {
                     ['NAV.ANNOUNCES', 'ansagen',    'fa-solid fa-clock', 62],
                     ['NAV.GUARD',     'schutz',     'fa-solid fa-shield', 63],
                     ['NAV.JOIN_IN',   'mitmachen',  'fa-solid fa-hand-sparkles', 64],
-                    ['NAV.STATS',     'statistik',  'fa-solid fa-chart-line', 65]
+                    ['NAV.STATS',     'statistik',  'fa-solid fa-chart-line', 65],
+                    // Musikwunsch (2026-09-07). Steht im Chatbot-Abschnitt,
+                    // weil er an der Heim-Guild haengt wie die Befehle - und
+                    // weil die Seite die OBS-Adresse traegt, ohne die der
+                    // Player unerreichbar ist.
+                    ['NAV.MUSIC',     'musik',      'fa-solid fa-music', 66]
                 ].forEach(([titel, pfad, icon, order]) => {
                     navItems.push(eintrag(titel, `${basis}/${pfad}`, icon, order, {
                         capability: 'STREAMING.CHAT.MANAGE',

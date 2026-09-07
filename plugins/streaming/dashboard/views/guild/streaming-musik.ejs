@@ -1,0 +1,216 @@
+<%
+/**
+ * Musikwunsch — die Seite fuer den Streamer.
+ *
+ * Vier Karten, in der Reihenfolge, in der man sie braucht: erst die Adresse
+ * fuer OBS (ohne die passiert nichts), dann der Zustand, dann die
+ * Warteschlange, dann die Befehle als Nachschlagewerk.
+ *
+ * **Die Ablage-Zahl steht ganz oben im Hinweis** und nicht unten bei den
+ * Befehlen: Eine leere Warteschlange sieht genauso aus wie eine leere Ablage,
+ * und wer den Freigabeschalter nicht gesetzt hat, sucht sonst am Player.
+ */
+%>
+<%- include('partials/streaming-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-music',
+  titel: 'Musikwunsch',
+  beschreibung: 'Was aus dem Chat gewünscht wird, spielt eine Browserquelle in OBS.'
+}) %>
+
+<% if (meldung) { %>
+  <div class="alert alert-success"><%= meldung %></div>
+<% } %>
+<% if (fehler) { %>
+  <div class="alert alert-danger"><%= fehler %></div>
+<% } %>
+
+<% if (!hatAblage) { %>
+  <div class="alert alert-warning">
+    <strong>Keine Musikablage.</strong> Das Musik-Plugin ist in dieser Guild nicht
+    aktiv — ohne es gibt es nichts abzuspielen.
+  </div>
+<% } else if (freigegeben === 0) { %>
+  <div class="alert alert-warning">
+    <strong>Noch keine Datei für den Stream freigegeben.</strong>
+    Lade unter <em>Musik → Dateien</em> etwas hoch und setze den Schalter
+    „für den Stream frei". Vorher findet <code>!request</code> nichts.
+  </div>
+<% } %>
+
+<div class="row row-cards">
+
+  <%# ---- 1. Die Adresse für OBS ---- %>
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fa-solid fa-satellite-dish me-2"></i>Adresse für OBS</h3>
+      </div>
+      <div class="card-body">
+        <p class="text-secondary">
+          In OBS: <strong>Quelle hinzufügen → Browser</strong>, diese Adresse einsetzen.
+          Der Ton kommt aus der Browserquelle — Discord wird dafür nicht gebraucht.
+        </p>
+
+        <div class="input-group mb-2">
+          <input type="text" class="form-control font-monospace" id="musik-adresse"
+                 value="<%= adresse %>" readonly>
+          <button class="btn" type="button" id="musik-kopieren">
+            <i class="fa-regular fa-copy me-1"></i>Kopieren
+          </button>
+        </div>
+
+        <div class="alert alert-info mb-0">
+          <strong>Wer diese Adresse hat, kann deine Bibliothek abspielen.</strong>
+          Sie ist der einzige Ausweis der Browserquelle — teile sie nicht im Stream
+          und blende sie beim Einrichten nicht ein.
+          <form method="post" action="/guild/<%= guildId %>/plugins/streaming/musik/schluessel"
+                class="mt-2"
+                onsubmit="return confirm('Neue Adresse erzeugen? Eine bereits laufende Browserquelle hört danach auf zu spielen, bis du die neue Adresse in OBS einträgst.');">
+            <button class="btn btn-sm btn-outline-danger" type="submit">
+              Adresse neu erzeugen
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%# ---- 2. Zustand ---- %>
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fa-solid fa-heart-pulse me-2"></i>Zustand</h3>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <span class="badge <%= player.verbunden ? 'bg-success' : 'bg-secondary' %> me-2">
+            <%= player.verbunden ? 'Browserquelle verbunden' : 'Browserquelle meldet sich nicht' %>
+          </span>
+          <% if (player.sekunden !== null && !player.verbunden) { %>
+            <span class="text-secondary">zuletzt vor <%= player.sekunden %> s</span>
+          <% } else if (player.sekunden === null) { %>
+            <span class="text-secondary">noch nie</span>
+          <% } %>
+        </div>
+
+        <div class="mb-3">
+          <% if (laeuft) { %>
+            <div><strong>Läuft:</strong> <%= laeuft.titel %></div>
+            <% if (laeuft.gewuenscht_von) { %>
+              <div class="text-secondary">gewünscht von <%= laeuft.gewuenscht_von %></div>
+            <% } %>
+          <% } else { %>
+            <div class="text-secondary">Gerade läuft nichts.</div>
+          <% } %>
+        </div>
+
+        <form method="post" action="/guild/<%= guildId %>/plugins/streaming/musik/abspielen">
+          <input type="hidden" name="an" value="<%= aktiv ? '0' : '1' %>">
+          <button class="btn <%= aktiv ? 'btn-outline-secondary' : 'btn-primary' %>" type="submit">
+            <i class="fa-solid <%= aktiv ? 'fa-pause' : 'fa-play' %> me-1"></i>
+            <%= aktiv ? 'Anhalten' : 'Weiterlaufen lassen' %>
+          </button>
+          <span class="text-secondary ms-2">
+            <%= aktiv ? 'Wiedergabe ist an.' : 'Wiedergabe ist angehalten.' %>
+          </span>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <%# ---- 3. Warteschlange ---- %>
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="fa-solid fa-list-ol me-2"></i>Als nächstes
+          <span class="badge bg-secondary-lt ms-2"><%= offen.length %></span>
+        </h3>
+      </div>
+      <div class="card-body">
+        <% if (!offen.length) { %>
+          <div class="text-secondary">Die Warteschlange ist leer.</div>
+        <% } else { %>
+          <ol class="mb-3 ps-3">
+            <% offen.forEach(z => { %>
+              <li>
+                <%= z.titel %>
+                <% if (z.gewuenscht_von) { %>
+                  <span class="text-secondary">— <%= z.gewuenscht_von %></span>
+                <% } %>
+              </li>
+            <% }) %>
+          </ol>
+          <form method="post" action="/guild/<%= guildId %>/plugins/streaming/musik/leeren"
+                onsubmit="return confirm('Die ganze Warteschlange leeren?');">
+            <button class="btn btn-sm btn-outline-danger" type="submit">Warteschlange leeren</button>
+          </form>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <%# ---- 4. Die Befehle ---- %>
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fa-solid fa-terminal me-2"></i>Befehle im Chat</h3>
+      </div>
+      <div class="card-body">
+        <p class="text-secondary">
+          Wer sie benutzen darf, stellst du unter <em>Meine Befehle</em> je Befehl ein —
+          die Angaben hier sind die Vorgaben.
+        </p>
+        <div class="table-responsive">
+          <table class="table table-sm">
+            <thead><tr><th>Befehl</th><th>Was er tut</th><th>Vorgabe</th></tr></thead>
+            <tbody>
+              <tr><td><code>!request &lt;Titel&gt;</code></td><td>Wünscht einen Titel aus der freigegebenen Ablage</td><td>alle</td></tr>
+              <tr><td><code>!song</code></td><td>Sagt, was gerade läuft</td><td>alle</td></tr>
+              <tr><td><code>!playlist</code></td><td>Zeigt die nächsten Titel</td><td>alle</td></tr>
+              <tr><td><code>!vote</code></td><td>Stimmt fürs Überspringen (<%= noetigeStimmen %> Stimmen)</td><td>alle</td></tr>
+              <tr><td><code>!skip</code></td><td>Überspringt sofort</td><td>Moderator</td></tr>
+              <tr><td><code>!prev</code></td><td>Einen Titel zurück</td><td>Moderator</td></tr>
+              <tr><td><code>!pause</code> / <code>!play</code></td><td>Hält an / lässt weiterlaufen</td><td>Moderator</td></tr>
+              <tr><td><code>!clear</code></td><td>Leert die Warteschlange</td><td>Moderator</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+    var knopf = document.getElementById('musik-kopieren');
+    var feld = document.getElementById('musik-adresse');
+    if (!knopf || !feld) return;
+
+    knopf.addEventListener('click', function () {
+        // `select()` zuerst: Scheitert die Zwischenablage (kein https, oder
+        // der Browser fragt), ist die Adresse wenigstens markiert und mit
+        // Strg+C zu holen. Ein Knopf, der nichts tut und nichts sagt, wäre
+        // schlimmer als keiner.
+        feld.select();
+        feld.setSelectionRange(0, 99999);
+
+        var fertig = function (text) {
+            knopf.innerHTML = text;
+            setTimeout(function () {
+                knopf.innerHTML = '<i class="fa-regular fa-copy me-1"></i>Kopieren';
+            }, 2000);
+        };
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(feld.value)
+                .then(function () { fertig('Kopiert'); })
+                .catch(function () { fertig('Markiert — Strg+C'); });
+        } else {
+            fertig('Markiert — Strg+C');
+        }
+    });
+})();
+</script>

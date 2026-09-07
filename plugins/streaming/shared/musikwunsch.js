@@ -90,8 +90,11 @@ async function zustand(guildId) {
 
     // `INSERT IGNORE`, nicht `INSERT`: Zwei gleichzeitige Anfragen kaemen sonst
     // beide hier an und die zweite liefe in den Schluesselkonflikt.
+    // `aktiv = 1` ausdruecklich und nicht ueber die Spaltenvorgabe: Eine neue
+    // Guild soll spielen, sobald etwas gewuenscht wird. Angehalten wird mit
+    // `!pause`, und das ist ein bewusster Griff.
     await db().query(
-        'INSERT IGNORE INTO streaming_music_state (guild_id, schluessel) VALUES (?, ?)',
+        'INSERT IGNORE INTO streaming_music_state (guild_id, schluessel, aktiv) VALUES (?, ?, 1)',
         [guildId, neuerSchluessel()]);
 
     const nochmal = await db().query(
