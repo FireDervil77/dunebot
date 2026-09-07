@@ -311,7 +311,25 @@ async function springen(guildId, richtung) {
             [guildId]);
     }
 
-    const ziel = zeilen?.[0];
+    let ziel = zeilen?.[0];
+
+    // **Endlosmodus sitzt HIER und nicht in `naechster`.** Er stand dort, und
+    // damit gingen `!skip` und `!vote` an ihm vorbei: Beide rufen `springen`
+    // direkt, bekamen "nichts mehr" und sagten das im Chat, obwohl der Schalter
+    // an war. Zwei Wege, einen Titel weiterzugehen, von denen nur einer den
+    // Endlosmodus kannte - derselbe Fehler wie zweimal zuvor an diesem Tag.
+    //
+    // Nur vorwaerts: Rueckwaerts etwas nachzulegen ergibt keinen Sinn, und
+    // `!prev` soll ehrlich sagen, dass davor nichts war.
+    if (!ziel && vor && z?.endlos) {
+        if (await nachlegen(guildId, (await aktueller(guildId))?.datei_id || null)) {
+            const nochmal = await db().query(
+                'SELECT * FROM streaming_music_queue WHERE guild_id = ? ORDER BY position DESC LIMIT 1',
+                [guildId]);
+            ziel = nochmal?.[0] || null;
+        }
+    }
+
     if (!ziel) return { ok: false, grund: vor ? 'nichts_mehr' : 'nichts_davor' };
 
     await db().query(
@@ -485,25 +503,11 @@ async function naechster(guildId, wie = {}) {
         // Nicht mehr lieferbar - dann gilt dasselbe wie beim Weiterruecken.
     }
 
-    // Was gerade lief - damit der Endlosmodus nicht zweimal dasselbe nachlegt.
-    const vorher = await aktueller(guildId);
-
     let uebersprungen = 0;
-    let nachgelegt = false;
     for (let versuch = 0; versuch < 25; versuch++) {
-        let e = await springen(guildId, +1);
-
-        // **Endlosmodus: einmal nachlegen, dann noch einmal versuchen.**
-        // Einmal je Aufruf und nicht in der Schleife - sonst fuellte ein
-        // Ablauf, in dem nichts abspielbar ist, die Warteschlange in einem
-        // Rutsch mit 25 Zeilen.
-        if (!e.ok && z.endlos && !nachgelegt) {
-            nachgelegt = true;
-            if (await nachlegen(guildId, vorher?.datei_id || null)) {
-                e = await springen(guildId, +1);
-            }
-        }
-
+        // `springen` traegt den Endlosmodus selbst - hier steht er bewusst
+        // nicht noch einmal.
+        const e = await springen(guildId, +1);
         if (!e.ok) return { spielen: false, grund: 'nichts_mehr', uebersprungen };
 
         const zeile = await aktueller(guildId);
@@ -531,6 +535,55 @@ async function naechster(guildId, wie = {}) {
     log().error(`[Streaming] 25 Musikwuensche in Folge nicht lieferbar (Guild ${guildId}) - `
               + 'die Warteschlange zeigt auf Dateien, die es nicht mehr gibt.');
     return { spielen: false, grund: 'nur_tote_zeilen', uebersprungen };
+}
+
+/**
+ * Die ganze freigegebene Ablage einreihen, in zufaelliger Reihenfolge.
+ *
+ * **Der Weg, eine Warteschlange zu fuellen, ohne sich sechsmal selbst etwas zu
+ * wuenschen.** Der Endlosmodus legt je einen Titel nach, wenn nichts mehr da
+ * ist - das haelt den Stream am Laufen, zeigt aber nie eine Liste. Wer sehen
+ * will, was kommt, reiht einmal alles ein.
+ *
+ * Gemischt und nicht alphabetisch: Sonst liefe jede Sendung in derselben
+ * Reihenfolge, und `!playlist` waere jedes Mal dieselbe Auskunft.
+ *
+ * **Ein Durchgang, kein Dauerzustand** - anders als der Endlosmodus. Ist die
+ * Liste durch, ist sie durch; wer beides will, schaltet beides ein.
+ *
+ * @param {string} guildId Guild
+ * @returns {Promise<{ok: boolean, grund?: string, anzahl?: number}>} Ergebnis
+ */
+async function ablageEinreihen(guildId) {
+    const quelle = ablage();
+    if (!quelle) return { ok: false, grund: 'keine_ablage' };
+
+    const alle = await quelle.suchen(guildId, null);
+    if (!alle.length) return { ok: false, grund: 'nichts_frei' };
+
+    // Fisher-Yates auf einer Kopie: `sort(() => Math.random() - .5)` mischt
+    // nachweislich schlecht und haengt vom Sortierverfahren ab.
+    const gemischt = [...alle];
+    for (let i = gemischt.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [gemischt[i], gemischt[j]] = [gemischt[j], gemischt[i]];
+    }
+
+    const naechste = await db().query(
+        'SELECT COALESCE(MAX(position), 0) AS pos FROM streaming_music_queue WHERE guild_id = ?',
+        [guildId]);
+    let position = Number(naechste?.[0]?.pos || 0);
+
+    for (const stueck of gemischt) {
+        position++;
+        await db().query(
+            `INSERT INTO streaming_music_queue
+                (guild_id, streamer_id, datei_id, titel, dauer_sek, position, gewuenscht_von)
+             VALUES (?, NULL, ?, ?, ?, ?, NULL)`,
+            [guildId, stueck.id, stueck.titel, stueck.dauerSek || null, position]);
+    }
+
+    return { ok: true, anzahl: gemischt.length };
 }
 
 /**
@@ -639,7 +692,7 @@ function stimmeAbgeben(guildId, absenderId) {
 module.exports = {
     zustand, schluesselNeu, guildZuSchluessel, playerGesehen,
     warteschlange, aktueller, wuenschen, springen, leeren, aufraeumen,
-    abspielen, naechster, nachlegen, endlosSchalten,
+    abspielen, naechster, nachlegen, endlosSchalten, ablageEinreihen,
     stimmeAbgeben, stimmenVergessen,
     ablage,
     AUFBEWAHRUNG_TAGE, NOETIGE_STIMMEN

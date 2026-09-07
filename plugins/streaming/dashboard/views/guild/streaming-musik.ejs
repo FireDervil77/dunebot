@@ -185,6 +185,24 @@
         </h3>
       </div>
       <div class="card-body">
+        <%#
+          Der Einreihen-Knopf steht in BEIDEN Zweigen, oben wie unten: Bei
+          leerer Liste ist er die Antwort auf "und jetzt?", bei voller das
+          Nachlegen. Ihn nur beim leeren Fall zu zeigen hiesse, dass man die
+          Liste nicht verlängern kann, ohne sie vorher leerzuräumen.
+        %>
+        <form method="post" action="/guild/<%= guildId %>/plugins/streaming/musik/einreihen"
+              class="mb-3">
+          <button class="btn btn-primary" type="submit"
+                  <%= (freigegeben === 0 || !hatAblage) ? 'disabled' : '' %>>
+            <i class="fa-solid fa-shuffle me-1"></i>
+            Ablage einreihen<% if (freigegeben) { %> (<%= freigegeben %>)<% } %>
+          </button>
+          <div class="form-hint mt-1">
+            Hängt alle freigegebenen Titel in zufälliger Reihenfolge an.
+          </div>
+        </form>
+
         <% if (!offen.length) { %>
           <div class="text-secondary">Die Warteschlange ist leer.</div>
         <% } else { %>

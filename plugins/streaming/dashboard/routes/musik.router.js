@@ -160,6 +160,29 @@ router.post('/endlos', requirePermission('STREAMING.CHAT.MANAGE'), async (req, r
     }
 });
 
+/** Die ganze freigegebene Ablage einreihen, gemischt. */
+router.post('/einreihen', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const basis = `/guild/${guildId}/plugins/streaming/musik`;
+
+    try {
+        const e = await musik.ablageEinreihen(guildId);
+        if (e.ok) {
+            return res.redirect(`${basis}?ok=${encodeURIComponent(
+                `${e.anzahl} Titel eingereiht — in zufälliger Reihenfolge.`)}`);
+        }
+        // Jeder Grund bekommt seinen Satz: "hat nicht geklappt" liesse offen,
+        // ob das Plugin fehlt oder nur keine Datei freigegeben ist.
+        return res.redirect(`${basis}?fehler=${encodeURIComponent(
+            e.grund === 'nichts_frei'
+                ? 'Es ist keine Datei für den Stream freigegeben.'
+                : 'Das Musik-Plugin ist in dieser Guild nicht aktiv.')}`);
+    } catch (error) {
+        ServiceManager.get('Logger').error('[Streaming] Ablage nicht einreihbar:', error);
+        return res.redirect(`${basis}?fehler=${encodeURIComponent('Das hat nicht geklappt.')}`);
+    }
+});
+
 /** Die Warteschlange leeren - derselbe Weg wie `!clear`. */
 router.post('/leeren', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
     const guildId = res.locals.guildId;
