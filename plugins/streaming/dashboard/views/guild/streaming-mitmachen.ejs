@@ -471,8 +471,15 @@ const befehlsseite = `/guild/${guildId}/plugins/streaming/befehle`;
   <%# ── Musikwunsch: gebaut am 2026-09-07 ─────────────────────────────────
       **Umetikettiert, nicht gelöscht.** Die Karte stand hier als „letzter
       offener Punkt"; ihre Begründung war eine Frage, die niemand beantwortet
-      hatte. Sie ist beantwortet, und der Weg dorthin gehört zur Karte — wer
-      nur „steht jetzt drüben" liest, weiß nicht, warum es vorher nicht ging.
+      hatte (privater Sprachkanal vs. Publikum). Sie ist beantwortet — die
+      Grenze liegt an der Quelle.
+
+      **Diese Vorgeschichte stand bis zum 2026-09-07 auf der Seite selbst.**
+      Der Betreiber hat sie gestrichen: „das ist für zuschauer und nutzer
+      uninteressant." Er hat recht — warum wir etwas früher nicht konnten, ist
+      Projektgeschichte und gehört in die Commit-Nachricht, nicht vor jemanden,
+      der gerade seinen Stream einrichtet. Was bleibt, ist die Regel, die für
+      ihn gilt: nur eigene, freigegebene Dateien.
 
       Der Musikwunsch hat einen **eigenen Menüpunkt**, weil er mehr ist als
       eine Karte: OBS-Adresse, Warteschlange, Endlosmodus, Zustand der
@@ -496,12 +503,8 @@ const befehlsseite = `/guild/${guildId}/plugins/streaming/befehle`;
           über eine <b>Browserquelle in OBS</b>, nicht über Discord.
         </p>
         <p class="text-secondary mb-3">
-          <b>Die Frage, die hier stand, ist beantwortet.</b> Sie lautete: Ein Wunsch
-          im Discord landet in einem privaten Sprachkanal, derselbe Wunsch im Stream
-          geht an ein Publikum. Die Antwort ist die Grenze an der <b>Quelle</b> — der
-          Stream-Weg spielt ausschließlich aus der eigenen hochgeladenen Ablage, und
-          zwar nur aus Dateien, die ausdrücklich freigegeben sind. Damit ist die
-          Lizenzfrage keine Frage der Software mehr.
+          Gespielt wird ausschließlich aus deiner eigenen hochgeladenen Ablage —
+          und nur aus Dateien, die du für den Stream freigegeben hast.
         </p>
         <a class="btn btn-outline-primary mt-auto align-self-start"
            href="/guild/<%= guildId %>/plugins/streaming/musik">

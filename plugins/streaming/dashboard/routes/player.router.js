@@ -90,6 +90,15 @@ router.get('/:schluessel', async (req, res) => {
     // 64 Hex-Zeichen und nichts anderes.
     const s = req.params.schluessel;
 
+    // **Die Titelanzeige ist aus, solange sie niemand verlangt.**
+    // Der Betreiber: "den titel des mp3s muss man den anzeigen? in der quelle?
+    // sonst lege ich ihn hinter die spiel szene so dass man ihn nicht sieht."
+    // Eine Quelle hinter einer anderen zu verstecken ist die Loesung fuer ein
+    // Problem, das es nicht geben muss - der Normalfall ist Ton ohne Bild.
+    // Wer den Titel im Bild will, haengt `?titel=1` an; die Musikseite gibt
+    // beide Adressen aus.
+    const zeigeTitel = req.query.titel === '1';
+
     res.type('html').send(`<!doctype html>
 <html lang="de"><head>
 <meta charset="utf-8">
@@ -122,7 +131,10 @@ router.get('/:schluessel', async (req, res) => {
   var wer = document.getElementById('wer');
   var laueft = false;
 
+  var ZEIGE_TITEL = ${zeigeTitel ? 'true' : 'false'};
+
   function zeigen(t, w) {
+    if (!ZEIGE_TITEL) { karte.className = ''; return; }
     titel.textContent = t || '';
     wer.textContent = w ? 'gewünscht von ' + w : '';
     karte.className = t ? 'an' : '';

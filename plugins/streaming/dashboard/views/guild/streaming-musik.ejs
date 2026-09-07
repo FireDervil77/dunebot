@@ -85,11 +85,27 @@
 
         <div class="input-group mb-2">
           <input type="text" class="form-control font-monospace" id="musik-adresse"
-                 value="<%= adresse %>" readonly>
+                 value="<%= adresse %>" data-basis="<%= adresse %>" readonly>
           <button class="btn" type="button" id="musik-kopieren">
             <i class="fa-regular fa-copy me-1"></i>Kopieren
           </button>
         </div>
+
+        <%#
+          Kein Serverzustand: Die Anzeige hängt an der Adresse, nicht an einer
+          Einstellung. Wer zwei Quellen will — eine nur mit Ton, eine mit Titel
+          im Bild — nimmt zweimal dieselbe Seite mit unterschiedlichem Anhang.
+          Eine gespeicherte Einstellung könnte das nicht.
+        %>
+        <label class="form-check form-switch mb-3">
+          <input class="form-check-input" type="checkbox" id="musik-titel-zeigen">
+          <span class="form-check-label">
+            Titel im Bild anzeigen
+            <span class="text-secondary">
+              — sonst liefert die Quelle nur Ton und bleibt unsichtbar.
+            </span>
+          </span>
+        </label>
 
         <div class="alert alert-info mb-0">
           <strong>Wer diese Adresse hat, kann deine Bibliothek abspielen.</strong>
@@ -285,6 +301,16 @@
     var knopf = document.getElementById('musik-kopieren');
     var feld = document.getElementById('musik-adresse');
     if (!knopf || !feld) return;
+
+    // Der Schalter ändert nur die angezeigte Adresse. Nichts wird gespeichert:
+    // Was die Quelle zeigt, entscheidet die Adresse, die in OBS steht.
+    var titelSchalter = document.getElementById('musik-titel-zeigen');
+    if (titelSchalter) {
+        titelSchalter.addEventListener('change', function () {
+            var basis = feld.dataset.basis;
+            feld.value = titelSchalter.checked ? basis + '?titel=1' : basis;
+        });
+    }
 
     knopf.addEventListener('click', function () {
         // `select()` zuerst: Scheitert die Zwischenablage (kein https, oder
