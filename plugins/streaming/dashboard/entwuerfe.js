@@ -234,7 +234,8 @@ const SEITEN = {
 
     mitmachen: {
         // **Gebaut am 2026-09-06 — aber nur zur Haelfte, und das steht auf der
-        // Seite selbst.** Clip und Umfrage sind fertig; Verlosung und
+        // Seite selbst.** Clip, Umfrage und seit dem 2026-09-07 auch die
+        // Verlosung sind fertig. Der urspruengliche Text dazu lautete: Verlosung und
         // Musikwunsch wurden gemessen und zurueckgestellt: `addEntry` sieht nach
         // reinen Kennungen aus, aber `checkRequirements` ruft in Zeile 2
         // `guild.members.fetch(userId)` und gibt sonst `member_not_found`. Ein
@@ -247,7 +248,11 @@ const SEITEN = {
         icon: 'fa-solid fa-hand-sparkles',
         titel: 'Mitmachen',
         untertitel: 'Was deine Zuschauer aus dem Chat heraus auslösen können',
-        zustand: 'entwurf',
+
+        // `halb`, nicht `entwurf`: Drei von vier Merkmalen laufen. Die Marke
+        // oben soll dasselbe sagen wie die Symbole darunter - sonst liest der
+        // Betreiber "Entwurf" und sieht drei gruene Punkte.
+        zustand: 'halb',
         nurHeim: true,
 
         wofuer: {
@@ -262,14 +267,16 @@ const SEITEN = {
         },
 
         merkmale: [
-            { zustand: 'entwurf', icon: 'fa-solid fa-gift', titel: 'Verlosung',
-              text: 'Mitmachen per <code>!los</code>. Angelegt wird weiter im Verlosungs-Plugin.' },
+            { zustand: 'steht', icon: 'fa-solid fa-gift', titel: 'Verlosung',
+              text: 'Mitmachen per <code>!los</code>. Angelegt wird weiter im Verlosungs-Plugin — '
+                  + 'dort stellst du bei der Verlosung ein, ob im Discord, im Stream oder in beidem '
+                  + 'mitgemacht wird.' },
             { zustand: 'entwurf', icon: 'fa-solid fa-music', titel: 'Musikwunsch',
               text: 'Wünschen per <code>!wunsch</code>. Warteschlange und Rechte aus dem Musik-Plugin.' },
-            { zustand: 'entwurf', icon: 'fa-solid fa-square-poll-vertical', titel: 'Umfrage',
-              text: 'Twitch-eigene Umfragen und Vorhersagen. Zusagen geklärt, Ereignisse fehlen.' },
-            { zustand: 'entwurf', icon: 'fa-solid fa-scissors', titel: 'Clip',
-              text: 'Automatisch einen Clip schneiden. Ein Aufruf, eine Zusage.' }
+            { zustand: 'steht', icon: 'fa-solid fa-square-poll-vertical', titel: 'Umfrage',
+              text: 'Twitch-eigene Umfragen: <code>!umfrage</code> sagt den Stand.' },
+            { zustand: 'steht', icon: 'fa-solid fa-scissors', titel: 'Clip',
+              text: '<code>!clip</code> schneidet die letzten Sekunden. Am 2026-09-06 im Stream gelaufen.' }
         ],
 
         vorhanden: [
@@ -279,9 +286,10 @@ const SEITEN = {
         ],
 
         fehlt: [
-            { was: 'Der Befehlsauswerter',
-              warum: 'Ohne ihn gibt es kein <code>!los</code> und kein <code>!wunsch</code> — '
-                   + 'diese Seite hängt an <b>Meine Befehle</b>.' },
+            { was: 'Musikwunsch aus dem Chat',
+              warum: '<code>!wunsch</code> gibt es noch nicht. Die Verrohrung wäre dieselbe wie bei '
+                   + 'der Verlosung; offen ist etwas anderes — <b>was im Stream überhaupt laufen '
+                   + 'darf</b>.' },
             { was: 'Streamsichere Musik',
               warum: 'Der einzige Punkt, der wirklich neu wäre. Ein Musikwunsch im Discord landet in '
                    + 'einem privaten Sprachkanal; derselbe Wunsch im Stream geht an ein Publikum. '
