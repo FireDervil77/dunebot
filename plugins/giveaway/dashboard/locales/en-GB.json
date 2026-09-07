@@ -159,6 +159,9 @@
     "ANF_KONTOALTER": "Minimum account age (days)",
     "ANF_SERVERZEIT": "Minimum time on server (days)",
     "ANF_ROLLE": "Required role (ID)",
-    "ANF_WERT": "Value"
+    "ANF_WERT": "Value",
+    "ANF_WEG_DISCORD": "Discord",
+    "ANF_WEG_STREAM": "Twitch chat",
+    "ANF_OHNE_WERT": "no value needed"
   }
 }

@@ -392,10 +392,19 @@ async function losZiehen(k) {
     const verlosung = await dienst.offeneVerlosung(streamer.heim_guild_id);
     if (!verlosung) return 'Gerade läuft kein Gewinnspiel.';
 
-    if (verlosung.nurAbonnenten && !k.istAbonnent) {
-        // Der Takt gilt auch hier: Sonst koennte ein Nichtabonnent den Chat
-        // mit Absagen fuellen, indem er den Befehl wiederholt.
-        return takt(streamer.id, 0, () => 'Bei diesem Gewinnspiel machen nur Abonnenten mit.');
+    // **Die Quelle prueft ihre eigenen Bedingungen.** Das Verlosungs-Plugin
+    // liefert sie nur durch; was ein Twitch-Abonnent ist, weiss es nicht - und
+    // soll es nicht wissen muessen.
+    const erlaubt = await lose.pruefen(verlosung.bedingungen, {
+        kontoId: k.absenderId,
+        istAbonnent: Boolean(k.istAbonnent),
+        streamerId: streamer.id
+    });
+
+    if (!erlaubt.ok) {
+        // Der Takt gilt auch hier: Sonst koennte jemand, der nicht darf, den
+        // Chat mit Absagen fuellen, indem er den Befehl wiederholt.
+        return takt(streamer.id, 0, () => erlaubt.grund);
     }
 
     const ergebnis = await lose.eintragen({

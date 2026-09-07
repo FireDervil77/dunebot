@@ -159,6 +159,9 @@
     "ANF_KONTOALTER": "Mindestalter des Kontos (Tage)",
     "ANF_SERVERZEIT": "Mindestzeit auf dem Server (Tage)",
     "ANF_ROLLE": "Rolle erforderlich (ID)",
-    "ANF_WERT": "Wert"
+    "ANF_WERT": "Wert",
+    "ANF_WEG_DISCORD": "Discord",
+    "ANF_WEG_STREAM": "Twitch-Chat",
+    "ANF_OHNE_WERT": "kein Wert nötig"
   }
 }

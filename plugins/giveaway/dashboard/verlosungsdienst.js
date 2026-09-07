@@ -32,7 +32,7 @@ const { ServiceManager } = require('dunebot-core');
  * zuverlaessig: Ein Plugin kann geladen und trotzdem fuer eine Guild aus sein.
  *
  * @param {string} guildId Guild
- * @returns {Promise<{id: number, preis: string, endet_am: Date, nurAbonnenten: boolean}|null>} Verlosung oder null
+ * @returns {Promise<{id: number, preis: string, endet_am: Date, bedingungen: Array}|null>} Verlosung oder null
  */
 async function offeneVerlosung(guildId) {
     const pluginManager = ServiceManager.get('pluginManager');
@@ -42,7 +42,7 @@ async function offeneVerlosung(guildId) {
 
     const db = ServiceManager.get('dbService');
     const zeilen = await db.query(`
-        SELECT id, prize, ends_at, stream_nur_abonnenten
+        SELECT id, prize, ends_at
           FROM giveaways
          WHERE guild_id = ?
            AND status = 'active'
@@ -53,14 +53,21 @@ async function offeneVerlosung(guildId) {
     `, [guildId]);
 
     if (!zeilen.length) return null;
+
+    // **Die Bedingungen kommen mit**, statt dass der Fragende sie nachholt:
+    // Sonst braeuchte er eine zweite Abfrage auf eine fremde Tabelle, und
+    // genau die soll es hier nicht geben. Mitgeliefert wird nur der
+    // Stream-Weg - die Discord-Regeln gehen ihn nichts an, und mit
+    // `guild.members.fetch` koennte er sie ohnehin nicht pruefen.
+    const bedingungen = await db.query(
+        "SELECT type, value FROM giveaway_requirements WHERE giveaway_id = ? AND weg = 'stream'",
+        [zeilen[0].id]);
+
     return {
         id: zeilen[0].id,
         preis: zeilen[0].prize,
         endet_am: zeilen[0].ends_at,
-        // Die Bedingung kommt **mit**, statt dass der Fragende sie nachholt:
-        // Sonst braeuchte er eine zweite Abfrage auf eine fremde Tabelle, und
-        // genau die soll es hier nicht geben.
-        nurAbonnenten: Boolean(zeilen[0].stream_nur_abonnenten)
+        bedingungen: bedingungen.map(b => ({ art: b.type, wert: b.value }))
     };
 }
 

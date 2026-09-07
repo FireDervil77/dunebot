@@ -43,9 +43,9 @@ const zeitpunkt = (w) => w ? new Date(w).toLocaleString('de-DE') : '—';
                       ? tr('giveaway:CREATE_TEILNAHME_BEIDE')
                       : tr('giveaway:CREATE_TEILNAHME_STREAM') %>
               </span>
-              <% if (v.stream_nur_abonnenten) { %>
-                <span class="badge bg-secondary-lt ms-1"><%= tr('giveaway:CREATE_NUR_ABONNENTEN') %></span>
-              <% } %>
+              <% (v.stream_bedingungen || []).forEach(b => { %>
+                <span class="badge bg-secondary-lt ms-1"><%= b %></span>
+              <% }); %>
             <% } %>
           </td>
           <td class="text-secondary"><%= kanalName(v.channel_id) %></td>

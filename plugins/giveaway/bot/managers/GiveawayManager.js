@@ -100,7 +100,6 @@ class GiveawayManager {
             claimDurationMs = null,
             requirements = [],
             teilnahme = 'discord',
-            streamNurAbonnenten = false,
         } = options;
 
         const endsAt = new Date(Date.now() + duration);
@@ -110,8 +109,8 @@ class GiveawayManager {
         const result = await this.dbService.query(
             `INSERT INTO giveaways (guild_id, channel_id, prize, title, description, winner_count,
                 ends_at, scheduled_start, created_by, hosted_by, embed_color, button_emoji,
-                allowed_roles, claim_duration_ms, status, teilnahme, stream_nur_abonnenten)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                allowed_roles, claim_duration_ms, status, teilnahme)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [guildId, channelId, prize, title, description, winnerCount,
              isScheduled ? new Date(new Date(scheduledStart).getTime() + duration) : endsAt,
              isScheduled ? new Date(scheduledStart) : null,
@@ -121,8 +120,7 @@ class GiveawayManager {
              status,
              // Ein unbekannter Weg wird nicht geraten: 'discord' ist das
              // Verhalten von vorher, und das ist die sichere Seite.
-             ['discord', 'stream', 'beide'].includes(teilnahme) ? teilnahme : 'discord',
-             streamNurAbonnenten ? 1 : 0]
+             ['discord', 'stream', 'beide'].includes(teilnahme) ? teilnahme : 'discord']
         );
 
         const giveawayId = result.insertId;
@@ -131,8 +129,9 @@ class GiveawayManager {
         if (requirements.length > 0) {
             for (const req of requirements) {
                 await this.dbService.query(
-                    `INSERT INTO giveaway_requirements (giveaway_id, type, value) VALUES (?, ?, ?)`,
-                    [giveawayId, req.type, String(req.value)]
+                    `INSERT INTO giveaway_requirements (giveaway_id, weg, type, value) VALUES (?, ?, ?, ?)`,
+                    [giveawayId, req.weg === 'stream' ? 'stream' : 'discord',
+                     req.type, String(req.value)]
                 );
             }
         }
@@ -466,9 +465,23 @@ class GiveawayManager {
 
     // ─── Requirements ───────────────────────────────────────
 
-    async getRequirements(giveawayId) {
+    /**
+     * Die Bedingungen einer Verlosung.
+     *
+     * **Vorgabe ist der Discord-Weg**, denn nur den prueft `checkRequirements`.
+     * Eine Twitch-Bedingung dort wuerde in keinem `case` des `switch` landen,
+     * durchfallen und - schlimmer - jeden Discord-Teilnehmer bestehen lassen,
+     * obwohl der Betreiber eine Einschraenkung gesetzt hat. Wer die
+     * Stream-Bedingungen will, fragt ausdruecklich danach.
+     *
+     * @param {number} giveawayId Verlosung
+     * @param {string} [weg='discord'] Teilnahmeweg
+     * @returns {Promise<Array>} Bedingungen
+     */
+    async getRequirements(giveawayId, weg = 'discord') {
         return await this.dbService.query(
-            `SELECT * FROM giveaway_requirements WHERE giveaway_id = ?`, [giveawayId]
+            `SELECT * FROM giveaway_requirements WHERE giveaway_id = ? AND weg = ?`,
+            [giveawayId, weg]
         );
     }
 

@@ -26,7 +26,10 @@ const jsTexte = {
   ANF_KONTOALTER:      tr('giveaway:JS.ANF_KONTOALTER'),
   ANF_SERVERZEIT:      tr('giveaway:JS.ANF_SERVERZEIT'),
   ANF_ROLLE:           tr('giveaway:JS.ANF_ROLLE'),
-  ANF_WERT:            tr('giveaway:JS.ANF_WERT')
+  ANF_WERT:            tr('giveaway:JS.ANF_WERT'),
+  ANF_WEG_DISCORD:     tr('giveaway:JS.ANF_WEG_DISCORD'),
+  ANF_WEG_STREAM:      tr('giveaway:JS.ANF_WEG_STREAM'),
+  ANF_OHNE_WERT:       tr('giveaway:JS.ANF_OHNE_WERT')
 };
 %>
 <%- include('shared/seitenkopf', {
@@ -37,5 +40,12 @@ const jsTexte = {
       icon:         icon,
       guildId:      guildId,
       texte:        jsTexte,
+
+      // Was der Stream-Weg pruefen kann, kommt aus der Losquelle und nicht aus
+      // diesem Plugin. `daten` gibt es im Kopf schon dafuer - automod reicht
+      // so seine Bedingungstypen durch.
+      daten:        (typeof streamBedingungen !== 'undefined' && streamBedingungen)
+                      ? { bedingungen: streamBedingungen } : {},
+
       aktion:       (typeof aktion !== 'undefined' ? aktion : null)
 }) %>

@@ -25,13 +25,19 @@
  * Die raeumt der taegliche Lauf ab: Lose, die aelter sind als jede sinnvolle
  * Verlosung, kann niemand mehr brauchen.
  *
- * # Kollation
+ * # Kollation - zwei verschiedene Regeln, und ich hatte sie verwechselt
  *
- * `utf8mb4_general_ci` wie alle `streaming_*`-Tabellen. Die
- * `giveaway*`-Tabellen sind `utf8mb4_unicode_ci` - ein JOIN ueber eine
- * Zeichenkette zwischen beiden **wirft**. Deshalb geht die Verbindung ueber
- * `verlosung_id` (INT, kollationsfrei) und ueber Parameter, nie ueber einen
- * JOIN.
+ * Die **Tabelle** ist `utf8mb4_general_ci` wie alle `streaming_*`-Tabellen.
+ * Die Spalte **`guild_id`** ist es nicht: Sie traegt ausdruecklich
+ * `utf8mb4_unicode_ci`, weil sie mit `guilds._id` vergleichbar bleiben muss.
+ * So halten es alle sechs anderen `streaming_*`-Tabellen auch - nachgemessen
+ * am 2026-09-07, nachdem `scripts/check-kollationen.js` die eine neue Spalte
+ * gemeldet hat, die es anders machte.
+ *
+ * Zur Verlosung geht die Verbindung ueber `verlosung_id` (INT,
+ * kollationsfrei) und ueber Parameter, nie ueber einen JOIN: Die
+ * `giveaway*`-Tabellen sind durchgehend `utf8mb4_unicode_ci`, und ein JOIN
+ * ueber eine Zeichenkette zwischen den beiden Welten **wirft**.
  */
 module.exports = {
     description: 'Lose aus dem Twitch-Chat',
@@ -41,7 +47,7 @@ module.exports = {
             CREATE TABLE IF NOT EXISTS streaming_lose (
                 id            BIGINT AUTO_INCREMENT PRIMARY KEY,
                 verlosung_id  INT          NOT NULL,
-                guild_id      VARCHAR(32)  NOT NULL,
+                guild_id      VARCHAR(32)  COLLATE utf8mb4_unicode_ci NOT NULL,
                 streamer_id   INT          NOT NULL,
                 konto_id      VARCHAR(64)  NOT NULL,
                 konto_name    VARCHAR(128) DEFAULT NULL,

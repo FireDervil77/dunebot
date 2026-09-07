@@ -46,7 +46,7 @@ function spaltenAus(sql) {
 }
 
 // --- Attrappen -----------------------------------------------------------
-const daten = { streamer: [], befehle: [], bausteine: [], lose: new Map() };
+const daten = { streamer: [], befehle: [], bausteine: [], lose: new Map(), abos: new Map() };
 const mitschrift = { schreibzugriffe: [], gesendet: [], unbekannt: [], bausteinAbfragen: 0,
                      clips: [], umfrageAbfragen: [] };
 
@@ -92,6 +92,10 @@ ServiceManager.register('dbService', {
             }
             daten.lose.set(schluessel, { verlosung_id: w[0], guild_id: w[1], streamer_id: w[2], konto_id: w[3], konto_name: w[4] });
             return { affectedRows: 1 };
+        }
+        if (/^SELECT stufe FROM streaming_subscribers/.test(s)) {
+            const stufe = daten.abos.get(String(w[1]));
+            return stufe ? [{ stufe }] : [];
         }
         if (/^SELECT COUNT\(\*\) AS n FROM streaming_lose/.test(s)) {
             return [{ n: [...daten.lose.values()].filter(l => String(l.verlosung_id) === String(w[0])).length }];
@@ -1024,7 +1028,7 @@ console.log('\n!los braucht ein anderes Plugin — und sagt das');
         'ohne laufende Verlosung sagt er das', mitschrift.gesendet.at(-1)?.text);
 
     // --- Eine Verlosung laeuft -----------------------------------------
-    welt.verlosung.offen = { id: 7, preis: 'Ein Spiel', endet_am: new Date(Date.now() + 3600e3), nurAbonnenten: false };
+    welt.verlosung.offen = { id: 7, preis: 'Ein Spiel', endet_am: new Date(Date.now() + 3600e3), bedingungen: [] };
     daten.lose.clear();
     require('../plugins/streaming/dashboard/kern/mitmachen').taktLeeren();
     mitschrift.gesendet.length = 0;
@@ -1073,7 +1077,9 @@ console.log('\n!los braucht ein anderes Plugin — und sagt das');
         neuZeile ? `abkuehlung_s = ${neuZeile.werte[5]}` : 'nicht geschrieben');
 
     // --- Nur Abonnenten -------------------------------------------------
-    welt.verlosung.offen.nurAbonnenten = true;
+    // Die Bedingung kommt jetzt aus `giveaway_requirements` und wird von der
+    // Losquelle selbst geprueft - das Verlosungs-Plugin reicht sie nur durch.
+    welt.verlosung.offen.bedingungen = [{ art: 'twitch_abonnent', wert: '1' }];
     daten.lose.clear();
     require('../plugins/streaming/dashboard/kern/mitmachen').taktLeeren();
     mitschrift.gesendet.length = 0;
@@ -1086,6 +1092,47 @@ console.log('\n!los braucht ein anderes Plugin — und sagt das');
     require('../plugins/streaming/dashboard/kern/mitmachen').taktLeeren();
     await befehle.auswerten(nachricht('!los', { absenderId: '56', istAbonnent: true }));
     pruefe(daten.lose.size === 1, 'ein Abonnent schon');
+
+    // **Eine Bedingung, die niemand kennt, sperrt — sie wird nicht uebergangen.**
+    // Sie stand in der Verlosung, jemand hat sie gewollt. Sie stillschweigend
+    // zu ignorieren machte aus einer engen Verlosung eine offene.
+    welt.verlosung.offen.bedingungen = [{ art: 'was_auch_immer', wert: '1' }];
+    daten.lose.clear();
+    require('../plugins/streaming/dashboard/kern/mitmachen').taktLeeren();
+    mitschrift.gesendet.length = 0;
+    await befehle.auswerten(nachricht('!los', { absenderId: '57', istAbonnent: true }));
+    pruefe(daten.lose.size === 0, 'eine unbekannte Bedingung laesst niemanden herein');
+    pruefe(/nicht prüfen/.test(mitschrift.gesendet.at(-1)?.text || ''),
+        'und sagt das auch', mitschrift.gesendet.at(-1)?.text);
+
+    // Abo-Stufe: gemessen wird gegen `streaming_subscribers.stufe`, und das
+    // ist Twitchs Tier-Zeichenkette ('1000'), nicht 1/2/3.
+    welt.verlosung.offen.bedingungen = [{ art: 'twitch_stufe', wert: '2' }];
+    daten.abos.set('58', '1000');
+    daten.lose.clear();
+    require('../plugins/streaming/dashboard/kern/mitmachen').taktLeeren();
+    await befehle.auswerten(nachricht('!los', { absenderId: '58', istAbonnent: true }));
+    pruefe(daten.lose.size === 0, 'Stufe 1 reicht nicht, wenn Stufe 2 verlangt ist');
+
+    daten.abos.set('59', '3000');
+    require('../plugins/streaming/dashboard/kern/mitmachen').taktLeeren();
+    await befehle.auswerten(nachricht('!los', { absenderId: '59', istAbonnent: true }));
+    pruefe(daten.lose.size === 1, 'Stufe 3 reicht fuer Stufe 2');
+
+    // Und wer gar nicht in der Liste steht: Die Stufe ist unbekannt, und
+    // unbekannt heisst nein - sonst waere die Bedingung wertlos.
+    //
+    // Gezaehlt wird die AENDERUNG, nicht der Stand: Ein `size === 1` haette
+    // sich auf den Fall davor verlassen und waere gruen geblieben, sobald
+    // dort etwas anders wird.
+    require('../plugins/streaming/dashboard/kern/mitmachen').taktLeeren();
+    mitschrift.gesendet.length = 0;
+    const vorUnbekannt = daten.lose.size;
+    await befehle.auswerten(nachricht('!los', { absenderId: '60', istAbonnent: true }));
+    pruefe(daten.lose.size === vorUnbekannt, 'eine unbekannte Stufe laesst niemanden herein',
+        `${vorUnbekannt} -> ${daten.lose.size}`);
+    pruefe(/nicht hinterlegt/.test(mitschrift.gesendet.at(-1)?.text || ''),
+        'und der Grund nennt genau das', mitschrift.gesendet.at(-1)?.text);
 
     LosquellenRegistry.leeren();
 }

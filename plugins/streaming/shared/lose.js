@@ -40,6 +40,13 @@ function db() {
 }
 
 /**
+ * @returns {Object} Protokoll
+ */
+function log() {
+    return ServiceManager.get('Logger');
+}
+
+/**
  * Ein Los eintragen.
  *
  * @param {Object} p Angaben
@@ -130,12 +137,108 @@ async function aufraeumen() {
 }
 
 /**
+ * Twitchs Stufen, wie sie wirklich ankommen.
+ *
+ * Gemessen am 2026-09-07 in `streaming_subscribers`: `stufe` haelt Twitchs
+ * Tier-Zeichenkette, nicht 1/2/3. Der Betreiber waehlt die kleine Zahl, wir
+ * rechnen sie hier um - eine `1000` im Formular waere zum Raten.
+ */
+const STUFEN = { 1: 1000, 2: 2000, 3: 3000 };
+
+/**
+ * Was dieser Weg pruefen kann.
+ *
+ * **Nur was ohne Rueckfrage bei Twitch geht.** „Nur Follower" fehlt mit
+ * Absicht: Follower fuehren wir als Zahl, nicht als Liste; die Bedingung
+ * waere ein Helix-Aufruf je Teilnehmer und braeuchte die Zusage des
+ * Kanalinhabers. Sie hier anzubieten hiesse, eine Bedingung zu versprechen,
+ * die im Ernstfall an einer fehlenden Zusage scheitert.
+ *
+ * @returns {Array<Object>} Bedingungsarten
+ */
+function bedingungen() {
+    return [
+        {
+            art: 'twitch_abonnent',
+            label: 'Nur Abonnenten des Kanals',
+            eingabe: 'keine',
+            hinweis: 'Das Abzeichen kommt mit jeder Chatnachricht mit — dafuer wird nichts abgefragt.'
+        },
+        {
+            art: 'twitch_stufe',
+            label: 'Mindestens Abo-Stufe',
+            eingabe: 'zahl',
+            hinweis: 'Stufe 1, 2 oder 3. Braucht die Abonnentenliste: Ist ein Abonnent dort nicht '
+                   + 'vermerkt, ist seine Stufe unbekannt und die Bedingung greift nicht.'
+        }
+    ];
+}
+
+/**
+ * Die Bedingungen des Stream-Wegs pruefen.
+ *
+ * **Unbekannt heisst nein, und das steht im Grund.** Eine Stufe, die wir
+ * nicht kennen, als „passt schon" durchzulassen machte die Bedingung
+ * wertlos; sie wortlos abzulehnen liesse den Zuschauer raten. Beides ist
+ * schlechter als ein Satz.
+ *
+ * @param {Array<Object>} liste Bedingungen aus der Verlosung
+ * @param {Object} kontext { kontoId, istAbonnent, streamerId }
+ * @returns {Promise<{ok: boolean, grund: string|null}>} Ergebnis
+ */
+async function pruefen(liste, kontext) {
+    for (const b of liste || []) {
+        if (b.art === 'twitch_abonnent') {
+            if (!kontext.istAbonnent) {
+                return { ok: false, grund: 'Bei diesem Gewinnspiel machen nur Abonnenten mit.' };
+            }
+            continue;
+        }
+
+        if (b.art === 'twitch_stufe') {
+            const verlangt = STUFEN[Number(b.wert)] || 0;
+            if (!verlangt) continue;   // unbrauchbarer Wert: die Bedingung faellt weg, statt alle zu sperren
+
+            const zeilen = await db().query(
+                'SELECT stufe FROM streaming_subscribers WHERE streamer_id = ? AND konto_id = ?',
+                [Number(kontext.streamerId), String(kontext.kontoId)]);
+
+            const hat = Number(zeilen[0]?.stufe || 0);
+
+            // **Dieser Zweig ist fuers Ergebnis redundant und fuer die
+            // Auskunft nicht.** `0 < verlangt` lehnt ohnehin ab; der
+            // Unterschied ist der Satz, den der Zuschauer liest. "Deine Stufe
+            // ist hier nicht hinterlegt" schickt ihn zum Streamer, "du
+            // brauchst Stufe 2" schickt ihn zum Abo-Knopf - und im zweiten
+            // Fall hat er vielleicht laengst Stufe 3.
+            if (!hat) {
+                return { ok: false, grund: `Für dieses Gewinnspiel braucht es Abo-Stufe ${b.wert} — deine Stufe ist hier nicht hinterlegt.` };
+            }
+            if (hat < verlangt) {
+                return { ok: false, grund: `Für dieses Gewinnspiel braucht es mindestens Abo-Stufe ${b.wert}.` };
+            }
+            continue;
+        }
+
+        // Eine Bedingung, die wir nicht kennen, wird NICHT uebergangen: Sie
+        // stand in der Verlosung, jemand hat sie gewollt. Sie stillschweigend
+        // zu ignorieren machte aus einer engen Verlosung eine offene.
+        log().warn(`[Streaming] unbekannte Bedingung "${b.art}" — Teilnahme abgelehnt`);
+        return { ok: false, grund: 'Dieses Gewinnspiel hat eine Bedingung, die ich hier nicht prüfen kann.' };
+    }
+
+    return { ok: true, grund: null };
+}
+
+/**
  * Die Losquelle, wie die Verlosung sie sieht.
  *
  * @type {Object}
  */
 const quelle = {
     label: 'Twitch-Chat',
+    bedingungen,
+    pruefen,
 
     /**
      * @param {Object} verlosung Die Verlosung
@@ -195,7 +298,7 @@ function abmelden() {
 }
 
 module.exports = {
-    QUELLE, AUFBEWAHRUNG_TAGE,
+    QUELLE, AUFBEWAHRUNG_TAGE, STUFEN,
     eintragen, fuerVerlosung, zaehlen, ansageEinreihen, aufraeumen,
-    quelle, anmelden, abmelden
+    bedingungen, pruefen, quelle, anmelden, abmelden
 };

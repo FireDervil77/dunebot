@@ -42,12 +42,22 @@
  */
 
 /**
+ * @typedef {Object} Bedingungsart
+ * @property {string} art Schluessel, wie er in `giveaway_requirements.type` steht
+ * @property {string} label Klartext fuer die Oberflaeche
+ * @property {string} eingabe 'keine' | 'zahl' | 'text' - was der Betreiber eintraegt
+ * @property {string} [hinweis] Was die Bedingung bedeutet
+ */
+
+/**
  * @typedef {Object} Losquelle
  * @property {string} label Klartext fuer die Oberflaeche, z. B. 'Twitch-Chat'
  * @property {Function} lose async (giveaway) => Los[] - die Lose dieser Verlosung
  * @property {Function} nennung (los) => string - wie der Gewinner genannt wird
  * @property {Function} [verkuenden] async (giveaway, los) => void - eigener Ansageweg
  * @property {Function} [verfuegbar] async (guildId) => boolean - fuer die Oberflaeche
+ * @property {Function} [bedingungen] () => Bedingungsart[] - was dieser Weg pruefen kann
+ * @property {Function} [pruefen] async (bedingungen, kontext) => {ok, grund}
  */
 
 /** @type {Map<string, Losquelle>} */
@@ -203,6 +213,32 @@ function dienst() {
 }
 
 /**
+ * Alle Bedingungen, die eingetragene Quellen pruefen koennen.
+ *
+ * **Das Verlosungs-Plugin fragt hier nach, statt sie zu kennen.** Bis zum
+ * 2026-09-07 hatte der Stream-Weg genau eine Bedingung, und die stand als
+ * eigene Spalte `stream_nur_abonnenten` in `giveaways` - also im *falschen*
+ * Plugin. Die zweite haette eine zweite Spalte gebraucht, und spaetestens
+ * dort haette `giveaway` wissen muessen, was ein Twitch-Abonnent ist.
+ *
+ * Der Katalog kommt deshalb von der Quelle. Das Verlosungs-Plugin zeigt ihn
+ * an, speichert den gewaehlten Schluessel und gibt ihn beim Pruefen zurueck -
+ * verstehen muss es ihn nie.
+ *
+ * @returns {Array<Object>} Bedingungsarten, jede mit ihrer Quelle
+ */
+function bedingungsarten() {
+    const alle = [];
+    for (const [name, quelle] of quellen.entries()) {
+        if (typeof quelle.bedingungen !== 'function') continue;
+        for (const art of quelle.bedingungen() || []) {
+            alle.push({ ...art, quelle: name });
+        }
+    }
+    return alle;
+}
+
+/**
  * Alles vergessen. Nur fuer Tests.
  *
  * @returns {void}
@@ -214,5 +250,5 @@ function leeren() {
 
 module.exports = {
     register, unregister, get, list, nennung, leeren, NAME_MUSTER, EIGEN,
-    dienstSetzen, dienstEntfernen, dienst
+    bedingungsarten, dienstSetzen, dienstEntfernen, dienst
 };

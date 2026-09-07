@@ -24,7 +24,7 @@ const zahlOderNull = (w) => {
 router.post('/create', requirePermission('GIVEAWAY.CREATE'), async (req, res) => {
     const { channel_id, prize, duration, winner_count, host_id,
             allowed_roles, scheduled_start, claim_duration, requirements,
-            teilnahme, stream_nur_abonnenten } = req.body;
+            teilnahme } = req.body;
 
     if (!channel_id || !prize || !duration) {
         return res.status(400).json({ success: false, error: 'Kanal, Preis und Dauer sind erforderlich' });
@@ -55,9 +55,13 @@ router.post('/create', requirePermission('GIVEAWAY.CREATE'), async (req, res) =>
         scheduledStart: scheduled_start || null,
         claimDurationMs: zahlOderNull(claim_duration),
         teilnahme: weg,
-        // Die Bedingung ohne den Weg dazu waere eine Einstellung ohne Wirkung.
-        streamNurAbonnenten: weg !== 'discord' && Boolean(stream_nur_abonnenten),
-        requirements: Array.isArray(requirements) ? requirements : []
+
+        // **Eine Stream-Bedingung ohne Stream-Weg waere eine Einstellung ohne
+        // Wirkung.** Sie faellt hier weg, statt in der Datenbank zu stehen und
+        // nie zu greifen - das waere genau die halbe Auskunft, die schlimmer
+        // ist als keine.
+        requirements: (Array.isArray(requirements) ? requirements : [])
+            .filter(r => r.weg !== 'stream' || weg !== 'discord')
     }, 'Die Verlosung konnte nicht angelegt werden');
 });
 

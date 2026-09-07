@@ -61,7 +61,10 @@ ServiceManager.register('Logger', {
 });
 
 const unbekannteAbfragen = [];
-const daten = { verlosung: null, eintraege: [], gewinner: [], geschrieben: [], angelegt: [] };
+const daten = {
+    verlosung: null, eintraege: [], gewinner: [], geschrieben: [], angelegt: [],
+    bedingungen: [], gefragteWege: [], geschriebeneBedingungen: []
+};
 
 ServiceManager.register('dbService', {
     async query(sql, werte = []) {
@@ -77,9 +80,15 @@ ServiceManager.register('dbService', {
             return daten.gewinner;
         }
         if (s.startsWith('SELECT * FROM giveaway_requirements')) {
-            // `_updateEmbedActive` zeigt die Bedingungen in der Einbettung an.
-            // Keine hier - die Discord-Bedingungen sind nicht Gegenstand
-            // dieser Pruefung, sie bleiben unangetastet.
+            // **Die Attrappe liest den Weg aus der Abfrage.** Ohne das bliebe
+            // gruen, wenn `getRequirements` den Filter verliert - und eine
+            // Twitch-Bedingung landete dann in `checkRequirements`, wo sie in
+            // keinem `case` steht.
+            daten.gefragteWege.push(werte[1]);
+            return daten.bedingungen.filter(b => b.weg === werte[1]);
+        }
+        if (s.startsWith('INSERT INTO giveaway_requirements')) {
+            daten.geschriebeneBedingungen.push(werte);
             return [];
         }
         if (s.startsWith('INSERT INTO giveaways')) {
@@ -311,8 +320,45 @@ function lage(teilnahme, eintraege) {
     pruefe(werte[15] === 'discord', 'ein unbekannter Weg faellt auf discord zurueck, nicht auf beide',
         String(werte[15]));
 
-    werte = await anlegen({ teilnahme: 'stream', streamNurAbonnenten: true });
-    pruefe(werte[16] === 1, 'die Abonnenten-Bedingung wird mitgeschrieben', String(werte[16]));
+    // -----------------------------------------------------------------------
+    console.log('\nBedingungen gehoeren zu einem Weg');
+    // -----------------------------------------------------------------------
+    daten.geschriebeneBedingungen.length = 0;
+    await anlegen({
+        teilnahme: 'beide',
+        requirements: [
+            { type: 'role', value: '123' },
+            { weg: 'stream', type: 'twitch_abonnent', value: '1' }
+        ]
+    });
+
+    const wege = daten.geschriebeneBedingungen.map(w => w[1]);
+    pruefe(wege.join(',') === 'discord,stream',
+        'jede Bedingung wird mit ihrem Weg gespeichert', wege.join(','));
+
+    // **Ohne Angabe: discord.** Der Weg darf nicht geraten werden - eine
+    // Bedingung, die versehentlich am Stream haengt, waere fuer den
+    // Discord-Weg lautlos verschwunden.
+    daten.geschriebeneBedingungen.length = 0;
+    await anlegen({ teilnahme: 'beide', requirements: [{ type: 'min_account_age', value: '7' }] });
+    pruefe(daten.geschriebeneBedingungen[0]?.[1] === 'discord',
+        'ohne Angabe gilt der Discord-Weg', String(daten.geschriebeneBedingungen[0]?.[1]));
+
+    // -----------------------------------------------------------------------
+    console.log('\nDie Discord-Pruefung sieht nur Discord-Bedingungen');
+    // -----------------------------------------------------------------------
+    lage('beide', []);
+    daten.bedingungen = [{ weg: 'stream', type: 'twitch_abonnent', value: '1' }];
+    daten.gefragteWege.length = 0;
+
+    const geprueft = await manager.checkRequirements(1, '111111111111111111');
+    pruefe(daten.gefragteWege.every(w => w === 'discord'),
+        'sie fragt ausdruecklich nach dem Discord-Weg', daten.gefragteWege.join(','));
+    pruefe(geprueft.passed === true,
+        'eine reine Twitch-Bedingung laesst den Discord-Teilnehmer durch',
+        'sonst scheiterte er an einer Regel, die ihn nichts angeht');
+
+    daten.bedingungen = [];
 
     // -----------------------------------------------------------------------
     console.log('\nHat die Attrappe alles gesehen?');

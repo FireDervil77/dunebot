@@ -22,12 +22,19 @@ const { requirePermission } = require('../../../../apps/dashboard/middlewares/pe
 const { makeTranslator, renderView, getGuildChannels, getGuildRoles, renderFehler } = require('./_shared');
 
 /**
- * Kann diese Guild ueberhaupt aus dem Stream heraus mitmachen lassen?
+ * Welche Bedingungen der Stream-Weg pruefen kann.
  *
- * **Der Schalter wird angezeigt, aber ausgegraut, wenn nicht.** Ihn ganz
- * wegzulassen waere bequemer und schlechter: Wer nicht weiss, dass es die
- * Moeglichkeit gibt, sucht sie auch nicht. So steht sie da, mit dem Grund
- * daneben.
+ * @returns {Array<Object>} Bedingungsarten der eingetragenen Quellen
+ */
+function streamBedingungen() {
+    const { LosquellenRegistry } = require('dunebot-sdk');
+    // Was der Stream-Weg pruefen kann, weiss die Quelle. Diese Seite zeigt es
+    // an und speichert den Schluessel; verstehen muss sie ihn nie.
+    return LosquellenRegistry.bedingungsarten();
+}
+
+/**
+ * Kann diese Guild ueberhaupt aus dem Stream heraus mitmachen lassen?
  *
  * @param {string} guildId Guild
  * @returns {Promise<boolean>} true, wenn das Streaming-Plugin hier laeuft
@@ -71,7 +78,46 @@ async function ladeLaufende(guildId) {
     verlosungen.forEach(v => { v.entry_count = nachId[v.id] || 0; });
 
     await fremdeLoseZaehlen(verlosungen);
+    await streamBedingungenAnhaengen(verlosungen);
     return verlosungen;
+}
+
+/**
+ * Die Stream-Bedingungen einer Verlosung als Klartext anhaengen.
+ *
+ * **Damit die Einstellung nach dem Anlegen nicht verschwindet.** Ohne das
+ * stuende in der Uebersicht nur „Twitch-Chat" - und ob die Verlosung dort
+ * jedem offensteht oder nur Abonnenten, waere nur noch in der Datenbank
+ * nachlesbar.
+ *
+ * Der Klartext kommt aus dem Katalog der Quelle; steht dort nichts (Plugin
+ * abgeschaltet), bleibt der rohe Schluessel stehen. Das ist haesslich und
+ * ehrlich - besser als eine Bedingung, die unsichtbar wird, weil niemand sie
+ * uebersetzen kann.
+ *
+ * @param {Array} verlosungen Die Verlosungen
+ * @returns {Promise<void>}
+ */
+async function streamBedingungenAnhaengen(verlosungen) {
+    const betroffen = verlosungen.filter(v => v.teilnahme === 'stream' || v.teilnahme === 'beide');
+    for (const v of verlosungen) v.stream_bedingungen = [];
+    if (!betroffen.length) return;
+
+    const ids = betroffen.map(v => v.id);
+    const zeilen = await ServiceManager.get('dbService').query(
+        `SELECT giveaway_id, type, value FROM giveaway_requirements
+          WHERE weg = 'stream' AND giveaway_id IN (${ids.map(() => '?').join(',')})`,
+        ids);
+
+    const katalog = new Map(streamBedingungen().map(b => [b.art, b]));
+    for (const z of zeilen) {
+        const v = betroffen.find(x => x.id === z.giveaway_id);
+        if (!v) continue;
+        const art = katalog.get(z.type);
+        v.stream_bedingungen.push(
+            art ? (art.eingabe === 'keine' ? art.label : `${art.label}: ${z.value}`)
+                : `${z.type} = ${z.value}`);
+    }
 }
 
 /**
@@ -217,7 +263,8 @@ router.get('/dashboard', requirePermission('GIVEAWAY.VIEW'), async (req, res) =>
         await renderView(res, 'guild/giveaway-dashboard', {
             tr, guildId, channels, roles,
             laufende, geplante, beendete, vorlagen, sperrliste, auswertung,
-            streamWeg: await streamWegMoeglich(guildId)
+            streamWeg: await streamWegMoeglich(guildId),
+            streamBedingungen: streamBedingungen()
         });
     } catch (error) {
         return renderFehler(res, error, 'Die Giveaway-Uebersicht konnte nicht geladen werden');
@@ -244,7 +291,8 @@ router.get('/laufende', requirePermission('GIVEAWAY.VIEW'), async (req, res) => 
 
         await renderView(res, 'guild/giveaway-active', {
             tr, guildId, laufende, geplante, vorlagen, channels, roles,
-            streamWeg: await streamWegMoeglich(guildId)
+            streamWeg: await streamWegMoeglich(guildId),
+            streamBedingungen: streamBedingungen()
         });
     } catch (error) {
         return renderFehler(res, error, 'Die laufenden Verlosungen konnten nicht geladen werden');

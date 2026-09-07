@@ -13,6 +13,24 @@
         return wurzel ? wurzel.dataset.giveawayBasis : '';
     }
 
+    /**
+     * Was der Stream-Weg pruefen kann.
+     *
+     * Kommt aus der Losquelle ueber den Seitenkopf. Ist die Liste leer, gibt
+     * es das Streaming-Plugin hier nicht - dann bleibt die Wegauswahl weg,
+     * statt eine Auswahl anzubieten, deren zweite Haelfte nichts enthaelt.
+     */
+    function streamArten() {
+        const wurzel = document.querySelector('[data-giveaway-bedingungen]');
+        if (!wurzel) return [];
+        try {
+            const liste = JSON.parse(wurzel.dataset.giveawayBedingungen);
+            return Array.isArray(liste) ? liste : [];
+        } catch {
+            return [];
+        }
+    }
+
     /** Text aus den Sprachdaten der Seite, mit Rueckfall. */
     function text(schluessel, ersatz) {
         const wurzel = document.querySelector('[data-giveaway-texte]');
@@ -85,9 +103,16 @@
     function leseAnforderungen() {
         return Array.from(document.querySelectorAll('#requirementsContainer [data-anforderung]'))
             .map(function (zeile) {
+                const art = zeile.querySelector('[data-anforderung-art]');
+                const wert = zeile.querySelector('[data-anforderung-wert]');
                 return {
-                    type: zeile.querySelector('[data-anforderung-art]')?.value,
-                    value: zeile.querySelector('[data-anforderung-wert]')?.value
+                    weg: zeile.querySelector('[data-anforderung-weg]')?.value || 'discord',
+                    type: art?.value,
+                    // **Eine Bedingung ohne Eingabefeld hat trotzdem einen Wert.**
+                    // "Nur Abonnenten" braucht nichts eingetippt; ohne diese
+                    // Zeile fiele sie unten aus dem Filter und waere lautlos
+                    // weg - die Verlosung stuende dann offen fuer alle.
+                    value: (wert && !wert.disabled) ? wert.value : '1'
                 };
             })
             .filter(function (a) { return a.type && a.value; });
@@ -105,25 +130,82 @@
         zeile.id = 'anforderung-' + id;
         zeile.setAttribute('data-anforderung', '');
 
+        // **Der Discord-Weg heisst `role`, nicht `required_role`.**
+        // Hier stand bis zum 2026-09-07 `required_role`. Die Spalte war ein
+        // ENUM('role','min_account_age','min_server_age') und die Datenbank
+        // laeuft mit STRICT_TRANS_TABLES - eine Rollenbedingung aus dem
+        // Dashboard haette also beim Anlegen geworfen, nachdem die Verlosung
+        // schon geschrieben war. `checkRequirements` kennt ebenfalls nur
+        // `role`; selbst ohne den Wurf haette die Bedingung nie gegriffen.
+        const discordArten = [
+            ['min_account_age', text('ANF_KONTOALTER', 'Mindestalter des Kontos (Tage)')],
+            ['min_server_age',  text('ANF_SERVERZEIT', 'Mindestzeit auf dem Server (Tage)')],
+            ['role',            text('ANF_ROLLE', 'Rolle erforderlich (ID)')]
+        ];
+
+        const stream = streamArten();
+
+        /** Die Auswahl der Arten fuer einen Weg neu aufbauen. */
+        function artenSetzen(weg) {
+            const auswahl = zeile.querySelector('[data-anforderung-art]');
+            const wert = zeile.querySelector('[data-anforderung-wert]');
+            const liste = weg === 'stream'
+                ? stream.map(function (b) { return [b.art, b.label, b.eingabe, b.hinweis]; })
+                : discordArten.map(function (d) { return [d[0], d[1], 'zahl_oder_text']; });
+
+            auswahl.innerHTML = liste.map(function (a) {
+                return '<option value="' + a[0] + '" data-eingabe="' + (a[2] || '') + '">' + a[1] + '</option>';
+            }).join('');
+            wertfeldSetzen();
+        }
+
+        /** Braucht die gewaehlte Art ueberhaupt eine Eingabe? */
+        function wertfeldSetzen() {
+            const gewaehlt = zeile.querySelector('[data-anforderung-art]')?.selectedOptions?.[0];
+            const wert = zeile.querySelector('[data-anforderung-wert]');
+            const hinweisFeld = zeile.querySelector('[data-anforderung-hinweis]');
+            const ohneEingabe = gewaehlt?.dataset.eingabe === 'keine';
+
+            wert.disabled = ohneEingabe;
+            wert.value = ohneEingabe ? '' : wert.value;
+            wert.placeholder = ohneEingabe
+                ? text('ANF_OHNE_WERT', 'kein Wert nötig')
+                : text('ANF_WERT', 'Wert');
+
+            const art = stream.find(function (b) { return b.art === gewaehlt?.value; });
+            hinweisFeld.textContent = art?.hinweis || '';
+        }
+
         zeile.innerHTML =
-            '<div class="col-5">' +
-              '<select class="form-select" data-anforderung-art>' +
-                '<option value="min_account_age">' + text('ANF_KONTOALTER', 'Mindestalter des Kontos (Tage)') + '</option>' +
-                '<option value="min_server_age">' + text('ANF_SERVERZEIT', 'Mindestzeit auf dem Server (Tage)') + '</option>' +
-                '<option value="required_role">' + text('ANF_ROLLE', 'Rolle erforderlich (ID)') + '</option>' +
-              '</select>' +
+            (stream.length
+                ? '<div class="col-3">' +
+                    '<select class="form-select" data-anforderung-weg>' +
+                      '<option value="discord">' + text('ANF_WEG_DISCORD', 'Discord') + '</option>' +
+                      '<option value="stream">' + text('ANF_WEG_STREAM', 'Twitch-Chat') + '</option>' +
+                    '</select>' +
+                  '</div>'
+                : '') +
+            '<div class="' + (stream.length ? 'col-4' : 'col-5') + '">' +
+              '<select class="form-select" data-anforderung-art></select>' +
             '</div>' +
-            '<div class="col-5">' +
-              '<input type="text" class="form-control" data-anforderung-wert placeholder="' + text('ANF_WERT', 'Wert') + '">' +
+            '<div class="' + (stream.length ? 'col-3' : 'col-5') + '">' +
+              '<input type="text" class="form-control" data-anforderung-wert>' +
             '</div>' +
             '<div class="col-2">' +
               '<button type="button" class="btn btn-outline-danger w-100" ' +
                 'onclick="document.getElementById(\'anforderung-' + id + '\').remove()">' +
                 '<i class="fa-solid fa-xmark"></i>' +
               '</button>' +
-            '</div>';
+            '</div>' +
+            '<div class="col-12"><div class="form-hint" data-anforderung-hinweis></div></div>';
 
         behaelter.appendChild(zeile);
+
+        artenSetzen('discord');
+        zeile.querySelector('[data-anforderung-weg]')?.addEventListener('change', function (e) {
+            artenSetzen(e.target.value);
+        });
+        zeile.querySelector('[data-anforderung-art]').addEventListener('change', wertfeldSetzen);
     };
 
     /** Felder aus einer Vorlage vorbelegen. */
@@ -190,7 +272,6 @@
                     scheduled_start: daten.get('scheduled_start') || null,
                     claim_duration: daten.get('claim_duration') || null,
                     teilnahme: daten.get('teilnahme') || 'discord',
-                    stream_nur_abonnenten: daten.get('stream_nur_abonnenten') === '1',
                     requirements: leseAnforderungen()
                 })
                     .then(function () { window.location.reload(); })
