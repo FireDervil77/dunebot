@@ -61,7 +61,7 @@ ServiceManager.register('Logger', {
 });
 
 const unbekannteAbfragen = [];
-const daten = { verlosung: null, eintraege: [], gewinner: [], geschrieben: [] };
+const daten = { verlosung: null, eintraege: [], gewinner: [], geschrieben: [], angelegt: [] };
 
 ServiceManager.register('dbService', {
     async query(sql, werte = []) {
@@ -75,6 +75,16 @@ ServiceManager.register('dbService', {
         }
         if (s.startsWith('SELECT user_id, quelle FROM giveaway_winners')) {
             return daten.gewinner;
+        }
+        if (s.startsWith('SELECT * FROM giveaway_requirements')) {
+            // `_updateEmbedActive` zeigt die Bedingungen in der Einbettung an.
+            // Keine hier - die Discord-Bedingungen sind nicht Gegenstand
+            // dieser Pruefung, sie bleiben unangetastet.
+            return [];
+        }
+        if (s.startsWith('INSERT INTO giveaways')) {
+            daten.angelegt.push(werte);
+            return { insertId: 42 };
         }
         if (s.startsWith('INSERT INTO giveaway_winners')) {
             daten.geschrieben.push(werte);
@@ -270,6 +280,39 @@ function lage(teilnahme, eintraege) {
     pruefe(beide.length === 1 && beide[0].quelle === 'streaming',
         'dieselbe Zahl in zwei Namensraeumen sind zwei Lose',
         'der Discord-Gewinner ist raus, das Twitch-Los nicht');
+
+    // -----------------------------------------------------------------------
+    console.log('\nDer Teilnahmeweg wird nicht geraten');
+    // -----------------------------------------------------------------------
+    const GiveawayManagerKlasse = require('../plugins/giveaway/bot/managers/GiveawayManager');
+    const anleger = new GiveawayManagerKlasse(client);
+
+    /**
+     * @param {Object} zusatz Angaben zum Weg
+     * @returns {Promise<Array>} Die geschriebenen Werte
+     */
+    async function anlegen(zusatz) {
+        daten.angelegt.length = 0;
+        // Signatur ist (guildId, channelId, options) - nicht ein Objekt.
+        await anleger.createGiveaway('g1', 'k1', { prize: 'P', duration: 3600000, ...zusatz })
+            .catch(e => console.log('    [Grund] ' + e.message));
+        return daten.angelegt[0] || [];
+    }
+
+    let werte = await anlegen({});
+    pruefe(werte[15] === 'discord', 'ohne Angabe bleibt es beim Discord-Weg', String(werte[15]));
+
+    werte = await anlegen({ teilnahme: 'beide' });
+    pruefe(werte[15] === 'beide', 'ein gueltiger Weg wird uebernommen', String(werte[15]));
+
+    // **Der wichtigste Fall.** Ein kaputtes Formularfeld darf keine Verlosung
+    // aufmachen, an der plötzlich jeder im Chat mitmacht.
+    werte = await anlegen({ teilnahme: 'irgendwas' });
+    pruefe(werte[15] === 'discord', 'ein unbekannter Weg faellt auf discord zurueck, nicht auf beide',
+        String(werte[15]));
+
+    werte = await anlegen({ teilnahme: 'stream', streamNurAbonnenten: true });
+    pruefe(werte[16] === 1, 'die Abonnenten-Bedingung wird mitgeschrieben', String(werte[16]));
 
     // -----------------------------------------------------------------------
     console.log('\nHat die Attrappe alles gesehen?');

@@ -31,12 +31,35 @@ const zeitpunkt = (w) => w ? new Date(w).toLocaleString('de-DE') : '—';
     <tbody>
       <% eintraege.forEach(v => { %>
         <tr>
-          <td><strong><%= v.prize %></strong></td>
+          <td>
+            <strong><%= v.prize %></strong>
+            <%# **Der Weg gehoert sichtbar dorthin, wo die Verlosung steht.**
+                Sonst ist die Einstellung nach dem Anlegen weg — und niemand
+                kann nachsehen, warum der Twitch-Chat nichts tut. %>
+            <% if (v.teilnahme === 'stream' || v.teilnahme === 'beide') { %>
+              <span class="badge bg-purple-lt ms-1" title="<%= tr('giveaway:CREATE_TEILNAHME') %>">
+                <i class="fa-brands fa-twitch me-1"></i>
+                <%= v.teilnahme === 'beide'
+                      ? tr('giveaway:CREATE_TEILNAHME_BEIDE')
+                      : tr('giveaway:CREATE_TEILNAHME_STREAM') %>
+              </span>
+              <% if (v.stream_nur_abonnenten) { %>
+                <span class="badge bg-secondary-lt ms-1"><%= tr('giveaway:CREATE_NUR_ABONNENTEN') %></span>
+              <% } %>
+            <% } %>
+          </td>
           <td class="text-secondary"><%= kanalName(v.channel_id) %></td>
           <td><%= v.winner_count %></td>
 
           <% if (modus === 'laufend') { %>
-            <td><span class="badge bg-secondary-lt"><%= v.entry_count || 0 %></span></td>
+            <td>
+              <span class="badge bg-secondary-lt" title="Discord"><%= v.entry_count || 0 %></span>
+              <% if (v.lose_fremd) { %>
+                <span class="badge bg-purple-lt ms-1" title="<%= tr('giveaway:CREATE_TEILNAHME_STREAM') %>">
+                  <i class="fa-brands fa-twitch me-1"></i><%= v.lose_fremd %>
+                </span>
+              <% } %>
+            </td>
             <td>
               <% if (v.ends_at) { %>
                 <span data-countdown="<%= new Date(v.ends_at).toISOString() %>"><%= zeitpunkt(v.ends_at) %></span>

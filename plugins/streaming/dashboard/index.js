@@ -54,6 +54,13 @@ class StreamingDashboardPlugin extends DashboardPlugin {
         await this._zugangsdatenPruefen();
         this._takteStarten();
 
+        // **Auch hier, nicht nur im Bot.** Der Bot braucht die Quelle fuer die
+        // Ziehung; das Dashboard braucht sie, um auf der Verlosungsseite die
+        // Lose aus dem Chat mitzuzaehlen. Ohne das zeigte eine Verlosung, an
+        // der nur im Stream mitgemacht wird, dauerhaft "0 Teilnehmer" - und
+        // der Betreiber haelt sie fuer kaputt, waehrend sie laeuft.
+        require('../shared/lose').anmelden();
+
         Logger.success('[Streaming] Dashboard-Plugin aktiviert');
         return true;
     }
@@ -358,6 +365,7 @@ class StreamingDashboardPlugin extends DashboardPlugin {
      */
     async onDisable() {
         try {
+            require('../shared/lose').abmelden();
             require('./kern/takt').anhalten();
             require('./ausgabe/drossel').anhalten();
             require('./ausgabe/strom').anhalten();

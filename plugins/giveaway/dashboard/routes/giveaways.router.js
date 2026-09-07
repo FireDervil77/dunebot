@@ -23,13 +23,25 @@ const zahlOderNull = (w) => {
 // =====================================================
 router.post('/create', requirePermission('GIVEAWAY.CREATE'), async (req, res) => {
     const { channel_id, prize, duration, winner_count, host_id,
-            allowed_roles, scheduled_start, claim_duration, requirements } = req.body;
+            allowed_roles, scheduled_start, claim_duration, requirements,
+            teilnahme, stream_nur_abonnenten } = req.body;
 
     if (!channel_id || !prize || !duration) {
         return res.status(400).json({ success: false, error: 'Kanal, Preis und Dauer sind erforderlich' });
     }
 
     const nutzer = angemeldeterNutzer(req, res);
+
+    // **Der Stream-Weg nur, wenn es ihn gibt.** Im Dialog ist das Feld schon
+    // ausgegraut; das hier haelt es auch dann, wenn jemand die Anfrage selbst
+    // zusammensetzt. Ein unbekannter Wert faellt auf 'discord' zurueck und
+    // nicht auf 'beide' - im Zweifel bleibt es beim Bisherigen.
+    const { ServiceManager } = require('dunebot-core');
+    const streamMoeglich = ServiceManager.has('pluginManager')
+        && await ServiceManager.get('pluginManager')
+            .isPluginEnabledForGuild('streaming', res.locals.guildId);
+
+    const weg = ['stream', 'beide'].includes(teilnahme) && streamMoeglich ? teilnahme : 'discord';
 
     return ueberBot(res, 'giveaway:createGiveaway', {
         guildId: res.locals.guildId,
@@ -42,6 +54,9 @@ router.post('/create', requirePermission('GIVEAWAY.CREATE'), async (req, res) =>
         allowedRoles: Array.isArray(allowed_roles) ? allowed_roles : null,
         scheduledStart: scheduled_start || null,
         claimDurationMs: zahlOderNull(claim_duration),
+        teilnahme: weg,
+        // Die Bedingung ohne den Weg dazu waere eine Einstellung ohne Wirkung.
+        streamNurAbonnenten: weg !== 'discord' && Boolean(stream_nur_abonnenten),
         requirements: Array.isArray(requirements) ? requirements : []
     }, 'Die Verlosung konnte nicht angelegt werden');
 });

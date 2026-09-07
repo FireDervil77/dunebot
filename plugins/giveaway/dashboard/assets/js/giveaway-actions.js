@@ -189,6 +189,8 @@
                         .map(function (o) { return o.value; }),
                     scheduled_start: daten.get('scheduled_start') || null,
                     claim_duration: daten.get('claim_duration') || null,
+                    teilnahme: daten.get('teilnahme') || 'discord',
+                    stream_nur_abonnenten: daten.get('stream_nur_abonnenten') === '1',
                     requirements: leseAnforderungen()
                 })
                     .then(function () { window.location.reload(); })

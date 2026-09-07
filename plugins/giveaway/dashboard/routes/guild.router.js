@@ -21,6 +21,24 @@ const { ServiceManager } = require('dunebot-core');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 const { makeTranslator, renderView, getGuildChannels, getGuildRoles, renderFehler } = require('./_shared');
 
+/**
+ * Kann diese Guild ueberhaupt aus dem Stream heraus mitmachen lassen?
+ *
+ * **Der Schalter wird angezeigt, aber ausgegraut, wenn nicht.** Ihn ganz
+ * wegzulassen waere bequemer und schlechter: Wer nicht weiss, dass es die
+ * Moeglichkeit gibt, sucht sie auch nicht. So steht sie da, mit dem Grund
+ * daneben.
+ *
+ * @param {string} guildId Guild
+ * @returns {Promise<boolean>} true, wenn das Streaming-Plugin hier laeuft
+ */
+async function streamWegMoeglich(guildId) {
+    const { ServiceManager } = require('dunebot-core');
+    if (!ServiceManager.has('pluginManager')) return false;
+    return Boolean(await ServiceManager.get('pluginManager')
+        .isPluginEnabledForGuild('streaming', guildId));
+}
+
 /** Skripte anmelden, die eine Seite braucht. */
 function skripteAnmelden(handles) {
     const assetManager = ServiceManager.get('assetManager');
@@ -52,7 +70,45 @@ async function ladeLaufende(guildId) {
     zaehler.forEach(z => { nachId[z.giveaway_id] = z.anzahl; });
     verlosungen.forEach(v => { v.entry_count = nachId[v.id] || 0; });
 
+    await fremdeLoseZaehlen(verlosungen);
     return verlosungen;
+}
+
+/**
+ * Die Lose zaehlen, die aus einer fremden Quelle kommen.
+ *
+ * **Getrennt gezaehlt, nicht dazugerechnet.** `entry_count` ist die Zahl der
+ * Discord-Teilnehmer und wird an mehreren Stellen so gelesen; sie still um
+ * Twitch-Lose zu erhoehen hiesse, zwei verschiedene Dinge unter einem Namen zu
+ * fuehren. Die Seite zeigt beide Zahlen nebeneinander.
+ *
+ * Ohne das zeigte eine Verlosung, an der nur im Stream mitgemacht wird,
+ * dauerhaft "0 Teilnehmer" - und der Betreiber haelt sie fuer kaputt, waehrend
+ * sie laeuft.
+ *
+ * @param {Array} verlosungen Die Verlosungen
+ * @returns {Promise<void>}
+ */
+async function fremdeLoseZaehlen(verlosungen) {
+    const { LosquellenRegistry } = require('dunebot-sdk');
+    const quellen = LosquellenRegistry.list();
+
+    for (const v of verlosungen) {
+        v.lose_fremd = 0;
+        if (v.teilnahme !== 'stream' && v.teilnahme !== 'beide') continue;
+
+        for (const { name, quelle } of quellen) {
+            try {
+                const lose = await quelle.lose(v);
+                v.lose_fremd += (lose || []).length;
+            } catch (e) {
+                // Eine kaputte Quelle darf die Uebersicht nicht mitnehmen -
+                // dieselbe Regel wie bei der Ziehung.
+                ServiceManager.get('Logger').warn(
+                    `[Giveaway] Losquelle "${name}" lieferte nicht: ${e.message}`);
+            }
+        }
+    }
 }
 
 /** Geplante Verlosungen, die noch nicht begonnen haben. */
@@ -160,7 +216,8 @@ router.get('/dashboard', requirePermission('GIVEAWAY.VIEW'), async (req, res) =>
 
         await renderView(res, 'guild/giveaway-dashboard', {
             tr, guildId, channels, roles,
-            laufende, geplante, beendete, vorlagen, sperrliste, auswertung
+            laufende, geplante, beendete, vorlagen, sperrliste, auswertung,
+            streamWeg: await streamWegMoeglich(guildId)
         });
     } catch (error) {
         return renderFehler(res, error, 'Die Giveaway-Uebersicht konnte nicht geladen werden');
@@ -185,7 +242,10 @@ router.get('/laufende', requirePermission('GIVEAWAY.VIEW'), async (req, res) => 
 
         skripteAnmelden(['giveaway-actions']);
 
-        await renderView(res, 'guild/giveaway-active', { tr, guildId, laufende, geplante, vorlagen, channels, roles });
+        await renderView(res, 'guild/giveaway-active', {
+            tr, guildId, laufende, geplante, vorlagen, channels, roles,
+            streamWeg: await streamWegMoeglich(guildId)
+        });
     } catch (error) {
         return renderFehler(res, error, 'Die laufenden Verlosungen konnten nicht geladen werden');
     }

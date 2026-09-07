@@ -99,6 +99,8 @@ class GiveawayManager {
             scheduledStart = null,
             claimDurationMs = null,
             requirements = [],
+            teilnahme = 'discord',
+            streamNurAbonnenten = false,
         } = options;
 
         const endsAt = new Date(Date.now() + duration);
@@ -108,15 +110,19 @@ class GiveawayManager {
         const result = await this.dbService.query(
             `INSERT INTO giveaways (guild_id, channel_id, prize, title, description, winner_count,
                 ends_at, scheduled_start, created_by, hosted_by, embed_color, button_emoji,
-                allowed_roles, claim_duration_ms, status)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                allowed_roles, claim_duration_ms, status, teilnahme, stream_nur_abonnenten)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [guildId, channelId, prize, title, description, winnerCount,
              isScheduled ? new Date(new Date(scheduledStart).getTime() + duration) : endsAt,
              isScheduled ? new Date(scheduledStart) : null,
              createdBy || '0', hostedBy || createdBy || '0', embedColor, buttonEmoji,
              allowedRoles ? JSON.stringify(allowedRoles) : null,
              claimDurationMs || null,
-             status]
+             status,
+             // Ein unbekannter Weg wird nicht geraten: 'discord' ist das
+             // Verhalten von vorher, und das ist die sichere Seite.
+             ['discord', 'stream', 'beide'].includes(teilnahme) ? teilnahme : 'discord',
+             streamNurAbonnenten ? 1 : 0]
         );
 
         const giveawayId = result.insertId;
