@@ -13,17 +13,6 @@
         return wurzel ? wurzel.dataset.musicBasis : '';
     }
 
-    /**
-     * CSRF-Token aus der Seite.
-     *
-     * An `fetch` haengt es der Theme-Helfer selbst an. Der Datei-Upload laeuft
-     * aber ueber `XMLHttpRequest` - nur damit gibt es einen Fortschritt - und
-     * muss es deshalb selbst mitschicken.
-     */
-    function csrf() {
-        return document.querySelector('meta[name="csrf-token"]')?.content || '';
-    }
-
     /** Text aus den Sprachdaten der Seite, mit Rueckfall. */
     function text(schluessel, ersatz) {
         const wurzel = document.querySelector('[data-music-texte]');
@@ -388,6 +377,15 @@
      * Der Inhaltstyp wird **nicht** gesetzt - der Browser muss die Grenze des
      * mehrteiligen Formulars selbst anhaengen, sonst kann der Server es nicht
      * zerlegen.
+     *
+     * **Der CSRF-Token wird hier NICHT gesetzt.** Hier stand eine eigene
+     * `setRequestHeader('X-CSRF-Token', ...)`-Zeile mit der Begruendung, der
+     * Theme-Helfer haenge das Token nur an `fetch` an. Das stimmt nicht:
+     * `csrf-helper.js` patcht auch `XMLHttpRequest.prototype.send` und laeuft
+     * auf jeder Seite (`theme.js` meldet es global an). Beide setzten also
+     * denselben Header - und `setRequestHeader` **ersetzt** einen schon
+     * gesetzten Wert nicht, sondern haengt ihn mit ", " an. Beim Server kam
+     * `<token>, <token>` an, und der meldete "ungueltiger CSRF-Token".
      */
     function dateiHochladen() {
         const feld = document.getElementById('musik-datei');
@@ -410,7 +408,6 @@
 
         const anfrageObjekt = new XMLHttpRequest();
         anfrageObjekt.open('POST', basis() + '/dateien/upload');
-        anfrageObjekt.setRequestHeader('X-CSRF-Token', csrf());
         anfrageObjekt.setRequestHeader('Accept', 'application/json');
 
         if (knopf) knopf.disabled = true;

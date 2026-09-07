@@ -2,7 +2,7 @@
     "name": "music",
     "displayName": "Musik",
     "description": "Musikwiedergabe aus YouTube, Spotify, SoundCloud und direkten Quellen",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "author": "FireBot Team",
     "license": "none",
     "type": "commonjs",
