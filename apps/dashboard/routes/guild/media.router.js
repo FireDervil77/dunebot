@@ -19,11 +19,26 @@ const fs = require('fs');
 const crypto = require('crypto');
 const { ServiceManager } = require('dunebot-core');
 
-// ── Erlaubte MIME-Types ──
-const ALLOWED_MIME_TYPES = [
-    'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
-    'image/x-icon', 'image/vnd.microsoft.icon'
-];
+// ── Erlaubte MIME-Types, und die Endung, unter der wir speichern ──
+// SVG ist bewusst nicht dabei: Eine SVG ist ausfuehrbares XML, und `/uploads/media`
+// liegt hinter express.static — sie liefe im Browser unter unserer Domain. Fuer
+// eine Medienbibliothek reichen die Rasterformate.
+//
+// Die Endung kommt aus dieser Zuordnung und NICHT aus dem Originalnamen:
+// `file.mimetype` bestimmt der hochladende Browser, die Endung bestimmte bisher
+// der Dateiname — express.static setzt den Content-Type aber nach der Endung.
+// Eine `boese.svg`, als `image/png` deklariert, waere also durch den Filter
+// gekommen und danach als `image/svg+xml` ausgeliefert worden. Was hier nicht
+// steht, entsteht jetzt gar nicht erst auf der Platte.
+const ERLAUBTE_TYPEN = {
+    'image/jpeg': '.jpg',
+    'image/png': '.png',
+    'image/gif': '.gif',
+    'image/webp': '.webp',
+    'image/x-icon': '.ico',
+    'image/vnd.microsoft.icon': '.ico'
+};
+const ALLOWED_MIME_TYPES = Object.keys(ERLAUBTE_TYPEN);
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 const MAX_FILES_PER_UPLOAD = 10;
 
@@ -36,9 +51,11 @@ const storage = multer.diskStorage({
         cb(null, uploadDir);
     },
     filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname).toLowerCase();
-        const uniqueName = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}${ext}`;
-        cb(null, uniqueName);
+        const ext = ERLAUBTE_TYPEN[file.mimetype];
+        // fileFilter laeuft vorher, hier duerfte nichts Unbekanntes ankommen —
+        // aber eine Datei ohne Endung waere schlimmer als eine abgelehnte.
+        if (!ext) return cb(new Error(`Dateityp '${file.mimetype}' ist nicht erlaubt`));
+        cb(null, `${Date.now()}-${crypto.randomBytes(8).toString('hex')}${ext}`);
     }
 });
 
@@ -81,7 +98,10 @@ router.get('/', requirePermission('CORE.MEDIA.VIEW'), async (req, res) => {
             activeMenu: `/guild/${guildId}/media`,
             guildId,
             maxFileSize: MAX_FILE_SIZE,
-            allowedTypes: ALLOWED_MIME_TYPES
+            allowedTypes: ALLOWED_MIME_TYPES,
+            // Damit die Seite nicht anbietet, was der Server ablehnt — beide
+            // kommen aus ERLAUBTE_TYPEN, es gibt also nur eine Wahrheit.
+            erlaubteEndungen: [...new Set(Object.values(ERLAUBTE_TYPEN))]
         });
     } catch (error) {
         Logger.error('[Media] Fehler beim Laden:', error);
