@@ -170,6 +170,18 @@ Object.assign(fehlerTexte, {
                       <option value="<%= z.name %>">{<%= z.name %>} (steht bei <%= z.zahl %>)</option>
                     <% }); %>
                   </select>
+
+                  <%# **Das Muster, das man sonst nicht findet.** Hochzählen und
+                      Anzeigen sind zwei Befehle, weil sie zwei verschiedene
+                      Rechte und zwei verschiedene Abkühlungen brauchen. Das
+                      geht seit jeher — es stand nur nirgends. %>
+                  <div class="zeile__hilfe mt-2">
+                    <b>Zählen und Anzeigen trennt man am besten:</b><br>
+                    <code>!tot</code> — zählt <code>{tode}</code> hoch, <b>nur Moderatoren</b>,
+                    Abkühlung <b>0</b>. Zweimal sterben heißt dann zweimal zählen.<br>
+                    <code>!tode</code> — zählt <b>nichts</b> hoch, sondern schreibt nur
+                    <code>{tode}</code> in die Antwort. Für alle, mit ein paar Sekunden Abkühlung.
+                  </div>
                 </div>
               </div>
             <% } %>

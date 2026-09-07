@@ -917,6 +917,44 @@ console.log('\nDer Streamer darf `!clip` aufmachen');
         String(daten.befehle.find(z => z.wort === 'clip')?.wer));
 }
 
+console.log('\nZaehlen und Anzeigen sind zwei Befehle — und das reicht');
+{
+    // **Der Wunsch des Betreibers vom 2026-09-07**, nachgestellt: Ein Zaehler,
+    // den nur Moderatoren hochsetzen duerfen, und eine Anzeige, die jeder
+    // aufrufen darf. Dafuer braucht es KEINEN neuen Mechanismus - `zaehler_name`
+    // zaehlt hoch, ein `{name}` im Text liest. Wer beides trennt, hat genau das.
+    //
+    // Diese Pruefung steht hier, damit die Trennung ein zugesicherter Vertrag
+    // ist und nicht ein Zufall, der beim naechsten Umbau verschwindet.
+    neuAufsetzen([
+        { wort: 'tot',  art: 'eigen', antwort: 'Tode: {tode}', zaehler_name: 'tode',
+          wer: 'moderator', abkuehlung_s: 0 },
+        { wort: 'tode', art: 'eigen', antwort: 'Tode: {tode}', zaehler_name: null,
+          wer: 'alle', abkuehlung_s: 0 }
+    ], true, 8100000, [{ name: 'tode', art: 'zaehler', zahl: 0 }]);
+
+    const zahl = () => daten.bausteine.find(b => b.name === 'tode').zahl;
+
+    // Zweimal hintereinander sterben — ohne Abkuehlung dazwischen.
+    await befehle.auswerten(nachricht('!tot', { istModerator: true }));
+    await befehle.auswerten(nachricht('!tot', { istModerator: true }));
+    pruefe(zahl() === 2, 'zweimal hintereinander zaehlt zweimal', String(zahl()));
+    pruefe(mitschrift.gesendet.map(g => g.text).join(' | ') === 'Tode: 1 | Tode: 2',
+        'und jede Antwort nennt den Stand NACH dem Hochzaehlen',
+        mitschrift.gesendet.map(g => g.text).join(' | '));
+
+    // Der Zuschauer darf sehen, aber nicht zaehlen.
+    await befehle.auswerten(nachricht('!tode'));
+    pruefe(zahl() === 2, 'die reine Anzeige zaehlt NICHT hoch', String(zahl()));
+    pruefe(mitschrift.gesendet.at(-1)?.text === 'Tode: 2',
+        'und zeigt denselben Stand', mitschrift.gesendet.at(-1)?.text);
+
+    // Und wer nicht darf, bewirkt gar nichts.
+    await befehle.auswerten(nachricht('!tot'));
+    pruefe(zahl() === 2, 'ein gewoehnlicher Zuschauer setzt den Zaehler nicht hoch',
+        String(zahl()));
+}
+
 console.log('\nDie Attrappe hat alles verstanden');
 pruefe(nieGeleert.length === 0,
     'keine unbekannte Abfrage still mit `[]` beantwortet — ueber den ganzen Lauf',
