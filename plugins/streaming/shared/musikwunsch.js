@@ -320,6 +320,89 @@ async function springen(guildId, richtung) {
 }
 
 /**
+ * Wiedergabe anhalten oder fortsetzen.
+ *
+ * **`aktiv` ist der Schalter, den der Player liest, bevor er etwas holt.**
+ * Bis hierher wurde das Feld nur geschrieben (in `springen` und `leeren`) und
+ * nie gelesen - ein Blindgaenger, gefunden durch die Frage des Betreibers
+ * „brauche ich als Admin nicht auch Befehle um das zu starten?".
+ *
+ * **Starten braucht keinen Befehl.** Der Player nimmt sich den naechsten
+ * Titel, sobald einer da ist; ein `!start` waere ein Knopf, den man druecken
+ * muss, damit etwas passiert, das ohnehin passieren soll. Gebraucht wird das
+ * Gegenteil: **anhalten**, wenn der Streamer reden will. `fortsetzen` ist der
+ * Rueckweg dazu und kein zweiter Startmechanismus.
+ *
+ * @param {string} guildId Guild
+ * @param {boolean} an true = spielen, false = anhalten
+ * @returns {Promise<{ok: boolean, aktiv: boolean, titel: string|null}>} Stand
+ */
+async function abspielen(guildId, an) {
+    await zustand(guildId);
+    await db().query(
+        'UPDATE streaming_music_state SET aktiv = ? WHERE guild_id = ?',
+        [an ? 1 : 0, guildId]);
+
+    const laeuft = await aktueller(guildId);
+    return { ok: true, aktiv: Boolean(an), titel: laeuft?.titel || null };
+}
+
+/**
+ * Was soll der Player als naechstes spielen?
+ *
+ * **Die einzige Stelle, die entscheidet, was zu hoeren ist.** Sie traegt
+ * deshalb alle drei Bedingungen zusammen, statt sie auf den Player zu
+ * verteilen: angehalten, nichts da, oder die Datei nicht mehr freigegeben.
+ *
+ * **Ein nicht mehr lieferbarer Titel wird uebersprungen, nicht beklagt.**
+ * Wurde eine Freigabe zurueckgenommen oder die Datei geloescht, liefert
+ * `tonquelle()` null - dann geht es weiter, sonst stuende der Stream still,
+ * weil eine einzelne Zeile nicht mehr aufloesbar ist. Genau dafuer gibt es
+ * keinen Fremdschluessel. Die Schleife ist begrenzt, damit eine Warteschlange
+ * aus lauter toten Kennungen nicht zur Endlosschleife wird.
+ *
+ * @param {string} guildId Guild
+ * @returns {Promise<{spielen: boolean, grund?: string, id?: number, titel?: string, dauerSek?: number|null, uebersprungen?: number}>} Was zu tun ist
+ */
+async function naechster(guildId) {
+    const z = await zustand(guildId);
+    if (!z?.aktiv) return { spielen: false, grund: 'angehalten' };
+
+    const quelle = ablage();
+    if (!quelle) return { spielen: false, grund: 'keine_ablage' };
+
+    let uebersprungen = 0;
+    for (let versuch = 0; versuch < 25; versuch++) {
+        const e = await springen(guildId, +1);
+        if (!e.ok) return { spielen: false, grund: 'nichts_mehr', uebersprungen };
+
+        const zeile = await aktueller(guildId);
+        if (!zeile) return { spielen: false, grund: 'nichts_mehr', uebersprungen };
+
+        const ton = await quelle.tonquelle(guildId, zeile.datei_id);
+        if (ton) {
+            return {
+                spielen: true,
+                id: zeile.id,
+                titel: zeile.titel,
+                dauerSek: zeile.dauer_sek ?? null,
+                uebersprungen
+            };
+        }
+
+        uebersprungen++;
+        log().warn(`[Streaming] Musikwunsch ${zeile.id} ("${zeile.titel}") ist nicht mehr `
+                 + `lieferbar - Freigabe zurueckgenommen oder Datei weg. Wird uebersprungen.`);
+    }
+
+    // Melden statt ausweichen: 25 tote Zeilen hintereinander sind kein
+    // Betriebszustand, sondern ein Befund.
+    log().error(`[Streaming] 25 Musikwuensche in Folge nicht lieferbar (Guild ${guildId}) - `
+              + 'die Warteschlange zeigt auf Dateien, die es nicht mehr gibt.');
+    return { spielen: false, grund: 'nur_tote_zeilen', uebersprungen };
+}
+
+/**
  * Alles aus der Warteschlange nehmen.
  *
  * @param {string} guildId Guild
@@ -410,6 +493,7 @@ function stimmeAbgeben(guildId, absenderId) {
 module.exports = {
     zustand, schluesselNeu, guildZuSchluessel, playerGesehen,
     warteschlange, aktueller, wuenschen, springen, leeren, aufraeumen,
+    abspielen, naechster,
     stimmeAbgeben, stimmenVergessen,
     ablage,
     AUFBEWAHRUNG_TAGE, NOETIGE_STIMMEN

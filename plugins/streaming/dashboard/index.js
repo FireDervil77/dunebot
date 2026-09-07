@@ -50,6 +50,7 @@ class StreamingDashboardPlugin extends DashboardPlugin {
         Logger.info('Aktiviere [Streaming] Dashboard-Plugin...');
 
         this._setupRoutes();
+        this._playerAnhaengen(app);
         this._eingangAnmelden();
         await this._zugangsdatenPruefen();
         this._takteStarten();
@@ -351,6 +352,38 @@ class StreamingDashboardPlugin extends DashboardPlugin {
      *
      * @private
      */
+    /**
+     * Den Player als Browserquelle anhaengen.
+     *
+     * **Ausserhalb des Guild-Bereichs und ausserhalb der Anmeldung**, weil OBS
+     * keine Sitzung mitbringt. Der Schluessel in der Adresse ist der Ausweis;
+     * warum das reicht und warum alles GET ist, steht in `player.router.js`.
+     *
+     * **Der Waechter ist kein Zierrat.** `onEnable` laeuft bei jedem Start,
+     * und ein zweites `app.use` auf denselben Pfad haengt einen zweiten Router
+     * daneben - beide antworten, der erste gewinnt, und welcher das ist, haengt
+     * an der Reihenfolge. Genau die Doppelung, die heute schon zweimal Zeit
+     * gekostet hat (5c92980, cf8c824).
+     *
+     * @param {Object} app Express-App
+     * @private
+     */
+    _playerAnhaengen(app) {
+        const Logger = ServiceManager.get('Logger');
+
+        if (this._playerHaengt) return;
+        if (!app || typeof app.use !== 'function') {
+            // Melden statt ausweichen: Ohne die Route gibt es keinen Ton, und
+            // der Streamer saehe nur eine Adresse, die 404 liefert.
+            Logger.error('[Streaming] Player nicht angehaengt - keine Express-App bekommen.');
+            return;
+        }
+
+        app.use('/stream/player', require('./routes/player.router'));
+        this._playerHaengt = true;
+        Logger.info('[Streaming] Player angehaengt: /stream/player/<schluessel>');
+    }
+
     _setupRoutes() {
         const Logger = ServiceManager.get('Logger');
 

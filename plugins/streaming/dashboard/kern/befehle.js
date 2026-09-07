@@ -282,6 +282,46 @@ const FERTIG = {
         }
     },
 
+    // **Kein `!start`.** Der Player nimmt sich den naechsten Titel von selbst,
+    // sobald einer da ist - ein Startbefehl waere ein Knopf, den jemand
+    // druecken muss, damit etwas passiert, das ohnehin passieren soll.
+    // Gebraucht wird das Gegenteil: anhalten, wenn geredet wird.
+    pause: {
+        beschreibung: 'Haelt die Musik an.',
+        wer: 'moderator',
+        abkuehlung_s: 0,
+        braucht: { plugin: 'music', name: 'Musik' },
+        tun: async (k) => {
+            const musik = require('../../shared/musikwunsch');
+            await musik.abspielen(k.streamerZeile.heim_guild_id, false);
+            return 'Musik angehalten.';
+        }
+    },
+
+    play: {
+        beschreibung: 'Laesst die Musik weiterlaufen.',
+        wer: 'moderator',
+        abkuehlung_s: 0,
+        braucht: { plugin: 'music', name: 'Musik' },
+        tun: async (k) => {
+            const musik = require('../../shared/musikwunsch');
+            const e = await musik.abspielen(k.streamerZeile.heim_guild_id, true);
+            return e.titel ? `Weiter mit: ${e.titel}` : 'Musik laeuft — sobald etwas gewuenscht wird.';
+        }
+    },
+
+    clear: {
+        beschreibung: 'Leert die Warteschlange.',
+        wer: 'moderator',
+        abkuehlung_s: 0,
+        braucht: { plugin: 'music', name: 'Musik' },
+        tun: async (k) => {
+            const musik = require('../../shared/musikwunsch');
+            const weg = await musik.leeren(k.streamerZeile.heim_guild_id);
+            return weg ? `Warteschlange geleert (${weg}).` : 'Die Warteschlange war schon leer.';
+        }
+    },
+
     vote: {
         beschreibung: 'Stimmt dafuer, den laufenden Titel zu ueberspringen.',
         wer: 'alle',
