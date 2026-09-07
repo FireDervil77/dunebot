@@ -131,14 +131,36 @@ router.get('/:schluessel', async (req, res) => {
   // **Der Player fragt, wir schieben nicht.** Eine OBS-Browserquelle verliert
   // ihre Verbindung beim Szenenwechsel und muss von selbst zurueckfinden -
   // eine offene Leitung waere still tot, ein Abruf alle paar Sekunden nicht.
-  function holen() {
-    fetch(BASIS + '/naechster', { cache: 'no-store' })
+  // **"weiter" nur, wenn wirklich weitergerueckt werden soll.** Diese Seite
+  // wird bei jedem Szenenwechsel neu geladen; fragte sie dann nach dem
+  // NAECHSTEN, spraenge sie ueber den Titel, den sie eben noch spielte - und
+  // bei nur einem Titel in der Warteschlange bliebe es still. Genau das ist
+  // beim ersten Lauf passiert.
+  function holen(weiter) {
+    var adresse = BASIS + '/naechster' + (weiter ? '?weiter=1' : '');
+    fetch(adresse, { cache: 'no-store' })
       .then(function (a) { return a.json(); })
       .then(function (d) {
         if (!d || !d.spielen) { laueft = false; zeigen(null); return; }
+
+        // Derselbe Titel, der schon laeuft: nicht neu anfangen lassen. Sonst
+        // setzte jeder Takt die Wiedergabe zurueck auf den Versatz.
+        if (laueft && ton.dataset.id === String(d.id)) return;
+
         laueft = true;
+        ton.dataset.id = String(d.id);
         zeigen(d.titel, d.gewuenschtVon);
         ton.src = BASIS + '/ton/' + d.id;
+
+        // An die Stelle springen, an der der Titel gerade waere. Ohne das
+        // begaenne er nach jedem Szenenwechsel von vorn.
+        if (d.versatzSek > 0) {
+          ton.addEventListener('loadedmetadata', function versetzen() {
+            ton.removeEventListener('loadedmetadata', versetzen);
+            try { ton.currentTime = d.versatzSek; } catch (e) { /* dann eben von vorn */ }
+          });
+        }
+
         ton.play().catch(function () {
           // Autoplay kann scheitern. In OBS nicht, aber in einem normalen
           // Browser-Tab - und dort soll es nicht still haengen bleiben.
@@ -148,22 +170,24 @@ router.get('/:schluessel', async (req, res) => {
       .catch(function () { laueft = false; });
   }
 
-  ton.addEventListener('ended', holen);
+  // Durch: **jetzt** darf vorgerueckt werden.
+  ton.addEventListener('ended', function () { laueft = false; holen(true); });
+
   ton.addEventListener('error', function () {
     // Eine Datei, die der Browser nicht abspielen kann, darf den Rest der
-    // Warteschlange nicht anhalten.
+    // Warteschlange nicht anhalten - also weiter, nicht noch einmal dieselbe.
     laueft = false;
-    holen();
+    holen(true);
   });
 
   // Der Takt tut zweierlei: Er holt Nachschub, wenn nichts laeuft, und er
   // meldet der Anlage, dass die Browserquelle ueberhaupt offen ist.
   setInterval(function () {
     fetch(BASIS + '/gesehen', { cache: 'no-store' }).catch(function () {});
-    if (!laueft) holen();
+    if (!laueft) holen(false);
   }, 5000);
 
-  holen();
+  holen(false);
 })();
 </script>
 </body></html>`);
@@ -181,7 +205,12 @@ router.get('/:schluessel/naechster', async (req, res) => {
     await musik.playerGesehen(guildId);
 
     try {
-        const e = await musik.naechster(guildId);
+        // **`weiter` entscheidet, ob vorgerueckt wird.** Ohne den Schalter
+        // rueckte diese Route immer vor - und ein neu geladener Player (jeder
+        // Szenenwechsel in OBS laedt neu) sprang damit ueber den Titel, den er
+        // gerade noch spielte. Beim ersten echten Lauf am 2026-09-07 blieb es
+        // deshalb still: Der einzige Titel war schon der laufende.
+        const e = await musik.naechster(guildId, { weiter: req.query.weiter === '1' });
         if (!e.spielen) return res.json({ spielen: false, grund: e.grund });
 
         const zeile = await musik.aktueller(guildId);
@@ -190,6 +219,7 @@ router.get('/:schluessel/naechster', async (req, res) => {
             id: e.id,
             titel: e.titel,
             dauerSek: e.dauerSek,
+            versatzSek: e.versatzSek || 0,
             gewuenschtVon: zeile?.gewuenscht_von || null
         });
     } catch (fehler) {

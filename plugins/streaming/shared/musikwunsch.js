@@ -351,11 +351,58 @@ async function abspielen(guildId, an) {
 }
 
 /**
- * Was soll der Player als naechstes spielen?
+ * Wie weit ist der laufende Titel schon?
+ *
+ * **Damit ein Szenenwechsel den Titel nicht von vorn anfangen laesst.** OBS
+ * laedt die Browserquelle beim Wechsel neu; ohne Versatz begaenne jedes Mal
+ * derselbe Anfang, und bei mehreren Wechseln kaeme man nie ans Ende.
+ *
+ * **Die Grenze steht hier, weil sie sonst niemand kennt:** Gerechnet wird ab
+ * `begonnen_am`, und eine Pause verschiebt den Wert nicht. Wer zehn Minuten
+ * pausiert, steigt danach zehn Minuten spaeter ein - oder, weil der Versatz
+ * nie ueber die Laenge hinausgeht, am Ende. Den Zeitpunkt beim Pausieren
+ * fortzuschreiben waere die genauere Loesung; sie braucht aber einen Player,
+ * der seine Position meldet, und der meldet heute nur, dass er da ist.
+ *
+ * @param {Date|string|null} begonnenAm Wann der Titel gestartet wurde
+ * @param {number|null} dauerSek Laenge, soweit bekannt
+ * @returns {number} Sekunden ab Titelanfang, nie negativ
+ */
+function versatzAus(begonnenAm, dauerSek) {
+    if (!begonnenAm) return 0;
+
+    const sekunden = Math.floor((Date.now() - new Date(begonnenAm).getTime()) / 1000);
+    if (!Number.isFinite(sekunden) || sekunden <= 0) return 0;
+
+    // Ohne bekannte Dauer nicht raten: Ein Versatz hinter dem Titelende laesst
+    // den Browser sofort `ended` melden, und der Titel waere uebersprungen.
+    if (!dauerSek) return sekunden;
+
+    // Zwei Sekunden Rand, damit der Einstieg nicht auf dem letzten Frame liegt.
+    return Math.min(sekunden, Math.max(0, dauerSek - 2));
+}
+
+/**
+ * Was soll der Player spielen?
  *
  * **Die einzige Stelle, die entscheidet, was zu hoeren ist.** Sie traegt
- * deshalb alle drei Bedingungen zusammen, statt sie auf den Player zu
- * verteilen: angehalten, nichts da, oder die Datei nicht mehr freigegeben.
+ * deshalb alle Bedingungen zusammen, statt sie auf den Player zu verteilen:
+ * angehalten, nichts da, oder die Datei nicht mehr freigegeben.
+ *
+ * ## `weiter` - der Fehler, den der erste echte Lauf gefunden hat
+ *
+ * Bis zum 2026-09-07 rueckte diese Funktion **immer** vor. Beim ersten Lauf
+ * wechselte der Betreiber die Szene, OBS lud die Browserquelle neu, sie fragte
+ * nach - und bekam "nichts mehr", weil der einzige Titel schon der laufende
+ * war. Gemessen: `aktuelle_id` stand auf ihm, `player_gesehen` war aktuell, und
+ * es blieb still. **Ein neu geladener Player will wissen, was LAEUFT, nicht was
+ * DANACH kommt.**
+ *
+ * Deshalb: `weiter = false` (die Vorgabe) nimmt den laufenden Titel, solange er
+ * lieferbar ist. Nur `weiter = true` - nach `ended`, `!skip`, `!vote` - rueckt
+ * vor. Laeuft noch gar nichts, faengt auch `false` vorn an; sonst muesste
+ * irgendetwas anderes die Wiedergabe starten, und das waere der `!start`, den
+ * es bewusst nicht gibt.
  *
  * **Ein nicht mehr lieferbarer Titel wird uebersprungen, nicht beklagt.**
  * Wurde eine Freigabe zurueckgenommen oder die Datei geloescht, liefert
@@ -365,14 +412,31 @@ async function abspielen(guildId, an) {
  * aus lauter toten Kennungen nicht zur Endlosschleife wird.
  *
  * @param {string} guildId Guild
- * @returns {Promise<{spielen: boolean, grund?: string, id?: number, titel?: string, dauerSek?: number|null, uebersprungen?: number}>} Was zu tun ist
+ * @param {{weiter?: boolean}} [wie] `weiter` rueckt vor, sonst gilt der laufende
+ * @returns {Promise<{spielen: boolean, grund?: string, id?: number, titel?: string, dauerSek?: number|null, versatzSek?: number, uebersprungen?: number}>} Was zu tun ist
  */
-async function naechster(guildId) {
+async function naechster(guildId, wie = {}) {
     const z = await zustand(guildId);
     if (!z?.aktiv) return { spielen: false, grund: 'angehalten' };
 
     const quelle = ablage();
     if (!quelle) return { spielen: false, grund: 'keine_ablage' };
+
+    // Der laufende Titel, wenn nicht ausdruecklich weitergerueckt werden soll.
+    if (!wie.weiter && z.aktuelle_id) {
+        const zeile = await aktueller(guildId);
+        if (zeile && await quelle.tonquelle(guildId, zeile.datei_id)) {
+            return {
+                spielen: true,
+                id: zeile.id,
+                titel: zeile.titel,
+                dauerSek: zeile.dauer_sek ?? null,
+                versatzSek: versatzAus(z.begonnen_am, zeile.dauer_sek),
+                uebersprungen: 0
+            };
+        }
+        // Nicht mehr lieferbar - dann gilt dasselbe wie beim Weiterruecken.
+    }
 
     let uebersprungen = 0;
     for (let versuch = 0; versuch < 25; versuch++) {
@@ -389,6 +453,7 @@ async function naechster(guildId) {
                 id: zeile.id,
                 titel: zeile.titel,
                 dauerSek: zeile.dauer_sek ?? null,
+                versatzSek: 0,   // gerade erst begonnen
                 uebersprungen
             };
         }
