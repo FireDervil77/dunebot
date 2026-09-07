@@ -3,7 +3,7 @@
   "identity": {
     "slug": "valheim",
     "name": "Valheim",
-    "version": "1.0.8",
+    "version": "1.0.9",
     "author": "firenetworks",
     "category": "survival",
     "description": {
@@ -160,6 +160,12 @@
         "when": "true"
       },
       {
+        "key": "resetmodifiers",
+        "form": "-resetmodifiers",
+        "from": "setting:mod_verwalten",
+        "when": "true"
+      },
+      {
         "key": "preset",
         "form": [
           "-preset",
@@ -217,6 +223,51 @@
         ],
         "from": "setting:mod_portals",
         "when": "not_empty"
+      },
+      {
+        "key": "key_nobuildcost",
+        "form": [
+          "-setkey",
+          "nobuildcost"
+        ],
+        "from": "setting:key_nobuildcost",
+        "when": "true"
+      },
+      {
+        "key": "key_playerevents",
+        "form": [
+          "-setkey",
+          "playerevents"
+        ],
+        "from": "setting:key_playerevents",
+        "when": "true"
+      },
+      {
+        "key": "key_fire",
+        "form": [
+          "-setkey",
+          "fire"
+        ],
+        "from": "setting:key_fire",
+        "when": "true"
+      },
+      {
+        "key": "key_passivemobs",
+        "form": [
+          "-setkey",
+          "passivemobs"
+        ],
+        "from": "setting:key_passivemobs",
+        "when": "true"
+      },
+      {
+        "key": "key_nomap",
+        "form": [
+          "-setkey",
+          "nomap"
+        ],
+        "from": "setting:key_nomap",
+        "when": "true"
       }
     ],
     "extra_args": {
@@ -923,6 +974,138 @@
       "takes_effect": "restart",
       "risk": "none",
       "role": "owner"
+    },
+    {
+      "key": "mod_verwalten",
+      "group": "world",
+      "name": {
+        "de": "Weltmodifikatoren aus dem Panel verwalten",
+        "en": "Manage world modifiers from the panel"
+      },
+      "description": {
+        "de": "Aus: Wir fassen die Modifikatoren dieser Welt nicht an — sie bleiben, wie sie sind. An: Bei JEDEM Start wird der Stand aus den Feldern hier neu aufgebaut. ⚠ Damit verschwindet auch, was jemand im Spiel über die Konsole gesetzt hat.",
+        "en": "Off: we do not touch this world's modifiers. On: the state is rebuilt from these fields on EVERY start — including discarding anything set in-game via the console."
+      },
+      "type": "boolean",
+      "default": false,
+      "apply": [
+        {
+          "target": "arg"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "owner"
+    },
+    {
+      "key": "key_nobuildcost",
+      "group": "world",
+      "name": {
+        "de": "Keine Baukosten",
+        "en": "No build cost"
+      },
+      "description": {
+        "de": "Bauen kostet kein Material. Praktisch zum Einrichten, und der Grund, warum es den Hammermodus gibt. Wirkt nur, wenn oben „aus dem Panel verwalten“ an ist.",
+        "en": "Building costs no materials. Only has an effect while „manage from the panel“ is on."
+      },
+      "type": "boolean",
+      "default": false,
+      "apply": [
+        {
+          "target": "arg"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "owner"
+    },
+    {
+      "key": "key_playerevents",
+      "group": "world",
+      "name": {
+        "de": "Spielerbasierte Überfälle",
+        "en": "Player-based raids"
+      },
+      "description": {
+        "de": "Überfälle richten sich nach dem Fortschritt einzelner Spieler statt nach dem der Welt. Wirkt nur, wenn oben „aus dem Panel verwalten“ an ist.",
+        "en": "Raids follow individual players' progress instead of the world's. Only has an effect while „manage from the panel“ is on."
+      },
+      "type": "boolean",
+      "default": false,
+      "apply": [
+        {
+          "target": "arg"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "owner"
+    },
+    {
+      "key": "key_fire",
+      "group": "world",
+      "name": {
+        "de": "Feuerrisiken",
+        "en": "Fire risks"
+      },
+      "description": {
+        "de": "Feuer greift auf Bauten über. Aus der immersiven Voreinstellung. Wirkt nur, wenn oben „aus dem Panel verwalten“ an ist.",
+        "en": "Fire spreads to buildings. From the immersive preset. Only has an effect while „manage from the panel“ is on."
+      },
+      "type": "boolean",
+      "default": false,
+      "apply": [
+        {
+          "target": "arg"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "owner"
+    },
+    {
+      "key": "key_passivemobs",
+      "group": "world",
+      "name": {
+        "de": "Passive Gegner",
+        "en": "Passive enemies"
+      },
+      "description": {
+        "de": "Gegner greifen nicht von sich aus an. Wirkt nur, wenn oben „aus dem Panel verwalten“ an ist.",
+        "en": "Enemies do not attack on their own. Only has an effect while „manage from the panel“ is on."
+      },
+      "type": "boolean",
+      "default": false,
+      "apply": [
+        {
+          "target": "arg"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "owner"
+    },
+    {
+      "key": "key_nomap",
+      "group": "world",
+      "name": {
+        "de": "Keine Karte",
+        "en": "No map"
+      },
+      "description": {
+        "de": "Es gibt keine Karte — weder eigene Position noch Erkundetes. Wirkt nur, wenn oben „aus dem Panel verwalten“ an ist.",
+        "en": "No map at all — no position, no explored terrain. Only has an effect while „manage from the panel“ is on."
+      },
+      "type": "boolean",
+      "default": false,
+      "apply": [
+        {
+          "target": "arg"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "owner"
     }
   ],
   "commands": {
@@ -997,7 +1180,7 @@
       "commands.players.ban: bannedlist.txt und das Eintragsformat [Plattform]_[Kennung] sind durch die offizielle Dokumentation belegt (siehe referenz/valheim.json). Am laufenden Server ist beides weiterhin ungeprüft — Doku ist kein Nachweis.",
       "commands.players.ban: Die Datei liegt im Speicherverzeichnis. Wird -savedir gesetzt, wandert sie mit — dann greift ein fester Pfad ins Leere.",
       "world_seed: GIBT ES NICHT als Startparameter — gemessen am 2026-09-06 an assembly_valheim.dll. Valheim kennt genau diese Parameter: -backuplong -backups -backupshort -console -crossplay -instanceid -joincode -logfile -modifier -name -password -port -preset -public -resetmodifiers -savedir -saveinterval -setkey -world. Kein -seed. Was an \"seed\" in der Assembly steht, sind Konsolenbefehle (printseeds, nextseed) und Logtexte. Der Seed entsteht beim Anlegen der Welt und liegt danach in der .fwl-Datei; ein bestimmter Seed geht nur, indem man die Welt anderswo mit ihm erzeugt und beide Dateien (.fwl und .db) hochlaedt. Das ist eine Dateiablage, keine Einstellung.",
-      "start_args: -preset, -modifier und -setkey — GEMESSEN am 2026-09-06 am laufenden Server, nicht aus der Doku uebernommen. Preset und die fuenf Modifikatoren sind jetzt als Einstellung gebaut (fachliche Hoehe). Die Referenz sagte nach Nodecraft, sie wirkten NUR beim ersten Erzeugen einer Welt; das ist WIDERLEGT: Lauf 1 erzeugte die Welt mit -preset hard, Lauf 2 lud dieselbe Welt mit -preset casual, und das Spiel meldete \"Setting world modifier preset: casual\" — nach dem Laden ruehrt nichts es mehr an. Deshalb takes_effect: restart, nicht new_world. Erlaubte Werte ebenfalls gemessen, mit Gegenprobe: Presets normal|casual|easy|hard|hardcore|immersive|hammer (veryeasy und ein erfundener Wert wurden LAUT abgelehnt). Modifikatoren: combat veryeasy|easy|hard|veryhard, deathpenalty casual|veryeasy|easy|hard|hardcore, resources muchless|less|more|muchmore|most, raids none|muchless|less|more|muchmore, portals casual|hard|veryhard. \"normal\" ist bei den Einzelwerten KEIN Wert, sondern das Nichtsetzen. ⚠ Ein ungueltiger Einzelwert wird STILL verworfen — keine Meldung im Log. Deshalb Auswahlfelder und kein Textfeld. Offen bleibt -setkey (globale Schluessel) und -resetmodifiers.",
+      "start_args: -preset, -modifier und -setkey — GEMESSEN am 2026-09-06 am laufenden Server, nicht aus der Doku uebernommen. Preset und die fuenf Modifikatoren sind jetzt als Einstellung gebaut (fachliche Hoehe). Die Referenz sagte nach Nodecraft, sie wirkten NUR beim ersten Erzeugen einer Welt; das ist WIDERLEGT: Lauf 1 erzeugte die Welt mit -preset hard, Lauf 2 lud dieselbe Welt mit -preset casual, und das Spiel meldete \"Setting world modifier preset: casual\" — nach dem Laden ruehrt nichts es mehr an. Deshalb takes_effect: restart, nicht new_world. Erlaubte Werte ebenfalls gemessen, mit Gegenprobe: Presets normal|casual|easy|hard|hardcore|immersive|hammer (veryeasy und ein erfundener Wert wurden LAUT abgelehnt). Modifikatoren: combat veryeasy|easy|hard|veryhard, deathpenalty casual|veryeasy|easy|hard|hardcore, resources muchless|less|more|muchmore|most, raids none|muchless|less|more|muchmore, portals casual|hard|veryhard. \"normal\" ist bei den Einzelwerten KEIN Wert, sondern das Nichtsetzen. ⚠ Ein ungueltiger Einzelwert wird STILL verworfen — keine Meldung im Log. Deshalb Auswahlfelder und kein Textfeld. setkey und resetmodifiers sind am 2026-09-07 nachgemessen und GEBAUT. Die fuenf Kaestchen des Spiels heissen: nobuildcost (Keine Baukosten), playerevents (Spielerbasierte Ueberfaelle), fire (Feuerrisiken), passivemobs (Passive Gegner), nomap (Keine Karte). Gefunden ueber die Presets: jedes wurde einzeln gesetzt und die .fwl danach ausgelesen — casual liefert passivemobs/playerevents/teleportall, hammer nobuildcost/passivemobs, immersive nomap/noportals/fire, hardcore nomap/nobossportals/deathskillsreset/deathdeleteitems. ⚠ DREI Messungen bestimmen die Bauform: (1) -setkey prueft NICHTS — ein \"erfundenerschluessel\" landete dauerhaft in der Welt. (2) Ein Schluessel verschwindet NIE von selbst: ohne jeden Parameter neu gestartet, standen alle sechs noch da. (3) Nur -resetmodifiers raeumt auf — danach stand exakt der eine gesetzte Schluessel da. Deshalb der Schalter \"Weltmodifikatoren aus dem Panel verwalten\": Ist er an, wird der Stand bei JEDEM Start aus den Feldern neu aufgebaut. Ist er aus, fasst das Panel die Welt nicht an — Bestandsserver bleiben dadurch unberuehrt. Der Preis steht in der Beschreibung des Schalters: -resetmodifiers loescht auch, was jemand im Spiel ueber die Konsole gesetzt hat.",
       "requirements.os_packages: GEMESSEN am 2026-09-06, der offene Punkt ist eingeloest. Am angehefteten Image nachgezaehlt (dpkg-query): libatomic1 und libc6 waren drin, libpulse fehlte vollstaendig — dpkg 0 Treffer, ldconfig 0 Treffer. Unity holt libpulse zur Laufzeit per dlopen, weshalb ldd sie nie zeigte. Das Wiki nennt libpulse-dev, weil es fuer Entwicklungsmaschinen geschrieben ist; im Laufzeit-Image genuegt libpulse0 (liefert libpulse.so.0 und libpulse-simple.so.0). Nachgehalten wird das jetzt von scripts/check-paket-abhaengigkeiten.js, nicht mehr von dieser Zeile."
     ]
   },

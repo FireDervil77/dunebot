@@ -7,7 +7,7 @@
       "de": "Baue Kolonien im All, automatisiere die Produktion mit Förderbändern und versorge deine Astronauten. Für 1–10 Spieler.",
       "en": "Explore an endless universe and build the most efficient constellation of colonies. Automate production with conveyor systems and take care of your astronauts. For 1-10 players."
     },
-    "version": "1.0.10",
+    "version": "1.0.11",
     "author": "firenetworks",
     "category": "sandbox",
     "origin": {
@@ -19,7 +19,7 @@
   "image": {
     "ref": "registry.firenetworks.de/fb/proton",
     "tag": "2026.09-GE-Proton10-32",
-    "digest": "sha256:ac5b6e87df384ace2e842e100ba1a6287ed282f4da46cabe7a12b3ec582ec939",
+    "digest": "sha256:374c1c48896516efeae46e1145ebff391a8927d99b5b8ff2a3a41bd96eaebc8e",
     "pinned_at": "2026-09-06",
     "platform": "linux",
     "arch": [
