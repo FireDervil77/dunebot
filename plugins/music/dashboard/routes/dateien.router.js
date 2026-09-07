@@ -173,9 +173,14 @@ router.post('/upload', requirePermission('MUSIC.FILES.UPLOAD'), (req, res) => {
                 }
             }
 
+            // **Die Textfelder kommen aus demselben Formular wie die Datei.**
+            // Multer legt sie in `req.body`, aber erst NACH der Datei - vorher
+            // steht dort nichts. Deshalb hier und nicht weiter oben.
             const id = await MusicFiles.anlegen(guildId, {
                 dateiname: req.file.filename,
                 originalname: req.file.originalname,
+                herkunft: (req.body?.herkunft || '').trim().slice(0, 255) || null,
+                fuerStream: req.body?.fuer_stream === '1' || req.body?.fuer_stream === 'true',
                 groesseBytes: req.file.size,
                 hochgeladenVon: angemeldeterNutzer(req, res)
             });
@@ -191,6 +196,48 @@ router.post('/upload', requirePermission('MUSIC.FILES.UPLOAD'), (req, res) => {
             return res.status(500).json({ success: false, message: 'Die Datei konnte nicht abgelegt werden.' });
         }
     });
+});
+
+// =====================================================
+// Herkunft und Stream-Freigabe nachtragen
+// =====================================================
+
+/**
+ * **Dasselbe Recht wie das Hochladen, nicht `MUSIC.VIEW`.**
+ *
+ * Wer eine Datei fuer den Stream freigibt, entscheidet, was vor Publikum
+ * laufen darf - das ist naeher am Hochladen als am Ansehen. Ein eigenes Recht
+ * dafuer waere ein weiterer Eintrag im Katalog, den niemand vergibt.
+ */
+router.post('/:id/merkmale', requirePermission('MUSIC.FILES.UPLOAD'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const id = Number(req.params.id);
+
+    if (!Number.isInteger(id) || id <= 0) {
+        return res.status(400).json({ success: false, message: 'Ungültige Kennung.' });
+    }
+
+    try {
+        // `auspacken` gehoert zu den Bot-Antworten, nicht zum Anfragekoerper -
+        // hier ist `req.body` das Richtige.
+        const daten = req.body || {};
+        const getroffen = await MusicFiles.merkmaleSetzen(id, guildId, {
+            herkunft: String(daten.herkunft || '').trim().slice(0, 255) || null,
+            fuerStream: daten.fuer_stream === true || daten.fuer_stream === '1'
+        });
+
+        // **Nicht getroffen heisst nicht „nichts geaendert".** Es heisst, dass
+        // die Zeile zu einer anderen Guild gehoert oder nicht mehr da ist -
+        // und das ist eine andere Auskunft als ein stilles OK.
+        if (!getroffen) {
+            return res.status(404).json({ success: false, message: 'Diese Datei gibt es hier nicht.' });
+        }
+
+        return res.json({ success: true });
+    } catch (error) {
+        ServiceManager.get('Logger').error('[Musik] Merkmale nicht speicherbar:', error);
+        return res.status(500).json({ success: false, message: 'Das konnte nicht gespeichert werden.' });
+    }
 });
 
 // =====================================================

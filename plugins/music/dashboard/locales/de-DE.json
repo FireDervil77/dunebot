@@ -181,6 +181,10 @@
     "NAME": "Datei",
     "SIZE": "Größe",
     "LAST_PLAYED": "Zuletzt gespielt",
-    "NEVER": "nie"
+    "NEVER": "nie",
+    "ORIGIN": "Herkunft",
+    "ORIGIN_PLACEHOLDER": "z. B. NCS, StreamBeats …",
+    "ORIGIN_HINT": "Nur für dich — damit du in einem Jahr noch weißt, wo du nachlegen kannst. Wird nicht geprüft.",
+    "FOR_STREAM": "Für den Stream"
   }
 }

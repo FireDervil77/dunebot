@@ -61,6 +61,26 @@
           <div class="progress-bar progress-bar-indeterminate"></div>
         </div>
 
+        <%# Herkunft und Freigabe reisen mit der Datei mit. Sie stehen HIER
+            und nicht in einem zweiten Schritt: Wer zwanzig Titel ablegt,
+            soll nicht zwanzigmal nachtragen muessen. %>
+        <div class="row g-2 mt-2">
+          <div class="col-md-8">
+            <input type="text" class="form-control" id="musik-datei-herkunft"
+                   maxlength="255"
+                   placeholder="<%= tr('music:FILES.ORIGIN_PLACEHOLDER') %>"
+                   <%= locals.darfHochladen === false ? 'disabled' : '' %>>
+            <div class="form-hint"><%= tr('music:FILES.ORIGIN_HINT') %></div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-check form-switch mt-2">
+              <input type="checkbox" class="form-check-input" id="musik-datei-stream"
+                     <%= locals.darfHochladen === false ? 'disabled' : '' %>>
+              <span class="form-check-label"><%= tr('music:FILES.FOR_STREAM') %></span>
+            </label>
+          </div>
+        </div>
+
         <div class="form-hint mt-2"><%= tr('music:FILES.UPLOAD_HINT') %></div>
       </div>
     </div>
@@ -84,6 +104,8 @@
             <thead>
               <tr>
                 <th><%= tr('music:FILES.NAME') %></th>
+                <th><%= tr('music:FILES.ORIGIN') %></th>
+                <th class="text-center"><%= tr('music:FILES.FOR_STREAM') %></th>
                 <th class="text-end"><%= tr('music:FILES.SIZE') %></th>
                 <th><%= tr('music:FILES.LAST_PLAYED') %></th>
                 <th class="w-1"></th>
@@ -94,6 +116,24 @@
                 <tr id="musik-datei-<%= d.id %>">
                   <td class="text-truncate" style="max-width:26rem;" title="<%= d.originalname %>">
                     <i class="fa-solid fa-music me-2 text-secondary"></i><%= d.originalname %>
+                  </td>
+                  <%# Beide Felder sind direkt bedienbar. Ein eigener
+                      Bearbeiten-Dialog fuer zwei Werte waere ein Klick mehr
+                      und eine Ansicht mehr, die auseinanderlaufen kann. %>
+                  <td>
+                    <input type="text" class="form-control form-control-sm" data-herkunft
+                           maxlength="255" value="<%= d.herkunft || '' %>"
+                           placeholder="<%= tr('music:FILES.ORIGIN_PLACEHOLDER') %>"
+                           onchange="musicDateiMerkmale(<%= d.id %>)"
+                           <%= locals.darfHochladen === false ? 'disabled' : '' %>>
+                  </td>
+                  <td class="text-center">
+                    <label class="form-check form-switch d-inline-block mb-0">
+                      <input type="checkbox" class="form-check-input" data-stream
+                             <%= d.fuer_stream ? 'checked' : '' %>
+                             onchange="musicDateiMerkmale(<%= d.id %>)"
+                             <%= locals.darfHochladen === false ? 'disabled' : '' %>>
+                    </label>
                   </td>
                   <td class="text-end text-secondary"><%= groesse(d.groesse_bytes) %></td>
                   <td class="text-secondary">

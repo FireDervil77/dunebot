@@ -84,11 +84,64 @@ class MusicFiles {
     static async anlegen(guildId, daten) {
         const dbService = ServiceManager.get('dbService');
         const ergebnis = await dbService.query(
-            `INSERT INTO music_files (guild_id, dateiname, originalname, groesse_bytes, hochgeladen_von)
-             VALUES (?, ?, ?, ?, ?)`,
-            [guildId, daten.dateiname, daten.originalname, daten.groesseBytes || 0, daten.hochgeladenVon || null]
+            `INSERT INTO music_files
+                (guild_id, dateiname, originalname, herkunft, fuer_stream, groesse_bytes, hochgeladen_von)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [guildId, daten.dateiname, daten.originalname,
+             daten.herkunft || null,
+             // **Freigeben ist eine Handlung.** Eine Datei kommt nie
+             // freigegeben in die Welt, auch wenn das Formular den Schalter
+             // vergisst - der Stream-Weg ist die Stelle, an der nichts
+             // versehentlich hineinrutschen darf.
+             daten.fuerStream ? 1 : 0,
+             daten.groesseBytes || 0, daten.hochgeladenVon || null]
         );
         return ergebnis.insertId;
+    }
+
+    /**
+     * Herkunft und Stream-Freigabe nachtragen.
+     *
+     * Beide zusammen, weil sie zusammen bearbeitet werden: Wer eine Datei
+     * freigibt, traegt bei der Gelegenheit ein, woher sie kam.
+     *
+     * @param {number} id Datensatz-ID
+     * @param {string} guildId Guild - schuetzt vor dem Bearbeiten fremder Zeilen
+     * @param {{herkunft: string|null, fuerStream: boolean}} merkmale Neue Werte
+     * @returns {Promise<boolean>} true, wenn eine Zeile getroffen wurde
+     */
+    static async merkmaleSetzen(id, guildId, merkmale) {
+        const dbService = ServiceManager.get('dbService');
+        const ergebnis = await dbService.query(
+            `UPDATE music_files SET herkunft = ?, fuer_stream = ? WHERE id = ? AND guild_id = ?`,
+            [merkmale.herkunft || null, merkmale.fuerStream ? 1 : 0, id, guildId]
+        );
+        return Number(ergebnis?.affectedRows || 0) > 0;
+    }
+
+    /**
+     * Die fuer den Stream freigegebenen Dateien einer Guild.
+     *
+     * Der Wunschbefehl sucht spaeter **nur** hierueber. Ein zweiter Weg an
+     * dieser Abfrage vorbei waere genau das Loch, gegen das die Ablage gebaut
+     * ist (`docs/musikwunsch/README.md`).
+     *
+     * @param {string} guildId Guild
+     * @param {string} [suche] Teil des Namens, gross/klein egal
+     * @returns {Promise<Array>} Dateien
+     */
+    static async fuerStream(guildId, suche = null) {
+        const dbService = ServiceManager.get('dbService');
+        const werte = [guildId];
+        let wo = 'guild_id = ? AND fuer_stream = 1';
+
+        if (suche && String(suche).trim()) {
+            wo += ' AND originalname LIKE ?';
+            werte.push(`%${String(suche).trim()}%`);
+        }
+
+        return await dbService.query(
+            `SELECT * FROM music_files WHERE ${wo} ORDER BY originalname ASC`, werte);
     }
 
     /**

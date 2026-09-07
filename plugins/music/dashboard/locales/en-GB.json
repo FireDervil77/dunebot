@@ -181,6 +181,10 @@
     "NAME": "File",
     "SIZE": "Size",
     "LAST_PLAYED": "Last played",
-    "NEVER": "never"
+    "NEVER": "never",
+    "ORIGIN": "Origin",
+    "ORIGIN_PLACEHOLDER": "e.g. NCS, StreamBeats …",
+    "ORIGIN_HINT": "For you only — so you still know where to get more in a year. Not verified.",
+    "FOR_STREAM": "For the stream"
   }
 }

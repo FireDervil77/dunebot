@@ -400,6 +400,14 @@
         const formular = new FormData();
         formular.append('datei', datei);
 
+        // Herkunft und Freigabe reisen im selben Formular mit. Multer legt sie
+        // erst NACH der Datei in `req.body` - der Server liest sie deshalb
+        // hinter dem Datei-Zweig, nicht davor.
+        const herkunft = document.getElementById('musik-datei-herkunft');
+        const fuerStream = document.getElementById('musik-datei-stream');
+        if (herkunft && herkunft.value.trim()) formular.append('herkunft', herkunft.value.trim());
+        if (fuerStream && fuerStream.checked) formular.append('fuer_stream', '1');
+
         const anfrageObjekt = new XMLHttpRequest();
         anfrageObjekt.open('POST', basis() + '/dateien/upload');
         anfrageObjekt.setRequestHeader('X-CSRF-Token', csrf());
@@ -434,6 +442,34 @@
 
         anfrageObjekt.send(formular);
     }
+
+    /**
+     * Herkunft und Stream-Freigabe einer abgelegten Datei aendern.
+     *
+     * **Ohne Neuladen.** Die Zeile aendert sich nur an zwei Stellen, und ein
+     * Seitenwechsel mitten im Pflegen von zwanzig Dateien waere die
+     * unangenehmere Antwort.
+     */
+    window.musicDateiMerkmale = function (id) {
+        const zeile = document.getElementById('musik-datei-' + id);
+        if (!zeile) return;
+
+        const herkunft = zeile.querySelector('[data-herkunft]');
+        const stream = zeile.querySelector('[data-stream]');
+
+        anfrage('POST', '/dateien/' + id + '/merkmale', {
+            herkunft: herkunft ? herkunft.value : '',
+            fuer_stream: stream ? stream.checked : false
+        })
+            .then(function () { melden(text('GESPEICHERT', 'Gespeichert.')); })
+            .catch(function (fehler) {
+                // **Den Schalter zurueckdrehen.** Sonst zeigt die Seite einen
+                // Zustand, den die Datenbank nicht hat - und der Betreiber
+                // haelt eine Datei fuer freigegeben, die es nicht ist.
+                if (stream) stream.checked = !stream.checked;
+                melden(fehler.message || text('FEHLER', 'Fehler'), 'error');
+            });
+    };
 
     window.musicListenTitelEntfernen = function (listeId, titelId) {
         if (!window.confirm(text('TITEL_ENTFERNEN', 'Diesen Titel aus der Liste nehmen?'))) return;
