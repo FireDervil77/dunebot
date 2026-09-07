@@ -2,12 +2,21 @@
 /**
  * Mitmachen (P9) — was Zuschauer aus dem Chat heraus auslösen können.
  *
- * **Drei von vier Punkten sind gebaut, und die Seite sagt das selbst.** Clip
- * und Umfrage gehören Twitch: Wir lösen aus und lesen den Stand, gespeichert
- * wird nichts. Die **Verlosung** gehört einem anderen Plugin — angelegt wird
- * sie dort, hier steht nur, was davon im Chat ankommt; ein zweiter Ort zum
- * Einstellen wäre eine zweite Wahrheit. Der **Musikwunsch** fehlt weiter, und
- * sein Grund steht auf der Seite, nicht in einer Fußnote.
+ * **Alle vier Punkte sind gebaut, und die Seite sagt das selbst.** Clip und
+ * Umfrage gehören Twitch: Wir lösen aus und lesen den Stand, gespeichert wird
+ * nichts. Die **Verlosung** gehört einem anderen Plugin — angelegt wird sie
+ * dort, hier steht nur, was davon im Chat ankommt; ein zweiter Ort zum
+ * Einstellen wäre eine zweite Wahrheit.
+ *
+ * Der **Musikwunsch** kam am 2026-09-07 dazu und ist der Grund, warum diese
+ * Zeile umgeschrieben wurde: Er hat einen **eigenen Menüpunkt**, weil er mehr
+ * ist als eine Karte (OBS-Adresse, Warteschlange, Endlosmodus, Zustand der
+ * Browserquelle). Seine Karte bleibt hier und verweist dorthin — die Reihe
+ * "was der Chat auslösen kann" wäre sonst unvollständig, und wer nur die
+ * Sidebar liest, fände ihn nicht als Mitmach-Weg wieder.
+ *
+ * Was jeder Punkt kostet und warum, steht bei ihm auf der Seite und nicht in
+ * einer Fußnote.
  *
  * Erwartet: bericht, ZUSTAND, STAND, vorWieLange, meldung, fehler
  */
@@ -459,37 +468,45 @@ const befehlsseite = `/guild/${guildId}/plugins/streaming/befehle`;
     </div>
   </div>
 
-  <%# ── Musikwunsch: der letzte offene Punkt ──────────────────────────────
-      Er steht weiter hier, weil ein Streichen ihn vergessen ließe. Der Grund
-      ist ein anderer als bei der Verlosung — nicht die Verrohrung, sondern
-      eine Frage, die niemand beantwortet hat. %>
+  <%# ── Musikwunsch: gebaut am 2026-09-07 ─────────────────────────────────
+      **Umetikettiert, nicht gelöscht.** Die Karte stand hier als „letzter
+      offener Punkt"; ihre Begründung war eine Frage, die niemand beantwortet
+      hatte. Sie ist beantwortet, und der Weg dorthin gehört zur Karte — wer
+      nur „steht jetzt drüben" liest, weiß nicht, warum es vorher nicht ging.
+
+      Der Musikwunsch hat einen **eigenen Menüpunkt**, weil er mehr ist als
+      eine Karte: OBS-Adresse, Warteschlange, Endlosmodus, Zustand der
+      Browserquelle. Hier bleibt der Verweis, damit die Reihe „was der Chat
+      auslösen kann" vollständig bleibt. %>
   <div class="col-12 col-lg-6">
     <div class="card h-100">
       <div class="card-header">
         <div class="kartenkopf">
-          <span class="kartensymbol"><i class="fa-solid fa-hourglass-half"></i></span>
+          <span class="kartensymbol"><i class="fa-solid fa-music"></i></span>
           <div class="kartenkopf__text">
             <h3 class="kartenkopf__titel">Musikwunsch</h3>
-            <div class="kartenkopf__satz">Noch nicht dabei — und der Grund hat sich geändert.</div>
+            <div class="kartenkopf__satz">Steht — mit eigener Seite.</div>
           </div>
         </div>
       </div>
-      <div class="card-body">
+      <div class="card-body d-flex flex-column">
         <p class="text-secondary mb-2">
-          Die Verlosung war bis zum 2026-09-07 mit demselben Satz hier gelistet: zu teuer,
-          weil <code>addEntry</code> über <code>guild.members.fetch</code> läuft. Das hat
-          sich als <b>halb falsch</b> herausgestellt — <code>checkRequirements</code>
-          steigt vorher aus, wenn eine Verlosung keine Bedingungen hat. Die Verrohrung
-          war also nie das Hindernis; sie steht jetzt links.
+          <code>!request</code>, <code>!song</code>, <code>!playlist</code>,
+          <code>!vote</code>, <code>!skip</code>, <code>!prev</code> — gespielt wird
+          über eine <b>Browserquelle in OBS</b>, nicht über Discord.
         </p>
-        <p class="text-secondary mb-0">
-          Beim Musikwunsch ist es etwas anderes, und das lässt sich nicht wegbauen:
-          Ein Wunsch im Discord landet in einem <b>privaten Sprachkanal</b>, derselbe
-          Wunsch im Stream geht an ein Publikum. Ob das Musik-Plugin zwischen Quellen
-          unterscheiden kann, wie eine Positivliste gepflegt würde, ob es brauchbare
-          Quellen gibt — <b>ungeprüft ist bisher alles daran</b>. Das ist eine
-          Entscheidung, kein Bauschritt.
+        <p class="text-secondary mb-3">
+          <b>Die Frage, die hier stand, ist beantwortet.</b> Sie lautete: Ein Wunsch
+          im Discord landet in einem privaten Sprachkanal, derselbe Wunsch im Stream
+          geht an ein Publikum. Die Antwort ist die Grenze an der <b>Quelle</b> — der
+          Stream-Weg spielt ausschließlich aus der eigenen hochgeladenen Ablage, und
+          zwar nur aus Dateien, die ausdrücklich freigegeben sind. Damit ist die
+          Lizenzfrage keine Frage der Software mehr.
         </p>
+        <a class="btn btn-outline-primary mt-auto align-self-start"
+           href="/guild/<%= guildId %>/plugins/streaming/musik">
+          <i class="fa-solid fa-arrow-right me-1"></i>Zur Musikseite
+        </a>
       </div>
     </div>
   </div>

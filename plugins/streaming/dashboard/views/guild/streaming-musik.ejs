@@ -152,13 +152,23 @@
           An/Aus, also ein Schalter und kein Kästchen — Hausregel.
           Er schickt sich selbst ab: Ein Schalter, neben dem noch ein
           Speichern-Knopf steht, lässt offen, ob er schon gilt.
+
+          **`requestSubmit()` und nicht `submit()`.** Hier stand `submit()`,
+          und der Schalter lief in „ungültiger CSRF-Token": `form.submit()`
+          löst **kein** `submit`-Ereignis aus — und genau daran hängt
+          `csrf-helper.js`, der das `_csrf`-Feld einsetzt. Das Formular ging
+          also ohne Token los. `requestSubmit()` verhält sich wie ein echter
+          Klick und feuert das Ereignis.
+
+          Kein eigenes `_csrf`-Feld hier: Das wäre ein zweiter Weg neben dem
+          Helfer, und einer von beiden liefe irgendwann anders.
         %>
         <form method="post" action="/guild/<%= guildId %>/plugins/streaming/musik/endlos"
               id="endlos-form">
           <input type="hidden" name="an" value="<%= endlos ? '0' : '1' %>">
           <label class="form-check form-switch mb-1">
             <input class="form-check-input" type="checkbox" <%= endlos ? 'checked' : '' %>
-                   onchange="document.getElementById('endlos-form').submit();">
+                   onchange="document.getElementById('endlos-form').requestSubmit();">
             <span class="form-check-label">Endlos weiterspielen</span>
           </label>
           <div class="form-hint">
