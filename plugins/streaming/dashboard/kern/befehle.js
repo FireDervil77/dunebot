@@ -85,9 +85,41 @@ const FERTIG = {
     },
     befehle: {
         beschreibung: 'Zählt auf, welche Befehle es hier gibt.',
-        antwort: (k) => k.woerter.length
-            ? `Verfügbar: ${k.woerter.map(w => PRAEFIX + w).join(' ')}`
-            : 'Hier sind noch keine Befehle eingerichtet.'
+
+        // **Getrennt mit ` · `, nicht mit einem Leerzeichen.** Bis zum
+        // 2026-09-07 stand hier `join(' ')`, und die Antwort war eine
+        // Wortkette: `!request !song !playlist !skip`. Im Chat, wo die Zeile
+        // umbricht und andere Nachrichten daruntersacken, ist das nicht
+        // lesbar. Echte Zeilen gibt es bei Twitch nicht - eine Nachricht ist
+        // eine Zeile -, also ist das Trennzeichen alles, was geht. Dasselbe
+        // benutzt `!umfrage` nebenan schon.
+        //
+        // **Und die Liste kann zu lang werden.** Twitch nimmt 500 Zeichen; was
+        // darueber steht, kommt abgeschnitten oder gar nicht an. Bei zwoelf
+        // Befehlen ist das weit weg, aber der Baukasten laesst eigene zu, und
+        // die Grenze faellt erst auf, wenn die Antwort einmal verschwindet.
+        // Deshalb wird hier gekuerzt und **gesagt, dass gekuerzt wurde** -
+        // eine still abgeschnittene Liste sieht aus wie eine vollstaendige.
+        antwort: (k) => {
+            if (!k.woerter.length) return 'Hier sind noch keine Befehle eingerichtet.';
+
+            const vorspann = 'Verfügbar: ';
+            const teile = k.woerter.map(w => PRAEFIX + w);
+            const ganz = vorspann + teile.join(' · ');
+            if (ganz.length <= 480) return ganz;
+
+            // Ruecken, bis der Hinweis mit hineinpasst.
+            let passt = teile.length;
+            let text = '';
+            while (passt > 0) {
+                const rest = teile.length - passt;
+                text = vorspann + teile.slice(0, passt).join(' · ')
+                     + ` … und ${rest} weitere`;
+                if (text.length <= 480) break;
+                passt--;
+            }
+            return text;
+        }
     },
 
     // **Der erste Befehl, der etwas bewirkt** (P9, 2026-09-05). Bis hierher
