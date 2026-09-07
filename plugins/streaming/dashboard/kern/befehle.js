@@ -153,6 +153,132 @@ const FERTIG = {
         abkuehlung_s: 0,
         braucht: { plugin: 'giveaway', name: 'Verlosungen' },
         tun: (k) => require('./mitmachen').losZiehen(k)
+    },
+
+    // ================================================================
+    // Musikwunsch (2026-09-07)
+    //
+    // **Englische Woerter, auf Entscheidung des Betreibers.** Die uebrigen
+    // Befehle sind deutsch; das ist bewusst uneinheitlich und keine
+    // Nachlaessigkeit - `!skip`, `!vote` und `!prev` sind in Twitch-Chats seit
+    // Jahren dieselben Woerter, und ein Zuschauer tippt, was er kennt.
+    //
+    // **`!next` fehlt, obwohl es auf der Wunschliste stand.** Es waere
+    // wortgleich mit `!skip`: beide gehen einen Schritt vor. Zwei Woerter fuer
+    // dieselbe Wirkung sind zwei Wege, an denen spaeter einer etwas anderes
+    // tut - genau der Einwand des Betreibers vom selben Tag. Wer `next`
+    // lieber mag, legt ihn als eigenen Befehl an; dafuer ist der Baukasten da.
+    // ================================================================
+
+    request: {
+        beschreibung: 'Wuenscht einen Titel aus der freigegebenen Ablage.',
+        wer: 'alle',
+        abkuehlung_s: 5,
+        braucht: { plugin: 'music', name: 'Musik' },
+        tun: async (k) => {
+            const musik = require('../../shared/musikwunsch');
+            const guildId = k.streamerZeile.heim_guild_id;
+
+            const e = await musik.wuenschen(guildId, k.streamerZeile.id, k.rest, k.absender);
+            if (e.ok) return `„${e.titel}" ist drin — ${e.offen} vor dir.`;
+
+            // Jeder Grund bekommt seinen eigenen Satz. Ein gemeinsames
+            // "hat nicht geklappt" liesse den Zuschauer raten, ob er sich
+            // vertippt hat oder ob die Anlage streikt.
+            if (e.grund === 'kein_begriff')  return `Sag dazu, was du hoeren willst: ${PRAEFIX}request <Titel>`;
+            if (e.grund === 'nicht_gefunden') return 'Das habe ich hier nicht.';
+            if (e.grund === 'keine_ablage') {
+                log().warn(`[Streaming] ${PRAEFIX}request: keine Musikablage eingetragen`);
+                return 'Musikwuensche sind gerade nicht moeglich.';
+            }
+            return 'Musikwuensche sind gerade nicht moeglich.';
+        }
+    },
+
+    song: {
+        beschreibung: 'Sagt, welcher Titel gerade laeuft.',
+        wer: 'alle',
+        abkuehlung_s: 10,
+        braucht: { plugin: 'music', name: 'Musik' },
+        tun: async (k) => {
+            const musik = require('../../shared/musikwunsch');
+            const zeile = await musik.aktueller(k.streamerZeile.heim_guild_id);
+
+            if (!zeile) return 'Gerade laeuft nichts.';
+            return zeile.gewuenscht_von
+                ? `Laeuft: ${zeile.titel} — gewuenscht von ${zeile.gewuenscht_von}`
+                : `Laeuft: ${zeile.titel}`;
+        }
+    },
+
+    playlist: {
+        beschreibung: 'Zeigt die naechsten Titel.',
+        wer: 'alle',
+        abkuehlung_s: 15,
+        braucht: { plugin: 'music', name: 'Musik' },
+        tun: async (k) => {
+            const musik = require('../../shared/musikwunsch');
+            const offen = await musik.warteschlange(k.streamerZeile.heim_guild_id,
+                { nurOffene: true, grenze: 5 });
+
+            if (!offen.length) return 'Danach ist die Liste leer.';
+            return 'Als naechstes: ' + offen.map((z, i) => `${i + 1}. ${z.titel}`).join(' · ');
+        }
+    },
+
+    skip: {
+        beschreibung: 'Ueberspringt den laufenden Titel.',
+        wer: 'moderator',
+        abkuehlung_s: 0,
+        braucht: { plugin: 'music', name: 'Musik' },
+        tun: async (k) => {
+            const musik = require('../../shared/musikwunsch');
+            const e = await musik.springen(k.streamerZeile.heim_guild_id, +1);
+            return e.ok ? `Weiter mit: ${e.titel}` : 'Danach kommt nichts mehr.';
+        }
+    },
+
+    prev: {
+        beschreibung: 'Geht einen Titel zurueck.',
+        wer: 'moderator',
+        abkuehlung_s: 0,
+        braucht: { plugin: 'music', name: 'Musik' },
+        tun: async (k) => {
+            const musik = require('../../shared/musikwunsch');
+            const e = await musik.springen(k.streamerZeile.heim_guild_id, -1);
+            return e.ok ? `Zurueck zu: ${e.titel}` : 'Davor war nichts.';
+        }
+    },
+
+    vote: {
+        beschreibung: 'Stimmt dafuer, den laufenden Titel zu ueberspringen.',
+        wer: 'alle',
+        abkuehlung_s: 0,
+        braucht: { plugin: 'music', name: 'Musik' },
+        tun: async (k) => {
+            const musik = require('../../shared/musikwunsch');
+            const guildId = k.streamerZeile.heim_guild_id;
+
+            // Ohne laufenden Titel gibt es nichts zu ueberspringen - und eine
+            // Stimme, die ins Leere gezaehlt wird, faellt beim naechsten Titel
+            // als Geisterstimme auf.
+            const laeuft = await musik.aktueller(guildId);
+            if (!laeuft) return 'Gerade laeuft nichts.';
+
+            // **Die Kennung, nicht der Name.** Ein Anzeigename ist aenderbar;
+            // wer zweimal stimmen will, braeuchte nur einen Namenswechsel.
+            const stand = musik.stimmeAbgeben(guildId, k.absenderId);
+            if (stand.schon) return `Deine Stimme zaehlt schon (${stand.stimmen}/${stand.noetig}).`;
+
+            if (!stand.reicht) {
+                return `${stand.stimmen}/${stand.noetig} fuer Ueberspringen.`;
+            }
+
+            const e = await musik.springen(guildId, +1);
+            return e.ok
+                ? `Uebersprungen — weiter mit: ${e.titel}`
+                : 'Genug Stimmen, aber danach kommt nichts mehr.';
+        }
     }
 };
 
