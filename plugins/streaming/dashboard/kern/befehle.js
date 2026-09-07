@@ -313,6 +313,28 @@ const FERTIG = {
         }
     },
 
+    // **`!stop` neben `!pause`, und das sind keine zwei Wege fuer dasselbe.**
+    // Der Betreiber: "ich muss eine moeglichkeit wie stop fuer moderatoren
+    // haben um das wirklich zu beenden wenn ich es brauche."
+    //
+    //   pause  haelt an  - derselbe Titel laeuft danach an derselben Stelle weiter
+    //   stop   beendet   - die Liste faengt beim naechsten !play von vorn an
+    //
+    // Die Warteschlange bleibt bei beiden stehen; die leert `!clear`. Zwei
+    // Wirkungen in einem Befehl liessen sonst niemanden mehr erkennen, welcher
+    // Griff was getan hat.
+    stop: {
+        beschreibung: 'Beendet die Wiedergabe.',
+        wer: 'moderator',
+        abkuehlung_s: 0,
+        braucht: { plugin: 'music', name: 'Musik' },
+        tun: async (k) => {
+            const musik = require('../../shared/musikwunsch');
+            await musik.beenden(k.streamerZeile.heim_guild_id);
+            return 'Musik beendet.';
+        }
+    },
+
     play: {
         beschreibung: 'Laesst die Musik weiterlaufen.',
         wer: 'moderator',

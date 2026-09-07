@@ -148,6 +148,18 @@
           </span>
         </form>
 
+        <%# Derselbe Unterschied wie zwischen !pause und !stop im Chat. %>
+        <form method="post" action="/guild/<%= guildId %>/plugins/streaming/musik/beenden"
+              class="mb-3">
+          <button class="btn btn-sm btn-outline-danger" type="submit">
+            <i class="fa-solid fa-stop me-1"></i>Beenden
+          </button>
+          <span class="text-secondary ms-2">
+            Hält an <b>und</b> setzt zurück — danach beginnt die Liste von vorn.
+            Die Warteschlange bleibt.
+          </span>
+        </form>
+
         <%#
           An/Aus, also ein Schalter und kein Kästchen — Hausregel.
           Er schickt sich selbst ab: Ein Schalter, neben dem noch ein
@@ -256,7 +268,8 @@
               <tr><td><code>!vote</code></td><td>Stimmt fürs Überspringen (<%= noetigeStimmen %> Stimmen)</td><td>alle</td></tr>
               <tr><td><code>!skip</code></td><td>Überspringt sofort</td><td>Moderator</td></tr>
               <tr><td><code>!prev</code></td><td>Einen Titel zurück</td><td>Moderator</td></tr>
-              <tr><td><code>!pause</code> / <code>!play</code></td><td>Hält an / lässt weiterlaufen</td><td>Moderator</td></tr>
+              <tr><td><code>!pause</code> / <code>!play</code></td><td>Hält an / lässt weiterlaufen — <em>an derselben Stelle</em></td><td>Moderator</td></tr>
+              <tr><td><code>!stop</code></td><td>Beendet — die Liste fängt danach von vorn an</td><td>Moderator</td></tr>
               <tr><td><code>!clear</code></td><td>Leert die Warteschlange</td><td>Moderator</td></tr>
             </tbody>
           </table>

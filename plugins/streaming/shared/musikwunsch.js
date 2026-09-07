@@ -628,6 +628,32 @@ async function endlosSchalten(guildId, an) {
 }
 
 /**
+ * Wiedergabe beenden - der Unterschied zu `abspielen(false)`.
+ *
+ * **`!pause` haelt an, `!stop` beendet.** Beide schalten `aktiv` aus; nur
+ * `stop` gibt zusaetzlich den Zeiger frei. Nach `pause` laeuft derselbe Titel
+ * an derselben Stelle weiter, nach `stop` faengt die Liste beim naechsten
+ * `!play` von vorn an.
+ *
+ * **Die Warteschlange bleibt stehen.** Sie zu leeren waere `!clear` - zwei
+ * Wirkungen in einem Befehl liessen niemanden mehr erkennen, welcher Griff was
+ * getan hat, und ein versehentliches `!stop` haette dann die Wuensche aller
+ * Zuschauer mitgenommen.
+ *
+ * @param {string} guildId Guild
+ * @returns {Promise<void>} nichts
+ */
+async function beenden(guildId) {
+    await zustand(guildId);
+    await db().query(
+        `UPDATE streaming_music_state
+            SET aktiv = 0, aktuelle_id = NULL, begonnen_am = NULL
+          WHERE guild_id = ?`,
+        [guildId]);
+    stimmenVergessen(guildId);
+}
+
+/**
  * Alles aus der Warteschlange nehmen.
  *
  * @param {string} guildId Guild
@@ -718,7 +744,7 @@ function stimmeAbgeben(guildId, absenderId) {
 module.exports = {
     zustand, schluesselNeu, guildZuSchluessel, playerGesehen,
     warteschlange, aktueller, wuenschen, springen, leeren, aufraeumen,
-    abspielen, naechster, nachlegen, endlosSchalten, ablageEinreihen, ablageAufzaehlen,
+    abspielen, beenden, naechster, nachlegen, endlosSchalten, ablageEinreihen, ablageAufzaehlen,
     stimmeAbgeben, stimmenVergessen,
     ablage,
     AUFBEWAHRUNG_TAGE, NOETIGE_STIMMEN

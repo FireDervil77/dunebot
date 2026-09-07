@@ -137,6 +137,21 @@ router.post('/abspielen', requirePermission('STREAMING.CHAT.MANAGE'), async (req
     }
 });
 
+/** Wiedergabe beenden - haelt an UND setzt zurueck, wie `!stop`. */
+router.post('/beenden', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const basis = `/guild/${guildId}/plugins/streaming/musik`;
+
+    try {
+        await musik.beenden(guildId);
+        return res.redirect(`${basis}?ok=${encodeURIComponent(
+            'Beendet — die Liste beginnt beim nächsten Start von vorn.')}`);
+    } catch (error) {
+        ServiceManager.get('Logger').error('[Streaming] Wiedergabe nicht beendbar:', error);
+        return res.redirect(`${basis}?fehler=${encodeURIComponent('Das hat nicht geklappt.')}`);
+    }
+});
+
 /**
  * Den Endlosmodus schalten.
  *

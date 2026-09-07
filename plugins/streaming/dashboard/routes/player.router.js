@@ -141,7 +141,36 @@ router.get('/:schluessel', async (req, res) => {
     fetch(adresse, { cache: 'no-store' })
       .then(function (a) { return a.json(); })
       .then(function (d) {
-        if (!d || !d.spielen) { laueft = false; zeigen(null); return; }
+        if (!d || !d.spielen) {
+          // **Anhalten heisst anhalten - sofort.** Bis hierher hoerte die Seite
+          // nur auf, Nachschub zu holen; der laufende Titel spielte zu Ende.
+          // Fuer den Streamer sah !pause damit aus, als taete es nichts.
+          //
+          // "angehalten" behaelt die Stelle (Pause), alles andere beendet den
+          // Ton ganz - bei "nichts_mehr" gibt es nichts, wozu man
+          // zurueckkehren koennte.
+          laueft = false;
+          if (d && d.grund === 'angehalten') {
+            ton.pause();
+          } else {
+            ton.pause();
+            ton.removeAttribute('src');
+            ton.load();
+            ton.dataset.id = '';
+          }
+          zeigen(null);
+          return;
+        }
+
+        // Derselbe Titel, nur pausiert: weiterlaufen lassen statt neu laden.
+        // Ein Neuladen spraenge ueber 'versatzSek' an eine Stelle, die durch
+        // die Pause gar nicht erreicht wurde.
+        if (ton.dataset.id === String(d.id) && ton.paused && ton.src) {
+          laueft = true;
+          zeigen(d.titel, d.gewuenschtVon);
+          ton.play().catch(function () { laueft = false; });
+          return;
+        }
 
         // Derselbe Titel, der schon laeuft: nicht neu anfangen lassen. Sonst
         // setzte jeder Takt die Wiedergabe zurueck auf den Versatz.
