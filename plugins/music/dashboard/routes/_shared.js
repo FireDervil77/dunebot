@@ -32,8 +32,44 @@ function makeTranslator(req, res) {
     };
 }
 
-/** View ueber den ThemeManager rendern. */
+/**
+ * View ueber den ThemeManager rendern - und dabei das Seitenskript anmelden.
+ *
+ * **Das Anmelden steht hier und nicht in den Routern.** Es stand vorher in
+ * `guild.router.js` als lokale Funktion, fuenfmal von Hand aufgerufen - und
+ * `dateien.router.js` rief sie nie auf, weil es sie gar nicht kannte. Folge:
+ * Auf der Dateien-Seite wurde `music-steuerung.js` nie geladen, der
+ * Hochladen-Knopf hatte keinen Zuhoerer und tat beim Klicken **nichts** -
+ * ohne Fehler, ohne Meldung, ohne Eintrag im Log. Genau die Bauform aus
+ * `vorhanden-heisst-nicht-funktioniert`.
+ *
+ * Jede music-Seite braucht dasselbe eine Skript, und es ist tolerant gegen
+ * fehlende Elemente (jeder Zugriff ist auf Vorhandensein geprueft). Also
+ * gehoert es an die Stelle, die keine Seite umgehen kann.
+ *
+ * **Es gibt jetzt genau einen Anmeldeweg, nicht zwei.** Die fuenf Aufrufe in
+ * `guild.router.js` sind entfernt - sich darauf zu verlassen, dass
+ * `enqueueScript` eine Doppelanmeldung wegwirft, hiesse den zweiten Weg zu
+ * dulden statt ihn abzuschaffen. Zwei Wege bedeuten frueher oder spaeter, dass
+ * einer von beiden etwas anderes tut.
+ *
+ * **Der Rueckgabewert wird ausgewertet.** `enqueueScript` meldet ein nicht
+ * registriertes Skript nur mit `warn` und `false` - der Aufrufer merkt nichts,
+ * die Seite rendert ohne Bedienung, und niemand sieht warum. Das ist derselbe
+ * stille Ausfall, der hier gerade behoben wurde; er darf nicht durch die
+ * Hintertuer zurueckkommen.
+ */
 async function renderView(res, viewPath, data) {
+    const assetManager = ServiceManager.get('assetManager');
+    const Logger = ServiceManager.get('Logger');
+
+    if (!assetManager) {
+        Logger?.error('[Musik] Kein assetManager - die Seite rendert ohne Bedienung.');
+    } else if (!assetManager.enqueueScript('music-steuerung')) {
+        Logger?.error('[Musik] Seitenskript "music-steuerung" ist nicht registriert - '
+                    + 'die Seite rendert, aber kein Knopf reagiert.');
+    }
+
     return await ServiceManager.get('themeManager').renderView(res, viewPath, data);
 }
 

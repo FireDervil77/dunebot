@@ -13,7 +13,6 @@
 
 const express = require('express');
 const router = express.Router();
-const { ServiceManager } = require('dunebot-core');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 const { MusicSettings, MusicHistory, MusicPlaylists } = require('../../shared/models');
 const klangfilter = require('../../bot/klangfilter');
@@ -21,13 +20,6 @@ const {
     makeTranslator, renderView, getGuildChannels, getSprachkanaele, getGuildRoles,
     zustandHolen, renderFehler, spielzeitText
 } = require('./_shared');
-
-/** Skripte anmelden, die eine Seite braucht. */
-function skripteAnmelden(handles) {
-    const assetManager = ServiceManager.get('assetManager');
-    if (!assetManager) return;
-    handles.forEach(h => assetManager.enqueueScript(h));
-}
 
 // =====================================================
 // Hauptmenue-Punkt -> Uebersicht
@@ -53,8 +45,6 @@ router.get('/dashboard', requirePermission('MUSIC.VIEW'), async (req, res) => {
             MusicPlaylists.getAll(guildId).catch(() => [])
         ]);
 
-        skripteAnmelden(['music-steuerung']);
-
         await renderView(res, 'guild/music-dashboard', {
             tr, guildId, zustand, einstellungen, statistik, channels, listen,
             filter: klangfilter.auswahl(),
@@ -77,8 +67,6 @@ router.get('/warteschlange', requirePermission('MUSIC.VIEW'), async (req, res) =
             zustandHolen(guildId),
             MusicPlaylists.getAll(guildId).catch(() => [])
         ]);
-
-        skripteAnmelden(['music-steuerung']);
 
         await renderView(res, 'guild/music-queue', { tr, guildId, zustand, listen, spielzeitText });
     } catch (error) {
@@ -103,8 +91,6 @@ router.get('/listen', requirePermission('MUSIC.VIEW'), async (req, res) => {
             if (!Number.isNaN(id)) offen = await MusicPlaylists.getWithTracks(id, guildId);
         }
 
-        skripteAnmelden(['music-steuerung']);
-
         await renderView(res, 'guild/music-playlists', { tr, guildId, listen, offen, spielzeitText });
     } catch (error) {
         return renderFehler(res, error, 'Die Wiedergabelisten konnten nicht geladen werden');
@@ -128,8 +114,6 @@ router.get('/verlauf', requirePermission('MUSIC.HISTORY.VIEW'), async (req, res)
             MusicPlaylists.getAll(guildId).catch(() => [])
         ]);
 
-        skripteAnmelden(['music-steuerung']);
-
         await renderView(res, 'guild/music-history', { tr, guildId, verlauf, statistik, tage, listen, spielzeitText });
     } catch (error) {
         return renderFehler(res, error, 'Der Verlauf konnte nicht geladen werden');
@@ -152,8 +136,6 @@ router.get('/settings', requirePermission('MUSIC.VIEW'), async (req, res) => {
             getSprachkanaele(guildId),
             getGuildRoles(guildId)
         ]);
-
-        skripteAnmelden(['music-steuerung']);
 
         await renderView(res, 'guild/music-settings', {
             tr, guildId, einstellungen, channels, sprachkanaele, roles,
