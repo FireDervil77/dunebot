@@ -34,10 +34,58 @@ const modelle = require('../../shared/models');
 const { vorlageWaehlen, VORGABE_LIVE, VORGABE_RUECKSCHAU } = require('../../shared/vorlagen');
 const { inhaltsStand } = require('../kern/entscheidung');
 const { melden } = require('../../shared/signale');
+const kanalstau = require('./kanalstau');
 
 const TAKT_MS = 500;
 const JE_LAUF = 20;
 const HOECHSTVERSUCHE = 5;
+
+/**
+ * Der Rueckbau bekommt eine eigene, viel laengere Lebensdauer.
+ *
+ * Gemessen am 2026-09-07 (Baustelle 102): Auftrag 633 wurde um 20:31:22
+ * angelegt und um 20:35:57 aufgegeben - **viereinhalb Minuten**. Genau in
+ * diesem Fenster war der Kanal am staerksten verstopft, denn der Rueckbau
+ * faellt ans Streamende, also hinter alles, was der Abend hineingelegt hat.
+ *
+ * Er ist zugleich der einzige Auftrag, dessen Ausbleiben **dauerhaft** zu
+ * sehen ist: Eine Ankuendigung, die nie zur Rueckschau wird, steht fuer immer
+ * auf "ist live". Eine verpasste Zuschauerzahl ist beim naechsten Takt
+ * vergessen; eine verpasste Rueckschau nie.
+ *
+ * Deshalb darf er warten. Die Nachricht laeuft nicht weg.
+ *
+ * 12 Versuche mit `min(1800, 2**n)` Sekunden Abstand ergeben
+ * 2+4+8+16+32+64+128+256+512+1024+1800 s = rund **64 Minuten**. Das deckt
+ * drei der 1200-Sekunden-Haenger aus Baustelle 76 ab.
+ */
+const HOECHSTVERSUCHE_AUFRAEUMEN = 12;
+
+/** Groesster Abstand zwischen zwei Versuchen - je Aktion. */
+const ABSTAND_HOECHST_S = 60;
+const ABSTAND_HOECHST_S_AUFRAEUMEN = 1800;
+
+/**
+ * Wie oft diese Aktion versucht wird.
+ *
+ * @param {string} aktion Auftragsart
+ * @returns {number} Hoechstzahl der Versuche
+ */
+function versuchsGrenze(aktion) {
+    return aktion === 'aufraeumen' ? HOECHSTVERSUCHE_AUFRAEUMEN : HOECHSTVERSUCHE;
+}
+
+/**
+ * Wie lange nach dem n-ten Fehlversuch gewartet wird.
+ *
+ * @param {string} aktion Auftragsart
+ * @param {number} versuche Bisherige Versuche
+ * @returns {number} Sekunden
+ */
+function abstandS(aktion, versuche) {
+    const hoechst = aktion === 'aufraeumen' ? ABSTAND_HOECHST_S_AUFRAEUMEN : ABSTAND_HOECHST_S;
+    return Math.min(hoechst, 2 ** versuche);
+}
 
 /**
  * Ab wann ein verspaeteter Auftrag ins Protokoll gehoert.
@@ -644,11 +692,30 @@ async function ausfuehren(auftrag) {
     const zeile = gesendet[0];
 
     if (auftrag.aktion === 'bearbeiten') {
+        // Staut der Bearbeiten-Eimer dieses Kanals, ist ein weiterer Versuch
+        // kein Versuch, sondern Nachschub (siehe kanalstau.js). Endgueltig,
+        // damit dieser Auftrag nicht noch fuenfmal wiederkommt - die Zeile
+        // bleibt aber im Ausgang stehen, mit dem Grund darin.
+        if (kanalstau.gestaut(zeile.channel_id)) {
+            return {
+                ok: false, endgueltig: true,
+                fehler: `Kanal gestaut - Bearbeitung ausgesetzt, noch ${kanalstau.restSekunden(zeile.channel_id)} s`
+            };
+        }
+
         const inhalt = nachricht.live({ streamer, zustand, ziel });
         const antwort = await anDenBot('streaming:edit', {
             guildId: ziel.guild_id, channelId: zeile.channel_id, messageId: zeile.message_id, ...inhalt
         });
-        if (!antwort.ok) return { ok: false, fehler: antwort.fehler, endgueltig: istEndgueltig(antwort) };
+        if (!antwort.ok) {
+            if (kanalstau.fehlversuch(zeile.channel_id, antwort.fehler)) {
+                log().error(`[Streaming/Ausgang] Kanal ${zeile.channel_id} gestaut: ` +
+                    `${kanalstau.SCHWELLE} Fristen in Folge. Bearbeitung ausgesetzt fuer ` +
+                    `${Math.round(kanalstau.DAUER_MS / 60000)} Minuten. Der Rueckbau laeuft weiter.`);
+            }
+            return { ok: false, fehler: antwort.fehler, endgueltig: istEndgueltig(antwort) };
+        }
+        kanalstau.erfolg(zeile.channel_id);
 
         // Den gezeigten Stand mitschreiben - er entscheidet, ob spaeter
         // ueberhaupt noch einmal bearbeitet werden muss.
@@ -693,9 +760,16 @@ async function ausfuehren(auftrag) {
                 await db().query("UPDATE streaming_messages SET zustand = 'weg' WHERE id = ?", [zeile.id]);
                 return { ok: true, fehler: null, endgueltig: true, hinweis: 'Nachricht war schon geloescht' };
             }
+
+            // Der Rueckbau **meldet** den Stau, laesst sich aber nie von ihm
+            // aussetzen: Er ist der einzige Auftrag, dessen Ausbleiben der
+            // Betreiber nach dem Stream noch sieht. Ein Versuch alle paar
+            // Minuten staut nichts.
+            kanalstau.fehlversuch(zeile.channel_id, antwort.fehler);
             return { ok: false, fehler: antwort.fehler, endgueltig: istEndgueltig(antwort) };
         }
 
+        kanalstau.erfolg(zeile.channel_id);
         await db().query('UPDATE streaming_messages SET geaendert_am = NOW() WHERE id = ?', [zeile.id]);
         return { ok: true, fehler: null, endgueltig: false };
     }
@@ -787,7 +861,7 @@ async function abarbeiten(auftrag) {
         }
 
         const versuche = auftrag.versuche + 1;
-        const aufgeben = ergebnis.endgueltig || versuche >= HOECHSTVERSUCHE;
+        const aufgeben = ergebnis.endgueltig || versuche >= versuchsGrenze(auftrag.aktion);
 
         await db().query(`
             UPDATE streaming_outbox
@@ -796,7 +870,7 @@ async function abarbeiten(auftrag) {
                    faellig_ab = DATE_ADD(NOW(3), INTERVAL ? SECOND)
              WHERE id = ?
         `, [versuche, String(ergebnis.fehler).slice(0, 512),
-            aufgeben ? 'aufgegeben' : 'offen', Math.min(60, 2 ** versuche), auftrag.id]);
+            aufgeben ? 'aufgegeben' : 'offen', abstandS(auftrag.aktion, versuche), auftrag.id]);
 
         // Auch das Aufgeben ist ein Ende - sonst steht bei den gescheiterten
         // Auftraegen fuer immer "nie ausgefuehrt".
@@ -821,7 +895,7 @@ async function abarbeiten(auftrag) {
     } catch (err) {
         await db().query(
             "UPDATE streaming_outbox SET versuche = versuche + 1, fehlertext = ?, zustand = IF(versuche + 1 >= ?, 'aufgegeben', 'offen') WHERE id = ?",
-            [String(err.message).slice(0, 512), HOECHSTVERSUCHE, auftrag.id]).catch(() => {});
+            [String(err.message).slice(0, 512), versuchsGrenze(auftrag.aktion), auftrag.id]).catch(() => {});
         log().error(`[Streaming] Auftrag ${auftrag.id} fehlgeschlagen:`, err);
     }
 }
@@ -929,7 +1003,8 @@ function anhalten() {
 }
 
 module.exports = {
-    TAKT_MS, JE_LAUF, HOECHSTVERSUCHE, BOT_FRIST_MS, BRAUCHT_KANAL,
+    TAKT_MS, JE_LAUF, HOECHSTVERSUCHE, HOECHSTVERSUCHE_AUFRAEUMEN, BOT_FRIST_MS, BRAUCHT_KANAL,
+    ABSTAND_HOECHST_S, ABSTAND_HOECHST_S_AUFRAEUMEN, versuchsGrenze, abstandS,
     starten, anhalten, lauf, auswaehlen, abarbeiten, ausfuehren, chatAnsageSenden,
-    istEndgueltig, istWeg
+    istEndgueltig, istWeg, kanalstau
 };
