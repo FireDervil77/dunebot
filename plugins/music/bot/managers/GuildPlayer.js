@@ -911,6 +911,43 @@ class GuildPlayer {
     }
 
     /**
+     * Den Namen zu `requestedBy` dazulegen — fuer die Anzeige, nicht als Ersatz.
+     *
+     * ── Befund des Betreibers (2026-09-07) ──────────────────────────────────
+     *
+     * „die liste als naechstes loest die discord ids nicht auf dort steht nur:
+     * live gewuenscht von 544578232704565262 und nicht der name des users."
+     *
+     * Im Discord-Chat steht `<@id>` und der Client loest es auf; im Dashboard
+     * steht dieselbe Zahl roh da. Aufloesen kann nur, wer den Client hat — also
+     * hier und nicht im Dashboard.
+     *
+     * **Nur aus dem Zwischenspeicher, nie `fetch`.** `zustand()` beantwortet
+     * eine IPC-Anfrage; ein Netzabruf je Titel haenge die Antwort an Discords
+     * Laune (dieselbe Falle wie `members.fetch()` mit 120 s Frist). Wer nicht
+     * im Speicher steht, behaelt seine Kennung — eine Zahl ist haesslich, ein
+     * haengendes Dashboard ist schlimmer.
+     *
+     * `requestedBy` bleibt die KENNUNG. Sie traegt die Abwesenheitspruefung
+     * (`_entferneVonAbwesenden`); ein Name an dieser Stelle waere ein zweiter
+     * Weg mit demselben Feldnamen.
+     *
+     * @param {Object|null} t Titel
+     * @returns {Object|null} Derselbe Titel mit `requestedByName`
+     * @private
+     */
+    _mitNamen(t) {
+        if (!t || !t.requestedBy) return t;
+
+        const gilde = this.client?.guilds?.cache?.get(this.guildId);
+        const name = gilde?.members?.cache?.get(t.requestedBy)?.displayName
+            || this.client?.users?.cache?.get(t.requestedBy)?.username
+            || null;
+
+        return name ? { ...t, requestedByName: name } : t;
+    }
+
+    /**
      * Zustand fuer Dashboard und Befehle.
      *
      * @returns {Object} Zustand
@@ -922,7 +959,7 @@ class GuildPlayer {
             sprachKanalId: this.sprachKanalId,
             textKanalId: this.textKanalId,
             aktuell: this.aktuell
-                ? { ...this.aktuell, positionSek: this.positionSek() }
+                ? { ...this._mitNamen(this.aktuell), positionSek: this.positionSek() }
                 : null,
             pausiert: this.pausiert,
             lautstaerke: this.lautstaerke,
@@ -932,7 +969,7 @@ class GuildPlayer {
             dauerbetrieb: this.dauerbetrieb,
             autoplay: this.autoplay,
             stimmen: this.stimmen.size,
-            warteschlange: this.warteschlange.map((t, i) => ({ ...t, position: i })),
+            warteschlange: this.warteschlange.map((t, i) => ({ ...this._mitNamen(t), position: i })),
 
             // Zwei Zahlen, weil zwei Fragen gestellt werden:
             //

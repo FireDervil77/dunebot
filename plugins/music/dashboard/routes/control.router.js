@@ -11,7 +11,10 @@ const express = require('express');
 const router = express.Router();
 const { ServiceManager } = require('dunebot-core');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
-const { zustandHolen, steuern, angemeldeterNutzer, fehler, auspacken } = require('./_shared');
+const { zustandHolen, steuern, angemeldeterNutzer, fehler, auspacken,
+        makeTranslator, spielzeitText } = require('./_shared');
+const path = require('path');
+const ejs = require('ejs');
 
 /** Zustand abfragen - davon lebt die laufende Anzeige der Uebersicht. */
 router.get('/state', requirePermission('MUSIC.VIEW'), async (req, res) => {
@@ -19,6 +22,49 @@ router.get('/state', requirePermission('MUSIC.VIEW'), async (req, res) => {
         res.json({ success: true, zustand: await zustandHolen(res.locals.guildId) });
     } catch (error) {
         fehler(res, error, 'Der Zustand konnte nicht gelesen werden');
+    }
+});
+
+/**
+ * Die Karte "Als Naechstes" als fertiges Stueck HTML.
+ *
+ * ── Warum HTML und nicht Daten (Befund des Betreibers, 2026-09-07) ──────────
+ *
+ * Die laufende Anzeige fuehrte nur den Spieler nach; die Warteschlange stand
+ * still, bis jemand die Seite neu lud. Sie im Browser aus dem Zustand
+ * nachzubauen hiesse, dieselbe Liste zweimal zu beschreiben - und die zweite
+ * lernt jede spaetere Aenderung der ersten nicht mehr.
+ *
+ * Deshalb rendert der Server dieselbe Vorlage, die auch die Seite benutzt
+ * (`partials/music-warteschlange-teil.ejs`), und der Browser tauscht nur den
+ * Inhalt aus. Kein Layout, kein Theme drumherum - das Stueck haengt an einer
+ * Karte, die schon steht.
+ *
+ * `MUSIC.VIEW` wie `/state`: Wer den Zustand sehen darf, darf auch sehen, was
+ * darin steht.
+ */
+router.get('/warteschlange-teil', requirePermission('MUSIC.VIEW'), async (req, res) => {
+    try {
+        const zustand = await zustandHolen(res.locals.guildId);
+        const vorlage = path.join(__dirname, '..', 'views', 'guild', 'partials',
+            'music-warteschlange-teil.ejs');
+
+        // **Nicht `{ async: true }`.** Damit gibt `include()` ein Versprechen
+        // zurueck statt HTML, und in der Liste stuende zweimal
+        // "[object Promise]" - gemessen, nicht befuerchtet. Die Vorlage wartet
+        // auf nichts, sie braucht den asynchronen Weg also nicht.
+        const html = await ejs.renderFile(vorlage,
+            { zustand, tr: makeTranslator(req, res), spielzeitText });
+
+        res.json({
+            success: true,
+            html,
+            // Die Zahl im Kopf der Karte steht ausserhalb des getauschten
+            // Stuecks - sie kommt als Zahl mit, nicht als zweites HTML.
+            anzahl: zustand.warteschlangeLaenge || 0
+        });
+    } catch (error) {
+        fehler(res, error, 'Die Warteschlange konnte nicht gelesen werden');
     }
 });
 

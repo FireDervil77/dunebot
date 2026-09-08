@@ -85,8 +85,9 @@ class MusicFiles {
         const dbService = ServiceManager.get('dbService');
         const ergebnis = await dbService.query(
             `INSERT INTO music_files
-                (guild_id, dateiname, originalname, herkunft, fuer_stream, groesse_bytes, hochgeladen_von)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                (guild_id, dateiname, originalname, herkunft, fuer_stream, groesse_bytes,
+                 dauer_sek, hochgeladen_von)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             [guildId, daten.dateiname, daten.originalname,
              daten.herkunft || null,
              // **Freigeben ist eine Handlung.** Eine Datei kommt nie
@@ -94,7 +95,12 @@ class MusicFiles {
              // vergisst - der Stream-Weg ist die Stelle, an der nichts
              // versehentlich hineinrutschen darf.
              daten.fuerStream ? 1 : 0,
-             daten.groesseBytes || 0, daten.hochgeladenVon || null]
+             daten.groesseBytes || 0,
+             // NULL heisst „nicht gemessen", nicht „null Sekunden lang". Die
+             // Restspielzeit rechnet mit `|| 0`; eine 0 in der Spalte waere
+             // eine Behauptung ueber eine Datei, die niemand angesehen hat.
+             Number.isFinite(daten.dauerSek) && daten.dauerSek > 0 ? daten.dauerSek : null,
+             daten.hochgeladenVon || null]
         );
         return ergebnis.insertId;
     }

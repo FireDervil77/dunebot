@@ -35,8 +35,14 @@ const quellenFarbe = { youtube: 'red', spotify: 'green', soundcloud: 'orange', d
     <div class="text-secondary small">
       <span class="badge bg-<%= quellenFarbe[t.source] || 'secondary' %>-lt"><%= t.source %></span>
       <span class="ms-2"><%= dauer(t.durationSec) %></span>
+      <%# Der Name, wenn der Bot ihn im Zwischenspeicher hatte; sonst die
+          Kennung. Monospace bleibt der Kennung vorbehalten - sie ist eine
+          Nummer, der Name ist keiner. %>
       <% if (t.requestedBy) { %>
-        <span class="ms-2"><%= tr('music:REQUESTED_BY') %> <span class="font-monospace"><%= t.requestedBy %></span></span>
+        <span class="ms-2"><%= tr('music:REQUESTED_BY') %>
+          <% if (t.requestedByName) { %><%= t.requestedByName %>
+          <% } else { %><span class="font-monospace"><%= t.requestedBy %></span><% } %>
+        </span>
       <% } %>
     </div>
   </div>

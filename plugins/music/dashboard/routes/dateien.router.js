@@ -31,6 +31,7 @@ const { ServiceManager } = require('dunebot-core');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 const { MusicFiles, MusicSettings } = require('../../shared/models');
 const { guildVerzeichnis, pfadFuer, ERLAUBTE_TYPEN, ERLAUBTE_ENDUNGEN } = require('../../shared/dateien');
+const { dauerLesen } = require('../../shared/dauer');
 const { makeTranslator, renderView, renderFehler, auspacken, angemeldeterNutzer } = require('./_shared');
 const { richtigstellen } = require('../../../../apps/dashboard/helpers/Dateiname');
 
@@ -177,8 +178,18 @@ router.post('/upload', requirePermission('MUSIC.FILES.UPLOAD'), (req, res) => {
             // **Die Textfelder kommen aus demselben Formular wie die Datei.**
             // Multer legt sie in `req.body`, aber erst NACH der Datei - vorher
             // steht dort nichts. Deshalb hier und nicht weiter oben.
+            // **Die Dauer wird hier gemessen, nicht spaeter.** Sie stand in
+            // keiner Zeile (alle sechs Dateien: NULL), und die Restspielzeit
+            // der Warteschlange ist ihre Summe - deshalb stand dort immer
+            // "-". Ein Fehlschlag kostet die Angabe, nicht den Upload.
+            const dauerSek = await dauerLesen(req.file.path);
+            if (dauerSek === null) {
+                Logger.warn(`[Musik] Dauer nicht lesbar: ${req.file.filename}`);
+            }
+
             const id = await MusicFiles.anlegen(guildId, {
                 dateiname: req.file.filename,
+                dauerSek,
                 // multer liest den Namen als latin1, Browser schicken UTF-8 -
                 // ohne das steht `LÃVI` in der Ablage statt `LÄVI`.
                 originalname: richtigstellen(req.file.originalname),

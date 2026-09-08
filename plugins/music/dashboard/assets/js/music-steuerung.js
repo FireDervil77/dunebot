@@ -115,7 +115,16 @@
             .then(function (antwort) {
                 melden(text('AUFGENOMMEN', '{anzahl} Titel aufgenommen.').replace('{anzahl}', antwort.aufgenommen ?? 1));
                 if (feld) feld.value = '';
-                window.location.reload();
+
+                // Wo die Liste sich selbst nachzieht, waere ein Neuladen der
+                // groebere Weg: Es nimmt Scrollstand und Meldung mit. Auf jeder
+                // anderen Seite bleibt es dabei - dort gibt es niemanden, der
+                // nachzoege.
+                if (document.getElementById('music-warteschlange-teil')) {
+                    zustandHolen().catch(function () { window.location.reload(); });
+                } else {
+                    window.location.reload();
+                }
             })
             .catch(fehlerMelden);
     };
@@ -499,6 +508,17 @@
     /** Kennung des zuletzt angezeigten Titels - erkennt den Wechsel. */
     let angezeigterTitel = null;
 
+    /** Dasselbe fuer die Warteschlange - eine Folge aller Kennungen. */
+    let angezeigteWarteschlange = null;
+
+    /**
+     * Der erste Takt vergleicht nur, er holt nicht.
+     *
+     * Die Seite kam mit demselben Zustand vom Server; das Stueck sofort noch
+     * einmal abzuholen waere eine Anfrage ohne Wirkung - bei jedem Seitenaufruf.
+     */
+    let ersteRunde = true;
+
     async function zustandHolen() {
         if (!document.getElementById('music-spieler')) return false;
 
@@ -543,8 +563,64 @@
         }
 
         kopfzeileSetzen(z);
+        warteschlangeNachziehen(z);
 
         return Boolean(t) && !z.pausiert;
+    }
+
+    /**
+     * Die Karte "Als Naechstes" nachziehen, wenn sich etwas geaendert hat.
+     *
+     * ── Befund des Betreibers (2026-09-07) ──────────────────────────────────
+     *
+     * „die Box als naechstes aktualisiert sich nicht mit den titeln die man
+     * hinzufuegt automatisch. so muss man die seite neuladen um zu sehen was
+     * sich aendert."
+     *
+     * Die Nachfuehrung gab es, sie fasste aber nur den Spieler an. Ein Titel,
+     * den jemand aus Discord oder aus dem Twitch-Chat dazulegte, erschien
+     * erst beim Neuladen.
+     *
+     * **Die Liste wird nicht hier gebaut.** Der Zustand traegt sie zwar
+     * vollstaendig - sie im Browser zusammenzusetzen hiesse aber, dieselbe
+     * Vorlage ein zweites Mal zu schreiben, und die zweite lernt keine
+     * spaetere Aenderung der ersten. Der Browser vergleicht nur, ob sich etwas
+     * geaendert hat, und holt das fertige Stueck vom Server.
+     *
+     * Der Vergleich laeuft ueber eine Kennzeichenfolge statt ueber die Laenge:
+     * Wer einen Titel entfernt und einen anderen dazulegt, hat dieselbe Anzahl
+     * und eine andere Liste.
+     *
+     * @param {Object} z Zustand aus /steuerung/state
+     * @returns {void}
+     */
+    function warteschlangeNachziehen(z) {
+        const behaelter = document.getElementById('music-warteschlange-teil');
+        if (!behaelter) return;
+
+        const kennung = (z.warteschlange || [])
+            .map(function (t) { return t.url || t.title || ''; }).join('~');
+
+        if (kennung === angezeigteWarteschlange) return;
+        angezeigteWarteschlange = kennung;
+
+        // Beim ersten Durchlauf steht die Liste schon richtig auf der Seite -
+        // sie kam mit demselben Zustand vom Server. Ein Abruf dafuer waere
+        // eine Anfrage, die nichts aendert.
+        if (ersteRunde) { ersteRunde = false; return; }
+
+        anfrage('GET', '/steuerung/warteschlange-teil')
+            .then(function (antwort) {
+                behaelter.innerHTML = antwort.html;
+                const zahl = document.getElementById('music-warteschlange-zahl');
+                if (zahl) zahl.textContent = antwort.anzahl;
+            })
+            .catch(function () {
+                // Nicht melden: Die Liste ist eine Anzeige, kein Vorgang des
+                // Betreibers. Beim naechsten Takt wird es erneut versucht -
+                // die Kennung steht dann anders als das Angezeigte.
+                angezeigteWarteschlange = null;
+            });
     }
 
     /**

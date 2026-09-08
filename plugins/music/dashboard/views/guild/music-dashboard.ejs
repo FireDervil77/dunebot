@@ -217,27 +217,18 @@
       <div class="card-header">
         <h3 class="card-title">
           <%= tr('music:DASHBOARD.NEXT_UP') %>
-          <span class="badge bg-secondary-lt ms-2"><%= zustand.warteschlangeLaenge %></span>
+          <span class="badge bg-secondary-lt ms-2" id="music-warteschlange-zahl"><%= zustand.warteschlangeLaenge %></span>
         </h3>
         <div class="card-actions">
           <a href="<%= basis %>/warteschlange" class="btn btn-sm btn-outline-primary"><%= tr('music:DASHBOARD.ALL') %></a>
         </div>
       </div>
 
-      <% if (zustand.warteschlange && zustand.warteschlange.length > 0) { %>
-        <div class="list-group list-group-flush">
-          <% zustand.warteschlange.slice(0, 8).forEach((eintrag, i) => { %>
-            <div class="list-group-item">
-              <%- include('partials/music-titelzeile', { t: eintrag, tr, nummer: i + 1 }) %>
-            </div>
-          <% }); %>
-        </div>
-        <div class="card-footer text-secondary">
-          <%= tr('music:DASHBOARD.REMAINING', { zeit: spielzeitText(zustand.restspielzeitSek) }) %>
-        </div>
-      <% } else { %>
-        <div class="card-body text-secondary"><%= tr('music:QUEUE.EMPTY') %></div>
-      <% } %>
+      <%# Der Inhalt liegt in einer eigenen Vorlage, weil die laufende Anzeige
+          ihn nachzieht - dieselbe Liste, nicht eine zweite im Browser. %>
+      <div id="music-warteschlange-teil">
+        <%- include('partials/music-warteschlange-teil', { zustand, tr, spielzeitText }) %>
+      </div>
     </div>
 
     <% if (statistik) { %>

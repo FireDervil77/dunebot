@@ -1,0 +1,37 @@
+<%
+/**
+ * Der Inhalt der Karte "Als Naechstes" - Liste und Restspielzeit.
+ *
+ * ── Warum das eine eigene Vorlage ist (Befund des Betreibers, 2026-09-07) ───
+ *
+ * „die Box als naechstes aktualisiert sich nicht mit den titeln die man
+ * hinzufuegt automatisch. so muss man die seite neuladen um zu sehen was sich
+ * aendert."
+ *
+ * Die laufende Anzeige fuehrte bis zum 2026-09-08 nur den Spieler nach
+ * (Position, Balken, Titel) - die Warteschlange nicht. Ein Titel, den jemand
+ * per Chatbefehl oder aus Discord dazulegte, erschien erst beim Neuladen.
+ *
+ * Damit die Nachfuehrung dieselbe Liste zeigt wie die Seite, wird sie hier
+ * **einmal** beschrieben und von zwei Seiten benutzt: von der Seite beim
+ * Aufbau und von `/steuerung/warteschlange-teil` beim Nachziehen. Die Liste im
+ * Browser nachzubauen waere der zweite Weg - und der erste, der auseinander
+ * laeuft.
+ *
+ * Erwartet: zustand, tr, spielzeitText
+ */
+%>
+<% if (zustand.warteschlange && zustand.warteschlange.length > 0) { %>
+  <div class="list-group list-group-flush">
+    <% zustand.warteschlange.slice(0, 8).forEach((eintrag, i) => { %>
+      <div class="list-group-item">
+        <%- include('music-titelzeile', { t: eintrag, tr, nummer: i + 1 }) %>
+      </div>
+    <% }); %>
+  </div>
+  <div class="card-footer text-secondary">
+    <%= tr('music:DASHBOARD.REMAINING', { zeit: spielzeitText(zustand.restspielzeitSek) }) %>
+  </div>
+<% } else { %>
+  <div class="card-body text-secondary"><%= tr('music:QUEUE.EMPTY') %></div>
+<% } %>
