@@ -20,7 +20,13 @@
       </div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <a class="btn btn-white btn-sm" href="/guild/<%= guildId %>/plugins/gameserver/metrics">Kennzahlen</a>
+      <%# Der Knopf zeigte auf eine Route, die es nie gab (Baustelle 107).
+          Seit dem 2026-09-08 sammelt das Dashboard den Verlauf; die Seite
+          kommt, wenn etwas darin steht. Bis dahin sagt der Knopf das, statt
+          ins Leere zu fuehren - ein toter Verweis ist schlimmer als ein
+          abgeblendeter Knopf, weil er beim Klicken nichts erklaert. %>
+      <span class="btn btn-white btn-sm disabled" aria-disabled="true"
+            title="Der Verlauf wird seit dem 2026-09-08 gesammelt. Die Seite kommt, sobald genug Messwerte da sind.">Kennzahlen</span>
       <a class="btn btn-primary btn-sm" href="/guild/<%= guildId %>/plugins/gameserver/servers/create">Server anlegen</a>
     </div>
   </div>

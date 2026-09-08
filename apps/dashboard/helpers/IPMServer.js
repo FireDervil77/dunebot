@@ -786,10 +786,126 @@ class IPMServer {
     }
 
     /**
+     * Den Verlauf mitschreiben — CPU, RAM und Spieler je Minute (E-8).
+     *
+     * ── Warum es das gibt (Baustelle 107, 2026-09-08) ───────────────────────
+     *
+     * `server_metrics` wurde am 2026-08-16 angelegt, samt Verdichtungsentwurf
+     * und der Frage, die sie beantworten soll: „War der Server gestern Abend am
+     * Anschlag, als alle geklagt haben?" Gemessen am 2026-09-08: **0 Zeilen.**
+     * Niemand schrieb hinein. Die Migration sagt selbst, wer es tun muesste —
+     * „beim Empfang des Heartbeats, nicht der Daemon".
+     *
+     * ── Warum hier und nicht im Plugin ──────────────────────────────────────
+     *
+     * Die Werte je Container gibt es nur an dieser Stelle: Der Heartbeat ist
+     * keine Ereignisnachricht und laeuft nicht ueber den `IPMEventRouter`. Sie
+     * von hier aus noch einmal als Ereignis zu verschicken, damit das Plugin
+     * sie zurueckbekommt, waere ein zweiter Weg fuer Daten, die schon in der
+     * Hand liegen. Diese Datei schreibt aus demselben Grund bereits
+     * `server_registry` (masterserver) und `daemon_logs`.
+     *
+     * ── Eine Anweisung, nicht eine je Server ────────────────────────────────
+     *
+     * Der Heartbeat kommt alle 30 s. Bei einer Abfrage je Server waeren das bei
+     * 80 Servern 160 Anweisungen je Minute fuer eine Handvoll Zahlen.
+     *
+     * ── Der laufende Mittelwert, und wo er ungenau ist ──────────────────────
+     *
+     *     neu = (alt * samples + wert) / (samples + 1)
+     *
+     * `samples` zaehlt die HERZSCHLAEGE im Korb, nicht die Messwerte je Spalte.
+     * Faellt ein einzelner Wert einmal aus (NULL), bleibt der alte Mittelwert
+     * stehen, und der naechste vorhandene Wert wird mit einem `samples`
+     * gewichtet, das einen Schlag zu hoch ist. Bei zwei Schlaegen je Minute ist
+     * die Abweichung kleiner als die Messung selbst — eine zweite Zaehlspalte je
+     * Messwert waere mehr Schema fuer weniger Wahrheit.
+     *
+     * **`samples` wird ZULETZT hochgezaehlt.** Die Mittelwerte darueber rechnen
+     * mit dem alten Stand, und MariaDB wertet die Zuweisungen von links nach
+     * rechts aus. Wer die Zeile nach oben schiebt, verschiebt jeden Mittelwert.
+     *
+     * **NULL heisst nicht gemessen, 0 heisst gemessen und niemand da.** Ein
+     * Server, der gar nichts liefert (gestoppter Container), bekommt keine
+     * Zeile: Eine Zeile voller NULL sieht aus wie eine Messluecke, nicht wie
+     * „war aus".
+     *
+     * Deshalb steht bei den Hoechstwerten auch kein
+     * `GREATEST(COALESCE(alt,0), COALESCE(neu,0))` — das machte aus „nie
+     * gemessen" eine gemessene Null. Erster Entwurf dieser Anweisung, beim
+     * Nachlesen gefunden.
+     *
+     * @param {Array} servers Die Serverliste aus dem Heartbeat
+     * @returns {Promise<void>}
+     * @private
+     */
+    async _schreibeKennzahlen(servers) {
+        const zahl = (w) => (w === null || w === undefined || w === '' || !Number.isFinite(Number(w)))
+            ? null : Number(w);
+
+        const zeilen = [];
+        for (const s of servers || []) {
+            const id = Number(s.server_id);
+            if (!Number.isInteger(id) || id <= 0) continue;
+
+            const cpu     = zahl(s.cpu_percent);
+            const ram     = zahl(s.ram_used_mb);
+            const spieler = zahl(s.players);
+
+            // Nichts gemessen, nichts aufzuheben.
+            if (cpu === null && ram === null && spieler === null) continue;
+
+            zeilen.push([id, cpu, ram === null ? null : Math.round(ram),
+                         ram === null ? null : Math.round(ram),
+                         spieler, spieler === null ? null : Math.round(spieler)]);
+        }
+
+        if (!zeilen.length) return;
+
+        const stueck = zeilen.map(() =>
+            `(?, 'minute', DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:00'), ?, ?, ?, ?, ?, 1)`).join(', ');
+
+        try {
+            await this.dbService.query(
+                `INSERT INTO server_metrics
+                     (server_id, bucket, bucket_start,
+                      cpu_avg, ram_mb_avg, ram_mb_max, players_avg, players_max, samples)
+                 VALUES ${stueck}
+                 ON DUPLICATE KEY UPDATE
+                     cpu_avg = IF(VALUES(cpu_avg) IS NULL, cpu_avg,
+                                  IF(cpu_avg IS NULL, VALUES(cpu_avg),
+                                     (cpu_avg * samples + VALUES(cpu_avg)) / (samples + 1))),
+                     ram_mb_avg = IF(VALUES(ram_mb_avg) IS NULL, ram_mb_avg,
+                                     IF(ram_mb_avg IS NULL, VALUES(ram_mb_avg),
+                                        (ram_mb_avg * samples + VALUES(ram_mb_avg)) / (samples + 1))),
+                     ram_mb_max = IF(VALUES(ram_mb_max) IS NULL, ram_mb_max,
+                                     IF(ram_mb_max IS NULL, VALUES(ram_mb_max),
+                                        GREATEST(ram_mb_max, VALUES(ram_mb_max)))),
+                     players_avg = IF(VALUES(players_avg) IS NULL, players_avg,
+                                      IF(players_avg IS NULL, VALUES(players_avg),
+                                         (players_avg * samples + VALUES(players_avg)) / (samples + 1))),
+                     players_max = IF(VALUES(players_max) IS NULL, players_max,
+                                      IF(players_max IS NULL, VALUES(players_max),
+                                         GREATEST(players_max, VALUES(players_max)))),
+                     samples = samples + 1`,
+                zeilen.flat()
+            );
+        } catch (error) {
+            // Der Verlauf ist eine Beigabe. Faellt er aus, darf der Herzschlag
+            // nicht mit ausfallen - an ihm haengt der Zustand aller Server.
+            this.Logger.error('[IPMServer] Kennzahlen nicht mitgeschrieben:', error);
+        }
+    }
+
+    /**
      * Server-Registry aktualisieren
      * @private
      */
     async _updateServerRegistry(daemonId, servers, guildId) {
+        // Der Verlauf zuerst: Er braucht dieselben Werte, und ein Fehler beim
+        // Registry-Schreiben soll ihn nicht mitnehmen.
+        await this._schreibeKennzahlen(servers);
+
         // Status-Mapping: Daemon-States → MySQL ENUM (online,offline,starting,stopping,error)
         const registryStatusMap = { running: 'online', stopped: 'offline', crashed: 'error' };
         const sseManager = ServiceManager.get('sseManager');

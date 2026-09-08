@@ -66,6 +66,14 @@ class CronWorker {
             );
         });
 
+        // Kennzahlen verdichten - eine halbe Stunde nach der Aufbewahrung,
+        // damit sich die beiden Durchlaeufe nicht ins Gehege kommen.
+        this._kennzahlen = cron.schedule('0 4 * * *', () => {
+            this.kennzahlenVerdichten().catch(err =>
+                Logger.warn(`[CronWorker] Kennzahlen-Verdichtung fehlgeschlagen: ${err.message}`)
+            );
+        });
+
         this._started = true;
         Logger.success('[CronWorker] Cron-Worker gestartet.');
     }
@@ -81,6 +89,10 @@ class CronWorker {
         if (this._aufbewahrung) {
             this._aufbewahrung.stop();
             this._aufbewahrung = null;
+        }
+        if (this._kennzahlen) {
+            this._kennzahlen.stop();
+            this._kennzahlen = null;
         }
         this._jobs.clear();
         this._started = false;
@@ -659,6 +671,103 @@ class CronWorker {
             } catch (err) {
                 Logger.warn(`[CronWorker] Aufbewahrungs-Durchlauf für Server ${s.id} fehlgeschlagen: ${err.message}`);
             }
+        }
+    }
+
+    /**
+     * Kennzahlen verdichten und altes wegraeumen (E-8, Baustelle 107).
+     *
+     * ── Warum es das braucht ────────────────────────────────────────────────
+     *
+     * Seit dem 2026-09-08 schreibt das Dashboard beim Herzschlag eine
+     * Minutenzeile je Server (`IPMServer._schreibeKennzahlen`). Das sind bei
+     * zwei Servern rund 2900 Zeilen am Tag; bei hundert Servern waeren es
+     * 144.000. Der Entwurf der Tabelle hat das vorweggenommen und zwei Stufen
+     * vorgesehen - **die Verdichtung ist kein Aufraeumen, sie ist der Grund,
+     * warum die Tabelle so aussieht.**
+     *
+     *   Minutenzeilen   14 Tage, danach zu Stundenzeilen verdichtet
+     *   Stundenzeilen   13 Monate (13, damit ein Jahresvergleich geht)
+     *
+     * ── Der gewichtete Mittelwert ───────────────────────────────────────────
+     *
+     * Nicht `AVG(cpu_avg)`: Eine Minute mit einem Messwert zaehlte dann so viel
+     * wie eine mit vier. Gewichtet wird mit `samples`, und der Nenner zaehlt
+     * **nur die Zeilen, die den Wert wirklich hatten** - sonst zoege eine
+     * Stunde mit halb fehlender Messung den Schnitt nach unten, obwohl gar
+     * nichts gemessen wurde. Genau die Falschaussage, gegen die diese Tabelle
+     * gebaut ist.
+     *
+     * ── In einer Transaktion ────────────────────────────────────────────────
+     *
+     * Verdichten und Loeschen gehoeren zusammen. Bricht es dazwischen ab,
+     * stuenden die Minutenzeilen noch da und wuerden beim naechsten Lauf ein
+     * ZWEITES Mal in dieselbe Stundenzeile gerechnet. Ein halber Durchlauf
+     * verfaelscht hier also Daten, statt nur Arbeit zu hinterlassen.
+     *
+     * @returns {Promise<void>}
+     */
+    async kennzahlenVerdichten() {
+        const Logger = ServiceManager.get('Logger');
+        const dbService = ServiceManager.get('dbService');
+
+        const MINUTEN_TAGE = 14;
+        const STUNDEN_MONATE = 13;
+
+        try {
+            const { verdichtet, geloescht } = await dbService.transaction(async (verbindung) => {
+                // Die Grenze EINMAL bestimmen und beiden Anweisungen geben.
+                // Zweimal `NOW()` waere zweimal eine andere Grenze, und die
+                // Zeilen dazwischen fielen aus der Verdichtung heraus.
+                const [[{ grenze }]] = await verbindung.query(
+                    'SELECT DATE_SUB(NOW(), INTERVAL ? DAY) AS grenze', [MINUTEN_TAGE]);
+
+                const [rein] = await verbindung.query(
+                    `INSERT INTO server_metrics
+                         (server_id, bucket, bucket_start,
+                          cpu_avg, ram_mb_avg, ram_mb_max, players_avg, players_max, samples)
+                     SELECT server_id, 'hour',
+                            DATE_FORMAT(bucket_start, '%Y-%m-%d %H:00:00'),
+                            SUM(cpu_avg * samples)
+                                / NULLIF(SUM(IF(cpu_avg IS NULL, 0, samples)), 0),
+                            SUM(ram_mb_avg * samples)
+                                / NULLIF(SUM(IF(ram_mb_avg IS NULL, 0, samples)), 0),
+                            MAX(ram_mb_max),
+                            SUM(players_avg * samples)
+                                / NULLIF(SUM(IF(players_avg IS NULL, 0, samples)), 0),
+                            MAX(players_max),
+                            SUM(samples)
+                       FROM server_metrics
+                      WHERE bucket = 'minute' AND bucket_start < ?
+                      GROUP BY server_id, DATE_FORMAT(bucket_start, '%Y-%m-%d %H:00:00')
+                     ON DUPLICATE KEY UPDATE
+                         cpu_avg = VALUES(cpu_avg),
+                         ram_mb_avg = VALUES(ram_mb_avg),
+                         ram_mb_max = VALUES(ram_mb_max),
+                         players_avg = VALUES(players_avg),
+                         players_max = VALUES(players_max),
+                         samples = VALUES(samples)`,
+                    [grenze]);
+
+                const [weg] = await verbindung.query(
+                    "DELETE FROM server_metrics WHERE bucket = 'minute' AND bucket_start < ?",
+                    [grenze]);
+
+                const [alt] = await verbindung.query(
+                    `DELETE FROM server_metrics
+                      WHERE bucket = 'hour' AND bucket_start < DATE_SUB(NOW(), INTERVAL ? MONTH)`,
+                    [STUNDEN_MONATE]);
+
+                return { verdichtet: weg.affectedRows || 0, geloescht: alt.affectedRows || 0,
+                         stunden: rein.affectedRows || 0 };
+            });
+
+            if (verdichtet || geloescht) {
+                Logger.info(`[CronWorker] Kennzahlen: ${verdichtet} Minutenzeile(n) verdichtet, `
+                    + `${geloescht} Stundenzeile(n) ueber ${STUNDEN_MONATE} Monate entfernt`);
+            }
+        } catch (err) {
+            Logger.warn(`[CronWorker] Kennzahlen-Verdichtung fehlgeschlagen: ${err.message}`);
         }
     }
 
