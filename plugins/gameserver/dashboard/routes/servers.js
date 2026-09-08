@@ -3542,7 +3542,7 @@ router.post('/:serverId/start', requirePermission('GAMESERVER.START'), async (re
         // Dieselbe Funktion nutzen Neustart und Cronjob – sonst driften die Pfade
         // auseinander, wie es beim Restart bereits passiert war.
         const { payload: startPayload, error: payloadError, dockerImage } =
-            buildStartPayload(server, guildId, Logger);
+            await buildStartPayload(server, guildId, Logger);
 
         if (payloadError) {
             Logger.error(`[Gameserver] ${payloadError} (Server ${serverId})`);
@@ -3814,7 +3814,7 @@ router.post('/:serverId/restart', requirePermission('GAMESERVER.RESTART'), async
         // Config leben nur im Speicher des Daemons. Nach einem Daemon-Neustart
         // stoppte ein Restart den Server sonst und scheiterte dann mit
         // "docker image not set".
-        const { payload: restartPayload, error: payloadError } = buildStartPayload(server, guildId, Logger);
+        const { payload: restartPayload, error: payloadError } = await buildStartPayload(server, guildId, Logger);
         if (payloadError) {
             return res.status(500).json({ success: false, message: payloadError });
         }

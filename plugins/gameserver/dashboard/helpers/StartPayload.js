@@ -17,6 +17,7 @@
 const fs   = require('fs');
 const path = require('path');
 
+const { ServiceManager } = require('dunebot-core');
 const { resolveUpdateOptions } = require('./UpdateOptions');
 
 /** Wo die Übergangs-Zuordnungen liegen (packages/fbpkg/uebergang/<slug>.json). */
@@ -320,7 +321,7 @@ function waehleDockerImage(dockerImages) {
  * @returns {{payload: object|null, error: string|null, dockerImage: string|null,
  *            startupCommand: string, ports: object, envVariables: object}}
  */
-function buildStartPayload(server, guildId, Logger = null) {
+async function buildStartPayload(server, guildId, Logger = null) {
     const warn  = (msg) => Logger?.warn?.(msg);
     const debug = (msg) => Logger?.debug?.(msg);
     // Absichtlich info und nicht debug: Diese eine Zeile ist der Beleg dafür,
@@ -457,7 +458,34 @@ function buildStartPayload(server, guildId, Logger = null) {
 
     const updateOptions = resolveUpdateOptions(server);
 
+    // ── Ist der Mod-Lader dieses Servers scharf? (E6/B.12) ───────────────────
+    //
+    // Der Daemon weiss das nicht von sich aus und soll es auch nicht wissen
+    // (I4: er misst und meldet, er verwaltet nicht). Die Liste der Inhalte
+    // liegt in `gameserver_content`; von hier geht der Schalter mit dem
+    // Startbefehl, und der Daemon setzt daraufhin `content.loader.adds` in den
+    // Auftrag ein — Umgebung und Argumente, mit denen BepInEx scharf wird.
+    //
+    // **Ein Fehlschlag hier startet den Server trotzdem, aber laut.** Ein
+    // Server, der wegen eines Datenbankschluckaufs gar nicht mehr hochkommt,
+    // waere schlimmer; ein Server, der still ohne seine Mods startet, ist die
+    // Sorte Fehler, die man erst beim Spielen merkt. Deshalb `error` und ein
+    // Satz, der die Folge nennt.
+    let laderAktiv = false;
+    try {
+        const dbService = ServiceManager.get('dbService');
+        const [zeile] = await dbService.query(
+            `SELECT id FROM gameserver_content
+              WHERE server_id = ? AND art = 'loader' AND aktiv = 1 AND status = 'installiert'
+              LIMIT 1`, [serverId]);
+        laderAktiv = Boolean(zeile);
+    } catch (fehler) {
+        Logger?.error?.('[StartPayload] Inhalte nicht lesbar — der Server startet OHNE '
+            + `seinen Mod-Lader, auch wenn einer eingerichtet ist: ${fehler.message}`);
+    }
+
     const payload = {
+        lader_aktiv: laderAktiv,
         server_id:       String(serverId),
         daemon_id:       server.daemon_id,
         rootserver_id:   server.rootserver_id,

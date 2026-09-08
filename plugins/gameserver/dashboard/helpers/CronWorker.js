@@ -334,7 +334,7 @@ class CronWorker {
         const server = await loadServerForStart(dbService, job.server_id);
         if (!server) throw new Error(`Server ${job.server_id} nicht gefunden`);
 
-        const { payload, error } = buildStartPayload(server, job.guild_id, ServiceManager.get('Logger'));
+        const { payload, error } = await buildStartPayload(server, job.guild_id, ServiceManager.get('Logger'));
         if (error) throw new Error(error);
 
         return { ...payload, server_id: serverId };
