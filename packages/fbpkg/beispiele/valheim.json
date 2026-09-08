@@ -1142,7 +1142,28 @@
     }
   },
   "content": {
-    "supported": false
+    "supported": true,
+    "loader": {
+      "key": "bepinex",
+      "installable_as_content": true,
+      "adds": {
+        "env": {
+          "DOORSTOP_ENABLED": "1",
+          "DOORSTOP_TARGET_ASSEMBLY": "./BepInEx/core/BepInEx.Preloader.dll",
+          "LD_LIBRARY_PATH": "./doorstop_libs:{{env:LD_LIBRARY_PATH}}",
+          "LD_PRELOAD": "libdoorstop_x64.so"
+        }
+      }
+    },
+    "sources": [
+      "upload",
+      "thunderstore"
+    ],
+    "path": "BepInEx/plugins",
+    "activation": "start",
+    "order_matters": false,
+    "needs_restart": true,
+    "client_side": true
   },
   "management": {
     "query": {
@@ -1181,7 +1202,8 @@
       "commands.players.ban: Die Datei liegt im Speicherverzeichnis. Wird -savedir gesetzt, wandert sie mit — dann greift ein fester Pfad ins Leere.",
       "world_seed: GIBT ES NICHT als Startparameter — gemessen am 2026-09-06 an assembly_valheim.dll. Valheim kennt genau diese Parameter: -backuplong -backups -backupshort -console -crossplay -instanceid -joincode -logfile -modifier -name -password -port -preset -public -resetmodifiers -savedir -saveinterval -setkey -world. Kein -seed. Was an \"seed\" in der Assembly steht, sind Konsolenbefehle (printseeds, nextseed) und Logtexte. Der Seed entsteht beim Anlegen der Welt und liegt danach in der .fwl-Datei; ein bestimmter Seed geht nur, indem man die Welt anderswo mit ihm erzeugt und beide Dateien (.fwl und .db) hochlaedt. Das ist eine Dateiablage, keine Einstellung.",
       "start_args: -preset, -modifier und -setkey — GEMESSEN am 2026-09-06 am laufenden Server, nicht aus der Doku uebernommen. Preset und die fuenf Modifikatoren sind jetzt als Einstellung gebaut (fachliche Hoehe). Die Referenz sagte nach Nodecraft, sie wirkten NUR beim ersten Erzeugen einer Welt; das ist WIDERLEGT: Lauf 1 erzeugte die Welt mit -preset hard, Lauf 2 lud dieselbe Welt mit -preset casual, und das Spiel meldete \"Setting world modifier preset: casual\" — nach dem Laden ruehrt nichts es mehr an. Deshalb takes_effect: restart, nicht new_world. Erlaubte Werte ebenfalls gemessen, mit Gegenprobe: Presets normal|casual|easy|hard|hardcore|immersive|hammer (veryeasy und ein erfundener Wert wurden LAUT abgelehnt). Modifikatoren: combat veryeasy|easy|hard|veryhard, deathpenalty casual|veryeasy|easy|hard|hardcore, resources muchless|less|more|muchmore|most, raids none|muchless|less|more|muchmore, portals casual|hard|veryhard. \"normal\" ist bei den Einzelwerten KEIN Wert, sondern das Nichtsetzen. ⚠ Ein ungueltiger Einzelwert wird STILL verworfen — keine Meldung im Log. Deshalb Auswahlfelder und kein Textfeld. setkey und resetmodifiers sind am 2026-09-07 nachgemessen und GEBAUT. Die fuenf Kaestchen des Spiels heissen: nobuildcost (Keine Baukosten), playerevents (Spielerbasierte Ueberfaelle), fire (Feuerrisiken), passivemobs (Passive Gegner), nomap (Keine Karte). Gefunden ueber die Presets: jedes wurde einzeln gesetzt und die .fwl danach ausgelesen — casual liefert passivemobs/playerevents/teleportall, hammer nobuildcost/passivemobs, immersive nomap/noportals/fire, hardcore nomap/nobossportals/deathskillsreset/deathdeleteitems. ⚠ DREI Messungen bestimmen die Bauform: (1) -setkey prueft NICHTS — ein \"erfundenerschluessel\" landete dauerhaft in der Welt. (2) Ein Schluessel verschwindet NIE von selbst: ohne jeden Parameter neu gestartet, standen alle sechs noch da. (3) Nur -resetmodifiers raeumt auf — danach stand exakt der eine gesetzte Schluessel da. Deshalb der Schalter \"Weltmodifikatoren aus dem Panel verwalten\": Ist er an, wird der Stand bei JEDEM Start aus den Feldern neu aufgebaut. Ist er aus, fasst das Panel die Welt nicht an — Bestandsserver bleiben dadurch unberuehrt. Der Preis steht in der Beschreibung des Schalters: -resetmodifiers loescht auch, was jemand im Spiel ueber die Konsole gesetzt hat.",
-      "requirements.os_packages: GEMESSEN am 2026-09-06, der offene Punkt ist eingeloest. Am angehefteten Image nachgezaehlt (dpkg-query): libatomic1 und libc6 waren drin, libpulse fehlte vollstaendig — dpkg 0 Treffer, ldconfig 0 Treffer. Unity holt libpulse zur Laufzeit per dlopen, weshalb ldd sie nie zeigte. Das Wiki nennt libpulse-dev, weil es fuer Entwicklungsmaschinen geschrieben ist; im Laufzeit-Image genuegt libpulse0 (liefert libpulse.so.0 und libpulse-simple.so.0). Nachgehalten wird das jetzt von scripts/check-paket-abhaengigkeiten.js, nicht mehr von dieser Zeile."
+      "requirements.os_packages: GEMESSEN am 2026-09-06, der offene Punkt ist eingeloest. Am angehefteten Image nachgezaehlt (dpkg-query): libatomic1 und libc6 waren drin, libpulse fehlte vollstaendig — dpkg 0 Treffer, ldconfig 0 Treffer. Unity holt libpulse zur Laufzeit per dlopen, weshalb ldd sie nie zeigte. Das Wiki nennt libpulse-dev, weil es fuer Entwicklungsmaschinen geschrieben ist; im Laufzeit-Image genuegt libpulse0 (liefert libpulse.so.0 und libpulse-simple.so.0). Nachgehalten wird das jetzt von scripts/check-paket-abhaengigkeiten.js, nicht mehr von dieser Zeile.",
+      "content: Der Lader ist BESCHRIEBEN, aber noch nicht INSTALLIERBAR (2026-09-08). Die Umgebung ist gemessen - aus dem startup.command unseres eigenen valheim-bepinex-Addons, nicht aus der Doku: DOORSTOP_ENABLED=1, DOORSTOP_TARGET_ASSEMBLY=./BepInEx/core/BepInEx.Preloader.dll, LD_PRELOAD=libdoorstop_x64.so und LD_LIBRARY_PATH mit ./doorstop_libs DAVOR. Letzteres steht als {{env:LD_LIBRARY_PATH}} da und nicht als voller Wert: Das Paket setzt ./linux64, und zwei Wahrheiten laufen beim ersten Aendern auseinander. Was FEHLT, ist der Weg, BepInEx auf den Server zu bekommen - der alte Egg holt denikson-BepInExPack_Valheim von Thunderstore und entpackt es ueber das Serververzeichnis. Bis es das gibt, bleibt eine Laderzeile in gameserver_content ohne Wirkung, weil sie niemand auf 'installiert' setzen kann. NICHT uebernommen: SteamAppId=892970 aus demselben Addon - unser Paket laeuft ohne, und ob Mods es brauchen, ist ungemessen."
     ]
   },
   "requirements": {
