@@ -170,25 +170,37 @@
                                                 <td>
                                                     <small><%= new Date(server.created_at).toLocaleDateString('de-DE') %></small>
                                                 </td>
+                                                <%# Der Auge-Knopf steht allein (Wunsch des Betreibers,
+                                                    2026-09-07). Vorher klebte er in derselben `btn-group`
+                                                    wie Start und Stopp - drei Knoepfe ohne Fuge, obwohl
+                                                    zwei davon etwas TUN und einer nur woanders hinfuehrt.
+
+                                                    `btn-list` setzt den Abstand; Start und Stopp bleiben
+                                                    zusammen, weil immer nur einer von beiden sichtbar ist. %>
                                                 <td>
-                                                    <div class="btn-group btn-group-sm">
-                                                        <!-- Start Button (immer gerendert, Display via CSS) -->
-                                                        <button class="btn btn-success btn-sm server-start-btn" 
-                                                                data-server-id="<%= server.id %>"
-                                                                data-server-name="<%= server.name %>"
-                                                                style="display: <%= server.status === 'offline' ? 'inline-block' : 'none' %>;">
-                                                            <i class="fa-solid fa-play"></i>
-                                                        </button>
-                                                        
-                                                        <!-- Stop Button (immer gerendert, Display via CSS) -->
-                                                        <button class="btn btn-warning btn-sm server-stop-btn" 
-                                                                data-server-id="<%= server.id %>"
-                                                                data-server-name="<%= server.name %>"
-                                                                style="display: <%= server.status === 'online' ? 'inline-block' : 'none' %>;">
-                                                            <i class="fa-solid fa-stop"></i>
-                                                        </button>
-                                                        
-                                                        <a href="/guild/<%= guildId %>/plugins/gameserver/servers/<%= server.id %>" class="btn btn-info btn-sm">
+                                                    <div class="btn-list flex-nowrap">
+                                                        <span class="btn-group btn-group-sm">
+                                                            <!-- Start Button (immer gerendert, Display via CSS) -->
+                                                            <button class="btn btn-success btn-sm server-start-btn"
+                                                                    title="Starten"
+                                                                    data-server-id="<%= server.id %>"
+                                                                    data-server-name="<%= server.name %>"
+                                                                    style="display: <%= server.status === 'offline' ? 'inline-block' : 'none' %>;">
+                                                                <i class="fa-solid fa-play"></i>
+                                                            </button>
+
+                                                            <!-- Stop Button (immer gerendert, Display via CSS) -->
+                                                            <button class="btn btn-warning btn-sm server-stop-btn"
+                                                                    title="Stoppen"
+                                                                    data-server-id="<%= server.id %>"
+                                                                    data-server-name="<%= server.name %>"
+                                                                    style="display: <%= server.status === 'online' ? 'inline-block' : 'none' %>;">
+                                                                <i class="fa-solid fa-stop"></i>
+                                                            </button>
+                                                        </span>
+
+                                                        <a href="/guild/<%= guildId %>/plugins/gameserver/servers/<%= server.id %>"
+                                                           class="btn btn-info btn-sm" title="Zum Server">
                                                             <i class="fa-solid fa-eye"></i>
                                                         </a>
                                                     </div>
@@ -453,52 +465,71 @@ function updateActionButtons(row, status) {
 // ========================================
 // Server Start/Stop via AJAX
 // ========================================
+/**
+ * Einen Vorgang an den Server geben - und sagen, was schiefging.
+ *
+ * ── Befund des Betreibers (2026-09-07) ──────────────────────────────────────
+ *
+ * "der start und stop button auf der seite hat noch nie funktioniert."
+ *
+ * Was hier geprueft und AUSGESCHLOSSEN wurde (2026-09-08): Die Routen gibt es
+ * (POST .../start und .../stop), das CSRF-Token haengt `csrf-helper.js` global
+ * an jedes `fetch`, die Rechte GAMESERVER.START/STOP stehen im Katalog und sind
+ * in allen vier Guilds ausgesaet, und beide Knoepfe werden gerendert.
+ *
+ * Was NICHT ausgeschlossen werden konnte, weil es dafuer einen Klick braucht:
+ * die Antwort selbst. Genau das hat die alte Fassung verschluckt - eine
+ * Fehlerseite (403, 500) ist kein JSON, `res.json()` wirft, und im Fangzweig
+ * stand ein Satz ohne Zahl: "Fehler beim Starten des Servers". Damit war jeder
+ * Fehlschlag gleich aussehend und keiner auffindbar.
+ *
+ * Jetzt steht die Zahl in der Meldung und die ganze Antwort in der Konsole.
+ * Der naechste Klick sagt, was los ist.
+ *
+ * @param {string} serverId Kennung
+ * @param {'start'|'stop'} vorgang Was getan werden soll
+ * @returns {void}
+ */
+function serverVorgang(serverId, vorgang) {
+    const adresse = `/guild/<%= guildId %>/plugins/gameserver/servers/${serverId}/${vorgang}`;
+    const wort = vorgang === 'start' ? 'Starten' : 'Stoppen';
+
+    fetch(adresse, { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+        .then(async (antwort) => {
+            const text = await antwort.text();
+            let daten = null;
+            try { daten = JSON.parse(text); } catch { /* keine JSON-Antwort */ }
+
+            if (!antwort.ok || !daten) {
+                console.error(`[Gameserver] ${wort} fehlgeschlagen`, {
+                    adresse, status: antwort.status, antwort: text.slice(0, 500)
+                });
+                showToast('error', `${wort} fehlgeschlagen (HTTP ${antwort.status})`
+                    + (daten && daten.message ? ': ' + daten.message : ''));
+                return;
+            }
+
+            if (daten.success) {
+                showToast('success', daten.message);
+                // Kein Reload - SSE aktualisiert den Status live
+            } else {
+                showToast('error', daten.message || `${wort} fehlgeschlagen`);
+            }
+        })
+        .catch((err) => {
+            // Hier landet nur noch, was die Anfrage gar nicht erst zustande
+            // kommen liess - kein Netz, abgebrochen.
+            console.error(`[Gameserver] ${wort}: Anfrage nicht zustande gekommen`, err);
+            showToast('error', `${wort}: keine Verbindung zum Dashboard`);
+        });
+}
+
 function startServer(serverId) {
-    // ❌ KEIN CONFIRM mehr - direkt starten!
-    
-    fetch(`/guild/<%= guildId %>/plugins/gameserver/servers/${serverId}/start`, {
-        method: 'POST',  // ✅ POST statt PUT!
-        headers: {
-            'Content-Type': 'application/json'
-        }
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            showToast('success', data.message);
-            // ✅ Kein Reload - SSE aktualisiert Status live
-        } else {
-            showToast('error', data.message);
-        }
-    })
-    .catch(err => {
-        console.error('Error starting server:', err);
-        showToast('error', 'Fehler beim Starten des Servers');
-    });
+    serverVorgang(serverId, 'start');
 }
 
 function stopServer(serverId) {
-    // ❌ KEIN CONFIRM mehr - direkt stoppen!
-    
-    fetch(`/guild/<%= guildId %>/plugins/gameserver/servers/${serverId}/stop`, {
-        method: 'POST',  // ✅ POST statt PUT!
-        headers: {
-            'Content-Type': 'application/json'
-        }
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            showToast('success', data.message);
-            // ✅ Kein Reload - SSE aktualisiert Status live
-        } else {
-            showToast('error', data.message);
-        }
-    })
-    .catch(err => {
-        console.error('Error stopping server:', err);
-        showToast('error', 'Fehler beim Stoppen des Servers');
-    });
+    serverVorgang(serverId, 'stop');
 }
 
 // ========================================

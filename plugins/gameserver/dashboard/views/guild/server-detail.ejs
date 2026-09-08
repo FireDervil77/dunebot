@@ -28,7 +28,12 @@
   Höhenstufen-Entscheidung vom 2026-08-18, angewandt auf die ganze Seite statt
   nur auf die Einstellungsliste.
 -%>
-<div class="fb-seite">
+<%# `data-fb-live-guild` ist der Haken, an dem `gameserver-live.js` sich
+    einhaengt (2026-09-08). Gemessen: Das Modul war vollstaendig gebaut und
+    wurde von dieser Seite auch geladen - es suchte beim Start dieses Attribut
+    und fand es NIRGENDS im ganzen Projekt. Deshalb stand die Seite still, so
+    wie der Betreiber es "seit Beginn des Projektes" beschreibt. %>
+<div class="fb-seite" data-fb-live-guild="<%= guildId %>">
 
   <%# ── Kopfzeile ───────────────────────────────────────────────────────── %>
   <% const u = locals.uebersicht; %>

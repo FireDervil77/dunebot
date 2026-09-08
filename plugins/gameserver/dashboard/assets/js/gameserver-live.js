@@ -173,11 +173,37 @@
 
     window.GameserverLiveAnzeige = LiveAnzeige;
 
-    // Selbst starten, wenn die Seite einen SSE-Client bereitgestellt hat.
+    // ── Selbst starten — und den eigenen Empfaenger bauen ───────────────────
+    //
+    // Bis zum 2026-09-08 stand hier `if (!wurzel || !window.gameserverSSE)
+    // return;`. **Beide Bedingungen waren nie erfuellt:** `data-fb-live-guild`
+    // stand in keiner einzigen Vorlage, und `window.gameserverSSE` baute nur
+    // die Dashboard-Seite in ihrem eigenen Inline-Skript. Das ganze Modul lief
+    // also nie - lautlos, so wie ein `return` es tut.
+    //
+    // Jetzt reicht der Haken in der Vorlage. Ist noch kein Empfaenger da, baut
+    // dieses Modul ihn aus der Guild-Kennung, die am Haken steht; ist schon
+    // einer da (Dashboard-Seite), wird er MITBENUTZT - zwei Verbindungen fuer
+    // dieselben Ereignisse waeren zwei Wege.
     document.addEventListener('DOMContentLoaded', () => {
         const wurzel = document.querySelector('[data-fb-live-guild]');
-        if (!wurzel || !window.gameserverSSE) return;
-        window.gameserverLive = new LiveAnzeige(window.gameserverSSE,
-            wurzel.dataset.fbLiveGuild);
+        if (!wurzel) return;
+
+        const guildId = wurzel.dataset.fbLiveGuild;
+
+        if (!window.gameserverSSE) {
+            if (typeof window.GameserverSSEClient !== 'function') {
+                // Melden statt ausweichen: Ohne Empfaenger bleibt die Seite
+                // stehen, und genau dieses Schweigen hat das Modul ein Jahr
+                // lang unbemerkt gelassen.
+                console.error('[Gameserver] Live-Anzeige: GameserverSSEClient ist nicht geladen — '
+                    + 'die Seite zeigt den Stand vom Aufruf und aktualisiert sich nicht.');
+                return;
+            }
+            window.gameserverSSE = new window.GameserverSSEClient(guildId);
+            window.gameserverSSE.connect();
+        }
+
+        window.gameserverLive = new LiveAnzeige(window.gameserverSSE, guildId);
     });
 })();
