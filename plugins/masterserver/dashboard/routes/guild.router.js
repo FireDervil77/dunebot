@@ -294,7 +294,49 @@ router.get('/logs', requirePermission('MASTERSERVER.LOGS.VIEW'), async (req, res
         query += ' ORDER BY created_at DESC LIMIT ?';
         params.push(limit);
 
-        const logs = await dbService.query(query, params);
+        // ── Die Zeilen in die Form bringen, die die Ansicht erwartet ──────
+        //
+        // Befund des Betreibers (2026-09-07): "Invalid Date | daemon | Daemon
+        // Event: reconnected" und Details, die nur `0: {  1: "` zeigen.
+        //
+        // Gemessen, beides Namensfehler gegen das echte Schema:
+        //
+        //   die Ansicht las   es gibt aber
+        //   log.timestamp     created_at        -> new Date(undefined)
+        //   log.log_id        id
+        //   log.source        (nichts) - dafuer event_type und action
+        //   log.metadata      eine JSON-ZEICHENKETTE, kein Objekt
+        //
+        // Das letzte erklaert die Zeichensuppe: `Object.entries("{...}")` geht
+        // ueber die Buchstaben, nicht ueber die Felder - Feld "0" ist "{",
+        // Feld "1" ist ein Anfuehrungszeichen.
+        //
+        // Umgeformt wird HIER und nicht in der Ansicht: Die Ansicht bekommt
+        // dieselben Namen wie ihre Schwester im Fenster (das Detailfenster
+        // baut aus derselben Liste), und eine kaputte Zeile kostet ihr Feld,
+        // nicht die Seite.
+        const rohLogs = await dbService.query(query, params);
+        const logs = (rohLogs || []).map((z) => {
+            let metadaten = null;
+            try {
+                const w = typeof z.metadata === 'string' ? JSON.parse(z.metadata) : z.metadata;
+                // Ein leeres Objekt ist keine Auskunft - dann soll die Ansicht
+                // gar keinen Details-Knopf anbieten.
+                if (w && typeof w === 'object' && Object.keys(w).length) metadaten = w;
+            } catch { /* unlesbare Metadaten kosten das Feld, nicht die Zeile */ }
+
+            return {
+                ...z,
+                log_id: z.id,
+                timestamp: z.created_at,
+                // Woher die Zeile stammt: `event_type` ist die Gattung
+                // (reconnect, disconnect, heartbeat_lost ...), `action` das
+                // rohe Wort. Beide zeigen, statt "daemon" hinzuschreiben.
+                source: z.event_type || 'daemon',
+                aktion: z.action || null,
+                metadata: metadaten
+            };
+        });
 
         // Stats berechnen
         const statsQuery = `

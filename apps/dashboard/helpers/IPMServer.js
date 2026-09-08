@@ -388,6 +388,14 @@ class IPMServer {
                 if (newCount === 0 && !this.wirdBeendet) {
                     RootServer.markOffline(daemonId)
                         .catch(err => this.Logger.error('[IPMServer] Statuswechsel auf offline fehlgeschlagen:', err));
+
+                    // **Auch das gehoert ins Protokoll** (2026-09-08). Bis heute
+                    // stand in `daemon_logs` ausschliesslich "verbunden" und
+                    // "wieder verbunden" - 490 Zeilen, 488 davon Wiederverbindung.
+                    // Ein Protokoll, in dem nur das Zurueckkommen steht, laesst
+                    // die Frage offen, wie lange er weg war.
+                    this._logDaemonEvent(daemonId, 'disconnected', { verbindungen: newCount })
+                        .catch(err => this.Logger.error('[IPMServer] Trennung nicht protokolliert:', err));
                 }
             }
         });
@@ -693,10 +701,13 @@ class IPMServer {
                 }
                 break;
 
-            case 'log':
-                // Log-Nachricht vom Daemon
-                await this._handleDaemonLog(daemonId, payload);
-                break;
+            // Ein Fall 'log' stand hier bis zum 2026-09-08. Gemessen: Der
+            // Daemon kennt genau drei Nachrichtenarten - command, event,
+            // response (`pkg/protocol/messages.go:20-24`), und `Validate()`
+            // weist alles andere ab. Eine Log-Nachricht konnte also nie
+            // ankommen; der Empfaenger dahinter hat nie eine Zeile geschrieben.
+            // Ein bereitstehender Empfaenger fuer etwas, das strukturell nicht
+            // kommt, laedt zu dem Glauben ein, das Protokoll sei vollstaendig.
 
             default:
                 this.Logger.warn(`[IPMServer] Unknown message type: ${type} from Daemon ${daemonId}`);
@@ -1004,32 +1015,6 @@ class IPMServer {
     }
 
     /**
-     * Daemon-Log verarbeiten
-     * @private
-     */
-    async _handleDaemonLog(daemonId, payload) {
-        const { level, message, context } = payload;
-
-        try {
-            // Guild-ID für Log-Eintrag holen
-            const daemon = await RootServer.getByDaemonId(daemonId);
-            
-            if (!daemon) return;
-            
-            // Level zu event_type mappen (error → error, rest → status_change)
-            const eventType = level === 'error' ? 'error' : 'status_change';
-
-            await this.dbService.query(
-                `INSERT INTO daemon_logs (guild_id, daemon_id, event_type, level, action, message, metadata, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
-                [daemon.guild_id, daemonId, eventType, level, level, message, JSON.stringify(context || {})]
-            );
-        } catch (error) {
-            this.Logger.error('[IPMServer] Failed to log daemon message:', error);
-        }
-    }
-
-    /**
      * Daemon-Event loggen
      * @private
      */
@@ -1040,19 +1025,31 @@ class IPMServer {
             
             if (!daemon) return;
             
-            // Event-Typ Mapping (ENUM: register, disconnect, command, error, status_change, heartbeat_lost, reconnect)
-            const eventTypeMap = {
-                'first_registration': 'register',
-                'reconnected': 'reconnect',
-                'connected': 'register'
+            // ── Eine Tafel statt drei Zuordnungen (2026-09-08) ───────────
+            //
+            // Hier standen Typ und Stufe in getrennten Zuordnungen, und der
+            // Satz war `Daemon Event: reconnected` - dieselbe Auskunft wie die
+            // Spalte `action` daneben, nur auf Englisch. Der Betreiber las die
+            // Seite und sah dreimal dasselbe Wort.
+            //
+            // ENUM von `daemon_logs.event_type`: register, disconnect, command,
+            // error, status_change, heartbeat_lost, reconnect.
+            const TAFEL = {
+                first_registration: { typ: 'register',       stufe: 'info',
+                    satz: 'Daemon hat sich zum ersten Mal angemeldet' },
+                connected:          { typ: 'register',       stufe: 'info',
+                    satz: 'Daemon verbunden' },
+                reconnected:        { typ: 'reconnect',      stufe: 'info',
+                    satz: 'Daemon wieder verbunden' },
+                disconnected:       { typ: 'disconnect',     stufe: 'warn',
+                    satz: 'Verbindung zum Daemon beendet' },
+                heartbeat_lost:     { typ: 'heartbeat_lost', stufe: 'warn',
+                    satz: 'Kein Herzschlag mehr - Verbindung getrennt' },
             };
-            const eventType = eventTypeMap[event] || 'status_change';
-            
-            // Level basierend auf Event-Typ bestimmen
-            let level = 'info'; // Default
-            if (eventType === 'error') level = 'error';
-            else if (eventType === 'disconnect' || eventType === 'heartbeat_lost') level = 'warn';
-            else if (eventType === 'register' || eventType === 'reconnect') level = 'info';
+            const eintrag = TAFEL[event]
+                || { typ: 'status_change', stufe: 'info', satz: `Daemon-Ereignis: ${event}` };
+            const eventType = eintrag.typ;
+            const level = eintrag.stufe;
             
             await this.dbService.query(
                 `INSERT INTO daemon_logs (guild_id, daemon_id, event_type, level, action, message, metadata, created_at)
@@ -1062,8 +1059,8 @@ class IPMServer {
                     daemonId,
                     eventType,
                     level,
-                    event, // action: 'first_registration', 'reconnected', 'connected'
-                    `Daemon Event: ${event}`,
+                    event, // action: der rohe Name, so wie er hereinkam
+                    eintrag.satz,
                     JSON.stringify(data || {})
                 ]
             );
@@ -1188,6 +1185,13 @@ class IPMServer {
                         .catch(err => this.Logger.error('[IPMServer] Heartbeat-Zähler nicht erhöht:', err));
                     RootServer.markOffline(daemonId)
                         .catch(err => this.Logger.error('[IPMServer] Statuswechsel auf offline fehlgeschlagen:', err));
+
+                    // Der Zaehler auf der Detailseite sagt WIE OFT, das Protokoll
+                    // sagt WANN. Ohne diesen Eintrag ist ein Aussetzer nach einer
+                    // Stunde nicht mehr auffindbar.
+                    this._logDaemonEvent(daemonId, 'heartbeat_lost',
+                        { still_seit_ms: now - conn.lastHeartbeat, frist_ms: timeout })
+                        .catch(err => this.Logger.error('[IPMServer] Herzschlagverlust nicht protokolliert:', err));
                 }
             }
         }, 30000); // Alle 30s prüfen

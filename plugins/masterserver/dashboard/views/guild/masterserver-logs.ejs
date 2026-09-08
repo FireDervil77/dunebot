@@ -186,8 +186,13 @@
                           second: '2-digit'
                         }) %></small>
                       </td>
+                      <%# Gattung und rohes Wort - vorher stand hier fest
+                          "daemon", weil `log.source` nie existierte. %>
                       <td>
-                        <code><%= log.source || 'daemon' %></code>
+                        <code><%= log.source %></code>
+                        <% if (log.aktion && log.aktion !== log.source) { %>
+                          <div class="text-secondary" style="font-size:11px"><%= log.aktion %></div>
+                        <% } %>
                       </td>
                       <td>
                         <%= log.message %>
