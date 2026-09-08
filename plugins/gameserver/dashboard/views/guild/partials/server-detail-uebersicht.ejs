@@ -336,13 +336,35 @@
     </div>
   <% } %>
 
-  <%# ── Welt ─────────────────────────────────────────────────────────────── %>
+  <%# ── Welt ───────────────────────────────────────────────────────────────
+
+      Die letzten fuenf Sicherungen, nicht nur die letzte (Wunsch des
+      Betreibers, 2026-09-07). Der Knopf bleibt - er fuehrt zum Anlegen,
+      Zurueckspielen und Loeschen; die Karte zeigt nur, ob es etwas gibt.
+  %>
   <div class="fb-karte">
     <div class="fb-kopf"><span>Welt</span></div>
     <div class="fb-koerper">
-      <div class="fb-muted" style="font-size:13px;margin-bottom:10px">
-        <%= u.welt.letzte ? 'Zuletzt gesichert ' + u.welt.text : 'Noch keine Sicherung vorhanden.' %>
-      </div>
+      <% if (!u.welt.liste || !u.welt.liste.length) { %>
+        <div class="fb-muted" style="font-size:13px;margin-bottom:10px">
+          Noch keine Sicherung vorhanden.
+        </div>
+      <% } else { %>
+        <div class="fb-muted" style="font-size:13px;margin-bottom:8px">
+          Zuletzt gesichert <%= u.welt.text %>
+        </div>
+        <% u.welt.liste.forEach(function (b, i) { %>
+          <div style="display:flex;gap:10px;padding:5px 0;align-items:baseline;<%=
+                i ? 'border-top:1px solid var(--fb-border)' : '' %>">
+            <div class="fb-muted" style="flex:0 0 108px;font-size:12px"><%= b.text %></div>
+            <div style="flex:1 1 auto;font-size:12px;word-break:break-all"><%= b.name || '—' %></div>
+            <% if (b.groesse) { %>
+              <div class="fb-mono fb-muted" style="font-size:12px"><%= b.groesse %></div>
+            <% } %>
+          </div>
+        <% }); %>
+        <div style="margin-top:10px"></div>
+      <% } %>
       <a class="btn btn-white btn-sm" href="?ansicht=<%= u.hoehe %>&bereich=sicherungen">Sicherungen…</a>
     </div>
   </div>

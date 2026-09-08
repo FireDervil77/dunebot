@@ -99,7 +99,7 @@ const RISIKO = {
  *
  * @param {object} server        Zeile aus `gameservers` (mit rootserver-Feldern)
  * @param {object|null} paket    Das Spielpaket (FBPKG_v1), oder null
- * @param {object} [zusatz]      { letzteSicherung, live }
+ * @param {object} [zusatz]      { sicherungen, live }
  * @returns {object}
  */
 function baueUebersicht(server, paket, zusatz = {}) {
@@ -118,7 +118,7 @@ function baueUebersicht(server, paket, zusatz = {}) {
         paket:         bauePaketkarte(server, paket, zusatz.paketZeile),
         bereitschaft:  baueBereitschaft(paket, server),
         kennzahlen:    baueKennzahlen(server),
-        welt:          baueWelt(zusatz.letzteSicherung),
+        welt:          baueWelt(zusatz.sicherungen ?? zusatz.letzteSicherung),
     };
 }
 
@@ -599,17 +599,77 @@ function baueBereitschaft(paket, server = {}) {
     };
 }
 
-/** Welt: wann zuletzt gesichert. */
-function baueWelt(letzteSicherung) {
-    if (!letzteSicherung) return { letzte: null };
-    const ms = Date.now() - new Date(letzteSicherung).getTime();
-    if (!Number.isFinite(ms) || ms < 0) return { letzte: null };
+/**
+ * Wie lange ist das her?
+ *
+ * @param {Date|string|null} zeitpunkt Ein Zeitpunkt in der Vergangenheit
+ * @returns {string|null} "vor 3 Stunden" oder null
+ */
+function seitdem(zeitpunkt) {
+    if (!zeitpunkt) return null;
+    const ms = Date.now() - new Date(zeitpunkt).getTime();
+    if (!Number.isFinite(ms) || ms < 0) return null;
+
+    // Einzahl mitgedacht: In der Karte stehen jetzt fuenf Zeilen untereinander,
+    // und "vor 1 Stunden" faellt dort auf, wo es bei einer Zeile durchging.
     const min = Math.floor(ms / 60000);
-    const text = min < 1 ? 'gerade eben'
-               : min < 60 ? `vor ${min} Minuten`
-               : min < 1440 ? `vor ${Math.floor(min / 60)} Stunden`
-               : `vor ${Math.floor(min / 1440)} Tagen`;
-    return { letzte: letzteSicherung, text };
+    const form = (zahl, eins, viele) => `vor ${zahl} ${zahl === 1 ? eins : viele}`;
+
+    return min < 1 ? 'gerade eben'
+         : min < 60 ? form(min, 'Minute', 'Minuten')
+         : min < 1440 ? form(Math.floor(min / 60), 'Stunde', 'Stunden')
+         : form(Math.floor(min / 1440), 'Tag', 'Tagen');
+}
+
+/** Bytes als "1,4 GB" — dieselbe Form wie in der Musikablage. */
+function groesse(bytes) {
+    const mb = Number(bytes || 0) / (1024 * 1024);
+    if (!Number.isFinite(mb) || mb <= 0) return null;
+    return mb >= 1024
+        ? `${(mb / 1024).toFixed(1).replace('.', ',')} GB`
+        : `${mb.toFixed(0)} MB`;
+}
+
+/**
+ * Welt: wann zuletzt gesichert — und die letzten fuenf.
+ *
+ * ── Wunsch des Betreibers (2026-09-07) ──────────────────────────────────────
+ *
+ * „die box Welt waere super wenn sie die letzten 5 backups anzeigen koennte.
+ * der button zu den sicherungen kann bleiben nur visuell."
+ *
+ * Die Karte sagte bisher nur, WANN zuletzt gesichert wurde. Das beantwortet
+ * nicht die Frage, die ein Betreiber vor einem Update hat: *Habe ich einen
+ * Stand, auf den ich zurueck kann?* Dafuer braucht er mehrere Zeitpunkte -
+ * einer koennte der einzige sein.
+ *
+ * `letzte` und `text` bleiben, damit nichts anderes nachgezogen werden muss.
+ *
+ * @param {Array} sicherungen Bis zu fuenf Zeilen, neueste zuerst
+ * @returns {{letzte: *, text: string|null, liste: Array}}
+ */
+function baueWelt(sicherungen) {
+    // Ein einzelner Zeitpunkt wird weiter angenommen: Diese Funktion hat
+    // frueher genau das bekommen, und ein Aufrufer, der es noch so macht, soll
+    // nicht still eine leere Karte erzeugen.
+    const zeilen = Array.isArray(sicherungen)
+        ? sicherungen
+        : (sicherungen ? [{ completed_at: sicherungen }] : []);
+
+    const liste = zeilen
+        .filter(z => z && z.completed_at)
+        .slice(0, 5)
+        .map(z => ({
+            id:     z.id ?? null,
+            name:   z.name || null,
+            wann:   z.completed_at,
+            text:   seitdem(z.completed_at),
+            groesse: groesse(z.size_bytes)
+        }));
+
+    if (!liste.length) return { letzte: null, text: null, liste: [] };
+
+    return { letzte: liste[0].wann, text: liste[0].text, liste };
 }
 
 module.exports = { baueUebersicht, HOEHE, WIRKUNG, RISIKO, GRUPPE, BEFEHL_NAME, BEFEHL_QUELLE };

@@ -2423,13 +2423,17 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
                     ? JSON.parse(paketZeile.paket_json) : paketZeile.paket_json)
                 : null;
 
-            const [letzte] = await dbService.query(
-                `SELECT completed_at FROM gameserver_backups
+            // Fuenf statt einer (Wunsch des Betreibers, 2026-09-07): Die Karte
+            // sagte nur, WANN zuletzt gesichert wurde. Die Frage vor einem
+            // Update ist aber, ob es einen Stand gibt, auf den man zurueck
+            // kann - dafuer braucht es mehrere Zeitpunkte.
+            const sicherungen = await dbService.query(
+                `SELECT id, name, size_bytes, completed_at FROM gameserver_backups
                   WHERE server_id = ? AND status = 'completed' AND completed_at IS NOT NULL
-                  ORDER BY completed_at DESC LIMIT 1`, [server.id]);
+                  ORDER BY completed_at DESC LIMIT 5`, [server.id]);
 
             uebersicht = baueUebersicht(server, paket, {
-                letzteSicherung: letzte?.completed_at || null,
+                sicherungen: sicherungen || [],
             });
         } catch (err) {
             Logger.error('[Gameserver] Übersichtskarte konnte nicht gebaut werden', err);
