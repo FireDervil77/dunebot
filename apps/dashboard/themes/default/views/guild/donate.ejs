@@ -8,9 +8,26 @@
 <!-- Success/Cancel Benachrichtigungen (dynamisch via JavaScript) -->
         <div id="payment-notification"></div>
         
-        <div class="row">
+        <%# Raster nach Tabler (2026-09-08).
+
+            Befund des Betreibers: "seit wir das layout des adminbereich
+            angepasst haben muessten wir die aufteilung des themes in /donate
+            ebenfalls anpassen, das sieht alles sehr gequetscht aus."
+
+            Dreimal dieselbe Ursache wie bei /admin/donations:
+
+              * blankes `row` ohne `row-cards` — keine senkrechten Rinnen,
+                sobald die Spalten untereinander rutschen
+              * `col-md-8` / `col-md-4` — die Spalten teilen sich schon ab
+                768 px. Die rechte ist dann rund 250 px breit und traegt eine
+                Tabelle mit vier Supporter-Stufen. Ab `lg` geteilt heisst:
+                darunter volle Breite statt Quetsche.
+              * die vier Karten der rechten Spalte sassen ohne jeden Abstand
+                aufeinander (keine einzige `mb-*` dazwischen)
+        %>
+        <div class="row row-cards">
             <!-- Donation-Form -->
-            <div class="col-md-8">
+            <div class="col-lg-8">
                 <div class="card">
                     <div class="card-status-top bg-primary"></div>
                     <div class="card-header">
@@ -151,7 +168,12 @@
             </div>
             
             <!-- Sidebar: Info & Stats -->
-            <div class="col-md-4">
+            <%# `d-flex flex-column gap-3` statt `mb-3` an jeder Karte: Die erste
+                haengt an einer Bedingung (userBadge), und eine Randregel "alle ausser
+                der letzten" ist mit einer bedingten Karte nicht mehr wahr. So
+                bekommt jede Karte denselben Abstand, auch die naechste, die
+                jemand hier einfuegt. %>
+            <div class="col-lg-4 d-flex flex-column gap-3">
                 
                 <!-- Deine Supporter-Info (falls vorhanden) -->
                 <% if (userBadge) { %>
