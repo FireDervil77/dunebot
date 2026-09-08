@@ -4,8 +4,8 @@
     "slug": "astro-colony-proton",
     "name": "Astro Colony (Windows)",
     "description": {
-      "de": "Baue Kolonien im All, automatisiere die Produktion mit Förderbändern und versorge deine Astronauten. Für 1–10 Spieler.",
-      "en": "Explore an endless universe and build the most efficient constellation of colonies. Automate production with conveyor systems and take care of your astronauts. For 1-10 players."
+      "de": "Vorlage fuer Windows-Spiele unter Proton. Astro Colony selbst laeuft nativ unter Linux - dafuer ist das Paket \"Astro Colony\" das richtige. Dieses hier entstand als Vergleichsimage waehrend einer Fehlersuche und bleibt als Muster stehen, wie ein reines Windows-Spiel lauffaehig wird. Baue Kolonien im All, automatisiere die Produktion mit Förderbändern und versorge deine Astronauten. Für 1–10 Spieler.",
+      "en": "Template for Windows-only games running under Proton. Astro Colony itself runs natively on Linux - use the \"Astro Colony\" package for that. This one started as a comparison image during debugging and remains as a blueprint. Explore an endless universe and build the most efficient constellation of colonies. Automate production with conveyor systems and take care of your astronauts. For 1-10 players."
     },
     "version": "1.0.11",
     "author": "firenetworks",
