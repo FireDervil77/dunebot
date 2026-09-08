@@ -2,8 +2,8 @@
 
 
         <!-- Stats-Leiste -->
-        <div class="row mb-3">
-            <div class="col-md-3 col-sm-6">
+        <div class="row row-cards row-deck mb-3">
+            <div class="col-sm-6 col-lg-3">
                 <div class="card card-sm">
                   <div class="card-body">
                     <div class="row align-items-center">
@@ -18,7 +18,7 @@
                   </div>
                 </div>
             </div>
-            <div class="col-md-3 col-sm-6">
+            <div class="col-sm-6 col-lg-3">
                 <div class="card card-sm">
                   <div class="card-body">
                     <div class="row align-items-center">
@@ -33,7 +33,7 @@
                   </div>
                 </div>
             </div>
-            <div class="col-md-3 col-sm-6">
+            <div class="col-sm-6 col-lg-3">
                 <div class="card card-sm">
                   <div class="card-body">
                     <div class="row align-items-center">
@@ -48,7 +48,7 @@
                   </div>
                 </div>
             </div>
-            <div class="col-md-3 col-sm-6">
+            <div class="col-sm-6 col-lg-3">
                 <div class="card card-sm">
                   <div class="card-body">
                     <div class="row align-items-center">
@@ -83,7 +83,14 @@
                 <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers/create" class="alert-link">Jetzt einen erstellen</a>.
             </div>
         <% } else { %>
-            <div class="row" id="rootserver-cards">
+            <%# Zwei je Zeile, nicht drei (Wunsch des Betreibers, 2026-09-07:
+                "die beiden kaestchen so gross machen das immer 2 rootserver in
+                eine zeile passen"). `col-lg-4` liess drei nebeneinander zu -
+                bei zwei Maschinen blieb rechts ein Drittel leer.
+
+                `row-cards` dazu, weil die Kaestchen sonst ohne senkrechten
+                Abstand aufeinandersitzen; das ist im Theme die uebliche Form. %>
+            <div class="row row-cards" id="rootserver-cards">
                 <% for (const rs of servers) { %>
                     <%
                         const cpuPct  = rs.cpu_usage_percent != null ? parseFloat(rs.cpu_usage_percent).toFixed(0) : null;
@@ -94,7 +101,7 @@
                         const ramPct  = (ramUsed && ramTot && parseFloat(ramTot) > 0) ? Math.round(parseFloat(ramUsed)/parseFloat(ramTot)*100) : null;
                         const diskPct = (diskUsed && diskTot && parseFloat(diskTot) > 0) ? Math.round(parseFloat(diskUsed)/parseFloat(diskTot)*100) : null;
                     %>
-                    <div class="col-lg-4 col-md-6">
+                    <div class="col-lg-6">
                         <div class="card"
                              id="rs-card-<%= rs.id %>"
                              data-rs-id="<%= rs.id %>"

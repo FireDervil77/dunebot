@@ -2,9 +2,24 @@
 
 
         
+        <%# Kachelraster nach Tabler (2026-09-08).
+
+            Befund des Betreibers: "die aufteilung der spalten fuer die cards
+            passt nicht mehr zum layout."
+
+            Die Seite stand noch auf dem Raster von vor dem Theme-Umbau: ein
+            blankes `row` ohne Rinnen, dazu `col-6` ab der kleinsten Breite -
+            zwei Kacheln nebeneinander auf einem Telefon, und untereinander
+            klebten sie aneinander.
+
+            `row-cards` setzt die senkrechten Abstaende, `row-deck` gibt allen
+            Kacheln einer Zeile dieselbe Hoehe (sonst haengt die mit dem
+            laengsten Text durch). Der Rest des Themes macht es genauso -
+            `guild/settings.ejs`, `guild/profile.ejs`, `guild/plugins.ejs`.
+        %>
         <!-- Statistik Info-Boxen -->
-        <div class="row">
-            <div class="col-lg-3 col-6">
+        <div class="row row-cards row-deck">
+            <div class="col-sm-6 col-lg-3">
                 <div class="card card-sm">
                   <div class="card-body">
                     <div class="row align-items-center">
@@ -20,7 +35,7 @@
                 </div>
             </div>
             
-            <div class="col-lg-3 col-6">
+            <div class="col-sm-6 col-lg-3">
                 <div class="card card-sm">
                   <div class="card-body">
                     <div class="row align-items-center">
@@ -36,7 +51,7 @@
                 </div>
             </div>
             
-            <div class="col-lg-3 col-6">
+            <div class="col-sm-6 col-lg-3">
                 <div class="card card-sm">
                   <div class="card-body">
                     <div class="row align-items-center">
@@ -52,7 +67,7 @@
                 </div>
             </div>
             
-            <div class="col-lg-3 col-6">
+            <div class="col-sm-6 col-lg-3">
                 <div class="card card-sm">
                   <div class="card-body">
                     <div class="row align-items-center">
@@ -69,7 +84,7 @@
             </div>
         </div>
         
-        <div class="row">
+        <div class="row row-cards">
             <!-- Donations Liste -->
             <div class="col-lg-8">
                 <div class="card">

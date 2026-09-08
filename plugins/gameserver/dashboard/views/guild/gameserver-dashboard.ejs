@@ -17,9 +17,18 @@
             </div>
 
             <!-- Stats Row -->
-            <div class="row">
+            <%# Kachelraster nach Tabler (2026-09-08).
+
+                Befund des Betreibers: "die abstaende der kacheln und boxen
+                muessen an das neue layout angepasst werden."
+
+                Die Seite stand noch auf dem Raster von vor dem Theme-Umbau:
+                blankes `row` ohne Rinnen, dazu `col-6` ab der kleinsten Breite.
+                `row-cards` setzt die senkrechten Abstaende, `row-deck` gibt
+                allen Kacheln einer Zeile dieselbe Hoehe. %>
+            <div class="row row-cards row-deck">
                 <!-- Total Servers -->
-                <div class="col-lg-3 col-6">
+                <div class="col-sm-6 col-lg-3">
                     <div class="card card-sm">
                       <div class="card-body">
                         <div class="row align-items-center">
@@ -39,7 +48,7 @@
                 </div>
 
                 <!-- Online Servers -->
-                <div class="col-lg-3 col-6">
+                <div class="col-sm-6 col-lg-3">
                     <div class="card card-sm">
                       <div class="card-body">
                         <div class="row align-items-center">
@@ -59,7 +68,7 @@
                 </div>
 
                 <!-- Offline Servers -->
-                <div class="col-lg-3 col-6">
+                <div class="col-sm-6 col-lg-3">
                     <div class="card card-sm">
                       <div class="card-body">
                         <div class="row align-items-center">
@@ -79,7 +88,7 @@
                 </div>
 
                 <!-- Total Players -->
-                <div class="col-lg-3 col-6">
+                <div class="col-sm-6 col-lg-3">
                     <div class="card card-sm">
                       <div class="card-body">
                         <div class="row align-items-center">
@@ -100,7 +109,7 @@
             </div>
 
             <!-- Content Row -->
-            <div class="row">
+            <div class="row row-cards">
                 <!-- Recent Servers -->
                 <div class="col-lg-8">
                     <div class="card">
