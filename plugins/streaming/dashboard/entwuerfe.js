@@ -186,11 +186,25 @@ const SEITEN = {
 
         wofuer: {
             titel: 'Eine Regelmenge, alle Chats',
+            // **Kein fremder Anbieter im sichtbaren Text** (2026-09-08).
+            //
+            // Hier stand: "Das kann Wizebot nicht: Dort sind es zwei getrennte
+            // Systeme, weil es kein Discord gibt." Der Betreiber: "sowas
+            // duerfen wir nicht" — und er hat recht. Einen Wettbewerber auf der
+            // eigenen Produktseite zu nennen und ihm etwas abzusprechen ist
+            // vergleichende Werbung ueber ein fremdes Erzeugnis; sie ist an
+            // Bedingungen geknuepft, die eine solche Behauptung nicht erfuellt,
+            // und sie altert schlecht: Was ein anderer heute nicht kann, kann
+            // er naechste Woche.
+            //
+            // Der Vorteil bleibt stehen, nur ohne Gegner. Was UNSER Weg leistet,
+            // traegt sich selbst.
             saetze: [
                 'Was du im Discord gegen Großschreibung, Links und verbotene Wörter eingestellt hast, '
                 + 'soll hier auch gelten — dieselben Regeln, dieselben Ausnahmen, dieselbe Eskalation. '
                 + 'Du pflegst sie an einer Stelle.',
-                'Das kann Wizebot nicht: Dort sind es zwei getrennte Systeme, weil es kein Discord gibt.'
+                'Eine Regelmenge für beide Chats heißt auch: Wer sie ändert, ändert sie überall — '
+                + 'kein zweites Regelwerk, das man vergisst.'
             ]
         },
 
