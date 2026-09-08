@@ -4662,9 +4662,117 @@ router.get('/:serverId/backups', requirePermission('GAMESERVER.BACKUPS.VIEW'), a
             [serverId]
         );
 
-        return res.json({ success: true, backups: backups || [] });
+        // Ob das Herunterladen ueberhaupt angeboten werden kann: Der Daemon
+        // meldet bei jeder Anmeldung den Port seines Sicherungsabrufs. Fehlt er
+        // (aeltere Bauart, oder der Zuhoerer kam nicht hoch), soll gar kein
+        // Knopf erscheinen - einer, der auf eine tote Adresse zeigt, ist
+        // schlimmer als keiner.
+        const [maschine] = await dbService.query(
+            `SELECT r.abruf_port
+               FROM gameservers gs JOIN rootserver r ON r.id = gs.rootserver_id
+              WHERE gs.id = ?`, [serverId]);
+
+        return res.json({
+            success: true,
+            backups: backups || [],
+            abruf: Boolean(maschine && maschine.abruf_port)
+        });
     } catch (error) {
         Logger.error('[Gameserver/Backups] Fehler beim Laden der Backup-Liste:', error);
+        return res.status(500).json({ success: false, message: 'Serverfehler' });
+    }
+});
+
+/**
+ * GET /guild/:guildId/plugins/gameserver/servers/:serverId/backups/:backupId/download
+ *
+ * Leitet auf eine unterschriebene, kurzlebige Adresse beim Daemon um.
+ *
+ * ── Warum eine Umleitung und kein Durchreichen (Baustelle 106) ──────────────
+ *
+ * Die Sicherungen des Betreibers sind 1,45 GB und 227 MB gross (gemessen).
+ * Durch das Dashboard geleitet hiesse: jedes Byte zweimal ueber die Leitung und
+ * ein Prozess, der waehrenddessen an einer Datei haengt. Der Browser kann das
+ * direkt bei der Maschine holen — er muss nur wissen, wo, und es beweisen
+ * koennen.
+ *
+ * **Die Adresse wird erst hier gebaut, nicht in der Liste.** Sonst stuenden
+ * fertige, gueltige Adressen im Quelltext der Seite, auch fuer Sicherungen, die
+ * niemand anfasst. So entsteht je Klick genau eine, und sie gilt fuenf Minuten.
+ *
+ * ⚠ Die Adresse traegt die Unterschrift in der URL. Sie landet damit in der
+ * Browser-Geschichte und in Zugriffsprotokollen dazwischen. Deshalb die kurze
+ * Frist und die Bindung an GENAU eine Datei.
+ */
+router.get('/:serverId/backups/:backupId/download',
+    requirePermission('GAMESERVER.BACKUPS.DOWNLOAD'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+
+    try {
+        const { serverId, backupId } = req.params;
+        const guildId = res.locals.guildId;
+
+        const [zeile] = await dbService.query(
+            `SELECT b.name, b.status,
+                    r.host, r.fqdn, r.fqdn_gilt, r.abruf_port, r.api_key
+               FROM gameserver_backups b
+               JOIN gameservers gs ON gs.id = b.server_id
+               JOIN rootserver r  ON r.id = gs.rootserver_id
+              WHERE b.id = ? AND b.server_id = ? AND b.guild_id = ?`,
+            [backupId, serverId, guildId]);
+
+        if (!zeile) {
+            return res.status(404).json({ success: false, message: 'Sicherung nicht gefunden' });
+        }
+        if (zeile.status !== 'completed') {
+            return res.status(409).json({
+                success: false,
+                message: 'Diese Sicherung ist noch nicht fertig.'
+            });
+        }
+        if (!zeile.abruf_port) {
+            // Kein stiller Fehlschlag: Der Betreiber soll den Grund lesen
+            // koennen, sonst sucht er ihn beim Browser.
+            return res.status(503).json({
+                success: false,
+                message: 'Die Maschine bietet keinen Abruf an — der Daemon ist zu alt '
+                       + 'oder sein Abruf-Zuhoerer läuft nicht.'
+            });
+        }
+        if (!zeile.api_key) {
+            return res.status(500).json({
+                success: false,
+                message: 'Für diese Maschine ist kein Schlüssel hinterlegt.'
+            });
+        }
+
+        const datei = `${zeile.name}.tar.gz`;
+        const bis = Math.floor(Date.now() / 1000) + 300;
+
+        // Dieselbe Rechnung wie im Daemon (internal/sicherungsabruf):
+        // HMAC-SHA256 ueber Kennung, Dateiname und Frist, mit Zeilenumbruch
+        // dazwischen - sonst waeren ("12","3x") und ("123","x") dasselbe.
+        const unterschrift = crypto.createHmac('sha256', zeile.api_key)
+            .update(`${serverId}\n${datei}\n${bis}`)
+            .digest('hex');
+
+        // Der geprüfte Name, wenn es einen gibt - sonst die IP. `fqdn_gilt`
+        // setzt ausschliesslich eine Messung beim Verbinden des Daemons.
+        const wirt = (zeile.fqdn_gilt && zeile.fqdn) ? zeile.fqdn : zeile.host;
+
+        const adresse = `http://${wirt}:${zeile.abruf_port}/sicherung`
+            + `?server=${encodeURIComponent(serverId)}`
+            + `&datei=${encodeURIComponent(datei)}`
+            + `&bis=${bis}`
+            + `&sig=${unterschrift}`;
+
+        Logger.info(`[Gameserver/Backups] Abruf ausgestellt: Sicherung ${backupId} `
+            + `(Server ${serverId}) über ${wirt}:${zeile.abruf_port}, gültig 5 Minuten`);
+
+        return res.redirect(adresse);
+    } catch (error) {
+        Logger.error('[Gameserver/Backups] Abruf konnte nicht ausgestellt werden:', error);
         return res.status(500).json({ success: false, message: 'Serverfehler' });
     }
 });

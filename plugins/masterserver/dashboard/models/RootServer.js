@@ -186,6 +186,16 @@ class RootServer {
         // daemon.yaml anpasste — der Kunde bekam dann einen Port angezeigt,
         // an dem niemand antwortet.
         if (daten.sftpPort) { fields.push('sftp_port = ?'); values.push(parseInt(daten.sftpPort, 10)); }
+        // Port des Sicherungsabrufs (B106) — **immer** geschrieben, auch als
+        // NULL. Anders als beim SFTP-Port darf hier kein alter Wert
+        // stehenbleiben: Meldet der Daemon nichts (aeltere Bauart, oder der
+        // Zuhoerer kam wegen eines belegten Ports nicht hoch), dann laeuft dort
+        // nichts, und ein Knopf auf eine tote Adresse ist schlimmer als keiner.
+        if (daten.abrufPort !== undefined) {
+            const port = parseInt(daten.abrufPort, 10);
+            fields.push('abruf_port = ?');
+            values.push(Number.isInteger(port) && port > 0 ? port : null);
+        }
         if (daten.installStatus) { fields.push('install_status = ?'); values.push(daten.installStatus); }
         if (daten.sessionToken) {
             fields.push('session_token = ?');

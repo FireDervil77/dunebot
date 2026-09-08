@@ -97,6 +97,13 @@
     const CAN_CREATE  = <%= userPermissions.permissions['GAMESERVER.BACKUPS.CREATE'] ? 'true' : 'false' %>;
     const CAN_DELETE  = <%= userPermissions.permissions['GAMESERVER.BACKUPS.DELETE'] ? 'true' : 'false' %>;
     const CAN_RESTORE = <%= userPermissions.permissions['GAMESERVER.BACKUPS.RESTORE'] ? 'true' : 'false' %>;
+    const CAN_DOWNLOAD = <%= userPermissions.permissions['GAMESERVER.BACKUPS.DOWNLOAD'] ? 'true' : 'false' %>;
+
+    // Ob die Maschine den Abruf ueberhaupt anbietet, sagt erst die Liste: Der
+    // Daemon meldet den Port seines Abruf-Zuhoerers bei jeder Anmeldung. Bis
+    // die Antwort da ist, gilt "nein" - ein Knopf, der auf eine tote Adresse
+    // zeigt, ist schlimmer als keiner (Baustelle 106).
+    let ABRUF_MOEGLICH = false;
 
     function formatBytes(bytes) {
         if (!bytes || bytes === 0) return '—';
@@ -140,6 +147,7 @@
             if (!data.success) throw new Error(data.message);
 
             const backups = data.backups || [];
+            ABRUF_MOEGLICH = Boolean(data.abruf);
             document.getElementById('backups-loading').style.display = 'none';
 
             if (backups.length === 0) {
@@ -157,6 +165,10 @@
                     <td><small>${fmtDate(b.created_at)}</small></td>
                     <td>
                         <div class="btn-group btn-group-sm">
+                            ${CAN_DOWNLOAD && ABRUF_MOEGLICH && b.status === 'completed' ? `
+                                <a class="btn btn-secondary btn-sm" href="${BASE_URL}/${b.id}/download" title="Herunterladen">
+                                    <i class="fas fa-download"></i>
+                                </a>` : ''}
                             ${CAN_RESTORE && b.status === 'completed' ? `
                                 <button class="btn btn-warning btn-sm" onclick="restoreBackup(${b.id}, '${escHtml(b.name)}')" title="Wiederherstellen">
                                     <i class="fas fa-undo"></i>

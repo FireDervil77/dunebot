@@ -444,7 +444,8 @@ class IPMServer {
     }
 
     async _handleRegister(ws, payload, clientIp) {
-        const { token, daemon_id, version, hardware, sftp_fingerprint, sftp_port } = payload;
+        const { token, daemon_id, version, hardware, sftp_fingerprint, sftp_port,
+                abruf_port } = payload;
 
         if (!token || !daemon_id) {
             return { success: false, error: 'Missing token or daemon_id' };
@@ -491,6 +492,9 @@ class IPMServer {
                         sessionToken: newSessionToken,
                         sftpFingerprint: sftp_fingerprint || null,
                         sftpPort:        sftp_port || null,
+                        // `?? null` und nicht `|| null`: Der Wert soll auch
+                        // dann gesetzt werden, wenn er fehlt — dann als NULL.
+                        abrufPort:       abruf_port ?? null,
                     });
                     
                     await this._logDaemonEvent(daemon_id, 'reconnected', { version });
@@ -601,6 +605,7 @@ class IPMServer {
                 installStatus:   'completed',
                 sftpFingerprint: sftp_fingerprint || null,
                 sftpPort:        sftp_port || null,
+                abrufPort:       abruf_port ?? null,
             });
 
             // Audit-Log
