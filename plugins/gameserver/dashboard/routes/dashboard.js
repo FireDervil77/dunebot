@@ -93,7 +93,13 @@ router.get('/', requirePermission('GAMESERVER.VIEW'), async (req, res) => {
         // View rendern
         await themeManager.renderView(res, 'guild/gameserver-dashboard', {
             title: 'Gameserver Dashboard',
-            activeMenu: `/guild/${guildId}/plugins/gameserver/dashboard`,
+            // **Die Wurzel, nicht diese Adresse** (2026-09-08). Die
+            // Seitenleiste vergleicht `activeMenu` Zeichen fuer Zeichen mit den
+            // angemeldeten Punkten (sidebar.ejs:70). Einen Punkt
+            // `/plugins/gameserver/dashboard` gibt es seit dem 2026-08-18 nicht
+            // mehr - angemeldet ist die Wurzel, die hierher umleitet. Ohne
+            // Treffer klappte der ganze Abschnitt zu, sobald man ihn oeffnete.
+            activeMenu: `/guild/${guildId}/plugins/gameserver`,
             serverStats,
             recentServers: Array.isArray(recentServers) ? recentServers : [],
             addonStats: Array.isArray(addonStats) ? addonStats : [],

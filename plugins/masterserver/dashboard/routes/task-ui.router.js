@@ -35,7 +35,10 @@ router.get('/:taskId', requirePermission('MASTERSERVER.VIEW'), async (req, res) 
 
         await renderView(res, 'guild/masterserver-task-details', {
             title: 'Task-Details',
-            activeMenu: `/guild/${guildId}/plugins/masterserver/tasks`,
+            // Einen Punkt `/tasks` gibt es in der Seitenleiste nicht - die
+            // Aufgaben haengen am Dashboard. Ohne Treffer klappt der Abschnitt
+            // zu (sidebar.ejs:70 vergleicht Zeichen fuer Zeichen).
+            activeMenu: `/guild/${guildId}/plugins/masterserver/dashboard`,
             taskId,
             guildId
         });

@@ -157,7 +157,10 @@ router.get('/my-addons', requirePermission('GAMESERVER.ADDONS.VIEW'), async (req
 
         await themeManager.renderView(res, 'guild/gameserver-my-addons', {
             title: 'Meine Addons',
-            activeMenu: `/guild/${guildId}/plugins/gameserver/addons/my-addons`,
+            // "Meine Addons" ist als Punkt entfallen (E4, 2026-08-18: es gibt
+            // nur EINEN Katalog). Ohne diese Zeile zeigte `activeMenu` auf
+            // einen Punkt, den es nicht mehr gibt - der Abschnitt schloss sich.
+            activeMenu: `/guild/${guildId}/plugins/gameserver/addons`,
             myAddons: myAddons || [],
             guildId,
             user: req.session.user,
@@ -206,7 +209,10 @@ router.get('/create', requirePermission('GAMESERVER.EDIT'), async (req, res) => 
 
         await themeManager.renderView(res, 'guild/gameserver-addon-editor', {
             title: 'Neues Addon erstellen',
-            activeMenu: `/guild/${guildId}/plugins/gameserver/addons/my-addons`,
+            // "Meine Addons" ist als Punkt entfallen (E4, 2026-08-18: es gibt
+            // nur EINEN Katalog). Ohne diese Zeile zeigte `activeMenu` auf
+            // einen Punkt, den es nicht mehr gibt - der Abschnitt schloss sich.
+            activeMenu: `/guild/${guildId}/plugins/gameserver/addons`,
             mode: 'create',
             template: template || null,
             gameData,
@@ -243,7 +249,10 @@ router.get('/edit/:id', requirePermission('GAMESERVER.EDIT'), async (req, res) =
 
         await themeManager.renderView(res, 'guild/gameserver-addon-editor', {
             title: `Addon bearbeiten: ${addon.name}`,
-            activeMenu: `/guild/${guildId}/plugins/gameserver/addons/my-addons`,
+            // "Meine Addons" ist als Punkt entfallen (E4, 2026-08-18: es gibt
+            // nur EINEN Katalog). Ohne diese Zeile zeigte `activeMenu` auf
+            // einen Punkt, den es nicht mehr gibt - der Abschnitt schloss sich.
+            activeMenu: `/guild/${guildId}/plugins/gameserver/addons`,
             mode: 'edit',
             addon,
             gameData: parseGameData(addon),
