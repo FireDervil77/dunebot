@@ -76,6 +76,108 @@ const pruefe = (ok, was, zusatz = '') => {
     pruefe(ausGrund.grund === null,
         'Bei ausgeschaltetem Server wird kein alter Satz als aktuell ausgegeben');
 
+    // ════════════════════════════════════════════════════════════════════════
+    // Baustelle 105 (2026-09-08): Die LISTE zeigte dieselbe Frage anders an
+    // ════════════════════════════════════════════════════════════════════════
+    //
+    // Zwei Löcher, ein Symptom. `baueServerListe` rechnete die Leiter aus der
+    // Spielerzahl statt sie zu lesen, und die Serverseite holte die Spalten gar
+    // nicht erst aus der Datenbank. Beides fiel niemandem auf, weil dieser
+    // Wächter nur die Rechnung prüfte, nicht ihre Eingabe.
+    console.log('\n▸ Die Serverliste liest dieselbe Leiter (Baustelle 105)');
+
+    const [addonZeile] = await c.query(
+        'SELECT addon_marketplace_id FROM gameservers WHERE addon_marketplace_id IS NOT NULL LIMIT 1');
+    const addonId = addonZeile[0] ? addonZeile[0].addon_marketplace_id : 1;
+    const nachAddon = { [addonId]: paket };
+    const zeile = (mehr) => ({
+        id: 1, name: 'Prüfserver', addon_marketplace_id: addonId,
+        current_players: null, max_players: null, ports: null, ...mehr,
+    });
+    const einzige = (mehr) => Serverseite.baueServerListe([zeile(mehr)], nachAddon).liste[0];
+
+    const listenFaelle = [
+        ['Stufe query ohne Spielerzahl heisst BEREIT',
+         { status: 'online', bereitschaft_stufe: 'query', current_players: null },
+         (x) => x.bereit && x.bereitschaftText === 'bereit',
+         'früher: „Abfrage antwortet nicht", weil die Spielerzahl fehlte'],
+        ['Spielerzahl ohne Meldung heisst NICHT bereit',
+         { status: 'online', bereitschaft_stufe: null, current_players: 3 },
+         (x) => !x.bereit && x.stufen.every(st => !st.erfuellt),
+         'früher: drei grüne Balken, nur weil eine Zahl vorlag'],
+        ['Stufe process nennt die Stufe, auf die er wartet',
+         { status: 'starting', bereitschaft_stufe: 'process' },
+         (x) => !x.bereit && x.stufen[0].erfuellt && /wartet auf/.test(x.bereitschaftText)],
+        ['Der Erklärsatz erreicht die Liste',
+         { status: 'starting', bereitschaft_stufe: 'process',
+           bereitschaft_grund: 'Port 2457 lauscht nach 60 s noch nicht.' },
+         (x) => /2457/.test(x.bereitschaftGrund || '')],
+        ['Ausgeschaltet heisst aus, nicht „Abfrage antwortet nicht"',
+         { status: 'offline', bereitschaft_stufe: 'query' },
+         (x) => !x.bereit && x.bereitschaftText === 'aus'],
+        ['Ohne Paket wird nichts behauptet',
+         { status: 'online', bereitschaft_stufe: 'query', addon_marketplace_id: -1 },
+         (x) => !x.bereit && !x.stufen.length && x.bereitschaftText === 'nicht messbar'],
+    ];
+    for (const [was, mehr, erwartet, zusatz] of listenFaelle) {
+        const x = einzige(mehr);
+        pruefe(erwartet(x), was,
+            (zusatz ? zusatz + ' · ' : '') + `text="${x.bereitschaftText}" `
+            + `balken=[${x.stufen.map(st => st.erfuellt ? '✓' : st.wartet ? '~' : '·').join('')}]`);
+    }
+
+    // ── Die Meldung des VORIGEN Laufs zählt nicht ────────────────────────────
+    console.log('\n▸ Eine Meldung von vor dem letzten Start zählt nicht');
+    const vorher = new Date(Date.now() - 3600e3);
+    const nachher = new Date(Date.now() - 60e3);
+    const alt = Serverseite.baueBereitschaft(paket, {
+        status: 'online', bereitschaft_stufe: 'query',
+        bereitschaft_am: vorher, last_started_at: nachher,
+    });
+    pruefe(!alt.gemessen && !alt.bereit && alt.veraltet,
+        'gemeldet vor dem Start → veraltet, keine grünen Balken',
+        `gemessen=${alt.gemessen} bereit=${alt.bereit} veraltet=${alt.veraltet}`);
+
+    const frisch = Serverseite.baueBereitschaft(paket, {
+        status: 'online', bereitschaft_stufe: 'query',
+        bereitschaft_am: nachher, last_started_at: vorher,
+    });
+    pruefe(frisch.gemessen && frisch.bereit && !frisch.veraltet,
+        'gemeldet nach dem Start → gilt');
+
+    const ohneZeiten = Serverseite.baueBereitschaft(paket,
+        { status: 'online', bereitschaft_stufe: 'query' });
+    pruefe(ohneZeiten.gemessen && ohneZeiten.bereit,
+        'ohne beide Zeitangaben wird kein Fehlalarm erzeugt');
+
+    // ── Und die Abfragen holen die Spalten überhaupt ─────────────────────────
+    //
+    // Der eigentliche Fund vom 2026-09-08: Die Serverseite rief die richtige
+    // Funktion auf und bekam trotzdem nichts zu sehen, weil ihre SQL-Abfrage
+    // die drei Spalten nicht auswählte. Eine Rechnung zu prüfen, ohne ihre
+    // Eingabe zu prüfen, ist ein grüner Wächter über einem leeren Feld.
+    console.log('\n▸ Die Routen holen die Spalten aus der Datenbank');
+    const fs = require('fs');
+    const quelle = fs.readFileSync(
+        require('path').join(__dirname, '../plugins/gameserver/dashboard/routes/servers.js'), 'utf8');
+    // Kommentare zuerst weg — sonst zählt eine Begründung als Beleg.
+    const ohneKommentare = quelle
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .split('\n').map(z => z.replace(/(^|\s)\/\/.*$/, '').replace(/(^|\s)--\s.*$/, '')).join('\n');
+
+    const bloecke = [
+        ['Übersicht  (router.get(\'/\'))', "router.get('/',", "router.get('/create'"],
+        ['Serverseite (router.get(\'/:serverId\'))', "router.get('/:serverId',", "router.get('/:serverId/"],
+    ];
+    for (const [name, von, bis] of bloecke) {
+        const a = ohneKommentare.indexOf(von);
+        const b = a >= 0 ? ohneKommentare.indexOf(bis, a) : -1;
+        const block = a >= 0 ? ohneKommentare.slice(a, b > a ? b : undefined) : '';
+        pruefe(a >= 0 && /bereitschaft_stufe/.test(block),
+            name + ' wählt bereitschaft_stufe aus',
+            a < 0 ? 'Block nicht gefunden — Anker anpassen' : '');
+    }
+
     await c.end();
     console.log(fehler === 0 ? '\n✅ Bereitschaft kommt an und behauptet nichts Ungemessenes\n'
                              : `\n❌ ${fehler} Abweichung(en)\n`);

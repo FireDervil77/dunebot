@@ -549,10 +549,31 @@ function baueBereitschaft(paket, server = {}) {
     const laeuft = ['online', 'starting'].includes(server.status);
     const wieWeit = stufen.findIndex(st => st.schluessel === gemeldet);
 
+    // ── Ist die Meldung von DIESEM Lauf? (Baustelle 105, 2026-09-08) ─────────
+    //
+    // `bereitschaft_am` bleibt stehen, bis fb-init das naechste Mal meldet.
+    // Ohne diesen Vergleich zeigte ein neu gestarteter Server die Stufe des
+    // VORIGEN Laufs — drei gruene Balken fuer einen Lauf, der nie bereit
+    // gemeldet hat. Das ist die gefaehrliche Richtung.
+    //
+    // `last_started_at` wird beim Startbefehl gesetzt, also VOR jeder Meldung
+    // von fb-init; ein spaeteres `bereitschaft_am` gehoert damit zu diesem Lauf.
+    // Fehlt eine der beiden Zeiten, wird nichts behauptet — eine Abfrage, die
+    // die Spalten nicht holt, soll keinen Fehlalarm ausloesen, sondern sich
+    // verhalten wie bisher.
+    const gestartetAm = server.last_started_at ? new Date(server.last_started_at).getTime() : null;
+    const gemeldetAm  = server.bereitschaft_am ? new Date(server.bereitschaft_am).getTime() : null;
+    const ausDiesemLauf = !(Number.isFinite(gestartetAm) && Number.isFinite(gemeldetAm)
+                            && gemeldetAm < gestartetAm);
+
+    // Eine Meldung zaehlt nur, wenn sie da ist, der Server laeuft und sie zu
+    // diesem Lauf gehoert. Diese eine Bedingung traegt die ganze Karte.
+    const zaehlt = Boolean(gemeldet) && laeuft && ausDiesemLauf;
+
     for (let i = 0; i < stufen.length; i++) {
         // Ohne Meldung wird nichts als erreicht behauptet. Drei graue Punkte
         // sind ehrlicher als drei geratene Haken.
-        stufen[i].erreicht = Boolean(gemeldet) && laeuft && wieWeit >= 0 && i <= wieWeit;
+        stufen[i].erreicht = zaehlt && wieWeit >= 0 && i <= wieWeit;
     }
 
     // Auf welche Stufe wartet der Server gerade? Die erste verlangte, die noch
@@ -560,19 +581,20 @@ function baueBereitschaft(paket, server = {}) {
     // Angabe auf false, und die Ansicht faerbt nichts gelb.
     const wartend = stufen.findIndex(st => st.verlangt && !st.erreicht);
     for (let i = 0; i < stufen.length; i++) {
-        stufen[i].wartet = Boolean(gemeldet) && laeuft && i === wartend;
+        stufen[i].wartet = zaehlt && i === wartend;
     }
 
     return {
         stufen,
         frist: r.timeout_sec || null,
-        gemessen: Boolean(gemeldet) && laeuft,
-        stufe: laeuft ? gemeldet : null,
+        gemessen: zaehlt,
+        stufe: zaehlt ? gemeldet : null,
         // Der Erklärsatz von fb-init — der Teil, für den die Messung gebaut wurde.
-        grund: laeuft ? (server.bereitschaft_grund || null) : null,
-        // Ein Stand von gestern ist keine Auskunft über heute.
-        veraltet: Boolean(gemeldet) && !laeuft,
-        bereit: laeuft && wieWeit >= 0
+        grund: zaehlt ? (server.bereitschaft_grund || null) : null,
+        // Ein Stand von gestern ist keine Auskunft über heute — und ein Stand
+        // vom vorigen Lauf ebenso wenig.
+        veraltet: Boolean(gemeldet) && (!laeuft || !ausDiesemLauf),
+        bereit: zaehlt && wieWeit >= 0
             && stufen.every((st, i) => !st.verlangt || i <= wieWeit),
     };
 }
@@ -595,37 +617,51 @@ module.exports = { baueUebersicht, HOEHE, WIRKUNG, RISIKO, GRUPPE, BEFEHL_NAME, 
 /**
  * Die Serverliste — Entwurf vom 2026-08-18, Artboard 1.
  *
- * ── Woher die Bereitschaftsbalken kommen, ohne dass jemand sie meldet ───────
+ * ── Die Balken lesen dieselbe Leiter wie die Serverseite ────────────────────
  *
- * Die volle Leiter (Prozess → Port → Abfrage) meldet `fb-init` über den
- * Agent-Socket, und sie kommt nicht an (Baustelle 58). Was wir trotzdem WISSEN,
- * ohne etwas zu erfinden:
+ * Bis zum 2026-09-08 stand hier ein zweiter Weg: „Prozess" hiess `status ===
+ * 'online'`, „Port" und „Abfrage" hiessen *es liegt eine Spielerzahl vor*. Das
+ * war 2026-08-18 eine ehrliche Notlösung — damals kam die Leiter von `fb-init`
+ * im Dashboard nicht an (Baustelle 58). **Seit dem 2026-08-23 kommt sie an**
+ * (`_handleReadiness`), und die Übersichtsabfrage holt die drei Spalten sogar
+ * ausdrücklich; nur las sie hier niemand.
  *
- *   Prozess   der Zustand ist `online` — der Container läuft, das hat der
- *             Daemon gemeldet
- *   Abfrage   eine Spielerzahl liegt vor. Sie entsteht NUR, wenn das Spiel auf
- *             eine Abfrage geantwortet hat. Wer antwortet, lauscht auch —
- *             also ist Port damit ebenfalls belegt.
+ * Der Preis war nicht bloss Ungenauigkeit: Der Text „Abfrage antwortet nicht"
+ * erschien, sobald `current_players` NULL war — eine Aussage über die
+ * SPIELERZÄHLUNG, ausgegeben als Aussage über die Bereitschaft. Der Betreiber
+ * hat genau das gemeldet („bei fast allen Spielen").
  *
- * Alles andere bleibt „nicht gemessen". Das ist keine Verlegenheitslösung,
- * sondern die Aussage: Wir wissen es nicht. Der Entwurf sagt es in der Legende
- * selbst — „nicht gemessen heisst: wir wissen es nicht. 0 heisst: gemessen,
- * niemand da."
+ * Deshalb ruft die Liste jetzt `baueBereitschaft()` auf, dieselbe Funktion wie
+ * die Serverseite. Eine Leiter, ein Weg. Was das Paket nicht zu prüfen verlangt
+ * (`ready_when` fehlt), bekommt keine Balken — nicht drei graue, die wie ein
+ * Messergebnis aussehen, sondern die Auskunft „nicht messbar".
+ *
+ * Die Legende der Ansicht sagt weiterhin, was ein grauer Balken heisst:
+ * „nicht gemessen heisst: wir wissen es nicht. 0 heisst: gemessen, niemand da."
  */
 function baueServerListe(zeilen, paketNachAddon = {}) {
     const liste = (zeilen || []).map((s) => {
         const paket = paketNachAddon[s.addon_marketplace_id] || null;
         const zustand = baueZustand(s);
 
-        const laeuft  = s.status === 'online';
+        const laeuft  = ['online', 'starting'].includes(s.status);
         const gefragt = s.current_players !== null && s.current_players !== undefined;
 
-        const stufen = [
-            { name: 'Prozess', erfuellt: laeuft },
-            { name: 'Port',    erfuellt: gefragt },
-            { name: 'Abfrage', erfuellt: gefragt },
-        ];
-        const erfuellt = stufen.filter(x => x.erfuellt).length;
+        // Dieselbe Leiter wie auf der Serverseite — nicht dieselbe Rechnung
+        // noch einmal. `null` heisst: Das Paket verlangt keine Bereitschaft.
+        const leiter = baueBereitschaft(paket, s);
+
+        const stufen = (leiter?.stufen || []).map(st => ({
+            name:     st.name,
+            erfuellt: st.erreicht,
+            wartet:   st.wartet,
+            verlangt: st.verlangt,
+            titel:    st.erklaerung,
+        }));
+
+        // Auf welche Stufe wartet er? Der Name gehört in den Text — „wartet"
+        // allein sagt einem Betreiber nicht, wo er nachsehen soll.
+        const wartetAuf = (leiter?.stufen || []).find(st => st.wartet)?.name || null;
 
         return {
             id:      s.id,
@@ -633,12 +669,18 @@ function baueServerListe(zeilen, paketNachAddon = {}) {
             spiel:   paket?.identity?.name || s.game_name || s.template_name || '—',
             zustand,
             stufen,
-            bereit:  erfuellt === 3,
+            bereit:  Boolean(leiter?.bereit),
+            // Der Erklärsatz von fb-init — in der Liste als Titel am Balken,
+            // auf der Serverseite im Klartext. Dieselbe Quelle.
+            bereitschaftGrund: leiter?.grund || null,
             bereitschaftText:
-                erfuellt === 3 ? 'bereit'
-              : laeuft         ? 'Abfrage antwortet nicht'
-              : s.status === 'starting' ? 'startet'
-              : 'aus',
+                !leiter                 ? 'nicht messbar'
+              : leiter.bereit           ? 'bereit'
+              : !laeuft                 ? (s.status === 'offline' ? 'aus' : zustand.text)
+              : leiter.veraltet         ? 'seit dem Start nichts gemeldet'
+              : !leiter.gemessen        ? 'noch nichts gemeldet'
+              : wartetAuf               ? 'wartet auf ' + wartetAuf
+              : 'startet',
             spieler: {
                 jetzt: gefragt ? s.current_players : null,
                 max:   s.max_players ?? null,

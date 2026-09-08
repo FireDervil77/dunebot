@@ -54,13 +54,22 @@
                 <div style="font-weight:600"><%= s.name %></div>
                 <div class="fb-muted fb-mono" style="font-size:12px">#<%= s.id %> · <%= s.spiel %></div>
               </td>
-              <td>
-                <div style="display:flex;gap:3px;margin-bottom:3px">
-                  <% s.stufen.forEach(function (st) { %>
-                    <span style="width:22px;height:5px;border-radius:100rem;background:<%=
-                      st.erfuellt ? 'var(--fb-success)' : '#e6e7e9' %>"></span>
-                  <% }); %>
-                </div>
+              <%# Die Balken zeigen dieselbe Leiter wie die Serverseite (B105).
+                  Gelb ist die Stufe, auf die er GERADE wartet — ohne sie sieht
+                  „zwei von drei" aus wie „steht", statt wie „ist unterwegs". %>
+              <td<% if (s.bereitschaftGrund) { %> title="<%= s.bereitschaftGrund %>"<% } %>>
+                <% if (!s.stufen.length) { %>
+                  <div class="fb-muted" style="font-size:12px">—</div>
+                <% } else { %>
+                  <div style="display:flex;gap:3px;margin-bottom:3px">
+                    <% s.stufen.forEach(function (st) { %>
+                      <span title="<%= st.name %><%= st.titel ? ' — ' + st.titel : '' %>"
+                            style="width:22px;height:5px;border-radius:100rem;background:<%=
+                        st.erfuellt ? 'var(--fb-success)' : st.wartet ? 'var(--fb-warning)' : '#e6e7e9'
+                      %>"></span>
+                    <% }); %>
+                  </div>
+                <% } %>
                 <div class="fb-muted" style="font-size:12px"><%= s.bereitschaftText %></div>
               </td>
               <td><span class="fb-pille<%= s.zustand.gut ? ' fb-pille-gut' : '' %>"><%= s.zustand.text %></span></td>
@@ -95,12 +104,34 @@
       </table>
     </div>
 
-    <div class="fb-koerper fb-muted" style="font-size:12px;border-top:1px solid var(--fb-border);display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <span style="display:flex;gap:3px">
-        <% for (let i=0;i<3;i++) { %><span style="width:22px;height:5px;border-radius:100rem;background:var(--fb-success)"></span><% } %>
-      </span>
-      <span>Prozess · Port · Abfrage</span>
-      <span><strong>nicht gemessen</strong> heisst: wir wissen es nicht. <strong>0</strong> heisst: gemessen, niemand da.</span>
+    <%# Die Legende nennt die drei Balken seit dem Entwurf. Was sie bis zum
+        2026-09-08 NICHT sagte: was einer, zwei oder keiner bedeuten — genau
+        die Frage des Betreibers. Drei Zeilen statt einer Aufzählung. %>
+    <div class="fb-koerper fb-muted" style="font-size:12px;border-top:1px solid var(--fb-border)">
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <% [['Prozess','Das Programm läuft.'],
+              ['Port','Der Port lauscht — jemand könnte sich verbinden.'],
+              ['Abfrage','Das Spiel antwortet auf eine Serverabfrage. Erst hier kommt ein Spieler wirklich rein.']
+             ].forEach(function (z, i) { %>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span style="display:flex;gap:3px">
+                <% for (let k=0;k<3;k++) { %><span style="width:22px;height:5px;border-radius:100rem;background:<%=
+                  k <= i ? 'var(--fb-success)' : '#e6e7e9' %>"></span><% } %>
+              </span>
+              <span><strong><%= z[0] %></strong> — <%= z[1] %></span>
+            </div>
+          <% }); %>
+        </div>
+        <div style="max-width:420px;display:flex;flex-direction:column;gap:4px">
+          <div><span style="display:inline-block;width:22px;height:5px;border-radius:100rem;background:var(--fb-warning);vertical-align:middle"></span>
+               Gelb ist die Stufe, auf die er gerade wartet.</div>
+          <div>Grau heisst <strong>nicht gemessen</strong>: wir wissen es nicht — nicht, dass es fehlschlug.</div>
+          <div>Bei der Spielerzahl heisst <strong>0</strong>: gemessen, niemand da.</div>
+          <div>Die Stufen meldet <span class="fb-mono">fb-init</span> aus dem Container. Ein Paket ohne
+               <span class="fb-mono">ready_when</span> meldet nichts — dort steht „nicht messbar".</div>
+        </div>
+      </div>
     </div>
   </div>
 

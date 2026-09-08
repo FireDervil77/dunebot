@@ -2157,6 +2157,13 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
                 gs.current_map,
                 gs.last_started_at,
                 gs.last_stopped_at,
+                -- Ohne diese drei baute baueBereitschaft() die Leiter aus
+                -- undefined und schrieb "nicht gemessen" hin, obwohl die Stufe
+                -- in derselben Zeile stand. Der Helfer war richtig, die
+                -- Abfrage holte seine Eingabe nicht (Baustelle 105, 2026-09-08).
+                gs.bereitschaft_stufe,
+                gs.bereitschaft_grund,
+                gs.bereitschaft_am,
                 gs.created_at,
                 gs.updated_at,
                 gs.sftp_username,
