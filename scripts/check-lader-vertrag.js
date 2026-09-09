@@ -54,10 +54,21 @@ pruefe(payload !== null && new RegExp(`${FELD}\\s*:`).test(payload),
     'Das Dashboard setzt das Feld in der Startnutzlast',
     'StartPayload.js');
 
-pruefe(payload !== null && /art\s*=\s*'loader'/.test(payload)
-       && /aktiv\s*=\s*1/.test(payload) && /status\s*=\s*'installiert'/.test(payload),
-    'Es liest dafuer die Inhalte-Tabelle (art=loader, aktiv, installiert)',
-    'Ohne diese drei Bedingungen waere jeder Server mit irgendeinem Inhalt "modifiziert"');
+// Die drei Bedingungen sind am 2026-09-09 aus StartPayload.js in den Helfer
+// gewandert — damit die Inhalte-Seite und der Startbefehl dieselbe Abfrage
+// benutzen. Der Waechter ist mitgewandert, statt die Pruefung zu lockern:
+// geprueft wird jetzt, dass die Bedingungen IM HELFER stehen und dass
+// StartPayload ihn wirklich aufruft.
+const helfer = lies(path.join(WURZEL, 'plugins/gameserver/dashboard/helpers/Inhalte.js'));
+
+pruefe(helfer !== null && /art\s*=\s*\?/.test(helfer) && /ART_LADER/.test(helfer)
+       && /aktiv\s*=\s*1/.test(helfer) && /status\s*=\s*'installiert'/.test(helfer),
+    'Der Helfer prueft alle drei Bedingungen (Lader, aktiv, installiert)',
+    'Ohne diese drei waere jeder Server mit irgendeinem Inhalt "modifiziert"');
+
+pruefe(payload !== null && /require\('\.\/Inhalte'\)\.laderAktiv/.test(payload),
+    'Die Startnutzlast fragt den Helfer, statt selbst zu rechnen',
+    'Zwei Abfragen fuer dieselbe Frage driften auseinander');
 
 pruefe(payload !== null && /async function buildStartPayload/.test(payload),
     'buildStartPayload ist asynchron',

@@ -473,12 +473,9 @@ async function buildStartPayload(server, guildId, Logger = null) {
     // Satz, der die Folge nennt.
     let laderAktiv = false;
     try {
-        const dbService = ServiceManager.get('dbService');
-        const [zeile] = await dbService.query(
-            `SELECT id FROM gameserver_content
-              WHERE server_id = ? AND art = 'loader' AND aktiv = 1 AND status = 'installiert'
-              LIMIT 1`, [serverId]);
-        laderAktiv = Boolean(zeile);
+        // Dieselbe Abfrage wie in der Inhalte-Seite — die drei Bedingungen
+        // stehen an EINER Stelle, sonst driften sie auseinander.
+        laderAktiv = await require('./Inhalte').laderAktiv(serverId);
     } catch (fehler) {
         Logger?.error?.('[StartPayload] Inhalte nicht lesbar — der Server startet OHNE '
             + `seinen Mod-Lader, auch wenn einer eingerichtet ist: ${fehler.message}`);
