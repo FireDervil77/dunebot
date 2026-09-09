@@ -1,0 +1,281 @@
+<%#
+  Mods und der Lader — Artboard 6 (docs/spielpakete/entwurf/Mods.dc.html).
+
+  ── Was der Entwurf verlangt und was daraus folgt ──────────────────────────
+
+  Der Lader steht ZUOBERST und sieht anders aus als ein Mod: „Ohne ihn laedt
+  kein Mod. Wird vor allen anderen geladen." Er ist keine Zeile wie die
+  anderen, auch wenn er in derselben Tabelle steht.
+
+  Jeder Mod traegt seine FASSUNG. Das ist der Kern von B.12: Ein Mod-Update
+  mitten in der Woche ist die haeufigste Ursache dafuer, dass ein Server nicht
+  mehr startet.
+
+  „Mitspieler brauchen ihn auch" steht am Mod UND unten noch einmal als Summe
+  samt Liste zum Weitergeben. Doppelt mit Absicht: Die Marke am Eintrag
+  beantwortet „welcher?", die Zeile unten „muss ich jetzt jemandem Bescheid
+  sagen?".
+
+  Entfernte Eintraege bleiben stehen (Betreiber, 2026-09-08: „dann ist das
+  ganze ein lernender Prozess den man ueberblicken kann") — aber eingeklappt.
+  Sie gehoeren nicht in dieselbe Liste wie das Laufende.
+%>
+<div id="inhalte-wurzel" data-server="<%= server.id %>" data-guild="<%= guildId %>">
+  <div class="fb-muted" style="font-size:13px">Wird geladen …</div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  const wurzel   = document.getElementById('inhalte-wurzel');
+  const SERVER   = wurzel.dataset.server;
+  const GUILD    = wurzel.dataset.guild;
+  const BASIS    = `/guild/${GUILD}/plugins/gameserver/servers/${SERVER}/inhalte`;
+  const DARF     = <%= userPermissions.permissions['GAMESERVER.FILES.MANAGE'] ? 'true' : 'false' %>;
+
+  const escape = (s) => String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+  function marke(text, ton) {
+    const farbe = ton === 'warn' ? 'var(--fb-warning)' : 'var(--fb-text-muted)';
+    return `<span class="fb-pille" style="font-size:11px;border-color:${farbe};color:${farbe}">${escape(text)}</span>`;
+  }
+
+  function zeile(e, nummer) {
+    const istLader = e.art === 'loader';
+    const marken = [];
+    if (e.status === 'fehlgeschlagen') marken.push(marke('fehlgeschlagen', 'warn'));
+    if (e.client_side)                 marken.push(marke('Mitspieler brauchen ihn auch'));
+
+    return `
+      <div style="display:flex;gap:12px;padding:12px 0;align-items:flex-start;border-top:1px solid var(--fb-border)">
+        <div class="fb-mono fb-muted" style="flex:0 0 22px;font-size:12px;padding-top:2px">
+          ${istLader ? '<i class="fa-solid fa-cube"></i>' : nummer}
+        </div>
+        <div style="flex:1 1 auto;min-width:0">
+          <div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap">
+            <span style="font-weight:600">${escape(e.name || e.kennung)}</span>
+            ${e.fassung ? `<span class="fb-mono fb-muted" style="font-size:12px">${escape(e.fassung)}</span>` : ''}
+            ${istLader ? marke('Lader') : ''}
+          </div>
+          <div class="fb-muted" style="font-size:12px;margin-top:2px">
+            ${istLader
+              ? 'Ohne ihn lädt kein Mod. Wird vor allen anderen geladen.'
+              : escape(e.ablage || '')}
+          </div>
+          ${marken.length ? `<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">${marken.join('')}</div>` : ''}
+          ${e.fehler ? `<div class="fb-muted" style="font-size:12px;margin-top:4px;color:var(--fb-danger)">${escape(e.fehler)}</div>` : ''}
+        </div>
+        ${DARF ? `
+          <div style="display:flex;gap:6px;align-items:center;flex:0 0 auto">
+            <label class="form-check form-switch mb-0" title="${e.aktiv ? 'Aktiv' : 'Aus'}">
+              <input class="form-check-input" type="checkbox" ${e.aktiv ? 'checked' : ''}
+                     onchange="inhaltSchalten(${e.id}, this.checked)">
+            </label>
+            <button class="btn btn-sm btn-outline-danger" title="Entfernen"
+                    onclick="inhaltEntfernen(${e.id}, '${escape(e.name || e.kennung)}')">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>` : ''}
+      </div>`;
+  }
+
+  function zeichne(d) {
+    if (!d.unterstuetzt) {
+      // Der Leerzustand aus dem Entwurf: Er sagt, dass das PAKET nichts zu
+      // Mods sagt — nicht, dass hier etwas fehlt.
+      wurzel.innerHTML = `
+        <div class="fb-muted" style="font-size:13px">
+          Dieses Spiel nimmt laut seinem Paket keine Inhalte auf
+          (<span class="fb-mono">content.supported</span> ist nicht gesetzt).
+          Solange das so ist, gibt es hier nichts zu verwalten.
+        </div>`;
+      return;
+    }
+
+    const aktive = [d.lader, ...d.mods].filter(e => e && e.aktiv).length;
+    const brauchen = d.mods.filter(e => e.aktiv && e.client_side);
+
+    let html = `
+      <div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:6px">
+        <span class="fb-muted" style="font-size:13px">
+          ${aktive} aktiv${d.lader ? '' : ' · kein Lader installiert'}
+          ${d.quellen && d.quellen.length ? ' · Quelle ' + d.quellen.map(escape).join(', ') : ''}
+        </span>
+        ${DARF ? `<button class="btn btn-white btn-sm" style="margin-left:auto"
+                    onclick="inhaltFormular()">Mod hinzufügen</button>` : ''}
+      </div>
+      <div id="inhalte-formular" style="display:none"></div>`;
+
+    if (!d.lader && DARF) {
+      html += `
+        <div class="fb-muted" style="font-size:12px;margin:8px 0;padding:8px 10px;border:1px solid var(--fb-border);border-radius:6px">
+          <strong>Zuerst der Lader.</strong> Ohne ihn lädt kein Mod — lade das
+          Lader-Paket (<span class="fb-mono">${escape(d.lader_key || 'BepInEx')}</span>, eine .zip)
+          hoch und wähle „Lader" als Art.
+        </div>`;
+    }
+
+    if (d.lader) html += zeile(d.lader, 0);
+    d.mods.forEach((m, i) => { html += zeile(m, i + 1); });
+
+    if (!d.lader && !d.mods.length) {
+      html += `<div class="fb-muted" style="font-size:13px;padding:12px 0">Noch nichts installiert.</div>`;
+    }
+
+    if (d.reihenfolgeZaehlt && d.mods.length > 1) {
+      html += `<div class="fb-muted" style="font-size:12px;margin-top:10px">
+                 Die <strong>Reihenfolge zählt</strong> bei diesem Lader.
+               </div>`;
+    }
+
+    if (brauchen.length) {
+      const liste = brauchen.map(m => `${m.name || m.kennung}${m.fassung ? ' ' + m.fassung : ''}`).join('\n');
+      html += `
+        <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--fb-border)">
+          <div style="font-size:13px">
+            <strong>${brauchen.length} ${brauchen.length === 1 ? 'Mod braucht' : 'Mods brauchen'} deine Mitspieler auch.</strong>
+            Wer sie nicht hat, kommt nicht auf den Server.
+          </div>
+          <textarea id="inhalte-weitergeben" class="form-control fb-mono" rows="${Math.min(6, brauchen.length + 1)}"
+                    style="margin-top:8px;font-size:12px" readonly>${escape(liste)}</textarea>
+          <button class="btn btn-white btn-sm" style="margin-top:6px" onclick="inhaltKopieren()">
+            Liste zum Weitergeben kopieren
+          </button>
+        </div>`;
+    }
+
+    if (d.entfernt && d.entfernt.length) {
+      html += `
+        <details style="margin-top:14px">
+          <summary class="fb-muted" style="font-size:12px;cursor:pointer">
+            ${d.entfernt.length} entfernt — Verlauf
+          </summary>
+          <div style="margin-top:6px">
+            ${d.entfernt.map(e => `
+              <div class="fb-muted" style="font-size:12px;padding:4px 0">
+                ${escape(e.name || e.kennung)}${e.fassung ? ' ' + escape(e.fassung) : ''}
+                · ${escape(String(e.created_at || '').slice(0, 10))}
+              </div>`).join('')}
+          </div>
+        </details>`;
+    }
+
+    wurzel.innerHTML = html;
+  }
+
+  window.inhalteLaden = function () {
+    fetch(BASIS, { headers: { Accept: 'application/json' } })
+      .then(r => r.json())
+      .then(d => {
+        if (!d.success) throw new Error(d.message || 'Fehler');
+        d.lader_key = d.lader_key || d.lader && d.lader.kennung;
+        zeichne(d);
+      })
+      .catch(e => {
+        wurzel.innerHTML = `<div class="fb-muted" style="font-size:13px;color:var(--fb-danger)">
+          Die Liste konnte nicht geladen werden: ${escape(e.message)}</div>`;
+      });
+  };
+
+  window.inhaltFormular = function () {
+    const feld = document.getElementById('inhalte-formular');
+    if (!feld) return;
+    if (feld.style.display !== 'none') { feld.style.display = 'none'; return; }
+
+    feld.style.display = '';
+    feld.innerHTML = `
+      <div style="border:1px solid var(--fb-border);border-radius:6px;padding:12px;margin:8px 0">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+          <div style="flex:0 0 150px">
+            <label class="form-label" style="font-size:12px">Art</label>
+            <select id="inhalt-art" class="form-select form-select-sm">
+              <option value="mod">Mod</option>
+              <option value="loader">Lader</option>
+            </select>
+          </div>
+          <div style="flex:1 1 180px">
+            <label class="form-label" style="font-size:12px">Name</label>
+            <input id="inhalt-name" class="form-control form-control-sm" placeholder="wie im Spiel">
+          </div>
+          <div style="flex:0 0 120px">
+            <label class="form-label" style="font-size:12px">Fassung</label>
+            <input id="inhalt-fassung" class="form-control form-control-sm" placeholder="1.2.3">
+          </div>
+          <div style="flex:1 1 200px">
+            <label class="form-label" style="font-size:12px">Datei (.dll oder .zip)</label>
+            <input id="inhalt-datei" type="file" class="form-control form-control-sm">
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="inhaltHochladen(this)">Hochladen</button>
+        </div>
+        <div class="fb-muted" style="font-size:12px;margin-top:8px">
+          Eine <span class="fb-mono">.zip</span> wird entpackt. Trägst du keine Fassung ein,
+          steht später „unbekannt“ — und beim nächsten Update weiß niemand, was vorher lief.
+        </div>
+        <div id="inhalt-meldung" style="font-size:12px;margin-top:6px"></div>
+      </div>`;
+  };
+
+  window.inhaltHochladen = function (knopf) {
+    const datei = document.getElementById('inhalt-datei').files[0];
+    const meldung = document.getElementById('inhalt-meldung');
+    if (!datei) { meldung.textContent = 'Bitte eine Datei wählen.'; return; }
+
+    const daten = new FormData();
+    daten.append('file', datei);
+    daten.append('art', document.getElementById('inhalt-art').value);
+    daten.append('name', document.getElementById('inhalt-name').value);
+    daten.append('fassung', document.getElementById('inhalt-fassung').value);
+
+    knopf.disabled = true;
+    meldung.textContent = 'Wird hochgeladen …';
+
+    fetch(BASIS, { method: 'POST', body: daten })
+      .then(async (a) => {
+        const d = await a.json().catch(() => null);
+        if (!a.ok || !d || !d.success) {
+          throw new Error((d && d.message) || `HTTP ${a.status}`);
+        }
+        return d;
+      })
+      .then(d => {
+        window.inhalteLaden();
+        if (d.neustartNoetig) {
+          alert(`${d.dateien} Datei(en) abgelegt. Wirksam wird es beim nächsten Start des Servers.`);
+        }
+      })
+      .catch(e => { meldung.textContent = 'Fehlgeschlagen: ' + e.message; })
+      .finally(() => { knopf.disabled = false; });
+  };
+
+  window.inhaltSchalten = function (id, aktiv) {
+    fetch(`${BASIS}/${id}/schalten`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ aktiv })
+    }).then(() => window.inhalteLaden());
+  };
+
+  window.inhaltEntfernen = function (id, name) {
+    if (!confirm(`"${name}" entfernen?`)) return;
+    fetch(`${BASIS}/${id}`, { method: 'DELETE' })
+      .then(r => r.json())
+      .then(d => {
+        if (d.hinweis) alert(d.hinweis);
+        window.inhalteLaden();
+      });
+  };
+
+  window.inhaltKopieren = function () {
+    const feld = document.getElementById('inhalte-weitergeben');
+    if (!feld) return;
+    feld.select();
+    // Erst markieren, dann die Zwischenablage versuchen: Scheitert sie (kein
+    // https, oder der Browser fragt), steht wenigstens die Auswahl da.
+    try { navigator.clipboard.writeText(feld.value); } catch (e) { /* markiert reicht */ }
+  };
+
+  window.inhalteLaden();
+})();
+</script>

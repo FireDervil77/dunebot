@@ -83,6 +83,7 @@
        [null,           'Server'],
        ['dateien',      'Dateien'],
        ['sicherungen',  'Sicherungen'],
+       ['inhalte',      'Mods'],
        ['konsole',      'Konsole'],
        ['rohmodus',     'Rohmodus'],
        ['fernsteuerung','Fernsteuerung'],
@@ -134,6 +135,8 @@
           <%- include('partials/server-detail-files', { server, guildId, userPermissions }) %>
         <% } else if (bereich === 'sicherungen') { %>
           <%- include('partials/server-detail-backups', { server, guildId, userPermissions }) %>
+        <% } else if (bereich === 'inhalte') { %>
+          <%- include('partials/server-detail-inhalte', { server, guildId, userPermissions }) %>
         <% } else if (bereich === 'konsole') { %>
           <%- include('partials/server-detail-console', { server, guildId, userPermissions, consoleTransport: locals.consoleTransport }) %>
         <% } else if (bereich === 'rohmodus') { %>

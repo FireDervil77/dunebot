@@ -2442,7 +2442,7 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
         // Welcher Bereich gezeigt wird — was frueher ein Reiter war.
         // Kein Bereich heisst: die Serverseite selbst.
         const BEREICHE = {
-            dateien: 'Dateien', sicherungen: 'Sicherungen', konsole: 'Konsole',
+            dateien: 'Dateien', sicherungen: 'Sicherungen', inhalte: 'Mods', konsole: 'Konsole',
             rohmodus: 'Einstellungen — Rohmodus', fernsteuerung: 'Fernsteuerung',
             aufgaben: 'Wiederkehrende Aufgaben', panels: 'Discord-Panels',
             oeffentlich: 'Öffentliche Seite',
