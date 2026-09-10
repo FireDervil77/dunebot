@@ -1146,6 +1146,9 @@
     "loader": {
       "key": "bepinex",
       "installable_as_content": true,
+      "packages": {
+        "thunderstore": "denikson-BepInExPack_Valheim"
+      },
       "adds": {
         "env": {
           "DOORSTOP_ENABLED": "1",
@@ -1159,6 +1162,9 @@
       "upload",
       "thunderstore"
     ],
+    "source_ids": {
+      "thunderstore": "valheim"
+    },
     "path": "BepInEx/plugins",
     "activation": "start",
     "order_matters": false,

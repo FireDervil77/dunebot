@@ -1007,6 +1007,22 @@
               "type": "boolean",
               "default": true
             },
+            "packages": {
+              "description": "Wie der Lader bei der jeweiligen Quelle heisst (ohne Fassung). Nur damit laesst sich eine aufgeloeste Abhaengigkeit als LADER erkennen und in die Serverwurzel legen statt zu den Mods. Raten waere hier falsch: 'enthaelt BepInEx im Namen' trifft auch Mods.",
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "thunderstore": {
+                  "type": "string"
+                },
+                "modrinth": {
+                  "type": "string"
+                },
+                "curseforge": {
+                  "type": "string"
+                }
+              }
+            },
             "adds": {
               "description": "Was der Lader dem Start hinzufügt, wenn er aktiv ist (E-20). Der Daemon setzt es in job.json ein; das Image weiß von Mods nichts.",
               "type": "object",
@@ -1045,6 +1061,27 @@
               "steam-workshop",
               "upload"
             ]
+          }
+        },
+        "source_ids": {
+          "description": "Wie das Spiel bei der jeweiligen Quelle heisst. Thunderstore trennt seine Pakete nach Community ('valheim', 'lethal-company'), und eine Suche ohne diese Angabe wuesste nicht, wo sie suchen soll. Schluessel = Quelle aus 'sources'.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "thunderstore": {
+              "type": "string",
+              "description": "Community-Kennung, wie in der Adresse: thunderstore.io/c/<hier>/"
+            },
+            "modrinth": {
+              "type": "string"
+            },
+            "curseforge": {
+              "type": "string"
+            },
+            "steam-workshop": {
+              "type": "string",
+              "description": "Die AppID des Spiels, als Zeichenkette"
+            }
           }
         },
         "path": {
