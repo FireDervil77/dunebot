@@ -34,6 +34,10 @@
   const BASIS    = `/guild/${GUILD}/plugins/gameserver/servers/${SERVER}/inhalte`;
   const DARF     = <%= userPermissions.permissions['GAMESERVER.FILES.MANAGE'] ? 'true' : 'false' %>;
 
+  // Was Thunderstore ueber neuere Fassungen sagt — auf Knopfdruck geholt, nicht
+  // beim Laden: Das ist eine Abfrage JE MOD bei einem fremden Dienst.
+  const NEUER = {};
+
   const escape = (s) => String(s == null ? '' : s)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
@@ -47,6 +51,9 @@
     const marken = [];
     if (e.status === 'fehlgeschlagen') marken.push(marke('fehlgeschlagen', 'warn'));
     if (e.client_side)                 marken.push(marke('Mitspieler brauchen ihn auch'));
+    const neuere = NEUER[e.id];
+    if (neuere && neuere.neuer)        marken.push(marke('neuer: ' + neuere.neueste, 'warn'));
+    if (neuere && neuere.fehler)       marken.push(marke('Fassung nicht abfragbar'));
 
     return `
       <div style="display:flex;gap:12px;padding:12px 0;align-items:flex-start;border-top:1px solid var(--fb-border)">
@@ -69,6 +76,11 @@
         </div>
         ${DARF ? `
           <div style="display:flex;gap:6px;align-items:center;flex:0 0 auto">
+            ${neuere && neuere.neuer ? `
+              <button class="btn btn-sm btn-outline-primary" title="Auf ${escape(neuere.neueste)} bringen"
+                      onclick="inhaltAktualisieren(${e.id}, '${escape(e.name || e.kennung)}')">
+                <i class="fa-solid fa-arrow-up"></i>
+              </button>` : ''}
             <label class="form-check form-switch mb-0" title="${e.aktiv ? 'Aktiv' : 'Aus'}">
               <input class="form-check-input" type="checkbox" ${e.aktiv ? 'checked' : ''}
                      onchange="inhaltSchalten(${e.id}, this.checked)">
@@ -103,17 +115,25 @@
           ${aktive} aktiv${d.lader ? '' : ' · kein Lader installiert'}
           ${d.quellen && d.quellen.length ? ' · Quelle ' + d.quellen.map(escape).join(', ') : ''}
         </span>
-        ${DARF ? `<button class="btn btn-white btn-sm" style="margin-left:auto"
-                    onclick="inhaltFormular()">Mod hinzufügen</button>` : ''}
+        <span style="margin-left:auto"></span>
+        ${d.mods.some(m => m.quelle === 'thunderstore') || (d.lader && d.lader.quelle === 'thunderstore')
+          ? `<button class="btn btn-white btn-sm" onclick="inhaltAktualisierungen(this)">Auf Aktualisierungen prüfen</button>`
+          : ''}
+        ${DARF && (d.quellen || []).includes('thunderstore')
+          ? `<button class="btn btn-primary btn-sm" onclick="inhaltSuche()">Aus Thunderstore</button>` : ''}
+        ${DARF ? `<button class="btn btn-white btn-sm"
+                    onclick="inhaltFormular()">Datei hochladen</button>` : ''}
       </div>
+      <div id="inhalte-suche" style="display:none"></div>
       <div id="inhalte-formular" style="display:none"></div>`;
 
     if (!d.lader && DARF) {
       html += `
         <div class="fb-muted" style="font-size:12px;margin:8px 0;padding:8px 10px;border:1px solid var(--fb-border);border-radius:6px">
-          <strong>Zuerst der Lader.</strong> Ohne ihn lädt kein Mod — lade das
-          Lader-Paket (<span class="fb-mono">${escape(d.lader_key || 'BepInEx')}</span>, eine .zip)
-          hoch und wähle „Lader" als Art.
+          <strong>Zuerst der Lader.</strong> Ohne ihn lädt kein Mod
+          (<span class="fb-mono">${escape(d.lader_key || 'BepInEx')}</span>).
+          Über Thunderstore kommt er als Abhängigkeit von selbst mit — beim
+          Hochladen wähle „Lader" als Art.
         </div>`;
     }
 
@@ -247,6 +267,185 @@
       })
       .catch(e => { meldung.textContent = 'Fehlgeschlagen: ' + e.message; })
       .finally(() => { knopf.disabled = false; });
+  };
+
+  // ── Thunderstore ──────────────────────────────────────────────────────────
+
+  window.inhaltSuche = function () {
+    const feld = document.getElementById('inhalte-suche');
+    if (!feld) return;
+    if (feld.style.display !== 'none') { feld.style.display = 'none'; return; }
+
+    feld.style.display = '';
+    feld.innerHTML = `
+      <div style="border:1px solid var(--fb-border);border-radius:6px;padding:12px;margin:8px 0">
+        <div style="display:flex;gap:8px;align-items:flex-end">
+          <div style="flex:1 1 auto">
+            <label class="form-label" style="font-size:12px">Mod suchen</label>
+            <input id="ts-begriff" class="form-control form-control-sm"
+                   placeholder="Name, z. B. Jotunn" onkeydown="if(event.key==='Enter')inhaltSuchen()">
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="inhaltSuchen()">Suchen</button>
+        </div>
+        <div class="fb-muted" style="font-size:12px;margin-top:8px">
+          Was ein Mod zum Laufen braucht, kommt mit — der Lader meistens auch.
+          Vor dem Installieren siehst du die vollständige Liste.
+        </div>
+        <div id="ts-treffer" style="margin-top:8px"></div>
+      </div>`;
+    document.getElementById('ts-begriff').focus();
+  };
+
+  window.inhaltSuchen = function () {
+    const begriff = (document.getElementById('ts-begriff') || {}).value || '';
+    const raum = document.getElementById('ts-treffer');
+    raum.innerHTML = '<div class="fb-muted" style="font-size:12px">Wird gesucht …</div>';
+
+    fetch(`${BASIS}/suche?q=${encodeURIComponent(begriff)}`, { headers: { Accept: 'application/json' } })
+      .then(async (a) => {
+        const d = await a.json().catch(() => null);
+        if (!a.ok || !d || !d.success) throw new Error((d && d.message) || `HTTP ${a.status}`);
+        return d;
+      })
+      .then(d => {
+        if (!d.treffer.length) {
+          raum.innerHTML = '<div class="fb-muted" style="font-size:12px">Nichts gefunden.</div>';
+          return;
+        }
+        raum.innerHTML = d.treffer.map(t => `
+          <div style="display:flex;gap:10px;padding:8px 0;border-top:1px solid var(--fb-border);align-items:flex-start">
+            ${t.bild ? `<img src="${escape(t.bild)}" alt="" width="32" height="32" style="border-radius:4px;flex:0 0 auto">` : ''}
+            <div style="flex:1 1 auto;min-width:0">
+              <div style="font-weight:600;font-size:13px">${escape(t.name)}
+                ${t.veraltet ? marke('veraltet', 'warn') : ''}</div>
+              <div class="fb-muted" style="font-size:12px">${escape(t.beschreibung).slice(0, 160)}</div>
+              <div class="fb-muted fb-mono" style="font-size:11px;margin-top:2px">
+                ${escape(t.kennung)} · ${Number(t.downloads).toLocaleString('de-DE')} Downloads</div>
+            </div>
+            ${DARF ? `<button class="btn btn-white btn-sm" style="flex:0 0 auto"
+                        onclick="inhaltVorschau('${escape(t.kennung)}', this)">Ansehen</button>` : ''}
+          </div>`).join('');
+      })
+      .catch(e => {
+        raum.innerHTML = `<div style="font-size:12px;color:var(--fb-danger)">Suche fehlgeschlagen: ${escape(e.message)}</div>`;
+      });
+  };
+
+  window.inhaltVorschau = function (kennung, knopf) {
+    knopf.disabled = true;
+    const raum = document.getElementById('ts-treffer');
+
+    fetch(`${BASIS}/vorschau?kennung=${encodeURIComponent(kennung)}`, { headers: { Accept: 'application/json' } })
+      .then(async (a) => {
+        const d = await a.json().catch(() => null);
+        if (!a.ok || !d || !d.success) throw new Error((d && d.message) || `HTTP ${a.status}`);
+        return d;
+      })
+      .then(d => {
+        const liste = d.pakete.map(p => `
+          <div style="display:flex;gap:8px;font-size:12px;padding:3px 0">
+            <span class="fb-mono" style="flex:1 1 auto">${escape(p.kennung)} ${escape(p.fassung)}</span>
+            ${p.art === 'loader' ? marke('Lader') : ''}
+            ${p.schonDa ? marke(p.schonFassung === p.fassung ? 'schon da' : 'ersetzt ' + escape(p.schonFassung || '?'), 'warn') : ''}
+          </div>`).join('');
+
+        raum.innerHTML = `
+          <div style="border:1px solid var(--fb-border);border-radius:6px;padding:10px">
+            <div style="font-size:13px;font-weight:600;margin-bottom:6px">
+              Das wird installiert (${d.pakete.length}):</div>
+            ${liste}
+            ${d.fehlend && d.fehlend.length ? `
+              <div style="font-size:12px;color:var(--fb-danger);margin-top:6px">
+                Nicht auflösbar: ${escape(d.fehlend.join('; '))}</div>` : ''}
+            <div style="display:flex;gap:8px;margin-top:10px">
+              <button class="btn btn-primary btn-sm"
+                      onclick="inhaltInstallieren('${escape(kennung)}', this)">Installieren</button>
+              <button class="btn btn-white btn-sm" onclick="inhaltSuchen()">Zurück</button>
+            </div>
+            <div id="ts-meldung" style="font-size:12px;margin-top:6px"></div>
+          </div>`;
+      })
+      .catch(e => {
+        raum.innerHTML = `<div style="font-size:12px;color:var(--fb-danger)">${escape(e.message)}</div>`;
+      })
+      .finally(() => { knopf.disabled = false; });
+  };
+
+  window.inhaltInstallieren = function (kennung, knopf) {
+    const meldung = document.getElementById('ts-meldung');
+    knopf.disabled = true;
+    meldung.textContent = 'Wird geholt … das kann bei großen Mods dauern.';
+
+    fetch(`${BASIS}/thunderstore`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kennung })
+    })
+      .then(async (a) => {
+        const d = await a.json().catch(() => null);
+        if (!a.ok || !d || !d.success) throw new Error((d && d.message) || `HTTP ${a.status}`);
+        return d;
+      })
+      .then(d => {
+        window.inhalteLaden();
+        const teile = [`${d.installiert.length} installiert`];
+        if (d.fehlgeschlagen.length) teile.push(`${d.fehlgeschlagen.length} fehlgeschlagen`);
+        // Ein Teilerfolg wird als solcher gesagt — nicht als Erfolg und nicht
+        // als Fehler. Was misslang, steht auch in der Liste.
+        alert(teile.join(', ')
+          + (d.fehlgeschlagen.length ? ':\n' + d.fehlgeschlagen.map(f => `${f.kennung}: ${f.fehler}`).join('\n') : '')
+          + (d.neustartNoetig ? '\n\nWirksam wird es beim nächsten Start des Servers.' : ''));
+      })
+      .catch(e => { meldung.textContent = 'Fehlgeschlagen: ' + e.message; })
+      .finally(() => { knopf.disabled = false; });
+  };
+
+  window.inhaltAktualisierungen = function (knopf) {
+    knopf.disabled = true;
+    const alterText = knopf.textContent;
+    knopf.textContent = 'Fragt nach …';
+
+    fetch(`${BASIS}/aktualisierungen`, { headers: { Accept: 'application/json' } })
+      .then(async (a) => {
+        const d = await a.json().catch(() => null);
+        if (!a.ok || !d || !d.success) throw new Error((d && d.message) || `HTTP ${a.status}`);
+        return d;
+      })
+      .then(d => {
+        for (const s of d.stand) NEUER[s.id] = s;
+        window.inhalteLaden();
+        const neue = d.stand.filter(s => s.neuer).length;
+        if (!neue) alert('Alles auf der neuesten Fassung.');
+      })
+      .catch(e => alert('Nicht abfragbar: ' + e.message))
+      .finally(() => { knopf.disabled = false; knopf.textContent = alterText; });
+  };
+
+  window.inhaltAktualisieren = function (id, name) {
+    if (!confirm(`"${name}" auf die neueste Fassung bringen?\n\n`
+               + 'Die alten Dateien werden vorher entfernt. Wirksam beim nächsten Start.')) return;
+
+    fetch(`${BASIS}/${id}/aktualisieren`, { method: 'POST' })
+      .then(async (a) => {
+        const d = await a.json().catch(() => null);
+        if (!a.ok || !d || !d.success) throw new Error((d && d.message) || `HTTP ${a.status}`);
+        return d;
+      })
+      .then(d => {
+        delete NEUER[id];
+        window.inhalteLaden();
+        if (!d.geaendert) { alert(d.message); return; }
+        let text = `${name}: ${d.vorher} → ${d.nachher}`;
+        if (d.alteDateienBlieben && d.alteDateienBlieben.length) {
+          text += `\n\n${d.alteDateienBlieben.length} alte Datei(en) blieben liegen.`;
+        }
+        if (d.ohneListe) {
+          text += '\n\nVon der vorigen Fassung war nicht festgehalten, welche Dateien dazugehörten '
+                + '— sie liegen noch da.';
+        }
+        alert(text);
+      })
+      .catch(e => alert('Nicht aktualisiert: ' + e.message));
   };
 
   window.inhaltSchalten = function (id, aktiv) {

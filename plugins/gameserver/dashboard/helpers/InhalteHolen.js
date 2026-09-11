@@ -1,0 +1,344 @@
+'use strict';
+
+/**
+ * Einen Mod von Thunderstore auf den Server holen (E6/B.12).
+ *
+ * ── Ein Weg, zwei Momente ───────────────────────────────────────────────────
+ *
+ * Im Tab „Mods" eines laufenden Servers und beim Anlegen eines neuen ist es
+ * dieselbe Arbeit: aufloesen, Zeilen schreiben, holen lassen, Zeilen
+ * fortschreiben. Der Unterschied ist nur, WANN sie losläuft — beim Anlegen erst
+ * nach der Grundinstallation, denn vorher gibt es kein Serververzeichnis.
+ * Deshalb steht sie hier und nicht in der Route.
+ *
+ * ── Wer was tut ─────────────────────────────────────────────────────────────
+ *
+ *   Dashboard  suchen, Fassung waehlen, Abhaengigkeiten aufloesen  (Entscheidungen)
+ *   Daemon     die Datei holen und ablegen                          (Arbeit)
+ *
+ * Der Daemon laedt selbst. Liefe die Datei durch das Dashboard, muesste sie
+ * base64-kodiert durch die WebSocket-Leitung (45-MB-Grenze) — ein Mod von
+ * 60 MB waere unmoeglich, obwohl die Maschine ihn in Sekunden hat.
+ *
+ * ⚠ Damit laedt der Daemon eine Adresse, die ihm jemand nennt. Die
+ * Herkunftsliste steht deshalb auf BEIDEN Seiten (`Thunderstore.HERKUNFT` und
+ * `inhalte_holen.go`), und `scripts/check-herkunftsliste.js` haelt sie
+ * zusammen.
+ */
+
+const { ServiceManager } = require('dunebot-core');
+const Thunderstore = require('./Thunderstore');
+const Inhalte = require('./Inhalte');
+
+/**
+ * Frist fuer einen Abruf. Grosszuegig: Der Daemon laedt und entpackt, und ein
+ * Modpack von 200 MB ueber eine langsame Leitung ist kein Fehler.
+ */
+const FRIST_MS = 180000;
+
+/** Der Daemon dieses Servers — ohne ihn geht nichts auf die Maschine. */
+async function daemonVon(dbService, server) {
+    const [zeile] = await dbService.query(
+        'SELECT daemon_id FROM rootserver WHERE id = ?', [server.rootserver_id]);
+    return zeile ? zeile.daemon_id : null;
+}
+
+/**
+ * `denikson-BepInExPack_Valheim` auseinandernehmen — OHNE Fassung.
+ *
+ * `Thunderstore.teileKennung` will drei Stuecke (mit Fassung); gespeichert wird
+ * bei uns aber `namespace-name`, weil die Fassung eine eigene Spalte hat.
+ * Getrennt wird am ERSTEN Bindestrich: Der Namensraum hat nie einen, der Name
+ * darf welche haben (`BepInExPack_Valheim` nicht, `Foo-Bar-Mod` schon).
+ */
+function teileOhneFassung(kennung) {
+    const text = String(kennung || '');
+    const schnitt = text.indexOf('-');
+    if (schnitt < 1 || schnitt === text.length - 1) return null;
+    return { namespace: text.slice(0, schnitt), name: text.slice(schnitt + 1) };
+}
+
+/**
+ * Ist dieses Paket der Lader des Spiels?
+ *
+ * Nur das Paket weiss es (`content.loader.packages.thunderstore`). Zu raten —
+ * „enthaelt BepInEx im Namen" — traefe auch jeden Mod, der BepInEx im Titel
+ * fuehrt, und der laege dann in der Serverwurzel statt bei den Mods.
+ */
+function istLader(inhalt, kennung) {
+    const name = inhalt?.loader?.packages?.thunderstore;
+    return Boolean(name) && String(name).toLowerCase() === String(kennung).toLowerCase();
+}
+
+/** Wohin gehoert dieses Paket? Lader in die Wurzel, Mod in `content.path`. */
+function zielFuer(inhalt, art) {
+    return art === Inhalte.ART_LADER ? '' : (inhalt.path || '');
+}
+
+/**
+ * Was wuerde installiert — mit dem, was schon da ist.
+ *
+ * Der Lader kommt bei Thunderstore meist als ABHAENGIGKEIT mit: Wer Jotunn
+ * waehlt, bekommt BepInEx, ohne es zu wissen. Genau das soll die Vorschau
+ * zeigen, bevor jemand klickt.
+ */
+async function vorschau({ serverId, inhalt, kennung, fassung = null }) {
+    const teil = teileOhneFassung(kennung);
+    if (!teil) throw new Error(`Unlesbare Kennung: ${kennung}`);
+
+    const { pakete, fehlend } = await Thunderstore.aufloesen(teil.namespace, teil.name, fassung);
+
+    let vorhanden = new Map();
+    if (serverId) {
+        const liste = await Inhalte.fuerServer(serverId);
+        for (const z of [liste.lader, ...liste.mods].filter(Boolean)) vorhanden.set(z.kennung, z);
+    }
+
+    return {
+        fehlend,
+        pakete: pakete.map(p => {
+            const art = istLader(inhalt, p.kennung) ? Inhalte.ART_LADER : Inhalte.ART_MOD;
+            const da = vorhanden.get(p.kennung) || null;
+            return {
+                kennung: p.kennung, name: p.name, fassung: p.fassung, bytes: p.bytes, art,
+                schonDa: Boolean(da),
+                schonFassung: da ? da.fassung : null,
+            };
+        }),
+    };
+}
+
+/**
+ * Die aufgeloesten Pakete wirklich ablegen.
+ *
+ * **Die Zeile wird VOR dem Abruf geschrieben** (`geplant`) und danach
+ * fortgeschrieben. Bricht der Daemon mittendrin ab, steht die Absicht trotzdem
+ * da — sonst waere ein halb installierter Mod ein Zustand ohne Spur.
+ *
+ * @private
+ */
+async function legeAb({ server, inhalt, guildId, pakete, fehlend = [] }) {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    const ipmServer = ServiceManager.get('ipmServer');
+
+    const daemonId = await daemonVon(dbService, server);
+    if (!daemonId) throw new Error('Kein Daemon zugewiesen');
+    if (!ipmServer?.isDaemonOnline(daemonId)) throw new Error('Daemon ist offline');
+
+    const ergebnis = {
+        installiert: [], fehlgeschlagen: [], fehlend,
+        neustartNoetig: inhalt.needs_restart !== false,
+    };
+
+    for (let i = 0; i < pakete.length; i++) {
+        const p = pakete[i];
+        const art = istLader(inhalt, p.kennung) ? Inhalte.ART_LADER : Inhalte.ART_MOD;
+
+        const grundzeile = {
+            serverId: server.id, guildId, art, quelle: 'thunderstore',
+            kennung: p.kennung, name: p.name, fassung: p.fassung,
+            reihenfolge: i, clientSide: Boolean(inhalt.client_side),
+        };
+
+        if (art === Inhalte.ART_MOD && !inhalt.path) {
+            // Kein Ablageort im Paket: Raten waere hier der teure Fehler.
+            await Inhalte.eintragen({ ...grundzeile, status: 'fehlgeschlagen',
+                fehler: 'Das Paket nennt keinen Ablageort fuer Mods (content.path)' });
+            ergebnis.fehlgeschlagen.push({ kennung: p.kennung,
+                fehler: 'Das Paket nennt keinen Ablageort fuer Mods (content.path)' });
+            continue;
+        }
+
+        await Inhalte.eintragen({ ...grundzeile, status: 'geplant' });
+
+        const ziel = zielFuer(inhalt, art);
+        const antwort = await ipmServer.sendCommand(daemonId, 'gameserver.content.fetch', {
+            server_id:     String(server.id),
+            rootserver_id: String(server.rootserver_id),
+            install_path:  server.install_path,
+            ziel,
+            adresse:       p.adresse,
+            dateiname:     `${p.kennung}-${p.fassung}.zip`,
+            entpacken:     true,
+        }, FRIST_MS).catch(fehler => ({ success: false, error: fehler.message }));
+
+        if (!antwort?.success) {
+            const fehler = antwort?.error || 'Der Daemon hat nicht geantwortet';
+            Logger.warn(`[Gameserver/Inhalte] ${p.kennung} ${p.fassung} nicht geholt: ${fehler}`);
+            await Inhalte.eintragen({ ...grundzeile, status: 'fehlgeschlagen', fehler });
+            ergebnis.fehlgeschlagen.push({ kennung: p.kennung, fassung: p.fassung, fehler });
+            continue;
+        }
+
+        const dateien = antwort.data?.dateien || [];
+        await Inhalte.eintragen({
+            ...grundzeile,
+            status: 'installiert',
+            // `ablage` ist die Anzeige, `dateien` die Wahrheit fuers Entfernen.
+            ablage: dateien.length === 1 ? dateien[0] : (ziel || '.'),
+            dateien,
+        });
+        Logger.info(`[Gameserver/Inhalte] ${p.kennung} ${p.fassung} auf Server ${server.id}: `
+            + `${dateien.length} Datei(en)`);
+        ergebnis.installiert.push({ kennung: p.kennung, fassung: p.fassung,
+            art, dateien: dateien.length });
+    }
+
+    return ergebnis;
+}
+
+/**
+ * Ein Paket samt Abhaengigkeiten installieren.
+ *
+ * @param {{server: object, inhalt: object, guildId: string, kennung: string, fassung?: string}} auftrag
+ */
+async function installiere({ server, inhalt, guildId, kennung, fassung = null }) {
+    if (!inhalt?.supported) {
+        throw new Error('Dieses Spiel nimmt laut seinem Paket keine Inhalte auf.');
+    }
+    if (!(inhalt.sources || []).includes('thunderstore')) {
+        throw new Error('Das Paket nennt Thunderstore nicht als Quelle.');
+    }
+    const teil = teileOhneFassung(kennung);
+    if (!teil) throw new Error(`Unlesbare Kennung: ${kennung}`);
+
+    const { pakete, fehlend } = await Thunderstore.aufloesen(teil.namespace, teil.name, fassung);
+    return legeAb({ server, inhalt, guildId, pakete, fehlend });
+}
+
+/**
+ * Die beim Anlegen vorgemerkten Mods holen — nach der Grundinstallation.
+ *
+ * Schlaegt einer fehl, steht seine Zeile auf `fehlgeschlagen` und die anderen
+ * laufen weiter: Ein Mod, den Thunderstore gerade nicht ausliefert, darf keine
+ * Serveranlage kaputtmachen.
+ *
+ * @returns {Promise<object|null>} null, wenn nichts vorgemerkt war
+ */
+async function holeGeplante({ server, inhalt, guildId }) {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+
+    const zeilen = await dbService.query(
+        `SELECT id, kennung, fassung FROM gameserver_content
+          WHERE server_id = ? AND quelle = 'thunderstore' AND status = 'geplant'
+          ORDER BY reihenfolge ASC, id ASC`,
+        [server.id]
+    );
+    if (!zeilen || !zeilen.length) return null;
+
+    Logger.info(`[Gameserver/Inhalte] Server ${server.id}: ${zeilen.length} vorgemerkte(r) Mod(s)`);
+
+    const gesamt = { installiert: [], fehlgeschlagen: [], fehlend: [], neustartNoetig: false };
+    for (const zeile of zeilen) {
+        try {
+            const e = await installiere({ server, inhalt, guildId,
+                kennung: zeile.kennung, fassung: zeile.fassung });
+            gesamt.installiert.push(...e.installiert);
+            gesamt.fehlgeschlagen.push(...e.fehlgeschlagen);
+            gesamt.fehlend.push(...e.fehlend);
+            gesamt.neustartNoetig = gesamt.neustartNoetig || e.neustartNoetig;
+        } catch (fehler) {
+            // Die Zeile traegt den Grund, nicht nur das Log: Wer den Server
+            // spaeter aufmacht, soll sehen, warum der Mod fehlt.
+            Logger.warn(`[Gameserver/Inhalte] ${zeile.kennung} nicht installierbar: ${fehler.message}`);
+            await dbService.query(
+                "UPDATE gameserver_content SET status = 'fehlgeschlagen', fehler = ? WHERE id = ?",
+                [fehler.message, zeile.id]
+            );
+            gesamt.fehlgeschlagen.push({ kennung: zeile.kennung, fehler: fehler.message });
+        }
+    }
+    return gesamt;
+}
+
+/**
+ * Die Dateien einer Zeile vom Server nehmen.
+ *
+ * Nur die aufgehobene Liste, keine Ordner: `ablage` traegt bei einem Mod aus
+ * mehreren Dateien den ZIELORDNER (`BepInEx/plugins`), und den zu loeschen
+ * naehme alle Mods mit. Hat eine alte Zeile keine Liste, wird nichts geloescht
+ * und das gesagt.
+ *
+ * @returns {Promise<{weg: number, blieb: string[], ohneListe: boolean}>}
+ */
+async function entferneDateien({ server, zeile, inhalt = null }) {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    const ipmServer = ServiceManager.get('ipmServer');
+
+    let dateien = Inhalte.dateienAus(zeile);
+    if (!dateien.length) {
+        // Zeilen von vor dem 2026-09-11 haben keine Liste. Aus `ablage` laesst
+        // sich nur eine EINZELNE Datei sicher ableiten — steht dort der
+        // Zielordner (`BepInEx/plugins`), naehme ein Loeschen alle Mods mit.
+        const ablage = String(zeile.ablage || '').replace(/^\/+/, '');
+        const einzeln = ablage && ablage !== (inhalt?.path || '')
+            && /\.[A-Za-z0-9]{1,8}$/.test(ablage);
+        if (!einzeln) return { weg: 0, blieb: [], ohneListe: true };
+        dateien = [ablage];
+    }
+
+    const daemonId = await daemonVon(dbService, server);
+    if (!daemonId || !ipmServer?.isDaemonOnline(daemonId)) {
+        return { weg: 0, blieb: dateien, ohneListe: false };
+    }
+
+    let weg = 0;
+    const blieb = [];
+    for (const datei of dateien) {
+        const antwort = await ipmServer.sendCommand(daemonId, 'gameserver.files.delete', {
+            server_id:     String(server.id),
+            rootserver_id: String(server.rootserver_id),
+            install_path:  server.install_path,
+            path:          '/' + String(datei).replace(/^\/+/, ''),
+        }, 30000).catch(fehler => ({ success: false, error: fehler.message }));
+
+        if (antwort?.success) weg++;
+        else {
+            blieb.push(datei);
+            Logger.warn(`[Gameserver/Inhalte] Datei blieb liegen (${datei}): `
+                + `${antwort?.error || 'keine Antwort'}`);
+        }
+    }
+    return { weg, blieb, ohneListe: false };
+}
+
+/**
+ * Auf die neueste Fassung bringen.
+ *
+ * **Erst die alten Dateien weg, dann die neuen holen.** Eine umbenannte DLL
+ * bliebe sonst liegen, der Lader faende beide Fassungen — und der Fehler zeigt
+ * sich erst im Spiel.
+ *
+ * @returns {Promise<object>} wie `installiere`, zusaetzlich `vorher`/`nachher`
+ */
+async function aktualisiere({ server, inhalt, guildId, zeile }) {
+    const teil = teileOhneFassung(zeile.kennung);
+    if (!teil) throw new Error(`Unlesbare Kennung: ${zeile.kennung}`);
+
+    const neuestes = await Thunderstore.paket(teil.namespace, teil.name);
+    if (!Thunderstore.hoeher(neuestes.fassung, zeile.fassung)) {
+        return { geaendert: false, vorher: zeile.fassung, nachher: neuestes.fassung,
+                 installiert: [], fehlgeschlagen: [], fehlend: [] };
+    }
+
+    const weg = await entferneDateien({ server, zeile });
+    const ergebnis = await installiere({ server, inhalt, guildId, kennung: zeile.kennung });
+
+    return {
+        ...ergebnis,
+        geaendert: true,
+        vorher: zeile.fassung,
+        nachher: neuestes.fassung,
+        alteDateienWeg: weg.weg,
+        alteDateienBlieben: weg.blieb,
+        ohneListe: weg.ohneListe,
+    };
+}
+
+module.exports = {
+    daemonVon, teileOhneFassung, istLader,
+    vorschau, installiere, holeGeplante, aktualisiere, entferneDateien,
+};

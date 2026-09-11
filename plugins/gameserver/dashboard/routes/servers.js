@@ -15,6 +15,7 @@ const StatusService = require('../helpers/StatusService');
 const { buildStartPayload, loadServerForStart, ladePaketFuerAddon, baueInstallNutzlast,
         paketWerteAnlegen, autoUpdateAus, istWahr } = require('../helpers/StartPayload');
 const { vergibPortsAusPaket } = require('../helpers/Portvergabe');
+const Inhalte = require('../helpers/Inhalte');
 const { baueUebersicht, baueServerListe, bauePaketAuswahl,
         baueMaschinenAuswahl, baueWerteSchritt } = require('../helpers/Serverseite');
 const { resolveStatusConfig } = require('../helpers/StatusSchema');
@@ -650,9 +651,22 @@ router.get('/create', requirePermission('GAMESERVER.CREATE'), async (req, res) =
             const am3 = ServiceManager.get('assetManager');
             if (am3) am3.enqueueStyle('gameserver-serverseite');
 
+            // Was das Paket zu Mods sagt — der Schritt „Mods" erscheint nur,
+            // wenn es sie ueberhaupt kennt UND Thunderstore als Quelle nennt.
+            const inhaltDesPakets = paketFuerWerte?.content || null;
+            const inhalte = {
+                unterstuetzt: Boolean(inhaltDesPakets?.supported),
+                thunderstore: Boolean(inhaltDesPakets?.supported)
+                    && (inhaltDesPakets.sources || []).includes('thunderstore')
+                    && Boolean(inhaltDesPakets.source_ids?.thunderstore),
+                lader:        inhaltDesPakets?.loader?.packages?.thunderstore || null,
+                laderName:    inhaltDesPakets?.loader?.key || null,
+            };
+
             return await themeManager.renderView(res, 'guild/server-create-step3', {
                 title: 'Server anlegen — Werte',
                 werte,
+                inhalte,
                 addonId: addonData.id,
                 addonSlug: addonData.slug,
                 rootserverId: req.query.rootserver_id || '',
@@ -980,6 +994,36 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
         // Fallback-Kette: explizite bind_ip aus Step3-Form → rootserver.host → null (daemon.yaml)
         if (rootserver.host) {
             await dbService.query('UPDATE gameservers SET bind_ip = ? WHERE id = ?', [rootserver.host, serverId]);
+        }
+
+        // ── Vorgemerkte Mods (E6/B.12) ──────────────────────────────────────
+        //
+        // Die Auswahl aus Schritt 3 wird jetzt zur Zeile — und zwar `geplant`:
+        // Ein Serververzeichnis, in das ein Mod gehoert, gibt es noch nicht.
+        // Geholt werden sie, wenn die Grundinstallation fertig ist
+        // (`_handleInstallCompleted`). Derselbe Weg wie im Tab „Mods", nur
+        // zeitversetzt — und ein Mod, den Thunderstore gerade nicht
+        // ausliefert, darf die Serveranlage nicht aufhalten.
+        const gewaehlteMods = [].concat(req.body.mod || [])
+            .filter(k => typeof k === 'string' && k.includes('-'));
+        if (gewaehlteMods.length) {
+            const inhalt = paket.content || {};
+            const laderPaket = inhalt.loader?.packages?.thunderstore || null;
+            for (let i = 0; i < gewaehlteMods.length; i++) {
+                await Inhalte.eintragen({
+                    serverId, guildId, quelle: 'thunderstore',
+                    // Der Lader ist keine Zeile wie die anderen — nur das Paket
+                    // weiss, welches Thunderstore-Paket er ist.
+                    art: laderPaket && gewaehlteMods[i].toLowerCase() === laderPaket.toLowerCase()
+                        ? Inhalte.ART_LADER : Inhalte.ART_MOD,
+                    kennung: gewaehlteMods[i],
+                    name: gewaehlteMods[i].slice(gewaehlteMods[i].indexOf('-') + 1),
+                    reihenfolge: i,
+                    clientSide: Boolean(inhalt.client_side),
+                    status: 'geplant',
+                });
+            }
+            Logger.info(`[Gameserver] ${gewaehlteMods.length} Mod(s) für Server ${serverId} vorgemerkt`);
         }
 
         // ✅ SFTP-Credentials direkt beim Server-Erstellen setzen

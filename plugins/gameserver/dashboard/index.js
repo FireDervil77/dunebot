@@ -961,10 +961,70 @@ class GameserverPlugin extends DashboardPlugin {
                 
                 Logger.success(`[Gameserver] Installation-Complete gebroadcastet: ${server.name} (${server_id})`);
             }
-            
+
+            // ── Jetzt die beim Anlegen vorgemerkten Mods (E6/B.12) ─────────
+            //
+            // Erst hier: Vorher gibt es kein Serververzeichnis, in das ein Mod
+            // gehoert. Ein Fehlschlag beendet die Installation NICHT — die
+            // Zeile traegt ihren Grund, und der Server ist da.
+            await this._holeVorgemerkteMods(server_id);
+
         } catch (error) {
             Logger.error(`[Gameserver] Fehler beim Install-Complete-Handling für Server ${server_id}:`, error);
             throw error;
+        }
+    }
+
+    /**
+     * Die beim Anlegen vorgemerkten Mods holen (E6/B.12).
+     *
+     * Eigener Schritt, weil er scheitern darf: Thunderstore kann gerade nicht
+     * ausliefern, ein Mod kann zurueckgezogen sein. Beides steht danach in der
+     * Zeile und in der Karte — die Installation des Servers selbst gilt
+     * trotzdem als abgeschlossen.
+     *
+     * @private
+     */
+    async _holeVorgemerkteMods(serverId) {
+        const Logger = ServiceManager.get('Logger');
+        const dbService = ServiceManager.get('dbService');
+
+        try {
+            const [server] = await dbService.query(
+                `SELECT id, guild_id, rootserver_id, install_path, addon_marketplace_id
+                   FROM gameservers WHERE id = ?`, [serverId]);
+            if (!server) return;
+
+            const { ladePaketFuerAddon } = require('./helpers/StartPayload');
+            const paketZeile = await ladePaketFuerAddon(dbService, server.addon_marketplace_id);
+            const paket = paketZeile
+                ? (typeof paketZeile.paket_json === 'string'
+                    ? JSON.parse(paketZeile.paket_json) : paketZeile.paket_json)
+                : null;
+            const inhalt = paket?.content || null;
+            if (!inhalt?.supported) return;
+
+            const InhalteHolen = require('./helpers/InhalteHolen');
+            const ergebnis = await InhalteHolen.holeGeplante({
+                server, inhalt, guildId: server.guild_id });
+            if (!ergebnis) return;
+
+            Logger.info(`[Gameserver] Server ${serverId}: ${ergebnis.installiert.length} Mod(s) `
+                + `installiert, ${ergebnis.fehlgeschlagen.length} fehlgeschlagen`);
+
+            const sseManager = ServiceManager.get('sseManager');
+            if (sseManager) {
+                sseManager.broadcast(server.guild_id, 'gameserver', {
+                    action:         'inhalte_geholt',
+                    server_id:      serverId,
+                    installiert:    ergebnis.installiert.length,
+                    fehlgeschlagen: ergebnis.fehlgeschlagen.length,
+                    timestamp:      Date.now(),
+                });
+            }
+        } catch (fehler) {
+            // Melden, nicht werfen: Der Server ist installiert, die Mods fehlen.
+            Logger.error(`[Gameserver] Vorgemerkte Mods für Server ${serverId} nicht geholt:`, fehler);
         }
     }
 

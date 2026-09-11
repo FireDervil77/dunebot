@@ -26,6 +26,8 @@ const { requirePermission } = require('../../../../apps/dashboard/middlewares/pe
 const { nimmDatei } = require('../helpers/DateiAnnahme');
 const { ladePaketFuerAddon } = require('../helpers/StartPayload');
 const Inhalte = require('../helpers/Inhalte');
+const InhalteHolen = require('../helpers/InhalteHolen');
+const Thunderstore = require('../helpers/Thunderstore');
 
 /**
  * Server samt Paket laden — und pruefen, dass er zur Guild gehoert.
@@ -48,12 +50,13 @@ async function ladeServerUndPaket(dbService, serverId, guildId) {
     return { server, paket };
 }
 
-/** Der Daemon dieses Servers — ohne ihn geht nichts auf die Maschine. */
-async function daemonVon(dbService, server) {
-    const [zeile] = await dbService.query(
-        'SELECT daemon_id FROM rootserver WHERE id = ?', [server.rootserver_id]);
-    return zeile ? zeile.daemon_id : null;
-}
+/**
+ * Der Daemon dieses Servers — ohne ihn geht nichts auf die Maschine.
+ *
+ * Steht im Helfer, weil der Abruf von Thunderstore ihn ebenso braucht; zwei
+ * Abfragen fuer dieselbe Frage driften auseinander.
+ */
+const { daemonVon } = InhalteHolen;
 
 // ════════════════════════════════════════════════════════════════════════════
 // Lesen
@@ -207,6 +210,238 @@ router.post('/:serverId/inhalte', requirePermission('GAMESERVER.FILES.MANAGE'), 
 });
 
 // ════════════════════════════════════════════════════════════════════════════
+// Thunderstore: suchen, ansehen, installieren, aktualisieren
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Bei welcher Thunderstore-Gemeinschaft dieses Spiel liegt.
+ *
+ * Thunderstore ist nach Spielen getrennt (`valheim`, `lethal-company`). Das
+ * sagt das PAKET (`content.source_ids.thunderstore`) — geraten waere es die
+ * Sorte Annahme, die bei jedem zweiten Spiel danebenliegt.
+ */
+function gemeinschaftAus(inhalt) {
+    return inhalt?.source_ids?.thunderstore || null;
+}
+
+/** Antwort, wenn das Paket Thunderstore gar nicht kennt. */
+function keineQuelle(res, inhalt) {
+    if (!inhalt?.supported) {
+        return res.status(409).json({ success: false,
+            message: 'Dieses Spiel nimmt laut seinem Paket keine Inhalte auf.' });
+    }
+    if (!(inhalt.sources || []).includes('thunderstore')) {
+        return res.status(409).json({ success: false,
+            message: 'Das Paket nennt Thunderstore nicht als Quelle.' });
+    }
+    if (!gemeinschaftAus(inhalt)) {
+        return res.status(409).json({ success: false,
+            message: 'Das Paket sagt nicht, welche Thunderstore-Gemeinschaft zu diesem Spiel '
+                   + 'gehoert (content.source_ids.thunderstore).' });
+    }
+    return null;
+}
+
+/**
+ * Suchen fuer ein Spiel, das noch keinen Server hat — der Schritt „Mods" beim
+ * Anlegen.
+ *
+ * Muss VOR den `/:serverId/...`-Routen stehen: `mods` waere sonst eine
+ * Server-Kennung.
+ */
+router.get('/mods/suche', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+
+    try {
+        const paketZeile = await ladePaketFuerAddon(dbService, parseInt(req.query.addon_id, 10));
+        const paket = paketZeile
+            ? (typeof paketZeile.paket_json === 'string'
+                ? JSON.parse(paketZeile.paket_json) : paketZeile.paket_json)
+            : null;
+        const inhalt = paket?.content || null;
+
+        const absage = keineQuelle(res, inhalt);
+        if (absage) return absage;
+
+        const treffer = await Thunderstore.suche(gemeinschaftAus(inhalt), req.query.q || '');
+        return res.json({ success: true, treffer, lader: inhalt.loader?.packages?.thunderstore || null });
+    } catch (error) {
+        Logger.warn('[Gameserver/Inhalte] Suche fehlgeschlagen:', error);
+        return res.status(502).json({ success: false, message: error.message });
+    }
+});
+
+/** Suchen fuer einen bestehenden Server. */
+router.get('/:serverId/inhalte/suche', requirePermission('GAMESERVER.VIEW'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+
+    try {
+        const geladen = await ladeServerUndPaket(dbService, req.params.serverId, res.locals.guildId);
+        if (!geladen) return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
+
+        const inhalt = geladen.paket?.content || null;
+        const absage = keineQuelle(res, inhalt);
+        if (absage) return absage;
+
+        const treffer = await Thunderstore.suche(gemeinschaftAus(inhalt), req.query.q || '');
+        return res.json({ success: true, treffer, lader: inhalt.loader?.packages?.thunderstore || null });
+    } catch (error) {
+        // 502, nicht 500: Der Fehler liegt beim fremden Dienst, nicht bei uns —
+        // und die Meldung sagt das auch, statt „Serverfehler" zu behaupten.
+        Logger.warn('[Gameserver/Inhalte] Suche fehlgeschlagen:', error);
+        return res.status(502).json({ success: false, message: error.message });
+    }
+});
+
+/**
+ * Was kaeme mit? — die Abhaengigkeiten, bevor jemand klickt.
+ *
+ * Der Lader ist dabei meist eine Abhaengigkeit: Wer Jotunn waehlt, bekommt
+ * BepInEx mit. Das gehoert VOR die Installation, nicht in ein Log danach.
+ */
+router.get('/:serverId/inhalte/vorschau', requirePermission('GAMESERVER.VIEW'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+
+    try {
+        const geladen = await ladeServerUndPaket(dbService, req.params.serverId, res.locals.guildId);
+        if (!geladen) return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
+
+        const inhalt = geladen.paket?.content || null;
+        const absage = keineQuelle(res, inhalt);
+        if (absage) return absage;
+
+        const schau = await InhalteHolen.vorschau({
+            serverId: req.params.serverId, inhalt,
+            kennung: req.query.kennung, fassung: req.query.fassung || null,
+        });
+        return res.json({ success: true, ...schau });
+    } catch (error) {
+        Logger.warn('[Gameserver/Inhalte] Vorschau fehlgeschlagen:', error);
+        return res.status(502).json({ success: false, message: error.message });
+    }
+});
+
+/** Installieren — das Paket samt allem, was es braucht. */
+router.post('/:serverId/inhalte/thunderstore', requirePermission('GAMESERVER.FILES.MANAGE'),
+    async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+
+    try {
+        const { serverId } = req.params;
+        const guildId = res.locals.guildId;
+
+        const geladen = await ladeServerUndPaket(dbService, serverId, guildId);
+        if (!geladen) return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
+
+        const inhalt = geladen.paket?.content || null;
+        const absage = keineQuelle(res, inhalt);
+        if (absage) return absage;
+
+        if (!req.body?.kennung) {
+            return res.status(400).json({ success: false, message: 'kennung fehlt' });
+        }
+
+        const ergebnis = await InhalteHolen.installiere({
+            server: geladen.server, inhalt, guildId,
+            kennung: String(req.body.kennung),
+            fassung: req.body.fassung ? String(req.body.fassung) : null,
+        });
+
+        Logger.info(`[Gameserver/Inhalte] Thunderstore ${req.body.kennung} auf Server ${serverId}: `
+            + `${ergebnis.installiert.length} installiert, ${ergebnis.fehlgeschlagen.length} fehlgeschlagen`);
+
+        // Auch ein Teilerfolg ist ein Erfolg der Anfrage — was misslang, steht
+        // in der Antwort und in den Zeilen, nicht in einem 500er.
+        return res.json({ success: true, ...ergebnis });
+    } catch (error) {
+        Logger.error('[Gameserver/Inhalte] Installation fehlgeschlagen:', error);
+        return res.status(502).json({ success: false, message: error.message });
+    }
+});
+
+/**
+ * Gibt es neuere Fassungen?
+ *
+ * Auf Knopfdruck, nicht beim Laden der Seite: Das ist eine Abfrage je Mod bei
+ * einem fremden Dienst — bei zehn Mods zehn Anfragen, und eine Serverseite, die
+ * darauf wartet, waere langsam ohne Not.
+ */
+router.get('/:serverId/inhalte/aktualisierungen', requirePermission('GAMESERVER.VIEW'),
+    async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+
+    try {
+        const geladen = await ladeServerUndPaket(dbService, req.params.serverId, res.locals.guildId);
+        if (!geladen) return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
+
+        const zeilen = await dbService.query(
+            `SELECT id, kennung, fassung FROM gameserver_content
+              WHERE server_id = ? AND quelle = 'thunderstore' AND status = 'installiert'`,
+            [req.params.serverId]
+        );
+        if (!zeilen.length) return res.json({ success: true, stand: [] });
+
+        return res.json({ success: true, stand: await Thunderstore.aktualisierungen(zeilen) });
+    } catch (error) {
+        Logger.warn('[Gameserver/Inhalte] Aktualisierungen nicht abfragbar:', error);
+        return res.status(502).json({ success: false, message: error.message });
+    }
+});
+
+/**
+ * Einen Eintrag auf die neueste Fassung bringen.
+ *
+ * Je Mod und auf Knopfdruck — nicht automatisch beim Start. Ein Mod-Update ist
+ * die haeufigste Ursache dafuer, dass ein Server nicht mehr startet (B.12);
+ * dass es passiert, weil jemand es ausgeloest hat, ist der halbe Unterschied.
+ */
+router.post('/:serverId/inhalte/:id/aktualisieren', requirePermission('GAMESERVER.FILES.MANAGE'),
+    async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+
+    try {
+        const { serverId, id } = req.params;
+        const guildId = res.locals.guildId;
+
+        const geladen = await ladeServerUndPaket(dbService, serverId, guildId);
+        if (!geladen) return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
+
+        const inhalt = geladen.paket?.content || null;
+        const absage = keineQuelle(res, inhalt);
+        if (absage) return absage;
+
+        const [zeile] = await dbService.query(
+            `SELECT * FROM gameserver_content
+              WHERE id = ? AND server_id = ? AND quelle = 'thunderstore'`,
+            [id, serverId]
+        );
+        if (!zeile) return res.status(404).json({ success: false, message: 'Eintrag nicht gefunden' });
+
+        const ergebnis = await InhalteHolen.aktualisiere({
+            server: geladen.server, inhalt, guildId, zeile,
+        });
+
+        if (!ergebnis.geaendert) {
+            return res.json({ success: true, geaendert: false,
+                message: `${zeile.name || zeile.kennung} ist schon auf ${ergebnis.nachher}.` });
+        }
+
+        Logger.info(`[Gameserver/Inhalte] ${zeile.kennung}: ${ergebnis.vorher} → ${ergebnis.nachher} `
+            + `(Server ${serverId})`);
+        return res.json({ success: true, ...ergebnis });
+    } catch (error) {
+        Logger.error('[Gameserver/Inhalte] Aktualisieren fehlgeschlagen:', error);
+        return res.status(502).json({ success: false, message: error.message });
+    }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
 // An/aus und entfernen
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -256,35 +491,32 @@ router.delete('/:serverId/inhalte/:id', requirePermission('GAMESERVER.FILES.MANA
         const zeile = await Inhalte.entfernen(id, serverId);
         if (!zeile) return res.status(404).json({ success: false, message: 'Eintrag nicht gefunden' });
 
-        let dateiWeg = false;
-        if (zeile.art === Inhalte.ART_MOD && zeile.ablage && !zeile.ablage.endsWith('.')) {
-            const daemonId = await daemonVon(dbService, geladen.server);
-            if (daemonId) {
-                const antwort = await ipmServer.sendCommand(daemonId, 'gameserver.files.delete', {
-                    server_id:     String(serverId),
-                    rootserver_id: String(geladen.server.rootserver_id),
-                    install_path:  geladen.server.install_path,
-                    path:          '/' + zeile.ablage,
-                }, 30000);
-                dateiWeg = Boolean(antwort?.success);
-                if (!dateiWeg) {
-                    // Melden, nicht verschweigen: Die Zeile steht auf entfernt,
-                    // die Datei liegt noch da — beim naechsten Start laedt der
-                    // Mod weiter, und niemand versteht warum.
-                    Logger.warn(`[Gameserver/Inhalte] Datei blieb liegen (${zeile.ablage}): `
-                        + `${antwort?.error || 'keine Antwort'}`);
-                }
-            }
+        // Geloescht wird die aufgehobene LISTE der Dateien, nicht `ablage`:
+        // Bei einem Mod aus mehreren Dateien steht dort der ZIELORDNER
+        // (`BepInEx/plugins`) — und den zu loeschen naehme jeden anderen Mod
+        // mit. Bis zum 2026-09-11 tat diese Route genau das.
+        let weg = { weg: 0, blieb: [], ohneListe: false };
+        if (zeile.art === Inhalte.ART_MOD) {
+            weg = await InhalteHolen.entferneDateien({
+                server: geladen.server, zeile, inhalt: geladen.paket?.content || null,
+            });
         }
 
-        return res.json({
-            success: true,
-            dateiWeg,
-            hinweis: zeile.art === Inhalte.ART_LADER
-                ? 'Der Lader ist abgeschaltet. Seine Dateien bleiben liegen — ohne den '
-                  + 'Schalter laedt er nicht.'
-                : (dateiWeg ? null : 'Die Zeile ist entfernt, die Datei liegt noch auf dem Server.'),
-        });
+        // Melden, nicht verschweigen: Eine Zeile auf „entfernt", deren Datei
+        // noch liegt, laedt beim naechsten Start weiter — und niemand versteht
+        // warum.
+        const hinweis = zeile.art === Inhalte.ART_LADER
+            ? 'Der Lader ist abgeschaltet. Seine Dateien bleiben liegen — ohne den '
+              + 'Schalter laedt er nicht.'
+            : weg.ohneListe
+                ? 'Die Zeile ist entfernt. Welche Dateien zu diesem Eintrag gehoeren, wurde '
+                  + 'bei seiner Installation nicht festgehalten — sie liegen noch auf dem Server.'
+                : weg.blieb.length
+                    ? `Die Zeile ist entfernt, ${weg.blieb.length} Datei(en) blieben liegen: `
+                      + weg.blieb.join(', ')
+                    : null;
+
+        return res.json({ success: true, dateiWeg: weg.weg > 0, dateien: weg.weg, hinweis });
     } catch (error) {
         Logger.error('[Gameserver/Inhalte] Entfernen fehlgeschlagen:', error);
         return res.status(500).json({ success: false, message: 'Serverfehler' });

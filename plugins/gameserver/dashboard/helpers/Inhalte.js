@@ -36,7 +36,7 @@ async function fuerServer(serverId) {
 
     const zeilen = await dbService.query(
         `SELECT id, art, quelle, kennung, name, fassung, aktiv, reihenfolge,
-                ablage, client_side, status, fehler, installiert_am, created_at
+                ablage, dateien, client_side, status, fehler, installiert_am, created_at
            FROM gameserver_content
           WHERE server_id = ?
           ORDER BY art = 'loader' DESC, reihenfolge ASC, id ASC`,
@@ -92,13 +92,14 @@ async function eintragen(daten) {
     const ergebnis = await dbService.query(
         `INSERT INTO gameserver_content
              (server_id, guild_id, art, quelle, kennung, name, fassung,
-              aktiv, reihenfolge, ablage, client_side, status, fehler, installiert_am)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)
+              aktiv, reihenfolge, ablage, dateien, client_side, status, fehler, installiert_am)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
              name           = VALUES(name),
              fassung        = VALUES(fassung),
              aktiv          = 1,
              ablage         = VALUES(ablage),
+             dateien        = VALUES(dateien),
              client_side    = VALUES(client_side),
              status         = VALUES(status),
              fehler         = VALUES(fehler),
@@ -108,6 +109,10 @@ async function eintragen(daten) {
             daten.kennung, daten.name || null, daten.fassung || null,
             Number(daten.reihenfolge) || 0,
             daten.ablage || null,
+            // Die genaue Liste — ohne sie muss das Entfernen raten, und bei
+            // einem Mod aus mehreren Dateien heisst Raten „der ganze Ordner".
+            Array.isArray(daten.dateien) && daten.dateien.length
+                ? JSON.stringify(daten.dateien) : null,
             daten.clientSide ? 1 : 0,
             daten.status || 'geplant',
             daten.fehler || null,
@@ -163,4 +168,26 @@ async function schalten(id, serverId, aktiv) {
     return ergebnis.affectedRows > 0;
 }
 
-module.exports = { fuerServer, laderAktiv, eintragen, entfernen, schalten, ART_LADER, ART_MOD };
+/**
+ * Die geschriebenen Dateien einer Zeile.
+ *
+ * Alte Zeilen (vor dem 2026-09-11) haben keine Liste — dann ist sie leer, und
+ * der Aufrufer muss selbst entscheiden, ob er mit `ablage` allein etwas
+ * anfangen kann. Eine erfundene Liste waere schlimmer als keine.
+ *
+ * @returns {string[]}
+ */
+function dateienAus(zeile) {
+    if (!zeile || !zeile.dateien) return [];
+    try {
+        const liste = typeof zeile.dateien === 'string' ? JSON.parse(zeile.dateien) : zeile.dateien;
+        return Array.isArray(liste) ? liste.filter(d => typeof d === 'string' && d) : [];
+    } catch {
+        return [];
+    }
+}
+
+module.exports = {
+    fuerServer, laderAktiv, eintragen, entfernen, schalten, dateienAus,
+    ART_LADER, ART_MOD,
+};
