@@ -135,7 +135,8 @@
                 "default": true
               },
               "branch": {
-                "type": "string"
+                "type": "string",
+                "description": "Fest (\"public-test\") oder aus einer Einstellung (\"{{setting:beta_branch}}\"). Ohne Wert heisst: kein -beta. Andere Platzhalter — auch die aus Eggs ({{SRCDS_BETAID}}) — weist der Daemon ab."
               },
               "platform": {
                 "enum": [
@@ -329,6 +330,16 @@
               "description": {},
               "script": {
                 "type": "string"
+              },
+              "env": {
+                "type": "object",
+                "description": "Was das Skript in seiner Umgebung sieht, und woher: Name → Wert, fest oder {{setting:<schlüssel>}}. Ein Skript bekommt NUR diese Variablen (und den Verzeichnisvertrag) — bis zum 2026-09-10 bekam es jede Variable des Servers unter ihrem Egg-Namen. Fehlt einer genannten Einstellung der Wert, läuft das Skript nicht.",
+                "propertyNames": {
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
               },
               "image": {
                 "type": "string",

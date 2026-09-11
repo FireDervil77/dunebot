@@ -7,7 +7,7 @@
       "de": "Baue Kolonien im All, automatisiere die Produktion mit Förderbändern und versorge deine Astronauten. Für 1–10 Spieler.",
       "en": "Explore an endless universe and build the most efficient constellation of colonies. Automate production with conveyor systems and take care of your astronauts. For 1-10 players."
     },
-    "version": "1.0.12",
+    "version": "1.0.13",
     "author": "firenetworks",
     "category": "sandbox",
     "origin": {
@@ -65,8 +65,21 @@
       {
         "type": "script",
         "script": "#!/bin/bash\nset -e\n\n# Astro Colony liest seine Einstellungen aus einer INI-Datei, nicht aus\n# Startparametern. Diese Datei legt sie an — EINMAL, bei der Installation.\n#\n# ── Der Ort: LinuxServer/, und das ist GEMESSEN (2026-08-30) ────────────────\n# Die Engine sagt es im Log selbst, mehrfach:\n#\n#   LogConfig: Applying CVar settings from … File\n#              [../../../AstroColony/Saved/Config/LinuxServer/Engine.ini]\n#   LogInit:   Active device profile: LinuxServer\n#\n# Eine frueherer Fassung dieses Pakets schrieb zusaetzlich nach\n# `WindowsServer/`, weil dort eine Datei lag. Das war ein Fehlschluss: Dass\n# eine Datei irgendwo liegt, sagt nichts darueber, woher gelesen wird.\n#\n# ── Der Abschnittsname, an dem alles haengt ────────────────────────────────\n# Das Spiel benutzt\n#\n#     [/Script/ACFeature.EHServerSubsystem]\n#\n# Beide Pelican-Eggs (Stand 2024) nennen den Abschnitt `AstroColony.…` — das\n# Modul wurde seither umbenannt. Eine INI mit dem alten Kopf wird KOMMENTARLOS\n# ignoriert: Der Server laeuft, meldet aber ueberall seine Vorgaben. Wer ein\n# Kennwort gesetzt hat, betreibt dann einen OFFENEN Server, ohne es zu merken.\n# Genau das war an Server 168 der Fall, belegt ueber die Serverabfrage.\n#\n# Beide Koepfe zu schreiben kostet nichts und traegt auch dann noch, wenn ein\n# Update zurueckbenennt oder ein aelterer Build laeuft.\n\nZIEL=\"AstroColony/Saved/Config/LinuxServer\"\nDATEI=\"$ZIEL/ServerSettings.ini\"\n\nif [ -f \"$DATEI\" ]; then\n  echo \"ServerSettings.ini ist schon da — sie bleibt unberuehrt.\"\n  exit 0\nfi\n\nmkdir -p \"$ZIEL\"\n{\n  for kopf in ACFeature AstroColony; do\n    echo \"[/Script/${kopf}.EHServerSubsystem]\"\n    echo \"ServerPassword=${SERVER_PASSWORD:-}\"\n    echo \"Seed=${SERVER_MAPSEED:-7300}\"\n    echo \"MapName=${SERVER_MAPNAME:-Kolonie}\"\n    echo \"MaxPlayers=${SERVER_MAXPLAYERS:-5}\"\n    echo \"ShouldLoadLatestSavegame=${SERVER_LOADLATESTSAVEGAME:-1}\"\n    echo \"AdminList=${SERVER_ADMINS:-}\"\n    echo \"SharedTechnologies=${SERVER_SHAREDTECHNOLOGIES:-1}\"\n    echo \"OxygenConsumption=${SERVER_OXYGENCONSUMPTION:-1}\"\n    echo \"FreeConstruction=${SERVER_FREECONSTRUCTION:-0}\"\n    echo \"AutosaveInterval=${SERVER_AUTOSAVEINTERVAL:-5.0}\"\n    echo \"AutosavesCount=${SERVER_AUTOSAVESCOUNT:-10}\"\n    echo\n  done\n} > \"$DATEI\"\n\necho \"geschrieben: $DATEI\"\n",
+        "env": {
+          "SERVER_PASSWORD": "{{setting:password}}",
+          "SERVER_MAPSEED": "{{setting:map_seed}}",
+          "SERVER_MAPNAME": "{{setting:map_name}}",
+          "SERVER_MAXPLAYERS": "{{setting:max_players}}",
+          "SERVER_LOADLATESTSAVEGAME": "{{setting:load_latest_savegame}}",
+          "SERVER_ADMINS": "{{setting:admins}}",
+          "SERVER_SHAREDTECHNOLOGIES": "{{setting:shared_technologies}}",
+          "SERVER_OXYGENCONSUMPTION": "{{setting:oxygen_consumption}}",
+          "SERVER_FREECONSTRUCTION": "{{setting:free_construction}}",
+          "SERVER_AUTOSAVEINTERVAL": "{{setting:autosave_interval}}",
+          "SERVER_AUTOSAVESCOUNT": "{{setting:autosaves_count}}"
+        },
         "reason": {
-          "de": "Astro Colony nimmt Kennwort, Spielerzahl, Seed und Kartennamen ausschliesslich ueber ServerSettings.ini entgegen. Geschrieben wird nach LinuxServer/ — die Engine nennt dieses Verzeichnis im Log selbst ('Active device profile: LinuxServer', 'Applying CVar settings from …/LinuxServer/Engine.ini'). Mit BEIDEN Abschnittskoepfen, weil das Modul von AstroColony nach ACFeature umbenannt wurde und die Eggs den alten Namen tragen.",
+          "de": "Astro Colony nimmt Kennwort, Spielerzahl, Seed und Kartennamen ausschliesslich ueber ServerSettings.ini entgegen. Geschrieben wird nach LinuxServer/ — die Engine nennt dieses Verzeichnis im Log selbst ('Active device profile: LinuxServer', 'Applying CVar settings from …/LinuxServer/Engine.ini'). Mit BEIDEN Abschnittskoepfen, weil das Modul von AstroColony nach ACFeature umbenannt wurde und die Eggs den alten Namen tragen. Die Werte kommen über `env` aus den Einstellungen des Servers (seit dem 2026-09-10) — vorher über Egg-Namen, die nur das Dashboard kannte.",
           "en": "Written to LinuxServer/ — the engine names that directory in its own log. Both section headers, because the module was renamed from AstroColony to ACFeature."
         }
       }

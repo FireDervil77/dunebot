@@ -3,7 +3,7 @@
   "identity": {
     "slug": "valheim",
     "name": "Valheim",
-    "version": "1.0.9",
+    "version": "1.0.10",
     "author": "firenetworks",
     "category": "survival",
     "description": {
@@ -56,7 +56,7 @@
         "app": 896660,
         "login": false,
         "validate": true,
-        "branch": "{{SRCDS_BETAID}}",
+        "branch": "{{setting:beta_branch}}",
         "description": {
           "de": "Serverdateien über SteamCMD laden (anonym)."
         }
