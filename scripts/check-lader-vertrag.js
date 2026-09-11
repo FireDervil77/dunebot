@@ -9,9 +9,9 @@
  * Schalter reist deshalb als **Feldname in einer JSON-Nutzlast** ueber die
  * WebSocket-Leitung:
  *
- *   Dashboard  StartPayload.js      payload.lader_aktiv = true|false
- *   Daemon     websocket/client.go  payload["lader_aktiv"].(bool)
- *   Daemon     auftrag_ablage.go    auftrag.Eingaben{ LaderAktiv: ... }
+ *   Dashboard  StartPayload.js         payload.lader_aktiv = true|false
+ *   Daemon     gameserver/nutzlast.go  payload["lader_aktiv"].(bool)
+ *   Daemon     auftrag_ablage.go       auftrag.Eingaben{ LaderAktiv: ... }
  *
  * **Ein Tippfehler auf einer Seite faellt nirgends auf.** Der Server startet,
  * nur ohne seinen Lader — und die Mods fehlen still. Genau die Sorte Fehler,
@@ -89,17 +89,29 @@ for (const rel of aufrufer) {
 }
 
 // ── Daemon: liest das Feld und reicht es weiter ─────────────────────────────
-const client = lies(path.join(DAEMON, 'internal/websocket/client.go'));
+//
+// Gelesen wird seit dem 2026-09-10 in `gameserver/nutzlast.go`
+// (NutzlastAnwenden) — EINE Deutung der Nutzlast für Start, Neustart,
+// Wiederanhängen und Absturzerholung. Vorher stand es in `websocket/client.go`.
+// Der Waechter ist mitgewandert und prueft zusaetzlich, dass beide Einstiege
+// wirklich dort vorbeikommen.
+const nutzlast = lies(path.join(DAEMON, 'internal/gameserver/nutzlast.go'));
 const ablage = lies(path.join(DAEMON, 'internal/gameserver/auftrag_ablage.go'));
 
-if (client === null || ablage === null) {
-    console.log(`  · Daemon-Quelltext nicht gefunden (${DAEMON}) — die zwei Pruefungen`);
+if (nutzlast === null || ablage === null) {
+    console.log(`  · Daemon-Quelltext nicht gefunden (${DAEMON}) — die Pruefungen`);
     console.log('    dazu entfallen. Das ist kein gruenes Ergebnis, sondern eine Luecke.');
     fehler++;
 } else {
-    pruefe(new RegExp(`payload\\["${FELD}"\\]`).test(client),
+    pruefe(new RegExp(`payload\\["${FELD}"\\]`).test(nutzlast),
         'Der Daemon liest genau dieses Feld',
-        'internal/websocket/client.go');
+        'internal/gameserver/nutzlast.go');
+    for (const rel of ['internal/websocket/client.go', 'cmd/daemon/main.go']) {
+        const quelle = lies(path.join(DAEMON, rel)) || '';
+        pruefe(/NutzlastAnwenden\s*\(/.test(quelle),
+            `${path.basename(rel)} deutet die Nutzlast ueber NutzlastAnwenden`,
+            'Eine zweite Deutung daneben vergisst den Schalter');
+    }
     pruefe(/LaderAktiv:\s*laderAktiv/.test(ablage),
         'Und reicht es an den Auftragsbau weiter',
         'internal/gameserver/auftrag_ablage.go');

@@ -359,7 +359,12 @@ function baueEinstellungen(server, paket, hoehe) {
             // Der Egg-Name ist das, was gespeichert wird. Ohne ihn lässt sich
             // die Einstellung ANZEIGEN, aber nicht ändern — und ein Feld, das
             // sich bedienen lässt und nichts bewirkt, ist schlimmer als keines.
-            variable:    direkt ? e.key : eggName,
+            // Mit `paket_werte` ist es IMMER der Paketschlüssel — auch für
+            // eine Einstellung, die erst eine neuere Paketfassung mitbrachte
+            // und deshalb noch keinen gespeicherten Wert hat. Bis zum
+            // 2026-09-10 stand hier `direkt ? …`: Solche Felder hatten keinen
+            // Namen und liessen sich nicht speichern.
+            variable:    paketWerte ? e.key : eggName,
             aenderbar:   Boolean(paketWerte) || Boolean(eggName),
             gruppe:      e.group || 'sonstiges',
             gruppeName:  GRUPPE[e.group] || null,
@@ -989,16 +994,13 @@ function baueWerteSchritt(paket, maschine, imageLiegtDa) {
     const alle = Array.isArray(paket?.settings) ? paket.settings : [];
     const gefragt = alle.filter(e => (e.role || 'expert') === 'player');
 
-    // Gespeichert wird unter dem EGG-Namen, nicht unter dem Paketschlüssel: Die
-    // Anlegeroute schreibt `variable_<ENV>` nach `env_variables`, und von dort
-    // liest der Startweg. Dieselbe Brücke wie überall — ohne sie landete der
-    // Servername unter „name" statt unter „SERVER_NAME" und käme nie an.
-    const uebergang = ladeUebergang(paket?.identity?.slug || '');
+    // Gespeichert wird unter dem Schlüssel des PAKETS (`setting_<schlüssel>`).
+    // Bis zum 2026-09-10 hießen die Felder nach dem Egg (`variable_SERVER_NAME`),
+    // und die Anlegeroute übersetzte über die Übergangsdatei zurück.
 
     return {
         felder: gefragt.map(e => ({
             schluessel: e.key,
-            variable: uebergang?.zuordnung?.[e.key] || null,
             // Der Servername ist zugleich der Name des Servers in der Datenbank.
             // Die Anlegeroute verlangt ihn als `server_name`; ihn zweimal
             // abzufragen wäre die Sorte Formular, die niemand ausfüllen will.

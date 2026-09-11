@@ -44,13 +44,13 @@
                 </div>
                 <div>
                   <% if (f.auswahl) { %>
-                    <select class="fb-feld" style="width:100%" name="<%= f.istServerName ? 'server_name' : (f.variable ? 'variable_' + f.variable : 'variable_' + f.schluessel) %>">
+                    <select class="fb-feld" style="width:100%" name="<%= f.istServerName ? 'server_name' : 'setting_' + f.schluessel %>">
                       <% f.auswahl.forEach(function (c) { %>
                         <option value="<%= c.wert %>" <%= String(f.vorgabe) === c.wert ? 'selected' : '' %>><%= c.name %></option>
                       <% }); %>
                     </select>
                   <% } else if (f.typ === 'boolean') { %>
-                    <select class="fb-feld" style="width:100%" name="<%= f.istServerName ? 'server_name' : (f.variable ? 'variable_' + f.variable : 'variable_' + f.schluessel) %>">
+                    <select class="fb-feld" style="width:100%" name="<%= f.istServerName ? 'server_name' : 'setting_' + f.schluessel %>">
                       <option value="1" <%= String(f.vorgabe) === '1' || f.vorgabe === true ? 'selected' : '' %>>An</option>
                       <option value="0" <%= String(f.vorgabe) === '1' || f.vorgabe === true ? '' : 'selected' %>>Aus</option>
                     </select>
@@ -67,7 +67,7 @@
                            autocomplete="<%= f.geheim ? 'new-password' : 'off' %>"
                            data-1p-ignore data-lpignore="true" data-bwignore
                            type="<%= f.geheim ? 'password' : (f.typ === 'number' ? 'number' : 'text') %>"
-                           name="<%= f.istServerName ? 'server_name' : (f.variable ? 'variable_' + f.variable : 'variable_' + f.schluessel) %>"
+                           name="<%= f.istServerName ? 'server_name' : 'setting_' + f.schluessel %>"
                            <% if (f.min !== null) { %>min="<%= f.min %>"<% } %>
                            <% if (f.max !== null) { %>max="<%= f.max %>"<% } %>
                            <%= f.pflicht ? 'required' : '' %>

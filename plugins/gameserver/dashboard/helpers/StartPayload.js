@@ -1,12 +1,26 @@
 /**
- * StartPayload – baut das IPM-Payload für Start und Neustart eines Gameservers
+ * StartPayload – die Aufträge des Dashboards an den Daemon: Start, Neustart,
+ * Installation, und die Werte eines neuen Servers.
  *
- * Image, Startup-Command, Ports und Config leben nur im Speicher des Daemons und
- * kommen ausschließlich aus diesem Payload. Der Neustart-Befehl schickte bisher
- * nur server_id und guild_id – nach einem Daemon-Neustart fehlte dem Server
- * damit alles, der Restart stoppte ihn und scheiterte beim Start mit
- * "docker image not set". Deshalb bauen Start, Neustart und Cronjob ihr Payload
- * hier an einer gemeinsamen Stelle.
+ * ── Eine Quelle: das Paket (Vertrag V2, entschieden 2026-08-15) ─────────────
+ *
+ * Das Dashboard schickt Paket, Werte und Zuteilung; der Daemon setzt selbst
+ * zusammen. Bis zum 2026-09-10 baute diese Datei die Nutzlast aus
+ * `frozen_game_data`, `launch_params` und `env_variables` — dem Egg — und legte
+ * das Paket obendrauf. Ohne Egg-Image brach der Start ab, obwohl das Paket eines
+ * hatte; fehlte ein Wert, hieß es „der alte Weg bleibt", den es im Daemon seit
+ * Stufe 4.2 gar nicht mehr gab. Und `install_image` kam aus den Egg-Skripten
+ * (UpdateOptions.js): Jedes Auto-Update lief so in
+ * `ghcr.io/parkervcp/installers:debian`.
+ *
+ * Betreiber am 2026-09-10: „wir brauchen keine rückfall lösung auf ein fremdes
+ * system." Fehlt das Paket oder ein Wert, der eine Welt kostet, gibt es keinen
+ * Auftrag, sondern einen Fehler, der sagt, was fehlt.
+ *
+ * Start und Neustart (Knopf, Discord, Cronjob) und alle Installationswege
+ * (Anlegen, Discord, Erneut versuchen, Neuinstallieren, Wiederanstoß) bauen
+ * hier — sonst driften sie auseinander, wie es beim Neustart schon zweimal
+ * passiert ist.
  *
  * @module helpers/StartPayload
  * @author FireBot Team
@@ -17,9 +31,6 @@
 const fs   = require('fs');
 const path = require('path');
 
-const { ServiceManager } = require('dunebot-core');
-const { resolveUpdateOptions } = require('./UpdateOptions');
-
 /** Wo die Übergangs-Zuordnungen liegen (packages/fbpkg/uebergang/<slug>.json). */
 const UEBERGANG_ORDNER = path.join(__dirname, '../../../../packages/fbpkg/uebergang');
 
@@ -29,19 +40,13 @@ const uebergangCache = new Map();
 /**
  * Lädt die Übergangs-Zuordnung „Paketschlüssel → Egg-Variablenname".
  *
- * WARUM ES SIE GIBT: Ein Paket nennt seine Einstellungen bei den eigenen
- * Schlüsseln (`world_name`), ein Bestandsserver hat den Wert unter dem
- * Egg-Namen gespeichert (`WORLD`). Zwischen beiden gibt es keine Brücke —
- * `start.args` verweist auf `setting:world_name`, aber nirgends steht, dass
- * dieser Wert einmal aus `WORLD` kam. Der Übersetzer hat die Herkunft nicht
- * mitgeschrieben.
- *
- * Diese Zuordnung stirbt mit 5a, sobald `gameservers` die Werte unter den
- * Paketschlüsseln speichert.
+ * ⚠ Der Startweg und die Installation lesen sie seit dem 2026-09-10 NICHT
+ * mehr. Übrig ist ein Leser: die Serverseite, die für Zeilen ohne
+ * `paket_werte` noch auf die Egg-Namen zurückgreift. Beide heutigen Server
+ * haben `paket_werte`; die Zuordnung fällt mit Stufe 3.
  *
  * @param {string} slug
  * @returns {object|null} Zuordnung oder null, wenn es keine gibt
- * @private
  */
 function ladeUebergang(slug) {
     if (uebergangCache.has(slug)) return uebergangCache.get(slug);
@@ -66,63 +71,13 @@ function ladeUebergang(slug) {
 }
 
 /**
- * Benennt die Portschlüssel des Servers auf die Zwecke des Pakets um.
- *
- * Das Paket nennt nur ZWECKE (Invariante I2) — `game`, `query`. Ein
- * Bestandsserver trägt die Schlüssel aus dem Egg-Import, bei Valheim
- * `game_plus_1`. Der Daemon löst den Zweck aus `payload.ports` auf und wies den
- * Auftrag am 2026-08-18 zu Recht ab: *„ready.query: Protokoll valheim genannt,
- * aber kein Port."* Er rät nicht.
- *
- * **Umbenennen, nicht ergänzen.** Stünden beide Schlüssel mit derselben Nummer
- * in der Liste, würde Docker denselben Host-Port zweimal binden.
- *
- * Schlüssel, die kein Paketzweck beansprucht, bleiben unverändert stehen — sie
- * gehören zur Portabbildung des Containers und gehen hier niemandem verloren.
- *
- * @returns {{ports: object, fehlend: Array<{purpose: string, alias: string}>}}
- * @private
- */
-function benennePortzwecke(paket, ports, portzwecke) {
-    const neu      = {};
-    const benutzt  = new Set();
-    const fehlend  = [];
-
-    for (const eintrag of paket.ports || []) {
-        const zweck = eintrag.purpose;
-        const alias = portzwecke[zweck];
-        if (ports[zweck] !== undefined) {
-            neu[zweck] = ports[zweck];
-            benutzt.add(zweck);
-        } else if (alias && ports[alias] !== undefined) {
-            neu[zweck] = ports[alias];
-            benutzt.add(alias);
-        } else if (eintrag.required) {
-            fehlend.push({ purpose: zweck, alias: alias || '(nicht zugeordnet)' });
-        }
-    }
-    for (const [k, v] of Object.entries(ports)) {
-        if (!benutzt.has(k) && neu[k] === undefined) neu[k] = v;
-    }
-    return { ports: neu, fehlend };
-}
-
-/**
  * Die Image-Adresse aus dem Paket — gepinnt, wenn möglich.
  *
- * Der Daemon nimmt sein Container-Image AUSSCHLIESSLICH aus
- * `game_data.docker_image` (`websocket/client.go:1411` → `srv.SetImage`). Das
- * Paket trägt seine Adresse in `image`, und beides auseinanderlaufen zu lassen
- * ist genau die Falle, in die der erste Startversuch am 2026-08-18 gelaufen ist:
- * Das Paket zeigte auf `fb/steamcmd`, gestartet wurde `ghcr.io/parkervcp` — ein
- * Image ohne `fb-init`, also ohne alles.
- *
- * Deshalb gewinnt bei angehängtem Paket das Paket. Bevorzugt wird der **Digest**
- * (`ref@sha256:…`): Ein Tag kann wandern, ein Digest nicht.
+ * Dieselbe Regel wie im Daemon (rezept.ImageAus): Bevorzugt wird der **Digest**
+ * (`ref@sha256:…`). Ein Tag kann wandern, ein Digest nicht.
  *
  * @param {object} paket
  * @returns {string|null}
- * @private
  */
 function imageAusPaket(paket) {
     const img = paket?.image;
@@ -132,349 +87,165 @@ function imageAusPaket(paket) {
     return img.ref;
 }
 
-/**
- * Baut `package` und `settings` für die Start-Payload — oder verweigert.
- *
- * ── Die Sperre, und warum sie existiert ─────────────────────────────────────
- *
- * Ohne Werte benutzt der Daemon die VORGABEN des Pakets. Bei Valheim steht dort
- * `world_name: "Dedicated"`, während der laufende Server `BoomTown` spielt —
- * und Valheim erzeugt bei einem unbekannten Weltnamen eine NEUE, LEERE Welt.
- * Ein stiller Rückfall auf Vorgaben kostet also einen Weltstand.
- *
- * Deshalb: Fehlt einer Einstellung mit `risk: progress` oder `world_reset` der
- * Wert, wird das Paket NICHT angehängt. Der Server geht dann den alten Weg
- * (`startup_command` liegt weiterhin bei) und die Meldung sagt, welcher
- * Schlüssel fehlte. Melden statt ausweichen.
- *
- * @param {object} server        - Zeile aus gameservers samt Paket-JOIN
- * @param {object} envVariables  - die gespeicherten Werte (Egg-Namen)
- * @param {function} melde       - Logger-Ausgabe
- * @returns {{paket: object, settings: object}|null}
- * @private
- */
-function baueSpielpaket(server, envVariables, melde) {
-    if (!server.paket_json) return null;
-
-    let paket;
-    try {
-        paket = typeof server.paket_json === 'string'
-              ? JSON.parse(server.paket_json) : server.paket_json;
-    } catch (err) {
-        melde(`[StartPayload] Paket ${server.paket_slug} nicht lesbar: ${err.message} — `
-            + 'der alte Weg bleibt.');
-        return null;
-    }
-
-    // ── Stufe 5a: Werte unter Paketschlüsseln, falls vorhanden ──────────────
-    //
-    // Seit dem 2026-08-23 speichert ein Server seine Werte direkt unter den
-    // Schlüsseln des Pakets (`gameservers.paket_werte`). Dann braucht es keine
-    // Übersetzung mehr — und damit auch keine Übergangsdatei.
-    //
-    // Die Brücke bleibt als RÜCKFALL für Zeilen, die noch nichts davon haben.
-    // Sie ersatzlos zu streichen hiesse, einen Bestandsserver beim nächsten
-    // Start mit den Paketvorgaben zu füttern — und die Vorgabe für `world_name`
-    // ist „Dedicated", während der laufende Server „BoomTown" spielt. Valheim
-    // erzeugt bei unbekanntem Weltnamen eine neue, LEERE Welt.
-    let paketWerte = null;
-    try {
-        paketWerte = typeof server.paket_werte === 'string'
-            ? JSON.parse(server.paket_werte) : (server.paket_werte || null);
-    } catch { paketWerte = null; }
-    const direkt = paketWerte && Object.keys(paketWerte).length > 0;
-
-    // Die Brücke wird WEITERHIN geladen — sie trägt mehr als die Werte:
-    // `arbeitsverzeichnis` (wo ein Bestandsserver seine Dateien wirklich hat)
-    // und `portzwecke`. Nur die WERTQUELLE wechselt.
-    const uebergang = ladeUebergang(server.paket_slug);
-    if (!direkt && !uebergang) {
-        melde(`[StartPayload] Für "${server.paket_slug}" gibt es weder gespeicherte `
-            + 'Paketwerte noch eine Übergangs-Zuordnung '
-            + `(packages/fbpkg/uebergang/${server.paket_slug}.json). Ohne beides liessen sich `
-            + 'die Werte nicht zuordnen — der alte Weg bleibt.');
-        return null;
-    }
-
-    const settings = {};
-    const fehlend  = [];
-    for (const eintrag of paket.settings || []) {
-        let quelle, wert;
-        if (direkt) {
-            quelle = 'paket_werte';
-            wert   = paketWerte[eintrag.key];
-        } else {
-            quelle = uebergang.zuordnung[eintrag.key];   // nur im Rückfall erreichbar
-            wert   = quelle ? envVariables[quelle] : undefined;
-        }
-        // Ein leerer String ist ein WERT (SRCDS_BETAID="" heisst "kein Beta-Zweig").
-        // Nur `undefined` heisst "nicht vorhanden".
-        if (wert === undefined) {
-            fehlend.push({ key: eintrag.key, quelle: quelle || '(nicht zugeordnet)',
-                           risk: eintrag.risk });
-            continue;
-        }
-        settings[eintrag.key] = String(wert);
-    }
-
-    const gefaehrlich = fehlend.filter(f => f.risk === 'progress' || f.risk === 'world_reset');
-    if (gefaehrlich.length) {
-        melde(`[StartPayload] Paket ${server.paket_slug} NICHT angehängt: `
-            + gefaehrlich.map(f => `"${f.key}" (aus ${f.quelle}, Risiko ${f.risk})`).join(', ')
-            + ' hat keinen Wert. Der Daemon würde die Paketvorgabe nehmen, und die kostet '
-            + 'hier einen Weltstand. Der alte Weg bleibt.');
-        return null;
-    }
-    if (fehlend.length) {
-        melde(`[StartPayload] Paket ${server.paket_slug}: ${fehlend.length} Einstellung(en) ohne `
-            + `Wert (${fehlend.map(f => f.key).join(', ')}) — der Daemon nimmt dort die Vorgabe. `
-            + 'Kein Risiko hinterlegt, deshalb kein Abbruch.');
-    }
-
-    // ── Arbeitsverzeichnis: Abweichung vom Verzeichnisvertrag ────────────────
-    //
-    // Der Vertrag (E-19) legt die Spieldateien nach `game/`. Ein Bestandsserver
-    // hat sie in der Volume-Wurzel, weil der alte Installer dorthin schreibt.
-    // Am 2026-08-19 gemessen: `fb-init` wechselte korrekt nach `game/`, fand
-    // nichts und beendete sich mit 126 — im Daemon-Log sah das aus wie ein
-    // Absturz des Spiels.
-    //
-    // Gesetzt wird es auf der KOPIE, die mitgeschickt wird — das gespeicherte
-    // Paket bleibt unberührt. Es beschreibt das Spiel, nicht die Geschichte
-    // eines einzelnen Volumes.
-    if (uebergang && uebergang.arbeitsverzeichnis) {
-        paket.start = paket.start || {};
-        if (paket.start.workdir !== uebergang.arbeitsverzeichnis) {
-            melde(`[StartPayload] Paket ${server.paket_slug}: Arbeitsverzeichnis auf `
-                + `${uebergang.arbeitsverzeichnis} gesetzt — dieser Bestandsserver hat seine `
-                + 'Spieldateien in der Volume-Wurzel, nicht in game/. Übergangsweise, '
-                + 'fällt mit dem Schritt-Ausführer weg.');
-        }
-        paket.start.workdir = uebergang.arbeitsverzeichnis;
-    }
-
-    return { paket, settings, portzwecke: uebergang ? uebergang.portzwecke : null };
-}
-
-
 /** @private */
-function parseJson(value, fallback, onError) {
+function parseJson(value, fallback) {
     if (value == null) return fallback;
     if (typeof value !== 'string') return value;
     try {
         return JSON.parse(value);
-    } catch (err) {
-        onError?.(err);
+    } catch {
         return fallback;
     }
 }
 
 /**
- * Sieht der Text nach einer Docker-Image-Adresse aus?
- * @private
+ * Ja/Nein, wie Formulare und Pakete es schreiben: `1`, `true`, `on`, `yes`.
+ *
+ * @param {*} wert
+ * @returns {boolean}
  */
-function siehtNachImageAus(text) {
-    const s = String(text || '').trim();
-    if (!s || /\s/.test(s)) return false;      // "Wine Latest" ist ein Etikett
-    return s.includes('/') || s.includes(':'); // ghcr.io/…  bzw.  image:tag
+function istWahr(wert) {
+    if (wert === true) return true;
+    if (wert === false || wert === null || wert === undefined) return false;
+    const v = String(wert).trim().toLowerCase();
+    return v === '1' || v === 'true' || v === 'on' || v === 'yes';
 }
 
 /**
- * Wählt aus `docker_images` die tatsächliche Image-Adresse.
+ * Wird vor dem Start aktualisiert? Die Paketeinstellung `auto_update`
+ * entscheidet.
  *
- * Pterodactyl-Eggs sind sich über die Richtung nicht einig, und beide Varianten
- * liegen in unserem Bestand nebeneinander:
+ * ── Zwei Schalter, eine Wahrheit ────────────────────────────────────────────
  *
- *   factorio-arm64    { "Box64": "ghcr.io/parkervcp/yolks:box64" }   Etikett → Image
- *   windrose          { "ghcr.io/parkervcp/steamcmd:proton": "Proton" }  Image → Etikett
+ * Bis zum 2026-09-10 gab es zwei: die Spalte `gameservers.auto_update` (die
+ * alte Bearbeitungsseite) und die Paketeinstellung „Automatisch aktualisieren"
+ * auf der Einstellungskarte. Wirksam war nur die Spalte — bei Server 186 stand
+ * die Karte auf „an", die Spalte auf 0, und es wurde nie aktualisiert. Jetzt
+ * gilt die Einstellung, die man sieht. Kennt ein Paket sie nicht, gibt es kein
+ * Auto-Update.
  *
- * Wer stur den Schlüssel nimmt, startet Factorio mit dem Image „Box64"; wer stur
- * den Wert nimmt, startet Windrose mit „Proton". Deshalb wird die Seite genommen,
- * die nach einer Image-Adresse aussieht, und der Schlüssel entscheidet nur, wenn
- * beide passen (der Normalfall: Schlüssel und Wert sind identisch).
+ * @param {object} paket
+ * @param {object} werte  paket_werte des Servers
+ * @returns {boolean}
+ */
+function autoUpdateAus(paket, werte) {
+    const eintrag = (paket?.settings || []).find(e => e.key === 'auto_update');
+    if (!eintrag) return false;
+    const wert = werte && Object.prototype.hasOwnProperty.call(werte, 'auto_update')
+        ? werte.auto_update : eintrag.default;
+    return istWahr(wert);
+}
+
+/**
+ * Die Werte für den Daemon: je Einstellung des Pakets der gespeicherte Wert,
+ * als Text. Fehlt einer, geht er nicht mit — der Daemon nimmt die Vorgabe des
+ * Pakets und meldet die Lücke.
  *
- * @param {object} dockerImages
- * @returns {string|null}
+ * Außer bei Einstellungen, deren Vorgabe einen Weltstand kostet (`risk:
+ * progress` oder `world_reset`): Valheim erzeugt bei unbekanntem Weltnamen eine
+ * neue, LEERE Welt. Die werden als `gefaehrlich` gemeldet, und der Aufrufer
+ * verweigert den Auftrag.
+ *
+ * @returns {{settings: object, gefaehrlich: string[]}}
  * @private
  */
-function waehleDockerImage(dockerImages) {
-    const eintraege = Object.entries(dockerImages || {});
-    if (!eintraege.length) return null;
-
-    for (const [schluessel, wert] of eintraege) {
-        if (siehtNachImageAus(schluessel)) return schluessel;
-        if (siehtNachImageAus(wert)) return String(wert);
+function werteFuerDaemon(paket, werte) {
+    const settings = {};
+    const gefaehrlich = [];
+    for (const eintrag of paket.settings || []) {
+        const wert = werte ? werte[eintrag.key] : undefined;
+        // Ein leerer Text ist ein WERT (beta_branch "" heisst „kein Beta-Zweig").
+        if (wert === undefined || wert === null) {
+            if (eintrag.risk === 'progress' || eintrag.risk === 'world_reset') {
+                gefaehrlich.push(eintrag.key);
+            }
+            continue;
+        }
+        settings[eintrag.key] = String(wert);
     }
-
-    // Nichts sieht nach einem Image aus – dann der Schlüssel, wie bisher.
-    return eintraege[0][0];
+    return { settings, gefaehrlich };
 }
 
 /**
- * Baut das vollständige Start-Payload für den Daemon.
+ * Welche Pflicht-Portzwecke des Pakets hat der Server nicht belegt?
  *
- * @param {object} server   - Zeile aus gameservers (inkl. frozen_game_data, ports,
- *                            env_variables, launch_params, install_path, bind_ip,
- *                            auto_update) plus daemon_id/system_user aus den JOINs
+ * Der Daemon löst Zwecke aus `ports` auf und weist einen Auftrag ohne sie ab
+ * (am 2026-08-18: „ready.query: Protokoll valheim genannt, aber kein Port").
+ * Hier ist der Ort, an dem es sich erklären lässt.
+ *
+ * @private
+ */
+function fehlendePorts(paket, ports) {
+    return (paket.ports || [])
+        .filter(p => p.required && ports[p.purpose] === undefined)
+        .map(p => p.purpose);
+}
+
+/** @private */
+function grenzenAus(server) {
+    // Gebuchte Ressourcen bei JEDEM Auftrag: Sie leben im Daemon nur im
+    // Speicher. NULL heisst "kein Limit".
+    return {
+        ram_mb:      server.allocated_ram_mb      ?? null,
+        cpu_percent: server.allocated_cpu_percent ?? null,
+        disk_gb:     server.allocated_disk_gb     ?? null,
+    };
+}
+
+/**
+ * Baut den Start- oder Neustartauftrag.
+ *
+ * @param {object} server   - Zeile aus loadServerForStart (gs.* samt Paket-JOIN)
  * @param {string} guildId
  * @param {object} [Logger]
- * @returns {{payload: object|null, error: string|null, dockerImage: string|null,
- *            startupCommand: string, ports: object, envVariables: object}}
+ * @returns {Promise<{payload: object|null, error: string|null, dockerImage: string|null}>}
  */
 async function buildStartPayload(server, guildId, Logger = null) {
-    const warn  = (msg) => Logger?.warn?.(msg);
-    const debug = (msg) => Logger?.debug?.(msg);
-    // Absichtlich info und nicht debug: Diese eine Zeile ist der Beleg dafür,
-    // dass der neue Weg wirklich greift. Wer beim ersten Ausrollen zusehen will,
-    // soll dafür nicht erst die Protokollstufe hochdrehen müssen.
-    const melde = (msg) => (Logger?.info ? Logger.info(msg) : Logger?.debug?.(msg));
-
     const serverId = server.id;
-    const ports        = parseJson(server.ports, {}, e => warn(`[StartPayload] ports: ${e.message}`)) || {};
-    const envVariables = parseJson(server.env_variables, {}, e => warn(`[StartPayload] env_variables: ${e.message}`)) || {};
-    const frozenData   = parseJson(server.frozen_game_data, null, e => warn(`[StartPayload] frozen_game_data: ${e.message}`));
 
-    // Template-Overrides VOR der Substitution einmergen
-    if (server.template_name && Array.isArray(frozenData?.templates)) {
-        const tpl = frozenData.templates.find(t => t.name === server.template_name);
-        if (tpl?.variables) {
-            Object.assign(envVariables, tpl.variables);
-            debug(`[StartPayload] Template "${server.template_name}" Variablen-Overrides angewendet`);
-        }
-    }
-
-    // ════════════════════════════════════════════════════════════════════════
-    // Portvariablen aus der Allocation speisen — VOR jeder Substitution.
-    //
-    // Ein Port hat einen Zweck (`game`, `query`, `rcon`), und die Nummer kommt
-    // aus dem Pool. Eine Variable wie `RCON_PORT` ist nur die Art, wie das
-    // Spiel davon erfaehrt — sie darf die belegte Nummer nicht bestimmen.
-    //
-    // Genau das geschah aber: `{{RCON_PORT}}` ist beides, ein Variablenname und
-    // das Muster `{{<KEY>_PORT}}` fuer den belegten Port `rcon`. Die
-    // Variablenschleife lief zuerst, also gewann der Wert aus den
-    // Umgebungsvariablen — eine containerinterne Zahl, die Docker nie
-    // veroeffentlicht. Der Dienst lauschte dort, erreichbar war er nirgends.
-    //
-    // Jetzt gewinnt der belegte Port, und zwar in beiden Richtungen: im
-    // Startbefehl UND in der Umgebung, die der Container bekommt. Sonst stuende
-    // im Befehl die eine und in der Umgebung die andere Zahl.
-    // ════════════════════════════════════════════════════════════════════════
-    for (const [zweck, portData] of Object.entries(ports)) {
-        const belegt = typeof portData === 'object'
-            ? (portData.internal ?? portData.external)
-            : portData;
-        if (belegt === undefined || belegt === null) continue;
-
-        const variablenName = `${zweck.toUpperCase()}_PORT`;
-        if (Object.prototype.hasOwnProperty.call(envVariables, variablenName)
-            && String(envVariables[variablenName]) !== String(belegt)) {
-            debug(`[StartPayload] ${variablenName}: ${envVariables[variablenName]} → ${belegt} (aus der Allocation)`);
-        }
-        if (Object.prototype.hasOwnProperty.call(envVariables, variablenName)) {
-            envVariables[variablenName] = String(belegt);
-        }
-    }
-
-    // Variablen-Substitution: {{WORLD}} → "BoomTown" usw.
-    let startupCommand = server.launch_params || '';
-    if (Array.isArray(frozenData?.variables)) {
-        for (const varDef of frozenData.variables) {
-            const envKey = varDef.env_variable;
-            if (!envKey) continue;
-            const value = envVariables[envKey] ?? envVariables[varDef.name] ?? varDef.default_value ?? '';
-            startupCommand = startupCommand.replace(new RegExp(`{{${envKey}}}`, 'g'), String(value));
-        }
-    } else {
-        // Altdaten ohne frozen_game_data: direkt mit den gespeicherten Keys ersetzen
-        for (const [key, value] of Object.entries(envVariables)) {
-            startupCommand = startupCommand.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
-        }
-    }
-
-    // Port-Platzhalter ersetzen
-    for (const [key, portData] of Object.entries(ports)) {
-        const portValue = typeof portData === 'object' ? (portData.internal || portData.external) : portData;
-        if (portValue === undefined) continue;
-        startupCommand = startupCommand.replace(new RegExp(`{{${key.toUpperCase()}_PORT}}`, 'g'), String(portValue));
-        if (key === 'game' || key === 'main') {
-            startupCommand = startupCommand.replace(/\{\{SERVER_PORT\}\}/g, String(portValue));
-        }
-    }
-
-    // Docker-Image + Runtime-Infos aus frozen_game_data
-    let dockerImage = null;
-    const runtime = { stop_mode: 'sigterm', stop_command: '', stop_timeout_sec: 30, done_string: '' };
-    let config = null;
-    let fileDenylist = [];
-    let platform = null;
-
-    if (frozenData) {
-        dockerImage = waehleDockerImage(frozenData.docker_images);
-
-        const stopSignal = frozenData.startup?.stop || '';
-        if (stopSignal === '^C') {
-            runtime.stop_mode = 'sigint';
-        } else if (stopSignal) {
-            runtime.stop_mode = 'console_command';
-            runtime.stop_command = stopSignal;
-        }
-        if (frozenData.startup?.done) {
-            runtime.done_string = frozenData.startup.done;
-        }
-
-        if (frozenData.config?.files && Object.keys(frozenData.config.files).length > 0) {
-            config = frozenData.config;
-        }
-        if (Array.isArray(frozenData.file_denylist)) {
-            fileDenylist = frozenData.file_denylist;
-        }
-        if (frozenData.platform) {
-            platform = frozenData.platform;
-        }
-
-        // Template-Config-Overrides mergen
-        if (server.template_name && Array.isArray(frozenData.templates)) {
-            const tpl = frozenData.templates.find(t => t.name === server.template_name);
-            if (tpl?.config_overrides) {
-                if (!config) config = { files: {} };
-                if (!config.files) config.files = {};
-                for (const [fname, overrides] of Object.entries(tpl.config_overrides)) {
-                    if (!config.files[fname]) config.files[fname] = { parser: 'file', find: {} };
-                    Object.assign(config.files[fname].find, overrides);
-                }
-                debug(`[StartPayload] Template "${server.template_name}" Config-Overrides angewendet`);
-            }
-        }
-    }
-
-    if (!dockerImage) {
+    const paket = parseJson(server.paket_json, null);
+    if (!paket) {
         return {
-            payload: null,
-            error: 'Kein Docker-Image konfiguriert. Server muss neu installiert werden.',
-            dockerImage: null, startupCommand, ports, envVariables,
+            payload: null, dockerImage: null,
+            error: `Server ${serverId} hat kein Spielpaket — ohne Paket gibt es keinen Start.`,
+        };
+    }
+    const image = imageAusPaket(paket);
+    if (!image) {
+        return {
+            payload: null, dockerImage: null,
+            error: `Das Paket ${server.paket_slug || paket.identity?.slug} nennt kein Image.`,
         };
     }
 
-    const updateOptions = resolveUpdateOptions(server);
+    const werte = parseJson(server.paket_werte, {}) || {};
+    const { settings, gefaehrlich } = werteFuerDaemon(paket, werte);
+    if (gefaehrlich.length) {
+        return {
+            payload: null, dockerImage: image,
+            error: `Kein Start: ${gefaehrlich.map(k => `„${k}"`).join(', ')} hat keinen gespeicherten `
+                 + 'Wert. Der Daemon nähme die Vorgabe des Pakets, und die kostet hier einen Weltstand.',
+        };
+    }
+
+    const ports = parseJson(server.ports, {}) || {};
+    const ohnePort = fehlendePorts(paket, ports);
+    if (ohnePort.length) {
+        return {
+            payload: null, dockerImage: image,
+            error: `Kein Start: Für ${ohnePort.map(z => `Zweck „${z}"`).join(', ')} ist kein Port belegt. `
+                 + `Vorhanden: ${Object.keys(ports).join(', ') || '(keine)'}.`,
+        };
+    }
 
     // ── Ist der Mod-Lader dieses Servers scharf? (E6/B.12) ───────────────────
     //
-    // Der Daemon weiss das nicht von sich aus und soll es auch nicht wissen
-    // (I4: er misst und meldet, er verwaltet nicht). Die Liste der Inhalte
-    // liegt in `gameserver_content`; von hier geht der Schalter mit dem
-    // Startbefehl, und der Daemon setzt daraufhin `content.loader.adds` in den
-    // Auftrag ein — Umgebung und Argumente, mit denen BepInEx scharf wird.
-    //
-    // **Ein Fehlschlag hier startet den Server trotzdem, aber laut.** Ein
-    // Server, der wegen eines Datenbankschluckaufs gar nicht mehr hochkommt,
-    // waere schlimmer; ein Server, der still ohne seine Mods startet, ist die
-    // Sorte Fehler, die man erst beim Spielen merkt. Deshalb `error` und ein
-    // Satz, der die Folge nennt.
+    // Die Liste der Inhalte liegt in `gameserver_content`; von hier geht der
+    // Schalter mit dem Auftrag. **Ein Fehlschlag hier startet den Server
+    // trotzdem, aber laut** — ein Server, der wegen eines
+    // Datenbankschluckaufs gar nicht hochkommt, wäre schlimmer.
     let laderAktiv = false;
     try {
-        // Dieselbe Abfrage wie in der Inhalte-Seite — die drei Bedingungen
-        // stehen an EINER Stelle, sonst driften sie auseinander.
         laderAktiv = await require('./Inhalte').laderAktiv(serverId);
     } catch (fehler) {
         Logger?.error?.('[StartPayload] Inhalte nicht lesbar — der Server startet OHNE '
@@ -482,109 +253,108 @@ async function buildStartPayload(server, guildId, Logger = null) {
     }
 
     const payload = {
-        lader_aktiv: laderAktiv,
         server_id:       String(serverId),
         daemon_id:       server.daemon_id,
         rootserver_id:   server.rootserver_id,
-        system_user:     server.system_user || 'gameserver',
-        install_path:    server.install_path || `${serverId}-${server.addon_slug || ''}`,
-        startup_command: startupCommand,
-        ports,
-        env_variables:   envVariables,
         guild_id:        String(guildId),
+        system_user:     server.system_user || 'gameserver',
+        install_path:    server.install_path || `${serverId}-${server.addon_slug || paket.identity?.slug || ''}`,
         bind_ip:         server.bind_ip || null,
-        file_denylist:   fileDenylist,
-        ...updateOptions,
-        platform:        platform || 'linux',
-        // Gebuchte Ressourcen bei JEDEM Start mitgeben, nicht nur bei der
-        // Installation: Image, Ports und Limits leben im Daemon nur im Speicher.
-        // Nach einem Daemon-Neustart wüsste er die Grenzen sonst nicht mehr und
-        // startete den Container wieder unbegrenzt. NULL heisst "kein Limit" —
-        // Bestandsserver ohne gepflegte Werte laufen also weiter wie bisher.
-        resource_limits: {
-            ram_mb:      server.allocated_ram_mb      ?? null,
-            cpu_percent: server.allocated_cpu_percent ?? null,
-            disk_gb:     server.allocated_disk_gb     ?? null,
-        },
-        game_data: {
-            docker_image: dockerImage,
-            runtime,
-            ...(config   ? { config }   : {}),
-            ...(platform ? { platform } : {}),
-        },
+        ports,
+        package:         paket,
+        settings,
+        lader_aktiv:     laderAktiv,
+        auto_update:     autoUpdateAus(paket, werte),
+        resource_limits: grenzenAus(server),
     };
 
-    // ── Der neue Weg: das Spielpaket mitschicken ────────────────────────────
-    //
-    // Liegt eines bei, baut der Daemon daraus einen Auftrag und startet über
-    // fb-init statt über die Startzeile. `startup_command` bleibt trotzdem in
-    // der Payload: Die INSTALLATION liest es weiterhin (install.go), und ein
-    // Feld zu früh zu entfernen bräche die Neuanlage jedes Servers.
-    //
-    // Fehlt das Paket oder verweigert die Sperre, bleibt es beim alten Weg —
-    // gemeldet, nicht verschwiegen.
-    const spielpaket = baueSpielpaket(server, envVariables, warn);
+    // Absichtlich info und nicht debug: Diese Zeile ist der Beleg, womit ein
+    // Server gestartet wurde.
+    const melde = (msg) => (Logger?.info ? Logger.info(msg) : Logger?.debug?.(msg));
+    melde(`[StartPayload] Server ${serverId}: Paket ${server.paket_slug || paket.identity?.slug} `
+        + `${server.paket_version || paket.identity?.version} (${server.paket_channel || '?'}) — `
+        + `${Object.keys(settings).length} von ${(paket.settings || []).length} Werten, `
+        + `Auto-Update ${payload.auto_update ? 'an' : 'aus'}.`);
 
-    // ── Portzwecke, bevor irgendetwas angehängt wird ────────────────────────
-    //
-    // Das Paket nennt nur Zwecke (I2), der Bestandsserver trägt die Schlüssel
-    // aus dem Egg-Import. Fehlt ein PFLICHT-Zweck, wird das Paket gar nicht
-    // erst angehängt: Der Daemon lehnt den Auftrag sonst ohnehin ab — am
-    // 2026-08-18 mit „ready.query: Protokoll valheim genannt, aber kein Port."
-    // Diese Meldung dort zu erzeugen ist eine Umleitung; hier ist der Ort, wo
-    // sie erklärbar ist.
-    const zwecke = spielpaket
-        ? benennePortzwecke(spielpaket.paket, ports, spielpaket.portzwecke)
-        : null;
+    return { payload, error: null, dockerImage: image };
+}
 
-    if (spielpaket && zwecke.fehlend.length) {
-        warn(`[StartPayload] Server ${serverId}: Paket ${server.paket_slug} NICHT angehängt — `
-           + 'für '
-           + zwecke.fehlend.map(f => `Zweck "${f.purpose}" (Alias ${f.alias})`).join(', ')
-           + ` ist kein Port belegt. Vorhanden sind: ${Object.keys(ports).join(', ') || '(keine)'}. `
-           + 'Der alte Weg bleibt.');
-    } else if (spielpaket) {
-        payload.package  = spielpaket.paket;
-        payload.settings = spielpaket.settings;
+/**
+ * Baut den Installationsauftrag — für Anlegen, Discord, Erneut versuchen,
+ * Neuinstallieren und den Wiederanstoß beim Reconnect.
+ *
+ * Bis zum 2026-09-10 schickte jede dieser Stellen ihre eigene Nutzlast aus
+ * dem Egg (`game_data`, `startup_command`, `env_variables`), zwei davon ganz
+ * ohne Paket. Jetzt kommt alles aus der Zeile des Servers, wie beim Start.
+ *
+ * @param {object} server   - Zeile aus loadServerForStart
+ * @param {string} guildId
+ * @param {{runInstall?: boolean, startAfter?: boolean, reinstall?: boolean}} [optionen]
+ * @returns {{payload: object|null, error: string|null}}
+ */
+function baueInstallNutzlast(server, guildId, optionen = {}) {
+    if (!server) return { payload: null, error: 'Server nicht gefunden.' };
 
-        // Umbenannt, nicht ergänzt: Zwei Schlüssel mit derselben Nummer liessen
-        // Docker denselben Host-Port zweimal binden.
-        const umbenannt = Object.entries(zwecke.ports)
-            .filter(([zweck]) => ports[zweck] === undefined)
-            .map(([zweck]) => zweck);
-        if (umbenannt.length) {
-            melde(`[StartPayload] Server ${serverId}: Portzwecke auf das Paket gehoben — `
-                + umbenannt.map(z => `${spielpaket.portzwecke[z]} → ${z}`).join(', '));
-        }
-        payload.ports = zwecke.ports;
-
-        // Das Image kommt jetzt aus dem Paket, nicht aus frozen_game_data.
-        // Ohne diese Zeile startet der Daemon das ALTE Image und findet darin
-        // kein fb-init — der Startversuch vom 2026-08-18 ist genau daran
-        // gescheitert. Das Feld selbst verschwindet mit frozen_game_data (5a);
-        // bis dahin wird es aus dem Paket gefüllt statt daneben gepflegt.
-        const paketImage = imageAusPaket(spielpaket.paket);
-        if (paketImage) {
-            if (paketImage !== dockerImage) {
-                melde(`[StartPayload] Server ${serverId}: Image kommt aus dem Paket — `
-                    + `${paketImage} (statt ${dockerImage})`);
-            }
-            payload.game_data.docker_image = paketImage;
-            dockerImage = paketImage;
-        } else {
-            warn(`[StartPayload] Server ${serverId}: Paket ${server.paket_slug} nennt kein `
-               + `image.ref — es bleibt bei ${dockerImage}. Enthält das Image kein fb-init, `
-               + 'startet der Server nicht.');
-        }
-
-        melde(`[StartPayload] Server ${serverId}: Paket ${server.paket_slug} `
-            + `${server.paket_version} (${server.paket_channel}) angehängt — `
-            + `${Object.keys(spielpaket.settings).length} von `
-            + `${(spielpaket.paket.settings || []).length} Werten zugeordnet. `
-            + `Der Server startet über fb-init.`);
+    const paket = parseJson(server.paket_json, null);
+    if (!paket) {
+        return {
+            payload: null,
+            error: `Für Server ${server.id} gibt es kein Spielpaket — ohne Paket gibt es keine Installation.`,
+        };
     }
+    const werte = parseJson(server.paket_werte, {}) || {};
+    const { settings } = werteFuerDaemon(paket, werte);
 
-    return { payload, error: null, dockerImage, startupCommand, ports, envVariables };
+    return {
+        error: null,
+        payload: {
+            server_id:       String(server.id),
+            rootserver_id:   String(server.rootserver_id),
+            daemon_id:       server.daemon_id,
+            guild_id:        String(guildId || server.guild_id),
+            addon_slug:      server.addon_slug || server.paket_slug || paket.identity?.slug,
+            install_path:    server.install_path,
+            ports:           parseJson(server.ports, {}) || {},
+            package:         paket,
+            // Aus ihnen löst das Rezept {{setting:…}} auf — den Zweig bei
+            // Valheim, die INI bei Astro Colony.
+            settings,
+            run_install:     optionen.runInstall !== false,
+            start_after:     optionen.startAfter === true,
+            reinstall:       optionen.reinstall === true,
+            resource_limits: grenzenAus(server),
+        },
+    };
+}
+
+/**
+ * Die Werte eines NEUEN Servers, nach den Schlüsseln des Pakets.
+ *
+ * Jede Einstellung bekommt einen Wert: die Eingabe, sonst die Vorgabe des
+ * Pakets. Danach muss kein Start raten, und die Einstellungskarte zeigt, was
+ * wirklich gilt. Der Servername ist zugleich die Einstellung `name` — ihn
+ * zweimal abzufragen wäre die Sorte Formular, die niemand ausfüllen will.
+ *
+ * Bis zum 2026-09-10 kamen die Eingaben unter den EGG-Namen
+ * (`variable_SERVER_NAME`) und wurden über die Übergangsdatei zurückübersetzt.
+ *
+ * @param {object} paket
+ * @param {object} eingaben   Schlüssel des Pakets → eingegebener Wert
+ * @param {string|null} serverName
+ * @returns {object}
+ */
+function paketWerteAnlegen(paket, eingaben = {}, serverName = null) {
+    const werte = {};
+    for (const eintrag of paket?.settings || []) {
+        let wert = eingaben[eintrag.key];
+        if (eintrag.key === 'name' && serverName) wert = serverName;
+        if (wert === undefined || wert === null) wert = eintrag.default;
+        if (wert === undefined || wert === null) continue;
+        // Ja/Nein immer als 1/0, wie die Werte-Karte es schickt. Aus dem
+        // Discord-Modal kommt Freitext („true", „on").
+        werte[eintrag.key] = eintrag.type === 'boolean' ? (istWahr(wert) ? '1' : '0') : String(wert);
+    }
+    return werte;
 }
 
 /**
@@ -604,16 +374,14 @@ async function loadServerForStart(dbService, serverId, guildId = null) {
     }
     // Das Spielpaket kommt über `packages.id = gs.addon_marketplace_id` — die
     // Einlieferung übernimmt die Kennung des Vorgängers ausdrücklich dafür
-    // (siehe scripts/liefere-pakete.js). Ab 5a trägt `gameservers` stattdessen
-    // `package_slug` und `channel`; bis dahin ist die Kennung die Brücke.
+    // (siehe scripts/liefere-pakete.js). Ab dem Tabellenschnitt (E-1) trägt
+    // `gameservers` stattdessen `package_slug` und `channel`.
     //
-    // Welche Fassung: `stable` schlägt `test`, danach die neueste. Solange
-    // `gameservers.channel` nicht existiert, ist das die ehrlichste Regel —
-    // sie bevorzugt das Freigegebene und nimmt sonst, was da ist.
+    // Welche Fassung: `stable` schlägt `test`, danach die neueste.
     const [row] = await dbService.query(`
         SELECT gs.*,
                r.daemon_id, r.id AS rootserver_id, r.system_user,
-               am.slug AS addon_slug, am.steam_app_id, am.steam_server_app_id,
+               am.slug AS addon_slug,
                pk.slug AS paket_slug,
                pv.fbpkg AS paket_json, pv.version AS paket_version,
                pv.channel AS paket_channel, pv.checksum AS paket_checksum
@@ -638,16 +406,14 @@ async function loadServerForStart(dbService, serverId, guildId = null) {
  * loadServerForStart() geht über `gs.addon_marketplace_id`; beim Anlegen gibt es
  * noch keinen Server, also über die Addon-Kennung direkt. Die Auswahlregel ist
  * bewusst dieselbe (`stable` vor allem, danach das Neueste): Ein Server soll mit
- * derselben Fassung installiert werden, mit der er später startet — sonst passt
- * die Bibliothek nicht zur Datei.
+ * derselben Fassung installiert werden, mit der er später startet.
  *
- * Kein Paket zu finden ist KEIN Fehler: Dann installiert der Daemon über den
- * alten Weg weiter. Genau daran hängt die stufenweise Umstellung.
+ * Kein Paket heisst: kein Server. Der Aufrufer weist ab — bis zum 2026-09-10
+ * installierte der Daemon dann über den Egg-Weg weiter.
  *
  * @param {object} dbService
- * @param {number} addonId  addon_marketplace.id (= packages.id, die Einlieferung
- *                          übernimmt die Kennung ausdrücklich dafür)
- * @returns {Promise<object|null>} { slug, version, channel, checksum, fbpkg }
+ * @param {number} addonId  addon_marketplace.id (= packages.id)
+ * @returns {Promise<object|null>} { paket_slug, paket_version, paket_channel, paket_checksum, paket_json }
  */
 async function ladePaketFuerAddon(dbService, addonId) {
     if (!addonId) return null;
@@ -668,38 +434,7 @@ async function ladePaketFuerAddon(dbService, addonId) {
     return row;
 }
 
-/**
- * Das Paket als fertiges Objekt für die Install-Nutzlast — oder null.
- *
- * Drei Stellen schicken `gameserver.install`: Anlegen, Erneut versuchen und
- * Neuinstallieren. Alle drei brauchen dieselbe Entscheidung, und sie an drei
- * Stellen auszuschreiben hiesse, dass zwei davon beim nächsten Umbau
- * zurückbleiben — genau das Muster, das im Bestand mehrfach zu finden war.
- *
- * Ein unlesbares Paket wird GEMELDET und dann übergangen: Der alte Weg steht
- * noch, und ein Server, der wegen der neuen Mechanik nicht entsteht, wäre die
- * schlechtere Wahl. Sobald der alte Weg weg ist (Stufe 4.2), muss das hier zum
- * Abbruch werden.
- *
- * @param {object} dbService
- * @param {number} addonId  gameservers.addon_marketplace_id bzw. addon_marketplace.id
- * @param {object} logger
- * @param {string} wofuer   Für die Protokollzeile: welcher Weg fragt
- * @returns {Promise<object|null>}
- */
-async function paketFuerInstall(dbService, addonId, logger, wofuer = 'Installation') {
-    try {
-        const p = await ladePaketFuerAddon(dbService, addonId);
-        if (!p) return null;
-        const paket = typeof p.paket_json === 'string' ? JSON.parse(p.paket_json) : p.paket_json;
-        logger?.info?.(`[Gameserver] ${wofuer} läuft über das Paket ${p.paket_slug} ${p.paket_version} (${p.paket_channel})`);
-        return paket;
-    } catch (err) {
-        logger?.error?.(`[Gameserver] Paket für Addon ${addonId} nicht lesbar — ${wofuer} läuft über den alten Weg`, err);
-        return null;
-    }
-}
-
-module.exports = { buildStartPayload, loadServerForStart, waehleDockerImage,
-                   baueSpielpaket, ladeUebergang, benennePortzwecke, imageAusPaket,
-                   ladePaketFuerAddon, paketFuerInstall };
+module.exports = {
+    buildStartPayload, baueInstallNutzlast, paketWerteAnlegen, autoUpdateAus, istWahr,
+    loadServerForStart, ladePaketFuerAddon, imageAusPaket, ladeUebergang,
+};

@@ -1500,19 +1500,8 @@ class IPMServer {
 
             // Gameserver mit Status 'installing' für diesen RootServer (via daemon_id)
             const pendingServers = await this.dbService.query(
-                `SELECT 
-                    gs.id as server_id,
-                    gs.rootserver_id,
-                    gs.addon_marketplace_id,
-                    gs.name,
-                    gs.ports,
-                    gs.env_variables,
-                    gs.launch_params as startup_command,
-                    gs.frozen_game_data,
-                    am.slug as addon_slug,
-                    am.name as addon_name
+                `SELECT gs.id AS server_id, gs.name, gs.guild_id
                  FROM gameservers gs
-                 LEFT JOIN addon_marketplace am ON gs.addon_marketplace_id = am.id
                  LEFT JOIN rootserver r ON gs.rootserver_id = r.id
                  WHERE r.daemon_id = ?
                  AND gs.status = 'installing'`,
@@ -1526,67 +1515,32 @@ class IPMServer {
 
             this.Logger.success(`[IPMServer] ${pendingServers.length} hängende Installation(en) gefunden, sende erneut...`);
 
-            // Jede Installation erneut senden
+            // ── Derselbe Auftrag wie beim Anlegen ───────────────────────────────
+            //
+            // Bis zum 2026-09-10 baute diese Stelle ihren Auftrag aus
+            // frozen_game_data, launch_params und env_variables — OHNE Paket.
+            // Beim Reconnect eines Daemons lief jede hängende Installation damit
+            // still in ein Egg-Skript im Fremd-Image, ohne dass jemand geklickt
+            // hatte.
+            const { loadServerForStart, baueInstallNutzlast } =
+                require('../../../plugins/gameserver/dashboard/helpers/StartPayload');
+
             for (const server of pendingServers) {
                 try {
-                    // frozen_game_data parsen
-                    let gameData = {};
-                    try {
-                        gameData = typeof server.frozen_game_data === 'string'
-                            ? JSON.parse(server.frozen_game_data)
-                            : (server.frozen_game_data || {});
-                    } catch (e) {
-                        this.Logger.warn(`[IPMServer] frozen_game_data parse error für Server ${server.server_id}:`, e);
-                        this.Logger.warn(`[IPMServer] frozen_game_data raw:`, server.frozen_game_data);
-                    }
-
-                    // Validierung: frozen_game_data muss existieren
-                    if (!gameData || Object.keys(gameData).length === 0) {
-                        this.Logger.error(`[IPMServer] Server ${server.server_id} hat keine frozen_game_data - überspringe Re-trigger`);
-                        
+                    const zeile = await loadServerForStart(this.dbService, server.server_id);
+                    const { payload: nutzlast, error: auftragsFehler } = baueInstallNutzlast(zeile, server.guild_id);
+                    if (auftragsFehler) {
+                        this.Logger.error(`[IPMServer] Server ${server.server_id} nicht erneut installierbar: ${auftragsFehler}`);
                         await this.dbService.query(
                             'UPDATE gameservers SET status = ?, error_message = ? WHERE id = ?',
-                            ['error', 'Keine frozen_game_data vorhanden - Installation kann nicht fortgesetzt werden', server.server_id]
+                            ['error', auftragsFehler, server.server_id]
                         );
                         continue;
                     }
 
-                    // Ports parsen
-                    let ports = {};
-                    try {
-                        ports = typeof server.ports === 'string'
-                            ? JSON.parse(server.ports)
-                            : server.ports;
-                    } catch (e) {
-                        this.Logger.warn(`[IPMServer] ports parse error für Server ${server.server_id}`);
-                    }
-
-                    // ENV Variables parsen
-                    let envVariables = {};
-                    try {
-                        envVariables = typeof server.env_variables === 'string'
-                            ? JSON.parse(server.env_variables)
-                            : server.env_variables;
-                    } catch (e) {
-                        this.Logger.warn(`[IPMServer] env_variables parse error für Server ${server.server_id}`);
-                    }
-
                     // Install-Command mit 60s Timeout senden
                     this.Logger.info(`[IPMServer] Re-trigger Installation: ${server.name} (ID: ${server.server_id})`);
-
-                    const response = await this.sendCommand(daemonId, 'gameserver.install', {
-                        server_id: server.server_id,
-                        rootserver_id: server.rootserver_id,
-                        addon_slug: server.addon_slug,
-                        addon_name: server.addon_name,
-                        template_name: null,
-                        steam_app_id: gameData.install?.steamcmd?.app_id,
-                        startup_command: server.startup_command,
-                        ports,
-                        env_variables: envVariables,
-                        game_data: gameData,
-                        platform: gameData.platform || 'linux'
-                    }, 60000);
+                    const response = await this.sendCommand(daemonId, 'gameserver.install', nutzlast, 60000);
 
                     if (response.success) {
                         this.Logger.success(`[IPMServer] Installation erneut gestartet: ${server.name}`);

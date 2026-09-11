@@ -557,6 +557,13 @@ class IPCServer {
 
                 // ── Gameserver erstellen ────────────────────────────────────────────────
                 case 'SERVER_CREATE': {
+                    // Nur aus einem Spielpaket, wie die Anlegeroute im Dashboard.
+                    //
+                    // Bis zum 2026-09-10 war das hier ein eigener Weg aus dem Egg:
+                    // Installationsskript, Startzeile, Egg-Ports, Egg-Variablen —
+                    // und KEIN Paket in der Nutzlast. Der Daemon installierte also
+                    // im Fremd-Image, und die Paketsperre der Anlegeseite galt hier
+                    // nicht.
                     const { addon_slug, server_name, owner_user_id } = payload;
                     if (!guildId || !addon_slug || !rootserverId || !server_name)
                         return message.reply({ success: false, error: 'guild_id, addon_slug, rootserver_id und server_name erforderlich' });
@@ -570,194 +577,79 @@ class IPCServer {
                     if (!rootserver.daemon_id) return message.reply({ success: false, error: 'RootServer hat keinen Daemon' });
 
                     const [addon] = await dbService.query(
-                        `SELECT id, name, slug, version, game_data, steam_app_id, steam_server_app_id
+                        `SELECT id, name, slug, version
                          FROM addon_marketplace WHERE slug = ? AND status = 'approved' LIMIT 1`,
                         [addon_slug]
                     );
-                    if (!addon) return message.reply({ success: false, error: `Addon \`${addon_slug}\` nicht gefunden` });
+                    if (!addon) return message.reply({ success: false, error: `Spiel \`${addon_slug}\` nicht gefunden` });
 
-                    // game_data parsen + normalisieren (identisch zum Dashboard-POST)
-                    let gameData = typeof addon.game_data === 'string' ? JSON.parse(addon.game_data) : (addon.game_data || {});
+                    const { ladePaketFuerAddon, paketWerteAnlegen, autoUpdateAus,
+                            loadServerForStart, baueInstallNutzlast } =
+                        require('../../../plugins/gameserver/dashboard/helpers/StartPayload');
+                    const { vergibPortsAusPaket } =
+                        require('../../../plugins/gameserver/dashboard/helpers/Portvergabe');
 
-                    // 1. docker_image aus docker_images (erster Wert)
-                    if (!gameData.docker_image && gameData.docker_images) {
-                        gameData.docker_image = Object.values(gameData.docker_images)[0] || '';
-                    }
-                    // 2. Pterodactyl-Format: scripts.installation → installation
-                    if (!gameData.installation && gameData.scripts?.installation) {
-                        const si = gameData.scripts.installation;
-                        gameData.installation = {
-                            docker_image:   si.container || '',
-                            script_content: (si.script || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n'),
-                        };
-                    }
-                    // 2b. FireBot-Native-Format: installation.script → script_content
-                    // (Valheim, eigene Addons nutzen 'script' statt 'script_content')
-                    if (gameData.installation?.script && !gameData.installation?.script_content) {
-                        gameData.installation = {
-                            ...gameData.installation,
-                            script_content: gameData.installation.script.replace(/\r\n/g, '\n').replace(/\r/g, '\n'),
-                        };
-                    }
-                    // 3. variables: Array → Map mit Defaults
-                    // Vorher: Port-Variablen mit daemon_auto_assign merken
-                    const autoAssignPortVars = [];
-                    const envVariables = {};
-                    if (Array.isArray(gameData.variables)) {
-                        for (const v of gameData.variables) {
-                            if (v.daemon_auto_assign && v.env_variable && v.env_variable.endsWith('_PORT') && v.env_variable !== 'SERVER_PORT') {
-                                autoAssignPortVars.push({
-                                    env_variable: v.env_variable,
-                                    default_value: parseInt(v.default_value, 10) || 0,
-                                });
-                            }
-                        }
-                        for (const v of gameData.variables) {
-                            if (v.env_variable) envVariables[v.env_variable] = v.default_value ?? '';
-                        }
-                        gameData.variables = { ...envVariables };
+                    const pz = await ladePaketFuerAddon(dbService, addon.id);
+                    const paket = pz
+                        ? (typeof pz.paket_json === 'string' ? JSON.parse(pz.paket_json) : pz.paket_json)
+                        : null;
+                    if (!paket) {
+                        return message.reply({ success: false,
+                            error: `Für \`${addon_slug}\` gibt es kein Spielpaket — ohne Paket lässt sich kein Server anlegen.` });
                     }
 
-                    // Benutzer-Overrides aus dem Discord-Modal anwenden (überschreiben Defaults)
-                    const { env_overrides } = payload;
-                    if (env_overrides && typeof env_overrides === 'object') {
-                        for (const [key, val] of Object.entries(env_overrides)) {
-                            // Nur bekannte ENV-Variable-Keys erlauben (Sicherheit: kein Einschleusen beliebiger Vars)
-                            if (typeof key === 'string' && /^[A-Z_][A-Z0-9_]*$/.test(key)) {
-                                envVariables[key] = String(val);
-                            }
-                        }
+                    // Werte aus dem Discord-Modal — unter den Schlüsseln des Pakets
+                    // (ADDON_VARIABLES liefert die Felder so). Nur bekannte Schlüssel.
+                    const bekannt = new Set((paket.settings || []).map(e => e.key));
+                    const eingaben = {};
+                    for (const [key, val] of Object.entries(payload.env_overrides || {})) {
+                        if (bekannt.has(key)) eingaben[key] = String(val);
                     }
-                    // gameData.variables mit finalen Werten synchronisieren (inkl. Modal-Overrides)
-                    gameData.variables = { ...envVariables };
+                    const paketWerte = paketWerteAnlegen(paket, eingaben, server_name);
 
-                    // startup_command
-                    const startup_command = gameData.startup?.command || '';
-                    if (!startup_command) return message.reply({ success: false, error: `Addon \`${addon_slug}\` hat keinen startup.command` });
-
-                    // Ports aus game_data
-                    const ports = {};
-                    if (gameData.ports && typeof gameData.ports === 'object') {
-                        for (const [portType, portDef] of Object.entries(gameData.ports)) {
-                            ports[portType] = { internal: portDef.default || 27015, external: portDef.default || 27015, protocol: portDef.protocol || 'udp' };
-                        }
-                    }
-                    if (!ports.game) ports.game = { internal: 27015, external: 27015, protocol: 'udp' };
-
-                    // ✅ Ports aus daemon_auto_assign Variablen ergänzen
-                    for (const pv of autoAssignPortVars) {
-                        const portType = pv.env_variable.replace(/_PORT$/, '').toLowerCase();
-                        if (!ports[portType] && pv.default_value > 0) {
-                            ports[portType] = { internal: pv.default_value, external: pv.default_value, protocol: 'udp' };
-                            Logger.debug(`[IPC/Gameserver] Port '${portType}' aus daemon_auto_assign Variable ${pv.env_variable} ergänzt (default: ${pv.default_value})`);
-                        }
+                    // Ports nach dem Paket — dieselbe Vergabe wie im Dashboard.
+                    let vergabe;
+                    try {
+                        vergabe = await vergibPortsAusPaket(dbService, rootserverId, paket, null);
+                    } catch (err) {
+                        return message.reply({ success: false, error: err.message });
                     }
 
-                    // ✅ Port-Auto-Assign aus port_allocations Pool (sequenziell: Game, Game+1, Game+2, ...)
-                    const allocatedFromPool = {};
-                    const extraPortTypes = Object.keys(ports).filter(t => t !== 'game');
-
-                    // Game-Port zuerst zuweisen
-                    const [gameAlloc] = await dbService.query(
-                        `SELECT id, port FROM port_allocations 
-                         WHERE rootserver_id = ? AND server_id IS NULL 
-                         ORDER BY port ASC LIMIT 1`,
-                        [rootserverId]
-                    );
-                    if (gameAlloc) {
-                        await dbService.query(
-                            'UPDATE port_allocations SET server_id = 0, assigned_at = NOW() WHERE id = ?',
-                            [gameAlloc.id]
+                    let newServerId;
+                    try {
+                        const result = await dbService.query(
+                            `INSERT INTO gameservers
+                                (guild_id, user_id, rootserver_id, addon_marketplace_id, template_name,
+                                 name, install_path, ports, env_variables, paket_werte, frozen_game_data,
+                                 launch_params, auto_restart, auto_update,
+                                 allocated_ram_mb, allocated_cpu_percent, allocated_disk_gb,
+                                 addon_version, status, created_at)
+                             VALUES (?, ?, ?, ?, ?, ?, 'temp', ?, '{}', ?, '{}', NULL, 0, ?, NULL, NULL, NULL, ?, 'installing', NOW())`,
+                            [guildId, owner_user_id || '0', rootserverId, addon.id,
+                             paket.identity?.name || addon.name, server_name,
+                             JSON.stringify(vergabe.ports), JSON.stringify(paketWerte),
+                             autoUpdateAus(paket, paketWerte) ? 1 : 0,
+                             paket.identity?.version || addon.version || '1.0.0']
                         );
-                        ports.game.internal = gameAlloc.port;
-                        ports.game.external = gameAlloc.port;
-                        allocatedFromPool.game = { allocId: gameAlloc.id, port: gameAlloc.port };
-                        Logger.info(`[IPC/Gameserver] Port game auto-assigned: ${gameAlloc.port} (Allocation #${gameAlloc.id})`);
-
-                        // Extra-Ports sequenziell: Game+1, Game+2, ...
-                        for (let i = 0; i < extraPortTypes.length; i++) {
-                            const portType = extraPortTypes[i];
-                            const desiredPort = gameAlloc.port + i + 1;
-                            const [seqAlloc] = await dbService.query(
-                                `SELECT id, port FROM port_allocations 
-                                 WHERE rootserver_id = ? AND port = ? AND server_id IS NULL LIMIT 1`,
-                                [rootserverId, desiredPort]
-                            );
-                            if (seqAlloc) {
-                                await dbService.query(
-                                    'UPDATE port_allocations SET server_id = 0, assigned_at = NOW() WHERE id = ?',
-                                    [seqAlloc.id]
-                                );
-                                ports[portType].internal = seqAlloc.port;
-                                ports[portType].external = seqAlloc.port;
-                                allocatedFromPool[portType] = { allocId: seqAlloc.id, port: seqAlloc.port };
-                                Logger.info(`[IPC/Gameserver] Port ${portType} sequential: ${seqAlloc.port} (Game+${i + 1}, Allocation #${seqAlloc.id})`);
-                            } else {
-                                const [freeAlloc] = await dbService.query(
-                                    `SELECT id, port FROM port_allocations 
-                                     WHERE rootserver_id = ? AND server_id IS NULL 
-                                     ORDER BY port ASC LIMIT 1`,
-                                    [rootserverId]
-                                );
-                                if (freeAlloc) {
-                                    await dbService.query(
-                                        'UPDATE port_allocations SET server_id = 0, assigned_at = NOW() WHERE id = ?',
-                                        [freeAlloc.id]
-                                    );
-                                    ports[portType].internal = freeAlloc.port;
-                                    ports[portType].external = freeAlloc.port;
-                                    allocatedFromPool[portType] = { allocId: freeAlloc.id, port: freeAlloc.port };
-                                    Logger.warn(`[IPC/Gameserver] Port ${portType}: sequenzieller Port ${desiredPort} nicht frei → Fallback: ${freeAlloc.port}`);
-                                } else {
-                                    Logger.warn(`[IPC/Gameserver] Kein freier Port im Allocation-Pool für Typ '${portType}'`);
-                                }
-                            }
-                        }
-                    } else {
-                        Logger.warn('[IPC/Gameserver] Kein freier Port im Allocation-Pool für game — nutze Default');
-                    }
-
-                    // Automatische Variablen-Belegung (generisch für alle Port-Typen)
-                    for (const [portType, portData] of Object.entries(ports)) {
-                        const envKey = portType.toUpperCase() + '_PORT';
-                        if (envKey in envVariables) {
-                            envVariables[envKey] = String(portData.internal || portData.external || 27015);
-                        }
-                        if ((portType === 'game' || portType === 'main') && 'SERVER_PORT' in envVariables) {
-                            envVariables.SERVER_PORT = String(portData.internal || portData.external || 27015);
-                        }
-                    }
-                    if ('SERVER_IP'   in envVariables) envVariables.SERVER_IP   = '0.0.0.0';
-                    if ('TZ' in envVariables && !envVariables.TZ) envVariables.TZ = 'UTC';
-
-                    const steamAppId = addon.steam_app_id || addon.steam_server_app_id || null;
-
-                    // DB-Insert
-                    const result = await dbService.query(
-                        `INSERT INTO gameservers
-                            (guild_id, user_id, rootserver_id, addon_marketplace_id, template_name,
-                             name, install_path, ports, env_variables, frozen_game_data,
-                             launch_params, auto_restart, auto_update,
-                             allocated_ram_mb, allocated_cpu_percent, allocated_disk_gb,
-                             addon_version, status, created_at)
-                         VALUES (?, ?, ?, ?, ?, ?, 'temp', ?, ?, ?, ?, 0, 0, NULL, NULL, NULL, ?, 'installing', NOW())`,
-                        [guildId, owner_user_id || '0', rootserverId, addon.id, addon.name,
-                         server_name,
-                         JSON.stringify(ports), JSON.stringify(envVariables),
-                         typeof addon.game_data === 'string' ? addon.game_data : JSON.stringify(addon.game_data),
-                         startup_command, addon.version]
-                    );
-                    const newServerId = result.insertId;
-
-                    // ✅ Port-Allocations mit echter server_id aktualisieren
-                    if (Object.keys(allocatedFromPool).length > 0) {
-                        for (const [portType, alloc] of Object.entries(allocatedFromPool)) {
+                        newServerId = result.insertId;
+                    } catch (err) {
+                        // Vorgemerkte Ports wieder freigeben — sie trügen sonst
+                        // `server_id = 0` für immer und sähen aus wie gebucht.
+                        const ids = Object.values(vergabe.belegt).map(a => a.allocId).filter(Boolean);
+                        if (ids.length) {
                             await dbService.query(
-                                'UPDATE port_allocations SET server_id = ?, assigned_at = NOW() WHERE id = ?',
-                                [newServerId, alloc.allocId]
-                            );
+                                `UPDATE port_allocations SET server_id = NULL, assigned_at = NULL
+                                  WHERE id IN (${ids.map(() => '?').join(',')}) AND server_id = 0`, ids
+                            ).catch(e => Logger.error('[IPC/Gameserver] Vorgemerkte Ports nicht freigegeben', e));
                         }
-                        Logger.info(`[IPC/Gameserver] ${Object.keys(allocatedFromPool).length} Port-Allocations für Server ${newServerId} zugewiesen`);
+                        throw err;
+                    }
+
+                    for (const alloc of Object.values(vergabe.belegt)) {
+                        await dbService.query(
+                            'UPDATE port_allocations SET server_id = ?, assigned_at = NOW() WHERE id = ?',
+                            [newServerId, alloc.allocId]
+                        );
                     }
 
                     // Install-Pfad setzen
@@ -788,40 +680,20 @@ class IPCServer {
                         }).catch(e => Logger.warn(`[IPC/Gameserver] SFTP-Sync fehlgeschlagen für ${newServerId}:`, e));
                     }
 
-                    // Installation an Daemon schicken
+                    // Installation an Daemon schicken — derselbe Baustein wie im
+                    // Dashboard (StartPayload.baueInstallNutzlast). Ist der Daemon
+                    // offline, bleibt der Server auf „installing": Der Wiederanstoß
+                    // beim Reconnect schickt denselben Auftrag. Hier stand bis zum
+                    // 2026-09-10 der Status „installed" — für einen Server ohne
+                    // eine einzige Datei.
                     if (ipmServer?.isDaemonOnline(rootserver.daemon_id)) {
-                        const installPayload = {
-                            server_id:      String(newServerId),
-                            rootserver_id:  String(rootserverId),
-                            daemon_id:      rootserver.daemon_id,
-                            guild_id:       guildId,
-                            addon_slug:     addon.slug,
-                            addon_name:     addon.name,
-                            template_name:  addon.name,
-                            steam_app_id:   steamAppId,
-                            startup_command,
-                            ports,
-                            env_variables:  envVariables,
-                            game_data:      gameData,
-                            platform:       gameData.platform || 'linux',
-                            run_install:    true,
-                            start_after:    false,
-                            resource_limits: { ram_mb: null, cpu_percent: null, disk_gb: null },
-                        };
-
-                        // DEBUG: Payload mit Dashboard-Route vergleichbar loggen
-                        Logger.debug(`[IPC/Gameserver] 🔍 Install Payload (Bot-Pfad):`, {
-                            daemonId: rootserver.daemon_id,
-                            server_id: newServerId,
-                            addon_slug,
-                            env_variables_keys: Object.keys(envVariables),
-                            env_variables: envVariables,
-                            game_data_vars: gameData.variables,
-                            script_len: gameData.installation?.script_content?.length ?? 0,
-                            install_image: gameData.installation?.docker_image,
-                            runtime_image: gameData.docker_image,
-                        });
-
+                        const zeile = await loadServerForStart(dbService, newServerId, guildId);
+                        const { payload: installPayload, error: auftragsFehler } = baueInstallNutzlast(zeile, guildId);
+                        if (auftragsFehler) {
+                            await dbService.query("UPDATE gameservers SET status = 'error', error_message = ? WHERE id = ?",
+                                [auftragsFehler, newServerId]);
+                            return message.reply({ success: false, error: auftragsFehler });
+                        }
                         ipmServer.sendCommand(rootserver.daemon_id, 'gameserver.install', installPayload, 60000)
                             .then(r => {
                                 if (!r?.success) {
@@ -830,7 +702,7 @@ class IPCServer {
                                 }
                                 // Allozierte Ports aus Daemon-Response in DB speichern
                                 if (r.allocated_ports && Object.keys(r.allocated_ports).length > 0) {
-                                    const realPorts = { ...ports };
+                                    const realPorts = { ...vergabe.ports };
                                     for (const [portType, portNum] of Object.entries(r.allocated_ports)) {
                                         if (realPorts[portType]) {
                                             realPorts[portType].external = portNum;
@@ -843,11 +715,9 @@ class IPCServer {
                                 }
                             })
                             .catch(e => Logger.error(`[IPC/Gameserver] Install error for ${newServerId}:`, e));
-                    } else {
-                        await dbService.query("UPDATE gameservers SET status = 'installed' WHERE id = ?", [newServerId]);
                     }
 
-                    return message.reply({ success: true, data: { id: newServerId, name: server_name, addon: addon.name } });
+                    return message.reply({ success: true, data: { id: newServerId, name: server_name, addon: paket.identity?.name || addon.name } });
                 }
 
                 // ── Gameserver starten ──────────────────────────────────────────────────
@@ -880,7 +750,7 @@ class IPCServer {
                     if (!ipmServer?.isDaemonOnline(srv.daemon_id)) return message.reply({ success: false, error: 'Daemon ist offline' });
 
                     const { payload: startPayload, error: payloadError, dockerImage } =
-                        buildStartPayload(srv, guildId, Logger);
+                        await buildStartPayload(srv, guildId, Logger);
 
                     if (payloadError) {
                         Logger.error(`[IPC/Gameserver] ${payloadError} (Server ${serverId})`);
@@ -935,15 +805,17 @@ class IPCServer {
 
                 // ── Gameserver neustarten ───────────────────────────────────────────────
                 case 'SERVER_RESTART': {
+                    // Derselbe Auftrag wie beim Start (buildStartPayload). Bis zum
+                    // 2026-09-10 schickte dieser Knopf nur server_id und guild_id:
+                    // Der Daemon nahm, was er im Speicher hatte — nach einem
+                    // Daemon-Neustart kein Image, und den Mod-Lader schaltete er ab.
                     if (!guildId || !serverId) return message.reply({ success: false, error: 'guild_id und server_id erforderlich' });
                     if (await actorMayNot('GAMESERVER.RESTART')) return;
-                    const [srv] = await dbService.query(
-                        `SELECT gs.id, gs.name, gs.status, gs.last_status_update, r.daemon_id
-                         FROM gameservers gs
-                         LEFT JOIN rootserver r ON gs.rootserver_id = r.id
-                         WHERE gs.id = ? AND gs.guild_id = ? LIMIT 1`,
-                        [serverId, guildId]
-                    );
+
+                    const { buildStartPayload, loadServerForStart } =
+                        require('../../../plugins/gameserver/dashboard/helpers/StartPayload');
+
+                    const srv = await loadServerForStart(dbService, serverId, guildId);
                     if (!srv) return message.reply({ success: false, error: 'Gameserver nicht gefunden' });
 
                     const restartErlaubt = pruefeServerAktion('restart', srv.status, srv.last_status_update);
@@ -952,16 +824,22 @@ class IPCServer {
                     if (!srv.daemon_id) return message.reply({ success: false, error: 'Kein Daemon zugewiesen' });
                     if (!ipmServer?.isDaemonOnline(srv.daemon_id)) return message.reply({ success: false, error: 'Daemon ist offline' });
 
+                    const { payload: restartPayload, error: payloadError } = await buildStartPayload(srv, guildId, Logger);
+                    if (payloadError) {
+                        Logger.error(`[IPC/Gameserver] ${payloadError} (Server ${serverId})`);
+                        return message.reply({ success: false, error: payloadError });
+                    }
+
+                    // „Startet…", bis der Daemon „läuft" meldet — nicht „online"
+                    // auf die bloße Annahme des Auftrags hin.
                     await dbService.query("UPDATE gameservers SET status = 'starting', last_status_update = NOW() WHERE id = ?", [serverId]);
                     require('../../../plugins/gameserver/dashboard/helpers/PanelService').pushZustandswechsel(serverId);
-                    const restartR = await ipmServer.sendCommand(srv.daemon_id, 'gameserver.restart', {
-                        server_id: String(serverId), guild_id: guildId,
-                    }, 30000);
+                    const restartR = await ipmServer.sendCommand(srv.daemon_id, 'gameserver.restart', restartPayload, 30000);
                     if (!restartR?.success) {
                         await dbService.query("UPDATE gameservers SET status = 'offline' WHERE id = ?", [serverId]);
-                        return message.reply({ success: false, error: restartR?.message || 'Restart fehlgeschlagen' });
+                        return message.reply({ success: false, error: restartR?.error || restartR?.message || 'Restart fehlgeschlagen' });
                     }
-                    await dbService.query("UPDATE gameservers SET status = 'online', last_started_at = NOW() WHERE id = ?", [serverId]);
+                    await dbService.query('UPDATE gameservers SET last_started_at = NOW() WHERE id = ?', [serverId]);
                     return message.reply({ success: true, data: { name: srv.name } });
                 }
 
@@ -1195,46 +1073,47 @@ class IPCServer {
 
                 // ── Benutzer-editierbare Variablen eines Addons ────────────────────────
                 case 'ADDON_VARIABLES': {
+                    // Die Felder des Discord-Modals beim Anlegen — aus dem SPIELPAKET.
+                    //
+                    // Bis zum 2026-09-10 kamen sie aus den Egg-Variablen des Addons
+                    // (SERVER_NAME, SERVER_PASSWORD …), und SERVER_CREATE nahm sie
+                    // unter diesen Namen an. Jetzt heisst ein Feld wie die
+                    // Einstellung im Paket. Die Form der Antwort bleibt, damit der
+                    // Bot unverändert bleibt: `env_variable` trägt den Schlüssel.
                     const { addon_slug } = payload;
                     if (!addon_slug) return message.reply({ success: false, error: 'addon_slug erforderlich' });
 
                     const [addon] = await dbService.query(
-                        `SELECT game_data FROM addon_marketplace WHERE slug = ? AND status = 'approved' LIMIT 1`,
+                        `SELECT id FROM addon_marketplace WHERE slug = ? AND status = 'approved' LIMIT 1`,
                         [addon_slug]
                     );
-                    if (!addon) return message.reply({ success: false, error: `Addon \`${addon_slug}\` nicht gefunden` });
+                    if (!addon) return message.reply({ success: false, error: `Spiel \`${addon_slug}\` nicht gefunden` });
 
-                    const gameData = typeof addon.game_data === 'string' ? JSON.parse(addon.game_data) : (addon.game_data || {});
-                    const daemonAuto = new Set(['SERVER_IP', 'SERVER_PORT', 'TZ']);
-                    // Wichtige Keywords: Diese Variablen kommen zuerst ins Modal
-                    const PRIO = ['PASSWORD', 'PASS', 'SECRET', 'TOKEN', 'KEY', 'NAME', 'WORLD', 'MAP', 'SEED'];
-                    const vars = (Array.isArray(gameData.variables) ? gameData.variables : [])
-                        .filter(v => v.user_editable !== false && !daemonAuto.has(v.env_variable))
-                        .sort((a, b) => {
-                            const aEmpty    = a.default_value == null || a.default_value === '';
-                            const bEmpty    = b.default_value == null || b.default_value === '';
-                            const aNullable = typeof a.rules === 'string' ? a.rules.includes('nullable') : !a.rules;
-                            const bNullable = typeof b.rules === 'string' ? b.rules.includes('nullable') : !b.rules;
+                    const { ladePaketFuerAddon, istWahr } = require('../../../plugins/gameserver/dashboard/helpers/StartPayload');
+                    const pz = await ladePaketFuerAddon(dbService, addon.id);
+                    const paket = pz
+                        ? (typeof pz.paket_json === 'string' ? JSON.parse(pz.paket_json) : pz.paket_json)
+                        : null;
+                    if (!paket) return message.reply({ success: false, error: `Für \`${addon_slug}\` gibt es kein Spielpaket` });
 
-                            // 1. Wirkliche Pflichtfelder zuerst (leer + nicht-nullable)
-                            const aRequired = aEmpty && !aNullable;
-                            const bRequired = bEmpty && !bNullable;
-                            if (aRequired !== bRequired) return aRequired ? -1 : 1;
-
-                            // 2. Wichtige Keywords (Passwort, Name, Welt ...)
-                            const aKey  = a.env_variable.toUpperCase();
-                            const bKey  = b.env_variable.toUpperCase();
-                            const aPrio = PRIO.some(k => aKey.includes(k));
-                            const bPrio = PRIO.some(k => bKey.includes(k));
-                            if (aPrio !== bPrio) return aPrio ? -1 : 1;
-
-                            // 3. Nullable + kein Default ans Ende (nur optionale Felder wie Beta Branch)
-                            const aLast = aEmpty && aNullable;
-                            const bLast = bEmpty && bNullable;
-                            if (aLast !== bLast) return aLast ? 1 : -1;
-
-                            return 0;
-                        });
+                    // Dieselbe Auswahl wie die Werte-Karte im Dashboard: gefragt
+                    // wird, was ein Spieler entscheidet (`role: player`). Den Namen
+                    // trägt der Befehl selbst. Pflichtfelder zuerst — Discord zeigt
+                    // nur fünf.
+                    const vars = (paket.settings || [])
+                        .filter(e => (e.role || 'expert') === 'player' && e.key !== 'name')
+                        .sort((a, b) => Number(b.required === true) - Number(a.required === true))
+                        .map(e => ({
+                            env_variable:  e.key,
+                            name:          e.name?.de || e.name?.en || e.key,
+                            // Das Modal kennt nur Text: Ja/Nein als 1/0, wie die
+                            // Werte-Karte im Dashboard es schickt.
+                            description:   (e.type === 'boolean' ? '1 = an, 0 = aus. ' : '')
+                                         + (e.description?.de || e.description?.en || ''),
+                            default_value: e.type === 'boolean'
+                                ? (istWahr(e.default) ? '1' : '0') : (e.default ?? ''),
+                            rules:         e.required === true ? 'required' : 'nullable',
+                        }));
                     // Rückgabe aller Variablen – der Bot nimmt nur die ersten 5 (Discord-Limit)
                     return message.reply({ success: true, data: vars, total: vars.length });
                 }
