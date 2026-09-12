@@ -212,12 +212,13 @@
             }).join('');
         }
 
-        window.modSuchen = function () {
+        window.modSuchen = function (seite) {
           var begriff = (document.getElementById('mod-begriff') || {}).value || '';
           var raum = document.getElementById('mod-treffer');
           raum.innerHTML = '<div class="fb-muted" style="font-size:12px">Wird gesucht …</div>';
 
-          fetch(SUCHE + '&q=' + encodeURIComponent(begriff), { headers: { Accept: 'application/json' } })
+          fetch(SUCHE + '&q=' + encodeURIComponent(begriff) + '&seite=' + (seite || 1),
+                { headers: { Accept: 'application/json' } })
             .then(function (a) { return a.json().then(function (d) { return { ok: a.ok, d: d }; }); })
             .then(function (r) {
               if (!r.ok || !r.d || !r.d.success) throw new Error((r.d && r.d.message) || 'Suche fehlgeschlagen');
@@ -225,9 +226,21 @@
                 raum.innerHTML = '<div class="fb-muted" style="font-size:12px">Nichts gefunden.</div>';
                 return;
               }
-              var kopf = r.d.gestoebert
-                ? '<div class="fb-muted" style="font-size:12px;padding-bottom:4px">Die beliebtesten ' +
-                  r.d.treffer.length + ' für dieses Spiel — tippe einen Namen, um gezielt zu suchen.</div>'
+              var kopf = '<div class="fb-muted" style="font-size:12px;padding-bottom:4px">' +
+                (r.d.gestoebert ? 'Beliebteste zuerst' : 'Treffer') + ' — Seite ' + r.d.seite +
+                ' von ' + r.d.seiten + ', ' + Number(r.d.gesamt).toLocaleString('de-DE') +
+                (r.d.gestoebert ? ' Mods für dieses Spiel' : ' Treffer') +
+                (r.d.verzeichnis ? ' · <a href="' + esc(r.d.verzeichnis) +
+                  '" target="_blank" rel="noopener noreferrer">alle bei Thunderstore ansehen</a>' : '') +
+                '</div>';
+              var blaettern = (r.d.zurueck || r.d.weiter)
+                ? '<div style="display:flex;gap:8px;align-items:center;padding-top:8px;border-top:1px solid var(--fb-border)">' +
+                  '<button type="button" class="btn btn-white btn-sm"' + (r.d.zurueck ? '' : ' disabled') +
+                    ' onclick="modSuchen(' + (r.d.seite - 1) + ')">← Zurück</button>' +
+                  '<span class="fb-muted" style="font-size:12px">Seite ' + r.d.seite + ' von ' + r.d.seiten + '</span>' +
+                  '<button type="button" class="btn btn-white btn-sm"' + (r.d.weiter ? '' : ' disabled') +
+                    ' onclick="modSuchen(' + (r.d.seite + 1) + ')">Weiter →</button>' +
+                  '</div>'
                 : '';
               raum.innerHTML = kopf + r.d.treffer.map(function (t) {
                 return '<div style="display:flex;gap:10px;padding:6px 0;border-top:1px solid var(--fb-border);align-items:flex-start">' +
@@ -244,7 +257,7 @@
                   '<button type="button" class="btn btn-white btn-sm" style="flex:0 0 auto" ' +
                     'onclick="modWaehlen(\'' + esc(t.kennung) + '\', \'' + esc(t.url || '') + '\')">Auswählen</button>' +
                   '</div>';
-              }).join('');
+              }).join('') + blaettern;
             })
             .catch(function (e) {
               raum.innerHTML = '<div style="font-size:12px;color:var(--fb-danger)">' + esc(e.message) + '</div>';

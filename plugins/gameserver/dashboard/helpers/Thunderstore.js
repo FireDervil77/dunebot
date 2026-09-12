@@ -82,17 +82,19 @@ async function hole(pfad) {
  * @param {string} begriff
  * @param {number} [grenze]
  */
-async function suche(community, begriff, grenze = 20) {
+async function suche(community, begriff, optionen = {}) {
     if (!community) throw new Error('Das Paket nennt keine Thunderstore-Community');
 
+    const seite = Math.max(1, parseInt(optionen.seite, 10) || 1);
     const abfrage = new URLSearchParams({
         q: String(begriff || ''),
         ordering: 'most-downloaded',
+        page: String(seite),
     });
     const daten = await hole(
         `/api/cyberstorm/listing/${encodeURIComponent(community)}/?${abfrage}`);
 
-    return (daten.results || []).slice(0, grenze).map(t => ({
+    const treffer = (daten.results || []).map(t => ({
         kennung:    `${t.namespace}-${t.name}`,
         namespace:  t.namespace,
         name:       t.name,
@@ -103,6 +105,39 @@ async function suche(community, begriff, grenze = 20) {
         veraltet:   Boolean(t.is_deprecated),
         geaendert:  t.last_updated || null,
     }));
+
+    // ── Blaettern statt Zwischenspeichern ───────────────────────────────────
+    //
+    // Die vollstaendige Liste waere `/c/<spiel>/api/v1/package/` — **162 MB**
+    // fuer Valheim, und sie aendert sich taeglich. Sie hier zu halten hiesse,
+    // einen Katalog zu pflegen, den die Quelle besser kennt
+    // (dieselbe Ueberlegung wie bei `gameserver_content`: die installierten
+    // Inhalte sind unsere Sache, die moeglichen nicht).
+    //
+    // Die Cyberstorm-Liste blaettert von sich aus: feste 20 je Seite, dazu
+    // `count`, `next` und `previous`. `count` ist die Antwort auf „wie viel
+    // gibt es hier ueberhaupt?" — am 2026-09-12 waren es 5746 fuer Valheim.
+    return {
+        treffer,
+        gesamt:   Number(daten.count) || treffer.length,
+        seite,
+        weiter:   Boolean(daten.next),
+        zurueck:  Boolean(daten.previous),
+        proSeite: PRO_SEITE,
+    };
+}
+
+/** Wie viele Treffer die Cyberstorm-Liste je Seite liefert (fest). */
+const PRO_SEITE = 20;
+
+/**
+ * Die Seite des Spiels bei Thunderstore — zum selber Stoebern.
+ *
+ * Ein Verzeichnis mit tausenden Eintraegen laesst sich in einer Karte nicht
+ * abbilden; wer wirklich schauen will, ist dort besser aufgehoben.
+ */
+function verzeichnis(community) {
+    return community ? 'https://thunderstore.io/c/' + encodeURIComponent(community) + '/' : null;
 }
 
 /**
@@ -272,4 +307,5 @@ async function aktualisierungen(zeilen) {
 
 module.exports = {
     HERKUNFT, istErlaubt, suche, paket, teileKennung, hoeher, aufloesen, aktualisierungen,
+    verzeichnis, PRO_SEITE,
 };

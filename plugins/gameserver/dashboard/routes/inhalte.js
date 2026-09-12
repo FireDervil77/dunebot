@@ -274,7 +274,7 @@ router.get('/mods/suche', requirePermission('GAMESERVER.CREATE'), async (req, re
         const absage = keineQuelle(res, inhalt);
         if (absage) return absage;
 
-        return res.json(await sucheAntwort(inhalt, req.query.q));
+        return res.json(await sucheAntwort(inhalt, req.query.q, req.query.seite));
     } catch (error) {
         Logger.warn('[Gameserver/Inhalte] Suche fehlgeschlagen:', error);
         return res.status(502).json({ success: false, message: error.message });
@@ -291,15 +291,25 @@ router.get('/mods/suche', requirePermission('GAMESERVER.CREATE'), async (req, re
  * Die Adresse baut der Server, nicht die Ansicht: Sie braucht die Gemeinschaft
  * aus dem Paket, und ohne sie landet man beim falschen Spiel.
  */
-async function sucheAntwort(inhalt, begriff) {
+async function sucheAntwort(inhalt, begriff, seite) {
     const gemeinschaft = gemeinschaftAus(inhalt);
-    const roh = await Thunderstore.suche(gemeinschaft, begriff || '', 25);
+    const roh = await Thunderstore.suche(gemeinschaft, begriff || '', { seite });
     return {
         success: true,
         gemeinschaft,
         gestoebert: !String(begriff || '').trim(),
         lader: inhalt.loader?.packages?.thunderstore || null,
-        treffer: roh.map(t => ({
+        // Wie viel es hier ueberhaupt gibt — die Frage stellt sich jeder, der
+        // ein Spiel noch nicht kennt, und ohne Antwort blaettert er blind.
+        gesamt:   roh.gesamt,
+        seite:    roh.seite,
+        seiten:   Math.max(1, Math.ceil(roh.gesamt / (roh.proSeite || 20))),
+        weiter:   roh.weiter,
+        zurueck:  roh.zurueck,
+        // Wer wirklich stoebern will, ist im Verzeichnis besser aufgehoben als
+        // in einer Karte mit 20 Zeilen.
+        verzeichnis: Thunderstore.verzeichnis(gemeinschaft),
+        treffer: roh.treffer.map(t => ({
             ...t,
             url: Inhalte.paketAdresse({ quelle: 'thunderstore', kennung: t.kennung }, gemeinschaft),
         })),
@@ -319,7 +329,7 @@ router.get('/:serverId/inhalte/suche', requirePermission('GAMESERVER.VIEW'), asy
         const absage = keineQuelle(res, inhalt);
         if (absage) return absage;
 
-        return res.json(await sucheAntwort(inhalt, req.query.q));
+        return res.json(await sucheAntwort(inhalt, req.query.q, req.query.seite));
     } catch (error) {
         // 502, nicht 500: Der Fehler liegt beim fremden Dienst, nicht bei uns —
         // und die Meldung sagt das auch, statt „Serverfehler" zu behaupten.

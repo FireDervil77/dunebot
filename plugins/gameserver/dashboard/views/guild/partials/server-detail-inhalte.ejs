@@ -329,12 +329,13 @@
     window.inhaltSuchen();
   };
 
-  window.inhaltSuchen = function () {
+  window.inhaltSuchen = function (seite) {
     const begriff = (document.getElementById('ts-begriff') || {}).value || '';
     const raum = document.getElementById('ts-treffer');
     raum.innerHTML = '<div class="fb-muted" style="font-size:12px">Wird gesucht …</div>';
 
-    fetch(`${BASIS}/suche?q=${encodeURIComponent(begriff)}`, { headers: { Accept: 'application/json' } })
+    fetch(`${BASIS}/suche?q=${encodeURIComponent(begriff)}&seite=${seite || 1}`,
+          { headers: { Accept: 'application/json' } })
       .then(async (a) => {
         const d = await a.json().catch(() => null);
         if (!a.ok || !d || !d.success) throw new Error((d && d.message) || `HTTP ${a.status}`);
@@ -345,10 +346,24 @@
           raum.innerHTML = '<div class="fb-muted" style="font-size:12px">Nichts gefunden.</div>';
           return;
         }
-        raum.innerHTML = (d.gestoebert
-          ? `<div class="fb-muted" style="font-size:12px;padding-bottom:4px">
-               Die beliebtesten ${d.treffer.length} für dieses Spiel — tippe einen Namen, um zu suchen.
-             </div>` : '')
+        const umfang = `
+          <div class="fb-muted" style="font-size:12px;padding-bottom:4px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap">
+            <span>${d.gestoebert ? 'Beliebteste zuerst' : 'Treffer'} —
+              Seite ${d.seite} von ${d.seiten}, ${Number(d.gesamt).toLocaleString('de-DE')}
+              ${d.gestoebert ? 'Mods für dieses Spiel' : 'Treffer'}</span>
+            ${d.verzeichnis ? `<a href="${escape(d.verzeichnis)}" target="_blank" rel="noopener noreferrer"
+                                 style="margin-left:auto">alle bei Thunderstore ansehen</a>` : ''}
+          </div>`;
+        const blaettern = (d.zurueck || d.weiter) ? `
+          <div style="display:flex;gap:8px;align-items:center;padding-top:8px;border-top:1px solid var(--fb-border)">
+            <button class="btn btn-white btn-sm" ${d.zurueck ? '' : 'disabled'}
+                    onclick="inhaltSuchen(${d.seite - 1})">← Zurück</button>
+            <span class="fb-muted" style="font-size:12px">Seite ${d.seite} von ${d.seiten}</span>
+            <button class="btn btn-white btn-sm" ${d.weiter ? '' : 'disabled'}
+                    onclick="inhaltSuchen(${d.seite + 1})">Weiter →</button>
+          </div>` : '';
+
+        raum.innerHTML = umfang
           + d.treffer.map(t => `
           <div style="display:flex;gap:10px;padding:8px 0;border-top:1px solid var(--fb-border);align-items:flex-start">
             ${t.bild ? `<img src="${escape(t.bild)}" alt="" width="32" height="32" style="border-radius:4px;flex:0 0 auto">` : ''}
@@ -363,7 +378,7 @@
             </div>
             ${DARF ? `<button class="btn btn-white btn-sm" style="flex:0 0 auto"
                         onclick="inhaltVorschau('${escape(t.kennung)}', this)">Ansehen</button>` : ''}
-          </div>`).join('');
+          </div>`).join('') + blaettern;
       })
       .catch(e => {
         raum.innerHTML = `<div style="font-size:12px;color:var(--fb-danger)">Suche fehlgeschlagen: ${escape(e.message)}</div>`;
@@ -399,7 +414,7 @@
             <div style="display:flex;gap:8px;margin-top:10px">
               <button class="btn btn-primary btn-sm"
                       onclick="inhaltInstallieren('${escape(kennung)}', this)">Installieren</button>
-              <button class="btn btn-white btn-sm" onclick="inhaltSuchen()">Zurück</button>
+              <button class="btn btn-white btn-sm" onclick="inhaltSuchen()">Zurück zur Liste</button>
             </div>
             <div id="ts-meldung" style="font-size:12px;margin-top:6px"></div>
           </div>`;

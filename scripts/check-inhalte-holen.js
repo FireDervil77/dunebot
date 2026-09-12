@@ -287,7 +287,8 @@ async function pruefe(name, fn) {
         Thunderstore.suche = async (gemeinschaft, begriff) => {
             assert.strictEqual(gemeinschaft, 'valheim', 'die Gemeinschaft kommt aus dem Paket');
             assert.strictEqual(begriff, 'jotunn');
-            return [{ kennung: 'ValheimModding-Jotunn', name: 'Jotunn' }];
+            return { treffer: [{ kennung: 'ValheimModding-Jotunn', name: 'Jotunn' }],
+                     gesamt: 19, seite: 1, weiter: false, zurueck: false, proSeite: 20 };
         };
         const r = await rufe('get', '/:serverId/inhalte/suche', { query: { q: 'jotunn' } });
         assert.strictEqual(r.status, 200);
@@ -371,7 +372,8 @@ async function pruefe(name, fn) {
     await pruefe('Suche ohne Begriff heisst stoebern — mit Adressen', async () => {
         Thunderstore.suche = async (gemeinschaft, begriff) => {
             assert.strictEqual(begriff, '', 'leer heisst leer, nicht undefined');
-            return [{ kennung: 'ValheimModding-Jotunn', name: 'Jotunn', downloads: 4152121 }];
+            return { treffer: [{ kennung: 'ValheimModding-Jotunn', name: 'Jotunn', downloads: 4152121 }],
+                     gesamt: 5746, seite: 1, weiter: true, zurueck: false, proSeite: 20 };
         };
         const r = await rufe('get', '/:serverId/inhalte/suche', { query: {} });
         assert.strictEqual(r.antwort.gestoebert, true, 'ohne Begriff wird gestoebert');
@@ -386,6 +388,22 @@ async function pruefe(name, fn) {
         assert.strictEqual(r.antwort.gemeinschaft, 'valheim');
         assert.strictEqual(r.antwort.mods[0].url,
             'https://thunderstore.io/c/valheim/p/ValheimModding/Jotunn/');
+    });
+
+    await pruefe('Der Umfang und die Seite gehen an die Ansicht', async () => {
+        // Ohne diese Zahlen blaettert man blind: 5746 Mods bei Valheim, 20 je
+        // Seite. Die Quelle sagt es (`count`/`next`), ein eigener Katalog waere
+        // 162 MB und taeglich veraltet.
+        Thunderstore.suche = async (gemeinschaft, begriff, optionen) => {
+            assert.strictEqual(optionen.seite, '3', 'die gewuenschte Seite kommt durch');
+            return { treffer: [], gesamt: 5746, seite: 3, weiter: true, zurueck: true, proSeite: 20 };
+        };
+        const r = await rufe('get', '/:serverId/inhalte/suche', { query: { seite: '3' } });
+        assert.strictEqual(r.antwort.gesamt, 5746);
+        assert.strictEqual(r.antwort.seiten, 288, '5746 / 20, aufgerundet');
+        assert.strictEqual(r.antwort.weiter, true);
+        assert.strictEqual(r.antwort.zurueck, true);
+        assert.strictEqual(r.antwort.verzeichnis, 'https://thunderstore.io/c/valheim/');
     });
 
     // ── Verdrahtung: haengt der Abruf an einem Ereignis, das ankommt? ───────
