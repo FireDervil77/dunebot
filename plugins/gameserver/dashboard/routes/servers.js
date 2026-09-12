@@ -1713,6 +1713,13 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
                 gs.sftp_password_hash,
                 gs.sftp_password_seen_at,
                 gs.env_variables,
+                -- Die Werte des Servers stehen seit dem 2026-08-23 in paket_werte,
+                -- und seit dem Egg-Schnitt (2026-09-10) NUR noch dort. Ohne diese
+                -- Spalte zeigte die Einstellungskarte "kein Wert hinterlegt", obwohl
+                -- alles gespeichert war - gefunden am 2026-09-12 an Server 188.
+                -- (Keine Backticks in dieser Abfrage: Sie steht in einem
+                -- Template-Literal und waere damit zu Ende.)
+                gs.paket_werte,
                 am.name as game_name,
                 am.slug as game_slug,
                 am.icon_url as game_icon,
