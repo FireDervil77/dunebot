@@ -70,9 +70,22 @@ function istLader(inhalt, kennung) {
     return Boolean(name) && String(name).toLowerCase() === String(kennung).toLowerCase();
 }
 
-/** Wohin gehoert dieses Paket? Lader in die Wurzel, Mod in `content.path`. */
+/**
+ * Wohin gehoert dieses Paket?
+ *
+ * Beide Pfade sind RELATIV ZUR VOLUME-WURZEL — auch der des Laders. Wer neben
+ * das Spiel legen will, schreibt `game/` selbst davor (Entscheidung des
+ * Betreibers, 2026-09-12).
+ *
+ * Warum das wichtig ist: Das Spiel laeuft in `game/`, und ein Lader wie BepInEx
+ * wird ueber Doorstop mit Pfaden RELATIV ZUM ARBEITSVERZEICHNIS geladen. Lag er
+ * in der Volume-Wurzel, zeigten `./doorstop_libs` und
+ * `./BepInEx/core/BepInEx.Preloader.dll` ins Leere — die Dateien lagen da, und
+ * nichts lud. Am 2026-09-12 an Server 188 gemessen.
+ */
 function zielFuer(inhalt, art) {
-    return art === Inhalte.ART_LADER ? '' : (inhalt.path || '');
+    if (art === Inhalte.ART_LADER) return inhalt.loader?.path || '';
+    return inhalt.path || '';
 }
 
 /**

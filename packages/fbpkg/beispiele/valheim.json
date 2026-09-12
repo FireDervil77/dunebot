@@ -3,7 +3,7 @@
   "identity": {
     "slug": "valheim",
     "name": "Valheim",
-    "version": "1.0.10",
+    "version": "1.0.11",
     "author": "firenetworks",
     "category": "survival",
     "description": {
@@ -298,6 +298,9 @@
           "terminates": true
         }
       ]
+    },
+    "env": {
+      "LD_LIBRARY_PATH": "./linux64"
     }
   },
   "env": {
@@ -1156,7 +1159,8 @@
           "LD_LIBRARY_PATH": "./doorstop_libs:{{env:LD_LIBRARY_PATH}}",
           "LD_PRELOAD": "libdoorstop_x64.so"
         }
-      }
+      },
+      "path": "game"
     },
     "sources": [
       "upload",
@@ -1165,7 +1169,7 @@
     "source_ids": {
       "thunderstore": "valheim"
     },
-    "path": "BepInEx/plugins",
+    "path": "game/BepInEx/plugins",
     "activation": "start",
     "order_matters": false,
     "needs_restart": true,

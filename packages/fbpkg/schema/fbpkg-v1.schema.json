@@ -864,6 +864,16 @@
           "type": "string",
           "default": "."
         },
+        "env": {
+          "type": "object",
+          "description": "Umgebungsvariablen, die das SPIEL braucht — nicht der Lader, nicht das Image. Valheim setzt in seinem eigenen Startskript LD_LIBRARY_PATH=./linux64; ohne dieses Feld hatte ein Paket keine Moeglichkeit, das zu sagen (dazugekommen am 2026-09-12, nachdem der Lader mit {{env:LD_LIBRARY_PATH}} auf eine Variable zeigte, die niemand setzte). Werte duerfen {{setting:…}} und {{port:…}} enthalten. HOME und XDG_CACHE_HOME gehoeren NICHT hierher — die setzt fb-init aus dem Verzeichnisvertrag (E-19).",
+          "propertyNames": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
         "extra_args": {
           "type": "object",
           "additionalProperties": false,
@@ -1018,6 +1028,10 @@
               "type": "boolean",
               "default": true
             },
+            "path": {
+              "type": "string",
+              "description": "Wohin das Laderpaket entpackt wird — relativ zur Volume-Wurzel, wie content.path. Leer heisst Volume-Wurzel. Ein Lader wie BepInEx MUSS neben der Spieldatei liegen, weil er ueber LD_PRELOAD/Doorstop mit Pfaden relativ zum Arbeitsverzeichnis geladen wird — fuer ein Spiel, das aus game/ startet, also \"game\". Ohne Angabe bleibt es bei der Wurzel; das ist richtig fuer Spiele, die von dort starten."
+            },
             "packages": {
               "description": "Wie der Lader bei der jeweiligen Quelle heisst (ohne Fassung). Nur damit laesst sich eine aufgeloeste Abhaengigkeit als LADER erkennen und in die Serverwurzel legen statt zu den Mods. Raten waere hier falsch: 'enthaelt BepInEx im Namen' trifft auch Mods.",
               "type": "object",
@@ -1096,7 +1110,8 @@
           }
         },
         "path": {
-          "type": "string"
+          "type": "string",
+          "description": "Wohin Mods gelegt werden — RELATIV ZUR VOLUME-WURZEL, nicht zum Spielverzeichnis. Wer sie neben das Spiel legen will (Unity/BepInEx), schreibt das \"game/\" ausdruecklich hin: \"game/BepInEx/plugins\". Gemessen am 2026-09-12 an Server 188: Ohne den Praefix landet der Lader in der Volume-Wurzel, das Spiel laeuft aber in game/ — und Doorstop sucht seine Dateien relativ zum Arbeitsverzeichnis. Die Dateien liegen dann da, und nichts laedt."
         },
         "activation": {
           "enum": [

@@ -30,8 +30,9 @@ const INHALT = {
     supported: true,
     sources: ['upload', 'thunderstore'],
     source_ids: { thunderstore: 'valheim' },
-    loader: { key: 'bepinex', packages: { thunderstore: 'denikson-BepInExPack_Valheim' } },
-    path: 'BepInEx/plugins',
+    loader: { key: 'bepinex', path: 'game',
+              packages: { thunderstore: 'denikson-BepInExPack_Valheim' } },
+    path: 'game/BepInEx/plugins',
     client_side: true,
     needs_restart: true,
 };
@@ -147,13 +148,18 @@ async function pruefe(name, fn) {
 (async () => {
     console.log('\nInstallieren');
 
-    await pruefe('Der Lader geht in die Wurzel, der Mod in content.path', async () => {
+    await pruefe('Der Lader geht neben das Spiel, der Mod in content.path', async () => {
         stelleThunderstore([BEPINEX, JOTUNN]);
         const e = await InhalteHolen.installiere({
             server: SERVER, inhalt: INHALT, guildId: 'g1', kennung: 'ValheimModding-Jotunn' });
         assert.strictEqual(e.installiert.length, 2);
-        assert.strictEqual(daemon.abrufe[0].ziel, '', 'Lader gehoert in die Serverwurzel');
-        assert.strictEqual(daemon.abrufe[1].ziel, 'BepInEx/plugins');
+        // Beide Pfade kommen aus dem PAKET und sind relativ zur Volume-Wurzel.
+        // Der Lader muss neben der Spieldatei liegen: Doorstop laedt ihn mit
+        // Pfaden relativ zum Arbeitsverzeichnis, und das ist game/. Lag er in
+        // der Wurzel, zeigten sie ins Leere — am 2026-09-12 an Server 188
+        // gemessen, der Start brach ab.
+        assert.strictEqual(daemon.abrufe[0].ziel, 'game', 'Lader gehoert neben das Spiel');
+        assert.strictEqual(daemon.abrufe[1].ziel, 'game/BepInEx/plugins');
         assert.strictEqual(db.zeilen[0].art, 'loader');
         assert.strictEqual(db.zeilen[1].art, 'mod');
     });
@@ -171,7 +177,7 @@ async function pruefe(name, fn) {
         await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT, guildId: 'g1',
             kennung: 'ValheimModding-Jotunn' });
         assert.deepStrictEqual(JSON.parse(db.zeilen[0].dateien),
-            ['BepInEx/plugins/A.dll', 'BepInEx/plugins/B.dll']);
+            ['game/BepInEx/plugins/A.dll', 'game/BepInEx/plugins/B.dll']);
         assert.strictEqual(db.zeilen[0].status, 'installiert');
     });
 
@@ -183,6 +189,16 @@ async function pruefe(name, fn) {
         assert.strictEqual(e.fehlgeschlagen.length, 1);
         assert.strictEqual(db.zeilen[0].status, 'fehlgeschlagen');
         assert.match(db.zeilen[0].fehler, /herkunft/);
+    });
+
+    await pruefe('Ohne loader.path bleibt der Lader in der Wurzel', async () => {
+        // Rueckwaertsvertraeglich: Ein Spiel, das AUS der Volume-Wurzel startet,
+        // braucht den Lader auch dort. Das Feld sagt es, es raet niemand.
+        stelleThunderstore([BEPINEX]);
+        const ohnePfad = { ...INHALT, loader: { ...INHALT.loader, path: undefined } };
+        await InhalteHolen.installiere({ server: SERVER, inhalt: ohnePfad, guildId: 'g1',
+            kennung: 'denikson-BepInExPack_Valheim' });
+        assert.strictEqual(daemon.abrufe[0].ziel, '');
     });
 
     await pruefe('Ohne Thunderstore im Paket gibt es keine Installation', async () => {
