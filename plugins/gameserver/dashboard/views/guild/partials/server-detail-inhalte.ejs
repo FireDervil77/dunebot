@@ -50,6 +50,7 @@
     const istLader = e.art === 'loader';
     const marken = [];
     if (e.status === 'fehlgeschlagen') marken.push(marke('fehlgeschlagen', 'warn'));
+    if (e.status === 'geplant')        marken.push(marke('wird noch geholt', 'warn'));
     if (e.client_side)                 marken.push(marke('Mitspieler brauchen ihn auch'));
     const neuere = NEUER[e.id];
     if (neuere && neuere.neuer)        marken.push(marke('neuer: ' + neuere.neueste, 'warn'));
@@ -126,6 +127,23 @@
       </div>
       <div id="inhalte-suche" style="display:none"></div>
       <div id="inhalte-formular" style="display:none"></div>`;
+
+    // Vorgemerktes, das noch nicht auf dem Server liegt. Normalerweise holt es
+    // das Dashboard selbst, sobald die Installation fertig gemeldet ist — hier
+    // steht der Knopf fuer den Fall, dass das schiefging.
+    const geplant = [d.lader, ...d.mods].filter(e => e && e.status === 'geplant');
+    if (geplant.length && DARF) {
+      html += `
+        <div style="font-size:13px;margin:8px 0;padding:10px;border:1px solid var(--fb-border);border-radius:6px">
+          <strong>${geplant.length} ${geplant.length === 1 ? 'Mod ist' : 'Mods sind'} vorgemerkt und noch nicht geholt.</strong>
+          <div class="fb-muted" style="font-size:12px;margin-top:2px">
+            Beim Anlegen ausgewählt. Geholt werden sie, sobald die Installation fertig
+            ist — hat das nicht geklappt, geht es hier von Hand.
+          </div>
+          <button class="btn btn-primary btn-sm" style="margin-top:8px"
+                  onclick="inhaltGeplantHolen(this)">Jetzt holen</button>
+        </div>`;
+    }
 
     if (!d.lader && DARF) {
       html += `
@@ -398,6 +416,30 @@
       })
       .catch(e => { meldung.textContent = 'Fehlgeschlagen: ' + e.message; })
       .finally(() => { knopf.disabled = false; });
+  };
+
+  window.inhaltGeplantHolen = function (knopf) {
+    knopf.disabled = true;
+    knopf.textContent = 'Wird geholt …';
+
+    fetch(`${BASIS}/geplant-holen`, { method: 'POST' })
+      .then(async (a) => {
+        const d = await a.json().catch(() => null);
+        if (!a.ok || !d || !d.success) throw new Error((d && d.message) || `HTTP ${a.status}`);
+        return d;
+      })
+      .then(d => {
+        window.inhalteLaden();
+        if (d.nichts) { alert(d.message); return; }
+        const teile = [`${d.installiert.length} installiert`];
+        if (d.fehlgeschlagen.length) teile.push(`${d.fehlgeschlagen.length} fehlgeschlagen`);
+        alert(teile.join(', ')
+          + (d.fehlgeschlagen.length
+              ? ':\n' + d.fehlgeschlagen.map(f => `${f.kennung}: ${f.fehler}`).join('\n') : '')
+          + (d.neustartNoetig ? '\n\nWirksam wird es beim nächsten Start des Servers.' : ''));
+      })
+      .catch(e => { alert('Nicht geholt: ' + e.message); window.inhalteLaden(); })
+      .finally(() => { knopf.disabled = false; knopf.textContent = 'Jetzt holen'; });
   };
 
   window.inhaltAktualisierungen = function (knopf) {

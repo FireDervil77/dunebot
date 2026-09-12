@@ -615,6 +615,29 @@ class GameserverPlugin extends DashboardPlugin {
             // autoritativ in IPMServer._registerEventHandlers() registriert
             // und broadcasten dort mit dem korrekten SSE-Namespace 'install'.
 
+            // ════════════════════════════════════════════════════════════
+            // Installation fertig → die vorgemerkten Mods holen (E6/B.12)
+            // ════════════════════════════════════════════════════════════
+            //
+            // ⚠ REGISTRIERT, nicht nur geschrieben. Bis zum 2026-09-12 haengte
+            // dieser Aufruf in `_handleInstallCompleted` — einer Methode OHNE
+            // Aufrufer. Beim ersten echten Test (Server 187) meldete der Daemon
+            // „Installation abgeschlossen", und beide Mod-Zeilen blieben auf
+            // `geplant`; im Log stand keine einzige Zeile davon. Die Methode ist
+            // deshalb entfernt, und der Haken haengt an dem Ereignis, das
+            // wirklich eintrifft: `install`/`completed`.
+            //
+            // Prioritaet 20 = NACH dem Kern (IPMServer registriert dasselbe
+            // Ereignis mit der Vorgabe 10 und setzt dort Status und Zaehler).
+            eventRouter.register(
+                MessageTypes.NS_INSTALL,
+                MessageTypes.INSTALL_COMPLETED,
+                async (payload) => {
+                    if (payload?.server_id) await this._holeVorgemerkteMods(payload.server_id);
+                },
+                { priority: 20 }
+            );
+
             this._handlersRegistered = true;
             Logger.success('[Gameserver] Event-Handler registriert (5 Handler)');
         } catch (error) {
@@ -920,60 +943,12 @@ class GameserverPlugin extends DashboardPlugin {
         }
     }
 
-    /**
-     * Handler: Install Completed
-     * @private
-     */
-    async _handleInstallCompleted(payload, message, context) {
-        const Logger = ServiceManager.get('Logger');
-        const dbService = ServiceManager.get('dbService');
-        
-        const { server_id, install_path, timestamp } = payload;
-        const { daemonId } = context;
-        
-        Logger.info(`[Gameserver] Installation abgeschlossen: Server ${server_id}`);
-        
-        try {
-            // Status auf 'installed' setzen (zeigt grünes "Installed" Badge + Start/Delete Buttons)
-            await dbService.query(
-                `UPDATE gameservers 
-                 SET status = 'installed', 
-                     updated_at = NOW() 
-                 WHERE id = ?`,
-                [server_id]
-            );
-            
-            // SSE-Broadcasting
-            const [server] = await dbService.query(
-                'SELECT guild_id, name FROM gameservers WHERE id = ?', 
-                [server_id]
-            );
-            
-            if (server) {
-                const sseManager = ServiceManager.get('sseManager');
-                sseManager.broadcast(server.guild_id, 'gameserver', {
-                    action: 'install_completed',
-                    server_id,
-                    server_name: server.name,
-                    install_path,
-                    timestamp
-                });
-                
-                Logger.success(`[Gameserver] Installation-Complete gebroadcastet: ${server.name} (${server_id})`);
-            }
-
-            // ── Jetzt die beim Anlegen vorgemerkten Mods (E6/B.12) ─────────
-            //
-            // Erst hier: Vorher gibt es kein Serververzeichnis, in das ein Mod
-            // gehoert. Ein Fehlschlag beendet die Installation NICHT — die
-            // Zeile traegt ihren Grund, und der Server ist da.
-            await this._holeVorgemerkteMods(server_id);
-
-        } catch (error) {
-            Logger.error(`[Gameserver] Fehler beim Install-Complete-Handling für Server ${server_id}:`, error);
-            throw error;
-        }
-    }
+    // Hier stand bis zum 2026-09-12 `_handleInstallCompleted` — sie setzte den
+    // Status auf „installed" und broadcastete „install_completed". **Sie hatte
+    // nie einen Aufrufer**: Registriert sind die fuenf Handler oben, dieser
+    // nicht. Was wirklich laeuft, ist `IPMServer._handleGameserverInstallComplete`
+    // (Status `offline`, Install-Zaehler, SSE). Zwei Wahrheiten fuer dasselbe
+    // Ereignis, von denen eine tot war — gefunden beim ersten echten Mod-Test.
 
     /**
      * Die beim Anlegen vorgemerkten Mods holen (E6/B.12).

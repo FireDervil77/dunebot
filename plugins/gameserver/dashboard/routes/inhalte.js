@@ -364,6 +364,51 @@ router.post('/:serverId/inhalte/thunderstore', requirePermission('GAMESERVER.FIL
 });
 
 /**
+ * Die vorgemerkten Mods jetzt holen.
+ *
+ * Normalerweise passiert das von selbst, sobald die Grundinstallation fertig
+ * gemeldet ist (`install`/`completed` → `_holeVorgemerkteMods`). Diesen Weg
+ * braucht es trotzdem, und zwar fuer die beiden Faelle, in denen das Ereignis
+ * nichts nuetzt: Der Abruf ist fehlgeschlagen (Thunderstore war nicht
+ * erreichbar), oder er ist gar nicht erst gelaufen — wie am 2026-09-12, als
+ * der Haken in einer Methode ohne Aufrufer sass.
+ *
+ * Ohne diesen Knopf waere die einzige Rettung, den Server neu zu installieren.
+ */
+router.post('/:serverId/inhalte/geplant-holen', requirePermission('GAMESERVER.FILES.MANAGE'),
+    async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+
+    try {
+        const { serverId } = req.params;
+        const guildId = res.locals.guildId;
+
+        const geladen = await ladeServerUndPaket(dbService, serverId, guildId);
+        if (!geladen) return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
+
+        const inhalt = geladen.paket?.content || null;
+        const absage = keineQuelle(res, inhalt);
+        if (absage) return absage;
+
+        const ergebnis = await InhalteHolen.holeGeplante({
+            server: geladen.server, inhalt, guildId });
+
+        if (!ergebnis) {
+            return res.json({ success: true, nichts: true,
+                message: 'Es ist nichts vorgemerkt.' });
+        }
+
+        Logger.info(`[Gameserver/Inhalte] Vorgemerktes für Server ${serverId} geholt: `
+            + `${ergebnis.installiert.length} installiert, ${ergebnis.fehlgeschlagen.length} fehlgeschlagen`);
+        return res.json({ success: true, ...ergebnis });
+    } catch (error) {
+        Logger.error('[Gameserver/Inhalte] Vorgemerktes nicht geholt:', error);
+        return res.status(502).json({ success: false, message: error.message });
+    }
+});
+
+/**
  * Gibt es neuere Fassungen?
  *
  * Auf Knopfdruck, nicht beim Laden der Seite: Das ist eine Abfrage je Mod bei

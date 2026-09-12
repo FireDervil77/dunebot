@@ -346,6 +346,51 @@ async function pruefe(name, fn) {
         assert.strictEqual(db.zeilen.find(z => z.id === 9).status, 'entfernt');
     });
 
+    // ── Verdrahtung: haengt der Abruf an einem Ereignis, das ankommt? ───────
+    //
+    // Am 2026-09-12 tat er das NICHT: Der Aufruf sass in
+    // `_handleInstallCompleted`, einer Methode ohne Aufrufer. Der Daemon meldete
+    // „Installation abgeschlossen", und beide Mod-Zeilen blieben auf `geplant`.
+    // Genau dieser Fehler ist von aussen unsichtbar — deshalb steht er hier.
+    console.log('\nVerdrahtung');
+
+    const fs = require('fs');
+    const ohneKommentare = (text) => text
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .split('\n').map(z => z.replace(/(^|[^:])\/\/.*$/, '$1')).join('\n');
+    const plugin = ohneKommentare(fs.readFileSync(
+        path.join(__dirname, '../plugins/gameserver/dashboard/index.js'), 'utf8'));
+
+    await pruefe('Der Abruf haengt an einem REGISTRIERTEN Ereignis', async () => {
+        const block = plugin.match(
+            /eventRouter\.register\(\s*MessageTypes\.NS_INSTALL,\s*MessageTypes\.INSTALL_COMPLETED,[\s\S]{0,500}?\{\s*priority/);
+        assert.ok(block, 'keine Registrierung fuer install/completed gefunden');
+        assert.match(block[0], /_holeVorgemerkteMods/,
+            'die Registrierung ruft den Abruf nicht auf');
+    });
+
+    await pruefe('Daneben liegt kein Handler ohne Aufrufer', async () => {
+        assert.ok(!/_handleInstallCompleted/.test(plugin),
+            '_handleInstallCompleted ist wieder da — sie wird nirgends registriert, '
+            + 'und was darin steht, laeuft nie');
+    });
+
+    await pruefe('Vorgemerktes laesst sich von Hand nachholen', async () => {
+        stelleThunderstore([JOTUNN]);
+        db.zeilen.push({ id: 1, server_id: 186, quelle: 'thunderstore', art: 'mod',
+            kennung: 'ValheimModding-Jotunn', fassung: null, status: 'geplant', reihenfolge: 0 });
+        const r = await rufe('post', '/:serverId/inhalte/geplant-holen');
+        assert.strictEqual(r.status, 200);
+        assert.strictEqual(r.antwort.installiert.length, 1);
+        assert.strictEqual(db.zeilen[0].status, 'installiert');
+    });
+
+    await pruefe('Ohne Vorgemerktes sagt die Route das, statt zu schweigen', async () => {
+        const r = await rufe('post', '/:serverId/inhalte/geplant-holen');
+        assert.strictEqual(r.antwort.nichts, true);
+        assert.strictEqual(daemon.abrufe.length, 0);
+    });
+
     Object.assign(Thunderstore, ECHT);
     console.log(`\n${bestanden} Pruefung(en) bestanden.\n`);
 })();
