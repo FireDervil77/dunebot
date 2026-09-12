@@ -111,7 +111,13 @@
     }
 
     const aktive = [d.lader, ...d.mods].filter(e => e && e.aktiv).length;
-    const brauchen = d.mods.filter(e => e.aktiv && e.client_side);
+    // ── Der Lader gehoert in diese Liste ────────────────────────────────────
+    //
+    // Er trug die Marke „Mitspieler brauchen ihn auch" an seiner Zeile, stand
+    // aber nicht in der Liste zum Weitergeben — ein Widerspruch in derselben
+    // Karte (Betreiber, 2026-09-12). Fuer den Mitspieler ist er sogar das
+    // ERSTE: Ohne ihn laedt bei ihm kein einziger Mod.
+    const brauchen = [d.lader, ...d.mods].filter(e => e && e.aktiv && e.client_side);
 
     let html = `
       <div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:6px">
@@ -175,15 +181,30 @@
       // Mit Adresse: Die Liste wird weitergegeben, und „EpicLoot 0.9.22" allein
       // schickt jeden Mitspieler erst einmal auf die Suche.
       const liste = brauchen.map(m => {
-        const kopf = `${m.name || m.kennung}${m.fassung ? ' ' + m.fassung : ''}`;
+        const kopf = `${m.name || m.kennung}${m.fassung ? ' ' + m.fassung : ''}`
+                   + (m.art === 'loader' ? '   ← zuerst installieren' : '');
         return m.url ? `${kopf}\n  ${m.url}` : `${kopf}\n  (hochgeladen — Datei vom Server nötig)`;
       }).join('\n');
+
+      const lader = brauchen.find(m => m.art === 'loader');
+      const modAnzahl = brauchen.filter(m => m.art !== 'loader').length;
+      const satz = lader
+        ? `Der Lader und ${modAnzahl} ${modAnzahl === 1 ? 'Mod' : 'Mods'} müssen auch bei deinen Mitspielern liegen.`
+        : `${modAnzahl} ${modAnzahl === 1 ? 'Mod braucht' : 'Mods brauchen'} deine Mitspieler auch.`;
       html += `
         <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--fb-border)">
           <div style="font-size:13px">
-            <strong>${brauchen.length} ${brauchen.length === 1 ? 'Mod braucht' : 'Mods brauchen'} deine Mitspieler auch.</strong>
-            Wer sie nicht hat, kommt nicht auf den Server.
+            <strong>${satz}</strong> Wer sie nicht hat, kommt nicht auf den Server.
           </div>
+          ${lader ? `
+            <div class="fb-muted" style="font-size:12px;margin-top:4px">
+              Zuerst der Lader
+              ${lader.url ? `(<a href="${escape(lader.url)}" target="_blank" rel="noopener noreferrer">${escape(lader.name || lader.kennung)}</a>)`
+                          : `(${escape(lader.name || lader.kennung)})`},
+              danach die Mods in seinen Ordner. Auf der verlinkten Seite steht,
+              wie er eingerichtet wird; die meisten Spieler nehmen dafür einen
+              Mod-Manager wie <span class="fb-mono">r2modman</span>.
+            </div>` : ''}
           <textarea id="inhalte-weitergeben" class="form-control fb-mono" rows="${Math.min(10, brauchen.length * 2 + 1)}"
                     style="margin-top:8px;font-size:12px" readonly>${escape(liste)}</textarea>
           <button class="btn btn-white btn-sm" style="margin-top:6px" onclick="inhaltKopieren()">

@@ -755,10 +755,17 @@ class GameserverPlugin extends DashboardPlugin {
         const StatusService = require('./helpers/StatusService');
         const PanelService  = require('./helpers/PanelService');
 
-        const { server_id, status, timestamp } = payload;
+        // `error` gehoert dazu: Der Daemon schickt bei einem gescheiterten Start
+        // oder Absturz den Grund mit — bis zum 2026-09-12 nahm dieser Handler
+        // nur drei Felder, und der Grund fiel hier herunter. Im Dashboard stand
+        // dann „error" und `error_message = NULL`; nachlesen liess es sich nur
+        // im Daemon-Log, das root gehoert (0600). Genau so ist der
+        // fehlgeschlagene Start von Server 188 unerklaerlich geblieben.
+        const { server_id, status, timestamp, error } = payload;
         const { daemonId } = context;
-        
-        Logger.debug(`[Gameserver] Status Changed: Server ${server_id} → ${status}`);
+
+        Logger.debug(`[Gameserver] Status Changed: Server ${server_id} → ${status}`
+            + (error ? ` (${error})` : ''));
         
         try {
             // Status-Mapping: Daemon → DB ENUM
@@ -774,11 +781,34 @@ class GameserverPlugin extends DashboardPlugin {
             
             const dbStatus = statusMap[status] || status;
             
-            // 1. MySQL-Update
-            await dbService.query(
-                'UPDATE gameservers SET status = ?, updated_at = NOW() WHERE id = ?',
-                [dbStatus, server_id]
-            );
+            // 1. MySQL-Update — mit dem Grund, wenn es einen gibt.
+            //
+            // Beim Verlassen des Fehlerzustands wird er geloescht: Eine alte
+            // Begruendung an einem laufenden Server ist schlimmer als keine,
+            // weil sie beim naechsten Blick wie die aktuelle aussieht.
+            if (dbStatus === 'error') {
+                await dbService.query(
+                    `UPDATE gameservers
+                        SET status = ?, error_message = ?, last_status_update = NOW(), updated_at = NOW()
+                      WHERE id = ?`,
+                    [dbStatus, error || null, server_id]
+                );
+                if (error) {
+                    Logger.warn(`[Gameserver] Server ${server_id} meldet "${status}": ${error}`);
+                } else {
+                    // Auch das ist eine Auskunft: Der Daemon hat den Zustand
+                    // gemeldet, aber keinen Grund mitgegeben.
+                    Logger.warn(`[Gameserver] Server ${server_id} meldet "${status}" OHNE Grund — `
+                        + 'der Grund steht nur im Daemon-Log');
+                }
+            } else {
+                await dbService.query(
+                    `UPDATE gameservers
+                        SET status = ?, error_message = NULL, last_status_update = NOW(), updated_at = NOW()
+                      WHERE id = ?`,
+                    [dbStatus, server_id]
+                );
+            }
             
             // 2. Guild-ID holen für SSE-Broadcasting
             const [server] = await dbService.query(
@@ -794,6 +824,7 @@ class GameserverPlugin extends DashboardPlugin {
                     server_id,
                     server_name: server.name,
                     status: dbStatus,  // ← WICHTIG: Gemappten Status senden (online statt running, offline statt stopped)
+                    error_message: dbStatus === 'error' ? (error || null) : null,
                     timestamp
                 });
 
