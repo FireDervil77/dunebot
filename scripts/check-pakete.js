@@ -130,6 +130,65 @@ function pruefeInvarianten(paket) {
         verstoesse.push(`Verweis: start.ready_when.port zeigt auf "${bereitPort}", diesen Zweck gibt es nicht.`);
     }
 
+    // ── Verweise auf die Umgebung: {{env:X}} muss auch jemand setzen ────────
+    //
+    // Das ist die Prüfung, die am 2026-09-12 gefehlt hat, und sie hat einen
+    // ganzen Tag gekostet. Der Valheim-Lader ergänzt
+    //
+    //     "LD_LIBRARY_PATH": "./doorstop_libs:{{env:LD_LIBRARY_PATH}}"
+    //
+    // — einen Wert, den es nicht gab. Kein Image setzte ihn, das Paket nannte
+    // ihn im Wurzel-`env`, aber der Daemon las dieses Feld nicht. Der Verweis
+    // blieb stehen, der Startauftrag galt als unvollständig, und der Server
+    // meldete das erst beim ERSTEN Start mit Mods (Server 188).
+    //
+    // Setting- und Port-Verweise werden seit jeher geprüft; env-Verweise waren
+    // die einzige Verweisart ohne Prüfung. Genau dort ist es passiert.
+    const gesetzt = new Set(Object.keys(paket.env || {}));
+
+    // Ausnahmen mit Begründung, kein stilles Durchwinken: Diese Namen setzt
+    // nicht das Paket, sondern die Umgebung darunter.
+    //   PATH, FB_IMAGE, LANG, TZ, STEAMCMD  → unsere Images (gemessen am
+    //                                         2026-09-12 an fb/steamcmd)
+    //   HOME, XDG_CACHE_HOME                → fb-init aus dem Verzeichnis-
+    //                                         vertrag E-19; ein Paket DARF sie
+    //                                         nicht setzen.
+    const ausDerUmgebung = new Set(['PATH', 'FB_IMAGE', 'LANG', 'TZ', 'STEAMCMD', 'HOME', 'XDG_CACHE_HOME']);
+
+    const envVerweise = []; // [{wo, name}]
+    const sammle = (wo, text) => {
+        for (const [, name] of String(text).matchAll(/\{\{env:([A-Za-z_][A-Za-z0-9_]*)\}\}/g)) {
+            envVerweise.push({ wo, name });
+        }
+    };
+    for (const [k, v] of Object.entries(paket.env || {})) sammle(`env.${k}`, v);
+    for (const a of paket.start?.args || []) {
+        for (const t of a.parts || []) sammle(`start.args["${a.key}"]`, t.text);
+        for (const f of [].concat(a.form || [])) sammle(`start.args["${a.key}"]`, f);
+    }
+    const zusatz = paket.content?.loader?.adds;
+    for (const [k, v] of Object.entries(zusatz?.env || {})) sammle(`content.loader.adds.env.${k}`, v);
+    for (const a of zusatz?.args || []) {
+        for (const t of a.parts || []) sammle(`content.loader.adds.args["${a.key}"]`, t.text);
+        for (const f of [].concat(a.form || [])) sammle(`content.loader.adds.args["${a.key}"]`, f);
+    }
+
+    for (const { wo, name } of envVerweise) {
+        if (gesetzt.has(name) || ausDerUmgebung.has(name)) continue;
+        verstoesse.push(`Verweis: ${wo} ergänzt {{env:${name}}} — diese Variable setzt niemand. `
+            + `Sie gehört in das Wurzelfeld "env" des Pakets; sonst bleibt der Verweis im Wert `
+            + `stehen und der Startauftrag wird als unvollständig abgewiesen.`);
+    }
+
+    // Und die Gegenrichtung: Eine Variable, die das Paket setzt, aber die vom
+    // Spiel gar nicht gebraucht wird, ist kein Fehler — sie kann aus dem
+    // Startskript des Spiels stammen. Ein Hinweis ist sie trotzdem wert.
+    if (paket.start?.env) {
+        verstoesse.push(`start.env gibt es nicht — die Umgebung des Spiels steht im Wurzelfeld `
+            + `"env". Unter "start" gab es sie am 2026-09-12 für ein paar Stunden: ein zweiter `
+            + `Weg für dieselbe Aussage, gebaut ohne nachzusehen, dass das Wurzelfeld längst da war.`);
+    }
+
     // ── Einstellungen: Ziel muss vollständig beschrieben sein ────────────────
     for (const s of paket.settings || []) {
         for (const z of s.apply || []) {

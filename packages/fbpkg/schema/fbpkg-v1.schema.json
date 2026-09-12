@@ -864,16 +864,6 @@
           "type": "string",
           "default": "."
         },
-        "env": {
-          "type": "object",
-          "description": "Umgebungsvariablen, die das SPIEL braucht — nicht der Lader, nicht das Image. Valheim setzt in seinem eigenen Startskript LD_LIBRARY_PATH=./linux64; ohne dieses Feld hatte ein Paket keine Moeglichkeit, das zu sagen (dazugekommen am 2026-09-12, nachdem der Lader mit {{env:LD_LIBRARY_PATH}} auf eine Variable zeigte, die niemand setzte). Werte duerfen {{setting:…}} und {{port:…}} enthalten. HOME und XDG_CACHE_HOME gehoeren NICHT hierher — die setzt fb-init aus dem Verzeichnisvertrag (E-19).",
-          "propertyNames": {
-            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
-          },
-          "additionalProperties": {
-            "type": "string"
-          }
-        },
         "extra_args": {
           "type": "object",
           "additionalProperties": false,
@@ -978,17 +968,14 @@
       }
     },
     "env": {
-      "description": "Feste Umgebungsvariablen ohne Bedienoberfläche. Alles, was ein Mensch ändern darf, gehört stattdessen nach settings[].",
+      "description": "Feste Umgebungsvariablen des SPIELS, ohne Bedienoberfläche. Alles, was ein Mensch ändern darf, gehört stattdessen nach settings[]. Gilt für den START — Installationsschritte tragen ihre eigene Umgebung (install.steps[].env), sonst sickert eine Variable für das Spiel still in einen SteamCMD-Lauf. Werte dürfen {{setting:…}} und {{port:…}} enthalten. HOME und XDG_CACHE_HOME gehören NICHT hierher — die setzt fb-init aus dem Verzeichnisvertrag (E-19). WARUM das wichtig ist: Wir starten das Binary direkt (start.program), nicht das Startskript des Spiels — alles, was dieses Skript exportiert, muss hier stehen. Valheims start_server.sh setzt in Zeile 3 LD_LIBRARY_PATH=./linux64. Dieses Feld stand von Anfang an im Schema, der Daemon las es aber bis zum 2026-09-12 nicht und verwarf es beim Einlesen stillschweigend; der erste Modstart (Server 188) brach daran ab, weil der Lader mit {{env:LD_LIBRARY_PATH}} auf eine Variable zeigte, die dadurch niemand setzte.",
       "type": "object",
       "propertyNames": {
         "$ref": "#/definitions/envKey"
       },
       "additionalProperties": {
-        "type": [
-          "string",
-          "number",
-          "boolean"
-        ]
+        "type": "string",
+        "description": "Nur Zeichenketten. Zahlen und Ja/Nein waren bis zum 2026-09-12 erlaubt, kamen aber in keinem Paket vor — und eine Zahl hier haette den Daemon beim Einlesen des GANZEN Pakets scheitern lassen (map[string]string). Wer eine Zahl braucht, schreibt sie als \"7\"."
       }
     },
     "settings": {
