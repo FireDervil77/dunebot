@@ -65,6 +65,9 @@
           <div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap">
             <span style="font-weight:600">${escape(e.name || e.kennung)}</span>
             ${e.fassung ? `<span class="fb-mono fb-muted" style="font-size:12px">${escape(e.fassung)}</span>` : ''}
+            ${e.url ? `<a href="${escape(e.url)}" target="_blank" rel="noopener noreferrer"
+                          class="fb-muted" style="font-size:12px" title="Seite bei Thunderstore">
+                         <i class="fa-solid fa-arrow-up-right-from-square"></i></a>` : ''}
             ${istLader ? marke('Lader') : ''}
           </div>
           <div class="fb-muted" style="font-size:12px;margin-top:2px">
@@ -169,14 +172,19 @@
     }
 
     if (brauchen.length) {
-      const liste = brauchen.map(m => `${m.name || m.kennung}${m.fassung ? ' ' + m.fassung : ''}`).join('\n');
+      // Mit Adresse: Die Liste wird weitergegeben, und „EpicLoot 0.9.22" allein
+      // schickt jeden Mitspieler erst einmal auf die Suche.
+      const liste = brauchen.map(m => {
+        const kopf = `${m.name || m.kennung}${m.fassung ? ' ' + m.fassung : ''}`;
+        return m.url ? `${kopf}\n  ${m.url}` : `${kopf}\n  (hochgeladen — Datei vom Server nötig)`;
+      }).join('\n');
       html += `
         <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--fb-border)">
           <div style="font-size:13px">
             <strong>${brauchen.length} ${brauchen.length === 1 ? 'Mod braucht' : 'Mods brauchen'} deine Mitspieler auch.</strong>
             Wer sie nicht hat, kommt nicht auf den Server.
           </div>
-          <textarea id="inhalte-weitergeben" class="form-control fb-mono" rows="${Math.min(6, brauchen.length + 1)}"
+          <textarea id="inhalte-weitergeben" class="form-control fb-mono" rows="${Math.min(10, brauchen.length * 2 + 1)}"
                     style="margin-top:8px;font-size:12px" readonly>${escape(liste)}</textarea>
           <button class="btn btn-white btn-sm" style="margin-top:6px" onclick="inhaltKopieren()">
             Liste zum Weitergeben kopieren
@@ -301,17 +309,24 @@
           <div style="flex:1 1 auto">
             <label class="form-label" style="font-size:12px">Mod suchen</label>
             <input id="ts-begriff" class="form-control form-control-sm"
-                   placeholder="Name, z. B. Jotunn" onkeydown="if(event.key==='Enter')inhaltSuchen()">
+                   placeholder="Name, z. B. Jotunn — leer lassen zum Stöbern"
+                   onkeydown="if(event.key==='Enter')inhaltSuchen()">
           </div>
           <button class="btn btn-primary btn-sm" onclick="inhaltSuchen()">Suchen</button>
         </div>
         <div class="fb-muted" style="font-size:12px;margin-top:8px">
-          Was ein Mod zum Laufen braucht, kommt mit — der Lader meistens auch.
-          Vor dem Installieren siehst du die vollständige Liste.
+          Ohne Eingabe siehst du die beliebtesten — zum Schauen, was es für dieses
+          Spiel überhaupt gibt. Was ein Mod zum Laufen braucht, kommt bei der
+          Installation mit, der Lader meistens auch.
+          <br>Nicht alles hier gehört auf einen Server: Mod-Manager wie
+          <span class="fb-mono">r2modman</span> laufen beim Spieler.
         </div>
         <div id="ts-treffer" style="margin-top:8px"></div>
       </div>`;
     document.getElementById('ts-begriff').focus();
+    // Gleich stöbern lassen: Ein leeres Feld mit einem Knopf daneben verrät
+    // nicht, dass dahinter schon eine Liste liegt.
+    window.inhaltSuchen();
   };
 
   window.inhaltSuchen = function () {
@@ -330,15 +345,21 @@
           raum.innerHTML = '<div class="fb-muted" style="font-size:12px">Nichts gefunden.</div>';
           return;
         }
-        raum.innerHTML = d.treffer.map(t => `
+        raum.innerHTML = (d.gestoebert
+          ? `<div class="fb-muted" style="font-size:12px;padding-bottom:4px">
+               Die beliebtesten ${d.treffer.length} für dieses Spiel — tippe einen Namen, um zu suchen.
+             </div>` : '')
+          + d.treffer.map(t => `
           <div style="display:flex;gap:10px;padding:8px 0;border-top:1px solid var(--fb-border);align-items:flex-start">
             ${t.bild ? `<img src="${escape(t.bild)}" alt="" width="32" height="32" style="border-radius:4px;flex:0 0 auto">` : ''}
             <div style="flex:1 1 auto;min-width:0">
               <div style="font-weight:600;font-size:13px">${escape(t.name)}
                 ${t.veraltet ? marke('veraltet', 'warn') : ''}</div>
               <div class="fb-muted" style="font-size:12px">${escape(t.beschreibung).slice(0, 160)}</div>
-              <div class="fb-muted fb-mono" style="font-size:11px;margin-top:2px">
-                ${escape(t.kennung)} · ${Number(t.downloads).toLocaleString('de-DE')} Downloads</div>
+              <div class="fb-muted" style="font-size:11px;margin-top:2px">
+                <span class="fb-mono">${escape(t.kennung)}</span> ·
+                ${Number(t.downloads).toLocaleString('de-DE')} Downloads
+                ${t.url ? `· <a href="${escape(t.url)}" target="_blank" rel="noopener noreferrer">ansehen</a>` : ''}</div>
             </div>
             ${DARF ? `<button class="btn btn-white btn-sm" style="flex:0 0 auto"
                         onclick="inhaltVorschau('${escape(t.kennung)}', this)">Ansehen</button>` : ''}

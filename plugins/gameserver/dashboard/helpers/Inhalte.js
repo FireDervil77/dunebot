@@ -187,7 +187,39 @@ function dateienAus(zeile) {
     }
 }
 
+/**
+ * Die Seite, auf der dieser Inhalt bei seiner Quelle steht.
+ *
+ * ── Warum das Spiel in die Adresse gehoert ──────────────────────────────────
+ *
+ * Thunderstore ist nach Spielen getrennt. `thunderstore.io/package/<ns>/<name>/`
+ * gibt es zwar — es leitet aber auf die Gemeinschaft um, in der das Paket
+ * ZUERST erschien: Fuer `ValheimModding-Jotunn` landet man damit bei
+ * **riskofrain2** (gemessen am 2026-09-12, HTTP 301). Richtig ist
+ * `/c/<gemeinschaft>/p/<namensraum>/<name>/`, und die Gemeinschaft weiss nur
+ * das Paket (`content.source_ids.thunderstore`).
+ *
+ * Deshalb steht die Adresse hier und nicht in der Ansicht: Die Ansicht kennt
+ * das Spielpaket nicht.
+ *
+ * @param {object} zeile      Zeile aus gameserver_content
+ * @param {string|null} gemeinschaft
+ * @returns {string|null} null, wenn es keine Seite gibt (hochgeladene Datei)
+ */
+function paketAdresse(zeile, gemeinschaft) {
+    if (!zeile || zeile.quelle !== 'thunderstore' || !gemeinschaft) return null;
+
+    const kennung = String(zeile.kennung || '');
+    const schnitt = kennung.indexOf('-');
+    if (schnitt < 1 || schnitt === kennung.length - 1) return null;
+
+    const namensraum = kennung.slice(0, schnitt);
+    const name = kennung.slice(schnitt + 1);
+    return 'https://thunderstore.io/c/' + encodeURIComponent(gemeinschaft)
+         + '/p/' + encodeURIComponent(namensraum) + '/' + encodeURIComponent(name) + '/';
+}
+
 module.exports = {
-    fuerServer, laderAktiv, eintragen, entfernen, schalten, dateienAus,
+    fuerServer, laderAktiv, eintragen, entfernen, schalten, dateienAus, paketAdresse,
     ART_LADER, ART_MOD,
 };

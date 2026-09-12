@@ -166,10 +166,14 @@
             geholt — samt allem, was ein Mod zum Laufen braucht. Der Lader
             (<span class="fb-mono"><%= locals.inhalte.laderName || 'BepInEx' %></span>)
             kommt dabei meist von selbst mit. Wirksam wird es beim ersten Start.
+            <br><strong>Suchen ohne Eingabe</strong> zeigt die beliebtesten Mods
+            dieses Spiels — zum Schauen, was es überhaupt gibt. Nicht alles davon
+            gehört auf einen Server: Mod-Manager wie
+            <span class="fb-mono">r2modman</span> laufen beim Spieler.
           </div>
           <div style="display:flex;gap:8px;align-items:flex-end;margin-top:10px">
             <input id="mod-begriff" class="fb-feld" style="flex:1 1 auto"
-                   placeholder="Mod suchen, z. B. Jotunn"
+                   placeholder="Mod suchen, z. B. Jotunn — leer lassen zum Stöbern"
                    onkeydown="if(event.key==='Enter'){event.preventDefault();modSuchen();}">
             <button type="button" class="btn btn-white btn-sm" onclick="modSuchen()">Suchen</button>
           </div>
@@ -199,7 +203,9 @@
             '<div style="font-size:13px;font-weight:600;margin-bottom:4px">Wird mitinstalliert (' + gewaehlt.length + ')</div>' +
             gewaehlt.map(function (m, i) {
               return '<div style="display:flex;gap:8px;align-items:center;padding:3px 0;font-size:12px">' +
-                '<span class="fb-mono" style="flex:1 1 auto">' + esc(m.kennung) + '</span>' +
+                '<span class="fb-mono" style="flex:1 1 auto">' + esc(m.kennung) +
+                  (m.url ? ' <a href="' + esc(m.url) + '" target="_blank" rel="noopener noreferrer">ansehen</a>' : '') +
+                '</span>' +
                 '<button type="button" class="btn btn-white btn-sm" onclick="modEntfernen(' + i + ')">Entfernen</button>' +
                 '<input type="hidden" name="mod" value="' + esc(m.kennung) + '">' +
                 '</div>';
@@ -219,16 +225,24 @@
                 raum.innerHTML = '<div class="fb-muted" style="font-size:12px">Nichts gefunden.</div>';
                 return;
               }
-              raum.innerHTML = r.d.treffer.slice(0, 10).map(function (t) {
+              var kopf = r.d.gestoebert
+                ? '<div class="fb-muted" style="font-size:12px;padding-bottom:4px">Die beliebtesten ' +
+                  r.d.treffer.length + ' für dieses Spiel — tippe einen Namen, um gezielt zu suchen.</div>'
+                : '';
+              raum.innerHTML = kopf + r.d.treffer.map(function (t) {
                 return '<div style="display:flex;gap:10px;padding:6px 0;border-top:1px solid var(--fb-border);align-items:flex-start">' +
                   '<div style="flex:1 1 auto;min-width:0">' +
                     '<div style="font-size:13px;font-weight:600">' + esc(t.name) +
                       (t.veraltet ? ' <span class="fb-pille" style="font-size:11px">veraltet</span>' : '') + '</div>' +
                     '<div class="fb-muted" style="font-size:12px">' + esc(String(t.beschreibung).slice(0, 140)) + '</div>' +
-                    '<div class="fb-muted fb-mono" style="font-size:11px">' + esc(t.kennung) + '</div>' +
+                    '<div class="fb-muted" style="font-size:11px">' +
+                      '<span class="fb-mono">' + esc(t.kennung) + '</span>' +
+                      (t.downloads ? ' · ' + Number(t.downloads).toLocaleString('de-DE') + ' Downloads' : '') +
+                      (t.url ? ' · <a href="' + esc(t.url) + '" target="_blank" rel="noopener noreferrer">ansehen</a>' : '') +
+                    '</div>' +
                   '</div>' +
                   '<button type="button" class="btn btn-white btn-sm" style="flex:0 0 auto" ' +
-                    'onclick="modWaehlen(\'' + esc(t.kennung) + '\')">Auswählen</button>' +
+                    'onclick="modWaehlen(\'' + esc(t.kennung) + '\', \'' + esc(t.url || '') + '\')">Auswählen</button>' +
                   '</div>';
               }).join('');
             })
@@ -237,9 +251,9 @@
             });
         };
 
-        window.modWaehlen = function (kennung) {
+        window.modWaehlen = function (kennung, url) {
           if (gewaehlt.some(function (m) { return m.kennung === kennung; })) return;
-          gewaehlt.push({ kennung: kennung });
+          gewaehlt.push({ kennung: kennung, url: url || null });
           zeichne();
         };
 

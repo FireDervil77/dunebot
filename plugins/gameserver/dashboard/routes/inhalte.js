@@ -73,8 +73,18 @@ router.get('/:serverId/inhalte', requirePermission('GAMESERVER.VIEW'), async (re
         const inhalt = geladen.paket?.content || null;
         const liste = await Inhalte.fuerServer(req.params.serverId);
 
+        // Jede Zeile bekommt die Seite ihrer Quelle mit — daraus baut die Karte
+        // die Liste zum Weitergeben. Gebaut wird sie HIER, weil nur hier das
+        // Spielpaket bekannt ist (die Gemeinschaft steht darin).
+        const gemeinschaft = inhalt?.source_ids?.thunderstore || null;
+        const mitAdresse = (z) => (z ? { ...z, url: Inhalte.paketAdresse(z, gemeinschaft) } : z);
+        liste.lader = mitAdresse(liste.lader);
+        liste.mods = liste.mods.map(mitAdresse);
+        liste.entfernt = liste.entfernt.map(mitAdresse);
+
         return res.json({
             success: true,
+            gemeinschaft,
             // Was das PAKET sagt — ohne das weiss die Ansicht nicht, ob sie
             // ueberhaupt etwas anbieten darf.
             unterstuetzt: Boolean(inhalt?.supported),
@@ -264,13 +274,37 @@ router.get('/mods/suche', requirePermission('GAMESERVER.CREATE'), async (req, re
         const absage = keineQuelle(res, inhalt);
         if (absage) return absage;
 
-        const treffer = await Thunderstore.suche(gemeinschaftAus(inhalt), req.query.q || '');
-        return res.json({ success: true, treffer, lader: inhalt.loader?.packages?.thunderstore || null });
+        return res.json(await sucheAntwort(inhalt, req.query.q));
     } catch (error) {
         Logger.warn('[Gameserver/Inhalte] Suche fehlgeschlagen:', error);
         return res.status(502).json({ success: false, message: error.message });
     }
 });
+
+/**
+ * Die Antwort auf eine Suche — samt Seite je Treffer.
+ *
+ * **Ohne Suchbegriff kommen die beliebtesten.** Das ist kein Nebeneffekt,
+ * sondern der Weg fuer jemanden, der das Spiel noch nicht kennt: erst schauen,
+ * was es gibt. Die Ansicht sagt es auch so.
+ *
+ * Die Adresse baut der Server, nicht die Ansicht: Sie braucht die Gemeinschaft
+ * aus dem Paket, und ohne sie landet man beim falschen Spiel.
+ */
+async function sucheAntwort(inhalt, begriff) {
+    const gemeinschaft = gemeinschaftAus(inhalt);
+    const roh = await Thunderstore.suche(gemeinschaft, begriff || '', 25);
+    return {
+        success: true,
+        gemeinschaft,
+        gestoebert: !String(begriff || '').trim(),
+        lader: inhalt.loader?.packages?.thunderstore || null,
+        treffer: roh.map(t => ({
+            ...t,
+            url: Inhalte.paketAdresse({ quelle: 'thunderstore', kennung: t.kennung }, gemeinschaft),
+        })),
+    };
+}
 
 /** Suchen fuer einen bestehenden Server. */
 router.get('/:serverId/inhalte/suche', requirePermission('GAMESERVER.VIEW'), async (req, res) => {
@@ -285,8 +319,7 @@ router.get('/:serverId/inhalte/suche', requirePermission('GAMESERVER.VIEW'), asy
         const absage = keineQuelle(res, inhalt);
         if (absage) return absage;
 
-        const treffer = await Thunderstore.suche(gemeinschaftAus(inhalt), req.query.q || '');
-        return res.json({ success: true, treffer, lader: inhalt.loader?.packages?.thunderstore || null });
+        return res.json(await sucheAntwort(inhalt, req.query.q));
     } catch (error) {
         // 502, nicht 500: Der Fehler liegt beim fremden Dienst, nicht bei uns —
         // und die Meldung sagt das auch, statt „Serverfehler" zu behaupten.

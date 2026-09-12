@@ -346,6 +346,48 @@ async function pruefe(name, fn) {
         assert.strictEqual(db.zeilen.find(z => z.id === 9).status, 'entfernt');
     });
 
+    // ── Die Seite, auf die man verweisen kann ───────────────────────────────
+    console.log('\nAdressen');
+
+    const Inhalte = require(path.join(HELFER, 'Inhalte.js'));
+
+    await pruefe('Die Adresse traegt das SPIEL im Pfad', async () => {
+        assert.strictEqual(
+            Inhalte.paketAdresse({ quelle: 'thunderstore', kennung: 'ValheimModding-Jotunn' }, 'valheim'),
+            'https://thunderstore.io/c/valheim/p/ValheimModding/Jotunn/');
+        // Ohne Gemeinschaft KEINE Adresse: Die naheliegende Form
+        // thunderstore.io/package/<ns>/<name>/ leitet auf die Gemeinschaft um,
+        // in der das Paket zuerst erschien — bei Jotunn auf riskofrain2
+        // (gemessen am 2026-09-12).
+        assert.strictEqual(
+            Inhalte.paketAdresse({ quelle: 'thunderstore', kennung: 'ValheimModding-Jotunn' }, null), null);
+    });
+
+    await pruefe('Eine hochgeladene Datei hat keine Seite', async () => {
+        assert.strictEqual(
+            Inhalte.paketAdresse({ quelle: 'upload', kennung: 'MeinMod.dll' }, 'valheim'), null);
+    });
+
+    await pruefe('Suche ohne Begriff heisst stoebern — mit Adressen', async () => {
+        Thunderstore.suche = async (gemeinschaft, begriff) => {
+            assert.strictEqual(begriff, '', 'leer heisst leer, nicht undefined');
+            return [{ kennung: 'ValheimModding-Jotunn', name: 'Jotunn', downloads: 4152121 }];
+        };
+        const r = await rufe('get', '/:serverId/inhalte/suche', { query: {} });
+        assert.strictEqual(r.antwort.gestoebert, true, 'ohne Begriff wird gestoebert');
+        assert.strictEqual(r.antwort.treffer[0].url,
+            'https://thunderstore.io/c/valheim/p/ValheimModding/Jotunn/');
+    });
+
+    await pruefe('Die Liste eines Servers traegt die Adressen mit', async () => {
+        db.zeilen.push({ id: 3, server_id: 186, art: 'mod', quelle: 'thunderstore',
+            kennung: 'ValheimModding-Jotunn', fassung: '2.30.0', status: 'installiert', aktiv: 1 });
+        const r = await rufe('get', '/:serverId/inhalte');
+        assert.strictEqual(r.antwort.gemeinschaft, 'valheim');
+        assert.strictEqual(r.antwort.mods[0].url,
+            'https://thunderstore.io/c/valheim/p/ValheimModding/Jotunn/');
+    });
+
     // ── Verdrahtung: haengt der Abruf an einem Ereignis, das ankommt? ───────
     //
     // Am 2026-09-12 tat er das NICHT: Der Aufruf sass in
