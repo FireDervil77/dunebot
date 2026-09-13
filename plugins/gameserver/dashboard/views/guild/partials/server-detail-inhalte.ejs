@@ -78,6 +78,39 @@
   // beim Laden: Das ist eine Abfrage JE MOD bei einem fremden Dienst.
   const NEUER = {};
 
+  // ── Ladestand: was BepInEx beim letzten Start wirklich geladen hat ────────
+  //
+  // Betreiber, 2026-09-13: Die Angaben im Modbereich sind nicht verlaesslich —
+  // der Server soll selbst sagen, welcher Mod laedt. Quelle ist die Logdatei
+  // des Laders (Route /ladestand, helpers/BepInExLog.js).
+  let LADESTAND = null;
+  let ZULETZT = null;
+  const LAUFTEXT = {
+    fehler: 'lädt nicht',
+    nicht_geladen: 'nicht geladen',
+    uebersprungen: 'übersprungen',
+    abgebrochen: 'Laden abgebrochen',
+    nicht_gesehen: 'im Log nicht gefunden',
+  };
+
+  function ladestandKopf() {
+    if (!LADESTAND) return '';
+    if (!LADESTAND.verfuegbar) {
+      return `<div class="fb-muted" style="font-size:12px;margin:4px 0 8px">Ladestand: ${escape(LADESTAND.grund || 'nicht verfügbar')}</div>`;
+    }
+    const wann = LADESTAND.stand
+      ? new Date(LADESTAND.stand).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+      : '?';
+    const fremd = (LADESTAND.fremd || []).map(p => p.name + (p.fassung ? ' ' + p.fassung : '')
+      + (p.status && p.status !== 'geladen' ? ' (' + (LAUFTEXT[p.status] || p.status) + ')' : ''));
+    return `
+      <div class="fb-muted" style="font-size:12px;margin:4px 0 8px">
+        Ladestand vom letzten Start (${escape(wann)})${LADESTAND.bepinex ? ' · BepInEx ' + escape(LADESTAND.bepinex) : ''}${LADESTAND.laeuft ? '' : ' · Server gestoppt'}
+        ${LADESTAND.vollstaendig ? '' : ' · <span style="color:var(--fb-danger)">das Laden wurde nicht abgeschlossen</span>'}
+        ${fremd.length ? `<br>Geladen, aber keinem Eintrag zugeordnet: ${escape(fremd.join(', '))}` : ''}
+      </div>`;
+  }
+
   const escape = (s) => String(s == null ? '' : s)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
@@ -95,6 +128,14 @@
     const neuere = NEUER[e.id];
     if (neuere && neuere.neuer)        marken.push(marke('neuer: ' + neuere.neueste, 'warn'));
     if (neuere && neuere.fehler)       marken.push(marke('Fassung nicht abfragbar'));
+    // Was BepInEx beim letzten Start dazu gesagt hat.
+    const lauf = LADESTAND && LADESTAND.zeilen ? LADESTAND.zeilen[e.id] : null;
+    if (lauf) {
+      if (lauf.trotzAus)                         marken.push(marke('ausgeschaltet — lädt trotzdem', 'warn'));
+      else if (lauf.status === 'geladen')        marken.push(marke('geladen'));
+      else if (lauf.status === 'neu_seit_start') marken.push(marke('seit dem letzten Start neu'));
+      else                                       marken.push(marke(LAUFTEXT[lauf.status] || lauf.status, 'warn'));
+    }
 
     return `
       <div style="display:flex;gap:12px;padding:12px 0;align-items:flex-start;border-top:1px solid var(--fb-border)">
@@ -117,6 +158,8 @@
           </div>
           ${marken.length ? `<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">${marken.join('')}</div>` : ''}
           ${e.fehler ? `<div class="fb-muted" style="font-size:12px;margin-top:4px;color:var(--fb-danger)">${escape(e.fehler)}</div>` : ''}
+          ${lauf && lauf.grund && lauf.status !== 'geladen' ? `<div class="fb-muted" style="font-size:12px;margin-top:4px${['fehler', 'nicht_geladen', 'abgebrochen'].includes(lauf.status) ? ';color:var(--fb-danger)' : ''}">${escape(lauf.grund)}</div>` : ''}
+          ${lauf && lauf.warnungen && lauf.warnungen.length ? `<div class="fb-muted" style="font-size:12px;margin-top:2px">${lauf.warnungen.map(escape).join('<br>')}</div>` : ''}
         </div>
         ${DARF ? `
           <div style="display:flex;gap:6px;align-items:center;flex:0 0 auto">
@@ -174,6 +217,7 @@
         ${DARF ? `<button class="btn btn-white btn-sm"
                     onclick="inhaltFormular()">Datei hochladen</button>` : ''}
       </div>
+      ${ladestandKopf()}
       <div id="inhalte-suche" style="display:none"></div>
       <div id="inhalte-formular" style="display:none"></div>`;
 
@@ -278,13 +322,35 @@
       .then(d => {
         if (!d.success) throw new Error(d.message || 'Fehler');
         d.lader_key = d.lader_key || d.lader && d.lader.kennung;
+        ZULETZT = d;
         zeichne(d);
+        ladestandLaden();
       })
       .catch(e => {
         wurzel.innerHTML = `<div class="fb-muted" style="font-size:13px;color:var(--fb-danger)">
           Die Liste konnte nicht geladen werden: ${escape(e.message)}</div>`;
       });
   };
+
+  // Nach der Liste, nicht vor ihr: Zwei Dateibefehle beim Daemon sollen die
+  // Liste nicht aufhalten.
+  function ladestandLaden() {
+    fetch(`${BASIS}/ladestand`, { headers: { Accept: 'application/json' } })
+      .then(async (a) => {
+        const d = await a.json().catch(() => null);
+        if (!a.ok || !d || !d.success) throw new Error((d && d.message) || `HTTP ${a.status}`);
+        return d;
+      })
+      .then(d => { LADESTAND = d; })
+      .catch(e => { LADESTAND = { verfuegbar: false, grund: 'nicht abrufbar — ' + e.message }; })
+      .finally(() => {
+        // Ein offenes Such- oder Hochladefeld nicht wegzeichnen; die Marken
+        // kommen dann mit dem naechsten Laden der Liste.
+        const offen = ['inhalte-suche', 'inhalte-formular']
+          .some(id => { const f = document.getElementById(id); return f && f.style.display !== 'none'; });
+        if (ZULETZT && !offen) zeichne(ZULETZT);
+      });
+  }
 
   window.inhaltFormular = function () {
     const feld = document.getElementById('inhalte-formular');

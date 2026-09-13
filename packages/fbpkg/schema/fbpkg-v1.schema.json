@@ -1019,6 +1019,10 @@
               "type": "string",
               "description": "Wohin das Laderpaket entpackt wird — relativ zur Volume-Wurzel, wie content.path. Leer heisst Volume-Wurzel. Ein Lader wie BepInEx MUSS neben der Spieldatei liegen, weil er ueber LD_PRELOAD/Doorstop mit Pfaden relativ zum Arbeitsverzeichnis geladen wird — fuer ein Spiel, das aus game/ startet, also \"game\". Ohne Angabe bleibt es bei der Wurzel; das ist richtig fuer Spiele, die von dort starten."
             },
+            "log": {
+              "type": "string",
+              "description": "Die Logdatei des Laders — relativ zur Volume-Wurzel, wie path. Aus ihr liest das Dashboard, welcher Mod beim letzten Start geladen wurde und welcher nicht (Ladestand im Mods-Reiter). BepInEx schreibt sie bei jedem Start neu: BepInEx/LogOutput.log unter loader.path. GEMESSEN am 2026-09-13 auf einer Kopie von Server 189 mit TeleportEverything 2.9.1: Die Ausnahme eines abstuerzenden Mods steht darin als [Error : Unity Log] zwischen 'Loading [X]' und 'Chainloader startup complete'. Warum nicht die Containerausgabe: Der Container wird beim Stopp entfernt, und der Konsolenverlauf fasst 500 Zeilen. Ohne dieses Feld zeigt der Reiter keinen Ladestand und sagt das."
+            },
             "packages": {
               "description": "Wie der Lader bei der jeweiligen Quelle heisst (ohne Fassung). Nur damit laesst sich eine aufgeloeste Abhaengigkeit als LADER erkennen und in die Serverwurzel legen statt zu den Mods. Raten waere hier falsch: 'enthaelt BepInEx im Namen' trifft auch Mods.",
               "type": "object",

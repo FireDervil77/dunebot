@@ -96,6 +96,7 @@ const db = {
 const daemon = {
     abrufe: [],          // gameserver.content.fetch
     geloescht: [],       // gameserver.files.delete
+    gelistet: [], gelesen: [], logInhalt: '', logFehlt: false,
     scheitern: new Set(),
     isDaemonOnline: () => true,
     async sendCommand(daemonId, befehl, nutzlast) {
@@ -110,6 +111,15 @@ const daemon = {
         if (befehl === 'gameserver.files.delete') {
             this.geloescht.push(nutzlast.path);
             return { success: true };
+        }
+        if (befehl === 'gameserver.files.list') {
+            this.gelistet.push(nutzlast.path);
+            return { success: true, data: { files: this.logFehlt ? [] : [
+                { name: 'LogOutput.log', is_dir: false, size: this.logInhalt.length, mod_time: '2026-09-13T14:26:42Z' }] } };
+        }
+        if (befehl === 'gameserver.files.read') {
+            this.gelesen.push(nutzlast.path);
+            return { success: true, data: { content: this.logInhalt } };
         }
         throw new Error('Unerwarteter Befehl: ' + befehl);
     },
@@ -140,6 +150,7 @@ const JOTUNN  = { kennung: 'ValheimModding-Jotunn', name: 'Jotunn', fassung: '2.
 let bestanden = 0;
 async function pruefe(name, fn) {
     db.zeilen = []; daemon.abrufe = []; daemon.geloescht = []; daemon.scheitern = new Set(); db.serverStatus = null;
+    daemon.gelistet = []; daemon.gelesen = []; daemon.logInhalt = ''; daemon.logFehlt = false;
     try {
         await fn();
         console.log(`  ✓ ${name}`);
@@ -635,6 +646,135 @@ async function pruefe(name, fn) {
         assert.strictEqual(r.antwort.installiert.length, 2);
         assert.strictEqual(r.antwort.laeuft, true);
         assert.strictEqual(r.antwort.neustartNoetig, true);
+    });
+
+    // ── Ladestand: was BepInEx beim letzten Start geladen hat (Betreiber: B) ─
+    //
+    // Die beiden Logs sind WOERTLICH aus echten Laeufen vom 2026-09-13 — beim
+    // Schreiben dieses Waechters aus den Dateien eingelesen, nicht abgetippt:
+    //   FEHLER_LOG  Kopie von Server 189 mit TeleportEverything 2.9.1 (Absturz beim Laden)
+    //   SAUBER_LOG  Server 189 selbst, BepInEx 5.4.23.5 mit Jotunn 2.30.0
+    console.log('\nLadestand');
+
+    const BepInExLog = require(path.join(HELFER, 'BepInExLog.js'));
+    const FEHLER_LOG = "[Message:   BepInEx] BepInEx 5.4.23.5 - valheim_server (09/12/2026 14:19:32)\n[Message:   BepInEx] User is running BepInExPack Valheim version 5.4.2350 from Thunderstore\n[Info   :   BepInEx] Running under Unity vUnknown (post-2017)\n[Info   :   BepInEx] CLR runtime version: 4.0.30319.42000\n[Info   :   BepInEx] Supports SRE: True\n[Info   :   BepInEx] System platform: Bits64, Linux\n[Message:   BepInEx] Preloader started\n[Info   :   BepInEx] Loaded 1 patcher method from [BepInEx.Preloader 5.4.23.5]\n[Info   :   BepInEx] 1 patcher plugin loaded\n[Info   :   BepInEx] Patching [UnityEngine.CoreModule] with [BepInEx.Chainloader]\n[Message:   BepInEx] Preloader finished\n[Info   :   BepInEx] Detected Unity version: v6000.0.75f1\n[Message:   BepInEx] Chainloader ready\n[Message:   BepInEx] Chainloader started\n[Info   :   BepInEx] 2 plugins to load\n[Info   :   BepInEx] Loading [Jotunn 2.30.0]\n[Info   :Jotunn.Main] Initializing ModCompatibility\n[Info   :Jotunn.Main] Initializing SynchronizationManager\n[Info   :Jotunn.Main] Initializing NetworkManager\n[Info   :   BepInEx] Loading [TeleportEverything 2.9.1]\n[Warning:  HarmonyX] AccessTools.DeclaredMethod: Could not find method for type ItemDrop+ItemData and name GetTooltip and parameters (ItemDrop+ItemData, int, bool, float, int)\n[Error  : Unity Log] ArgumentException: Undefined target method for patch method static void TeleportEverything.Plugin+GetTooltip_Patch::Postfix(ItemDrop+ItemData item, String& __result)\nStack trace:\nHarmonyLib.PatchClassProcessor.PatchWithAttributes (System.Reflection.MethodBase& lastOriginal) (at <474744d65d8e460fa08cd5fd82b5d65f>:0)\nHarmonyLib.PatchClassProcessor.Patch () (at <474744d65d8e460fa08cd5fd82b5d65f>:0)\nRethrow as HarmonyException: Patching exception in method null\nHarmonyLib.PatchClassProcessor.ReportException (System.Exception exception, System.Reflection.MethodBase original) (at <474744d65d8e460fa08cd5fd82b5d65f>:0)\nHarmonyLib.PatchClassProcessor.Patch () (at <474744d65d8e460fa08cd5fd82b5d65f>:0)\nHarmonyLib.Harmony.<PatchAll>b__11_0 (System.Type type) (at <474744d65d8e460fa08cd5fd82b5d65f>:0)\nHarmonyLib.CollectionExtensions.Do[T] (System.Collections.Generic.IEnumerable`1[T] sequence, System.Action`1[T] action) (at <474744d65d8e460fa08cd5fd82b5d65f>:0)\nHarmonyLib.Harmony.PatchAll (System.Reflection.Assembly assembly) (at <474744d65d8e460fa08cd5fd82b5d65f>:0)\nHarmonyLib.Harmony.PatchAll () (at <474744d65d8e460fa08cd5fd82b5d65f>:0)\nTeleportEverything.Plugin.Awake () (at <cda60ebd653a4bec842f096420f9dd76>:0)\nUnityEngine.GameObject:AddComponent(Type)\nBepInEx.Bootstrap.Chainloader:Start()\nUnityEngine.GameObject:.cctor()\nPlatformInitializer:EarlyInitialize()\n\n[Message:   BepInEx] Chainloader startup complete\n[Info   : Unity Log] 09/13/2026 16:38:19: Set background loading budget to Low\n\n[Info   : Unity Log] 09/13/2026 16:38:19: Loading first scene!\n";
+    const SAUBER_LOG = "[Message:   BepInEx] BepInEx 5.4.23.5 - valheim_server (09/12/2026 12:19:32)\n[Message:   BepInEx] User is running BepInExPack Valheim version 5.4.2350 from Thunderstore\n[Info   :   BepInEx] Running under Unity vUnknown (post-2017)\n[Info   :   BepInEx] CLR runtime version: 4.0.30319.42000\n[Info   :   BepInEx] Supports SRE: True\n[Info   :   BepInEx] System platform: Bits64, Linux\n[Message:   BepInEx] Preloader started\n[Info   :   BepInEx] Loaded 1 patcher method from [BepInEx.Preloader 5.4.23.5]\n[Info   :   BepInEx] 1 patcher plugin loaded\n[Info   :   BepInEx] Patching [UnityEngine.CoreModule] with [BepInEx.Chainloader]\n[Message:   BepInEx] Preloader finished\n[Info   :   BepInEx] Detected Unity version: v6000.0.75f1\n[Message:   BepInEx] Chainloader ready\n[Message:   BepInEx] Chainloader started\n[Info   :   BepInEx] 1 plugin to load\n[Info   :   BepInEx] Loading [Jotunn 2.30.0]\n[Info   :Jotunn.Main] Initializing ModCompatibility\n[Info   :Jotunn.Main] Initializing SynchronizationManager\n[Info   :Jotunn.Main] Initializing NetworkManager\n[Message:   BepInEx] Chainloader startup complete\n[Info   : Unity Log] 09/13/2026 13:06:51: Set background loading budget to Low\n\n[Info   : Unity Log] 09/13/2026 13:06:51: Loading first scene!\n\n";
+    const nachName = (e, name) => e.plugins.find(x => x.name === name);
+
+    await pruefe('Echter Absturz: Jotunn geladen, TeleportEverything laedt nicht — mit Grund', async () => {
+        const e = BepInExLog.werteAus(FEHLER_LOG);
+        assert.strictEqual(e.vollstaendig, true);
+        assert.strictEqual(e.anzahl, 2);
+        assert.strictEqual(nachName(e, 'Jotunn').status, 'geladen');
+        const te = nachName(e, 'TeleportEverything');
+        assert.strictEqual(te.fassung, '2.9.1');
+        assert.strictEqual(te.status, 'fehler');
+        assert.match(te.grund, /Undefined target method/);
+        assert.ok(te.warnungen.some(w => /HarmonyX/.test(w)), 'die HarmonyX-Warnung gehoert zu ihm');
+    });
+
+    await pruefe('Echter sauberer Start: alles geladen, Fassungen gelesen', async () => {
+        const e = BepInExLog.werteAus(SAUBER_LOG);
+        assert.strictEqual(e.vollstaendig, true);
+        assert.strictEqual(e.bepinex, '5.4.23.5');
+        assert.strictEqual(e.pack, '5.4.2350');
+        assert.deepStrictEqual(e.plugins.map(p => [p.name, p.status]), [['Jotunn', 'geladen']]);
+    });
+
+    // Im echten Log von 189 stehen nach dem Chainloader Unity-Fehler (Shader,
+    // Video, AsyncResourceUpload). Sie gehoeren dem SPIEL. Ohne diese Pruefung
+    // fiele nicht auf, wenn sie dem zuletzt geladenen Mod angehaengt wuerden —
+    // beide Ausschnitte oben enden vor ihnen.
+    const LANG_LOG = "[Message:   BepInEx] BepInEx 5.4.23.5 - valheim_server (09/12/2026 12:19:32)\n[Message:   BepInEx] User is running BepInExPack Valheim version 5.4.2350 from Thunderstore\n[Info   :   BepInEx] Running under Unity vUnknown (post-2017)\n[Info   :   BepInEx] CLR runtime version: 4.0.30319.42000\n[Info   :   BepInEx] Supports SRE: True\n[Info   :   BepInEx] System platform: Bits64, Linux\n[Message:   BepInEx] Preloader started\n[Info   :   BepInEx] Loaded 1 patcher method from [BepInEx.Preloader 5.4.23.5]\n[Info   :   BepInEx] 1 patcher plugin loaded\n[Info   :   BepInEx] Patching [UnityEngine.CoreModule] with [BepInEx.Chainloader]\n[Message:   BepInEx] Preloader finished\n[Info   :   BepInEx] Detected Unity version: v6000.0.75f1\n[Message:   BepInEx] Chainloader ready\n[Message:   BepInEx] Chainloader started\n[Info   :   BepInEx] 1 plugin to load\n[Info   :   BepInEx] Loading [Jotunn 2.30.0]\n[Info   :Jotunn.Main] Initializing ModCompatibility\n[Info   :Jotunn.Main] Initializing SynchronizationManager\n[Info   :Jotunn.Main] Initializing NetworkManager\n[Message:   BepInEx] Chainloader startup complete\n[Info   : Unity Log] 09/13/2026 13:06:51: Set background loading budget to Low\n\n[Info   : Unity Log] 09/13/2026 13:06:51: Loading first scene!\n\n[Info   : Unity Log] 09/13/2026 13:06:51: Preferences initialized! Activating first scene!\n\n[Info   : Unity Log] 09/13/2026 13:06:53: Loading: Starting to load scene: start.unity (169d7618616154c03be07e9ad3af5893)\n\n[Info   : Unity Log] 09/13/2026 13:06:53: Set background loading budget to Normal\n\n[Info   : Unity Log] 09/13/2026 13:06:53: Loaded localization file #0 - 'localization' language: 'English'\n\n[Info   : Unity Log] 09/13/2026 13:06:53: Loaded localization file #1 - 'localization_extra' language: 'English'\n\n[Info   : Unity Log] 09/13/2026 13:06:53: Loaded localization file #2 - 'heightmap_message' language: 'English'\n\n[Info   : Unity Log] 09/13/2026 13:06:53: Loaded localization file #3 - 'localization_witch' language: 'English'\n\n[Info   : Unity Log] 09/13/2026 13:06:53: Loaded localization file #4 - 'localization_ashlands' language: 'English'\n\n[Info   : Unity Log] 09/13/2026 13:06:53: Loaded localization file #5 - 'localization_deepnorth' language: 'English'\n\n[Info   : Unity Log] 09/13/2026 13:06:53: Loaded localization file #6 - 'localization_captions' language: 'English'\n\n[Info   : Unity Log] 09/13/2026 13:06:53: Loaded localization file #7 - 'localization_warriortitles' language: 'English'\n\n[Info   : Unity Log] 09/13/2026 13:06:53: Loaded localization file #8 - 'localization_combatupdate' language: 'English'\n\n[Info   : Unity Log] 09/13/2026 13:06:53: Loaded localization file #9 - 'localization_ps' language: 'English'\n\n[Info   : Unity Log] 09/13/2026 13:06:53: Loaded localization file #10 - 'localization_celebrationupdate' language: 'English'\n\n[Info   : Unity Log] 09/13/2026 13:06:53: Loaded localization file #11 - 'localization_xbox' language: 'English'\n\n[Info   : Unity Log] 09/13/2026 13:06:53: Loaded localization file #12 - 'localization_switch' language: 'English'\n\n[Info   : Unity Log] 09/13/2026 13:06:57: Set background loading budget to High\n\n[Info   : Unity Log] 09/13/2026 13:06:57: GPU Device: 0000:0000 (Unknown)\n\n[Error  : Unity Log] AsyncResourceUpload failed.\n[Error  : Unity Log] AsyncResourceUpload failed.\n[Info   : Unity Log] 09/13/2026 13:07:02: Loading: Done, Total time: -9.856241\n\n[Info   : Unity Log] 09/13/2026 13:07:25: Set background loading budget to Low\n\n[Warning: Unity Log] HDR Render Texture not supported, disabling HDR on reflection probe.\n[Error  : Unity Log] This custom render path shader needs to have at least 1 passes.\n[Error  : Unity Log] Could not find material Hidden/VideoDecode. Make sure the Video shaders are included in your build, in the Built-in Shader Settings section of the Graphics Settings.\n[Error  : Unity Log] Could not find video decode shader pass YCbCr_To_RGB1 in shader <not found>\n[Error  : Unity Log] Could not find video decode shader pass YCbCrA_To_RGBAFull in shader <not found>\n[Error  : Unity Log] Could not find video decode shader pass YCbCrA_To_RGBA in shader <not found>\n[Error  : Unity Log] Could not find video decode shader pass Flip_RGBA_To_RGBA in shader <not found>\n[Error  : Unity Log] Could not find video decode shader pass Flip_RGBASplit_To_RGBA in shader <not found>\n[Error  : Unity Log] This custom render path shader needs to have at least 1 passes.\n";
+    await pruefe('Unity-Fehler nach dem Chainloader gehoeren dem Spiel, nicht dem letzten Mod', async () => {
+        assert.match(LANG_LOG, /\[Error  : Unity Log\] AsyncResourceUpload failed/, 'Ausschnitt ohne Unity-Fehler');
+        const e = BepInExLog.werteAus(LANG_LOG);
+        assert.strictEqual(nachName(e, 'Jotunn').status, 'geladen');
+        assert.strictEqual(nachName(e, 'Jotunn').grund, null);
+    });
+
+    await pruefe('Endet der Start mitten im Laden, heisst das abgebrochen — nicht geladen', async () => {
+        const bis = FEHLER_LOG.split('\n');
+        const i = bis.findIndex(z => z.includes('Loading [TeleportEverything 2.9.1]'));
+        const e = BepInExLog.werteAus(bis.slice(0, i + 1).join('\n'));
+        assert.strictEqual(e.vollstaendig, false);
+        assert.strictEqual(nachName(e, 'TeleportEverything').status, 'abgebrochen');
+        assert.strictEqual(nachName(e, 'Jotunn').status, 'geladen');
+    });
+
+    // Nicht aus einem Lauf, sondern im Satzbau aus BepInEx.dll 5.4.23.5
+    // (`strings -e l`): Meldungen, die ein Plugin nennen, ohne es zu laden.
+    await pruefe('Chainloader-Meldungen ohne Loading-Zeile werden erkannt', async () => {
+        const e = BepInExLog.werteAus([
+            '[Error  :   BepInEx] Could not load [XPortal 1.2.24] because it has missing dependencies: com.jotunn.jotunn (2.27.1)',
+            '[Warning:   BepInEx] Skipping [Alt 1.0.0] because a newer version exists (Alt 1.1.0)',
+            '[Message:   BepInEx] Chainloader startup complete',
+        ].join('\n'));
+        assert.strictEqual(nachName(e, 'XPortal').status, 'nicht_geladen');
+        assert.match(nachName(e, 'XPortal').grund, /Fehlende Abhängigkeiten: com\.jotunn\.jotunn/);
+        assert.strictEqual(nachName(e, 'Alt').status, 'uebersprungen');
+    });
+
+    await pruefe('Zuordnung: Name, Fremdes separat, neu seit dem Start, ausgeschaltet und doch geladen', async () => {
+        const e = BepInExLog.werteAus(FEHLER_LOG);
+        const stand = '2026-09-13T14:26:42Z';
+        const r = BepInExLog.ordneZu(e, {
+            lader: { id: 17, art: 'loader', status: 'installiert', fassung: '5.4.2350', installiert_am: '2026-09-13T08:34:11Z' },
+            mods: [
+                { id: 23, name: 'TeleportEverything', kennung: 'OdinPlus-TeleportEverything', fassung: '2.9.1',
+                  status: 'installiert', aktiv: 1, installiert_am: '2026-09-13T08:00:00Z' },
+                { id: 30, name: 'Neu', kennung: 'X-Neu', fassung: '1.0.0',
+                  status: 'installiert', aktiv: 1, installiert_am: '2026-09-13T15:00:00Z' },
+            ],
+        }, stand);
+        assert.strictEqual(r.zeilen[23].status, 'fehler');
+        assert.strictEqual(r.zeilen[30].status, 'neu_seit_start');
+        assert.strictEqual(r.zeilen[17].status, 'geladen');
+        assert.deepStrictEqual(r.fremd.map(p => p.name), ['Jotunn'], 'Jotunn hat hier keine Zeile — also fremd');
+
+        const aus = BepInExLog.ordneZu(BepInExLog.werteAus(SAUBER_LOG), { lader: null, mods: [
+            { id: 19, name: 'Jotunn', kennung: 'ValheimModding-Jotunn', fassung: '2.30.0',
+              status: 'installiert', aktiv: 0, installiert_am: '2026-09-13T08:00:00Z' }] }, stand);
+        assert.strictEqual(aus.zeilen[19].trotzAus, true, 'Schalten laesst die Datei liegen — BepInEx laedt sie');
+    });
+
+    await pruefe('Ohne content.loader.log sagt die Route es — ohne Daemon zu fragen', async () => {
+        const r = await rufe('get', '/:serverId/inhalte/ladestand');
+        assert.strictEqual(r.status, 200);
+        assert.strictEqual(r.antwort.verfuegbar, false);
+        assert.match(r.antwort.grund, /content\.loader\.log/);
+        assert.strictEqual(daemon.gelesen.length, 0);
+    });
+
+    await pruefe('Mit content.loader.log liest die Route die Datei und ordnet zu', async () => {
+        INHALT.loader.log = 'game/BepInEx/LogOutput.log';
+        try {
+            daemon.logInhalt = FEHLER_LOG;
+            db.zeilen.push({ id: 23, server_id: 186, quelle: 'thunderstore', art: 'mod',
+                kennung: 'OdinPlus-TeleportEverything', name: 'TeleportEverything', fassung: '2.9.1',
+                status: 'installiert', aktiv: 1, installiert_am: '2026-09-13T08:00:00Z' });
+            const r = await rufe('get', '/:serverId/inhalte/ladestand');
+            assert.strictEqual(r.status, 200, JSON.stringify(r.antwort));
+            assert.strictEqual(r.antwort.verfuegbar, true);
+            assert.deepStrictEqual(daemon.gelistet, ['/game/BepInEx']);
+            assert.deepStrictEqual(daemon.gelesen, ['/game/BepInEx/LogOutput.log']);
+            assert.strictEqual(r.antwort.stand, '2026-09-13T14:26:42Z');
+            assert.strictEqual(r.antwort.zeilen[23].status, 'fehler');
+
+            daemon.gelesen = []; daemon.logFehlt = true;
+            const leer = await rufe('get', '/:serverId/inhalte/ladestand');
+            assert.strictEqual(leer.antwort.verfuegbar, false);
+            assert.match(leer.antwort.grund, /noch keinen Start/);
+            assert.strictEqual(daemon.gelesen.length, 0, 'ohne Datei wird nichts gelesen');
+        } finally {
+            delete INHALT.loader.log;
+        }
+    });
+
+    await pruefe('Der Reiter holt den Ladestand und zeigt ihn je Zeile', async () => {
+        assert.match(reiter, /\/ladestand`/, 'der Reiter fragt /ladestand nicht ab');
+        assert.match(reiter, /LADESTAND\.zeilen\[e\.id\]/, 'die Zeile liest ihren Ladestand nicht');
+        assert.match(reiter, /lauf\.trotzAus/, '"ausgeschaltet — laedt trotzdem" fehlt');
     });
 
     Object.assign(Thunderstore, ECHT);

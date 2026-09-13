@@ -28,6 +28,7 @@ const { ladePaketFuerAddon } = require('../helpers/StartPayload');
 const Inhalte = require('../helpers/Inhalte');
 const InhalteHolen = require('../helpers/InhalteHolen');
 const Thunderstore = require('../helpers/Thunderstore');
+const BepInExLog = require('../helpers/BepInExLog');
 
 /**
  * Server samt Paket laden — und pruefen, dass er zur Guild gehoert.
@@ -468,6 +469,72 @@ router.post('/:serverId/inhalte/geplant-holen', requirePermission('GAMESERVER.FI
     } catch (error) {
         Logger.error('[Gameserver/Inhalte] Vorgemerktes nicht geholt:', error);
         return res.status(502).json({ success: false, message: error.message });
+    }
+});
+
+/**
+ * Was hat der Lader beim letzten Start wirklich geladen? (Betreiber, 2026-09-13: B)
+ *
+ * Gelesen wird die Logdatei, die das PAKET nennt (`content.loader.log`) —
+ * ueber die Dateibefehle, die der Daemon schon hat. Warum die Datei und nicht
+ * die Konsole, steht in helpers/BepInExLog.js.
+ *
+ * Kein Fehlerstatus, wenn es nichts auszuwerten gibt: `verfuegbar: false` mit
+ * dem Grund. Ein Server ohne Start seit der Installation hat keinen Ladestand,
+ * und das ist eine Auskunft, kein Fehler.
+ */
+router.get('/:serverId/inhalte/ladestand', requirePermission('GAMESERVER.VIEW'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    const ipmServer = ServiceManager.get('ipmServer');
+
+    try {
+        const geladen = await ladeServerUndPaket(dbService, req.params.serverId, res.locals.guildId);
+        if (!geladen) return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
+
+        const nicht = (grund) => res.json({ success: true, verfuegbar: false, grund });
+        const lader = geladen.paket?.content?.loader;
+        if (!lader?.log) return nicht('Das Paket nennt keine Logdatei des Laders (content.loader.log).');
+        if (lader.key !== 'bepinex') return nicht(`Für den Lader „${lader.key}" gibt es noch keine Auswertung.`);
+
+        const daemonId = await daemonVon(dbService, geladen.server);
+        if (!daemonId || !ipmServer?.isDaemonOnline(daemonId)) return nicht('Der Daemon ist gerade nicht erreichbar.');
+
+        const pfad = '/' + String(lader.log).replace(/^\/+/, '');
+        const ordner = pfad.slice(0, pfad.lastIndexOf('/')) || '/';
+        const datei = pfad.slice(pfad.lastIndexOf('/') + 1);
+        const nutzlast = {
+            server_id: String(geladen.server.id),
+            rootserver_id: String(geladen.server.rootserver_id),
+            install_path: geladen.server.install_path,
+        };
+
+        const liste = await ipmServer.sendCommand(daemonId, 'gameserver.files.list', { ...nutzlast, path: ordner }, 15000)
+            .catch(fehler => ({ success: false, error: fehler.message }));
+        const eintrag = liste?.success ? (liste.data?.files || []).find(f => f.name === datei && !f.is_dir) : null;
+        if (!eintrag) return nicht('Seit der Lader liegt, gab es noch keinen Start — die Logdatei fehlt.');
+
+        const gelesen = await ipmServer.sendCommand(daemonId, 'gameserver.files.read', { ...nutzlast, path: pfad }, 15000)
+            .catch(fehler => ({ success: false, error: fehler.message }));
+        if (!gelesen?.success) {
+            return nicht('Die Logdatei ließ sich nicht lesen: ' + (gelesen?.error || 'keine Antwort'));
+        }
+
+        const ergebnis = BepInExLog.werteAus(gelesen.data?.content || '');
+        const zuordnung = BepInExLog.ordneZu(ergebnis, await Inhalte.fuerServer(req.params.serverId), eintrag.mod_time);
+
+        return res.json({
+            success: true, verfuegbar: true,
+            stand: eintrag.mod_time || null,
+            vollstaendig: ergebnis.vollstaendig,
+            bepinex: ergebnis.bepinex,
+            pack: ergebnis.pack,
+            laeuft: wirkung(geladen).laeuft,
+            ...zuordnung,
+        });
+    } catch (error) {
+        Logger.error('[Gameserver/Inhalte] Ladestand nicht auswertbar:', error);
+        return res.status(500).json({ success: false, message: 'Serverfehler' });
     }
 });
 
