@@ -177,18 +177,21 @@ async function pruefe(name, fn) {
     // Liste mehr. Fuenf Waisen, darunter `.doorstop_version`: Sie wies den
     // Lader als Doorstop 4 aus, waehrend Doorstop 3 installiert war, und
     // schickte die Fehlersuche in die falsche Richtung.
+    // Seit dem 2026-09-13 wird der gewaehlte Lader nicht mehr herabgestuft —
+    // der Fassungswechsel, an dem hier das Aufraeumen geprueft wird, ist deshalb
+    // ein HOCHstufen. Die Waisen von 189 entstanden beim Herabstufen.
     await pruefe('Eine andere Fassung raeumt erst auf', async () => {
         db.zeilen.push({ id: 1, server_id: 186, quelle: 'thunderstore', art: 'loader',
-            kennung: 'denikson-BepInExPack_Valheim', fassung: '5.4.2333', status: 'installiert',
+            kennung: 'denikson-BepInExPack_Valheim', fassung: '5.4.2200', status: 'installiert',
             ablage: 'game',
             dateien: JSON.stringify(['game/.doorstop_version', 'game/BepInEx/core/BepInEx.pdb']) });
-        stelleThunderstore([{ ...BEPINEX, fassung: '5.4.2200' }]);
+        stelleThunderstore([BEPINEX]);
         await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT, guildId: 'g1',
             kennung: 'denikson-BepInExPack_Valheim' });
         assert.deepStrictEqual(daemon.geloescht,
             ['/game/.doorstop_version', '/game/BepInEx/core/BepInEx.pdb'],
             'die Dateien der alten Fassung muessen VOR dem Holen weg');
-        assert.strictEqual(db.zeilen[0].fassung, '5.4.2200');
+        assert.strictEqual(db.zeilen[0].fassung, '5.4.2333');
     });
 
     await pruefe('Dieselbe Fassung raeumt NICHT auf', async () => {
@@ -200,6 +203,76 @@ async function pruefe(name, fn) {
             kennung: 'denikson-BepInExPack_Valheim' });
         assert.deepStrictEqual(daemon.geloescht, [],
             'ohne Fassungswechsel gibt es nichts zu entfernen');
+    });
+
+    // ── Der Lader wird nie herabgestuft, wenn er gewaehlt ist ──────────────
+    //
+    // Betreiber, 2026-09-13. Anlass: TeleportEverything verlangte BepInEx
+    // 5.4.2200 und zog das installierte 5.4.2333 fuer alle Mods herunter.
+    console.log('\nLader-Regel');
+
+    const LADER_ZEILE = (fassung, status = 'installiert') => ({ id: 1, server_id: 186,
+        quelle: 'thunderstore', art: 'loader', kennung: 'denikson-BepInExPack_Valheim',
+        fassung, status, ablage: 'game', dateien: JSON.stringify(['game/BepInEx/core/BepInEx.dll']) });
+    const geholt = () => daemon.abrufe.map(a => a.adresse.match(/download\/[^/]+\/([^/]+)/)[1]);
+
+    await pruefe('Ein Mod mit aelterer Lader-Angabe stuft den Lader nicht herab', async () => {
+        db.zeilen.push(LADER_ZEILE('5.4.2350'));
+        stelleThunderstore([{ ...BEPINEX, fassung: '5.4.2200' }, JOTUNN]);
+        const e = await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT, guildId: 'g1',
+            kennung: 'ValheimModding-Jotunn' });
+        assert.deepStrictEqual(geholt(), ['Jotunn'], 'nur der Mod wird geholt, nicht der aeltere Lader');
+        assert.deepStrictEqual(daemon.geloescht, [], 'am Lader wird nichts geloescht');
+        assert.strictEqual(db.zeilen.find(z => z.art === 'loader').fassung, '5.4.2350');
+        assert.deepStrictEqual(e.beibehalten,
+            [{ kennung: 'denikson-BepInExPack_Valheim', fassung: '5.4.2350', verlangt: '5.4.2200' }]);
+        assert.strictEqual(e.installiert.length, 1);
+    });
+
+    await pruefe('Hochstufen bleibt erlaubt', async () => {
+        db.zeilen.push(LADER_ZEILE('5.4.2200'));
+        stelleThunderstore([BEPINEX, JOTUNN]);
+        const e = await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT, guildId: 'g1',
+            kennung: 'ValheimModding-Jotunn' });
+        assert.deepStrictEqual(geholt(), ['BepInExPack_Valheim', 'Jotunn']);
+        assert.strictEqual(db.zeilen.find(z => z.art === 'loader').fassung, '5.4.2333');
+        assert.deepStrictEqual(e.beibehalten, []);
+    });
+
+    await pruefe('Auch ein vorgemerkter Lader wird nicht herabgestuft', async () => {
+        db.zeilen.push(LADER_ZEILE('5.4.2350', 'geplant'));
+        stelleThunderstore([{ ...BEPINEX, fassung: '5.4.2200' }, JOTUNN]);
+        const e = await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT, guildId: 'g1',
+            kennung: 'ValheimModding-Jotunn' });
+        assert.deepStrictEqual(geholt(), ['Jotunn']);
+        assert.strictEqual(e.beibehalten.length, 1);
+    });
+
+    await pruefe('Ein fehlgeschlagener Lader ist nicht gewaehlt — er wird geholt', async () => {
+        db.zeilen.push(LADER_ZEILE('5.4.2350', 'fehlgeschlagen'));
+        stelleThunderstore([{ ...BEPINEX, fassung: '5.4.2200' }, JOTUNN]);
+        const e = await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT, guildId: 'g1',
+            kennung: 'ValheimModding-Jotunn' });
+        assert.deepStrictEqual(geholt(), ['BepInExPack_Valheim', 'Jotunn']);
+        assert.deepStrictEqual(e.beibehalten, []);
+    });
+
+    await pruefe('Die Vorschau sagt dasselbe: bleibt, nicht ersetzt', async () => {
+        db.zeilen.push(LADER_ZEILE('5.4.2350'));
+        stelleThunderstore([{ ...BEPINEX, fassung: '5.4.2200' }, JOTUNN]);
+        let v = await InhalteHolen.vorschau({ serverId: 186, inhalt: INHALT, kennung: 'ValheimModding-Jotunn' });
+        assert.strictEqual(v.pakete[0].bleibt, true, 'aelterer Lader: bleibt');
+        assert.strictEqual(v.pakete[1].bleibt, false, 'ein Mod faellt nie unter die Regel');
+        stelleThunderstore([{ ...BEPINEX, fassung: '5.4.2400' }, JOTUNN]);
+        v = await InhalteHolen.vorschau({ serverId: 186, inhalt: INHALT, kennung: 'ValheimModding-Jotunn' });
+        assert.strictEqual(v.pakete[0].bleibt, false, 'neuerer Lader: wird ersetzt');
+    });
+
+    await pruefe('Der Reiter zeigt es an — in der Vorschau und als Toast', async () => {
+        const text = require('fs').readFileSync(path.join(__dirname,
+            '../plugins/gameserver/dashboard/views/guild/partials/server-detail-inhalte.ejs'), 'utf8');
+        assert.match(text, /p\.bleibt \?/, 'die Vorschau kennt "bleibt" nicht');
+        assert.match(text, /d\.beibehalten/, 'der Toast meldet den beibehaltenen Lader nicht');
     });
 
     await pruefe('Die Abhaengigkeit liegt VOR dem Mod', async () => {

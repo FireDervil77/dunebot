@@ -59,6 +59,12 @@
     melde(fehl.length ? 'warning' : 'success',
       teile.join(', ') + (fehl.length ? ': ' + fehl.map(f => `${f.kennung}: ${f.fehler}`).join('; ') : ''),
       fehl.length ? 12000 : undefined);
+    // Der gewaehlte Lader wird nie herabgestuft — gesagt wird es trotzdem, sonst
+    // wundert sich jemand, warum die verlangte Fassung nicht ankam.
+    for (const b of d.beibehalten || []) {
+      melde('info', `${b.kennung} ${b.fassung} bleibt — verlangt war ${b.verlangt}. `
+            + 'Der Lader wird nie herabgestuft.', 10000);
+    }
     if (d.installiert.length) wirkungMelden(d);
   };
 
@@ -458,7 +464,7 @@
           <div style="display:flex;gap:8px;font-size:12px;padding:3px 0">
             <span class="fb-mono" style="flex:1 1 auto">${escape(p.kennung)} ${escape(p.fassung)}</span>
             ${p.art === 'loader' ? marke('Lader') : ''}
-            ${p.schonDa ? marke(p.schonFassung === p.fassung ? 'schon da' : 'ersetzt ' + escape(p.schonFassung || '?'), 'warn') : ''}
+            ${p.bleibt ? marke('bleibt ' + (p.schonFassung || '?')) : p.schonDa ? marke(p.schonFassung === p.fassung ? 'schon da' : 'ersetzt ' + escape(p.schonFassung || '?'), 'warn') : ''}
           </div>`).join('');
 
         raum.innerHTML = `

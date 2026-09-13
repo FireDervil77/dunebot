@@ -83,6 +83,30 @@ function istLader(inhalt, kennung) {
  * `./BepInEx/core/BepInEx.Preloader.dll` ins Leere — die Dateien lagen da, und
  * nichts lud. Am 2026-09-12 an Server 188 gemessen.
  */
+/**
+ * Bleibt der gewaehlte Lader, statt herabgestuft zu werden?
+ *
+ * Entscheidung des Betreibers (2026-09-13): **Den Lader darf man nie
+ * herabstufen, wenn er gewaehlt ist.** Anlass war Server 189:
+ * TeleportEverything verlangte BepInEx 5.4.2200, installiert war 5.4.2333 — und
+ * der eigene Code des Mods wollte 5.4.23.3. Die Angabe war veraltet und zog den
+ * Lader fuer ALLE Mods des Servers herunter.
+ *
+ * Gewaehlt heisst: installiert oder vorgemerkt. Eine fehlgeschlagene Zeile
+ * zaehlt nicht — da liegt kein Lader, den man schuetzen koennte. Hochstufen
+ * bleibt erlaubt, gleiche Fassung laeuft wie bisher.
+ *
+ * Vorschau und Installation fragen DIESE Funktion. Zwei Stellen mit derselben
+ * Regel zeigen sonst "ersetzt", waehrend in Wahrheit nichts ersetzt wird.
+ */
+function laderBleibt(inhalt, paket, da) {
+    return Boolean(da)
+        && istLader(inhalt, paket.kennung)
+        && ['installiert', 'geplant'].includes(da.status)
+        && Boolean(da.fassung)
+        && Thunderstore.hoeher(da.fassung, paket.fassung);
+}
+
 function zielFuer(inhalt, art) {
     if (art === Inhalte.ART_LADER) return inhalt.loader?.path || '';
     return inhalt.path || '';
@@ -116,6 +140,7 @@ async function vorschau({ serverId, inhalt, kennung, fassung = null }) {
                 kennung: p.kennung, name: p.name, fassung: p.fassung, bytes: p.bytes, art,
                 schonDa: Boolean(da),
                 schonFassung: da ? da.fassung : null,
+                bleibt: laderBleibt(inhalt, p, da),
             };
         }),
     };
@@ -140,7 +165,7 @@ async function legeAb({ server, inhalt, guildId, pakete, fehlend = [] }) {
     if (!ipmServer?.isDaemonOnline(daemonId)) throw new Error('Daemon ist offline');
 
     const ergebnis = {
-        installiert: [], fehlgeschlagen: [], fehlend,
+        installiert: [], fehlgeschlagen: [], fehlend, beibehalten: [],
         neustartNoetig: inhalt.needs_restart !== false,
     };
 
@@ -165,6 +190,17 @@ async function legeAb({ server, inhalt, guildId, pakete, fehlend = [] }) {
     for (let i = 0; i < pakete.length; i++) {
         const p = pakete[i];
         const art = istLader(inhalt, p.kennung) ? Inhalte.ART_LADER : Inhalte.ART_MOD;
+
+        // Der gewaehlte Lader wird nie herabgestuft (siehe laderBleibt). Die
+        // Zeile bleibt unberuehrt — auch nicht auf "geplant" umgeschrieben,
+        // sonst stuende dort kurz die niedrigere Fassung.
+        const schon = vorhanden.get(p.kennung);
+        if (laderBleibt(inhalt, p, schon)) {
+            ergebnis.beibehalten.push({ kennung: p.kennung, fassung: schon.fassung, verlangt: p.fassung });
+            Logger.info(`[Gameserver/Inhalte] ${p.kennung} ${schon.fassung} bleibt auf Server ${server.id} `
+                + `— verlangt war ${p.fassung}, der Lader wird nicht herabgestuft`);
+            continue;
+        }
 
         const grundzeile = {
             serverId: server.id, guildId, art, quelle: 'thunderstore',
@@ -274,7 +310,7 @@ async function holeGeplante({ server, inhalt, guildId }) {
 
     Logger.info(`[Gameserver/Inhalte] Server ${server.id}: ${zeilen.length} vorgemerkte(r) Mod(s)`);
 
-    const gesamt = { installiert: [], fehlgeschlagen: [], fehlend: [], neustartNoetig: false };
+    const gesamt = { installiert: [], fehlgeschlagen: [], fehlend: [], beibehalten: [], neustartNoetig: false };
     for (const zeile of zeilen) {
         try {
             const e = await installiere({ server, inhalt, guildId,
@@ -282,6 +318,7 @@ async function holeGeplante({ server, inhalt, guildId }) {
             gesamt.installiert.push(...e.installiert);
             gesamt.fehlgeschlagen.push(...e.fehlgeschlagen);
             gesamt.fehlend.push(...e.fehlend);
+            gesamt.beibehalten.push(...(e.beibehalten || []));
             gesamt.neustartNoetig = gesamt.neustartNoetig || e.neustartNoetig;
         } catch (fehler) {
             // Die Zeile traegt den Grund, nicht nur das Log: Wer den Server
