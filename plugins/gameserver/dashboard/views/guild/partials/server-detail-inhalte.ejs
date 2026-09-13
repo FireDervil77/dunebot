@@ -28,6 +28,40 @@
 (function () {
   'use strict';
 
+  // ── Rueckmeldung: dasselbe Toast-System wie der Rest der Serverseite ──────
+  //
+  // Bis zum 2026-09-13 meldete dieser Reiter ueber Browser-Dialoge — als
+  // einziger auf der Seite. Eine Mod-Aenderung im laufenden Betrieb ist aber
+  // genau die Sorte Handlung, die man bewusst trifft und bestaetigt sehen will;
+  // und ein Entfernen, das ein paar Sekunden braucht, sah ohne Zwischenmeldung
+  // aus, als passiere nichts (Betreiber, 2026-09-13).
+  const melde = (typ, text, dauer) => {
+    if (typeof showToast === 'function') showToast(typ, text, dauer ? { timeOut: dauer } : undefined);
+  };
+
+  // Mods laedt das Spiel beim Start. Die Route schickt mit, ob der Server gerade
+  // laeuft — daran haengt, ob jetzt jemand handeln muss.
+  const wirkungMelden = (d) => {
+    if (!d || !d.neustartNoetig) return;
+    if (d.laeuft) {
+      melde('warning', 'Der Server läuft — die Änderung wirkt erst nach einem Neustart.', 12000);
+    } else {
+      melde('info', 'Wirkt beim nächsten Start des Servers.', 8000);
+    }
+  };
+
+  // Installieren und Vorgemerktes-Holen liefern dieselbe Antwort. Ein
+  // Teilerfolg wird als solcher gesagt — nicht als Erfolg und nicht als Fehler.
+  const ergebnisMelden = (d) => {
+    const fehl = d.fehlgeschlagen || [];
+    const teile = [`${d.installiert.length} installiert`];
+    if (fehl.length) teile.push(`${fehl.length} fehlgeschlagen`);
+    melde(fehl.length ? 'warning' : 'success',
+      teile.join(', ') + (fehl.length ? ': ' + fehl.map(f => `${f.kennung}: ${f.fehler}`).join('; ') : ''),
+      fehl.length ? 12000 : undefined);
+    if (d.installiert.length) wirkungMelden(d);
+  };
+
   const wurzel   = document.getElementById('inhalte-wurzel');
   const SERVER   = wurzel.dataset.server;
   const GUILD    = wurzel.dataset.guild;
@@ -308,11 +342,14 @@
       })
       .then(d => {
         window.inhalteLaden();
-        if (d.neustartNoetig) {
-          alert(`${d.dateien} Datei(en) abgelegt. Wirksam wird es beim nächsten Start des Servers.`);
-        }
+        meldung.textContent = '';
+        melde('success', `${d.dateien} Datei(en) abgelegt.`);
+        wirkungMelden(d);
       })
-      .catch(e => { meldung.textContent = 'Fehlgeschlagen: ' + e.message; })
+      .catch(e => {
+        meldung.textContent = 'Fehlgeschlagen: ' + e.message;
+        melde('error', 'Hochladen fehlgeschlagen: ' + e.message);
+      })
       .finally(() => { knopf.disabled = false; });
   };
 
@@ -450,6 +487,7 @@
     const meldung = document.getElementById('ts-meldung');
     knopf.disabled = true;
     meldung.textContent = 'Wird geholt … das kann bei großen Mods dauern.';
+    melde('info', `„${kennung}“ wird geholt …`);
 
     fetch(`${BASIS}/thunderstore`, {
       method: 'POST',
@@ -463,21 +501,20 @@
       })
       .then(d => {
         window.inhalteLaden();
-        const teile = [`${d.installiert.length} installiert`];
-        if (d.fehlgeschlagen.length) teile.push(`${d.fehlgeschlagen.length} fehlgeschlagen`);
-        // Ein Teilerfolg wird als solcher gesagt — nicht als Erfolg und nicht
-        // als Fehler. Was misslang, steht auch in der Liste.
-        alert(teile.join(', ')
-          + (d.fehlgeschlagen.length ? ':\n' + d.fehlgeschlagen.map(f => `${f.kennung}: ${f.fehler}`).join('\n') : '')
-          + (d.neustartNoetig ? '\n\nWirksam wird es beim nächsten Start des Servers.' : ''));
+        meldung.textContent = '';
+        ergebnisMelden(d);
       })
-      .catch(e => { meldung.textContent = 'Fehlgeschlagen: ' + e.message; })
+      .catch(e => {
+        meldung.textContent = 'Fehlgeschlagen: ' + e.message;
+        melde('error', 'Nicht installiert: ' + e.message);
+      })
       .finally(() => { knopf.disabled = false; });
   };
 
   window.inhaltGeplantHolen = function (knopf) {
     knopf.disabled = true;
     knopf.textContent = 'Wird geholt …';
+    melde('info', 'Vorgemerkte Mods werden geholt …');
 
     fetch(`${BASIS}/geplant-holen`, { method: 'POST' })
       .then(async (a) => {
@@ -487,15 +524,10 @@
       })
       .then(d => {
         window.inhalteLaden();
-        if (d.nichts) { alert(d.message); return; }
-        const teile = [`${d.installiert.length} installiert`];
-        if (d.fehlgeschlagen.length) teile.push(`${d.fehlgeschlagen.length} fehlgeschlagen`);
-        alert(teile.join(', ')
-          + (d.fehlgeschlagen.length
-              ? ':\n' + d.fehlgeschlagen.map(f => `${f.kennung}: ${f.fehler}`).join('\n') : '')
-          + (d.neustartNoetig ? '\n\nWirksam wird es beim nächsten Start des Servers.' : ''));
+        if (d.nichts) { melde('info', d.message); return; }
+        ergebnisMelden(d);
       })
-      .catch(e => { alert('Nicht geholt: ' + e.message); window.inhalteLaden(); })
+      .catch(e => { melde('error', 'Nicht geholt: ' + e.message); window.inhalteLaden(); })
       .finally(() => { knopf.disabled = false; knopf.textContent = 'Jetzt holen'; });
   };
 
@@ -514,15 +546,18 @@
         for (const s of d.stand) NEUER[s.id] = s;
         window.inhalteLaden();
         const neue = d.stand.filter(s => s.neuer).length;
-        if (!neue) alert('Alles auf der neuesten Fassung.');
+        melde(neue ? 'info' : 'success', neue
+          ? `${neue} Aktualisierung(en) verfügbar — in der Liste markiert.`
+          : 'Alles auf der neuesten Fassung.');
       })
-      .catch(e => alert('Nicht abfragbar: ' + e.message))
+      .catch(e => melde('error', 'Nicht abfragbar: ' + e.message))
       .finally(() => { knopf.disabled = false; knopf.textContent = alterText; });
   };
 
   window.inhaltAktualisieren = function (id, name) {
     if (!confirm(`"${name}" auf die neueste Fassung bringen?\n\n`
                + 'Die alten Dateien werden vorher entfernt. Wirksam beim nächsten Start.')) return;
+    melde('info', `„${name}“ wird aktualisiert …`);
 
     fetch(`${BASIS}/${id}/aktualisieren`, { method: 'POST' })
       .then(async (a) => {
@@ -533,36 +568,62 @@
       .then(d => {
         delete NEUER[id];
         window.inhalteLaden();
-        if (!d.geaendert) { alert(d.message); return; }
-        let text = `${name}: ${d.vorher} → ${d.nachher}`;
+        if (!d.geaendert) { melde('info', d.message); return; }
+        melde('success', `${name}: ${d.vorher} → ${d.nachher}`);
         if (d.alteDateienBlieben && d.alteDateienBlieben.length) {
-          text += `\n\n${d.alteDateienBlieben.length} alte Datei(en) blieben liegen.`;
+          melde('warning', `${d.alteDateienBlieben.length} alte Datei(en) von ${name} blieben liegen.`, 12000);
         }
         if (d.ohneListe) {
-          text += '\n\nVon der vorigen Fassung war nicht festgehalten, welche Dateien dazugehörten '
-                + '— sie liegen noch da.';
+          melde('warning', `Von der vorigen Fassung von ${name} war nicht festgehalten, welche `
+                + 'Dateien dazugehörten — sie liegen noch da.', 12000);
         }
-        alert(text);
+        wirkungMelden(d);
       })
-      .catch(e => alert('Nicht aktualisiert: ' + e.message));
+      .catch(e => melde('error', 'Nicht aktualisiert: ' + e.message));
   };
 
   window.inhaltSchalten = function (id, aktiv) {
+    // Dieselbe Deutung wie die Route: true oder '1' heisst an.
+    const an = aktiv === true || aktiv === '1';
     fetch(`${BASIS}/${id}/schalten`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ aktiv })
-    }).then(() => window.inhalteLaden());
+    })
+      .then(async (a) => {
+        const d = await a.json().catch(() => null);
+        if (!a.ok || !d || !d.success) throw new Error((d && d.message) || `HTTP ${a.status}`);
+        return d;
+      })
+      .then(d => {
+        melde('success', an ? 'Eingeschaltet.' : 'Abgeschaltet.');
+        wirkungMelden(d);
+      })
+      // Bis zum 2026-09-13 lief ein Fehlschlag hier ohne jede Meldung durch.
+      .catch(e => melde('error', 'Nicht geschaltet: ' + e.message))
+      .finally(() => window.inhalteLaden());
   };
 
   window.inhaltEntfernen = function (id, name) {
     if (!confirm(`"${name}" entfernen?`)) return;
+    // Entfernt wird Datei fuer Datei, das braucht ein paar Sekunden — ohne
+    // diese Zeile sah es aus, als passiere nichts.
+    melde('info', `„${name}“ wird entfernt …`);
+
     fetch(`${BASIS}/${id}`, { method: 'DELETE' })
-      .then(r => r.json())
+      .then(async (a) => {
+        const d = await a.json().catch(() => null);
+        if (!a.ok || !d || !d.success) throw new Error((d && d.message) || `HTTP ${a.status}`);
+        return d;
+      })
       .then(d => {
-        if (d.hinweis) alert(d.hinweis);
-        window.inhalteLaden();
-      });
+        if (d.hinweis) melde('warning', d.hinweis, 12000);
+        else melde('success', `„${name}“ entfernt` + (d.dateien ? ` — ${d.dateien} Datei(en) gelöscht.` : '.'));
+        wirkungMelden(d);
+      })
+      // Bis zum 2026-09-13 ohne Fehlerzweig: Scheiterte das Entfernen, kam nichts.
+      .catch(e => melde('error', 'Nicht entfernt: ' + e.message))
+      .finally(() => window.inhalteLaden());
   };
 
   window.inhaltKopieren = function () {

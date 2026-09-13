@@ -62,7 +62,7 @@ const db = {
         }
         if (/FROM gameservers WHERE id = \? AND guild_id = \?/.test(sql)) {
             return [{ id: 186, name: 'Bude', guild_id: 'g1', rootserver_id: 55,
-                      install_path: '186-valheim', addon_marketplace_id: 173, status: 'online' }];
+                      install_path: '186-valheim', addon_marketplace_id: 173, status: this.serverStatus || 'online' }];
         }
         if (/FROM packages pk/.test(sql)) {
             return [{ paket_slug: 'valheim', paket_version: '1.0.10', paket_channel: 'test',
@@ -83,6 +83,11 @@ const db = {
             const z = this.zeilen.find(x => x.id === params[1]);
             if (z) { z.status = 'fehlgeschlagen'; z.fehler = params[0]; }
             return { affectedRows: 1 };
+        }
+        if (/UPDATE gameserver_content SET aktiv = \?/.test(sql)) {
+            const z = this.zeilen.find(x => String(x.id) === String(params[1]) && x.status !== 'entfernt');
+            if (z) z.aktiv = params[0];
+            return { affectedRows: z ? 1 : 0 };
         }
         throw new Error('Unerwartete Abfrage: ' + String(sql).trim().slice(0, 70));
     },
@@ -134,7 +139,7 @@ const JOTUNN  = { kennung: 'ValheimModding-Jotunn', name: 'Jotunn', fassung: '2.
 
 let bestanden = 0;
 async function pruefe(name, fn) {
-    db.zeilen = []; daemon.abrufe = []; daemon.geloescht = []; daemon.scheitern = new Set();
+    db.zeilen = []; daemon.abrufe = []; daemon.geloescht = []; daemon.scheitern = new Set(); db.serverStatus = null;
     try {
         await fn();
         console.log(`  ✓ ${name}`);
@@ -498,6 +503,65 @@ async function pruefe(name, fn) {
         const r = await rufe('post', '/:serverId/inhalte/geplant-holen');
         assert.strictEqual(r.antwort.nichts, true);
         assert.strictEqual(daemon.abrufe.length, 0);
+    });
+
+    // ── Rueckmeldung: Toasts und der Neustart-Hinweis (2026-09-13) ──────────
+    //
+    // Mods laedt das Spiel beim START. Wer im laufenden Betrieb installiert oder
+    // entfernt, sieht im Spiel nichts, bis der Server neu startet — und der
+    // Reiter sagte das nur in zwei von fuenf Wegen, ueber Browser-Dialoge, ohne
+    // zu wissen, ob der Server gerade laeuft (Betreiber, 2026-09-13).
+    console.log('\nRueckmeldung');
+
+    const reiter = ohneKommentare(fs.readFileSync(path.join(__dirname,
+        '../plugins/gameserver/dashboard/views/guild/partials/server-detail-inhalte.ejs'), 'utf8'));
+    const JOTUNN_ZEILE = () => ({ id: 9, server_id: 186, quelle: 'thunderstore', art: 'mod',
+        kennung: 'ValheimModding-Jotunn', fassung: '2.30.0', status: 'installiert', aktiv: 1,
+        dateien: JSON.stringify(['game/BepInEx/plugins/Jotunn.dll']) });
+
+    await pruefe('Der Reiter meldet ueber das Toast-System, nicht ueber Browser-Dialoge', async () => {
+        const dialoge = reiter.match(/\balert\s*\(/g) || [];
+        assert.strictEqual(dialoge.length, 0, `${dialoge.length} Browser-Dialog(e) im Mods-Reiter`);
+        assert.match(reiter, /showToast\(/, 'kein showToast im Reiter');
+    });
+
+    await pruefe('Entfernen bei laufendem Server: Neustart noetig', async () => {
+        db.zeilen.push(JOTUNN_ZEILE());
+        const r = await rufe('delete', '/:serverId/inhalte/:id', { params: { id: '9' } });
+        assert.strictEqual(r.status, 200);
+        assert.strictEqual(r.antwort.laeuft, true);
+        assert.strictEqual(r.antwort.neustartNoetig, true);
+    });
+
+    await pruefe('Gestoppter Server: wirkt beim naechsten Start', async () => {
+        db.serverStatus = 'offline';
+        db.zeilen.push(JOTUNN_ZEILE());
+        const r = await rufe('delete', '/:serverId/inhalte/:id', { params: { id: '9' } });
+        assert.strictEqual(r.status, 200);
+        assert.strictEqual(r.antwort.laeuft, false, 'offline darf nicht als laufend gelten');
+        assert.strictEqual(r.antwort.neustartNoetig, true);
+    });
+
+    await pruefe('Schalten sagt es auch — und meldet einen Fehlschlag', async () => {
+        db.zeilen.push(JOTUNN_ZEILE());
+        let r = await rufe('post', '/:serverId/inhalte/:id/schalten',
+            { params: { id: '9' }, body: { aktiv: false } });
+        assert.strictEqual(r.status, 200);
+        assert.strictEqual(r.antwort.laeuft, true);
+        assert.strictEqual(db.zeilen[0].aktiv, 0);
+        r = await rufe('post', '/:serverId/inhalte/:id/schalten',
+            { params: { id: '77' }, body: { aktiv: true } });
+        assert.strictEqual(r.status, 404);
+    });
+
+    await pruefe('Installieren sagt es auch', async () => {
+        stelleThunderstore([BEPINEX, JOTUNN]);
+        const r = await rufe('post', '/:serverId/inhalte/thunderstore',
+            { body: { kennung: 'ValheimModding-Jotunn' } });
+        assert.strictEqual(r.status, 200, JSON.stringify(r.antwort));
+        assert.strictEqual(r.antwort.installiert.length, 2);
+        assert.strictEqual(r.antwort.laeuft, true);
+        assert.strictEqual(r.antwort.neustartNoetig, true);
     });
 
     Object.assign(Thunderstore, ECHT);

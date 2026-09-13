@@ -51,6 +51,26 @@ async function ladeServerUndPaket(dbService, serverId, guildId) {
 }
 
 /**
+ * Wirkt die Aenderung sofort — oder erst nach einem Neustart?
+ *
+ * Mods laedt das Spiel beim START. Wer im laufenden Betrieb installiert,
+ * entfernt oder schaltet, sieht im Spiel nichts, bis der Server neu startet
+ * (Betreiber, 2026-09-13). Ob jetzt jemand handeln muss, haengt am Status: Ein
+ * laufender Server braucht den Neustart, ein gestoppter nimmt die Aenderung
+ * beim naechsten Start ohnehin mit.
+ *
+ * „Laeuft" heisst hier dasselbe wie auf der Serverseite (Serverseite.js):
+ * online oder starting. Ein Server, der gerade hochfaehrt, hat seine Mods
+ * schon gelesen.
+ */
+function wirkung(geladen) {
+    return {
+        neustartNoetig: geladen.paket?.content?.needs_restart !== false,
+        laeuft: ['online', 'starting'].includes(geladen.server?.status),
+    };
+}
+
+/**
  * Der Daemon dieses Servers — ohne ihn geht nichts auf die Maschine.
  *
  * Steht im Helfer, weil der Abruf von Thunderstore ihn ebenso braucht; zwei
@@ -211,7 +231,7 @@ router.post('/:serverId/inhalte', requirePermission('GAMESERVER.FILES.MANAGE'), 
             dateien: dateien.length,
             // Der Betreiber soll wissen, dass es erst nach dem Neustart wirkt —
             // sonst sucht er den Mod im laufenden Spiel.
-            neustartNoetig: inhalt.needs_restart !== false,
+            ...wirkung(geladen),
         });
     } catch (error) {
         Logger.error('[Gameserver/Inhalte] Hochladen fehlgeschlagen:', error);
@@ -399,7 +419,7 @@ router.post('/:serverId/inhalte/thunderstore', requirePermission('GAMESERVER.FIL
 
         // Auch ein Teilerfolg ist ein Erfolg der Anfrage — was misslang, steht
         // in der Antwort und in den Zeilen, nicht in einem 500er.
-        return res.json({ success: true, ...ergebnis });
+        return res.json({ success: true, ...ergebnis, ...wirkung(geladen) });
     } catch (error) {
         Logger.error('[Gameserver/Inhalte] Installation fehlgeschlagen:', error);
         return res.status(502).json({ success: false, message: error.message });
@@ -444,7 +464,7 @@ router.post('/:serverId/inhalte/geplant-holen', requirePermission('GAMESERVER.FI
 
         Logger.info(`[Gameserver/Inhalte] Vorgemerktes für Server ${serverId} geholt: `
             + `${ergebnis.installiert.length} installiert, ${ergebnis.fehlgeschlagen.length} fehlgeschlagen`);
-        return res.json({ success: true, ...ergebnis });
+        return res.json({ success: true, ...ergebnis, ...wirkung(geladen) });
     } catch (error) {
         Logger.error('[Gameserver/Inhalte] Vorgemerktes nicht geholt:', error);
         return res.status(502).json({ success: false, message: error.message });
@@ -522,7 +542,7 @@ router.post('/:serverId/inhalte/:id/aktualisieren', requirePermission('GAMESERVE
 
         Logger.info(`[Gameserver/Inhalte] ${zeile.kennung}: ${ergebnis.vorher} → ${ergebnis.nachher} `
             + `(Server ${serverId})`);
-        return res.json({ success: true, ...ergebnis });
+        return res.json({ success: true, ...ergebnis, ...wirkung(geladen) });
     } catch (error) {
         Logger.error('[Gameserver/Inhalte] Aktualisieren fehlgeschlagen:', error);
         return res.status(502).json({ success: false, message: error.message });
@@ -537,6 +557,10 @@ router.post('/:serverId/inhalte/:id/schalten', requirePermission('GAMESERVER.FIL
     async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     try {
+        const dbService = ServiceManager.get('dbService');
+        const geladen = await ladeServerUndPaket(dbService, req.params.serverId, res.locals.guildId);
+        if (!geladen) return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
+
         const getroffen = await Inhalte.schalten(
             req.params.id, req.params.serverId, req.body.aktiv === true || req.body.aktiv === '1');
         if (!getroffen) {
@@ -545,7 +569,7 @@ router.post('/:serverId/inhalte/:id/schalten', requirePermission('GAMESERVER.FIL
                 message: 'Eintrag nicht gefunden oder bereits entfernt'
             });
         }
-        return res.json({ success: true });
+        return res.json({ success: true, ...wirkung(geladen) });
     } catch (error) {
         Logger.error('[Gameserver/Inhalte] Schalten fehlgeschlagen:', error);
         return res.status(500).json({ success: false, message: 'Serverfehler' });
@@ -604,7 +628,7 @@ router.delete('/:serverId/inhalte/:id', requirePermission('GAMESERVER.FILES.MANA
                       + weg.blieb.join(', ')
                     : null;
 
-        return res.json({ success: true, dateiWeg: weg.weg > 0, dateien: weg.weg, hinweis });
+        return res.json({ success: true, dateiWeg: weg.weg > 0, dateien: weg.weg, hinweis, ...wirkung(geladen) });
     } catch (error) {
         Logger.error('[Gameserver/Inhalte] Entfernen fehlgeschlagen:', error);
         return res.status(500).json({ success: false, message: 'Serverfehler' });
