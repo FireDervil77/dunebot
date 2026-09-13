@@ -164,6 +164,39 @@ async function pruefe(name, fn) {
         assert.strictEqual(db.zeilen[1].art, 'mod');
     });
 
+    // ── Der Fund vom 2026-09-13 (Server 189) ────────────────────────────────
+    //
+    // Ein Mod verlangte BepInEx 5.4.2200, installiert war 5.4.2333. `legeAb`
+    // schrieb die neue Dateiliste per ON DUPLICATE KEY UPDATE ueber die alte —
+    // die Dateien der alten Fassung blieben liegen und standen danach in KEINER
+    // Liste mehr. Fuenf Waisen, darunter `.doorstop_version`: Sie wies den
+    // Lader als Doorstop 4 aus, waehrend Doorstop 3 installiert war, und
+    // schickte die Fehlersuche in die falsche Richtung.
+    await pruefe('Eine andere Fassung raeumt erst auf', async () => {
+        db.zeilen.push({ id: 1, server_id: 186, quelle: 'thunderstore', art: 'loader',
+            kennung: 'denikson-BepInExPack_Valheim', fassung: '5.4.2333', status: 'installiert',
+            ablage: 'game',
+            dateien: JSON.stringify(['game/.doorstop_version', 'game/BepInEx/core/BepInEx.pdb']) });
+        stelleThunderstore([{ ...BEPINEX, fassung: '5.4.2200' }]);
+        await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT, guildId: 'g1',
+            kennung: 'denikson-BepInExPack_Valheim' });
+        assert.deepStrictEqual(daemon.geloescht,
+            ['/game/.doorstop_version', '/game/BepInEx/core/BepInEx.pdb'],
+            'die Dateien der alten Fassung muessen VOR dem Holen weg');
+        assert.strictEqual(db.zeilen[0].fassung, '5.4.2200');
+    });
+
+    await pruefe('Dieselbe Fassung raeumt NICHT auf', async () => {
+        db.zeilen.push({ id: 1, server_id: 186, quelle: 'thunderstore', art: 'loader',
+            kennung: 'denikson-BepInExPack_Valheim', fassung: '5.4.2333', status: 'installiert',
+            ablage: 'game', dateien: JSON.stringify(['game/.doorstop_version']) });
+        stelleThunderstore([BEPINEX]);
+        await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT, guildId: 'g1',
+            kennung: 'denikson-BepInExPack_Valheim' });
+        assert.deepStrictEqual(daemon.geloescht, [],
+            'ohne Fassungswechsel gibt es nichts zu entfernen');
+    });
+
     await pruefe('Die Abhaengigkeit liegt VOR dem Mod', async () => {
         stelleThunderstore([BEPINEX, JOTUNN]);
         await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT, guildId: 'g1',

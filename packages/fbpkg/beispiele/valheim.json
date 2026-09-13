@@ -3,7 +3,7 @@
   "identity": {
     "slug": "valheim",
     "name": "Valheim",
-    "version": "1.0.12",
+    "version": "1.0.13",
     "author": "firenetworks",
     "category": "survival",
     "description": {
@@ -1153,6 +1153,8 @@
         "env": {
           "DOORSTOP_ENABLED": "1",
           "DOORSTOP_TARGET_ASSEMBLY": "./BepInEx/core/BepInEx.Preloader.dll",
+          "DOORSTOP_ENABLE": "TRUE",
+          "DOORSTOP_INVOKE_DLL_PATH": "./BepInEx/core/BepInEx.Preloader.dll",
           "LD_LIBRARY_PATH": "./doorstop_libs:{{env:LD_LIBRARY_PATH}}",
           "LD_PRELOAD": "libdoorstop_x64.so"
         }
@@ -1202,6 +1204,7 @@
     "complete": false,
     "open": [
       "requirements: Mindest-RAM und Plattenbedarf nicht gemessen — nicht geraten.",
+      "content.loader: ZWEI Doorstop-Fassungen im Umlauf, deshalb stehen BEIDE Namenssaetze in adds.env - GEMESSEN am 2026-09-13 an Server 189, nicht aus der Doku. Der Pack denikson-BepInExPack_Valheim liefert je nach Fassung unterschiedliche Doorstop-Binaerdateien: 5.4.2333 bringt Doorstop 4 (DOORSTOP_ENABLED, DOORSTOP_TARGET_ASSEMBLY), 5.4.2200 bringt Doorstop 3 (DOORSTOP_ENABLE, DOORSTOP_INVOKE_DLL_PATH, DOORSTOP_CORLIB_OVERRIDE_PATH). Nachgesehen wurde in der Bibliothek selbst (welche DOORSTOP_*-Namen sie nachschlaegt), nicht in .doorstop_version - die Datei log: Sie blieb als Waise von 5.4.2333 liegen und wies 4.4.0 aus, waehrend Doorstop 3 installiert war. DER PREIS EINES FEHLENDEN NAMENS IST KEIN STILLES NICHTLADEN, SONDERN EIN ABSTURZ: Ist DOORSTOP_ENABLE bei Doorstop 3 nicht gesetzt, faellt der per LD_PRELOAD vorgeladene Doorstop mit SIGSEGV (Exit 139) um - und zwar bevor irgendein Programm laeuft. Im Container stand nur 'fb-init: [started]/[exited]', kein Wort vom Spiel. Nachgestellt mit einem blossen 'echo' im selben Image: ohne DOORSTOP_ENABLE 139, mit ihm 0. Doorstop 4 vertraegt die alten Namen anstandslos (alle vier Kombinationen 0), deshalb ist das Setzen beider Saetze sicher und nicht bloss bequem. Was NICHT gemacht wurde: die Doorstop-Fassung beim Installieren auslesen und den Namenssatz danach waehlen - richtiger, aber mehr Maschinerie; wenn ein dritter Satz auftaucht, ist das der Weg. NICHT UEBERNOMMEN, obwohl das Startskript des Packs es setzt: DOORSTOP_CORLIB_OVERRIDE_PATH=./unstripped_corlib. Es ZERLEGT dieses Valheim. Gemessen am 2026-09-13 im echten Lauf: Doorstop meldet 'Got override: ./unstripped_corlib', und Mono bricht danach mit 'Your mono runtime and class libraries are out of sync - the out of sync library is unstripped_corlib/mscorlib.dll' ab. Der unstripped_corlib des Packs gehoert zu einer aelteren Unity-Fassung. OHNE die Variable laeuft BepInEx.Preloader.Entrypoint.Main() durch - ebenfalls im echten Lauf belegt. Lehre: Der erste Test lief gegen ein blosses 'echo' und meldete fuer beide Varianten Erfolg, weil dort nie Mono geladen wurde. Ein gruener Test ohne die Maschinerie, um die es geht, ist kein Beweis.",
       "management.saves: Pfad aus der Spieldokumentation übernommen, am laufenden Server noch nicht geprüft.",
       "management.logs: Valheim schreibt keine eigene Logdatei; Ausgabe kommt nur über die Konsole.",
       "content: BepInEx wird heute über ein zweites Addon abgebildet (valheim-bepinex). Nach B.12 gehört der Lader als Inhalt hierher.",

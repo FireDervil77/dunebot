@@ -144,6 +144,24 @@ async function legeAb({ server, inhalt, guildId, pakete, fehlend = [] }) {
         neustartNoetig: inhalt.needs_restart !== false,
     };
 
+    // ── Liegt schon eine ANDERE Fassung da? ─────────────────────────────────
+    //
+    // Gemessen am 2026-09-13 an Server 189: Ein Mod verlangte BepInEx 5.4.2200,
+    // installiert war 5.4.2333. `Inhalte.eintragen` schreibt per
+    // ON DUPLICATE KEY UPDATE die neue Dateiliste ueber die alte — die Dateien
+    // der alten Fassung bleiben liegen und stehen danach in KEINER Liste mehr.
+    // Fuenf Waisen blieben so zurueck, darunter `.doorstop_version`, die den
+    // Lader faelschlich als Doorstop 4 auswies, obwohl Doorstop 3 installiert
+    // war. Genau daran laesst sich der Fehler dann nicht mehr erkennen.
+    //
+    // `aktualisiere` macht es seit jeher richtig ("erst die alten Dateien weg,
+    // dann die neuen holen"); hier fehlte derselbe Schritt.
+    const vorhanden = new Map();
+    {
+        const { lader, mods } = await Inhalte.fuerServer(server.id);
+        for (const z of [lader, ...mods]) if (z) vorhanden.set(z.kennung, z);
+    }
+
     for (let i = 0; i < pakete.length; i++) {
         const p = pakete[i];
         const art = istLader(inhalt, p.kennung) ? Inhalte.ART_LADER : Inhalte.ART_MOD;
@@ -161,6 +179,19 @@ async function legeAb({ server, inhalt, guildId, pakete, fehlend = [] }) {
             ergebnis.fehlgeschlagen.push({ kennung: p.kennung,
                 fehler: 'Das Paket nennt keinen Ablageort fuer Mods (content.path)' });
             continue;
+        }
+
+        // Aufraeumen VOR dem Umschreiben der Zeile: Der Schritt auf "geplant"
+        // setzt `dateien` auf NULL. Danach waere die Liste der alten Fassung
+        // nur noch in einer Kopie im Speicher — und wer sich darauf verlaesst,
+        // baut auf das Kopierverhalten des Treibers statt auf die Reihenfolge.
+        const alt = vorhanden.get(p.kennung);
+        if (alt && alt.status === 'installiert' && alt.fassung && alt.fassung !== p.fassung) {
+            const weg = await entferneDateien({ server, zeile: alt, inhalt });
+            Logger.info(`[Gameserver/Inhalte] ${p.kennung}: ${alt.fassung} → ${p.fassung}, `
+                + `${weg.weg} alte Datei(en) entfernt`
+                + (weg.blieb.length ? `, ${weg.blieb.length} blieben liegen` : '')
+                + (weg.ohneListe ? ' (alte Zeile ohne Dateiliste — nichts zu entfernen)' : ''));
         }
 
         await Inhalte.eintragen({ ...grundzeile, status: 'geplant' });
