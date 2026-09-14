@@ -462,7 +462,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function deleteServer(serverId, serverName) {
-        if (!confirm(`Server "${serverName}" WIRKLICH löschen? Diese Aktion kann nicht rückgängig gemacht werden!`)) return;
+        if (!confirm(`Server "${serverName}" WIRKLICH löschen? Diese Aktion kann nicht rückgängig gemacht werden!\n\nLäuft er noch, wird er vorher gestoppt — das kann bis zu zweieinhalb Minuten dauern.`)) return;
+        showToast('info', `„${serverName}" wird gelöscht … läuft er noch, wird er zuerst gestoppt.`);
         
         fetch(`/guild/${guildId}/plugins/gameserver/servers/${serverId}`, {
             method: 'DELETE',
@@ -653,9 +654,12 @@ document.addEventListener('DOMContentLoaded', function() {
             restartBtn.style.display = 'none';
         }
         
-        // Delete-Button: Bei offline/error/installed (NICHT bei online/starting/stopping!)
+        // Delete-Button: seit dem 2026-09-14 auch bei online/starting — das
+        // Löschen stoppt den Server selbst und wartet, bis er unten ist.
+        // Während eines laufenden Übergangs (stopping, installing, updating)
+        // bleibt er weg.
         if (deleteBtn) {
-            if (status === 'offline' || status === 'error' || status === 'installed') {
+            if (['offline', 'error', 'installed', 'online', 'starting'].includes(status)) {
                 deleteBtn.style.display = 'inline-block';
             } else {
                 deleteBtn.style.display = 'none';

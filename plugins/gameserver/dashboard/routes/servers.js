@@ -17,6 +17,7 @@ const { buildStartPayload, loadServerForStart, ladePaketFuerAddon, baueInstallNu
 const { vergibPortsAusPaket } = require('../helpers/Portvergabe');
 const Inhalte = require('../helpers/Inhalte');
 const Quellen = require('../helpers/Quellen');
+const ServerStopp = require('../helpers/ServerStopp');
 const { baueUebersicht, baueServerListe, bauePaketAuswahl,
         baueMaschinenAuswahl, baueWerteSchritt } = require('../helpers/Serverseite');
 const { resolveStatusConfig } = require('../helpers/StatusSchema');
@@ -2263,6 +2264,7 @@ router.delete('/:serverId', requirePermission('GAMESERVER.DELETE'), async (req, 
                 gs.id,
                 gs.name,
                 gs.status,
+                gs.last_status_update,
                 gs.install_path,
                 gs.rootserver_id,
                 r.daemon_id,
@@ -2285,11 +2287,45 @@ router.delete('/:serverId', requirePermission('GAMESERVER.DELETE'), async (req, 
         // ════════════════════════════════════════════════════════════
         // 2. Status-Check: Server muss gestoppt sein
         // ════════════════════════════════════════════════════════════
-        if (server.status === 'online' || server.status === 'starting') {
-            return res.status(400).json({
-                success: false,
-                message: 'Server muss zuerst gestoppt werden'
-            });
+        // ── Läuft er noch? Dann erst stoppen, dann löschen ──────────────────
+        //
+        // Betreiber, 2026-09-14: „Dass man den Server stoppen muss zum Löschen —
+        // das könnte diese Funktion ja auch von alleine machen." Bis dahin wies
+        // die Route hier nur ab (Baustelle 115: ein hängendes `starting` machte
+        // das Löschen ganz unmöglich).
+        //
+        // **Gewartet wird auf die Meldung des Daemons, nicht auf die Antwort
+        // des Befehls.** Der Daemon reiht den Stopp nur ein, und beim
+        // Deinstallieren stoppt er selbst NICHTS — er löscht Volume und
+        // Verzeichnis, auch unter einem noch laufenden Container. Deshalb gilt:
+        // Kommt der Server nicht sicher herunter, wird nichts gelöscht.
+        if (['online', 'starting', 'stopping'].includes(server.status)) {
+            // Ein laufender Stopp wird nicht doppelt ausgelöst — außer er hängt
+            // länger, als ein Übergang darf (dasselbe Ventil wie beim Stoppen).
+            const { uebergangVerfallen } = require('../helpers/ServerState');
+            const schonImStopp = server.status === 'stopping'
+                && !uebergangVerfallen(server.last_status_update);
+
+            if (!schonImStopp) {
+                Logger.info(`[Gameserver] Server ${serverId} läuft noch (${server.status}) — wird vor dem Löschen gestoppt`);
+                const stopp = await ServerStopp.stoppe({ server, guildId });
+                if (!stopp.ok) {
+                    return res.status(stopp.status || 500).json({
+                        success: false,
+                        message: `Der Server läuft und ließ sich nicht stoppen: ${stopp.grund}. Es wurde nichts gelöscht.`
+                    });
+                }
+            }
+
+            const warten = await ServerStopp.warteBisGestoppt(serverId);
+            if (!warten.ok) {
+                Logger.warn(`[Gameserver] Löschen von Server ${serverId} abgebrochen: ${warten.grund}`);
+                return res.status(warten.zeitueberschreitung ? 504 : 409).json({
+                    success: false,
+                    message: `${warten.grund}. Es wurde nichts gelöscht — der Server bleibt, bis er sicher unten ist.`
+                });
+            }
+            Logger.info(`[Gameserver] Server ${serverId} ist unten — Löschen geht weiter`);
         }
 
         // ════════════════════════════════════════════════════════════
@@ -2966,78 +3002,30 @@ router.post('/:serverId/stop', requirePermission('GAMESERVER.STOP'), async (req,
             });
         }
 
-        if (server.status !== 'online' && server.status !== 'starting') {
-            return res.status(400).json({
+        // ── Seit dem 2026-09-14 über EINEN Helfer ──────────────────────────────
+        //
+        // Bis dahin prüfte diese Route selbst (`online`/`starting`), schrieb nach
+        // der Antwort des Daemons sofort `offline` und schickte dem Browser nichts.
+        // Der Daemon reiht den Stopp aber nur ein (`queued`) — `stopping` kam nie
+        // live an, und ein noch laufender Container stand in der Datenbank schon
+        // auf `offline`. Einzelheiten in helpers/ServerStopp.js; das Löschen
+        // benutzt denselben Helfer, damit es erst dann Dateien anfasst, wenn der
+        // Server wirklich unten ist.
+        const ergebnis = await ServerStopp.stoppe({ server, guildId });
+        if (!ergebnis.ok) {
+            return res.status(ergebnis.status || 500).json({
                 success: false,
-                message: 'Server läuft nicht'
+                message: ergebnis.grund
             });
         }
 
-        if (!server.daemon_id) {
-            return res.status(404).json({
-                success: false,
-                message: 'Kein Daemon zugewiesen'
-            });
-        }
-
-        const ipmServer = ServiceManager.get('ipmServer');
-        
-        if (!ipmServer) {
-            return res.status(503).json({
-                success: false,
-                message: 'IPM-Server nicht verfügbar'
-            });
-        }
-
-        if (!ipmServer.isDaemonOnline(server.daemon_id)) {
-            return res.status(503).json({
-                success: false,
-                message: 'Daemon ist offline'
-            });
-        }
-
-        // Status auf 'stopping' setzen
-        await dbService.query(
-            'UPDATE gameservers SET status = ? WHERE id = ?',
-            ['stopping', serverId]
-        );
-
-        // IPM-Command an Daemon senden
-        Logger.info(`[Gameserver] Sende Stop-Command an Daemon ${server.daemon_id}`);
-
-        const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.stop', {
-            server_id: serverId,
-            guild_id: guildId  // ✅ Guild-ID für Event-Broadcasting
-        }, 30000);
-
-        if (response.success) {
-            // Status auf 'offline' setzen
-            await dbService.query(
-                'UPDATE gameservers SET status = ? WHERE id = ?',
-                ['offline', serverId]
-            );
-
-            Logger.success(`[Gameserver] Server ${serverId} gestoppt`);
-            
-            res.json({
-                success: true,
-                message: `Server "${server.name}" wurde gestoppt`
-            });
-        } else {
-            // Status zurücksetzen falls Stop fehlschlägt
-            await dbService.query(
-                'UPDATE gameservers SET status = ?, error_message = ? WHERE id = ?',
-                ['online', response.error || 'Stop failed', serverId]
-            );
-
-            Logger.error(`[Gameserver] Stop fehlgeschlagen für Server ${serverId}:`, response.error);
-            
-            res.status(500).json({
-                success: false,
-                message: response.error || 'Server konnte nicht gestoppt werden'
-            });
-        }
-
+        res.json({
+            success: true,
+            eingereiht: Boolean(ergebnis.eingereiht),
+            message: ergebnis.eingereiht
+                ? `Server "${server.name}" wird gestoppt …`
+                : `Server "${server.name}" wurde gestoppt`
+        });
     } catch (error) {
         Logger.error('[Gameserver] Fehler beim Stoppen des Servers:', error);
         res.status(500).json({

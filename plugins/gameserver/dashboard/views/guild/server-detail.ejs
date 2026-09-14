@@ -235,7 +235,10 @@ document.addEventListener('DOMContentLoaded', function() {
             if (restartBtn) restartBtn.style.display = (normalized === 'online') ? '' : 'none';
             // Reinstall-Button immer anzeigen
             if (reinstallBtn) reinstallBtn.style.display = '';
-            if (deleteBtn) deleteBtn.style.display = (normalized === 'offline' || normalized === 'error' || normalized === 'installed') ? '' : 'none';
+            // Seit dem 2026-09-14 auch bei laufendem Server: Das Löschen stoppt
+            // ihn selbst und wartet, bis er wirklich unten ist. Nur während eines
+            // Übergangs, der gerade läuft, bleibt der Knopf weg.
+            if (deleteBtn) deleteBtn.style.display = ['offline', 'error', 'installed', 'online', 'starting'].includes(normalized) ? '' : 'none';
         }
     };
 

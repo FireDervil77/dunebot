@@ -189,7 +189,7 @@ async function deleteServer(serverId, serverName) {
     }
 
     // Zweite Bestätigung
-    if (!confirm(`Letzte Bestätigung: Server "${serverName}" wirklich löschen?`)) {
+    if (!confirm(`Letzte Bestätigung: Server "${serverName}" wirklich löschen?\n\nLäuft er noch, wird er vorher gestoppt — das kann bis zu zweieinhalb Minuten dauern.`)) {
         console.log('[ServerAction] Delete abgebrochen (zweite Bestätigung)');
         return;
     }
@@ -209,7 +209,7 @@ async function deleteServer(serverId, serverName) {
 
     // Loading-Toast
     if (window.showToast) {
-        window.showToast('info', 'Server wird gelöscht...');
+        window.showToast('info', 'Server wird gelöscht … läuft er noch, wird er zuerst gestoppt.');
     }
 
     try {
