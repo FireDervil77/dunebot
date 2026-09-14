@@ -384,7 +384,14 @@ class GameserverPlugin extends DashboardPlugin {
                     // ────────────────────────────────────────────────────────
                     // 2a. Server stoppen (falls läuft)
                     // ────────────────────────────────────────────────────────
-                    if (server.status === 'running' || server.status === 'starting') {
+                    // `online`, nicht `running`: Die Spalte kennt `running` nicht
+                    // (ENUM installing, installed, starting, online, stopping,
+                    // offline, error, updating) — das ist ein Daemon-Wert, den
+                    // diese Datei weiter unten selbst in `online` uebersetzt. Bis
+                    // zum 2026-09-14 stand hier `running`, und laufende Server
+                    // wurden beim Abbau des Plugins deshalb nie gestoppt, bevor
+                    // ihre Dateien weg waren (Baustelle 117).
+                    if (server.status === 'online' || server.status === 'starting') {
                         try {
                             Logger.info(`[Gameserver] Stoppe Server ${server.id} (${server.name})...`);
                             
