@@ -44,6 +44,16 @@ const { ServiceManager } = require('dunebot-core');
  */
 const HERKUNFT = ['thunderstore.io', 'gcdn.thunderstore.io'];
 
+// ── Wer dieser Anbieter ist (Vertrag in Quellen.js) ────────────────────────
+//
+// `KENNUNG` ist zugleich der Wert in `gameserver_content.quelle` und der Name
+// im Paket (`content.sources`, `content.source_ids`). Ein zweiter Name fuer
+// dieselbe Sache waere die erste Stelle, an der zwei Anbieter auseinanderlaufen.
+const KENNUNG = 'thunderstore';
+const TITEL = 'Thunderstore';
+/** Thunderstore teilt seinen Katalog nach SPIELEN — das ist hier der „Raum". */
+const RAUM_NAME = 'Gemeinschaft';
+
 const BASIS = 'https://thunderstore.io';
 const FRIST_MS = 15000;
 
@@ -146,7 +156,11 @@ function verzeichnis(community) {
  * Beide Wege liefern dieselbe Form zurueck — der Aufrufer soll nicht wissen
  * muessen, ob die Fassung von ihm kam oder von Thunderstore.
  */
-async function paket(namespace, name, fassung = null) {
+async function paket(raum, kennung, fassung = null) {
+    const teil = teileOhneFassung(kennung);
+    if (!teil) throw new Error(`Unlesbare Kennung: ${kennung}`);
+    const { namespace, name } = teil;
+
     const p = `/api/experimental/package/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}/`;
     const daten = fassung
         ? await hole(`${p}${encodeURIComponent(fassung)}/`)
@@ -175,6 +189,24 @@ async function paket(namespace, name, fassung = null) {
         // Ebene hoeher ist der Tag, an dem das Paket zum ersten Mal erschien.
         veroeffentlicht: daten.date_created || null,
     };
+}
+
+/**
+ * `denikson-BepInExPack_Valheim` auseinandernehmen — OHNE Fassung.
+ *
+ * Gespeichert wird bei uns `namespace-name`, weil die Fassung eine eigene
+ * Spalte hat. Getrennt wird am ERSTEN Bindestrich: Der Namensraum hat nie
+ * einen, der Name darf welche haben (`Foo-Bar-Mod`).
+ *
+ * Das ist Thunderstore-Wissen und steht deshalb hier. Bis zum 2026-09-14 lag es
+ * im gemeinsamen Holweg — und haette dort jeden weiteren Anbieter gezwungen,
+ * seine Kennungen in Thunderstore-Form zu pressen.
+ */
+function teileOhneFassung(kennung) {
+    const text = String(kennung || '');
+    const schnitt = text.indexOf('-');
+    if (schnitt < 1 || schnitt === text.length - 1) return null;
+    return { namespace: text.slice(0, schnitt), name: text.slice(schnitt + 1) };
 }
 
 /**
@@ -234,7 +266,10 @@ function hoeher(a, b) {
  *
  * @returns {Promise<Array>} Pakete in Installationsreihenfolge, ohne Doppel
  */
-async function aufloesen(namespace, name, fassung = null) {
+async function aufloesen(raum, kennung, fassung = null) {
+    const wurzelTeil = teileOhneFassung(kennung);
+    if (!wurzelTeil) throw new Error(`Unlesbare Kennung: ${kennung}`);
+
     const gefunden = new Map();   // kennung → Paket
     const fehlend = [];
 
@@ -243,7 +278,7 @@ async function aufloesen(namespace, name, fassung = null) {
 
         let p;
         try {
-            p = await paket(ns, nm, fs);
+            p = await paket(raum, `${ns}-${nm}`, fs);
         } catch (fehler) {
             // Melden, nicht ueberspringen: Ein Mod, dessen Abhaengigkeit es
             // nicht mehr gibt, wird nicht laufen. Das gehoert VOR die
@@ -273,9 +308,9 @@ async function aufloesen(namespace, name, fassung = null) {
         return p;
     }
 
-    const wurzel = await verfolge(namespace, name, fassung, 0);
+    const wurzel = await verfolge(wurzelTeil.namespace, wurzelTeil.name, fassung, 0);
     if (!wurzel) {
-        throw new Error(fehlend[0] || `${namespace}/${name} nicht gefunden`);
+        throw new Error(fehlend[0] || `${kennung} nicht gefunden`);
     }
 
     return { pakete: [...gefunden.values()], fehlend };
@@ -287,16 +322,15 @@ async function aufloesen(namespace, name, fassung = null) {
  * Fehler eines einzelnen Pakets beenden die Liste nicht — sonst verschwiegen
  * ein geloeschtes Paket und ein Netzausfall die Auskunft ueber alle anderen.
  */
-async function aktualisierungen(zeilen) {
+async function aktualisierungen(raum, zeilen) {
     const Logger = ServiceManager.get('Logger');
     const ergebnis = [];
 
     for (const zeile of zeilen) {
-        const teil = zeile.kennung ? zeile.kennung.split('-') : [];
-        if (teil.length < 2) continue;
+        if (!teileOhneFassung(zeile.kennung)) continue;
 
         try {
-            const p = await paket(teil[0], teil.slice(1).join('-'));
+            const p = await paket(raum, zeile.kennung);
             ergebnis.push({
                 id: zeile.id,
                 kennung: zeile.kennung,
@@ -323,7 +357,35 @@ async function aktualisierungen(zeilen) {
     return ergebnis;
 }
 
+/**
+ * Ist diese Fassung neuer als die, die auf dem Server liegt?
+ *
+ * Bei Thunderstore die Nummer: Der Dienst erzwingt SemVer, jede Fassung ist
+ * `a.b.c`. (Bei Modrinth ist das anders — deshalb fragt der gemeinsame Weg den
+ * Anbieter und vergleicht nicht selbst.)
+ */
+function neuerAls(paketNeu, zeile) {
+    return hoeher(paketNeu?.fassung, zeile?.fassung);
+}
+
+/**
+ * Die Seite eines Mods bei Thunderstore.
+ *
+ * Ohne Gemeinschaft gibt es keine Adresse: `/c/<spiel>/p/<raum>/<name>/` ist der
+ * einzige Weg, und ein geratenes Spiel fuehrte auf eine fremde Seite. Bis zum
+ * 2026-09-14 stand das in `Inhalte.paketAdresse` — also im gemeinsamen Weg,
+ * obwohl nur Thunderstore diese Form kennt.
+ */
+function adresse(raum, kennung) {
+    if (!raum) return null;
+    const teil = teileOhneFassung(kennung);
+    if (!teil) return null;
+    return `${BASIS}/c/${encodeURIComponent(raum)}`
+         + `/p/${encodeURIComponent(teil.namespace)}/${encodeURIComponent(teil.name)}/`;
+}
+
 module.exports = {
-    HERKUNFT, istErlaubt, suche, paket, teileKennung, hoeher, aufloesen, aktualisierungen,
-    verzeichnis, PRO_SEITE,
+    KENNUNG, TITEL, RAUM_NAME, HERKUNFT, PRO_SEITE,
+    istErlaubt, suche, verzeichnis, adresse, paket, aufloesen, aktualisierungen,
+    hoeher, neuerAls, teileKennung, teileOhneFassung,
 };

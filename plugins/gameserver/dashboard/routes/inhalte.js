@@ -27,7 +27,7 @@ const { nimmDatei } = require('../helpers/DateiAnnahme');
 const { ladePaketFuerAddon } = require('../helpers/StartPayload');
 const Inhalte = require('../helpers/Inhalte');
 const InhalteHolen = require('../helpers/InhalteHolen');
-const Thunderstore = require('../helpers/Thunderstore');
+const Quellen = require('../helpers/Quellen');
 const BepInExLog = require('../helpers/BepInExLog');
 
 /**
@@ -97,21 +97,29 @@ router.get('/:serverId/inhalte', requirePermission('GAMESERVER.VIEW'), async (re
         // Jede Zeile bekommt die Seite ihrer Quelle mit — daraus baut die Karte
         // die Liste zum Weitergeben. Gebaut wird sie HIER, weil nur hier das
         // Spielpaket bekannt ist (die Gemeinschaft steht darin).
-        const gemeinschaft = inhalt?.source_ids?.thunderstore || null;
-        const mitAdresse = (z) => (z ? { ...z, url: Inhalte.paketAdresse(z, gemeinschaft) } : z);
+        const raeume = Quellen.raeumeAus(inhalt);
+        const mitAdresse = (z) => (z ? { ...z, url: Inhalte.paketAdresse(z, raeume) } : z);
         liste.lader = mitAdresse(liste.lader);
         liste.mods = liste.mods.map(mitAdresse);
         liste.entfernt = liste.entfernt.map(mitAdresse);
 
         return res.json({
             success: true,
-            gemeinschaft,
+            // Alle Anbieter dieses Spiels, in der Reihenfolge des Pakets — die
+            // Karte baut daraus ihre Auswahl und ihre Adressen.
+            quellen: Quellen.ausPaket(inhalt).map(q => ({
+                kennung: q, titel: Quellen.fuer(q).TITEL,
+                raumName: Quellen.fuer(q).RAUM_NAME, raum: raeume[q] || null,
+            })),
+            raeume,
             // Was das PAKET sagt — ohne das weiss die Ansicht nicht, ob sie
             // ueberhaupt etwas anbieten darf.
             unterstuetzt: Boolean(inhalt?.supported),
             lader: inhalt?.loader?.key || null,
             pfad: inhalt?.path || null,
-            quellen: inhalt?.sources || [],
+            // Was das Paket WOERTLICH nennt — auch `upload` und Anbieter, die
+            // dieses Dashboard noch nicht kann.
+            quellenImPaket: inhalt?.sources || [],
             reihenfolgeZaehlt: Boolean(inhalt?.order_matters),
             ...liste,
         });
@@ -245,32 +253,41 @@ router.post('/:serverId/inhalte', requirePermission('GAMESERVER.FILES.MANAGE'), 
 // ════════════════════════════════════════════════════════════════════════════
 
 /**
- * Bei welcher Thunderstore-Gemeinschaft dieses Spiel liegt.
+ * Welcher Anbieter ist gemeint — und hat das Spiel ihn ueberhaupt?
  *
- * Thunderstore ist nach Spielen getrennt (`valheim`, `lethal-company`). Das
- * sagt das PAKET (`content.source_ids.thunderstore`) — geraten waere es die
- * Sorte Annahme, die bei jedem zweiten Spiel danebenliegt.
+ * Gibt entweder den Namen zurueck oder eine fertige Absage. Drei Faelle, drei
+ * verschiedene Saetze: Das Spiel nimmt gar keine Inhalte; es kennt diesen
+ * Anbieter nicht; es sagt nicht, welcher Teil seines Katalogs zu ihm gehoert.
+ * Eine gemeinsame Meldung („geht nicht") liesse den Betreiber raten, was zu tun
+ * ist — und zu tun ist bei allen dreien etwas anderes.
+ *
+ * @returns {{quelle: string, raum: string}|{absage: true}}
  */
-function gemeinschaftAus(inhalt) {
-    return inhalt?.source_ids?.thunderstore || null;
-}
-
-/** Antwort, wenn das Paket Thunderstore gar nicht kennt. */
-function keineQuelle(res, inhalt) {
+function quelleWaehlen(res, inhalt, gewuenscht) {
     if (!inhalt?.supported) {
-        return res.status(409).json({ success: false,
+        res.status(409).json({ success: false,
             message: 'Dieses Spiel nimmt laut seinem Paket keine Inhalte auf.' });
+        return { absage: true };
     }
-    if (!(inhalt.sources || []).includes('thunderstore')) {
-        return res.status(409).json({ success: false,
-            message: 'Das Paket nennt Thunderstore nicht als Quelle.' });
+    const quelle = Quellen.waehle(inhalt, gewuenscht);
+    if (!quelle) {
+        const moeglich = Quellen.ausPaket(inhalt);
+        res.status(409).json({ success: false,
+            message: gewuenscht
+                ? `Das Paket nennt ${gewuenscht} nicht als Quelle.`
+                  + (moeglich.length ? ` Möglich wäre: ${moeglich.join(', ')}.` : '')
+                : 'Das Paket nennt keine Quelle, aus der sich Inhalte holen lassen.' });
+        return { absage: true };
     }
-    if (!gemeinschaftAus(inhalt)) {
-        return res.status(409).json({ success: false,
-            message: 'Das Paket sagt nicht, welche Thunderstore-Gemeinschaft zu diesem Spiel '
-                   + 'gehoert (content.source_ids.thunderstore).' });
+    const raum = Quellen.raumAus(inhalt, quelle);
+    if (!raum) {
+        const anbieter = Quellen.fuer(quelle);
+        res.status(409).json({ success: false,
+            message: `Das Paket sagt nicht, welche ${anbieter.RAUM_NAME} bei ${anbieter.TITEL} `
+                   + `zu diesem Spiel gehört (content.source_ids.${quelle}).` });
+        return { absage: true };
     }
-    return null;
+    return { quelle, raum };
 }
 
 /**
@@ -292,10 +309,11 @@ router.get('/mods/suche', requirePermission('GAMESERVER.CREATE'), async (req, re
             : null;
         const inhalt = paket?.content || null;
 
-        const absage = keineQuelle(res, inhalt);
-        if (absage) return absage;
+        const gewaehlt = quelleWaehlen(res, inhalt, req.query.quelle);
+        if (gewaehlt.absage) return;
 
-        return res.json(await sucheAntwort(inhalt, req.query.q, req.query.seite));
+        return res.json(await sucheAntwort(inhalt, gewaehlt.quelle, gewaehlt.raum,
+            req.query.q, req.query.seite));
     } catch (error) {
         Logger.warn('[Gameserver/Inhalte] Suche fehlgeschlagen:', error);
         return res.status(502).json({ success: false, message: error.message });
@@ -312,14 +330,16 @@ router.get('/mods/suche', requirePermission('GAMESERVER.CREATE'), async (req, re
  * Die Adresse baut der Server, nicht die Ansicht: Sie braucht die Gemeinschaft
  * aus dem Paket, und ohne sie landet man beim falschen Spiel.
  */
-async function sucheAntwort(inhalt, begriff, seite) {
-    const gemeinschaft = gemeinschaftAus(inhalt);
-    const roh = await Thunderstore.suche(gemeinschaft, begriff || '', { seite });
+async function sucheAntwort(inhalt, quelle, raum, begriff, seite) {
+    const anbieter = Quellen.fuer(quelle);
+    const roh = await anbieter.suche(raum, begriff || '', { seite });
     return {
         success: true,
-        gemeinschaft,
+        quelle,
+        titel: anbieter.TITEL,
+        raum,
         gestoebert: !String(begriff || '').trim(),
-        lader: inhalt.loader?.packages?.thunderstore || null,
+        lader: inhalt.loader?.packages?.[quelle] || null,
         // Wie viel es hier ueberhaupt gibt — die Frage stellt sich jeder, der
         // ein Spiel noch nicht kennt, und ohne Antwort blaettert er blind.
         gesamt:   roh.gesamt,
@@ -329,10 +349,10 @@ async function sucheAntwort(inhalt, begriff, seite) {
         zurueck:  roh.zurueck,
         // Wer wirklich stoebern will, ist im Verzeichnis besser aufgehoben als
         // in einer Karte mit 20 Zeilen.
-        verzeichnis: Thunderstore.verzeichnis(gemeinschaft),
+        verzeichnis: anbieter.verzeichnis(raum),
         treffer: roh.treffer.map(t => ({
             ...t,
-            url: Inhalte.paketAdresse({ quelle: 'thunderstore', kennung: t.kennung }, gemeinschaft),
+            url: Inhalte.paketAdresse({ quelle, kennung: t.kennung }, raum),
         })),
     };
 }
@@ -347,10 +367,11 @@ router.get('/:serverId/inhalte/suche', requirePermission('GAMESERVER.VIEW'), asy
         if (!geladen) return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
 
         const inhalt = geladen.paket?.content || null;
-        const absage = keineQuelle(res, inhalt);
-        if (absage) return absage;
+        const gewaehlt = quelleWaehlen(res, inhalt, req.query.quelle);
+        if (gewaehlt.absage) return;
 
-        return res.json(await sucheAntwort(inhalt, req.query.q, req.query.seite));
+        return res.json(await sucheAntwort(inhalt, gewaehlt.quelle, gewaehlt.raum,
+            req.query.q, req.query.seite));
     } catch (error) {
         // 502, nicht 500: Der Fehler liegt beim fremden Dienst, nicht bei uns —
         // und die Meldung sagt das auch, statt „Serverfehler" zu behaupten.
@@ -374,11 +395,11 @@ router.get('/:serverId/inhalte/vorschau', requirePermission('GAMESERVER.VIEW'), 
         if (!geladen) return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
 
         const inhalt = geladen.paket?.content || null;
-        const absage = keineQuelle(res, inhalt);
-        if (absage) return absage;
+        const gewaehlt = quelleWaehlen(res, inhalt, req.query.quelle);
+        if (gewaehlt.absage) return;
 
         const schau = await InhalteHolen.vorschau({
-            serverId: req.params.serverId, inhalt,
+            serverId: req.params.serverId, inhalt, quelle: gewaehlt.quelle,
             kennung: req.query.kennung, fassung: req.query.fassung || null,
         });
         return res.json({ success: true, ...schau });
@@ -388,8 +409,16 @@ router.get('/:serverId/inhalte/vorschau', requirePermission('GAMESERVER.VIEW'), 
     }
 });
 
-/** Installieren — das Paket samt allem, was es braucht. */
-router.post('/:serverId/inhalte/thunderstore', requirePermission('GAMESERVER.FILES.MANAGE'),
+/**
+ * Installieren — das Paket samt allem, was es braucht.
+ *
+ * Die Route hiess bis zum 2026-09-14 `/thunderstore`. Ein Anbietername im
+ * PFAD haette bei jedem weiteren Anbieter eine zweite Route ergeben, die
+ * dasselbe tut — und die erste waere beim naechsten Fund berichtigt worden und
+ * die zweite nicht. Jetzt steht der Anbieter im Rumpf, wo er hingehoert: Er ist
+ * eine Angabe, keine andere Handlung.
+ */
+router.post('/:serverId/inhalte/holen', requirePermission('GAMESERVER.FILES.MANAGE'),
     async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
@@ -402,20 +431,20 @@ router.post('/:serverId/inhalte/thunderstore', requirePermission('GAMESERVER.FIL
         if (!geladen) return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
 
         const inhalt = geladen.paket?.content || null;
-        const absage = keineQuelle(res, inhalt);
-        if (absage) return absage;
+        const gewaehlt = quelleWaehlen(res, inhalt, req.body?.quelle);
+        if (gewaehlt.absage) return;
 
         if (!req.body?.kennung) {
             return res.status(400).json({ success: false, message: 'kennung fehlt' });
         }
 
         const ergebnis = await InhalteHolen.installiere({
-            server: geladen.server, inhalt, guildId,
+            server: geladen.server, inhalt, guildId, quelle: gewaehlt.quelle,
             kennung: String(req.body.kennung),
             fassung: req.body.fassung ? String(req.body.fassung) : null,
         });
 
-        Logger.info(`[Gameserver/Inhalte] Thunderstore ${req.body.kennung} auf Server ${serverId}: `
+        Logger.info(`[Gameserver/Inhalte] ${gewaehlt.quelle} ${req.body.kennung} auf Server ${serverId}: `
             + `${ergebnis.installiert.length} installiert, ${ergebnis.fehlgeschlagen.length} fehlgeschlagen`);
 
         // Auch ein Teilerfolg ist ein Erfolg der Anfrage — was misslang, steht
@@ -452,8 +481,10 @@ router.post('/:serverId/inhalte/geplant-holen', requirePermission('GAMESERVER.FI
         if (!geladen) return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
 
         const inhalt = geladen.paket?.content || null;
-        const absage = keineQuelle(res, inhalt);
-        if (absage) return absage;
+        // Hier wird keine Quelle gewaehlt: Jede vorgemerkte Zeile bringt ihre
+        // eigene mit. Geprueft wird nur, dass das Spiel ueberhaupt Inhalte nimmt.
+        const gewaehlt = quelleWaehlen(res, inhalt, null);
+        if (gewaehlt.absage) return;
 
         const ergebnis = await InhalteHolen.holeGeplante({
             server: geladen.server, inhalt, guildId });
@@ -558,14 +589,38 @@ router.get('/:serverId/inhalte/aktualisierungen', requirePermission('GAMESERVER.
         const geladen = await ladeServerUndPaket(dbService, req.params.serverId, res.locals.guildId);
         if (!geladen) return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
 
+        const inhalt = geladen.paket?.content || null;
+        const namen = Object.keys(Quellen.ANBIETER);
         const zeilen = await dbService.query(
-            `SELECT id, kennung, fassung FROM gameserver_content
-              WHERE server_id = ? AND quelle = 'thunderstore' AND status = 'installiert'`,
-            [req.params.serverId]
+            `SELECT id, kennung, fassung, quelle,
+                    DATE_FORMAT(veroeffentlicht, '%Y-%m-%d') AS veroeffentlicht
+               FROM gameserver_content
+              WHERE server_id = ? AND status = 'installiert'
+                AND quelle IN (${namen.map(() => '?').join(', ')})`,
+            [req.params.serverId, ...namen]
         );
         if (!zeilen.length) return res.json({ success: true, stand: [] });
 
-        return res.json({ success: true, stand: await Thunderstore.aktualisierungen(zeilen) });
+        // Je Anbieter EIN Aufruf mit seinen Zeilen: Er kennt seine Frist, seine
+        // Ratengrenze und seine Art, „neuer" zu entscheiden. Ein Anbieter, der
+        // gerade nicht antwortet, nimmt die anderen nicht mit — seine Zeilen
+        // tragen dann den Grund.
+        const stand = [];
+        for (const name of namen) {
+            const seine = zeilen.filter(z => z.quelle === name);
+            if (!seine.length) continue;
+            const raum = Quellen.raumAus(inhalt, name);
+            try {
+                stand.push(...await Quellen.fuer(name).aktualisierungen(raum, seine));
+            } catch (fehler) {
+                Logger.warn(`[Gameserver/Inhalte] ${name} nicht abfragbar: ${fehler.message}`);
+                for (const z of seine) {
+                    stand.push({ id: z.id, kennung: z.kennung, installiert: z.fassung,
+                        neueste: null, neuer: false, fehler: fehler.message });
+                }
+            }
+        }
+        return res.json({ success: true, stand });
     } catch (error) {
         Logger.warn('[Gameserver/Inhalte] Aktualisierungen nicht abfragbar:', error);
         return res.status(502).json({ success: false, message: error.message });
@@ -592,15 +647,22 @@ router.post('/:serverId/inhalte/:id/aktualisieren', requirePermission('GAMESERVE
         if (!geladen) return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
 
         const inhalt = geladen.paket?.content || null;
-        const absage = keineQuelle(res, inhalt);
-        if (absage) return absage;
 
         const [zeile] = await dbService.query(
-            `SELECT * FROM gameserver_content
-              WHERE id = ? AND server_id = ? AND quelle = 'thunderstore'`,
+            `SELECT *, DATE_FORMAT(veroeffentlicht, '%Y-%m-%d') AS veroeffentlicht
+               FROM gameserver_content WHERE id = ? AND server_id = ?`,
             [id, serverId]
         );
         if (!zeile) return res.status(404).json({ success: false, message: 'Eintrag nicht gefunden' });
+
+        // Eine hochgeladene Datei hat keinen Anbieter, den man fragen koennte.
+        if (!Quellen.gibtEs(zeile.quelle)) {
+            return res.status(409).json({ success: false,
+                message: 'Dieser Eintrag kam nicht aus einem Katalog — für ihn gibt es keine '
+                       + 'Fassung zum Nachschlagen.' });
+        }
+        const gewaehlt = quelleWaehlen(res, inhalt, zeile.quelle);
+        if (gewaehlt.absage) return;
 
         const ergebnis = await InhalteHolen.aktualisiere({
             server: geladen.server, inhalt, guildId, zeile,

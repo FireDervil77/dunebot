@@ -16,6 +16,7 @@ const { buildStartPayload, loadServerForStart, ladePaketFuerAddon, baueInstallNu
         paketWerteAnlegen, autoUpdateAus, istWahr } = require('../helpers/StartPayload');
 const { vergibPortsAusPaket } = require('../helpers/Portvergabe');
 const Inhalte = require('../helpers/Inhalte');
+const Quellen = require('../helpers/Quellen');
 const { baueUebersicht, baueServerListe, bauePaketAuswahl,
         baueMaschinenAuswahl, baueWerteSchritt } = require('../helpers/Serverseite');
 const { resolveStatusConfig } = require('../helpers/StatusSchema');
@@ -652,15 +653,17 @@ router.get('/create', requirePermission('GAMESERVER.CREATE'), async (req, res) =
             if (am3) am3.enqueueStyle('gameserver-serverseite');
 
             // Was das Paket zu Mods sagt — der Schritt „Mods" erscheint nur,
-            // wenn es sie ueberhaupt kennt UND Thunderstore als Quelle nennt.
+            // wenn es sie kennt UND mindestens einen Katalog nennt, den dieses
+            // Dashboard fragen kann (Quellen.js). Seit dem 2026-09-14 ist das
+            // nicht mehr zwingend Thunderstore.
             const inhaltDesPakets = paketFuerWerte?.content || null;
+            const kataloge = Boolean(inhaltDesPakets?.supported)
+                ? Quellen.ausPaket(inhaltDesPakets).filter(q => Quellen.raumAus(inhaltDesPakets, q))
+                : [];
             const inhalte = {
                 unterstuetzt: Boolean(inhaltDesPakets?.supported),
-                thunderstore: Boolean(inhaltDesPakets?.supported)
-                    && (inhaltDesPakets.sources || []).includes('thunderstore')
-                    && Boolean(inhaltDesPakets.source_ids?.thunderstore),
-                lader:        inhaltDesPakets?.loader?.packages?.thunderstore || null,
-                laderName:    inhaltDesPakets?.loader?.key || null,
+                quellen: kataloge.map(q => ({ kennung: q, titel: Quellen.fuer(q).TITEL })),
+                laderName: inhaltDesPakets?.loader?.key || null,
             };
 
             return await themeManager.renderView(res, 'guild/server-create-step3', {
@@ -1004,21 +1007,32 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
         // (`_handleInstallCompleted`). Derselbe Weg wie im Tab „Mods", nur
         // zeitversetzt — und ein Mod, den Thunderstore gerade nicht
         // ausliefert, darf die Serveranlage nicht aufhalten.
+        // Jede Auswahl reist als `<quelle>|<kennung>`. Der Trenner ist mit
+        // Absicht kein Bindestrich: Thunderstore-Kennungen haben welche
+        // (`ValheimModding-Jotunn`), Modrinth-Slugs duerfen welche haben
+        // (`fabric-api`) — ein `|` kommt in keiner von beiden vor. Bis zum
+        // 2026-09-14 stand hier `k.includes('-')` als Pruefung, und die haette
+        // jeden Modrinth-Mod ohne Bindestrich stillschweigend verworfen.
         const gewaehlteMods = [].concat(req.body.mod || [])
-            .filter(k => typeof k === 'string' && k.includes('-'));
+            .filter(k => typeof k === 'string' && k.includes('|'))
+            .map(k => ({ quelle: k.slice(0, k.indexOf('|')), kennung: k.slice(k.indexOf('|') + 1) }))
+            .filter(m => m.kennung && Quellen.gibtEs(m.quelle));
         if (gewaehlteMods.length) {
             const inhalt = paket.content || {};
-            const laderPaket = inhalt.loader?.packages?.thunderstore || null;
             for (let i = 0; i < gewaehlteMods.length; i++) {
+                const { quelle, kennung } = gewaehlteMods[i];
+                // Der Lader ist keine Zeile wie die anderen — und nur das Paket
+                // weiss, welches Paket DIESER Quelle er ist.
+                const laderPaket = inhalt.loader?.packages?.[quelle] || null;
                 await Inhalte.eintragen({
-                    serverId, guildId, quelle: 'thunderstore',
-                    // Der Lader ist keine Zeile wie die anderen — nur das Paket
-                    // weiss, welches Thunderstore-Paket er ist.
-                    art: laderPaket && gewaehlteMods[i].toLowerCase() === laderPaket.toLowerCase()
+                    serverId, guildId, quelle,
+                    art: laderPaket && kennung.toLowerCase() === laderPaket.toLowerCase()
                         ? Inhalte.ART_LADER : Inhalte.ART_MOD,
-                    kennung: gewaehlteMods[i],
-                    name: gewaehlteMods[i].slice(gewaehlteMods[i].indexOf('-') + 1),
+                    kennung,
+                    name: kennung.includes('-') ? kennung.slice(kennung.indexOf('-') + 1) : kennung,
                     reihenfolge: i,
+                    // Vorlaeufig aus dem Paket: Was der Katalog je Mod sagt,
+                    // steht erst beim Holen fest und wird dann ueberschrieben.
                     clientSide: Boolean(inhalt.client_side),
                     status: 'geplant',
                 });

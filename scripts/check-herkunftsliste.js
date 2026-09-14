@@ -37,12 +37,29 @@ const pruefe = (ok, was, zusatz = '') => {
 console.log('\n▸ Die Herkunftsliste auf beiden Seiten');
 
 // ── Dashboard ───────────────────────────────────────────────────────────────
-const { HERKUNFT, istErlaubt } = require(
-    path.join(WURZEL, 'plugins/gameserver/dashboard/helpers/Thunderstore.js'));
+//
+// Gefragt wird die WEICHE, nicht ein einzelner Anbieter: Seit dem 2026-09-14
+// gibt es mehrere, und ein Waechter, der nur den ersten kennt, meldet gruen,
+// waehrend der zweite abgewiesen wird.
+const Quellen = require(path.join(WURZEL, 'plugins/gameserver/dashboard/helpers/Quellen.js'));
+const HERKUNFT = Quellen.HERKUNFT;
 
 pruefe(Array.isArray(HERKUNFT) && HERKUNFT.length > 0,
     'Das Dashboard nennt seine erlaubten Herkuenfte',
-    `Thunderstore.js: ${HERKUNFT.join(', ')}`);
+    `Quellen.js: ${HERKUNFT.join(', ')}`);
+
+// Jeder Anbieter prueft selbst — eine gemeinsame Liste ohne Pruefung waere nur
+// Zierde. Geprueft wird deshalb je Anbieter, dass SEINE Hosts durchkommen und
+// die des anderen nicht.
+for (const [name, anbieter] of Object.entries(Quellen.ANBIETER)) {
+    const eigene = anbieter.HERKUNFT;
+    const fremde = HERKUNFT.filter(h => !eigene.includes(h));
+    pruefe(eigene.every(h => anbieter.istErlaubt(`https://${h}/x`)),
+        `${anbieter.TITEL} laesst seine eigenen Hosts durch`, `${name}: ${eigene.join(', ')}`);
+    pruefe(fremde.every(h => anbieter.istErlaubt(`https://${h}/x`) === false),
+        `${anbieter.TITEL} laesst NUR seine eigenen durch`,
+        fremde.length ? `fremd: ${fremde.join(', ')}` : 'kein anderer Anbieter zum Vergleich');
+}
 
 // ── Daemon ──────────────────────────────────────────────────────────────────
 //
@@ -85,13 +102,20 @@ if (!fs.existsSync(pfad)) {
 // ── Und die Pruefung selbst greift ──────────────────────────────────────────
 //
 // Eine Liste, die niemand befragt, waere dieselbe Luecke wie keine Liste.
-pruefe(istErlaubt('https://thunderstore.io/package/download/x/y/1.0.0/') === true,
+const ts = Quellen.fuer('thunderstore');
+pruefe(ts.istErlaubt('https://thunderstore.io/package/download/x/y/1.0.0/') === true,
     'Eine erlaubte Adresse kommt durch');
-pruefe(istErlaubt('https://boese-thunderstore.io/x.zip') === false,
+pruefe(ts.istErlaubt('https://boese-thunderstore.io/x.zip') === false,
     'Ein angehaengter Name kommt NICHT durch',
     'Exakter Namensvergleich, kein endsWith');
-pruefe(istErlaubt('http://thunderstore.io/x.zip') === false,
+pruefe(ts.istErlaubt('http://thunderstore.io/x.zip') === false,
     'Ohne https kommt nichts durch');
+
+const mr = Quellen.fuer('modrinth');
+pruefe(mr.istErlaubt('https://cdn.modrinth.com/data/AABBCC/versions/x/mod.jar') === true,
+    'Auch die Modrinth-Auslieferung kommt durch');
+pruefe(mr.istErlaubt('https://boese-cdn.modrinth.com/x.jar') === false,
+    'Und auch dort kein endsWith');
 
 console.log(fehler === 0
     ? '\n✅ Beide Seiten sprechen von denselben Adressen\n'

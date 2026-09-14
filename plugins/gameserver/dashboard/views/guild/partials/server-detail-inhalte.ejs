@@ -74,9 +74,19 @@
   const BASIS    = `/guild/${GUILD}/plugins/gameserver/servers/${SERVER}/inhalte`;
   const DARF     = <%= userPermissions.permissions['GAMESERVER.FILES.MANAGE'] ? 'true' : 'false' %>;
 
-  // Was Thunderstore ueber neuere Fassungen sagt — auf Knopfdruck geholt, nicht
+  // Was der Katalog ueber neuere Fassungen sagt — auf Knopfdruck geholt, nicht
   // beim Laden: Das ist eine Abfrage JE MOD bei einem fremden Dienst.
   const NEUER = {};
+
+  // ── Welcher Anbieter gerade gefragt wird ─────────────────────────────────
+  //
+  // Seit dem 2026-09-14 kann ein Spiel mehrere nennen (Quellen.js). Die Wahl
+  // gehoert zur Suche, nicht zur Zeile: Was installiert ist, traegt seine
+  // Quelle selbst — und wird auch dort aktualisiert, egal was hier steht.
+  let QUELLE = null;
+  const quellenListe = () => (ZULETZT && ZULETZT.quellen) || [];
+  const quelleJetzt = () => QUELLE || (quellenListe()[0] || {}).kennung || null;
+  const titelVon = (kennung) => (quellenListe().find(q => q.kennung === kennung) || {}).titel || kennung;
 
   // ── Ladestand: was BepInEx beim letzten Start wirklich geladen hat ────────
   //
@@ -172,6 +182,9 @@
     if (e.status === 'fehlgeschlagen') marken.push(marke('fehlgeschlagen', 'warn'));
     if (e.status === 'geplant')        marken.push(marke('wird noch geholt', 'warn'));
     if (e.client_side)                 marken.push(marke('Mitspieler brauchen ihn auch'));
+    // Nur wenn es etwas zu unterscheiden gibt: Bei einem einzigen Katalog
+    // stuende an jeder Zeile dieselbe Marke und saegte nichts.
+    if (quellenListe().length > 1 && e.quelle) marken.push(marke(titelVon(e.quelle)));
     const neuere = NEUER[e.id];
     if (neuere && neuere.neuer)        marken.push(marke('neuer: ' + neuere.neueste, 'warn',
       neuere.neuesteVom ? 'Erschienen am ' + zeigeTag(neuere.neuesteVom) : undefined));
@@ -244,6 +257,9 @@
     }
 
     const aktive = [d.lader, ...d.mods].filter(e => e && e.aktiv).length;
+    // Die Anbieter, die dieses Dashboard fuer dieses Spiel fragen kann.
+    const kataloge = d.quellen || [];
+    const namen = kataloge.map(q => q.kennung);
     // ── Der Lader gehoert in diese Liste ────────────────────────────────────
     //
     // Er trug die Marke „Mitspieler brauchen ihn auch" an seiner Zeile, stand
@@ -256,14 +272,15 @@
       <div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:6px">
         <span class="fb-muted" style="font-size:13px">
           ${aktive} aktiv${d.lader ? '' : ' · kein Lader installiert'}
-          ${d.quellen && d.quellen.length ? ' · Quelle ' + d.quellen.map(escape).join(', ') : ''}
+          ${kataloge.length ? ' · Quelle ' + kataloge.map(q => escape(q.titel)).join(', ') : ''}
         </span>
         <span style="margin-left:auto"></span>
-        ${d.mods.some(m => m.quelle === 'thunderstore') || (d.lader && d.lader.quelle === 'thunderstore')
+        ${[d.lader, ...d.mods].some(e => e && namen.includes(e.quelle))
           ? `<button class="btn btn-white btn-sm" onclick="inhaltAktualisierungen(this)">Auf Aktualisierungen prüfen</button>`
           : ''}
-        ${DARF && (d.quellen || []).includes('thunderstore')
-          ? `<button class="btn btn-primary btn-sm" onclick="inhaltSuche()">Aus Thunderstore</button>` : ''}
+        ${DARF && kataloge.length
+          ? `<button class="btn btn-primary btn-sm" onclick="inhaltSuche()">${
+               kataloge.length === 1 ? 'Aus ' + escape(kataloge[0].titel) : 'Aus einem Katalog'}</button>` : ''}
         ${DARF ? `<button class="btn btn-white btn-sm"
                     onclick="inhaltFormular()">Datei hochladen</button>` : ''}
       </div>
@@ -483,9 +500,18 @@
     if (feld.style.display !== 'none') { feld.style.display = 'none'; return; }
 
     feld.style.display = '';
+    const kataloge = quellenListe();
+    QUELLE = quelleJetzt();
     feld.innerHTML = `
       <div style="border:1px solid var(--fb-border);border-radius:6px;padding:12px;margin:8px 0">
         <div style="display:flex;gap:8px;align-items:flex-end">
+          ${kataloge.length > 1 ? `
+            <div style="flex:0 0 160px">
+              <label class="form-label" style="font-size:12px">Katalog</label>
+              <select id="ts-quelle" class="form-select form-select-sm" onchange="inhaltQuelle(this.value)">
+                ${kataloge.map(q => `<option value="${escape(q.kennung)}" ${q.kennung === QUELLE ? 'selected' : ''}>${escape(q.titel)}</option>`).join('')}
+              </select>
+            </div>` : ''}
           <div style="flex:1 1 auto">
             <label class="form-label" style="font-size:12px">Mod suchen</label>
             <input id="ts-begriff" class="form-control form-control-sm"
@@ -509,12 +535,20 @@
     window.inhaltSuchen();
   };
 
+  // Katalog gewechselt: Die Trefferliste des einen sagt nichts ueber den
+  // anderen, also wird neu gesucht statt gefiltert.
+  window.inhaltQuelle = function (kennung) {
+    QUELLE = kennung;
+    window.inhaltSuchen();
+  };
+
   window.inhaltSuchen = function (seite) {
     const begriff = (document.getElementById('ts-begriff') || {}).value || '';
     const raum = document.getElementById('ts-treffer');
     raum.innerHTML = '<div class="fb-muted" style="font-size:12px">Wird gesucht …</div>';
 
-    fetch(`${BASIS}/suche?q=${encodeURIComponent(begriff)}&seite=${seite || 1}`,
+    fetch(`${BASIS}/suche?quelle=${encodeURIComponent(quelleJetzt() || '')}`
+          + `&q=${encodeURIComponent(begriff)}&seite=${seite || 1}`,
           { headers: { Accept: 'application/json' } })
       .then(async (a) => {
         const d = await a.json().catch(() => null);
@@ -530,9 +564,9 @@
           <div class="fb-muted" style="font-size:12px;padding-bottom:4px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap">
             <span>${d.gestoebert ? 'Beliebteste zuerst' : 'Treffer'} —
               Seite ${d.seite} von ${d.seiten}, ${Number(d.gesamt).toLocaleString('de-DE')}
-              ${d.gestoebert ? 'Mods für dieses Spiel' : 'Treffer'}</span>
+              ${d.gestoebert ? 'Mods für dieses Spiel' : 'Treffer'} bei ${escape(d.titel)}</span>
             ${d.verzeichnis ? `<a href="${escape(d.verzeichnis)}" target="_blank" rel="noopener noreferrer"
-                                 style="margin-left:auto">alle bei Thunderstore ansehen</a>` : ''}
+                                 style="margin-left:auto">alle bei ${escape(d.titel)} ansehen</a>` : ''}
           </div>`;
         const blaettern = (d.zurueck || d.weiter) ? `
           <div style="display:flex;gap:8px;align-items:center;padding-top:8px;border-top:1px solid var(--fb-border)">
@@ -569,7 +603,8 @@
     knopf.disabled = true;
     const raum = document.getElementById('ts-treffer');
 
-    fetch(`${BASIS}/vorschau?kennung=${encodeURIComponent(kennung)}`, { headers: { Accept: 'application/json' } })
+    fetch(`${BASIS}/vorschau?quelle=${encodeURIComponent(quelleJetzt() || '')}`
+          + `&kennung=${encodeURIComponent(kennung)}`, { headers: { Accept: 'application/json' } })
       .then(async (a) => {
         const d = await a.json().catch(() => null);
         if (!a.ok || !d || !d.success) throw new Error((d && d.message) || `HTTP ${a.status}`);
@@ -584,6 +619,7 @@
               ${p.bleibt ? marke('bleibt ' + (p.schonFassung || '?')) : p.schonDa ? marke(p.schonFassung === p.fassung ? 'schon da' : 'ersetzt ' + escape(p.schonFassung || '?'), 'warn') : ''}
             </div>
             ${alterZeile(p.veroeffentlicht) ? `<div class="fb-muted" style="font-size:11px">${escape(alterZeile(p.veroeffentlicht))}</div>` : ''}
+            ${p.spielfassungen && p.spielfassungen.length ? `<div class="fb-muted" style="font-size:11px">Für ${escape(p.spielfassungen.slice(0, 4).join(', '))}${p.spielfassungen.length > 4 ? ' …' : ''}</div>` : ''}
           </div>`).join('');
 
         raum.innerHTML = `
@@ -614,10 +650,10 @@
     meldung.textContent = 'Wird geholt … das kann bei großen Mods dauern.';
     melde('info', `„${kennung}“ wird geholt …`);
 
-    fetch(`${BASIS}/thunderstore`, {
+    fetch(`${BASIS}/holen`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kennung })
+      body: JSON.stringify({ kennung, quelle: quelleJetzt() })
     })
       .then(async (a) => {
         const d = await a.json().catch(() => null);

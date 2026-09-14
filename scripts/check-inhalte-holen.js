@@ -56,9 +56,14 @@ const db = {
             const z = this.zeilen.find(x => x.kennung === params[2]);
             return z ? [z] : [];
         }
-        if (/SELECT id, kennung, fassung FROM gameserver_content/.test(sql)) {
-            const gesucht = /status = 'installiert'/.test(sql) ? 'installiert' : 'geplant';
-            return this.zeilen.filter(z => z.status === gesucht);
+        // Vorgemerkte Zeilen — seit dem 2026-09-14 mit ihrer Quelle und auf die
+        // bekannten Anbieter eingegrenzt.
+        if (/SELECT id, kennung, fassung, quelle FROM gameserver_content/.test(sql)) {
+            return this.zeilen.filter(z => z.status === 'geplant');
+        }
+        // Der Aktualisierungsstand — installierte Zeilen aller Kataloge.
+        if (/SELECT id, kennung, fassung, quelle,\s+DATE_FORMAT/.test(sql)) {
+            return this.zeilen.filter(z => z.status === 'installiert');
         }
         if (/FROM gameservers WHERE id = \? AND guild_id = \?/.test(sql)) {
             return [{ id: 186, name: 'Bude', guild_id: 'g1', rootserver_id: 55,
@@ -68,8 +73,8 @@ const db = {
             return [{ paket_slug: 'valheim', paket_version: '1.0.10', paket_channel: 'test',
                       paket_json: JSON.stringify({ identity: { slug: 'valheim' }, content: INHALT }) }];
         }
-        if (/SELECT \* FROM gameserver_content WHERE id = \? AND server_id = \?/.test(sql)
-            || /SELECT \* FROM gameserver_content\s+WHERE id = \? AND server_id = \? AND quelle/.test(sql)) {
+        if (/SELECT \*(, DATE_FORMAT)?[\s\S]*?FROM gameserver_content\s+WHERE id = \? AND server_id = \?/.test(sql)
+            || /SELECT \* FROM gameserver_content WHERE id = \? AND server_id = \?/.test(sql)) {
             const z = this.zeilen.find(x => String(x.id) === String(params[0]));
             return z ? [z] : [];
         }
@@ -136,8 +141,11 @@ const InhalteHolen = require(path.join(HELFER, 'InhalteHolen.js'));
 const ECHT = { aufloesen: Thunderstore.aufloesen, paket: Thunderstore.paket,
                suche: Thunderstore.suche, aktualisierungen: Thunderstore.aktualisierungen };
 function stelleThunderstore(pakete, neueste = null) {
-    Thunderstore.aufloesen = async () => ({ pakete, fehlend: [] });
-    Thunderstore.paket = async (ns, name) => neueste || pakete[pakete.length - 1];
+    // Seit dem 2026-09-14 hat jeder Anbieter dieselbe Signatur
+    // (raum, kennung, fassung) — die Attrappe muss sie mitsprechen, sonst
+    // prueft sie einen Weg, den es nicht mehr gibt.
+    Thunderstore.aufloesen = async (raum, kennung, fassung) => ({ pakete, fehlend: [] });
+    Thunderstore.paket = async (raum, kennung) => neueste || pakete[pakete.length - 1];
 }
 
 const SERVER = { id: 186, rootserver_id: 55, install_path: '186-valheim' };
@@ -170,7 +178,7 @@ async function pruefe(name, fn) {
     await pruefe('Der Lader geht neben das Spiel, der Mod in content.path', async () => {
         stelleThunderstore([BEPINEX, JOTUNN]);
         const e = await InhalteHolen.installiere({
-            server: SERVER, inhalt: INHALT, guildId: 'g1', kennung: 'ValheimModding-Jotunn' });
+            server: SERVER, inhalt: INHALT, guildId: 'g1', quelle: 'thunderstore', kennung: 'ValheimModding-Jotunn' });
         assert.strictEqual(e.installiert.length, 2);
         // Beide Pfade kommen aus dem PAKET und sind relativ zur Volume-Wurzel.
         // Der Lader muss neben der Spieldatei liegen: Doorstop laedt ihn mit
@@ -201,7 +209,7 @@ async function pruefe(name, fn) {
             dateien: JSON.stringify(['game/.doorstop_version', 'game/BepInEx/core/BepInEx.pdb']) });
         stelleThunderstore([BEPINEX]);
         await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT, guildId: 'g1',
-            kennung: 'denikson-BepInExPack_Valheim' });
+            quelle: 'thunderstore', kennung: 'denikson-BepInExPack_Valheim' });
         assert.deepStrictEqual(daemon.geloescht,
             ['/game/.doorstop_version', '/game/BepInEx/core/BepInEx.pdb'],
             'die Dateien der alten Fassung muessen VOR dem Holen weg');
@@ -214,7 +222,7 @@ async function pruefe(name, fn) {
             ablage: 'game', dateien: JSON.stringify(['game/.doorstop_version']) });
         stelleThunderstore([BEPINEX]);
         await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT, guildId: 'g1',
-            kennung: 'denikson-BepInExPack_Valheim' });
+            quelle: 'thunderstore', kennung: 'denikson-BepInExPack_Valheim' });
         assert.deepStrictEqual(daemon.geloescht, [],
             'ohne Fassungswechsel gibt es nichts zu entfernen');
     });
@@ -234,7 +242,7 @@ async function pruefe(name, fn) {
         db.zeilen.push(LADER_ZEILE('5.4.2350'));
         stelleThunderstore([{ ...BEPINEX, fassung: '5.4.2200' }, JOTUNN]);
         const e = await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT, guildId: 'g1',
-            kennung: 'ValheimModding-Jotunn' });
+            quelle: 'thunderstore', kennung: 'ValheimModding-Jotunn' });
         assert.deepStrictEqual(geholt(), ['Jotunn'], 'nur der Mod wird geholt, nicht der aeltere Lader');
         assert.deepStrictEqual(daemon.geloescht, [], 'am Lader wird nichts geloescht');
         assert.strictEqual(db.zeilen.find(z => z.art === 'loader').fassung, '5.4.2350');
@@ -247,7 +255,7 @@ async function pruefe(name, fn) {
         db.zeilen.push(LADER_ZEILE('5.4.2200'));
         stelleThunderstore([BEPINEX, JOTUNN]);
         const e = await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT, guildId: 'g1',
-            kennung: 'ValheimModding-Jotunn' });
+            quelle: 'thunderstore', kennung: 'ValheimModding-Jotunn' });
         assert.deepStrictEqual(geholt(), ['BepInExPack_Valheim', 'Jotunn']);
         assert.strictEqual(db.zeilen.find(z => z.art === 'loader').fassung, '5.4.2333');
         assert.deepStrictEqual(e.beibehalten, []);
@@ -257,7 +265,7 @@ async function pruefe(name, fn) {
         db.zeilen.push(LADER_ZEILE('5.4.2350', 'geplant'));
         stelleThunderstore([{ ...BEPINEX, fassung: '5.4.2200' }, JOTUNN]);
         const e = await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT, guildId: 'g1',
-            kennung: 'ValheimModding-Jotunn' });
+            quelle: 'thunderstore', kennung: 'ValheimModding-Jotunn' });
         assert.deepStrictEqual(geholt(), ['Jotunn']);
         assert.strictEqual(e.beibehalten.length, 1);
     });
@@ -266,7 +274,7 @@ async function pruefe(name, fn) {
         db.zeilen.push(LADER_ZEILE('5.4.2350', 'fehlgeschlagen'));
         stelleThunderstore([{ ...BEPINEX, fassung: '5.4.2200' }, JOTUNN]);
         const e = await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT, guildId: 'g1',
-            kennung: 'ValheimModding-Jotunn' });
+            quelle: 'thunderstore', kennung: 'ValheimModding-Jotunn' });
         assert.deepStrictEqual(geholt(), ['BepInExPack_Valheim', 'Jotunn']);
         assert.deepStrictEqual(e.beibehalten, []);
     });
@@ -274,11 +282,11 @@ async function pruefe(name, fn) {
     await pruefe('Die Vorschau sagt dasselbe: bleibt, nicht ersetzt', async () => {
         db.zeilen.push(LADER_ZEILE('5.4.2350'));
         stelleThunderstore([{ ...BEPINEX, fassung: '5.4.2200' }, JOTUNN]);
-        let v = await InhalteHolen.vorschau({ serverId: 186, inhalt: INHALT, kennung: 'ValheimModding-Jotunn' });
+        let v = await InhalteHolen.vorschau({ serverId: 186, inhalt: INHALT, quelle: 'thunderstore', kennung: 'ValheimModding-Jotunn' });
         assert.strictEqual(v.pakete[0].bleibt, true, 'aelterer Lader: bleibt');
         assert.strictEqual(v.pakete[1].bleibt, false, 'ein Mod faellt nie unter die Regel');
         stelleThunderstore([{ ...BEPINEX, fassung: '5.4.2400' }, JOTUNN]);
-        v = await InhalteHolen.vorschau({ serverId: 186, inhalt: INHALT, kennung: 'ValheimModding-Jotunn' });
+        v = await InhalteHolen.vorschau({ serverId: 186, inhalt: INHALT, quelle: 'thunderstore', kennung: 'ValheimModding-Jotunn' });
         assert.strictEqual(v.pakete[0].bleibt, false, 'neuerer Lader: wird ersetzt');
     });
 
@@ -292,7 +300,7 @@ async function pruefe(name, fn) {
     await pruefe('Die Abhaengigkeit liegt VOR dem Mod', async () => {
         stelleThunderstore([BEPINEX, JOTUNN]);
         await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT, guildId: 'g1',
-            kennung: 'ValheimModding-Jotunn' });
+            quelle: 'thunderstore', kennung: 'ValheimModding-Jotunn' });
         assert.deepStrictEqual(db.zeilen.map(z => z.reihenfolge), [0, 1]);
         assert.match(daemon.abrufe[0].adresse, /BepInExPack/);
     });
@@ -300,7 +308,7 @@ async function pruefe(name, fn) {
     await pruefe('Die geschriebenen Dateien werden aufgehoben', async () => {
         stelleThunderstore([JOTUNN]);
         await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT, guildId: 'g1',
-            kennung: 'ValheimModding-Jotunn' });
+            quelle: 'thunderstore', kennung: 'ValheimModding-Jotunn' });
         assert.deepStrictEqual(JSON.parse(db.zeilen[0].dateien),
             ['game/BepInEx/plugins/A.dll', 'game/BepInEx/plugins/B.dll']);
         assert.strictEqual(db.zeilen[0].status, 'installiert');
@@ -310,7 +318,7 @@ async function pruefe(name, fn) {
         stelleThunderstore([JOTUNN]);
         daemon.scheitern.add(JOTUNN.adresse);
         const e = await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT, guildId: 'g1',
-            kennung: 'ValheimModding-Jotunn' });
+            quelle: 'thunderstore', kennung: 'ValheimModding-Jotunn' });
         assert.strictEqual(e.fehlgeschlagen.length, 1);
         assert.strictEqual(db.zeilen[0].status, 'fehlgeschlagen');
         assert.match(db.zeilen[0].fehler, /herkunft/);
@@ -322,16 +330,22 @@ async function pruefe(name, fn) {
         stelleThunderstore([BEPINEX]);
         const ohnePfad = { ...INHALT, loader: { ...INHALT.loader, path: undefined } };
         await InhalteHolen.installiere({ server: SERVER, inhalt: ohnePfad, guildId: 'g1',
-            kennung: 'denikson-BepInExPack_Valheim' });
+            quelle: 'thunderstore', kennung: 'denikson-BepInExPack_Valheim' });
         assert.strictEqual(daemon.abrufe[0].ziel, '');
     });
 
-    await pruefe('Ohne Thunderstore im Paket gibt es keine Installation', async () => {
+    await pruefe('Was das Paket nicht nennt, wird nicht geholt', async () => {
         stelleThunderstore([JOTUNN]);
+        // Verlangt, aber nicht im Paket: abgewiesen, und die Absage nennt ihn.
+        await assert.rejects(
+            InhalteHolen.installiere({ server: SERVER, inhalt: { ...INHALT, sources: ['upload'] },
+                guildId: 'g1', quelle: 'thunderstore', kennung: 'ValheimModding-Jotunn' }),
+            /thunderstore nicht als Quelle/);
+        // Und ohne Angabe faellt nichts still auf irgendeinen Anbieter zurueck.
         await assert.rejects(
             InhalteHolen.installiere({ server: SERVER, inhalt: { ...INHALT, sources: ['upload'] },
                 guildId: 'g1', kennung: 'ValheimModding-Jotunn' }),
-            /Thunderstore nicht als Quelle/);
+            /keine Quelle/);
         assert.strictEqual(daemon.abrufe.length, 0);
     });
 
@@ -440,8 +454,8 @@ async function pruefe(name, fn) {
 
     await pruefe('Ist nichts Neueres da, passiert nichts', async () => {
         stelleThunderstore([JOTUNN], JOTUNN);
-        const zeile = { id: 1, art: 'mod', kennung: 'ValheimModding-Jotunn', fassung: '2.29.2',
-            dateien: JSON.stringify(['BepInEx/plugins/Jotunn.dll']) };
+        const zeile = { id: 1, art: 'mod', quelle: 'thunderstore', kennung: 'ValheimModding-Jotunn',
+            fassung: '2.29.2', dateien: JSON.stringify(['BepInEx/plugins/Jotunn.dll']) };
         const e = await InhalteHolen.aktualisiere({ server: SERVER, inhalt: INHALT, guildId: 'g1', zeile });
         assert.strictEqual(e.geaendert, false);
         assert.deepStrictEqual(daemon.geloescht, [], 'nichts anfassen, wenn nichts neu ist');
@@ -471,8 +485,8 @@ async function pruefe(name, fn) {
     }
 
     await pruefe('Suche liefert die Treffer des Spiels', async () => {
-        Thunderstore.suche = async (gemeinschaft, begriff) => {
-            assert.strictEqual(gemeinschaft, 'valheim', 'die Gemeinschaft kommt aus dem Paket');
+        Thunderstore.suche = async (raum, begriff) => {
+            assert.strictEqual(raum, 'valheim', 'die Gemeinschaft kommt aus dem Paket');
             assert.strictEqual(begriff, 'jotunn');
             return { treffer: [{ kennung: 'ValheimModding-Jotunn', name: 'Jotunn' }],
                      gesamt: 19, seite: 1, weiter: false, zurueck: false, proSeite: 20 };
@@ -494,8 +508,8 @@ async function pruefe(name, fn) {
 
     await pruefe('Installieren ueber die Route legt beide ab', async () => {
         stelleThunderstore([BEPINEX, JOTUNN]);
-        const r = await rufe('post', '/:serverId/inhalte/thunderstore',
-            { body: { kennung: 'ValheimModding-Jotunn' } });
+        const r = await rufe('post', '/:serverId/inhalte/holen',
+            { body: { kennung: 'ValheimModding-Jotunn', quelle: 'thunderstore' } });
         assert.strictEqual(r.status, 200);
         assert.strictEqual(r.antwort.installiert.length, 2);
         assert.strictEqual(r.antwort.neustartNoetig, true);
@@ -504,7 +518,7 @@ async function pruefe(name, fn) {
 
     await pruefe('Ohne kennung gibt es eine Absage, keinen Abruf', async () => {
         stelleThunderstore([JOTUNN]);
-        const r = await rufe('post', '/:serverId/inhalte/thunderstore', { body: {} });
+        const r = await rufe('post', '/:serverId/inhalte/holen', { body: {} });
         assert.strictEqual(r.status, 400);
         assert.strictEqual(daemon.abrufe.length, 0);
     });
@@ -514,7 +528,8 @@ async function pruefe(name, fn) {
             fassung: '2.29.2', status: 'installiert', art: 'mod' });
         db.zeilen.push({ id: 8, quelle: 'thunderstore', kennung: 'Irgendwas-Geplant',
             fassung: null, status: 'geplant', art: 'mod' });
-        Thunderstore.aktualisierungen = async (zeilen) => {
+        Thunderstore.aktualisierungen = async (raum, zeilen) => {
+            assert.strictEqual(raum, 'valheim', 'auch hier kommt der Raum aus dem Paket');
             assert.deepStrictEqual(zeilen.map(z => z.id), [7], 'nur installierte Zeilen');
             return [{ id: 7, kennung: 'ValheimModding-Jotunn', installiert: '2.29.2',
                       neueste: '2.30.0', neuer: true }];
@@ -572,7 +587,12 @@ async function pruefe(name, fn) {
         db.zeilen.push({ id: 3, server_id: 186, art: 'mod', quelle: 'thunderstore',
             kennung: 'ValheimModding-Jotunn', fassung: '2.30.0', status: 'installiert', aktiv: 1 });
         const r = await rufe('get', '/:serverId/inhalte');
-        assert.strictEqual(r.antwort.gemeinschaft, 'valheim');
+        // Seit dem 2026-09-14 nennt die Liste ALLE Kataloge des Spiels mit
+        // ihrem Raum — die Karte baut daraus ihre Auswahl.
+        assert.deepStrictEqual(r.antwort.raeume, { thunderstore: 'valheim' });
+        assert.deepStrictEqual(r.antwort.quellen,
+            [{ kennung: 'thunderstore', titel: 'Thunderstore',
+               raumName: 'Gemeinschaft', raum: 'valheim' }]);
         assert.strictEqual(r.antwort.mods[0].url,
             'https://thunderstore.io/c/valheim/p/ValheimModding/Jotunn/');
     });
@@ -689,8 +709,8 @@ async function pruefe(name, fn) {
 
     await pruefe('Installieren sagt es auch', async () => {
         stelleThunderstore([BEPINEX, JOTUNN]);
-        const r = await rufe('post', '/:serverId/inhalte/thunderstore',
-            { body: { kennung: 'ValheimModding-Jotunn' } });
+        const r = await rufe('post', '/:serverId/inhalte/holen',
+            { body: { kennung: 'ValheimModding-Jotunn', quelle: 'thunderstore' } });
         assert.strictEqual(r.status, 200, JSON.stringify(r.antwort));
         assert.strictEqual(r.antwort.installiert.length, 2);
         assert.strictEqual(r.antwort.laeuft, true);
@@ -875,14 +895,14 @@ async function pruefe(name, fn) {
     await pruefe('Der Erscheinungstag wird beim Installieren aufgehoben', async () => {
         stelleThunderstore([JOTUNN]);
         await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT, guildId: 'g1',
-            kennung: 'ValheimModding-Jotunn' });
+            quelle: 'thunderstore', kennung: 'ValheimModding-Jotunn' });
         assert.strictEqual(db.zeilen[0].veroeffentlicht, '2026-07-13',
             'ohne die Spalte muesste die Liste je Mod bei Thunderstore nachfragen');
     });
 
     await pruefe('Die Vorschau kennt ihn auch — der Verdacht gehoert VOR die Installation', async () => {
         stelleThunderstore([JOTUNN]);
-        const v = await InhalteHolen.vorschau({ serverId: 186, inhalt: INHALT,
+        const v = await InhalteHolen.vorschau({ serverId: 186, inhalt: INHALT, quelle: 'thunderstore',
             kennung: 'ValheimModding-Jotunn' });
         assert.strictEqual(v.pakete[0].veroeffentlicht, '2026-07-13T05:41:39.807962Z');
     });

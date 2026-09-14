@@ -21,13 +21,20 @@
  * 60 MB waere unmoeglich, obwohl die Maschine ihn in Sekunden hat.
  *
  * ⚠ Damit laedt der Daemon eine Adresse, die ihm jemand nennt. Die
- * Herkunftsliste steht deshalb auf BEIDEN Seiten (`Thunderstore.HERKUNFT` und
+ * Herkunftsliste steht deshalb auf BEIDEN Seiten (`Quellen.HERKUNFT` und
  * `inhalte_holen.go`), und `scripts/check-herkunftsliste.js` haelt sie
  * zusammen.
+ *
+ * ── Der Weg kennt seinen Anbieter nicht ─────────────────────────────────────
+ *
+ * Seit dem 2026-09-14 steht hier kein Anbietername mehr. Welcher gefragt wird,
+ * entscheidet `Quellen.waehle()` aus dem Paket, und die Zeile in
+ * `gameserver_content.quelle` haelt fest, woher sie kam. Was ein Anbieter
+ * koennen muss, steht in `Quellen.js`.
  */
 
 const { ServiceManager } = require('dunebot-core');
-const Thunderstore = require('./Thunderstore');
+const Quellen = require('./Quellen');
 const Inhalte = require('./Inhalte');
 
 /**
@@ -44,29 +51,14 @@ async function daemonVon(dbService, server) {
 }
 
 /**
- * `denikson-BepInExPack_Valheim` auseinandernehmen — OHNE Fassung.
- *
- * `Thunderstore.teileKennung` will drei Stuecke (mit Fassung); gespeichert wird
- * bei uns aber `namespace-name`, weil die Fassung eine eigene Spalte hat.
- * Getrennt wird am ERSTEN Bindestrich: Der Namensraum hat nie einen, der Name
- * darf welche haben (`BepInExPack_Valheim` nicht, `Foo-Bar-Mod` schon).
- */
-function teileOhneFassung(kennung) {
-    const text = String(kennung || '');
-    const schnitt = text.indexOf('-');
-    if (schnitt < 1 || schnitt === text.length - 1) return null;
-    return { namespace: text.slice(0, schnitt), name: text.slice(schnitt + 1) };
-}
-
-/**
  * Ist dieses Paket der Lader des Spiels?
  *
- * Nur das Paket weiss es (`content.loader.packages.thunderstore`). Zu raten —
+ * Nur das Paket weiss es (`content.loader.packages.<quelle>`). Zu raten —
  * „enthaelt BepInEx im Namen" — traefe auch jeden Mod, der BepInEx im Titel
  * fuehrt, und der laege dann in der Serverwurzel statt bei den Mods.
  */
-function istLader(inhalt, kennung) {
-    const name = inhalt?.loader?.packages?.thunderstore;
+function istLader(inhalt, kennung, quelle) {
+    const name = inhalt?.loader?.packages?.[quelle];
     return Boolean(name) && String(name).toLowerCase() === String(kennung).toLowerCase();
 }
 
@@ -99,12 +91,12 @@ function istLader(inhalt, kennung) {
  * Vorschau und Installation fragen DIESE Funktion. Zwei Stellen mit derselben
  * Regel zeigen sonst "ersetzt", waehrend in Wahrheit nichts ersetzt wird.
  */
-function laderBleibt(inhalt, paket, da) {
+function laderBleibt(inhalt, paket, da, anbieter) {
     return Boolean(da)
-        && istLader(inhalt, paket.kennung)
+        && istLader(inhalt, paket.kennung, anbieter.KENNUNG)
         && ['installiert', 'geplant'].includes(da.status)
         && Boolean(da.fassung)
-        && Thunderstore.hoeher(da.fassung, paket.fassung);
+        && anbieter.hoeher(da.fassung, paket.fassung);
 }
 
 function zielFuer(inhalt, art) {
@@ -119,32 +111,42 @@ function zielFuer(inhalt, art) {
  * waehlt, bekommt BepInEx, ohne es zu wissen. Genau das soll die Vorschau
  * zeigen, bevor jemand klickt.
  */
-async function vorschau({ serverId, inhalt, kennung, fassung = null }) {
-    const teil = teileOhneFassung(kennung);
-    if (!teil) throw new Error(`Unlesbare Kennung: ${kennung}`);
+async function vorschau({ serverId, inhalt, quelle, kennung, fassung = null }) {
+    const anbieter = Quellen.fuer(quelle);
+    const raum = Quellen.raumAus(inhalt, quelle);
 
-    const { pakete, fehlend } = await Thunderstore.aufloesen(teil.namespace, teil.name, fassung);
+    const { pakete, fehlend } = await anbieter.aufloesen(raum, kennung, fassung);
 
     let vorhanden = new Map();
     if (serverId) {
         const liste = await Inhalte.fuerServer(serverId);
-        for (const z of [liste.lader, ...liste.mods].filter(Boolean)) vorhanden.set(z.kennung, z);
+        // Verglichen wird NUR innerhalb derselben Quelle: `essentialsx` bei
+        // Modrinth und `essentialsx` bei einem anderen Anbieter waeren zwei
+        // Dinge, und „schon da" waere dann eine Verwechslung.
+        for (const z of [liste.lader, ...liste.mods].filter(Boolean)) {
+            if (z.quelle === quelle) vorhanden.set(z.kennung, z);
+        }
     }
 
     return {
+        quelle,
         fehlend,
         pakete: pakete.map(p => {
-            const art = istLader(inhalt, p.kennung) ? Inhalte.ART_LADER : Inhalte.ART_MOD;
+            const art = istLader(inhalt, p.kennung, quelle) ? Inhalte.ART_LADER : Inhalte.ART_MOD;
             const da = vorhanden.get(p.kennung) || null;
             return {
                 kennung: p.kennung, name: p.name, fassung: p.fassung, bytes: p.bytes, art,
                 schonDa: Boolean(da),
                 schonFassung: da ? da.fassung : null,
-                bleibt: laderBleibt(inhalt, p, da),
+                bleibt: laderBleibt(inhalt, p, da, anbieter),
                 // Vorschlag A: der Verdacht gehoert VOR die Installation. Der
                 // Vergleich mit dem Spielstand passiert in der Karte — sie hat
                 // beides, den Ladestand und diese Liste.
                 veroeffentlicht: p.veroeffentlicht || null,
+                // Was nur manche Anbieter wissen — Modrinth nennt beides je
+                // Fassung, Thunderstore gar nicht. Fehlt es, fehlt es; erfunden
+                // wird nichts.
+                spielfassungen: p.spielfassungen || null,
             };
         }),
     };
@@ -159,11 +161,12 @@ async function vorschau({ serverId, inhalt, kennung, fassung = null }) {
  *
  * @private
  */
-async function legeAb({ server, inhalt, guildId, pakete, fehlend = [] }) {
+async function legeAb({ server, inhalt, guildId, quelle, pakete, fehlend = [] }) {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     const ipmServer = ServiceManager.get('ipmServer');
 
+    const anbieter = Quellen.fuer(quelle);
     const daemonId = await daemonVon(dbService, server);
     if (!daemonId) throw new Error('Kein Daemon zugewiesen');
     if (!ipmServer?.isDaemonOnline(daemonId)) throw new Error('Daemon ist offline');
@@ -196,18 +199,18 @@ async function legeAb({ server, inhalt, guildId, pakete, fehlend = [] }) {
     const vorhanden = new Map();
     {
         const { lader, mods } = await Inhalte.fuerServer(server.id);
-        for (const z of [lader, ...mods]) if (z) vorhanden.set(z.kennung, z);
+        for (const z of [lader, ...mods]) if (z && z.quelle === quelle) vorhanden.set(z.kennung, z);
     }
 
     for (let i = 0; i < pakete.length; i++) {
         const p = pakete[i];
-        const art = istLader(inhalt, p.kennung) ? Inhalte.ART_LADER : Inhalte.ART_MOD;
+        const art = istLader(inhalt, p.kennung, quelle) ? Inhalte.ART_LADER : Inhalte.ART_MOD;
 
         // Der gewaehlte Lader wird nie herabgestuft (siehe laderBleibt). Die
         // Zeile bleibt unberuehrt — auch nicht auf "geplant" umgeschrieben,
         // sonst stuende dort kurz die niedrigere Fassung.
         const schon = vorhanden.get(p.kennung);
-        if (laderBleibt(inhalt, p, schon)) {
+        if (laderBleibt(inhalt, p, schon, anbieter)) {
             ergebnis.beibehalten.push({ kennung: p.kennung, fassung: schon.fassung, verlangt: p.fassung });
             Logger.info(`[Gameserver/Inhalte] ${p.kennung} ${schon.fassung} bleibt auf Server ${server.id} `
                 + `— verlangt war ${p.fassung}, der Lader wird nicht herabgestuft`);
@@ -215,14 +218,20 @@ async function legeAb({ server, inhalt, guildId, pakete, fehlend = [] }) {
         }
 
         const grundzeile = {
-            serverId: server.id, guildId, art, quelle: 'thunderstore',
+            serverId: server.id, guildId, art, quelle,
             kennung: p.kennung, name: p.name, fassung: p.fassung,
             // Der Erscheinungstag gehoert an JEDE Zeile, auch an die geplante
             // und die fehlgeschlagene: `eintragen` schreibt per ON DUPLICATE
             // KEY UPDATE alle Felder, und was hier fehlt, loescht den Wert der
             // vorigen Runde.
             veroeffentlicht: p.veroeffentlicht || null,
-            reihenfolge: i, clientSide: Boolean(inhalt.client_side),
+            reihenfolge: i,
+            // Sagt der Anbieter es je MOD, gilt seine Angabe; sonst die des
+            // Pakets. Modrinth fuehrt `client_side` je Projekt, Thunderstore
+            // nicht — und „alle Mods dieses Spiels brauchen die Mitspieler
+            // auch" ist die gröbere Auskunft von beiden.
+            clientSide: typeof p.clientSeitig === 'boolean'
+                ? p.clientSeitig : Boolean(inhalt.client_side),
         };
 
         if (art === Inhalte.ART_MOD && !inhalt.path) {
@@ -290,20 +299,24 @@ async function legeAb({ server, inhalt, guildId, pakete, fehlend = [] }) {
 /**
  * Ein Paket samt Abhaengigkeiten installieren.
  *
- * @param {{server: object, inhalt: object, guildId: string, kennung: string, fassung?: string}} auftrag
+ * @param {{server: object, inhalt: object, guildId: string, quelle?: string,
+ *          kennung: string, fassung?: string}} auftrag
  */
-async function installiere({ server, inhalt, guildId, kennung, fassung = null }) {
+async function installiere({ server, inhalt, guildId, quelle, kennung, fassung = null }) {
     if (!inhalt?.supported) {
         throw new Error('Dieses Spiel nimmt laut seinem Paket keine Inhalte auf.');
     }
-    if (!(inhalt.sources || []).includes('thunderstore')) {
-        throw new Error('Das Paket nennt Thunderstore nicht als Quelle.');
+    const gewaehlt = Quellen.waehle(inhalt, quelle);
+    if (!gewaehlt) {
+        throw new Error(quelle
+            ? `Das Paket nennt ${quelle} nicht als Quelle.`
+            : 'Das Paket nennt keine Quelle, aus der sich Inhalte holen lassen.');
     }
-    const teil = teileOhneFassung(kennung);
-    if (!teil) throw new Error(`Unlesbare Kennung: ${kennung}`);
+    const anbieter = Quellen.fuer(gewaehlt);
+    const raum = Quellen.raumAus(inhalt, gewaehlt);
 
-    const { pakete, fehlend } = await Thunderstore.aufloesen(teil.namespace, teil.name, fassung);
-    return legeAb({ server, inhalt, guildId, pakete, fehlend });
+    const { pakete, fehlend } = await anbieter.aufloesen(raum, kennung, fassung);
+    return legeAb({ server, inhalt, guildId, quelle: gewaehlt, pakete, fehlend });
 }
 
 /**
@@ -319,11 +332,15 @@ async function holeGeplante({ server, inhalt, guildId }) {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
 
+    // Jede Zeile bringt ihre Quelle mit. Gefragt wird nach den Anbietern, die
+    // es gibt — eine hochgeladene Datei ist nicht „vorgemerkt", die liegt schon.
+    const namen = Object.keys(Quellen.ANBIETER);
     const zeilen = await dbService.query(
-        `SELECT id, kennung, fassung FROM gameserver_content
-          WHERE server_id = ? AND quelle = 'thunderstore' AND status = 'geplant'
+        `SELECT id, kennung, fassung, quelle FROM gameserver_content
+          WHERE server_id = ? AND quelle IN (${namen.map(() => '?').join(', ')})
+            AND status = 'geplant'
           ORDER BY reihenfolge ASC, id ASC`,
-        [server.id]
+        [server.id, ...namen]
     );
     if (!zeilen || !zeilen.length) return null;
 
@@ -333,7 +350,7 @@ async function holeGeplante({ server, inhalt, guildId }) {
                      aufgeraeumt: [], neustartNoetig: false };
     for (const zeile of zeilen) {
         try {
-            const e = await installiere({ server, inhalt, guildId,
+            const e = await installiere({ server, inhalt, guildId, quelle: zeile.quelle,
                 kennung: zeile.kennung, fassung: zeile.fassung });
             gesamt.installiert.push(...e.installiert);
             gesamt.fehlgeschlagen.push(...e.fehlgeschlagen);
@@ -437,21 +454,24 @@ async function entferneDateien({ server, zeile, inhalt = null }) {
  * @returns {Promise<object>} wie `installiere`, zusaetzlich `vorher`/`nachher`
  */
 async function aktualisiere({ server, inhalt, guildId, zeile }) {
-    const teil = teileOhneFassung(zeile.kennung);
-    if (!teil) throw new Error(`Unlesbare Kennung: ${zeile.kennung}`);
+    // Aktualisiert wird bei DEM Anbieter, von dem die Zeile kam — nicht bei dem,
+    // den das Paket zuerst nennt. Ein Mod wandert nicht die Quelle.
+    const anbieter = Quellen.fuer(zeile.quelle);
+    const raum = Quellen.raumAus(inhalt, zeile.quelle);
 
     // Die alte Fassung wird JETZT festgehalten, nicht am Ende abgelesen:
     // Zwischen hier und der Rueckgabe schreibt `legeAb` dieselbe Zeile fort.
     // Wer sie danach noch einmal liest, meldet „2.30.0 → 2.30.0".
     const vorher = zeile.fassung;
 
-    const neuestes = await Thunderstore.paket(teil.namespace, teil.name);
-    if (!Thunderstore.hoeher(neuestes.fassung, vorher)) {
+    const neuestes = await anbieter.paket(raum, zeile.kennung);
+    if (!anbieter.neuerAls(neuestes, zeile)) {
         return { geaendert: false, vorher, nachher: neuestes.fassung,
                  installiert: [], fehlgeschlagen: [], fehlend: [] };
     }
 
-    const ergebnis = await installiere({ server, inhalt, guildId, kennung: zeile.kennung });
+    const ergebnis = await installiere({ server, inhalt, guildId,
+        quelle: zeile.quelle, kennung: zeile.kennung });
 
     // Aufgeraeumt hat `legeAb` — hier wird der Eintrag DIESES Mods gesucht.
     // Ein leerer Eintrag heisst: Es gab nichts zu entfernen (gleiche Fassung
@@ -471,6 +491,6 @@ async function aktualisiere({ server, inhalt, guildId, zeile }) {
 }
 
 module.exports = {
-    daemonVon, teileOhneFassung, istLader,
+    daemonVon, istLader,
     vorschau, installiere, holeGeplante, aktualisiere, entferneDateien,
 };

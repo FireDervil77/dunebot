@@ -15,6 +15,7 @@
  */
 
 const { ServiceManager } = require('dunebot-core');
+const Quellen = require('./Quellen');
 
 /** Der Lader ist die erste Zeile, kein Sonderfall. */
 const ART_LADER = 'loader';
@@ -212,21 +213,27 @@ function dateienAus(zeile) {
  * Deshalb steht die Adresse hier und nicht in der Ansicht: Die Ansicht kennt
  * das Spielpaket nicht.
  *
- * @param {object} zeile      Zeile aus gameserver_content
- * @param {string|null} gemeinschaft
- * @returns {string|null} null, wenn es keine Seite gibt (hochgeladene Datei)
+ * ── Wie die Adresse entsteht, weiss der Anbieter ────────────────────────────
+ *
+ * Seit dem 2026-09-14 baut sie nicht mehr diese Funktion, sondern der Anbieter
+ * (`Quellen.fuer(zeile.quelle).adresse(raum, kennung)`). Hier bleibt nur die
+ * Zuordnung: welche Zeile zu welchem Raum gehoert. Eine hochgeladene Datei hat
+ * keine Seite und bekommt deshalb `null` — das ist eine Auskunft, kein Fehler.
+ *
+ * @param {object} zeile   Zeile aus gameserver_content
+ * @param {object|string|null} raeume  Raum je Quelle (`Quellen.raeumeAus`);
+ *        eine blosse Zeichenkette gilt als Raum der Quelle dieser Zeile
+ * @returns {string|null}
  */
-function paketAdresse(zeile, gemeinschaft) {
-    if (!zeile || zeile.quelle !== 'thunderstore' || !gemeinschaft) return null;
+function paketAdresse(zeile, raeume) {
+    if (!zeile || !zeile.quelle || !Quellen.gibtEs(zeile.quelle)) return null;
 
-    const kennung = String(zeile.kennung || '');
-    const schnitt = kennung.indexOf('-');
-    if (schnitt < 1 || schnitt === kennung.length - 1) return null;
+    const raum = typeof raeume === 'string' || raeume === null || raeume === undefined
+        ? raeume
+        : raeume[zeile.quelle];
+    if (!raum) return null;
 
-    const namensraum = kennung.slice(0, schnitt);
-    const name = kennung.slice(schnitt + 1);
-    return 'https://thunderstore.io/c/' + encodeURIComponent(gemeinschaft)
-         + '/p/' + encodeURIComponent(namensraum) + '/' + encodeURIComponent(name) + '/';
+    return Quellen.fuer(zeile.quelle).adresse(raum, zeile.kennung);
 }
 
 module.exports = {

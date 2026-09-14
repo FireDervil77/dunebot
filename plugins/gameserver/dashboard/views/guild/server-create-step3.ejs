@@ -154,7 +154,7 @@
         Nur wenn das PAKET sie kennt. Die Auswahl wird beim Anlegen als
         `geplant` festgehalten und nach der Grundinstallation geholt — vorher
         gibt es kein Serververzeichnis, in das ein Mod gehoert. -%>
-    <% if (locals.inhalte && locals.inhalte.thunderstore) { %>
+    <% if (locals.inhalte && locals.inhalte.quellen && locals.inhalte.quellen.length) { %>
       <div class="fb-karte" style="margin-top:12px">
         <div class="fb-kopf">
           <span>Mods</span>
@@ -162,7 +162,8 @@
         </div>
         <div class="fb-koerper">
           <div class="fb-muted" style="font-size:13px">
-            Was du hier wählst, wird nach der Grundinstallation von Thunderstore
+            Was du hier wählst, wird nach der Grundinstallation
+            von <%= locals.inhalte.quellen.map(function (q) { return q.titel; }).join(' bzw. ') %>
             geholt — samt allem, was ein Mod zum Laufen braucht. Der Lader
             (<span class="fb-mono"><%= locals.inhalte.laderName || 'BepInEx' %></span>)
             kommt dabei meist von selbst mit. Wirksam wird es beim ersten Start.
@@ -172,6 +173,15 @@
             <span class="fb-mono">r2modman</span> laufen beim Spieler.
           </div>
           <div style="display:flex;gap:8px;align-items:flex-end;margin-top:10px">
+            <% if (locals.inhalte.quellen.length > 1) { %>
+              <select id="mod-quelle" class="fb-feld" style="flex:0 0 160px" onchange="modSuchen()">
+                <% locals.inhalte.quellen.forEach(function (q) { %>
+                  <option value="<%= q.kennung %>"><%= q.titel %></option>
+                <% }); %>
+              </select>
+            <% } else { %>
+              <input type="hidden" id="mod-quelle" value="<%= locals.inhalte.quellen[0].kennung %>">
+            <% } %>
             <input id="mod-begriff" class="fb-feld" style="flex:1 1 auto"
                    placeholder="Mod suchen, z. B. Jotunn — leer lassen zum Stöbern"
                    onkeydown="if(event.key==='Enter'){event.preventDefault();modSuchen();}">
@@ -186,7 +196,15 @@
       (function () {
         'use strict';
         var SUCHE = '/guild/<%= guildId %>/plugins/gameserver/servers/mods/suche?addon_id=<%= locals.addonId || '' %>';
-        var gewaehlt = [];   // {kennung, name}
+        var gewaehlt = [];   // {quelle, kennung, url}
+
+        // Welcher Katalog gerade gefragt wird. Bei einem einzigen steht er in
+        // einem verborgenen Feld — dann gibt es nichts zu waehlen, aber der
+        // Wert reist trotzdem mit.
+        function quelleJetzt() {
+          var f = document.getElementById('mod-quelle');
+          return f ? f.value : '';
+        }
 
         function esc(s) {
           return String(s == null ? '' : s)
@@ -207,7 +225,9 @@
                   (m.url ? ' <a href="' + esc(m.url) + '" target="_blank" rel="noopener noreferrer">ansehen</a>' : '') +
                 '</span>' +
                 '<button type="button" class="btn btn-white btn-sm" onclick="modEntfernen(' + i + ')">Entfernen</button>' +
-                '<input type="hidden" name="mod" value="' + esc(m.kennung) + '">' +
+                // `<quelle>|<kennung>` — der Trenner kommt in keiner Kennung
+                // beider Kataloge vor, ein Bindestrich dagegen in fast jeder.
+                '<input type="hidden" name="mod" value="' + esc(m.quelle + '|' + m.kennung) + '">' +
                 '</div>';
             }).join('');
         }
@@ -217,7 +237,8 @@
           var raum = document.getElementById('mod-treffer');
           raum.innerHTML = '<div class="fb-muted" style="font-size:12px">Wird gesucht …</div>';
 
-          fetch(SUCHE + '&q=' + encodeURIComponent(begriff) + '&seite=' + (seite || 1),
+          fetch(SUCHE + '&quelle=' + encodeURIComponent(quelleJetzt())
+                + '&q=' + encodeURIComponent(begriff) + '&seite=' + (seite || 1),
                 { headers: { Accept: 'application/json' } })
             .then(function (a) { return a.json().then(function (d) { return { ok: a.ok, d: d }; }); })
             .then(function (r) {
@@ -231,7 +252,7 @@
                 ' von ' + r.d.seiten + ', ' + Number(r.d.gesamt).toLocaleString('de-DE') +
                 (r.d.gestoebert ? ' Mods für dieses Spiel' : ' Treffer') +
                 (r.d.verzeichnis ? ' · <a href="' + esc(r.d.verzeichnis) +
-                  '" target="_blank" rel="noopener noreferrer">alle bei Thunderstore ansehen</a>' : '') +
+                  '" target="_blank" rel="noopener noreferrer">alle bei ' + esc(r.d.titel) + ' ansehen</a>' : '') +
                 '</div>';
               var blaettern = (r.d.zurueck || r.d.weiter)
                 ? '<div style="display:flex;gap:8px;align-items:center;padding-top:8px;border-top:1px solid var(--fb-border)">' +
@@ -255,7 +276,7 @@
                     '</div>' +
                   '</div>' +
                   '<button type="button" class="btn btn-white btn-sm" style="flex:0 0 auto" ' +
-                    'onclick="modWaehlen(\'' + esc(t.kennung) + '\', \'' + esc(t.url || '') + '\')">Auswählen</button>' +
+                    'onclick="modWaehlen(\'' + esc(r.d.quelle) + '\', \'' + esc(t.kennung) + '\', \'' + esc(t.url || '') + '\')">Auswählen</button>' +
                   '</div>';
               }).join('') + blaettern;
             })
@@ -264,9 +285,11 @@
             });
         };
 
-        window.modWaehlen = function (kennung, url) {
-          if (gewaehlt.some(function (m) { return m.kennung === kennung; })) return;
-          gewaehlt.push({ kennung: kennung, url: url || null });
+        window.modWaehlen = function (quelle, kennung, url) {
+          // Dieselbe Kennung bei zwei Katalogen sind zwei Dinge — verglichen
+          // wird deshalb das Paar, nicht der Name allein.
+          if (gewaehlt.some(function (m) { return m.kennung === kennung && m.quelle === quelle; })) return;
+          gewaehlt.push({ quelle: quelle, kennung: kennung, url: url || null });
           zeichne();
         };
 
