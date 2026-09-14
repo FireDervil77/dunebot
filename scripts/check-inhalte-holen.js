@@ -359,7 +359,8 @@ async function pruefe(name, fn) {
         const zeile = { art: 'mod', ablage: 'BepInEx/plugins',
             dateien: JSON.stringify(['BepInEx/plugins/Jotunn.dll', 'BepInEx/plugins/Jotunn.xml']) };
         const weg = await InhalteHolen.entferneDateien({ server: SERVER, zeile, inhalt: INHALT });
-        assert.strictEqual(weg.weg, 2);
+        assert.strictEqual(weg.bestaetigt, 2);
+        assert.strictEqual(weg.gesamt, 2);
         assert.deepStrictEqual(daemon.geloescht,
             ['/BepInEx/plugins/Jotunn.dll', '/BepInEx/plugins/Jotunn.xml']);
     });
@@ -374,8 +375,27 @@ async function pruefe(name, fn) {
     await pruefe('Eine Altzeile mit EINER Datei loescht diese', async () => {
         const zeile = { art: 'mod', ablage: 'BepInEx/plugins/Alt.dll', dateien: null };
         const weg = await InhalteHolen.entferneDateien({ server: SERVER, zeile, inhalt: INHALT });
-        assert.strictEqual(weg.weg, 1);
+        assert.strictEqual(weg.bestaetigt, 1);
         assert.deepStrictEqual(daemon.geloescht, ['/BepInEx/plugins/Alt.dll']);
+    });
+
+    // ── Die Zahl zaehlt Bestaetigungen, keine Dateien (gemessen 2026-09-14) ─
+    //
+    // `os.RemoveAll` im Daemon gibt bei einem fehlenden Pfad `nil` zurueck — ein
+    // Loeschauftrag fuer eine Datei, die es nicht gibt, kommt als Erfolg
+    // zurueck. Das ist fuer die Handlung richtig und fuer die Meldung eine
+    // Falle: Der doppelte Aufraeumlauf vom 13.09. meldete beim zweiten Mal
+    // dieselben 111 Dateien. Deshalb heisst das Feld `bestaetigt`.
+    await pruefe('Ein Loeschauftrag auf eine fehlende Datei zaehlt als bestaetigt, nicht als geloescht', async () => {
+        const zeile = { art: 'mod', ablage: 'BepInEx/plugins',
+            dateien: JSON.stringify(['BepInEx/plugins/Weg.dll', 'BepInEx/plugins/Auch-weg.dll']) };
+        const weg = await InhalteHolen.entferneDateien({ server: SERVER, zeile, inhalt: INHALT });
+        // Die Attrappe antwortet wie der Daemon: Erfolg, ohne nachzusehen.
+        assert.strictEqual(weg.bestaetigt, 2, 'der Daemon hat zweimal bestaetigt');
+        assert.strictEqual(weg.gesamt, 2, 'gestellt wurden zwei Auftraege');
+        assert.deepStrictEqual(weg.blieb, [], 'nur Ablehnungen sind hart');
+        assert.strictEqual(weg.weg, undefined,
+            'das alte Feld `weg` behauptete „so viele Dateien lagen da" — es darf nicht zurueckkommen');
     });
 
     console.log('\nAktualisieren');
@@ -401,7 +421,7 @@ async function pruefe(name, fn) {
             'die alte Datei muss genau EINMAL geloescht werden');
         assert.strictEqual(daemon.abrufe.length, 1);
         // Der Toast der Karte liest diese Felder — sie kommen jetzt aus `legeAb`.
-        assert.strictEqual(e.alteDateienWeg, 1);
+        assert.strictEqual(e.alteDateienBestaetigtWeg, 1);
         assert.deepStrictEqual(e.alteDateienBlieben, []);
         assert.strictEqual(e.ohneListe, false);
         assert.deepStrictEqual(e.aufgeraeumt.map(a => a.kennung), ['ValheimModding-Jotunn']);
@@ -900,6 +920,15 @@ async function pruefe(name, fn) {
         // Altzeilen ohne Spaltenwert: „Auf Aktualisierungen pruefen" liefert den
         // Tag mit, wenn die installierte Fassung die neueste ist.
         assert.match(reiter, /neuere\.installiertVom/, 'der Ersatzweg fuer Altzeilen fehlt');
+    });
+
+    await pruefe('Der Toast behauptet nicht, geloescht zu haben, was schon fehlte', async () => {
+        assert.match(reiter, /sind vom Server weg/, 'die ehrliche Formulierung fehlt');
+        assert.doesNotMatch(reiter, /Datei\(en\) gelöscht/, 'die alte Behauptung steht wieder da');
+        db.zeilen.push(JOTUNN_ZEILE());
+        const r = await rufe('delete', '/:serverId/inhalte/:id', { params: { id: '9' } });
+        assert.strictEqual(r.antwort.bestaetigtWeg, 1);
+        assert.strictEqual(r.antwort.dateien, undefined, 'das Feld `dateien` hiess wie eine Dateizahl');
     });
 
     Object.assign(Thunderstore, ECHT);

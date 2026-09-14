@@ -678,7 +678,7 @@ router.delete('/:serverId/inhalte/:id', requirePermission('GAMESERVER.FILES.MANA
         // Bei einem Mod aus mehreren Dateien steht dort der ZIELORDNER
         // (`BepInEx/plugins`) — und den zu loeschen naehme jeden anderen Mod
         // mit. Bis zum 2026-09-11 tat diese Route genau das.
-        let weg = { weg: 0, blieb: [], ohneListe: false };
+        let weg = { bestaetigt: 0, gesamt: 0, blieb: [], ohneListe: false };
         if (zeile.art === Inhalte.ART_MOD) {
             weg = await InhalteHolen.entferneDateien({
                 server: geladen.server, zeile, inhalt: geladen.paket?.content || null,
@@ -699,7 +699,11 @@ router.delete('/:serverId/inhalte/:id', requirePermission('GAMESERVER.FILES.MANA
                       + weg.blieb.join(', ')
                     : null;
 
-        return res.json({ success: true, dateiWeg: weg.weg > 0, dateien: weg.weg, hinweis, ...wirkung(geladen) });
+        // `bestaetigtWeg` statt `dateien`: Der Daemon meldet auch Erfolg, wenn
+        // die Datei schon fehlte (siehe entferneDateien). Die Zahl sagt „dort
+        // liegt nichts mehr", nicht „so viel haben wir geloescht".
+        return res.json({ success: true, dateiWeg: weg.bestaetigt > 0,
+                          bestaetigtWeg: weg.bestaetigt, hinweis, ...wirkung(geladen) });
     } catch (error) {
         Logger.error('[Gameserver/Inhalte] Entfernen fehlgeschlagen:', error);
         return res.status(500).json({ success: false, message: 'Serverfehler' });

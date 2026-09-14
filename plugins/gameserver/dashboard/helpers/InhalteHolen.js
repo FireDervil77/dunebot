@@ -244,7 +244,7 @@ async function legeAb({ server, inhalt, guildId, pakete, fehlend = [] }) {
             ergebnis.aufgeraeumt.push({ kennung: p.kennung,
                 vorher: alt.fassung, nachher: p.fassung, ...weg });
             Logger.info(`[Gameserver/Inhalte] ${p.kennung}: ${alt.fassung} → ${p.fassung}, `
-                + `${weg.weg} alte Datei(en) entfernt`
+                + `${weg.bestaetigt} von ${weg.gesamt} Datei(en) der alten Fassung bestaetigt weg`
                 + (weg.blieb.length ? `, ${weg.blieb.length} blieben liegen` : '')
                 + (weg.ohneListe ? ' (alte Zeile ohne Dateiliste — nichts zu entfernen)' : ''));
         }
@@ -363,7 +363,24 @@ async function holeGeplante({ server, inhalt, guildId }) {
  * naehme alle Mods mit. Hat eine alte Zeile keine Liste, wird nichts geloescht
  * und das gesagt.
  *
- * @returns {Promise<{weg: number, blieb: string[], ohneListe: boolean}>}
+ * ── `bestaetigt` heisst „ist weg", nicht „war da" (gemessen 2026-09-14) ────
+ *
+ * Der Daemon antwortet auf einen Loeschauftrag fuer eine Datei, die es gar
+ * nicht gibt, mit Erfolg: `HandleFileDelete` ruft `os.RemoveAll`
+ * (`internal/gameserver/files.go`), und das gibt bei einem fehlenden Pfad
+ * `nil` zurueck — in Go nachgestellt; die Pfadpruefung davor fragt nicht nach
+ * Existenz. Das ist fuer die HANDLUNG richtig so: „weg damit" darf beliebig oft
+ * laufen. Fuer die MELDUNG ist es eine Falle, und sie ist einmal zugeschnappt —
+ * der doppelte Aufraeumlauf vom 13.09. meldete beim zweiten Mal dieselben 111
+ * Dateien wie beim ersten und war im Log nicht von einem echten zu
+ * unterscheiden.
+ *
+ * Deshalb heisst die Zahl hier `bestaetigt` und nicht `weg`: Sie sagt, fuer wie
+ * viele Pfade der Server bestaetigt hat, dass dort nichts mehr liegt — ob wir
+ * sie geloescht haben oder ob sie schon fehlten, sagt sie NICHT. Die Gegenzahl
+ * `blieb` ist dagegen hart: Diese Pfade liegen sicher noch da.
+ *
+ * @returns {Promise<{bestaetigt: number, gesamt: number, blieb: string[], ohneListe: boolean}>}
  */
 async function entferneDateien({ server, zeile, inhalt = null }) {
     const Logger = ServiceManager.get('Logger');
@@ -378,16 +395,16 @@ async function entferneDateien({ server, zeile, inhalt = null }) {
         const ablage = String(zeile.ablage || '').replace(/^\/+/, '');
         const einzeln = ablage && ablage !== (inhalt?.path || '')
             && /\.[A-Za-z0-9]{1,8}$/.test(ablage);
-        if (!einzeln) return { weg: 0, blieb: [], ohneListe: true };
+        if (!einzeln) return { bestaetigt: 0, gesamt: 0, blieb: [], ohneListe: true };
         dateien = [ablage];
     }
 
     const daemonId = await daemonVon(dbService, server);
     if (!daemonId || !ipmServer?.isDaemonOnline(daemonId)) {
-        return { weg: 0, blieb: dateien, ohneListe: false };
+        return { bestaetigt: 0, gesamt: dateien.length, blieb: dateien, ohneListe: false };
     }
 
-    let weg = 0;
+    let bestaetigt = 0;
     const blieb = [];
     for (const datei of dateien) {
         const antwort = await ipmServer.sendCommand(daemonId, 'gameserver.files.delete', {
@@ -397,14 +414,14 @@ async function entferneDateien({ server, zeile, inhalt = null }) {
             path:          '/' + String(datei).replace(/^\/+/, ''),
         }, 30000).catch(fehler => ({ success: false, error: fehler.message }));
 
-        if (antwort?.success) weg++;
+        if (antwort?.success) bestaetigt++;
         else {
             blieb.push(datei);
             Logger.warn(`[Gameserver/Inhalte] Datei blieb liegen (${datei}): `
                 + `${antwort?.error || 'keine Antwort'}`);
         }
     }
-    return { weg, blieb, ohneListe: false };
+    return { bestaetigt, gesamt: dateien.length, blieb, ohneListe: false };
 }
 
 /**
@@ -440,14 +457,14 @@ async function aktualisiere({ server, inhalt, guildId, zeile }) {
     // Ein leerer Eintrag heisst: Es gab nichts zu entfernen (gleiche Fassung
     // oder Zeile ohne Dateiliste), nicht „es wurde vergessen".
     const weg = (ergebnis.aufgeraeumt || []).find(a => a.kennung === zeile.kennung)
-        || { weg: 0, blieb: [], ohneListe: false };
+        || { bestaetigt: 0, gesamt: 0, blieb: [], ohneListe: false };
 
     return {
         ...ergebnis,
         geaendert: true,
         vorher,
         nachher: neuestes.fassung,
-        alteDateienWeg: weg.weg,
+        alteDateienBestaetigtWeg: weg.bestaetigt,
         alteDateienBlieben: weg.blieb,
         ohneListe: weg.ohneListe,
     };

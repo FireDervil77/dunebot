@@ -743,7 +743,11 @@
       })
       .then(d => {
         if (d.hinweis) melde('warning', d.hinweis, 12000);
-        else melde('success', `„${name}“ entfernt` + (d.dateien ? ` — ${d.dateien} Datei(en) gelöscht.` : '.'));
+        // „sind vom Server weg" und nicht „gelöscht": Der Daemon bestätigt auch
+        // eine Datei, die schon fehlte. Beides heißt für den Server dasselbe —
+        // da liegt nichts mehr —, aber nur das eine ist wörtlich wahr.
+        else melde('success', `„${name}“ entfernt`
+          + (d.bestaetigtWeg ? ` — ${d.bestaetigtWeg} Datei(en) sind vom Server weg.` : '.'));
         wirkungMelden(d);
       })
       // Bis zum 2026-09-13 ohne Fehlerzweig: Scheiterte das Entfernen, kam nichts.
