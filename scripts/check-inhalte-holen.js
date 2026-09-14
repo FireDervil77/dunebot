@@ -377,16 +377,42 @@ async function pruefe(name, fn) {
 
     console.log('\nAktualisieren');
 
-    await pruefe('Erst die alten Dateien weg, dann die neue Fassung', async () => {
+    // ── Ein Weg, nicht zwei (Betreiber, 2026-09-14) ─────────────────────────
+    //
+    // Bis zum 2026-09-14 raeumte `aktualisiere` selbst auf UND `legeAb` gleich
+    // danach noch einmal — dieselben Dateien, zwei Runden IPC, und der zweite
+    // Lauf loeschte, was es nicht mehr gab. Die Zeile steht deshalb hier in der
+    // Datenbank, so wie im echten Lauf: Nur dann kann `legeAb` sie ueberhaupt
+    // finden, und nur dann faellt ein doppeltes Loeschen auf.
+    await pruefe('Erst die alten Dateien weg, dann die neue Fassung — und das genau einmal', async () => {
         stelleThunderstore([{ ...JOTUNN, fassung: '2.30.0' }], { ...JOTUNN, fassung: '2.30.0' });
-        const zeile = { id: 1, art: 'mod', kennung: 'ValheimModding-Jotunn', fassung: '2.29.2',
+        const zeile = { id: 1, server_id: 186, quelle: 'thunderstore', art: 'mod',
+            kennung: 'ValheimModding-Jotunn', fassung: '2.29.2', status: 'installiert',
             ablage: 'BepInEx/plugins', dateien: JSON.stringify(['BepInEx/plugins/Jotunn.dll']) };
+        db.zeilen.push(zeile);
         const e = await InhalteHolen.aktualisiere({ server: SERVER, inhalt: INHALT, guildId: 'g1', zeile });
         assert.strictEqual(e.geaendert, true);
         assert.strictEqual(e.vorher, '2.29.2');
         assert.strictEqual(e.nachher, '2.30.0');
-        assert.deepStrictEqual(daemon.geloescht, ['/BepInEx/plugins/Jotunn.dll']);
+        assert.deepStrictEqual(daemon.geloescht, ['/BepInEx/plugins/Jotunn.dll'],
+            'die alte Datei muss genau EINMAL geloescht werden');
         assert.strictEqual(daemon.abrufe.length, 1);
+        // Der Toast der Karte liest diese Felder — sie kommen jetzt aus `legeAb`.
+        assert.strictEqual(e.alteDateienWeg, 1);
+        assert.deepStrictEqual(e.alteDateienBlieben, []);
+        assert.strictEqual(e.ohneListe, false);
+        assert.deepStrictEqual(e.aufgeraeumt.map(a => a.kennung), ['ValheimModding-Jotunn']);
+    });
+
+    await pruefe('Eine Altzeile ohne Dateiliste sagt es beim Aktualisieren', async () => {
+        stelleThunderstore([{ ...JOTUNN, fassung: '2.30.0' }], { ...JOTUNN, fassung: '2.30.0' });
+        const zeile = { id: 1, server_id: 186, quelle: 'thunderstore', art: 'mod',
+            kennung: 'ValheimModding-Jotunn', fassung: '2.29.2', status: 'installiert',
+            ablage: 'BepInEx/plugins', dateien: null };
+        db.zeilen.push(zeile);
+        const e = await InhalteHolen.aktualisiere({ server: SERVER, inhalt: INHALT, guildId: 'g1', zeile });
+        assert.strictEqual(e.ohneListe, true, 'der Hinweis darf auf dem neuen Weg nicht verloren gehen');
+        assert.deepStrictEqual(daemon.geloescht, []);
     });
 
     await pruefe('Ist nichts Neueres da, passiert nichts', async () => {

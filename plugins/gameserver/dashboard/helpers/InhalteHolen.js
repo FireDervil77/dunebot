@@ -165,7 +165,7 @@ async function legeAb({ server, inhalt, guildId, pakete, fehlend = [] }) {
     if (!ipmServer?.isDaemonOnline(daemonId)) throw new Error('Daemon ist offline');
 
     const ergebnis = {
-        installiert: [], fehlgeschlagen: [], fehlend, beibehalten: [],
+        installiert: [], fehlgeschlagen: [], fehlend, beibehalten: [], aufgeraeumt: [],
         neustartNoetig: inhalt.needs_restart !== false,
     };
 
@@ -179,8 +179,16 @@ async function legeAb({ server, inhalt, guildId, pakete, fehlend = [] }) {
     // Lader faelschlich als Doorstop 4 auswies, obwohl Doorstop 3 installiert
     // war. Genau daran laesst sich der Fehler dann nicht mehr erkennen.
     //
-    // `aktualisiere` macht es seit jeher richtig ("erst die alten Dateien weg,
-    // dann die neuen holen"); hier fehlte derselbe Schritt.
+    // ── Hier und NUR hier wird aufgeraeumt (Betreiber, 2026-09-14) ──────────
+    //
+    // Bis zum 2026-09-14 tat `aktualisiere` es noch einmal selbst, vor dem
+    // Aufruf: zwei Wege fuer dieselbe Sache, belegt im Log vom 13.09. (dieselbe
+    // Zeile „111 alte Datei(en) entfernt" zweimal). Der aeltere Weg ist der
+    // raus, weil er nur den Knopf „Aktualisieren" kennt. Eine Fassung wechselt
+    // aber auch ueber Abhaengigkeiten — XPortal 1.2.24 verlangt Jotunn 2.27.1,
+    // waehrend 2.30.0 liegt — und diesen Weg deckt nur diese Stelle ab.
+    // Was entfernt wurde, steht in `ergebnis.aufgeraeumt`; `aktualisiere`
+    // meldet es von dort weiter, statt es selbst zu tun.
     const vorhanden = new Map();
     {
         const { lader, mods } = await Inhalte.fuerServer(server.id);
@@ -224,6 +232,8 @@ async function legeAb({ server, inhalt, guildId, pakete, fehlend = [] }) {
         const alt = vorhanden.get(p.kennung);
         if (alt && alt.status === 'installiert' && alt.fassung && alt.fassung !== p.fassung) {
             const weg = await entferneDateien({ server, zeile: alt, inhalt });
+            ergebnis.aufgeraeumt.push({ kennung: p.kennung,
+                vorher: alt.fassung, nachher: p.fassung, ...weg });
             Logger.info(`[Gameserver/Inhalte] ${p.kennung}: ${alt.fassung} → ${p.fassung}, `
                 + `${weg.weg} alte Datei(en) entfernt`
                 + (weg.blieb.length ? `, ${weg.blieb.length} blieben liegen` : '')
@@ -310,7 +320,8 @@ async function holeGeplante({ server, inhalt, guildId }) {
 
     Logger.info(`[Gameserver/Inhalte] Server ${server.id}: ${zeilen.length} vorgemerkte(r) Mod(s)`);
 
-    const gesamt = { installiert: [], fehlgeschlagen: [], fehlend: [], beibehalten: [], neustartNoetig: false };
+    const gesamt = { installiert: [], fehlgeschlagen: [], fehlend: [], beibehalten: [],
+                     aufgeraeumt: [], neustartNoetig: false };
     for (const zeile of zeilen) {
         try {
             const e = await installiere({ server, inhalt, guildId,
@@ -319,6 +330,7 @@ async function holeGeplante({ server, inhalt, guildId }) {
             gesamt.fehlgeschlagen.push(...e.fehlgeschlagen);
             gesamt.fehlend.push(...e.fehlend);
             gesamt.beibehalten.push(...(e.beibehalten || []));
+            gesamt.aufgeraeumt.push(...(e.aufgeraeumt || []));
             gesamt.neustartNoetig = gesamt.neustartNoetig || e.neustartNoetig;
         } catch (fehler) {
             // Die Zeile traegt den Grund, nicht nur das Log: Wer den Server
@@ -391,7 +403,10 @@ async function entferneDateien({ server, zeile, inhalt = null }) {
  *
  * **Erst die alten Dateien weg, dann die neuen holen.** Eine umbenannte DLL
  * bliebe sonst liegen, der Lader faende beide Fassungen — und der Fehler zeigt
- * sich erst im Spiel.
+ * sich erst im Spiel. Getan wird das in `legeAb` (siehe dort), nicht hier:
+ * Seit dem 2026-09-14 gibt es dafuer genau EINEN Weg, und der ist der, den
+ * auch eine Abhaengigkeit nimmt. Hier wird nur weitergemeldet, was dort
+ * geschah.
  *
  * @returns {Promise<object>} wie `installiere`, zusaetzlich `vorher`/`nachher`
  */
@@ -399,19 +414,29 @@ async function aktualisiere({ server, inhalt, guildId, zeile }) {
     const teil = teileOhneFassung(zeile.kennung);
     if (!teil) throw new Error(`Unlesbare Kennung: ${zeile.kennung}`);
 
+    // Die alte Fassung wird JETZT festgehalten, nicht am Ende abgelesen:
+    // Zwischen hier und der Rueckgabe schreibt `legeAb` dieselbe Zeile fort.
+    // Wer sie danach noch einmal liest, meldet „2.30.0 → 2.30.0".
+    const vorher = zeile.fassung;
+
     const neuestes = await Thunderstore.paket(teil.namespace, teil.name);
-    if (!Thunderstore.hoeher(neuestes.fassung, zeile.fassung)) {
-        return { geaendert: false, vorher: zeile.fassung, nachher: neuestes.fassung,
+    if (!Thunderstore.hoeher(neuestes.fassung, vorher)) {
+        return { geaendert: false, vorher, nachher: neuestes.fassung,
                  installiert: [], fehlgeschlagen: [], fehlend: [] };
     }
 
-    const weg = await entferneDateien({ server, zeile });
     const ergebnis = await installiere({ server, inhalt, guildId, kennung: zeile.kennung });
+
+    // Aufgeraeumt hat `legeAb` — hier wird der Eintrag DIESES Mods gesucht.
+    // Ein leerer Eintrag heisst: Es gab nichts zu entfernen (gleiche Fassung
+    // oder Zeile ohne Dateiliste), nicht „es wurde vergessen".
+    const weg = (ergebnis.aufgeraeumt || []).find(a => a.kennung === zeile.kennung)
+        || { weg: 0, blieb: [], ohneListe: false };
 
     return {
         ...ergebnis,
         geaendert: true,
-        vorher: zeile.fassung,
+        vorher,
         nachher: neuestes.fassung,
         alteDateienWeg: weg.weg,
         alteDateienBlieben: weg.blieb,
