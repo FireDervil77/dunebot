@@ -36,7 +36,11 @@ async function fuerServer(serverId) {
 
     const zeilen = await dbService.query(
         `SELECT id, art, quelle, kennung, name, fassung, aktiv, reihenfolge,
-                ablage, dateien, client_side, status, fehler, installiert_am, created_at
+                ablage, dateien, client_side, status, fehler, installiert_am, created_at,
+                -- Als Zeichenkette lesen: Ein DATE kaeme als Date-Objekt zurueck,
+                -- und dessen Umweg ueber die Zeitzone macht aus dem 09.09. in der
+                -- JSON-Antwort den 08.09. (siehe die Migration).
+                DATE_FORMAT(veroeffentlicht, '%Y-%m-%d') AS veroeffentlicht
            FROM gameserver_content
           WHERE server_id = ?
           ORDER BY art = 'loader' DESC, reihenfolge ASC, id ASC`,
@@ -91,12 +95,13 @@ async function eintragen(daten) {
 
     const ergebnis = await dbService.query(
         `INSERT INTO gameserver_content
-             (server_id, guild_id, art, quelle, kennung, name, fassung,
+             (server_id, guild_id, art, quelle, kennung, name, fassung, veroeffentlicht,
               aktiv, reihenfolge, ablage, dateien, client_side, status, fehler, installiert_am)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
              name           = VALUES(name),
              fassung        = VALUES(fassung),
+             veroeffentlicht = VALUES(veroeffentlicht),
              aktiv          = 1,
              ablage         = VALUES(ablage),
              dateien        = VALUES(dateien),
@@ -107,6 +112,11 @@ async function eintragen(daten) {
         [
             daten.serverId, String(daten.guildId), daten.art, daten.quelle,
             daten.kennung, daten.name || null, daten.fassung || null,
+            // Nur der Tag, und zwar so, wie die Quelle ihn nennt (ISO). Ohne
+            // Umweg ueber ein Date-Objekt: Der Treiber wuerde es in die
+            // Sitzungszeitzone schieben, und ein Datum kurz vor Mitternacht
+            // rutschte dabei auf den Vortag.
+            daten.veroeffentlicht ? String(daten.veroeffentlicht).slice(0, 10) : null,
             Number(daten.reihenfolge) || 0,
             daten.ablage || null,
             // Die genaue Liste — ohne sie muss das Entfernen raten, und bei

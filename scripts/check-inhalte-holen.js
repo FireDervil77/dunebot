@@ -43,11 +43,11 @@ const db = {
     async query(sql, params) {
         if (/FROM rootserver WHERE id/.test(sql)) return [{ daemon_id: 'd1' }];
         if (/INSERT INTO gameserver_content/.test(sql)) {
-            const [serverId, guildId, art, quelle, kennung, name, fassung, reihenfolge,
-                   ablage, dateien, clientSide, status, fehler] = params;
+            const [serverId, guildId, art, quelle, kennung, name, fassung, veroeffentlicht,
+                   reihenfolge, ablage, dateien, clientSide, status, fehler] = params;
             const da = this.zeilen.find(z => z.kennung === kennung && z.quelle === quelle);
             const zeile = da || { id: this.zeilen.length + 1, server_id: serverId, quelle, kennung };
-            Object.assign(zeile, { guild_id: guildId, art, name, fassung, reihenfolge,
+            Object.assign(zeile, { guild_id: guildId, art, name, fassung, veroeffentlicht, reihenfolge,
                 ablage, dateien, client_side: clientSide, status, fehler });
             if (!da) this.zeilen.push(zeile);
             return { insertId: da ? 0 : zeile.id };
@@ -144,8 +144,11 @@ const SERVER = { id: 186, rootserver_id: 55, install_path: '186-valheim' };
 
 const BEPINEX = { kennung: 'denikson-BepInExPack_Valheim', name: 'BepInExPack_Valheim',
                   fassung: '5.4.2333', adresse: 'https://thunderstore.io/package/download/denikson/BepInExPack_Valheim/5.4.2333/', bytes: 1 };
+// Die Erscheinungstage sind bei Thunderstore abgefragt (2026-09-14), nicht
+// erfunden: Jotunn 2.29.2 → 13.07.2026, TeleportEverything 2.9.1 → 08.02.2026.
 const JOTUNN  = { kennung: 'ValheimModding-Jotunn', name: 'Jotunn', fassung: '2.29.2',
-                  adresse: 'https://thunderstore.io/package/download/ValheimModding/Jotunn/2.29.2/', bytes: 1 };
+                  adresse: 'https://thunderstore.io/package/download/ValheimModding/Jotunn/2.29.2/', bytes: 1,
+                  veroeffentlicht: '2026-07-13T05:41:39.807962Z' };
 
 let bestanden = 0;
 async function pruefe(name, fn) {
@@ -801,6 +804,102 @@ async function pruefe(name, fn) {
         assert.match(reiter, /\/ladestand`/, 'der Reiter fragt /ladestand nicht ab');
         assert.match(reiter, /LADESTAND\.zeilen\[e\.id\]/, 'die Zeile liest ihren Ladestand nicht');
         assert.match(reiter, /lauf\.trotzAus/, '"ausgeschaltet — laedt trotzdem" fehlt');
+    });
+
+    // ── Vorschlag A: das Alter einer Fassung gegen den Spielstand ───────────
+    //
+    // Betreiber, 2026-09-13/14: Thunderstore nennt keine Spielfassung, also
+    // vergleichen wir zwei Daten — den Erscheinungstag der Mod-Fassung und den
+    // Stand der Spieldateien aus der Kopfzeile des BepInEx-Logs.
+    console.log('\nAlter gegen den Spielstand');
+
+    await pruefe('Die Kopfzeile nennt den Stand der Spieldatei', async () => {
+        const k = BepInExLog.spielstandAus('BepInEx 5.4.23.5 - valheim_server (09/12/2026 14:19:32)');
+        assert.strictEqual(k.fassung, '5.4.23.5');
+        assert.strictEqual(k.prozess, 'valheim_server');
+        assert.strictEqual(k.stand, '2026-09-12');
+        assert.strictEqual(k.roh, '09/12/2026 14:19:32');
+    });
+
+    await pruefe('Eine unbekannte Schreibweise wird gemeldet, nicht geraten', async () => {
+        // Ein Container mit deutscher Kultur schriebe 12.09.2026. Aus 09.12.2026
+        // wuerde bei einem Rateversuch still der 9. Dezember — eine falsche
+        // Auskunft, die wie eine richtige aussieht.
+        const de = BepInExLog.spielstandAus('BepInEx 5.4.23.5 - valheim_server (12.09.2026 14:19:32)');
+        assert.strictEqual(de.stand, null);
+        assert.strictEqual(de.roh, '12.09.2026 14:19:32', 'die Rohangabe gehoert trotzdem weitergereicht');
+        // Monat 13 gibt es nicht — JavaScript rechnet stillschweigend weiter.
+        assert.strictEqual(BepInExLog.spielstandAus('BepInEx 5.4 - x (13/12/2026 00:00:00)').stand, null);
+        // Ohne Klammer gibt es kein Datum, aber sehr wohl eine Fassung.
+        const ohne = BepInExLog.spielstandAus('BepInEx 5.4.23.5 - valheim_server');
+        assert.strictEqual(ohne.stand, null);
+        assert.strictEqual(ohne.fassung, '5.4.23.5');
+    });
+
+    await pruefe('Das echte Log traegt den Stand mit — ohne zweiten Griff zum Daemon', async () => {
+        const e = BepInExLog.werteAus(FEHLER_LOG);
+        assert.strictEqual(e.spiel.stand, '2026-09-12');
+        assert.strictEqual(e.bepinex, '5.4.23.5', 'die Fassung darf darueber nicht verlorengehen');
+
+        INHALT.loader.log = 'game/BepInEx/LogOutput.log';
+        try {
+            daemon.logInhalt = FEHLER_LOG;
+            const r = await rufe('get', '/:serverId/inhalte/ladestand');
+            assert.strictEqual(r.antwort.spiel.stand, '2026-09-12', 'die Route reicht den Stand nicht durch');
+            assert.deepStrictEqual(daemon.gelesen, ['/game/BepInEx/LogOutput.log'], 'genau eine Datei');
+        } finally {
+            delete INHALT.loader.log;
+        }
+    });
+
+    await pruefe('Der Erscheinungstag wird beim Installieren aufgehoben', async () => {
+        stelleThunderstore([JOTUNN]);
+        await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT, guildId: 'g1',
+            kennung: 'ValheimModding-Jotunn' });
+        assert.strictEqual(db.zeilen[0].veroeffentlicht, '2026-07-13',
+            'ohne die Spalte muesste die Liste je Mod bei Thunderstore nachfragen');
+    });
+
+    await pruefe('Die Vorschau kennt ihn auch — der Verdacht gehoert VOR die Installation', async () => {
+        stelleThunderstore([JOTUNN]);
+        const v = await InhalteHolen.vorschau({ serverId: 186, inhalt: INHALT,
+            kennung: 'ValheimModding-Jotunn' });
+        assert.strictEqual(v.pakete[0].veroeffentlicht, '2026-07-13T05:41:39.807962Z');
+    });
+
+    await pruefe('Der Reiter rechnet den Abstand aus — gegen die echten Daten', async () => {
+        // Der Vergleich passiert im Browser: Liste und Ladestand kommen aus zwei
+        // Abrufen, und nur dort liegen beide vor. Geprueft wird deshalb der
+        // Code, der wirklich ausgeliefert wird — aus der Vorlage geschnitten.
+        const roh = fs.readFileSync(path.join(__dirname,
+            '../plugins/gameserver/dashboard/views/guild/partials/server-detail-inhalte.ejs'), 'utf8');
+        const von = roh.indexOf('const TAG_MS');
+        const bis = roh.indexOf('\n  }\n', roh.indexOf('function alterZeile')) + 4;
+        assert.ok(von > 0 && bis > von, 'der Rechenblock steht nicht mehr in der Vorlage');
+        const baue = (stand) => new Function('LADESTAND', 'escape',
+            roh.slice(von, bis) + '; return alterZeile;')({ verfuegbar: Boolean(stand), spiel: { stand } }, String);
+
+        const mit = baue('2026-09-12');
+        // Die beiden Faelle vom 13.09.: TeleportEverything 2.9.1 stuerzte ab,
+        // Jotunn 2.30.0 lief. Die Zahl 216 ist gerechnet, nicht gesetzt.
+        assert.strictEqual(mit('2026-02-08T00:52:06.908446Z'),
+            'Fassung vom 08.02.2026 — 216 Tage vor den Spieldateien');
+        assert.strictEqual(mit('2026-09-09T21:49:37.646168Z'),
+            'Fassung vom 09.09.2026 — 3 Tage vor den Spieldateien');
+        assert.strictEqual(mit('2026-09-12'), 'Fassung vom 12.09.2026 — vom selben Tag wie die Spieldateien');
+        assert.strictEqual(mit('2026-09-14'), 'Fassung vom 14.09.2026 — 2 Tage nach den Spieldateien');
+        assert.strictEqual(mit(null), '', 'ohne Erscheinungstag steht da nichts');
+        // Ohne Ladestand bleibt die Auskunft halb — aber sie luegt nicht.
+        assert.strictEqual(baue(null)('2026-09-09T21:49:37.646168Z'), 'Fassung vom 09.09.2026');
+    });
+
+    await pruefe('Der Reiter zeigt ihn an drei Stellen: Kopf, Zeile, Vorschau', async () => {
+        assert.match(reiter, /Spieldateien vom/, 'die Kopfzeile nennt den Spielstand nicht');
+        assert.match(reiter, /alterZeile\(e\.veroeffentlicht/, 'die Mod-Zeile zeigt den Erscheinungstag nicht');
+        assert.match(reiter, /alterZeile\(p\.veroeffentlicht\)/, 'die Vorschau zeigt ihn nicht');
+        // Altzeilen ohne Spaltenwert: „Auf Aktualisierungen pruefen" liefert den
+        // Tag mit, wenn die installierte Fassung die neueste ist.
+        assert.match(reiter, /neuere\.installiertVom/, 'der Ersatzweg fuer Altzeilen fehlt');
     });
 
     Object.assign(Thunderstore, ECHT);

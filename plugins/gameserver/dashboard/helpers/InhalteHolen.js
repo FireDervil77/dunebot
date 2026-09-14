@@ -141,6 +141,10 @@ async function vorschau({ serverId, inhalt, kennung, fassung = null }) {
                 schonDa: Boolean(da),
                 schonFassung: da ? da.fassung : null,
                 bleibt: laderBleibt(inhalt, p, da),
+                // Vorschlag A: der Verdacht gehoert VOR die Installation. Der
+                // Vergleich mit dem Spielstand passiert in der Karte — sie hat
+                // beides, den Ladestand und diese Liste.
+                veroeffentlicht: p.veroeffentlicht || null,
             };
         }),
     };
@@ -213,6 +217,11 @@ async function legeAb({ server, inhalt, guildId, pakete, fehlend = [] }) {
         const grundzeile = {
             serverId: server.id, guildId, art, quelle: 'thunderstore',
             kennung: p.kennung, name: p.name, fassung: p.fassung,
+            // Der Erscheinungstag gehoert an JEDE Zeile, auch an die geplante
+            // und die fehlgeschlagene: `eintragen` schreibt per ON DUPLICATE
+            // KEY UPDATE alle Felder, und was hier fehlt, loescht den Wert der
+            // vorigen Runde.
+            veroeffentlicht: p.veroeffentlicht || null,
             reihenfolge: i, clientSide: Boolean(inhalt.client_side),
         };
 

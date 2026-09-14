@@ -34,6 +34,76 @@ const kuerze = (s) => {
     return t.length > 240 ? t.slice(0, 237) + '…' : t;
 };
 
+/**
+ * Der Stand der Spieldatei aus der Kopfzeile des Logs.
+ *
+ * ── Warum diese Zeile die Antwort auf die Versionsfrage traegt ─────────────
+ *
+ * Betreiber, 2026-09-13: „wenn wir die Spielversion nicht gegen die Mods
+ * pruefen koennen, haben wir genau solche Probleme." Thunderstore fuehrt kein
+ * Feld fuer die Spielfassung — ein direkter Abgleich ist aus der Quelle nicht
+ * moeglich. Der Server selbst nennt aber ein Datum, und zwar hier:
+ *
+ *   [Message:   BepInEx] BepInEx 5.4.23.5 - valheim_server (09/12/2026 14:19:32)
+ *
+ * ── Was dieses Datum IST (gemessen, nicht angenommen) ──────────────────────
+ *
+ * Der Zeitstempel der Spieldatei auf DIESEM Server, nicht der Tag, an dem
+ * Valve den Build veroeffentlicht hat. Belege:
+ *   - In `BepInEx.Preloader.dll` 5.4.23.5 stehen die Formatzeichenketten
+ *     `BepInEx {0} - {1}` und `{0} ({1})` unmittelbar benachbart im
+ *     Zeichenkettenbereich, und die Datei ruft `File.GetLastWriteTime` auf
+ *     `Paths.ExecutablePath` auf (`strings -a`, 2026-09-14).
+ *   - Zwei Logs vom selben Serverstand zeigen 12:19:32 und 14:19:32 am selben
+ *     Tag — dieselbe Sekunde in zwei Zeitzonen, also ein Dateistempel und
+ *     keine Startzeit.
+ *   - Steam veroeffentlichte Build 25253791 am 11.09.2026 13:08 UTC; die Datei
+ *     auf 189 traegt den 12.09. — der Tag, an dem der Server sie holte.
+ *
+ * Das taugt fuer die Frage „wurde dieser Mod VOR den Spieldateien gebaut?",
+ * denn SteamPipe schreibt eine unveraenderte Datei beim Pruefen NICHT neu: Der
+ * Stempel wandert nur, wenn das Spiel wirklich eine neue Fassung bekam.
+ *
+ * ── Ohne Zeitzone, deshalb nur der Tag ─────────────────────────────────────
+ *
+ * Die Zeile traegt die Ortszeit des Containers und sagt nicht, welche. Zurueck
+ * kommt deshalb nur das Datum; die Uhrzeit bleibt als `roh` dabei, damit
+ * niemand sie aus dem Datum zurueckrechnet.
+ *
+ * Unbekannte Schreibweisen werden GEMELDET, nicht geraten: Ein Container mit
+ * deutscher Kultur schriebe `12.09.2026`, und aus `09.12.2026` wuerde sonst
+ * still der 9. Dezember.
+ *
+ * @param {string} nachricht Text nach `[Message:   BepInEx] `
+ * @returns {{prozess: string|null, stand: string|null, roh: string|null}|null}
+ */
+function spielstandAus(nachricht) {
+    const m = String(nachricht || '').match(/^BepInEx (\S+) - (.+)$/);
+    if (!m) return null;
+
+    const rest = m[2].trim();
+    const klammer = rest.match(/^(.*?)\s*\(([^)]*)\)$/);
+    const prozess = (klammer ? klammer[1] : rest).trim() || null;
+    const roh = klammer ? klammer[2].trim() : null;
+
+    // Die invariante Kultur von .NET: M/d/yyyy, Monat zuerst. Mit oder ohne
+    // fuehrende Null, mit oder ohne AM/PM — die REIHENFOLGE ist das, worauf es
+    // ankommt, und der Schraegstrich ist ihr Erkennungszeichen.
+    const t = roh && roh.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\b/);
+    let stand = null;
+    if (t) {
+        const [, monat, tag, jahr] = t;
+        const d = new Date(Date.UTC(Number(jahr), Number(monat) - 1, Number(tag)));
+        // Ein 13. Monat oder ein 32. Tag rutschen in JavaScript stillschweigend
+        // weiter — das waere genau die falsche Auskunft, die wie eine richtige
+        // aussieht.
+        if (d.getUTCMonth() === Number(monat) - 1 && d.getUTCDate() === Number(tag)) {
+            stand = d.toISOString().slice(0, 10);
+        }
+    }
+    return { prozess, stand, roh, fassung: m[1] };
+}
+
 /** `Jotunn 2.30.0` → { name: 'Jotunn', fassung: '2.30.0' }; Namen duerfen Leerzeichen haben. */
 function teilePlugin(text) {
     const s = String(text || '').trim();
@@ -66,11 +136,13 @@ const MELDUNGEN = [
  *
  * @param {string} text Inhalt von LogOutput.log
  * @returns {{vollstaendig: boolean, bepinex: string|null, pack: string|null, anzahl: number|null,
+ *            spiel: {prozess: string|null, stand: string|null, roh: string|null}|null,
  *            plugins: Array<{name: string, fassung: string|null, status: string|null,
  *                            grund: string|null, warnungen: string[]}>}}
  */
 function werteAus(text) {
-    const ergebnis = { vollstaendig: false, bepinex: null, pack: null, anzahl: null, plugins: [] };
+    const ergebnis = { vollstaendig: false, bepinex: null, pack: null, anzahl: null,
+                       spiel: null, plugins: [] };
     const bekannt = new Map();
     const plugin = (roh) => {
         const { name, fassung } = teilePlugin(roh);
@@ -93,7 +165,11 @@ function werteAus(text) {
 
         if (quelle === 'BepInEx') {
             let m;
-            if (!ergebnis.bepinex && (m = nachricht.match(/^BepInEx (\S+) - /))) { ergebnis.bepinex = m[1]; continue; }
+            if (!ergebnis.bepinex && (m = spielstandAus(nachricht))) {
+                ergebnis.bepinex = m.fassung;
+                ergebnis.spiel = { prozess: m.prozess, stand: m.stand, roh: m.roh };
+                continue;
+            }
             if (!ergebnis.pack && (m = nachricht.match(/version (\d+(?:\.\d+)+) from Thunderstore/))) { ergebnis.pack = m[1]; continue; }
             if ((m = nachricht.match(/^(\d+) plugins? to load$/))) { ergebnis.anzahl = Number(m[1]); continue; }
             if ((m = nachricht.match(/^Loading \[(.+)\]$/))) {
@@ -201,4 +277,4 @@ function ordneZu(ergebnis, liste, stand) {
     return { zeilen, fremd };
 }
 
-module.exports = { werteAus, ordneZu, teilePlugin };
+module.exports = { werteAus, ordneZu, teilePlugin, spielstandAus };

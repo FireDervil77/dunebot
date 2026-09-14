@@ -163,6 +163,17 @@ async function paket(namespace, name, fassung = null) {
         adresse:      daten.download_url,
         bytes:        daten.file_size || 0,
         abhaengig:    daten.dependencies || [],
+        // ── Das Datum DIESER Fassung, nicht das des Pakets ──────────────────
+        //
+        // Thunderstore fuehrt kein Feld fuer die Spielfassung (nachgesehen am
+        // 2026-09-13). Wann eine Mod-Fassung erschien, ist der einzige
+        // Anhaltspunkt dafuer, ob sie den heutigen Spielstand ueberhaupt
+        // gesehen hat — und genau den trennte er am 2026-09-13 sauber:
+        // TeleportEverything 2.9.1 war 216 Tage aelter als der Spielbuild und
+        // stuerzte ab, Jotunn 2.30.0 war zwei Tage alt und lief.
+        // `date_created` steht an der FASSUNG; das gleichnamige Feld eine
+        // Ebene hoeher ist der Tag, an dem das Paket zum ersten Mal erschien.
+        veroeffentlicht: daten.date_created || null,
     };
 }
 
@@ -292,6 +303,13 @@ async function aktualisierungen(zeilen) {
                 installiert: zeile.fassung,
                 neueste: p.fassung,
                 neuer: hoeher(p.fassung, zeile.fassung),
+                neuesteVom: p.veroeffentlicht,
+                // Steht die Zeile schon auf der neuesten Fassung, ist DIESE
+                // Abfrage zugleich die Auskunft ueber die installierte — ohne
+                // einen zweiten Abruf. Fuer Zeilen aus der Zeit vor der Spalte
+                // `veroeffentlicht` ist das der einzige Weg, den Erscheinungstag
+                // ueberhaupt zu erfahren, ohne sie neu zu installieren.
+                installiertVom: p.fassung === zeile.fassung ? p.veroeffentlicht : null,
             });
         } catch (fehler) {
             Logger.warn(`[Thunderstore] ${zeile.kennung} nicht abfragbar: ${fehler.message}`);

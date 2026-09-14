@@ -529,6 +529,10 @@ router.get('/:serverId/inhalte/ladestand', requirePermission('GAMESERVER.VIEW'),
             vollstaendig: ergebnis.vollstaendig,
             bepinex: ergebnis.bepinex,
             pack: ergebnis.pack,
+            // Der Stand der Spieldateien — die andere Haelfte von Vorschlag A.
+            // Er steht in derselben Zeile wie die BepInEx-Fassung, wird also
+            // ohne einen zweiten Griff zum Daemon mitgelesen.
+            spiel: ergebnis.spiel,
             laeuft: wirkung(geladen).laeuft,
             ...zuordnung,
         });

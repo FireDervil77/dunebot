@@ -103,9 +103,16 @@
       : '?';
     const fremd = (LADESTAND.fremd || []).map(p => p.name + (p.fassung ? ' ' + p.fassung : '')
       + (p.status && p.status !== 'geladen' ? ' (' + (LAUFTEXT[p.status] || p.status) + ')' : ''));
+    // Der Stand der Spieldateien steht in derselben Logzeile wie die
+    // BepInEx-Fassung. Der Titel sagt, was das Datum ist — „Spieldateien" allein
+    // liesse offen, ob es der Tag des Steam-Builds ist. Ist er es nicht.
+    const spiel = spielstand()
+      ? `<span title="Zeitstempel der Spieldatei auf diesem Server, aus der Kopfzeile des BepInEx-Logs. Nicht der Tag, an dem Steam den Build veröffentlicht hat — der Tag, an dem dieser Server ihn bekam.">`
+        + ` · Spieldateien vom ${escape(zeigeTag(LADESTAND.spiel.stand))}</span>`
+      : '';
     return `
       <div class="fb-muted" style="font-size:12px;margin:4px 0 8px">
-        Ladestand vom letzten Start (${escape(wann)})${LADESTAND.bepinex ? ' · BepInEx ' + escape(LADESTAND.bepinex) : ''}${LADESTAND.laeuft ? '' : ' · Server gestoppt'}
+        Ladestand vom letzten Start (${escape(wann)})${LADESTAND.bepinex ? ' · BepInEx ' + escape(LADESTAND.bepinex) : ''}${spiel}${LADESTAND.laeuft ? '' : ' · Server gestoppt'}
         ${LADESTAND.vollstaendig ? '' : ' · <span style="color:var(--fb-danger)">das Laden wurde nicht abgeschlossen</span>'}
         ${fremd.length ? `<br>Geladen, aber keinem Eintrag zugeordnet: ${escape(fremd.join(', '))}` : ''}
       </div>`;
@@ -114,9 +121,49 @@
   const escape = (s) => String(s == null ? '' : s)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
-  function marke(text, ton) {
+  // ── Das Alter einer Mod-Fassung gegen den Spielstand (Betreiber: Vorschlag A)
+  //
+  // Thunderstore nennt keine Spielfassung — nachgesehen am 2026-09-13, das Feld
+  // gibt es nicht. Was es gibt, sind zwei Daten: der Erscheinungstag der
+  // Fassung (`veroeffentlicht`, aus der Quelle mitgeschrieben) und der Stand
+  // der Spieldateien (Kopfzeile des BepInEx-Logs, siehe helpers/BepInExLog.js).
+  // Am 13.09. trennten sie die Faelle sauber: TeleportEverything 2.9.1 lag 216
+  // Tage vor den Spieldateien und stuerzte ab, Jotunn 2.30.0 zwei Tage und lief.
+  //
+  // **Hinweis, kein Urteil** (Betreiber, 2026-09-13). Deshalb steht hier eine
+  // Zahl und keine Farbe: Auch Jotunn war aelter als die Spieldateien und lief
+  // einwandfrei. Eine Schwelle, ab der es „zu alt" waere, haben wir nicht
+  // gemessen — und eine erfundene saehe aus wie eine gemessene.
+  const TAG_MS = 86400000;
+  const alsTag = (wert) => {
+    const t = String(wert == null ? '' : wert).slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(t) ? t : null;
+  };
+  const zeigeTag = (iso) => {
+    const t = alsTag(iso);
+    if (!t) return null;
+    const [j, m, d] = t.split('-');
+    return `${d}.${m}.${j}`;
+  };
+  const spielstand = () => (LADESTAND && LADESTAND.verfuegbar && LADESTAND.spiel
+    && alsTag(LADESTAND.spiel.stand)) || null;
+
+  function alterZeile(veroeffentlicht) {
+    const wann = zeigeTag(veroeffentlicht);
+    if (!wann) return '';
+    const stand = spielstand();
+    if (!stand) return `Fassung vom ${wann}`;
+    const tage = Math.round((Date.parse(stand) - Date.parse(alsTag(veroeffentlicht))) / TAG_MS);
+    if (tage === 0) return `Fassung vom ${wann} — vom selben Tag wie die Spieldateien`;
+    return tage > 0
+      ? `Fassung vom ${wann} — ${tage} Tage vor den Spieldateien`
+      : `Fassung vom ${wann} — ${-tage} Tage nach den Spieldateien`;
+  }
+
+  function marke(text, ton, titel) {
     const farbe = ton === 'warn' ? 'var(--fb-warning)' : 'var(--fb-text-muted)';
-    return `<span class="fb-pille" style="font-size:11px;border-color:${farbe};color:${farbe}">${escape(text)}</span>`;
+    return `<span class="fb-pille" style="font-size:11px;border-color:${farbe};color:${farbe}"`
+      + `${titel ? ` title="${escape(titel)}"` : ''}>${escape(text)}</span>`;
   }
 
   function zeile(e, nummer) {
@@ -126,7 +173,8 @@
     if (e.status === 'geplant')        marken.push(marke('wird noch geholt', 'warn'));
     if (e.client_side)                 marken.push(marke('Mitspieler brauchen ihn auch'));
     const neuere = NEUER[e.id];
-    if (neuere && neuere.neuer)        marken.push(marke('neuer: ' + neuere.neueste, 'warn'));
+    if (neuere && neuere.neuer)        marken.push(marke('neuer: ' + neuere.neueste, 'warn',
+      neuere.neuesteVom ? 'Erschienen am ' + zeigeTag(neuere.neuesteVom) : undefined));
     if (neuere && neuere.fehler)       marken.push(marke('Fassung nicht abfragbar'));
     // Was BepInEx beim letzten Start dazu gesagt hat.
     const lauf = LADESTAND && LADESTAND.zeilen ? LADESTAND.zeilen[e.id] : null;
@@ -156,6 +204,8 @@
               ? 'Ohne ihn lädt kein Mod. Wird vor allen anderen geladen.'
               : escape(e.ablage || '')}
           </div>
+          ${(() => { const t = alterZeile(e.veroeffentlicht || (neuere && neuere.installiertVom));
+                     return t ? `<div class="fb-muted" style="font-size:12px;margin-top:2px">${escape(t)}</div>` : ''; })()}
           ${marken.length ? `<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">${marken.join('')}</div>` : ''}
           ${e.fehler ? `<div class="fb-muted" style="font-size:12px;margin-top:4px;color:var(--fb-danger)">${escape(e.fehler)}</div>` : ''}
           ${lauf && lauf.grund && lauf.status !== 'geladen' ? `<div class="fb-muted" style="font-size:12px;margin-top:4px${['fehler', 'nicht_geladen', 'abgebrochen'].includes(lauf.status) ? ';color:var(--fb-danger)' : ''}">${escape(lauf.grund)}</div>` : ''}
@@ -527,10 +577,13 @@
       })
       .then(d => {
         const liste = d.pakete.map(p => `
-          <div style="display:flex;gap:8px;font-size:12px;padding:3px 0">
-            <span class="fb-mono" style="flex:1 1 auto">${escape(p.kennung)} ${escape(p.fassung)}</span>
-            ${p.art === 'loader' ? marke('Lader') : ''}
-            ${p.bleibt ? marke('bleibt ' + (p.schonFassung || '?')) : p.schonDa ? marke(p.schonFassung === p.fassung ? 'schon da' : 'ersetzt ' + escape(p.schonFassung || '?'), 'warn') : ''}
+          <div style="padding:3px 0">
+            <div style="display:flex;gap:8px;font-size:12px">
+              <span class="fb-mono" style="flex:1 1 auto">${escape(p.kennung)} ${escape(p.fassung)}</span>
+              ${p.art === 'loader' ? marke('Lader') : ''}
+              ${p.bleibt ? marke('bleibt ' + (p.schonFassung || '?')) : p.schonDa ? marke(p.schonFassung === p.fassung ? 'schon da' : 'ersetzt ' + escape(p.schonFassung || '?'), 'warn') : ''}
+            </div>
+            ${alterZeile(p.veroeffentlicht) ? `<div class="fb-muted" style="font-size:11px">${escape(alterZeile(p.veroeffentlicht))}</div>` : ''}
           </div>`).join('');
 
         raum.innerHTML = `
