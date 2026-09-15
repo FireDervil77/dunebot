@@ -648,6 +648,11 @@ class StreamingDashboardPlugin extends DashboardPlugin {
             eintrag('NAV.ANNOUNCE', `${basis}/ankuendigung`, 'fa-solid fa-bullhorn', 20, { abschnitt: VERFOLGUNG }),
             eintrag('NAV.ALERTS',   `${basis}/meldungen`,    'fa-solid fa-bell', 30, { abschnitt: VERFOLGUNG }),
             eintrag('NAV.ROLES',    `${basis}/rollen`,       'fa-solid fa-user-tag', 40, { abschnitt: VERFOLGUNG }),
+            // **Zusatz „Streamserver"** (Baustelle 118, 2026-09-15). Unter
+            // Verfolgung, weil er an den Zielen der Guild haengt wie die Rollen.
+            // Steht auch ohne Gameserver-Plugin da - die Seite sagt dann, warum
+            // es nichts zu steuern gibt, statt dass der Punkt still fehlt.
+            eintrag('NAV.STREAMSERVER', `${basis}/streamserver`, 'fa-solid fa-server', 45, { abschnitt: VERFOLGUNG }),
             //
             // **"Zustand" bleibt vorerst unter Verfolgung.** Der Entwurf laesst
             // ihn verschwinden — er WIRD die Uebersicht (P3). Bis die Seite

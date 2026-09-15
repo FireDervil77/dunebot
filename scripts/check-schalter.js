@@ -57,7 +57,8 @@ const GEWOLLTE_KAESTCHEN = [
     // deckte die ganze Datei. Mit der Zerlegung in Funktionskarten sind sie
     // in eigene Teile gezogen und brauchen je eine eigene Begruendung.
     ['ziel-kopf.ejs', 'Erwähnung bei der Probe — begleitet einen Knopfdruck und ist danach wieder leer; ein Schalter würde behaupten, es sei dauerhaft an'],
-    ['ziel-meldungen.ejs', 'melder_arten — Mehrfachauswahl aus Raid, Bits, Followern und Abonnenten']
+    ['ziel-meldungen.ejs', 'melder_arten — Mehrfachauswahl aus Raid, Bits, Followern und Abonnenten'],
+    ['streaming-streamserver.ejs', 'Streamer des Zusatzes Streamserver — Mehrfachauswahl, wer für den Stopp zählt; der An/Aus-Schalter daneben ist ein form-switch']
 ];
 
 /**

@@ -35,6 +35,8 @@ const { vorlageWaehlen, VORGABE_LIVE, VORGABE_RUECKSCHAU, CHAT_MAX } = require('
 const { inhaltsStand } = require('../kern/entscheidung');
 const { melden } = require('../../shared/signale');
 const kanalstau = require('./kanalstau');
+const serverstopp = require('../kern/serverstopp');
+const serverstoppEntscheidung = require('../kern/serverstoppEntscheidung');
 
 const TAKT_MS = 500;
 const JE_LAUF = 20;
@@ -118,7 +120,7 @@ const BOT_FRIST_MS = 30_000;
  * — und beim Streamende ist genau er der eilige (die Rolle soll weg, wenn die
  * Sendung endet).
  */
-const BRAUCHT_KANAL = new Set(['posten', 'bearbeiten', 'aufraeumen', 'probe', 'melden']);
+const BRAUCHT_KANAL = new Set(['posten', 'bearbeiten', 'aufraeumen', 'probe', 'melden', 'serverhinweis']);
 
 let laeuftGerade = false;
 let uhr = null;
@@ -524,6 +526,13 @@ async function ausfuehren(auftrag) {
         return await chatAnsageSenden(auftrag);
     }
 
+    // **Der Streamserver-Stopp ebenfalls VOR `umfeldLaden`** (Baustelle 118):
+    // Er hat kein Ziel, sondern gehoert einer Einstellung je Guild und Server -
+    // `umfeldLaden` wuerde ihn mit "Ziel existiert nicht mehr" wegwerfen.
+    if (auftrag.aktion === 'serverstopp') {
+        return await serverstopp.ausfuehren(auftrag);
+    }
+
     const umfeld = await umfeldLaden(auftrag);
     if (!umfeld) return { ok: false, fehler: 'Ziel existiert nicht mehr', endgueltig: true };
 
@@ -694,6 +703,22 @@ async function ausfuehren(auftrag) {
             ok: true, fehler: null, endgueltig: false,
             hinweis: `Meldung gesendet (${nutzlast.art}${anzahl > 1 ? `, ${anzahl} gesammelt` : ''})`
         };
+    }
+
+    // **Hinweis des Zusatzes „Streamserver"** (Baustelle 118): wird gestoppt,
+    // abgebrochen, gestoppt. Er laeuft ueber das Ziel, damit die Kanalgrenze in
+    // `auswaehlen` auch fuer ihn gilt.
+    if (auftrag.aktion === 'serverhinweis') {
+        const nutzlast = typeof auftrag.nutzlast === 'string'
+            ? JSON.parse(auftrag.nutzlast) : (auftrag.nutzlast || {});
+
+        const antwort = await anDenBot('streaming:post', {
+            guildId: ziel.guild_id, channelId: ziel.channel_id,
+            veroeffentlichen: false, content: serverstoppEntscheidung.hinweisText(nutzlast)
+        });
+
+        if (!antwort.ok) return { ok: false, fehler: antwort.fehler, endgueltig: istEndgueltig(antwort) };
+        return { ok: true, fehler: null, endgueltig: false, hinweis: `Streamserver-Hinweis gesendet (${nutzlast.art})` };
     }
 
     // Bearbeiten und Aufraeumen brauchen eine stehende Nachricht.

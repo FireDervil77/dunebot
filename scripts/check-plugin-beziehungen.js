@@ -174,7 +174,7 @@ function harteGriffe(plugins) {
  * Kommt eine neue dazu, soll dieser Probelauf sie NICHT stillschweigend
  * mitzählen, sondern hier ergänzt werden.
  */
-const STELLEN = ['LosquellenRegistry', 'MusikablageRegistry', 'VerbindungsRegistry', 'WebhookRegistry'];
+const STELLEN = ['LosquellenRegistry', 'MusikablageRegistry', 'ServersteuerungRegistry', 'VerbindungsRegistry', 'WebhookRegistry'];
 
 function weicheBeziehungen(plugins) {
     const karte = new Map(STELLEN.map(s => [s, { bietet: new Set(), nutzt: new Set() }]));

@@ -22,6 +22,7 @@ const WebhookRegistry = require("./lib/WebhookRegistry");
 const VerbindungsRegistry = require("./lib/VerbindungsRegistry");
 const LosquellenRegistry = require("./lib/LosquellenRegistry");
 const MusikablageRegistry = require("./lib/MusikablageRegistry");
+const ServersteuerungRegistry = require("./lib/ServersteuerungRegistry");
 const FormAntwort = require("./lib/FormAntwort");
 
 module.exports = {
@@ -43,6 +44,7 @@ module.exports = {
     WebhookRegistry,
     LosquellenRegistry,
     MusikablageRegistry,
+    ServersteuerungRegistry,
     VerbindungsRegistry,
     FormAntwort,
     // IPM (Inter-Process Messaging) - Event-Bus Architecture

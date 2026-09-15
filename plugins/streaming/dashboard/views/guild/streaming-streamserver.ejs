@@ -1,0 +1,218 @@
+<%
+/**
+ * Zusatz „Streamserver" (Baustelle 118, 2026-09-15).
+ *
+ * Bauplan: docs/streamer-plugin/17-Streamserver.md
+ *
+ * ## Ein Formular je Server
+ *
+ * Anders als bei den Rollen teilen sich die Karten keine Felder. Ein Formular
+ * je Server schickt nur, was zu ihm gehört — ein gemeinsames müsste für jeden
+ * Server alle Felder mitschicken, und ein fehlendes Kästchen wäre von „bewusst
+ * abgewählt" nicht zu unterscheiden.
+ *
+ * ## Speichern braucht zwei Rechte
+ *
+ * `STREAMING.SETTINGS.EDIT` und `GAMESERVER.STOP`. Der Zusatz stoppt einen
+ * Server — wer das einrichtet, muss es auch von Hand dürfen. Für den
+ * Guild-Besitzer ist das unsichtbar.
+ *
+ * Erwartet: anbieterDa, server, einstellungen (nach server_id), kandidaten
+ *           {mit, ohne}, entscheidungen, darfStoppen, grenzen, meldung, fehler
+ */
+const darfEinstellen = typeof hasPermission === 'function' && hasPermission('STREAMING.SETTINGS.EDIT');
+const darfSpeichern = darfEinstellen && darfStoppen;
+
+const marke = (an) => an
+  ? '<span class="zustandsmarke zustandsmarke--steht">an</span>'
+  : '<span class="zustandsmarke zustandsmarke--entwurf">aus</span>';
+
+const STATUS = {
+  online: 'läuft', offline: 'aus', starting: 'startet', stopping: 'stoppt',
+  installing: 'wird installiert', installed: 'installiert', updating: 'wird aktualisiert', error: 'Fehler'
+};
+
+const FEHLER = {
+  recht: 'Zum Speichern brauchst du zusätzlich das Recht, Gameserver zu stoppen.',
+  anbieter: 'Das Gameserver-Plugin ist nicht aktiv — ohne es gibt es nichts zu steuern.',
+  server: 'Diesen Server gibt es in dieser Guild nicht.',
+  modus: 'Der Modus ist ungültig.',
+  nachlauf: `Der Nachlauf muss zwischen ${grenzen.min} und ${grenzen.max} Minuten liegen.`,
+  streamer: 'In der Auswahl steht ein Streamer, der hier nicht auswählbar ist. Lade die Seite neu.',
+  leer: 'Ohne ausgewählten Streamer kann der Zusatz nicht an sein. Wähl mindestens einen aus oder schalte ihn aus.',
+  technisch: 'Das hat technisch nicht geklappt. Der Grund steht im Protokoll.'
+};
+%>
+
+<%- include('partials/streaming-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-server',
+  titel: 'Streamserver',
+  beschreibung: 'Einen Gameserver stoppen, wenn der letzte ausgewählte Streamer offline ist.'
+}) %>
+
+<% if (meldung === 'gespeichert') { %>
+  <div class="alert alert-success">Gespeichert. Das gilt ab dem nächsten Streamende.</div>
+<% } %>
+<% if (fehler) { %>
+  <div class="alert alert-danger"><%= FEHLER[fehler] || FEHLER.technisch %></div>
+<% } %>
+
+<% if (!anbieterDa) { %>
+  <div class="alert alert-warning">
+    <h4 class="alert-title">Kein Gameserver-Plugin</h4>
+    <p class="mb-0">Das Gameserver-Plugin ist auf dieser Anlage nicht aktiv. Ohne es gibt es keine Server, die der Zusatz stoppen könnte.</p>
+  </div>
+<% } else if (!server.length) { %>
+  <div class="alert alert-info mb-3">In dieser Guild gibt es noch keinen Gameserver.</div>
+<% } %>
+
+<% if (anbieterDa && server.length && darfEinstellen && !darfStoppen) { %>
+  <div class="alert alert-info">Du kannst hier nur ansehen: Zum Speichern brauchst du zusätzlich das Recht, Gameserver zu stoppen.</div>
+<% } %>
+
+<div class="alert alert-secondary">
+  <strong>So entscheidet der Zusatz:</strong> Endet der Stream des letzten ausgewählten Streamers,
+  wartet er den Nachlauf ab und prüft dann neu. Gestoppt wird nur, wenn niemand aus der Auswahl
+  live ist, der Server läuft und <strong>genau 0 Spieler</strong> drauf sind. Ist die Spielerzahl
+  unbekannt, bleibt der Server an. Im Modus „nur melden" wird nichts gestoppt und nichts in Discord
+  geschrieben — das Ergebnis steht unten.
+</div>
+
+<% (server || []).forEach(s => {
+     const e = einstellungen[s.id] || { aktiv: 0, modus: 'melden', nachlauf_min: grenzen.vorgabe, streamer_ids: [] };
+     const auswahl = new Set((e.streamer_ids || []).map(Number));
+     const wirksam = Boolean(e.aktiv) && auswahl.size > 0;
+%>
+  <form method="POST" action="/guild/<%= guildId %>/plugins/streaming/streamserver/<%= s.id %>" id="server-<%= s.id %>">
+    <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+
+    <div class="card mb-3">
+      <div class="card-header">
+        <div class="kartenkopf">
+          <span class="kartensymbol"><i class="fa-solid fa-server"></i></span>
+          <div class="kartenkopf__text">
+            <h3 class="kartenkopf__titel"><%= s.name %> <%- marke(wirksam) %></h3>
+            <div class="kartenkopf__satz">
+              <%= STATUS[s.status] || s.status %> ·
+              <%= s.spieler === null ? 'Spielerzahl unbekannt' : `${s.spieler} Spieler` %>
+              <% if (wirksam) { %> · Modus: <%= e.modus === 'stoppen' ? 'stoppen' : 'nur melden' %><% } %>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <div class="zeilen">
+          <div class="zeile">
+            <div class="zeile__bez">
+              Zusatz
+              <small>aus heißt: nichts passiert</small>
+            </div>
+            <div>
+              <label class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" name="aktiv" value="1"
+                       <%= e.aktiv ? 'checked' : '' %> <%= darfSpeichern ? '' : 'disabled' %>>
+                <span class="form-check-label">Server stoppen, wenn der letzte ausgewählte Streamer offline ist</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="zeile">
+            <div class="zeile__bez">
+              Modus
+              <small>erst testen, dann scharf schalten</small>
+            </div>
+            <div>
+              <select class="form-select" name="modus" <%= darfSpeichern ? '' : 'disabled' %>>
+                <option value="melden" <%= e.modus !== 'stoppen' ? 'selected' : '' %>>Nur melden — nichts wird gestoppt, keine Nachricht in Discord</option>
+                <option value="stoppen" <%= e.modus === 'stoppen' ? 'selected' : '' %>>Stoppen — mit Hinweis im Ankündigungskanal</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="zeile">
+            <div class="zeile__bez">
+              Nachlauf
+              <small>Minuten nach dem Streamende</small>
+            </div>
+            <div>
+              <input type="number" class="form-control" name="nachlauf_min"
+                     min="<%= grenzen.min %>" max="<%= grenzen.max %>" step="1"
+                     value="<%= e.nachlauf_min %>" <%= darfSpeichern ? '' : 'disabled' %>>
+              <div class="zeile__hilfe">
+                Im Modus „stoppen" steht beim Streamende ein Hinweis im Ankündigungskanal. Geht vorher jemand
+                wieder live oder bleibt jemand auf dem Server, folgt „abgebrochen".
+              </div>
+            </div>
+          </div>
+
+          <div class="zeile">
+            <div class="zeile__bez">
+              Streamer
+              <small>wer zählt</small>
+            </div>
+            <div>
+              <% if (!kandidaten.mit.length) { %>
+                <div class="text-secondary">
+                  Noch kein Streamer mit eingetragenem Mitglied. Das Mitglied trägst du auf der Seite des Kanals ein.
+                </div>
+              <% } %>
+              <% kandidaten.mit.forEach(k => { %>
+                <label class="form-check">
+                  <input class="form-check-input" type="checkbox" name="streamer" value="<%= k.streamer_id %>"
+                         <%= auswahl.has(k.streamer_id) ? 'checked' : '' %> <%= darfSpeichern ? '' : 'disabled' %>>
+                  <span class="form-check-label"><%= k.anzeigename || k.login %></span>
+                </label>
+              <% }); %>
+              <% if (kandidaten.ohne.length) { %>
+                <div class="zeile__hilfe">
+                  Nicht auswählbar, weil beim Kanal kein Mitglied eingetragen ist:
+                  <%= kandidaten.ohne.map(k => k.anzeigename || k.login).join(', ') %>.
+                </div>
+              <% } %>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <% if (darfSpeichern) { %>
+        <div class="card-footer text-end">
+          <button type="submit" class="btn btn-primary">Speichern</button>
+        </div>
+      <% } %>
+    </div>
+  </form>
+<% }); %>
+
+<div class="card">
+  <div class="card-header">
+    <div class="kartenkopf">
+      <span class="kartensymbol"><i class="fa-solid fa-list-check"></i></span>
+      <div class="kartenkopf__text">
+        <h3 class="kartenkopf__titel">Zuletzt entschieden</h3>
+        <div class="kartenkopf__satz">Jedes Streamende mit aktivem Zusatz — auch was im Modus „nur melden" passiert wäre.</div>
+      </div>
+    </div>
+  </div>
+  <% if (!entscheidungen.length) { %>
+    <div class="card-body text-secondary">Noch nichts. Hier erscheint das nächste Streamende eines ausgewählten Streamers.</div>
+  <% } else { %>
+    <div class="table-responsive">
+      <table class="table table-vcenter card-table">
+        <thead>
+          <tr><th>Wann</th><th>Server</th><th>Ergebnis</th></tr>
+        </thead>
+        <tbody>
+          <% entscheidungen.forEach(z => { %>
+            <tr>
+              <td class="text-nowrap"><%= z.wann %></td>
+              <td><%= z.server %></td>
+              <td><%= z.ergebnis %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>

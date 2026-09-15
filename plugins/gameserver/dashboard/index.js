@@ -259,6 +259,18 @@ class GameserverPlugin extends DashboardPlugin {
         // fehlende Alt-Addons aus shared/addons/*.json an — Eggs mit
         // parkervcp-/pterodactyl-Images. Die Spiele kommen aus Paketen.
         
+        // **Steuerung fuer andere Plugins anbieten** (Baustelle 118). Der Zusatz
+        // „Streamserver" im Streaming-Plugin fragt hier nach, ohne dieses Plugin
+        // zu `require`n. Scheitert das Eintragen, laeuft das Plugin trotzdem -
+        // der Zusatz meldet dann, dass es keinen Anbieter gibt.
+        try {
+            const { ServersteuerungRegistry } = require('dunebot-sdk');
+            ServersteuerungRegistry.register('gameserver', require('./helpers/Serversteuerung').anbieter);
+            Logger.debug('[Gameserver] Serversteuerung fuer andere Plugins eingetragen');
+        } catch (err) {
+            Logger.error('[Gameserver] Serversteuerung nicht eingetragen:', err);
+        }
+
         Logger.success('[Gameserver] Dashboard-Plugin aktiviert');
         return true;
     }
@@ -269,6 +281,11 @@ class GameserverPlugin extends DashboardPlugin {
     async onDisable() {
         const Logger = ServiceManager.get('Logger');
         Logger.info('Deaktiviere [Gameserver] Dashboard-Plugin...');
+        try {
+            require('dunebot-sdk').ServersteuerungRegistry.unregister('gameserver');
+        } catch (err) {
+            Logger.warn('[Gameserver] Serversteuerung nicht ausgetragen:', err);
+        }
         // CronWorker stoppen
         const cronWorker = ServiceManager.get('gameserverCronWorker');
         if (cronWorker) cronWorker.stop();

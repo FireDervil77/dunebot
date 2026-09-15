@@ -22,7 +22,8 @@
     "GUARD": "Chat-Schutz",
     "JOIN_IN": "Mitmachen",
     "STATS": "Statistik",
-    "MUSIC": "Musik"
+    "MUSIC": "Musik",
+    "STREAMSERVER": "Streamserver"
   },
   "STREAMERS": {
     "TITLE": "Kanäle",

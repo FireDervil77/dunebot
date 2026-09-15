@@ -1001,6 +1001,122 @@ router.post('/rollen', requirePermission('STREAMING.SETTINGS.EDIT'), async (req,
     }
 });
 
+// =====================================================
+// Zusatz „Streamserver" (Baustelle 118)
+// =====================================================
+//
+// Bauplan: docs/streamer-plugin/17-Streamserver.md. Die Server kommen vom
+// Gameserver-Plugin ueber `ServersteuerungRegistry` - kein `require` dorthin.
+
+/**
+ * Hat der angemeldete Benutzer dieses Recht in dieser Guild? Fuer den
+ * Guild-Besitzer immer ja (Wildcard im PermissionManager).
+ *
+ * **Nicht pruefbar heisst nein - und wird gemeldet.** Ein stilles `false`
+ * saehe aus wie ein fehlendes Recht.
+ *
+ * @param {Object} res Antwort mit `locals.user`
+ * @param {string} guildId Guild
+ * @param {string} recht Rechteschluessel
+ * @returns {Promise<boolean>}
+ */
+async function hatRecht(res, guildId, recht) {
+    const userId = res.locals.user?.id;
+    if (!userId || !ServiceManager.has('permissionManager')) return false;
+    try {
+        return Boolean(await ServiceManager.get('permissionManager').hasPermission(userId, guildId, recht));
+    } catch (error) {
+        ServiceManager.get('Logger').warn(`[Streaming] Recht ${recht} fuer ${userId} nicht pruefbar: ${error.message}`);
+        return false;
+    }
+}
+
+router.get('/streamserver', requirePermission('STREAMING.VIEW'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const tr = makeTranslator(req, res);
+    const serverstopp = require('../kern/serverstopp');
+    const entscheidung = require('../kern/serverstoppEntscheidung');
+
+    try {
+        const anbieter = serverstopp.anbieter();
+        const [server, einstellungen, kandidaten, letzte, zone, darfStoppen] = await Promise.all([
+            anbieter ? anbieter.server(guildId) : Promise.resolve([]),
+            serverstopp.einstellungen(guildId),
+            serverstopp.kandidaten(guildId),
+            serverstopp.letzteEntscheidungen(guildId),
+            ServiceManager.get('dbService').getConfig('streaming', 'ZEITZONE', 'shared', guildId),
+            hatRecht(res, guildId, 'GAMESERVER.STOP')
+        ]);
+
+        const zeitzone = typeof zone === 'string' && zone.trim() ? zone.trim() : 'Europe/Berlin';
+        const wann = (d) => {
+            if (!d) return '—';
+            try {
+                return new Date(d).toLocaleString('de-DE', { timeZone: zeitzone, dateStyle: 'short', timeStyle: 'short' });
+            } catch {
+                return new Date(d).toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
+            }
+        };
+
+        const entscheidungen = (letzte || []).map(z => ({
+            wann: wann(z.erledigt_am || z.faellig_ab),
+            server: z.nutzlast.server_name || `Server ${z.nutzlast.server_id}`,
+            ergebnis: z.zustand === 'offen'
+                ? `Wartet bis ${wann(z.faellig_ab)}` + (z.versuche ? ` — ${z.versuche} Fehlversuch(e): ${z.fehlertext || 'ohne Angabe'}` : '')
+                : z.zustand === 'aufgegeben'
+                    ? `Gescheitert: ${z.fehlertext || 'ohne Angabe'}`
+                    : (z.fehlertext || 'erledigt')
+        }));
+
+        await renderView(res, 'guild/streaming-streamserver', {
+            tr, guildId,
+            anbieterDa: Boolean(anbieter),
+            server: server || [],
+            einstellungen, kandidaten, entscheidungen, darfStoppen,
+            grenzen: { min: entscheidung.NACHLAUF_MIN, max: entscheidung.NACHLAUF_MAX, vorgabe: entscheidung.NACHLAUF_VORGABE },
+            meldung: req.query.ok || null,
+            fehler: req.query.fehler || null
+        });
+    } catch (error) {
+        return renderFehler(res, error, 'Der Streamserver-Zusatz konnte nicht geladen werden');
+    }
+});
+
+router.post('/streamserver/:serverId', requirePermission('STREAMING.SETTINGS.EDIT'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const zurueck = `/guild/${guildId}/plugins/streaming/streamserver`;
+    const serverstopp = require('../kern/serverstopp');
+    const entscheidung = require('../kern/serverstoppEntscheidung');
+
+    const serverId = Number(req.params.serverId);
+    if (!Number.isInteger(serverId) || serverId <= 0) return res.redirect(`${zurueck}?fehler=server`);
+
+    try {
+        // Der Zusatz stoppt einen Server - wer ihn einrichtet, muss das auch
+        // von Hand duerfen.
+        if (!(await hatRecht(res, guildId, 'GAMESERVER.STOP'))) return res.redirect(`${zurueck}?fehler=recht`);
+
+        const anbieter = serverstopp.anbieter();
+        if (!anbieter) return res.redirect(`${zurueck}?fehler=anbieter`);
+        if (!(await anbieter.zustand(guildId, serverId))) return res.redirect(`${zurueck}?fehler=server`);
+
+        const { mit } = await serverstopp.kandidaten(guildId);
+        const pruefung = entscheidung.eingabePruefen(req.body, mit.map(k => k.streamer_id));
+        if (!pruefung.ok) return res.redirect(`${zurueck}?fehler=${pruefung.fehler}#server-${serverId}`);
+
+        await serverstopp.speichern(guildId, serverId, pruefung.werte, res.locals.user?.id || null);
+
+        const w = pruefung.werte;
+        ServiceManager.get('Logger').info(`[Streaming/Streamserver] Server ${serverId} (Guild ${guildId}) gespeichert: ` +
+            `aktiv=${w.aktiv}, modus=${w.modus}, nachlauf=${w.nachlaufMin} min, streamer=${w.streamerIds.join(',') || '-'}`);
+
+        return res.redirect(`${zurueck}?ok=gespeichert#server-${serverId}`);
+    } catch (error) {
+        ServiceManager.get('Logger').error('[Streaming] Streamserver speichern', error);
+        return res.redirect(`${zurueck}?fehler=technisch`);
+    }
+});
+
 Object.keys(SEITEN_BEDARF)
     // `kanal` hat eine eigene Adresse mit Kennung — sie steht weiter unten
     // bei den anderen `/streamer/...`-Routen.

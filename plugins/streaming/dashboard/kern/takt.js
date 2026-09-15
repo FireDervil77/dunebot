@@ -33,6 +33,7 @@ const entscheidung = require('./entscheidung');
 const { melden } = require('../../shared/signale');
 const abos = require('./abos');
 const melder = require('./melder');
+const serverstopp = require('./serverstopp');
 
 const TAKT_MS = 5_000;
 const ANREICHERN_MS = 30_000;
@@ -331,6 +332,16 @@ async function gingLive(streamer, zustand, ereignis) {
     // Deshalb steht das VOR den beiden Abbruechen darunter.
     const rollen = await rollenAuffaechern(streamer.id, 'geben');
 
+    // **Zusatz „Streamserver"** (Baustelle 118): Wartet ein Stopp auf diesen
+    // Streamer, wird er abgebrochen - auch wenn unten keine Ankuendigung folgt,
+    // denn gesendet wird trotzdem. Eigenes `catch` wie bei der Chat-Ansage:
+    // Der Zusatz darf das Ereignis nicht mitreissen.
+    try {
+        await serverstopp.beiStreambeginn(streamer.id);
+    } catch (err) {
+        log().error(`[Streaming] Streamserver-Abbruch fuer ${streamer.login} fehlgeschlagen:`, err);
+    }
+
     if (wahl.handlung === 'nichts') return `keine Meldung: ${wahl.grund}` + (rollen ? `, ${rollen} Rolle(n) vorgemerkt` : '');
     if (wahl.handlung === 'aktualisieren') return `keine zweite Ankuendigung: ${wahl.grund}`;
 
@@ -445,6 +456,16 @@ async function beendet(streamer, zustand, ereignis) {
     // auch dann genommen, wenn gar nichts angekuendigt wurde: Die Rolle haengt
     // am Livezustand, nicht an der Nachricht.
     const rollen = await rollenAuffaechern(streamer.id, 'nehmen', karenzMs);
+
+    // **Zusatz „Streamserver"** (Baustelle 118) - hier UND in `nachStreamende`.
+    // Dieser Weg (die Meldung `stream.offline`) ruft `nachStreamende` nicht
+    // auf; die Selbstheilung ruft nur jenes. Doppelte Auftraege verhindert
+    // `vormerken` selbst.
+    try {
+        await serverstopp.vormerken(streamer.id);
+    } catch (err) {
+        log().error(`[Streaming] Streamserver-Stopp fuer ${streamer.login} nicht vorgemerkt:`, err);
+    }
 
     if (wahl.handlung === 'nichts') {
         return wahl.grund + (rollen ? `, ${rollen} Rolle(n) zum Entziehen vorgemerkt` : '');
@@ -618,7 +639,15 @@ async function nachStreamende(streamerId) {
     const karenzMs = einstellungen().karenzMinuten * 60_000;
     const auftraege = await auffaechern(streamerId, 'aufraeumen', karenzMs);
     const rollen = await rollenAuffaechern(streamerId, 'nehmen', karenzMs);
-    return auftraege + rollen;
+
+    // Zusatz „Streamserver" (Baustelle 118) - siehe `beendet()`.
+    let stopps = 0;
+    try {
+        stopps = await serverstopp.vormerken(streamerId);
+    } catch (err) {
+        log().error(`[Streaming] Streamserver-Stopp fuer Streamer ${streamerId} nicht vorgemerkt:`, err);
+    }
+    return auftraege + rollen + stopps;
 }
 
 // =====================================================
