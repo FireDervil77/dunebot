@@ -2186,60 +2186,10 @@ router.get('/:serverId/edit', requirePermission('GAMESERVER.EDIT'), async (req, 
 // Hier stand bis zum 2026-09-10 ein zweiter Start: `PUT /:serverId/start`. Er
 // baute den Auftrag aus frozen_game_data und launch_params — ohne Paket — und
 // hatte keinen Aufrufer mehr (Liste und Serverseite rufen `POST /:serverId/start`).
-
-/**
- * PUT /guild/:guildId/plugins/gameserver/servers/:serverId/stop
- * Server stoppen
- */
-router.put('/:serverId/stop', requirePermission('GAMESERVER.STOP'), async (req, res) => {
-    const Logger = ServiceManager.get('Logger');
-    const dbService = ServiceManager.get('dbService');
-    
-    try {
-        const { guildId, serverId } = req.params;
-
-        Logger.info(`[Gameserver] Server-Stop angefordert (ID: ${serverId})`);
-
-        // Server-Status prüfen
-        const [server] = await dbService.query(
-            'SELECT id, name, status FROM gameservers WHERE id = ? AND guild_id = ?',
-            [serverId, guildId]
-        );
-
-        if (!server) {
-            return res.status(404).json({
-                success: false,
-                message: 'Server nicht gefunden'
-            });
-        }
-
-        if (server.status === 'offline') {
-            return res.status(400).json({
-                success: false,
-                message: 'Server ist bereits offline'
-            });
-        }
-
-        // Status auf 'stopping' setzen
-        await dbService.query(
-            'UPDATE gameservers SET status = ? WHERE id = ?',
-            ['stopping', serverId]
-        );
-
-        // TODO: IPC an Bot senden → Server stoppen
-
-        res.json({
-            success: true,
-            message: `Server "${server.name}" wird gestoppt...`
-        });
-    } catch (error) {
-        Logger.error('[Gameserver] Fehler beim Stoppen des Servers:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Serverfehler beim Stoppen des Gameservers'
-        });
-    }
-});
+//
+// Ebenso bis zum 2026-09-15 `PUT /:serverId/stop`: Er schrieb nur `stopping`, an
+// der Stelle des Stopps stand ein TODO — und er hatte keinen Aufrufer. Gestoppt
+// wird ueber `POST /:serverId/stop` → `ServerStopp.stoppe` (Baustelle 119).
 
 /**
  * DELETE /guild/:guildId/plugins/gameserver/servers/:serverId
