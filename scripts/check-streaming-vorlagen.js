@@ -132,6 +132,18 @@ pruefe('genau ein Knopf, auch mit On-Air-Kanal', knoepfe.length, 1);
 pruefe('kein Knopf zeigt auf einen Discord-Kanal',
     knoepfe.some(k => String(k.url).includes('discord.com/channels')), false);
 
+// Baustelle 124: Twitch liefert das Vorschaubild immer unter derselben Adresse,
+// Discord holte es dann nicht neu. Jede Ankuendigung braucht eine eigene.
+const BILD = 'https://static-cdn.jtvnw.net/previews-ttv/live_user_x-1280x720.jpg';
+const T0 = Date.parse('2026-09-15T05:40:43Z');
+const bildVon = (ziel, jetzt) => nachricht.live({ streamer, zustand: { ...zustand, vorschaubild: BILD }, ziel, jetzt }).embeds[0].image;
+pruefe('Vorschaubild bekommt eine Zeitmarke', bildVon({}, T0), { url: `${BILD}?t=${Math.floor(T0 / 1000)}` });
+pruefe('sieben Sekunden spaeter eine andere Adresse (nitrinax, 15.09.)',
+    bildVon({}, T0).url === bildVon({}, T0 + 7000).url, false);
+pruefe('eigenes Bild bleibt ohne Marke', bildVon({ eigenes_bild: 'https://x.example/bild.png' }, T0), { url: 'https://x.example/bild.png' });
+pruefe('Adresse mit ? bekommt &', nachricht.mitZeitmarke('https://x.example/a.jpg?w=1', 1000), 'https://x.example/a.jpg?w=1&t=1');
+pruefe('ohne Vorschaubild kein Bild', nachricht.live({ streamer, zustand: { ...zustand, vorschaubild: null }, ziel: {} }).embeds[0].image, undefined);
+
 // Die Vorgaben selbst muessen die eigenen Regeln bestehen
 pruefe('Vorgabe live ist gueltig',       pruefeVorlage(VORGABE_LIVE),       null);
 pruefe('Vorgabe rueckschau ist gueltig', pruefeVorlage(VORGABE_RUECKSCHAU), null);

@@ -81,6 +81,28 @@ function textFuellen(vorlage, werte) {
 }
 
 /**
+ * Das Vorschaubild mit Zeitmarke (Baustelle 124).
+ *
+ * Twitch liefert das Bild eines Kanals immer unter derselben Adresse
+ * (`live_user_<login>-1280x720.jpg`). Dieselbe Adresse gibt Discord keinen
+ * Grund, das Bild neu zu holen - die Ankuendigung zeigte deshalb das Bild des
+ * vorigen Streams. Eine Marke je Senden oder Bearbeiten macht jede Adresse neu.
+ *
+ * Gesekundet, nicht geminutet: Die erste Bearbeitung kam bei nitrinax sieben
+ * Sekunden nach dem Posten, also in derselben Minute. Mehr Bearbeitungen
+ * entstehen dadurch nicht - ob bearbeitet wird, entscheidet `inhaltsStand` am
+ * rohen Zustand.
+ *
+ * @param {string} adresse Bildadresse
+ * @param {number} [jetzt] Zeitpunkt in ms
+ * @returns {string} Adresse mit Marke
+ */
+function mitZeitmarke(adresse, jetzt = Date.now()) {
+    if (!adresse) return adresse;
+    return `${adresse}${String(adresse).includes('?') ? '&' : '?'}t=${Math.floor(jetzt / 1000)}`;
+}
+
+/**
  * Die Ankuendigung, waehrend gesendet wird.
  *
  * @param {Object} daten Alles, was gebraucht wird
@@ -89,9 +111,10 @@ function textFuellen(vorlage, werte) {
  * @param {Object} daten.ziel { rolle_id, vorlage, onair_channel, eigenes_bild }
  *   `vorlage` ist bereits aufgeloest - der Aufrufer entscheidet, ob die eigene
  *   Vorlage des Ziels oder der Standard der Guild gilt.
+ * @param {number} [daten.jetzt] Zeitpunkt in ms, fuer die Zeitmarke am Vorschaubild
  * @returns {{content: string, embeds: Array, components: Array}} Discord-Nutzlast
  */
-function live({ streamer, zustand = {}, ziel = {} }) {
+function live({ streamer, zustand = {}, ziel = {}, jetzt = Date.now() }) {
     const url = kanalAdresse(streamer.plattform, streamer.login);
     const name = streamer.anzeigename || streamer.login;
     const erwaehnung = ziel.rolle_id ? `<@&${ziel.rolle_id}>` : '';
@@ -120,9 +143,10 @@ function live({ streamer, zustand = {}, ziel = {} }) {
         title: zustand.titel || name,
         url,
         fields: felder,
-        image: (ziel.eigenes_bild || zustand.vorschaubild)
-            ? { url: ziel.eigenes_bild || zustand.vorschaubild }
-            : undefined,
+        // Ein eigenes Bild ist fest und bekommt keine Marke.
+        image: ziel.eigenes_bild
+            ? { url: ziel.eigenes_bild }
+            : zustand.vorschaubild ? { url: mitZeitmarke(zustand.vorschaubild, jetzt) } : undefined,
         footer: { text: `${streamer.plattform === 'twitch' ? 'Twitch' : streamer.plattform}` },
         timestamp: zustand.begonnen_am ? new Date(zustand.begonnen_am).toISOString() : undefined
     };
@@ -295,4 +319,4 @@ function melder({ streamer, nutzlast = {} }) {
     return { content: `${zeile()} — <${url}>`, embeds: [], components: [] };
 }
 
-module.exports = { FARBEN, FARBE_VORBEI, VORGABE_VORLAGE, VORGABE_RUECKSCHAU, kanalAdresse, dauerText, textFuellen, live, rueckschau, melder, namenListe };
+module.exports = { FARBEN, FARBE_VORBEI, VORGABE_VORLAGE, VORGABE_RUECKSCHAU, kanalAdresse, dauerText, textFuellen, mitZeitmarke, live, rueckschau, melder, namenListe };
