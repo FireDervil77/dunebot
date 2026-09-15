@@ -155,7 +155,9 @@ async function alleStreamer() {
 async function zustandDerGuild(guildId) {
     const [ueberblick] = await db().query(`
         SELECT  COUNT(DISTINCT t.streamer_id)                      AS ueberwacht,
-                SUM(CASE WHEN z.ist_live = 1 THEN 1 ELSE 0 END)    AS live,
+                -- DISTINCT, weil der Abo-Join jeden Kanal je Abo einmal
+                -- liefert: ohne zaehlte ein Live-Kanal mit drei Abos dreifach
+                COUNT(DISTINCT CASE WHEN z.ist_live = 1 THEN t.streamer_id END) AS live,
                 MAX(a.letzte_meldung_am)                           AS letzte_meldung_am
         FROM streaming_targets t
         LEFT JOIN streaming_state z ON z.streamer_id = t.streamer_id
