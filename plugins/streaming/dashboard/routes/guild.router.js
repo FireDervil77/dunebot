@@ -438,9 +438,19 @@ async function zielSeite(seite, req, res) {
             for (const z of ziele) {
                 try {
                     const streamer = (await ServiceManager.get('dbService').query(
-                        'SELECT id, plattform, kanal_id, login FROM streaming_streamers WHERE id = ?',
+                        'SELECT id, plattform, kanal_id, login, heim_guild_id FROM streaming_streamers WHERE id = ?',
                         [z.streamer_id]))[0];
                     if (!streamer) continue;
+
+                    // **Die Zusage zeigt nur die Heim-Guild des Kanals** (Baustelle
+                    // 125). Anderswo stuende hier, wer den Kanal verknuepft hat und
+                    // was er erlaubt. Ein Zustand fuer "andere Heim-Guild" und "keine
+                    // Heim-Guild" zugleich - zwei Texte verrieten, ob er verknuepft ist.
+                    if (String(streamer.heim_guild_id || '') !== String(guildId)) {
+                        z.aboZusage = 'nicht-heim';
+                        z.melderScopes = 'nicht-heim';
+                        continue;
+                    }
 
                     const inhaber = await abonnenten.kanalInhaber(streamer);
                     if (!inhaber) { z.aboZusage = false; z.melderScopes = []; continue; }

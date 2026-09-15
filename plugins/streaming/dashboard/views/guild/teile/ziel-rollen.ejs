@@ -34,6 +34,12 @@ const mDa = (mitglieder || []).some(m => String(m.id) === String(z.mitglied_id))
         <strong>noch nicht erlaubt</strong>. Bis dahin wird die Rolle nicht vergeben —
         er erteilt es unter „Verbundene Konten“ in seinem Profil.
       </div>
+    <% } else if (z.aboZusage === 'nicht-heim') { %>
+      <div class="form-hint text-warning">
+        Abonnenten-Rollen vergibt nur die <strong>Heim-Guild</strong> des Kanals, und das ist nicht
+        diese Guild. Hier wird die Rolle nicht vergeben. Die Heim-Guild wählt der Kanalinhaber
+        selbst unter „Mein Kanal“ in seinem Profil.
+      </div>
     <% } else if (z.aboZusage === 'unbekannt') { %>
       <div class="form-hint text-danger">
         Der Stand der Zusage <strong>konnte nicht geprüft werden</strong>. Das heißt nicht,

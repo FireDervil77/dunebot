@@ -41,7 +41,8 @@ const gewaehlt = String(z.melder_arten || '').split(',').map(x => x.trim()).filt
            const b = melderBeschreibung(art);
            const scope = b && b.scope;
            const fehlt = scope && Array.isArray(z.melderScopes) && !z.melderScopes.includes(scope);
-           const unbekannt = z.melderScopes === null; %>
+           const unbekannt = z.melderScopes === null;
+           const nichtHeim = z.melderScopes === 'nicht-heim'; %>
         <div class="col-md-6">
           <label class="form-check">
             <input class="form-check-input" type="checkbox" name="melder_arten"
@@ -50,7 +51,9 @@ const gewaehlt = String(z.melder_arten || '').split(',').map(x => x.trim()).filt
             <span class="form-check-label"><%= a.label %></span>
             <span class="form-check-description">
               <%= a.hinweis %>
-              <% if (unbekannt && scope) { %>
+              <% if (nichtHeim && scope) { %>
+                <span class="text-secondary">Die Zusage des Kanalinhabers zeigt nur seine Heim-Guild.</span>
+              <% } else if (unbekannt && scope) { %>
                 <span class="text-danger">Zusage nicht prüfbar.</span>
               <% } else if (fehlt) { %>
                 <span class="text-warning">Wirkt noch nicht — dem Kanalinhaber fehlt die Zusage.</span>

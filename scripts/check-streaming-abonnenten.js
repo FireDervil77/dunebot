@@ -45,7 +45,7 @@ function pruefe(gut, text, zusatz = '') {
 }
 
 // Attrappen: alles im Speicher, mit Mitschrift.
-const daten = { auftraege: [], ziele: [], verknuepfungen: [], abonnenten: [], vergaben: [], zustand: [] };
+const daten = { auftraege: [], ziele: [], verknuepfungen: [], abonnenten: [], vergaben: [], zustand: [], heim: {} };
 
 ServiceManager.register('Logger', { info: () => {}, debug: () => {}, warn: () => {}, error: () => {}, success: () => {} });
 ServiceManager.register('dbService', {
@@ -55,8 +55,12 @@ ServiceManager.register('dbService', {
             const t = daten.verknuepfungen.find(v => v.plattform === w[0] && String(v.konto_id) === String(w[1]));
             return t ? [{ user_id: t.user_id }] : [];
         }
-        if (s.startsWith('SELECT id, guild_id, abo_rolle_id FROM streaming_targets')) {
+        if (s.startsWith('SELECT id, streamer_id, guild_id, abo_rolle_id FROM streaming_targets')) {
             return daten.ziele.filter(z => z.streamer_id === w[0] && z.aktiv && z.abo_rolle_id);
+        }
+        // Baustelle 125: Abo-Rollen nur in der Heim-Guild des Kanals.
+        if (s.startsWith('SELECT id, heim_guild_id FROM streaming_streamers WHERE id IN')) {
+            return w.map(id => ({ id, heim_guild_id: daten.heim[id] ?? null }));
         }
         if (s.startsWith('SELECT konto_id FROM streaming_subscribers')) {
             return daten.abonnenten.filter(a => a.streamer_id === w[0]);
@@ -185,6 +189,9 @@ const drossel    = require('../plugins/streaming/dashboard/ausgabe/drossel');
         { id: 2, streamer_id: 7, guild_id: 'G2', abo_rolle_id: 'R2', aktiv: 1 },
         { id: 3, streamer_id: 7, guild_id: 'G3', abo_rolle_id: null, aktiv: 1 }
     ];
+    // G1 ist die Heim-Guild des Kanals. G2 hat ebenfalls eine Abo-Rolle, ist
+    // aber fremd - dort vergibt die Zusage des Inhabers nichts (Baustelle 125).
+    daten.heim = { 7: 'G1' };
 
     // Ohne Verknuepfung: vermerkt, aber keine Rolle.
     daten.auftraege = [];
@@ -200,12 +207,21 @@ const drossel    = require('../plugins/streaming/dashboard/ausgabe/drossel');
     daten.auftraege = [];
     await abonnenten.aufnehmen(streamer, { kontoId: '111', kontoName: 'Mit' });
 
-    pruefe(daten.auftraege.length === 2, 'je Ziel MIT Abo-Rolle ein Auftrag', `${daten.auftraege.length} statt 3`);
+    pruefe(daten.auftraege.length === 1, 'ein Auftrag: nur das Ziel mit Abo-Rolle in der Heim-Guild', `${daten.auftraege.length}`);
     pruefe(daten.auftraege.every(a => a.aktion === 'rolle_geben'), 'und zwar zum Geben');
     pruefe(daten.auftraege.every(a => a.nutzlast.mitglied_id === 'D111'),
         'an das verknuepfte Discord-Mitglied');
-    pruefe(String(daten.auftraege.map(a => a.nutzlast.rolle_id).sort()) === 'R1,R2',
-        'jede Guild bekommt IHRE Rolle', 'derselbe Streamer heisst woanders anders');
+    pruefe(String(daten.auftraege.map(a => a.nutzlast.rolle_id).sort()) === 'R1',
+        'die Heim-Guild bekommt IHRE Rolle');
+    pruefe(!daten.auftraege.some(a => a.guild === 'G2'),
+        'die fremde Guild mit Abo-Rolle bekommt keinen Auftrag', 'Baustelle 125');
+
+    // Ohne Heim-Guild vergibt keine Guild eine Abo-Rolle.
+    daten.heim = {};
+    daten.auftraege = [];
+    await abonnenten.aufnehmen(streamer, { kontoId: '111', kontoName: 'Mit' });
+    pruefe(daten.auftraege.length === 0, 'ohne Heim-Guild kein Rollenauftrag', `${daten.auftraege.length}`);
+    daten.heim = { 7: 'G1' };
 
     // Der entscheidende Punkt: der Grund muss mitreisen.
     pruefe(daten.auftraege.every(a => a.nutzlast.grund === 'abo'),
@@ -246,8 +262,8 @@ const drossel    = require('../plugins/streaming/dashboard/ausgabe/drossel');
 
     daten.auftraege = [];
     await abonnenten.entfernen(streamer, { kontoId: '111' });
-    pruefe(daten.auftraege.length === 2 && daten.auftraege.every(a => a.aktion === 'rolle_nehmen'),
-        'das Ende nimmt die Rolle in jeder Guild');
+    pruefe(daten.auftraege.length === 1 && daten.auftraege.every(a => a.aktion === 'rolle_nehmen' && a.guild === 'G1'),
+        'das Ende nimmt die Rolle in der Heim-Guild');
     pruefe(!daten.abonnenten.some(a => a.konto_id === '111'),
         'und streicht ihn aus der Abonnentenliste');
 

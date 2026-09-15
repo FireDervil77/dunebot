@@ -82,7 +82,7 @@ async function aboRollenGewuenscht(streamerId) {
     // Abfragen mit je eigener Bedingung waeren drei Gelegenheiten, den
     // Rueckfall zu vergessen.
     const zeilen = await db().query(`
-        SELECT id, guild_id, abo_rolle_id FROM streaming_targets
+        SELECT id, streamer_id, guild_id, abo_rolle_id FROM streaming_targets
          WHERE streamer_id = ? AND aktiv = 1
     `, [streamerId]);
     const mitRolle = await require('./abonnenten').mitAufgeloesterRolle(zeilen);

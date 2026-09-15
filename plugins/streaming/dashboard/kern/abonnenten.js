@@ -117,11 +117,28 @@ async function mitgliedFuer(plattform, kontoId) {
  */
 async function zieleMitRolle(streamerId) {
     const zeilen = await db().query(`
-        SELECT id, guild_id, abo_rolle_id
+        SELECT id, streamer_id, guild_id, abo_rolle_id
           FROM streaming_targets
          WHERE streamer_id = ? AND aktiv = 1
     `, [streamerId]);
     return await mitAufgeloesterRolle(zeilen);
+}
+
+/**
+ * Die Heim-Guild je Kanal.
+ *
+ * Getrennt abgefragt und nicht per `JOIN`: So bleibt der Vergleich in
+ * JavaScript, wie die Aufloesung der Vorgabe daneben.
+ *
+ * @param {Array<number>} streamerIds Streamer
+ * @returns {Promise<Map<number, string|null>>} Kennung → Heim-Guild oder null
+ */
+async function heimGuilds(streamerIds) {
+    const ids = [...new Set((streamerIds || []).map(Number).filter(Number.isInteger))];
+    if (!ids.length) return new Map();
+    const zeilen = await db().query(
+        `SELECT id, heim_guild_id FROM streaming_streamers WHERE id IN (${ids.map(() => '?').join(',')})`, ids);
+    return new Map((zeilen || []).map(z => [Number(z.id), z.heim_guild_id ? String(z.heim_guild_id) : null]));
 }
 
 /**
@@ -139,15 +156,26 @@ async function zieleMitRolle(streamerId) {
  * der Konfigurationstabelle des Kerns, und ein `JOIN` aus einer Plugin-Tabelle
  * dorthin wirft an der Kollationsgrenze (`scripts/check-kollationen.js`).
  *
- * @param {Array<Object>} zeilen Zielzeilen mit `guild_id` und `abo_rolle_id`
- * @returns {Promise<Array<Object>>} nur die mit Rolle, `abo_rolle_id` aufgeloest
+ * **Und nur in der Heim-Guild des Kanals** (Baustelle 125, Betreiber am
+ * 2026-09-15: „Ja, nur in der Heim-Guild"). Die Abonnentenliste ist mit der
+ * Zusage des Kanalinhabers gelesen - sie vergibt keine Rollen in einer Guild,
+ * die er nicht als seine gewaehlt hat. Ohne Heim-Guild vergibt keine. Weil alle
+ * drei Wege hier durchgehen, gilt das fuers Bestellen, Vergeben und Abholen
+ * zugleich.
+ *
+ * @param {Array<Object>} zeilen Zielzeilen mit `streamer_id`, `guild_id` und `abo_rolle_id`
+ * @returns {Promise<Array<Object>>} nur die mit Rolle in der Heim-Guild, `abo_rolle_id` aufgeloest
  */
 async function mitAufgeloesterRolle(zeilen) {
     const modelle = require('../../shared/models');
+    const heime = await heimGuilds(zeilen.map(z => z.streamer_id));
     const vorgaben = new Map();
     const treffer = [];
 
     for (const z of zeilen) {
+        const heim = heime.get(Number(z.streamer_id));
+        if (!heim || heim !== String(z.guild_id)) continue;
+
         let rolle = String(z.abo_rolle_id || '').trim();
         if (!rolle) {
             const gid = String(z.guild_id);
@@ -300,7 +328,7 @@ async function abgleichen(streamer) {
 }
 
 module.exports = {
-    mitAufgeloesterRolle,
+    mitAufgeloesterRolle, heimGuilds,
     vergleichen, kanalInhaber, mitgliedFuer, zieleMitRolle,
     auftragSchreiben, aufnehmen, entfernen, abgleichen
 };

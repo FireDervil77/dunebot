@@ -52,7 +52,7 @@ function pruefe(gut, text, zusatz = '') {
 process.env.DASHBOARD_BASE_URL = 'https://pruefung.example';
 
 // --- Attrappen -----------------------------------------------------------
-const daten = { abos: [], ziele: [], abonnenten: [], inhaber: null, scopes: '', vorgaben: {} };
+const daten = { abos: [], ziele: [], abonnenten: [], inhaber: null, scopes: '', vorgaben: {}, heim: { 1: 'g1' } };
 const mitschrift = { insert: [], update: [], abonniert: [], abbestellt: [], geloescht: [] };
 const unbekannteAbfragen = [];
 
@@ -71,8 +71,12 @@ ServiceManager.register('dbService', {
         // in JavaScript auf — die Attrappe liefert deshalb ALLE aktiven Ziele
         // und darf hier nicht mehr vorfiltern, sonst prueft sie den Rueckfall
         // an sich selbst vorbei.
-        if (s.startsWith('SELECT id, guild_id, abo_rolle_id FROM streaming_targets')) {
+        if (s.startsWith('SELECT id, streamer_id, guild_id, abo_rolle_id FROM streaming_targets')) {
             return daten.ziele.filter(z => z.streamer_id === w[0] && z.aktiv);
+        }
+        // Baustelle 125: Abo-Rollen nur in der Heim-Guild des Kanals.
+        if (s.startsWith('SELECT id, heim_guild_id FROM streaming_streamers WHERE id IN')) {
+            return w.map(id => ({ id, heim_guild_id: daten.heim[id] ?? null }));
         }
         // Die Melder (12c) haengen am selben Weg: `abosSichern` fragt, welche
         // Arten eine Guild will. Hier will keine eine — geprueft werden die
@@ -159,8 +163,9 @@ const abos = require('../plugins/streaming/dashboard/kern/abos');
 function neuAufsetzen(bestand = [], rolleGewuenscht = false, melderArten = null, scopes = '') {
     daten.abos = bestand.map((b, i) => ({ id: i + 1, streamer_id: 1, ...b }));
     daten.ziele = (rolleGewuenscht || melderArten)
-        ? [{ streamer_id: 1, aktiv: 1, abo_rolle_id: rolleGewuenscht ? '999' : null, melder_arten: melderArten }]
+        ? [{ streamer_id: 1, aktiv: 1, guild_id: 'g1', abo_rolle_id: rolleGewuenscht ? '999' : null, melder_arten: melderArten }]
         : [];
+    daten.heim = { 1: 'g1' };
     daten.inhaber = scopes ? '4711' : null;
     daten.scopes = scopes;
     daten.vorgaben = {};
@@ -195,6 +200,29 @@ console.log('\nDie Abo-Rolle der Guild traegt bis zur Bestellung durch');
     daten.vorgaben = {};
     pruefe(await abos.aboRollenGewuenscht(1) === true,
         'die eigene Rolle am Ziel gilt weiter, auch ohne Vorgabe');
+}
+
+console.log('\nAbo-Rollen nur in der Heim-Guild des Kanals (Baustelle 125)');
+{
+    // Die Abonnentenliste ist mit der Zusage des Kanalinhabers gelesen. Eine
+    // fremde Guild mit einem Ziel auf seinen Kanal bestellt darueber nichts.
+    neuAufsetzen([], false, null, 'channel:read:subscriptions');
+    daten.ziele = [{ streamer_id: 1, aktiv: 1, guild_id: 'fremd', abo_rolle_id: '999', melder_arten: null }];
+    pruefe(await abos.aboRollenGewuenscht(1) === false,
+        'Rolle in einer fremden Guild bestellt keine Abo-Ereignisse');
+
+    daten.vorgaben = { 'fremd|ABO_ROLLE_ID': '4242' };
+    pruefe(await abos.aboRollenGewuenscht(1) === false,
+        'auch nicht ueber die Guild-Vorgabe der fremden Guild');
+
+    daten.vorgaben = {};
+    daten.ziele.push({ streamer_id: 1, aktiv: 1, guild_id: 'g1', abo_rolle_id: '999', melder_arten: null });
+    pruefe(await abos.aboRollenGewuenscht(1) === true,
+        'dasselbe Ziel in der Heim-Guild daneben traegt');
+
+    daten.heim = { 1: null };
+    pruefe(await abos.aboRollenGewuenscht(1) === false,
+        'ohne Heim-Guild vergibt keine Guild eine Abo-Rolle');
 }
 
 console.log('\nWas in die Tabelle geht, ist ein Name');
