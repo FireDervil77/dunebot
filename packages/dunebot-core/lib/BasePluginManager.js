@@ -75,7 +75,7 @@ class BasePluginManager {
     // ==============================
 
     /**
-     * Initialisiert alle Plugins und deren Abhängigkeiten
+     * Laedt den Kern (`core`). Die uebrigen Plugins schalten Dashboard und Bot selbst ein, aus `guild_plugins`.
      * @returns {Promise<Array>} Liste der geladenen Plugins
      * @throws {Error} Bei Fehlern während der Initialisierung
      * @author FireDervil
@@ -117,137 +117,16 @@ class BasePluginManager {
             // "after_core_plugin_enable" Hook ausführen
             await this.hooks.doAction('after_core_plugin_enable', this.getPlugin("core"));
 
-            // Get enabled plugins from core config
-            const corePluginInstance = this.getPlugin("core");
-
-            const config = await corePluginInstance.getConfig();
-            let enabled_plugins = config.ENABLED_PLUGINS || [];
-            
-
-            // "filter_enabled_plugins" Hook ausführen
-            enabled_plugins = await this.hooks.applyFilter('filter_enabled_plugins', enabled_plugins);
-
-            // Get all available plugins from registry except disabled ones
-            const enableablePlugins = filteredPlugins.filter(
-                (p) => p.name !== "core" && enabled_plugins.includes(p.name),
-            );
-
-            // "before_dependency_check" Hook ausführen
-            await this.hooks.doAction('before_dependency_check', enableablePlugins);
-            
-            // Check dependencies and filter out plugins with missing dependencies
-            const pluginsToDisable = [];
-            const pluginsToSkip = [];
-
-            for (const plugin of enableablePlugins) {
-                // Check if all dependencies are available in the registry
-                const missingDeps = (plugin.dependencies || []).filter(
-                    (dep) => !filteredPlugins.some((p) => p.name === dep),
-                );
-
-                if (missingDeps.length > 0) {
-                    this.logger.warn(
-                        `Plugin ${plugin.name} has dependencies that are not in registry: ${missingDeps.join(", ")}. Skipping this plugin.`,
-                    );
-                    pluginsToSkip.push(plugin.name);
-                    
-                    // "plugin_skipped" Hook ausführen
-                    await this.hooks.doAction('plugin_skipped', plugin.name, 'missing_dependencies', missingDeps);
-                    continue;
-                }
-
-                // Check if all dependencies are in the enabled_plugins list
-                const disabledDeps = (plugin.dependencies || []).filter(
-                    (dep) => dep !== "core" && !enabled_plugins.includes(dep),
-                );
-
-                if (disabledDeps.length > 0) {
-                    this.logger.warn(
-                        `Plugin ${plugin.name} has dependencies that are not enabled: ${disabledDeps.join(", ")}. Adding to disabled plugins.`,
-                    );
-                    pluginsToDisable.push(plugin.name);
-                    
-                    // "plugin_disabled" Hook ausführen
-                    await this.hooks.doAction('plugin_disabled', plugin.name, 'disabled_dependencies', disabledDeps);
-                }
-            }
-            
-            // "after_dependency_check" Hook ausführen
-            await this.hooks.doAction('after_dependency_check', { pluginsToDisable, pluginsToSkip });
-
-            // Update enabled plugins list if needed
-            if (pluginsToDisable.length > 0) {
-                // "before_update_enabled_plugins" Hook ausführen
-                await this.hooks.doAction('before_update_enabled_plugins', enabled_plugins, pluginsToDisable);
-                
-                for (const pluginName of pluginsToDisable) {
-                    const index = enabled_plugins.indexOf(pluginName);
-                    if (index !== -1) {
-                        enabled_plugins.splice(index, 1);
-                    }
-                }
-                config.ENABLED_PLUGINS = enabled_plugins;
-                
-                // Korrekte Nutzung des Mysql aufrufs
-               await dbService.query(`
-                    INSERT INTO configs (plugin_name, config_key, config_value, context)
-                    VALUES (?, ?, ?, ?)
-                    ON DUPLICATE KEY UPDATE
-                        config_value = VALUES(config_value)
-                `, [
-                    "core",
-                    "ENABLED_PLUGINS",
-                    JSON.stringify(enabled_plugins),
-                    "shared"
-                ]);
-                
-                // "after_update_enabled_plugins" Hook ausführen
-                await this.hooks.doAction('after_update_enabled_plugins', enabled_plugins);
-                
-                this.logger.info(
-                    `Removed ${pluginsToDisable.length} plugins with disabled dependencies from enabled list.`,
-                );
-            }
-
-            // Filter plugins to enable (all plugins except core, disabled ones and ones with missing dependencies)
-            let pluginsToEnable = filteredPlugins.filter(
-                (p) =>
-                    p.name !== "core" &&
-                    enabled_plugins.includes(p.name) &&
-                    !pluginsToSkip.includes(p.name),
-            );
-            
-            // "filter_plugins_to_enable" Hook ausführen
-            pluginsToEnable = await this.hooks.applyFilter('filter_plugins_to_enable', pluginsToEnable);
-
-            // "before_determine_load_order" Hook ausführen
-            await this.hooks.doAction('before_determine_load_order', pluginsToEnable);
-            
-            const loadOrder = this.#getTopologicalOrder(pluginsToEnable);
-            
-            // "filter_plugin_load_order" Hook ausführen
-            const finalLoadOrder = await this.hooks.applyFilter('filter_plugin_load_order', loadOrder);
-
-            // "before_plugins_enable" Hook ausführen
-            await this.hooks.doAction('before_plugins_enable', finalLoadOrder);
-            
-            for (const pluginName of finalLoadOrder) {
-                // "before_plugin_enable" Hook ausführen
-                await this.hooks.doAction('before_plugin_enable', pluginName);
-                
-                const meta = filteredPlugins.find((p) => p.name === pluginName);
-                if (!meta.installed) {
-                    await this.installPlugin(pluginName);
-                }
-                console.log("BEVOR ENABLE PLUGIN");
-                await this.enablePlugin(pluginName);
-                
-                // "after_plugin_enable" Hook ausführen
-                await this.hooks.doAction('after_plugin_enable', pluginName, this.getPlugin(pluginName));
-            }
-
-            // "after_plugins_enable" Hook ausführen
-            await this.hooks.doAction('after_plugins_enable', this.plugins);
+            // Hier stand bis zum 2026-09-15 eine zweite Einschaltrunde: Sie las
+            // `ENABLED_PLUGINS` aus `configs`, pruefte `pluginDependencies`,
+            // nahm Plugins mit abgeschalteter Abhaengigkeit aus der Liste und
+            // schrieb sie zurueck nach `configs`. Eingeschaltet wird seit dem
+            // Umbau auf `guild_plugins` woanders (Dashboard: `loadPlugins` in
+            // app.js, Bot: eigenes `init`). Die Liste gab es nicht mehr, die
+            // Runde lief ueber null Plugins - und waere mit der ersten
+            // `configs`-Zeile aufgewacht und haette Plugins in der Produktion
+            // abgeschaltet. Beziehungen zwischen Plugins blockieren nicht
+            // (Betreiber, 2026-09-15; docs/plugin-beziehungen.md).
             
             this.logger.success(`Loaded ${this.availablePlugins.length} plugins.`);
             
@@ -648,106 +527,6 @@ class BasePluginManager {
     // ==============================
     // Private Utility Methods
     // ==============================
-
-    #findCycle(plugins) {
-        const visited = new Set();
-        const stack = new Set();
-        const graph = new Map();
-
-        // Build adjacency list
-        plugins.forEach((plugin) => {
-            graph.set(plugin.name, (plugin.dependencies || []).slice());
-        });
-
-        const cycle = [];
-
-        const dfs = (node) => {
-            visited.add(node);
-            stack.add(node);
-
-            for (const neighbor of graph.get(node) || []) {
-                if (!visited.has(neighbor)) {
-                    const foundCycle = dfs(neighbor);
-                    if (foundCycle) {
-                        cycle.unshift(node);
-                        return true;
-                    }
-                } else if (stack.has(neighbor)) {
-                    cycle.push(neighbor);
-                    cycle.unshift(node);
-                    return true;
-                }
-            }
-
-            stack.delete(node);
-            return false;
-        };
-
-        for (const plugin of plugins) {
-            if (!visited.has(plugin.name) && dfs(plugin.name)) {
-                // Trim the cycle to start from the first repeated element
-                const startIndex = cycle.indexOf(cycle[cycle.length - 1]);
-                return cycle.slice(startIndex);
-            }
-        }
-
-        return null;
-    }
-
-    #getTopologicalOrder(plugins) {
-
-        // Create adjacency list and in-degree count
-        const graph = new Map();
-        const inDegree = new Map();
-
-        // Get all plugin names for easy lookup
-        const pluginNames = new Set(plugins.map((p) => p.name));
-
-        plugins.forEach((plugin) => {
-            graph.set(plugin.name, []);
-            inDegree.set(plugin.name, 0);
-        });
-
-        // Build the graph
-        plugins.forEach((plugin) => {
-            (plugin.dependencies || []).forEach((dep) => {
-                if (dep === "core") return;
-                // Only process dependencies that exist in our plugin list
-                if (pluginNames.has(dep)) {
-                    graph.get(dep).push(plugin.name);
-                    inDegree.set(plugin.name, inDegree.get(plugin.name) + 1);
-                }
-            });
-        });
-
-        // Find all sources (nodes with in-degree 0)
-        const queue = plugins
-            .filter((plugin) => inDegree.get(plugin.name) === 0)
-            .map((plugin) => plugin.name);
-
-        const result = [];
-
-        while (queue.length) {
-            const pluginName = queue.shift();
-            result.push(pluginName);
-
-            for (const neighbor of graph.get(pluginName)) {
-                inDegree.set(neighbor, inDegree.get(neighbor) - 1);
-                if (inDegree.get(neighbor) === 0) {
-                    queue.push(neighbor);
-                }
-            }
-        }
-
-        if (result.length !== plugins.length) {
-            const cycle = this.#findCycle(plugins);
-            throw new Error(
-                `Circular dependency detected in plugins: ${cycle.join(" -> ")} -> ${cycle[0]}`,
-            );
-        }
-
-        return result;
-    }
 
     async #cloneOrUpdateRepo(repository, branch = "main") {
         const repoHash = this.#createRepoHash(repository);

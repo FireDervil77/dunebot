@@ -1,33 +1,32 @@
 #!/usr/bin/env node
 /**
- * Was würde beim nächsten Start passieren? — Probelauf ohne Wirkung.
+ * Beziehungen zwischen Plugins — Probelauf ohne Wirkung.
  *
- * ── Warum es diesen Probelauf gibt ──────────────────────────────────────────
+ * ── Stand ───────────────────────────────────────────────────────────────────
  *
- * `BasePluginManager` prüft beim Start die Abhängigkeiten zwischen Plugins. Er
- * **meldet einen Fund nicht, er handelt**: Ist die Abhängigkeit eines Plugins
- * abgeschaltet, entfernt er das Plugin aus `ENABLED_PLUGINS` und **schreibt die
- * neue Liste in die Tabelle `configs`**. Dauerhaft. Es bleibt aus, bis es
- * jemand von Hand wieder einschaltet.
+ * Bis zum 2026-09-15 hatte `BasePluginManager.init()` eine zweite
+ * Einschaltrunde: Sie las `ENABLED_PLUGINS` aus `configs`, prüfte
+ * `pluginDependencies` und SCHRIEB bei einer abgeschalteten Abhängigkeit eine
+ * gekürzte Liste zurück — Plugins wären in der Produktion ausgegangen. Die Runde
+ * lief über null Plugins, weil längst über `guild_plugins` eingeschaltet wird,
+ * und wäre mit der ersten `configs`-Zeile aufgewacht. Sie ist entfernt.
  *
- * Der Betreiber am 2026-09-14: *„Wir bauen allerdings auf Production, und da
- * kann ich mir aktuell — zumindest bei den Gameservern — kein Reinstall des
- * ganzen Pakets erlauben, weil der Streamserver darüber läuft."*
+ * Die Fassung vom 14.09. meldete hier „Es würde ABGESCHALTET". Das war ein
+ * Rechenfehler dieses Skripts: Es wandte die Regel auf ALLE Plugins an, der
+ * Manager nur auf die aus der (leeren) Liste. Berichtigung in
+ * `docs/plugin-beziehungen.md`.
  *
- * Deshalb rechnet dieses Skript dieselbe Prüfung **vorher** und zeigt, was
- * geschähe. Es öffnet die Datenbank nur lesend, startet nichts neu und ändert
- * nichts. Einzelheiten und die geplante Reihenfolge: `docs/plugin-beziehungen.md`.
+ * Grundsatz des Betreibers (2026-09-15): **Beziehungen blockieren nicht.** Dieser
+ * Probelauf hält fest, dass das beim Start so bleibt, und zeigt, welche
+ * Beziehungen es wirklich gibt. Er ändert nichts und öffnet keine Datenbank.
  *
  * ── Drei Teile ──────────────────────────────────────────────────────────────
  *
- *   A  Wirkungsprobe     Was würde der Manager heute tun?
+ *   C  Verankerung       Kommt die Abschaltrunde zurück? Liest jemand ENABLED_PLUGINS?
+ *   A  Erklärungen       Was steht in `pluginDependencies` — und wo wirkt es noch?
  *   B  Bestandsaufnahme  Welche Beziehungen gibt es WIRKLICH — erklärt oder nicht?
- *   C  Verankerung       Gilt noch, was dieser Probelauf über den Manager annimmt?
  *
- * Teil C ist der wichtigste: Ein Probelauf, der eine veraltete Annahme
- * nachrechnet, ist schlimmer als keiner.
- *
- *   node scripts/check-plugin-beziehungen.js
+ *   node scripts/check-plugin-beziehungen.js [--wenn <plugin>=<abhaengigkeit>]
  */
 'use strict';
 
@@ -40,16 +39,36 @@ const MANAGER = path.join(WURZEL, 'packages/dunebot-core/lib/BasePluginManager.j
 
 let fehler = 0;
 const melde = (ok, was, zusatz = '') => {
-    console.log(`  ${ok ? '✅' : '❌'} ${was}${zusatz ? '\n       ' + zusatz : ''}`);
+    console.log(`  ${ok ? '✅' : '❌'} ${was}${!ok && zusatz ? '\n       ' + zusatz : ''}`);
     if (!ok) fehler++;
 };
 const hinweis = (text) => console.log(`  · ${text}`);
 
-/** Kommentare weg, bevor irgendetwas gemessen wird — sonst misst man Prosa. */
+/**
+ * Kommentare weg, bevor irgendetwas gemessen wird — sonst misst man Prosa.
+ *
+ * Zeilen werden an `\r?\n` getrennt: `BasePluginManager.js` hat CRLF, und `.`
+ * trifft kein `\r`. Mit `split('\n')` blieb der Kommentar stehen, und dieser
+ * Probelauf meldete am 2026-09-15 einen Kommentar als Leser von `ENABLED_PLUGINS`.
+ */
 function ohneKommentare(quelle) {
     return String(quelle)
         .replace(/\/\*[\s\S]*?\*\//g, '')
-        .split('\n').map(z => z.replace(/(^|[^:])\/\/.*$/, '$1')).join('\n');
+        .split(/\r?\n/).map(z => z.replace(/(^|[^:])\/\/.*$/, '$1')).join('\n');
+}
+
+function dateienUnter(wurzel) {
+    const treffer = [];
+    const gehe = (ordner) => {
+        for (const eintrag of fs.readdirSync(ordner, { withFileTypes: true })) {
+            if (eintrag.name === 'node_modules' || eintrag.name === 'vendor') continue;
+            const voll = path.join(ordner, eintrag.name);
+            if (eintrag.isDirectory()) gehe(voll);
+            else if (eintrag.name.endsWith('.js')) treffer.push(voll);
+        }
+    };
+    gehe(wurzel);
+    return treffer;
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -67,7 +86,7 @@ function lesePlugins() {
         plugins.push({
             ordner: name,
             name: pkg.name || name,
-            // Genau die Felder, die der Manager liest (BasePluginManager:516).
+            // Das Feld, das der Manager noch liest (getPluginsMeta → installPlugin).
             abhaengig: pkg.pluginDependencies || [],
             faehigkeiten: pkg.faehigkeiten || null,
         });
@@ -75,69 +94,24 @@ function lesePlugins() {
     return plugins;
 }
 
-/** Die eingeschalteten Plugins — nur lesend, und ohne Datenbank kein Ratespiel. */
-async function leseEingeschaltet() {
-    require('dotenv').config({ path: path.join(WURZEL, 'apps/dashboard/.env') });
-    if (!process.env.MYSQL_USER) return { fehlt: 'keine Zugangsdaten in apps/dashboard/.env' };
-
-    let mysql;
-    try { mysql = require('mysql2/promise'); }
-    catch { return { fehlt: 'mysql2 nicht verfügbar' }; }
-
-    let verbindung;
-    try {
-        verbindung = await mysql.createConnection({
-            host: process.env.MYSQL_HOST, port: Number(process.env.MYSQL_PORT) || 3306,
-            user: process.env.MYSQL_USER, password: process.env.MYSQL_PASSWORD,
-            database: process.env.MYSQL_DATABASE, connectTimeout: 5000,
-        });
-        // Was der Manager liest (BasePluginManager:123) …
-        const [zeilen] = await verbindung.query(
-            `SELECT config_value FROM configs
-              WHERE plugin_name = 'core' AND config_key = 'ENABLED_PLUGINS' AND context = 'shared'
-              LIMIT 1`);
-        // … und was das Dashboard TATSÄCHLICH einschaltet (app.js:316 ff.).
-        // Die beiden sind seit dem Umbau auf `guild_plugins` nicht dasselbe —
-        // und genau diese Lücke ist die Falle.
-        const [ausGuilds] = await verbindung.query(
-            `SELECT DISTINCT plugin_name FROM guild_plugins
-              WHERE is_enabled = 1 AND plugin_name != 'core'`);
-        const wirklich = ausGuilds.map(z => z.plugin_name).sort();
-
-        if (!zeilen.length) return { fehlt: 'kein Eintrag ENABLED_PLUGINS in `configs`', wirklich };
-        const wert = zeilen[0].config_value;
-        return { liste: typeof wert === 'string' ? JSON.parse(wert) : wert, wirklich };
-    } catch (e) {
-        return { fehlt: e.message };
-    } finally {
-        if (verbindung) await verbindung.end().catch(() => {});
-    }
-}
-
 // ════════════════════════════════════════════════════════════════════════════
-// A — Wirkungsprobe: dieselbe Rechnung wie der Manager, ohne zu handeln
+// A — Erklärungen: stimmen sie, und wo wirken sie noch?
 // ════════════════════════════════════════════════════════════════════════════
 
-function wirkungsprobe(plugins, eingeschaltet) {
+/**
+ * Die einzige verbliebene Wirkung von `pluginDependencies` ist
+ * `installPlugin`: Fehlt eine erklärte Abhängigkeit, lehnt es ab. Beim Start
+ * passiert nichts mehr. Ringe haben keine Wirkung, sind aber ein Fehler in
+ * den Erklärungen.
+ */
+function erklaerungen(plugins) {
     const namen = new Set(plugins.map(p => p.name));
-    const uebersprungen = [];
-    const abgeschaltet = [];
-
+    const fehlend = [];
     for (const p of plugins) {
-        // Regel 1 (BasePluginManager:144): Abhängigkeit gar nicht vorhanden.
-        const fehlend = p.abhaengig.filter(d => !namen.has(d));
-        if (fehlend.length) { uebersprungen.push({ p, fehlend }); continue; }
-
-        // Regel 2 (:160): Abhängigkeit vorhanden, aber nicht eingeschaltet.
-        // `core` ist ausgenommen — es ist immer da.
-        if (!eingeschaltet) continue;
-        const aus = p.abhaengig.filter(d => d !== 'core' && !eingeschaltet.includes(d));
-        if (aus.length) abgeschaltet.push({ p, aus });
+        const f = p.abhaengig.filter(d => d !== 'core' && !namen.has(d));
+        if (f.length) fehlend.push({ p, fehlend: f });
     }
-
-    // Regel 3: Ringe. Der Manager bricht darauf ab; hier wird nur gezeigt.
-    const ringe = findeRinge(plugins);
-    return { uebersprungen, abgeschaltet, ringe };
+    return { fehlend, ringe: findeRinge(plugins) };
 }
 
 function findeRinge(plugins) {
@@ -160,20 +134,6 @@ function findeRinge(plugins) {
 // ════════════════════════════════════════════════════════════════════════════
 // B — Bestandsaufnahme: welche Beziehungen gibt es wirklich?
 // ════════════════════════════════════════════════════════════════════════════
-
-function dateienUnter(wurzel) {
-    const treffer = [];
-    const gehe = (ordner) => {
-        for (const eintrag of fs.readdirSync(ordner, { withFileTypes: true })) {
-            if (eintrag.name === 'node_modules' || eintrag.name === 'vendor') continue;
-            const voll = path.join(ordner, eintrag.name);
-            if (eintrag.isDirectory()) gehe(voll);
-            else if (eintrag.name.endsWith('.js')) treffer.push(voll);
-        }
-    };
-    gehe(wurzel);
-    return treffer;
-}
 
 /**
  * Harte Griffe über Plugin-Grenzen.
@@ -241,143 +201,126 @@ function weicheBeziehungen(plugins) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// C — Verankerung: gilt noch, was hier über den Manager angenommen wird?
+// C — Verankerung: bleibt es dabei, dass beim Start nichts blockiert?
 // ════════════════════════════════════════════════════════════════════════════
 
 function verankerung() {
     if (!fs.existsSync(MANAGER)) {
         melde(false, 'Der PluginManager liegt, wo dieser Probelauf ihn erwartet',
-            path.relative(WURZEL, MANAGER) + ' fehlt — die Rechnung unten ist dann Vermutung');
+            path.relative(WURZEL, MANAGER) + ' fehlt — die Prüfungen unten sind dann Vermutung');
         return;
     }
     const quelle = ohneKommentare(fs.readFileSync(MANAGER, 'utf8'));
 
+    melde(!/ENABLED_PLUGINS/.test(quelle),
+        'Der Manager liest `ENABLED_PLUGINS` nicht mehr',
+        'die Abschaltrunde ist zurück — sie misst gegen eine Liste, die es nicht gibt, und wacht mit der ersten `configs`-Zeile auf');
+    melde(!/INSERT\s+INTO\s+configs/i.test(quelle),
+        'Der Manager schreibt nichts nach `configs`',
+        'genau dieser Schreibvorgang schaltete Plugins dauerhaft ab');
     melde(/pluginDependencies/.test(quelle),
         'Der Manager liest weiterhin `pluginDependencies`',
-        'sonst rechnet dieser Probelauf mit einem Feld, das niemand mehr liest');
-    melde(/ENABLED_PLUGINS/.test(quelle) && /INSERT INTO configs/.test(quelle),
-        'Das Abschalten schreibt weiterhin in `configs` — das ist der gefährliche Teil',
-        'verschwindet der Schreibvorgang, ist die Warnung unten überholt');
-    melde(/dependencies \|\| \[\]\)\.filter/.test(quelle),
-        'Die beiden Regeln (fehlend / abgeschaltet) stehen unverändert im Manager');
+        'sonst prüft Teil A ein Feld, das niemand mehr liest');
+
+    hinweis(/missingDeps/.test(quelle) && /Please install them first/.test(quelle)
+        ? '`installPlugin` lehnt ab, wenn eine erklärte Abhängigkeit fehlt — die einzige verbliebene Wirkung'
+        : '`installPlugin` prüft `pluginDependencies` nicht mehr');
+
+    // Die zweite Quelle für „ist eingeschaltet" darf nicht über einen anderen
+    // Leser zurückkommen. Kommentare zählen nicht — dort steht sie als Verlauf.
+    const leser = [];
+    for (const wurzel of ['apps', 'packages', 'plugins']) {
+        for (const datei of dateienUnter(path.join(WURZEL, wurzel))) {
+            if (/ENABLED_PLUGINS/.test(ohneKommentare(fs.readFileSync(datei, 'utf8')))) {
+                leser.push(path.relative(WURZEL, datei));
+            }
+        }
+    }
+    melde(!leser.length, 'Kein Code in apps/, packages/, plugins/ liest `ENABLED_PLUGINS`',
+        leser.join('\n       '));
 }
 
 // ════════════════════════════════════════════════════════════════════════════
 
-(async () => {
-    console.log('\n▸ Probelauf: Beziehungen zwischen Plugins (es wird NICHTS geändert)');
+console.log('\n▸ Probelauf: Beziehungen zwischen Plugins (es wird NICHTS geändert)');
 
-    const plugins = lesePlugins();
-    console.log(`\nC — Verankerung (${path.relative(WURZEL, MANAGER)})`);
-    verankerung();
+const plugins = lesePlugins();
+console.log(`\nC — Verankerung (${path.relative(WURZEL, MANAGER)})`);
+verankerung();
 
-    console.log(`\nA — Wirkungsprobe (${plugins.length} Plugins)`);
-    const erklaert = plugins.filter(p => p.abhaengig.length);
-    if (!erklaert.length) {
-        hinweis(`Kein einziges Plugin erklärt eine Abhängigkeit (\`pluginDependencies\`).`);
-        hinweis('Der Manager hat heute also nichts zu prüfen — und damit auch nichts,');
-        hinweis('was er abschalten könnte. Das ist der Grund, warum dieser Schritt');
-        hinweis('gefahrlos ist: Es gibt noch nichts, das wirken könnte.');
+console.log(`\nA — Erklärungen (${plugins.length} Plugins)`);
+const erklaert = plugins.filter(p => p.abhaengig.length);
+hinweis(erklaert.length
+    ? 'Erklärt: ' + erklaert.map(p => `${p.name} → ${p.abhaengig.join(', ')}`).join(' · ')
+    : 'Kein Plugin erklärt eine Abhängigkeit (`pluginDependencies`).');
+
+const a = erklaerungen(plugins);
+melde(a.fehlend.length === 0, 'Jede erklärte Abhängigkeit gibt es als Plugin',
+    a.fehlend.map(f => `${f.p.name}: ${f.fehlend.join(', ')} fehlt`).join('\n       ')
+    + '\n       Wirkung: `installPlugin` lehnt die Installation ab. Beim Start passiert nichts.');
+melde(a.ringe.length === 0, 'Keine Ringe in den erklärten Abhängigkeiten', a.ringe.join('\n       '));
+
+// ── Was-wäre-wenn ───────────────────────────────────────────────────────────
+//
+//   node scripts/check-plugin-beziehungen.js --wenn gameserver=masterserver
+//
+// Prüft eine Erklärung, die es noch NICHT gibt, bevor sie jemand schreibt.
+const wennArg = process.argv.find(x => x.startsWith('--wenn='))
+    || (process.argv.includes('--wenn') ? process.argv[process.argv.indexOf('--wenn') + 1] : null);
+if (wennArg) {
+    const [wer, was] = wennArg.replace(/^--wenn=/, '').split('=');
+    const ziel = plugins.find(p => p.name === wer);
+    console.log(`\nA' — Was wäre, wenn \`${wer}\` von \`${was}\` abhinge?`);
+    if (!ziel) {
+        melde(false, `Das Plugin \`${wer}\` gibt es`, 'Name aus der package.json, nicht der Ordnername');
     } else {
-        hinweis('Erklärt: ' + erklaert.map(p => `${p.name} → ${p.abhaengig.join(', ')}`).join(' · '));
+        const angenommen = plugins.map(p => p === ziel
+            ? { ...p, abhaengig: [...p.abhaengig, ...String(was).split(',')] } : p);
+        const w = erklaerungen(angenommen);
+        const fehlt = w.fehlend.some(x => x.p.name === wer);
+        const ring = w.ringe.length > a.ringe.length;
+        melde(!fehlt && !ring, `\`${wer}\` → \`${was}\` wäre eine gültige Erklärung`,
+            fehlt ? `\`${was}\` gibt es nicht als Plugin — \`installPlugin\` lehnte \`${wer}\` ab`
+                  : `es entstünde ein Ring: ${w.ringe.join(' | ')}`);
+        hinweis('Beim Start schaltet eine Erklärung nichts ab — die Runde dafür gibt es nicht mehr.');
     }
+}
 
-    const ein = await leseEingeschaltet();
-    if (ein.wirklich) hinweis(`Wirklich eingeschaltet laut \`guild_plugins\` (${ein.wirklich.length}): ${ein.wirklich.join(', ')}`);
+console.log('\nB — Bestandsaufnahme: die Beziehungen, die es wirklich gibt');
 
-    if (ein.fehlt) {
-        // ── Das ist der Fund, nicht nur eine Lücke ──────────────────────────
-        //
-        // Der Manager misst Regel 2 gegen `configs.ENABLED_PLUGINS`. Diese Zeile
-        // gibt es hier nicht — das Dashboard schaltet seit dem Umbau ueber
-        // `guild_plugins` ein (app.js:384: „ENABLED_PLUGINS wird nicht mehr aus
-        // configs geladen!"). Die Liste ist damit LEER, und gegen eine leere
-        // Liste ist jede Abhaengigkeit „nicht eingeschaltet".
-        melde(false, 'Die Liste, gegen die Regel 2 misst, ist gefüllt',
-            `${ein.fehlt}.\n`
-            + '       Sie ist damit LEER — und gegen eine leere Liste gilt JEDE Abhängigkeit als\n'
-            + '       abgeschaltet. Die erste harte Deklaration würde ihr eigenes Plugin abschalten\n'
-            + '       und in `configs` schreiben. Eingeschaltet wird heute über `guild_plugins`\n'
-            + '       (apps/dashboard/app.js:316 ff.), gemessen wird gegen `configs` — das ist die Falle.\n'
-            + '       ⇒ Vor JEDER harten Deklaration gehört diese Quelle geradegezogen.');
-    } else {
-        hinweis(`Gemessen wird gegen \`configs.ENABLED_PLUGINS\` (${ein.liste.length}): ${ein.liste.join(', ')}`);
+const griffe = harteGriffe(plugins);
+if (!griffe.length) {
+    melde(true, 'Kein Plugin greift hart in ein anderes');
+} else {
+    const paare = new Map();
+    for (const g of griffe) {
+        const schluessel = `${g.von} → ${g.nach}`;
+        if (!paare.has(schluessel)) paare.set(schluessel, []);
+        paare.get(schluessel).push(g.wo);
     }
-
-    const probe = wirkungsprobe(plugins, ein.liste || null);
-    melde(probe.uebersprungen.length === 0,
-        'Kein Plugin würde beim nächsten Start ÜBERSPRUNGEN',
-        probe.uebersprungen.map(u => `${u.p.name}: ${u.fehlend.join(', ')} fehlt`).join('\n       '));
-    melde(probe.abgeschaltet.length === 0,
-        'Kein Plugin würde ABGESCHALTET und in `configs` geschrieben',
-        probe.abgeschaltet.map(a => `${a.p.name}: ${a.aus.join(', ')} ist aus`).join('\n       '));
-    melde(probe.ringe.length === 0, 'Keine Ringe in den erklärten Abhängigkeiten',
-        probe.ringe.join('\n       '));
-
-    // ── Was-wäre-wenn ───────────────────────────────────────────────────────
-    //
-    //   node scripts/check-plugin-beziehungen.js --wenn gameserver=masterserver
-    //
-    // Rechnet dieselben Regeln mit einer Deklaration, die es noch NICHT gibt.
-    // Damit lässt sich eine geplante Zeile prüfen, bevor sie jemand schreibt.
-    const wennArg = process.argv.find(a => a.startsWith('--wenn='))
-        || (process.argv.includes('--wenn') ? process.argv[process.argv.indexOf('--wenn') + 1] : null);
-    if (wennArg) {
-        const roh = wennArg.replace(/^--wenn=/, '');
-        const [wer, was] = roh.split('=');
-        const ziel = plugins.find(p => p.name === wer);
-        console.log(`\nA' — Was wäre, wenn \`${wer}\` von \`${was}\` abhinge?`);
-        if (!ziel) {
-            melde(false, `Das Plugin \`${wer}\` gibt es`, 'Name aus der package.json, nicht der Ordnername');
-        } else {
-            const angenommen = plugins.map(p => p === ziel
-                ? { ...p, abhaengig: [...p.abhaengig, ...String(was).split(',')] } : p);
-            const wenn = wirkungsprobe(angenommen, ein.liste || []);
-            const trifft = [...wenn.uebersprungen, ...wenn.abgeschaltet].some(x => x.p.name === wer);
-            melde(!trifft, `\`${wer}\` bliebe eingeschaltet`,
-                trifft
-                    ? `Es würde ${wenn.uebersprungen.some(x => x.p.name === wer) ? 'ÜBERSPRUNGEN' : 'ABGESCHALTET und in `configs` geschrieben'}.\n`
-                      + '       Genau das ist der Schritt, der auf einer laufenden Anlage nicht passieren darf.'
-                    : '');
-        }
+    console.log(`  ⚠ ${griffe.length} harte(r) Griff(e) über Plugin-Grenzen — unerklärt:`);
+    for (const [paar, orte] of paare) {
+        const p = plugins.find(x => x.ordner === paar.split(' → ')[0]);
+        const nach = paar.split(' → ')[1];
+        const gedeckt = p && p.abhaengig.includes(nach);
+        console.log(`     ${paar}  (${orte.length}×)${gedeckt ? ' — erklärt' : ' — NICHT erklärt'}`);
+        for (const ort of orte.slice(0, 3)) console.log(`        ${ort}`);
+        if (orte.length > 3) console.log(`        … und ${orte.length - 3} weitere`);
     }
+    console.log('     Ohne das andere Plugin fliegt die Datei beim Laden.');
+}
 
-    console.log('\nB — Bestandsaufnahme: die Beziehungen, die es wirklich gibt');
+console.log('\n  Weiche Beziehungen über die Registrierungsstellen:');
+for (const [stelle, e] of weicheBeziehungen(plugins)) {
+    const bietet = [...e.bietet];
+    const nutzt = [...e.nutzt];
+    if (!bietet.length && !nutzt.length) { console.log(`     ${stelle}: niemand`); continue; }
+    console.log(`     ${stelle}: bietet ${bietet.join(', ') || '—'} · nutzt ${nutzt.join(', ') || '—'}`);
+}
+console.log('     Diese Beziehungen laufen, sind aber nirgends erklärt —');
+console.log('     der Manager weiß nichts davon (docs/plugin-beziehungen.md).');
 
-    const griffe = harteGriffe(plugins);
-    if (!griffe.length) {
-        melde(true, 'Kein Plugin greift hart in ein anderes');
-    } else {
-        const paare = new Map();
-        for (const g of griffe) {
-            const schluessel = `${g.von} → ${g.nach}`;
-            if (!paare.has(schluessel)) paare.set(schluessel, []);
-            paare.get(schluessel).push(g.wo);
-        }
-        console.log(`  ⚠ ${griffe.length} harte(r) Griff(e) über Plugin-Grenzen — unerklärt:`);
-        for (const [paar, orte] of paare) {
-            const p = plugins.find(x => x.ordner === paar.split(' → ')[0]);
-            const nach = paar.split(' → ')[1];
-            const gedeckt = p && p.abhaengig.includes(nach);
-            console.log(`     ${paar}  (${orte.length}×)${gedeckt ? ' — erklärt' : ' — NICHT erklärt'}`);
-            for (const ort of orte.slice(0, 3)) console.log(`        ${ort}`);
-            if (orte.length > 3) console.log(`        … und ${orte.length - 3} weitere`);
-        }
-        console.log('     Ohne das andere Plugin fliegt die Datei beim Laden.');
-    }
-
-    console.log('\n  Weiche Beziehungen über die Registrierungsstellen:');
-    for (const [stelle, e] of weicheBeziehungen(plugins)) {
-        const bietet = [...e.bietet];
-        const nutzt = [...e.nutzt];
-        if (!bietet.length && !nutzt.length) { console.log(`     ${stelle}: niemand`); continue; }
-        console.log(`     ${stelle}: bietet ${bietet.join(', ') || '—'} · nutzt ${nutzt.join(', ') || '—'}`);
-    }
-    console.log('     Diese Beziehungen laufen, sind aber nirgends erklärt —');
-    console.log('     der Manager weiß nichts davon (docs/plugin-beziehungen.md).');
-
-    console.log(fehler === 0
-        ? '\n✅ Nichts würde beim nächsten Start abgeschaltet.\n'
-        : `\n❌ ${fehler} Punkt(e) zum Ansehen — nichts wurde geändert.\n`);
-    process.exit(fehler === 0 ? 0 : 1);
-})();
+console.log(fehler === 0
+    ? '\n✅ Beim Start blockiert keine Beziehung, und die alte Liste liest niemand.\n'
+    : `\n❌ ${fehler} Punkt(e) zum Ansehen — nichts wurde geändert.\n`);
+process.exit(fehler === 0 ? 0 : 1);
