@@ -22,6 +22,25 @@ const { ServiceManager } = require('dunebot-core');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 const { makeTranslator, renderView, renderFehler } = require('./_shared');
 const musik = require('../../shared/musikwunsch');
+const musikende = require('../kern/musikende');
+const musikendeEntscheidung = require('../kern/musikendeEntscheidung');
+const modelle = require('../../shared/models');
+
+/**
+ * Der letzte Auftrag „Musik am Streamende" als eine Zeile.
+ *
+ * @param {Object|null} a Zeile aus `musikende.letzter`
+ * @param {string} zeitzone IANA-Zeitzone der Guild
+ * @returns {string|null} Klartext
+ */
+function streamendeZeile(a, zeitzone) {
+    if (!a) return null;
+    const zeit = (d) => new Date(d).toLocaleString('de-DE', {
+        timeZone: zeitzone, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+    });
+    if (a.zustand === 'offen') return `wartet bis ${zeit(a.faellig_ab)}`;
+    return `${zeit(a.erledigt_am || a.faellig_ab)} — ${a.fehlertext || a.zustand}`;
+}
 
 /**
  * Die Adresse, die der Streamer in OBS eintraegt.
@@ -84,8 +103,17 @@ router.get('/', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => 
             }
         }
 
+        const [streamende, streamendeLetzter, zeitzone] = await Promise.all([
+            musikende.einstellung(guildId),
+            musikende.letzter(guildId),
+            modelle.zeitzone(guildId)
+        ]);
+
         return await renderView(res, 'guild/streaming-musik', {
             tr, guildId,
+            streamende,
+            streamendeZuletzt: streamendeZeile(streamendeLetzter, zeitzone),
+            nachlaufGrenzen: { min: musikendeEntscheidung.NACHLAUF_MIN, max: musikendeEntscheidung.NACHLAUF_MAX },
             adresse: playerAdresse(req, zustand.schluessel),
             aktiv: Boolean(zustand.aktiv),
             endlos: Boolean(zustand.endlos),
@@ -171,6 +199,33 @@ router.post('/endlos', requirePermission('STREAMING.CHAT.MANAGE'), async (req, r
                : 'Endlos aus — es läuft nur noch, was gewünscht wird.')}`);
     } catch (error) {
         ServiceManager.get('Logger').error('[Streaming] Endlosmodus nicht schaltbar:', error);
+        return res.redirect(`${basis}?fehler=${encodeURIComponent('Das hat nicht geklappt.')}`);
+    }
+});
+
+/**
+ * Musik am Streamende: an/aus und Nachlauf (Baustelle 128).
+ *
+ * Dasselbe Recht wie der Knopf „Beenden" daneben - die Einstellung tut spaeter
+ * nichts anderes als ihn.
+ */
+router.post('/streamende', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const basis = `/guild/${guildId}/plugins/streaming/musik`;
+
+    const pruefung = musikendeEntscheidung.eingabePruefen(req.body || {});
+    if (!pruefung.ok) {
+        return res.redirect(`${basis}?fehler=${encodeURIComponent(
+            `Der Nachlauf muss zwischen ${musikendeEntscheidung.NACHLAUF_MIN} und ${musikendeEntscheidung.NACHLAUF_MAX} Minuten liegen.`)}`);
+    }
+
+    try {
+        await musikende.speichern(guildId, pruefung.werte);
+        return res.redirect(`${basis}?ok=${encodeURIComponent(pruefung.werte.an
+            ? `Gespeichert — nach dem Stream endet die Musik nach ${pruefung.werte.nachlaufMin} Minuten.`
+            : 'Gespeichert — die Musik läuft nach dem Stream weiter.')}`);
+    } catch (error) {
+        ServiceManager.get('Logger').error('[Streaming] Musikende nicht speicherbar:', error);
         return res.redirect(`${basis}?fehler=${encodeURIComponent('Das hat nicht geklappt.')}`);
     }
 });

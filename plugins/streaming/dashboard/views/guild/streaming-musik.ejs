@@ -209,6 +209,42 @@
             <% } %>
           </div>
         </form>
+
+        <%#
+          Musik am Streamende (Baustelle 128). Ein Formular für Schalter und
+          Nachlauf: Der Schalter schickt sich selbst ab wie „Endlos", der Knopf
+          übernimmt den Nachlauf — beide senden beide Felder.
+        %>
+        <hr class="my-3">
+        <form method="post" action="/guild/<%= guildId %>/plugins/streaming/musik/streamende"
+              id="streamende-form">
+          <label class="form-check form-switch mb-1">
+            <input class="form-check-input" type="checkbox" name="an" value="1" <%= streamende.an ? 'checked' : '' %>
+                   onchange="document.getElementById('streamende-form').requestSubmit();">
+            <span class="form-check-label">Nach dem Stream beenden</span>
+          </label>
+          <div class="input-group input-group-sm mt-2" style="max-width: 18rem;">
+            <span class="input-group-text">Nachlauf</span>
+            <input type="number" class="form-control" name="nachlauf_min"
+                   min="<%= nachlaufGrenzen.min %>" max="<%= nachlaufGrenzen.max %>"
+                   value="<%= streamende.nachlaufMin %>" aria-label="Nachlauf in Minuten">
+            <span class="input-group-text">Min.</span>
+            <button class="btn btn-outline-primary" type="submit">Übernehmen</button>
+          </div>
+          <div class="form-hint">
+            <% if (streamende.an) { %>
+              Endet der Stream, wartet der Zusatz <%= streamende.nachlaufMin %> Minuten. Geht in der
+              Zeit wieder jemand live, bleibt die Musik an, sonst wird sie beendet — die Warteschlange
+              bleibt. Es zählt jeder Kanal, dessen Heim-Guild diese Guild ist. Läuft beim Streamende
+              keine Musik, passiert nichts.
+            <% } else { %>
+              Die Musik läuft nach dem Stream weiter, bis jemand sie anhält.
+            <% } %>
+          </div>
+          <% if (streamendeZuletzt) { %>
+            <div class="text-secondary small mt-1">Zuletzt: <%= streamendeZuletzt %></div>
+          <% } %>
+        </form>
       </div>
     </div>
   </div>

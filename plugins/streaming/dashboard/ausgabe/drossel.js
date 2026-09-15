@@ -37,6 +37,7 @@ const { melden } = require('../../shared/signale');
 const kanalstau = require('./kanalstau');
 const serverstopp = require('../kern/serverstopp');
 const serverstoppEntscheidung = require('../kern/serverstoppEntscheidung');
+const musikende = require('../kern/musikende');
 
 const TAKT_MS = 500;
 const JE_LAUF = 20;
@@ -531,6 +532,12 @@ async function ausfuehren(auftrag) {
     // `umfeldLaden` wuerde ihn mit "Ziel existiert nicht mehr" wegwerfen.
     if (auftrag.aktion === 'serverstopp') {
         return await serverstopp.ausfuehren(auftrag);
+    }
+
+    // Musik am Streamende (Baustelle 128) - aus demselben Grund vor `umfeldLaden`:
+    // Der Auftrag gehoert der Guild, nicht einem Ziel.
+    if (auftrag.aktion === 'musikende') {
+        return await musikende.ausfuehren(auftrag);
     }
 
     const umfeld = await umfeldLaden(auftrag);

@@ -34,6 +34,7 @@ const { melden } = require('../../shared/signale');
 const abos = require('./abos');
 const melder = require('./melder');
 const serverstopp = require('./serverstopp');
+const musikende = require('./musikende');
 
 const TAKT_MS = 5_000;
 const ANREICHERN_MS = 30_000;
@@ -342,6 +343,13 @@ async function gingLive(streamer, zustand, ereignis) {
         log().error(`[Streaming] Streamserver-Abbruch fuer ${streamer.login} fehlgeschlagen:`, err);
     }
 
+    // Musik am Streamende (Baustelle 128): wartendes Beenden abbrechen.
+    try {
+        await musikende.beiStreambeginn(streamer.id);
+    } catch (err) {
+        log().error(`[Streaming] Musikende-Abbruch fuer ${streamer.login} fehlgeschlagen:`, err);
+    }
+
     if (wahl.handlung === 'nichts') return `keine Meldung: ${wahl.grund}` + (rollen ? `, ${rollen} Rolle(n) vorgemerkt` : '');
     if (wahl.handlung === 'aktualisieren') return `keine zweite Ankuendigung: ${wahl.grund}`;
 
@@ -465,6 +473,13 @@ async function beendet(streamer, zustand, ereignis) {
         await serverstopp.vormerken(streamer.id);
     } catch (err) {
         log().error(`[Streaming] Streamserver-Stopp fuer ${streamer.login} nicht vorgemerkt:`, err);
+    }
+
+    // Musik am Streamende (Baustelle 128) - ebenfalls hier UND in `nachStreamende`.
+    try {
+        await musikende.vormerken(streamer.id);
+    } catch (err) {
+        log().error(`[Streaming] Musikende fuer ${streamer.login} nicht vorgemerkt:`, err);
     }
 
     if (wahl.handlung === 'nichts') {
@@ -647,7 +662,15 @@ async function nachStreamende(streamerId) {
     } catch (err) {
         log().error(`[Streaming] Streamserver-Stopp fuer Streamer ${streamerId} nicht vorgemerkt:`, err);
     }
-    return auftraege + rollen + stopps;
+
+    // Musik am Streamende (Baustelle 128) - siehe `beendet()`.
+    let musik = 0;
+    try {
+        musik = await musikende.vormerken(streamerId);
+    } catch (err) {
+        log().error(`[Streaming] Musikende fuer Streamer ${streamerId} nicht vorgemerkt:`, err);
+    }
+    return auftraege + rollen + stopps + musik;
 }
 
 // =====================================================
