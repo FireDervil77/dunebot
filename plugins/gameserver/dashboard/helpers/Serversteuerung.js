@@ -51,6 +51,24 @@ function spielerzahl(zeile, jetzt = Date.now()) {
 }
 
 /**
+ * Der letzte Start in Millisekunden.
+ *
+ * `last_started_at` setzen der Startknopf (`routes/servers.js`), der Cronjob
+ * (`CronWorker._merkeStart`) und die Meldung des Daemons, dass der Server laeuft
+ * (`IPMServer._handleGameserverStatusChanged` - beim Wechsel, nicht bei jeder
+ * Abfrage). Ein Nutzer vergleicht den Wert nur auf Gleichheit: Aendert er sich,
+ * wurde gestartet.
+ *
+ * @param {Date|string|null} wert
+ * @returns {number|null}
+ */
+function startzeit(wert) {
+    if (!wert) return null;
+    const ms = new Date(wert).getTime();
+    return Number.isFinite(ms) ? ms : null;
+}
+
+/**
  * @param {Object} zeile Zeile aus gameservers + gameserver_status
  * @returns {import('dunebot-sdk/lib/ServersteuerungRegistry').ServerZustand}
  */
@@ -59,12 +77,13 @@ function alsZustand(zeile) {
         id: Number(zeile.id),
         name: zeile.name,
         status: zeile.status,
-        spieler: spielerzahl(zeile)
+        spieler: spielerzahl(zeile),
+        gestartet_am: startzeit(zeile.last_started_at)
     };
 }
 
 const ABFRAGE = `
-    SELECT gs.id, gs.name, gs.status,
+    SELECT gs.id, gs.name, gs.status, gs.last_started_at,
            st.players_current, st.queried_at, st.online
       FROM gameservers gs
       LEFT JOIN gameserver_status st ON st.server_id = gs.id`;
@@ -102,4 +121,4 @@ const anbieter = {
     }
 };
 
-module.exports = { anbieter, spielerzahl, SPIELER_GILT_MS };
+module.exports = { anbieter, spielerzahl, startzeit, SPIELER_GILT_MS };

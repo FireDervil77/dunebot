@@ -26,14 +26,39 @@ const NACHLAUF_VORGABE = 15;
 /**
  * Soll nach einem Streamende ein Stopp vorgemerkt werden?
  *
+ * **Abgeschaltet wird nur, was waehrend des Streams lief.** Ist der Server beim
+ * Streamende aus, gibt es nichts zu stoppen - und ohne diese Regel stuende ein
+ * Auftrag bereit, der einen danach von Hand gestarteten Server (Vorbereitung,
+ * niemand streamt) beim Faelligwerden abschaltet. Dazu gehoert
+ * `startBeimVormerken` in `beimFaelligwerden`.
+ *
  * @param {Object|null} einstellung { aktiv }
  * @param {number} liveInAuswahl Ausgewaehlte Streamer, die jetzt noch live sind
+ * @param {Object} [lage]
+ * @param {boolean} [lage.anbieterDa] Ist ein Anbieter eingetragen?
+ * @param {Object|null} [lage.server] { status } vom Anbieter
  * @returns {{vormerken: boolean, grund: string}}
  */
-function beimStreamende(einstellung, liveInAuswahl) {
+function beimStreamende(einstellung, liveInAuswahl, { anbieterDa, server } = {}) {
     if (!einstellung || !Number(einstellung.aktiv)) return { vormerken: false, grund: 'aus' };
     if (Number(liveInAuswahl) > 0) return { vormerken: false, grund: 'noch_live' };
+    if (!anbieterDa) return { vormerken: false, grund: 'kein_anbieter' };
+    if (!server) return { vormerken: false, grund: 'server_fehlt' };
+    if (server.status !== 'online') return { vormerken: false, grund: 'nicht_online' };
     return { vormerken: true, grund: 'letzter_offline' };
+}
+
+/**
+ * Ein Startzeitpunkt als Zahl, damit `Date`, ISO-Text und Millisekunden
+ * gleich verglichen werden. Unlesbares wird `null`.
+ *
+ * @param {Date|string|number|null|undefined} wert
+ * @returns {number|null}
+ */
+function zeitpunkt(wert) {
+    if (wert === null || wert === undefined || wert === '') return null;
+    const ms = typeof wert === 'number' ? wert : new Date(wert).getTime();
+    return Number.isFinite(ms) ? ms : null;
 }
 
 /** @param {string} grund @returns {{handlung: string, grund: string}} */
@@ -46,15 +71,23 @@ const abbruch = (grund) => ({ handlung: 'abbrechen', grund });
  * @param {boolean} lage.anbieterDa Ist ein Anbieter eingetragen?
  * @param {Object|null} lage.einstellung { aktiv, modus }
  * @param {number} lage.liveInAuswahl Ausgewaehlte Streamer, die live sind
- * @param {Object|null} lage.server { status, spieler } vom Anbieter
+ * @param {Object|null} lage.server { status, spieler, gestartet_am } vom Anbieter
+ * @param {*} [lage.startBeimVormerken] `gestartet_am` des Servers beim Streamende.
+ *        Weicht der Wert jetzt ab, wurde der Server dazwischen gestartet - von
+ *        Hand, per Cronjob oder nach einem Absturz - und er bleibt an.
+ *        `undefined` heisst: nicht erfasst (Auftrag von vor dieser Regel).
  * @returns {{handlung: 'stoppen'|'wuerde_stoppen'|'abbrechen', grund: string}}
  */
-function beimFaelligwerden({ anbieterDa, einstellung, liveInAuswahl, server } = {}) {
+function beimFaelligwerden({ anbieterDa, einstellung, liveInAuswahl, server, startBeimVormerken } = {}) {
     if (!anbieterDa) return abbruch('kein_anbieter');
     if (!einstellung || !Number(einstellung.aktiv)) return abbruch('aus');
     if (Number(liveInAuswahl) > 0) return abbruch('wieder_live');
     if (!server) return abbruch('server_fehlt');
     if (server.status !== 'online') return abbruch('nicht_online');
+    if (startBeimVormerken !== undefined
+        && zeitpunkt(server.gestartet_am) !== zeitpunkt(startBeimVormerken)) {
+        return abbruch('neu_gestartet');
+    }
 
     if (server.spieler === null || server.spieler === undefined || server.spieler === '') {
         return abbruch('spieler_unbekannt');
@@ -108,7 +141,8 @@ const GRUENDE = {
     aus: 'der Zusatz ist ausgeschaltet',
     wieder_live: 'ein ausgewählter Streamer ist wieder live',
     server_fehlt: 'den Server gibt es nicht mehr',
-    nicht_online: 'der Server läuft nicht mehr',
+    nicht_online: 'der Server läuft nicht',
+    neu_gestartet: 'der Server wurde nach dem Streamende neu gestartet',
     spieler_unbekannt: 'die Spielerzahl ist unbekannt',
     spieler_da: 'es ist noch jemand auf dem Server',
     leer_und_offline: 'niemand live, niemand auf dem Server'
@@ -151,5 +185,5 @@ function hinweisText(nutzlast = {}) {
 
 module.exports = {
     MODI, NACHLAUF_MIN, NACHLAUF_MAX, NACHLAUF_VORGABE,
-    beimStreamende, beimFaelligwerden, eingabePruefen, grundKlartext, hinweisText
+    beimStreamende, beimFaelligwerden, eingabePruefen, grundKlartext, hinweisText, zeitpunkt
 };

@@ -218,8 +218,24 @@ async function vormerken(streamerId) {
 
     for (const e of betroffen || []) {
         const live = await liveInAuswahl(e.guild_id, e.server_id);
-        const wahl = entscheidung.beimStreamende(e, live);
-        if (!wahl.vormerken) continue;
+        const a = anbieter();
+        // Kein `.catch(() => null)`: Ein gescheiterter Abruf ist kein „Server
+        // fehlt". Er wird genannt, und die uebrigen Server dieses Streamers laufen weiter.
+        let server;
+        try {
+            server = a ? await a.zustand(e.guild_id, e.server_id) : null;
+        } catch (err) {
+            log().error(`[Streaming/Streamserver] Server ${e.server_id} (Guild ${e.guild_id}): Zustand nicht abrufbar, kein Stopp vorgemerkt — ${err.message}`);
+            continue;
+        }
+
+        const wahl = entscheidung.beimStreamende(e, live, { anbieterDa: Boolean(a), server });
+        if (!wahl.vormerken) {
+            if (!['aus', 'noch_live'].includes(wahl.grund)) {
+                log().info(`[Streaming/Streamserver] ${server?.name || `Server ${e.server_id}`} (Guild ${e.guild_id}): kein Stopp vorgemerkt — ${entscheidung.grundKlartext(wahl.grund)}`);
+            }
+            continue;
+        }
 
         // Laufen `beendet()` und die Selbstheilung fuer dasselbe Ende, wartet
         // der erste Auftrag schon.
@@ -231,9 +247,7 @@ async function vormerken(streamerId) {
         `, [e.guild_id, String(e.server_id)]);
         if (wartend && wartend.length) continue;
 
-        const a = anbieter();
-        const server = a ? await a.zustand(e.guild_id, e.server_id).catch(() => null) : null;
-        const serverName = server?.name || `Server ${e.server_id}`;
+        const serverName = server.name || `Server ${e.server_id}`;
 
         const ziele = await db().query(
             'SELECT t.id, s.login FROM streaming_targets t JOIN streaming_streamers s ON s.id = t.streamer_id WHERE t.streamer_id = ? AND t.guild_id = ? AND t.aktiv = 1 ORDER BY t.id ASC LIMIT 1',
@@ -248,7 +262,9 @@ async function vormerken(streamerId) {
             VALUES (NULL, ?, 'serverstopp', ?, DATE_ADD(NOW(3), INTERVAL ? MINUTE))
         `, [e.guild_id, JSON.stringify({
             server_id: Number(e.server_id), server_name: serverName, streamer_id: Number(streamerId),
-            login: ziele?.[0]?.login || null, hinweis_ziel: hinweisZiel, nachlauf_min: nachlaufMin, angekuendigt
+            login: ziele?.[0]?.login || null, hinweis_ziel: hinweisZiel, nachlauf_min: nachlaufMin, angekuendigt,
+            // Der Stromanschluss: Weicht er beim Faelligwerden ab, wurde dazwischen gestartet.
+            gestartet_am: server.gestartet_am ?? null
         }), nachlaufMin]);
 
         if (angekuendigt) {
@@ -331,7 +347,8 @@ async function ausfuehren(auftrag) {
     const server = a ? await a.zustand(guildId, serverId) : null;
 
     const wahl = entscheidung.beimFaelligwerden({
-        anbieterDa: Boolean(a), einstellung: einstellungZeilen?.[0] || null, liveInAuswahl: live, server
+        anbieterDa: Boolean(a), einstellung: einstellungZeilen?.[0] || null, liveInAuswahl: live, server,
+        startBeimVormerken: n.gestartet_am
     });
     const name = server?.name || n.server_name || `Server ${serverId}`;
 

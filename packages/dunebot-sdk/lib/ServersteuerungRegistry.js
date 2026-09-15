@@ -38,6 +38,8 @@
  * @property {string} name Anzeigename
  * @property {string} status Zustand, z. B. 'online', 'offline', 'stopping'
  * @property {number|null} spieler Spieler auf dem Server; null = unbekannt
+ * @property {number|null} gestartet_am Letzter Start in ms; null = unbekannt.
+ *           Nur auf Gleichheit vergleichen - aendert sich der Wert, wurde gestartet
  */
 
 /**

@@ -21,7 +21,7 @@
 'use strict';
 
 const e = require('../plugins/streaming/dashboard/kern/serverstoppEntscheidung');
-const { spielerzahl, SPIELER_GILT_MS } = require('../plugins/gameserver/dashboard/helpers/Serversteuerung');
+const { spielerzahl, startzeit, SPIELER_GILT_MS } = require('../plugins/gameserver/dashboard/helpers/Serversteuerung');
 
 let geprueft = 0, gescheitert = 0;
 
@@ -33,10 +33,16 @@ function pruefe(was, ist, soll) {
 }
 
 console.log('\nBeim Streamende — wird vorgemerkt?');
-pruefe('keine Einstellung', e.beimStreamende(null, 0).vormerken, false);
-pruefe('Zusatz aus', e.beimStreamende({ aktiv: 0 }, 0).vormerken, false);
-pruefe('noch jemand aus der Auswahl live', e.beimStreamende({ aktiv: 1 }, 1).grund, 'noch_live');
-pruefe('letzter offline', e.beimStreamende({ aktiv: 1 }, 0).vormerken, true);
+const LAEUFT = { anbieterDa: true, server: { status: 'online', spieler: 0, gestartet_am: 1000 } };
+pruefe('keine Einstellung', e.beimStreamende(null, 0, LAEUFT).vormerken, false);
+pruefe('Zusatz aus', e.beimStreamende({ aktiv: 0 }, 0, LAEUFT).vormerken, false);
+pruefe('noch jemand aus der Auswahl live', e.beimStreamende({ aktiv: 1 }, 1, LAEUFT).grund, 'noch_live');
+pruefe('letzter offline, Server laeuft', e.beimStreamende({ aktiv: 1 }, 0, LAEUFT).vormerken, true);
+pruefe('Server aus — nichts zu stoppen, keine Ankuendigung', e.beimStreamende({ aktiv: 1 }, 0, { anbieterDa: true, server: { status: 'offline' } }).grund, 'nicht_online');
+pruefe('Server startet gerade', e.beimStreamende({ aktiv: 1 }, 0, { anbieterDa: true, server: { status: 'starting' } }).grund, 'nicht_online');
+pruefe('Server fehlt', e.beimStreamende({ aktiv: 1 }, 0, { anbieterDa: true, server: null }).grund, 'server_fehlt');
+pruefe('kein Anbieter', e.beimStreamende({ aktiv: 1 }, 0, { anbieterDa: false, server: null }).grund, 'kein_anbieter');
+pruefe('ohne Lage wird nichts vorgemerkt', e.beimStreamende({ aktiv: 1 }, 0).vormerken, false);
 
 console.log('\nBeim Faelligwerden — der Normalfall');
 const LEER = { status: 'online', spieler: 0 };
@@ -63,6 +69,21 @@ pruefe('Spielerzahl negativ', e.beimFaelligwerden(lage({ server: { status: 'onli
 pruefe('Spielerzahl kein Wert', e.beimFaelligwerden(lage({ server: { status: 'online', spieler: 'abc' } })).grund, 'spieler_unbekannt');
 pruefe('Spielerzahl leerer Text', e.beimFaelligwerden(lage({ server: { status: 'online', spieler: '' } })).grund, 'spieler_unbekannt');
 pruefe('ohne Angaben stuerzt nichts', e.beimFaelligwerden().handlung, 'abbrechen');
+
+console.log('\nBeim Faelligwerden — der Stromanschluss (gestartet nach dem Streamende?)');
+const START = Date.parse('2026-09-15T02:00:00Z');
+const mitStart = (jetzt, vorher, ueber = {}) => lage({ server: { status: 'online', spieler: 0, gestartet_am: jetzt }, startBeimVormerken: vorher, ...ueber });
+pruefe('unveraendert — stoppt', e.beimFaelligwerden(mitStart(START, START)).handlung, 'stoppen');
+pruefe('von Hand neu gestartet — bleibt an', e.beimFaelligwerden(mitStart(START + 600_000, START)).grund, 'neu_gestartet');
+pruefe('beim Streamende unbekannt, jetzt gestartet — bleibt an', e.beimFaelligwerden(mitStart(START, null)).grund, 'neu_gestartet');
+pruefe('Startzeit jetzt verloren — bleibt an', e.beimFaelligwerden(mitStart(null, START)).grund, 'neu_gestartet');
+pruefe('beide unbekannt — die anderen Regeln entscheiden', e.beimFaelligwerden(mitStart(null, null)).handlung, 'stoppen');
+pruefe('ISO-Text und Millisekunden sind derselbe Start', e.beimFaelligwerden(mitStart(START, '2026-09-15T02:00:00.000Z')).handlung, 'stoppen');
+pruefe('auch im Modus melden', e.beimFaelligwerden(mitStart(START + 1000, START, { einstellung: AN_MELDEN })).grund, 'neu_gestartet');
+pruefe('Auftrag von vor der Regel (nicht erfasst)', e.beimFaelligwerden(lage({ server: { status: 'online', spieler: 0, gestartet_am: START } })).handlung, 'stoppen');
+pruefe('neu gestartet und Spieler da — Start zuerst', e.beimFaelligwerden(mitStart(START + 1000, START, { server: { status: 'online', spieler: 2, gestartet_am: START + 1000 } })).grund, 'neu_gestartet');
+pruefe('Server offline schlaegt neu gestartet', e.beimFaelligwerden(mitStart(START + 1000, START, { server: { status: 'offline', spieler: 0, gestartet_am: START + 1000 } })).grund, 'nicht_online');
+pruefe('Hinweis nennt den Grund', e.hinweisText({ art: 'abgebrochen', server_name: 'X', grund: 'neu_gestartet' }).includes('nach dem Streamende neu gestartet'), true);
 
 console.log('\nFormular');
 const ERLAUBT = [1, 3];
@@ -98,6 +119,11 @@ pruefe('Abfrage gescheitert (online = 0)', spielerzahl({ players_current: 0, que
 pruefe('ohne Zeitpunkt', spielerzahl({ players_current: 0, online: 1 }, JETZT), null);
 pruefe('zu alt: der Poller steht', spielerzahl({ players_current: 0, queried_at: vor(SPIELER_GILT_MS + 1000), online: 1 }, JETZT), null);
 pruefe('knapp noch gueltig', spielerzahl({ players_current: 0, queried_at: vor(SPIELER_GILT_MS - 1000), online: 1 }, JETZT), 0);
+
+console.log('\nStartzeit des Gameserver-Anbieters');
+pruefe('Date wird Millisekunden', startzeit(new Date(START)), START);
+pruefe('nie gestartet', startzeit(null), null);
+pruefe('unlesbar wird null, nicht NaN', startzeit('kaputt'), null);
 
 console.log(gescheitert === 0
     ? `\nErgebnis: ${geprueft} Faelle, 0 Abweichungen.\n`

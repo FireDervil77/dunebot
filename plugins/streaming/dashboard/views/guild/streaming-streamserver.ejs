@@ -75,7 +75,8 @@ const FEHLER = {
   <strong>So entscheidet der Zusatz:</strong> Endet der Stream des letzten ausgewählten Streamers,
   wartet er den Nachlauf ab und prüft dann neu. Gestoppt wird nur, wenn niemand aus der Auswahl
   live ist, der Server läuft und <strong>genau 0 Spieler</strong> drauf sind. Ist die Spielerzahl
-  unbekannt, bleibt der Server an. Im Modus „nur melden" wird nichts gestoppt und nichts in Discord
+  unbekannt, bleibt der Server an. Abgeschaltet wird nur, was schon beim Streamende lief: War der
+  Server da aus oder wurde er danach gestartet — etwa von Hand zur Vorbereitung —, bleibt er an. Im Modus „nur melden" wird nichts gestoppt und nichts in Discord
   geschrieben — das Ergebnis steht unten.
 </div>
 
