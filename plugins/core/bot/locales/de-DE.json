@@ -90,5 +90,18 @@
      "SETTINGS": {
         "NEW_LANGUAGE": "neue Sprache",
         "NEW_PREFIX": "neuer Prefix"
+    },
+
+    "WILLKOMMEN": {
+        "TITEL": "Danke für die Einladung!",
+        "TEXT": "Schön, hier zu sein. Auf **{{server}}** bin ich jetzt dabei — nur tue ich noch nichts. Was ich können soll, entscheidest du im Dashboard. Vier Schritte reichen für den Anfang.",
+        "SCHRITTE_TITEL": "Erste Schritte",
+        "SCHRITT_SPRACHE": "Sprache des Servers prüfen",
+        "SCHRITT_PLUGINS": "Plugins einschalten",
+        "SCHRITT_RECHTE": "Rechte und Gruppen einrichten",
+        "SCHRITT_HILFE": "Hilfe und Dokumentation",
+        "SEITE_TITEL": "Alles auf einer Seite",
+        "SEITE_LINK": "Zur Willkommensseite",
+        "FUSS": "Diese Nachricht kommt einmalig, beim Beitritt."
     }
 }

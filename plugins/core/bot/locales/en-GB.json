@@ -90,5 +90,18 @@
     "SETTINGS": {
         "NEW_LANGUAGE": "new language",
         "NEW_PREFIX": "new prefix"
+    },
+
+    "WILLKOMMEN": {
+        "TITEL": "Thanks for the invite!",
+        "TEXT": "Good to be here. I have joined **{{server}}** — but I am not doing anything yet. What I do is up to you, in the dashboard. Four steps are enough to get going.",
+        "SCHRITTE_TITEL": "First steps",
+        "SCHRITT_SPRACHE": "Check the server language",
+        "SCHRITT_PLUGINS": "Turn on plugins",
+        "SCHRITT_RECHTE": "Set up permissions and groups",
+        "SCHRITT_HILFE": "Help and documentation",
+        "SEITE_TITEL": "Everything on one page",
+        "SEITE_LINK": "Open the welcome page",
+        "FUSS": "You get this message once, when I join."
     }
 }

@@ -21,9 +21,15 @@ module.exports = async (client) => {
     client.defaultLanguage = config?.LOCALE?.DEFAULT || "de-DE";
 
     // Guild-Locale aus DB setzen
+    //
+    // `getConfigs()` gibt die Schluessel so zurueck, wie sie in `configs`
+    // stehen — also `LOCALE`. Bis zum 2026-09-16 stand hier `settings?.locale`
+    // (klein). Das gibt es nicht: der Ausdruck war immer `undefined`, jede
+    // Guild bekam `client.defaultLanguage` und der Bot hat die im Dashboard
+    // gewaehlte Sprache nach jedem Neustart ignoriert — ohne eine Zeile im Log.
     for (const guild of client.guilds.cache.values()) {
         const settings = await dbService.getConfigs(guild.id);
-        guild.locale = settings?.locale || client.defaultLanguage;
+        guild.locale = settings?.LOCALE || client.defaultLanguage;
     }
 
     // Alle Guilds synchronisieren + Slash-Commands registrieren

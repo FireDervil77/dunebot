@@ -116,6 +116,22 @@ router.put('/general', requirePermission('CORE.SETTINGS.EDIT'), async (req, res)
         // Session-Locale löschen → sofortiger Sprachwechsel
         delete req.session.locale;
 
+        // Dem Bot Bescheid sagen. Er hält die Sprache je Guild im Speicher
+        // (`guild.locale`) und liest sie sonst nur beim Start — ohne diese
+        // Zeile redet er bis zum nächsten Neustart in der alten Sprache
+        // weiter. Der Handler dafür lag seit jeher ungenutzt in
+        // `apps/bot/ipc/SET_GUILD_LOCALE.js`.
+        if (locale) {
+            try {
+                const ipcServer = ServiceManager.get('ipcServer');
+                // Frist gesetzt: veza wartet sonst unbegrenzt und haengt das
+                // Speichern der Seite an die Antwort des Bots.
+                await ipcServer.broadcast('dashboard:SET_GUILD_LOCALE', { guildId, locale }, true, { timeout: 3000 });
+            } catch (err) {
+                Logger.warn(`[KernSettings] Bot über die neue Sprache nicht erreicht: ${err.message}`);
+            }
+        }
+
         res.json({ success: true, message: 'Einstellungen erfolgreich gespeichert!' });
     } catch (error) {
         Logger.error('[KernSettings] Fehler beim Speichern:', error);

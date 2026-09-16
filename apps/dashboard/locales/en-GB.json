@@ -571,5 +571,31 @@
     "ERROR_HELP_CACHE": "Clearing your browser cache",
     "ERROR_HELP_DISCORD": "Signing out of Discord and signing in again",
     "ERROR_HELP_ADMIN": "Contacting the bot administrator"
+  },
+
+  "WILLKOMMEN": {
+    "TITEL": "Welcome",
+    "BEGRUESSUNG": "{{server}} is set up",
+    "EINLEITUNG": "The bot has joined the server but is not doing anything yet. What it does is up to you. The four steps below are enough to get going — you can stop and come back later.",
+    "SPRACHE_LABEL": "Language of this page",
+    "SPRACHE_HINWEIS": "This only changes what you are reading right now. The language the bot speaks on the server is set in step 1.",
+    "SCHRITTE_TITEL": "First steps",
+    "SCHRITT1_TITEL": "Check the server language",
+    "SCHRITT1_TEXT": "The language the bot replies in on Discord.",
+    "SCHRITT1_UEBERNOMMEN": "Taken from your server's setting in Discord: {{sprache}}.",
+    "SCHRITT1_KNOPF": "Open settings",
+    "SCHRITT2_TITEL": "Turn on plugins",
+    "SCHRITT2_TEXT": "Without a plugin the bot can do nothing. Turn on what you need — each one brings its own area.",
+    "SCHRITT2_KNOPF": "Open plugins",
+    "SCHRITT3_TITEL": "Set up permissions and groups",
+    "SCHRITT3_TEXT": "Who may do what in the dashboard? The groups are already there, you only hand them out.",
+    "SCHRITT3_KNOPF": "Open permissions",
+    "SCHRITT4_TITEL": "Help and documentation",
+    "SCHRITT4_TEXT": "Look up what each plugin does and which commands exist.",
+    "SCHRITT4_KNOPF": "Open documentation",
+    "SUPPORT_KNOPF": "Open support server",
+    "FERTIG_TITEL": "What next?",
+    "FERTIG_TEXT": "Everything else lives in the server's dashboard. You can come back to this page any time.",
+    "FERTIG_KNOPF": "Open dashboard"
   }
 }

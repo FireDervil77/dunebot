@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const { ServiceManager } = require("dunebot-core");
+const { baueEinladungsUrl } = require("../helpers/Einladung");
 
 /**
  * Middleware to check if the user is logged in
@@ -85,9 +86,7 @@ module.exports.CheckGuildAccess = async (req, res, next) => {
             Logger.warn(`⚠️ [GHOST-ID BLOCKIERT] User muss Bot erst zum Server einladen!`);
             
             // Zur Bot-Einladung weiterleiten
-            return res.redirect(
-                `https://discord.com/api/oauth2/authorize?client_id=${process.env.CLIENT_ID}&scope=bot+applications.commands&permissions=1374891929078&guild_id=${guildId}`
-            );
+            return res.redirect(baueEinladungsUrl(req, guildId));
         }
         
         // Guild existiert in DB - Jetzt OAuth2-Rechte prüfen

@@ -3,6 +3,7 @@ const querystring = require("querystring");
 require("dotenv").config();
 
 const { ServiceManager } = require("dunebot-core");
+const { baueEinladungsUrl, ruecksprungPruefen, warteAufGuild } = require("../helpers/Einladung");
 
 // Discord OAuth2 Konfiguration
 const CLIENT_ID = process.env.CLIENT_ID;
@@ -67,6 +68,31 @@ exports.callback = async (req, res) => {
             themeManager.getLayout('auth') : 
             'layouts/auth';
         
+        // Rücksprung aus einer Bot-Einladung?
+        //
+        // Muss **vor** allem anderen stehen: Der Code aus einer Einladung
+        // gehört zu den Bot-Scopes. Würden wir unten damit `/users/@me`
+        // abfragen, scheiterte der Aufruf — der Einladende landete auf einer
+        // Fehlerseite statt auf der Willkommensseite.
+        const einladung = ruecksprungPruefen(req);
+        if (einladung) {
+            if (!einladung.gueltig) {
+                Logger.warn(`[Einladung] Rücksprung verworfen (${einladung.grund})`);
+                return res.redirect("/auth/server-selector");
+            }
+            Logger.info(`[Einladung] Bot wurde zu Guild ${einladung.guildId} hinzugefügt`);
+
+            // Kurz warten, bis der Bot die Guild eingetragen hat — sonst
+            // schickt CheckGuildAccess den Einladenden zurück zur Einladung.
+            const eingetragen = await warteAufGuild(einladung.guildId);
+            if (!eingetragen) {
+                req.session.errorMessage = 'GUILD_UNAVAILABLE';
+                return res.redirect("/auth/server-selector");
+            }
+
+            return res.redirect(`/guild/${einladung.guildId}/willkommen`);
+        }
+
         if (!req.query.code) {
             Logger.warn("OAuth Callback ohne Code aufgerufen");
             return res.redirect("/auth/login?error=no_code");
@@ -546,7 +572,7 @@ exports.getServerSelector = async (req, res) => {
 
             const settingsUrl = botInGuild
                 ? `/guild/${guild.id}`
-                : `https://discord.com/api/oauth2/authorize?client_id=${process.env.CLIENT_ID}&scope=bot+applications.commands&permissions=1374891929078&guild_id=${guild.id}`;
+                : baueEinladungsUrl(req, guild.id);
 
             const iconURL = guild.icon
                 ? `https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.png?size=128`
@@ -606,7 +632,7 @@ exports.setActiveGuild = async (req, res) => {
         const validationResponse = await ipcServer.broadcastOne("dashboard:VALIDATE_GUILD", { guildId });
         if (!validationResponse?.success || !validationResponse?.data?.valid) {
             Logger.warn(`Bot ist nicht auf Server ${guildId}, Aktivierung nicht möglich`);
-            return res.redirect(`https://discord.com/api/oauth2/authorize?client_id=${process.env.CLIENT_ID}&scope=bot+applications.commands&permissions=1374891929078&guild_id=${guildId}`);
+            return res.redirect(baueEinladungsUrl(req, guildId));
         }
 
         // 2. Guild in DB aktualisieren

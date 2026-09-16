@@ -590,5 +590,31 @@
     "ERROR_HELP_CACHE": "Deinen Browser-Cache zu leeren",
     "ERROR_HELP_DISCORD": "Dich von Discord abzumelden und erneut anzumelden",
     "ERROR_HELP_ADMIN": "Den Bot-Administrator zu kontaktieren"
+  },
+
+  "WILLKOMMEN": {
+    "TITEL": "Willkommen",
+    "BEGRUESSUNG": "{{server}} ist eingerichtet",
+    "EINLEITUNG": "Der Bot ist auf dem Server, tut aber noch nichts. Was er können soll, entscheidest du hier. Die vier Schritte unten reichen für den Anfang — du kannst jederzeit unterbrechen und später weitermachen.",
+    "SPRACHE_LABEL": "Sprache dieser Seite",
+    "SPRACHE_HINWEIS": "Das ändert nur, was du gerade liest. Die Sprache, in der der Bot auf dem Server spricht, stellst du in Schritt 1 ein.",
+    "SCHRITTE_TITEL": "Erste Schritte",
+    "SCHRITT1_TITEL": "Sprache des Servers prüfen",
+    "SCHRITT1_TEXT": "In welcher Sprache der Bot in Discord antwortet.",
+    "SCHRITT1_UEBERNOMMEN": "Übernommen aus der Einstellung deines Servers in Discord: {{sprache}}.",
+    "SCHRITT1_KNOPF": "Zu den Einstellungen",
+    "SCHRITT2_TITEL": "Plugins einschalten",
+    "SCHRITT2_TEXT": "Ohne Plugin kann der Bot nichts. Schalte ein, was du brauchst — jedes bringt seinen eigenen Bereich mit.",
+    "SCHRITT2_KNOPF": "Zu den Plugins",
+    "SCHRITT3_TITEL": "Rechte und Gruppen einrichten",
+    "SCHRITT3_TEXT": "Wer darf im Dashboard was? Die Gruppen stehen schon bereit, du verteilst nur noch.",
+    "SCHRITT3_KNOPF": "Zu den Rechten",
+    "SCHRITT4_TITEL": "Hilfe und Dokumentation",
+    "SCHRITT4_TEXT": "Nachschlagen, was die einzelnen Plugins tun und welche Befehle es gibt.",
+    "SCHRITT4_KNOPF": "Zur Dokumentation",
+    "SUPPORT_KNOPF": "Zum Support-Server",
+    "FERTIG_TITEL": "Und dann?",
+    "FERTIG_TEXT": "Alles Weitere findest du im Dashboard des Servers. Diese Seite kannst du jederzeit wieder aufrufen.",
+    "FERTIG_KNOPF": "Zum Dashboard"
   }
 }

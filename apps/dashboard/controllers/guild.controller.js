@@ -618,6 +618,122 @@ exports.updatePlugins = async (req, res) => {
 };
 
 /**
+ * Willkommensseite nach dem Einladen des Bots anzeigen
+ *
+ * Erreichbar auf zwei Wegen: über den Rücksprung aus der Discord-Einladung
+ * (`auth.controller.callback`) und über den Link in der Begrüßung, die der Bot
+ * in Discord schickt.
+ *
+ * **Die Sprache hängt hier nicht an der Guild.** Wer gerade eingeladen hat,
+ * sieht die Seite in der Sprache des Servers — kann aber oben umschalten, ohne
+ * dass sich die Einstellung der Guild ändert. Deshalb der eigene
+ * `changeLanguage`-Aufruf: `req.translate` fragt i18next bei jedem Schlüssel
+ * nach der aktuellen Sprache, die `base.middleware` vorher gesetzt hat.
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
+ */
+exports.getWillkommen = async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const themeManager = ServiceManager.get('themeManager');
+    const i18n = ServiceManager.get('i18n');
+
+    try {
+        res.locals.layout = themeManager.getLayout('guild');
+
+        const guildId = req.params.guildId;
+        const dbService = ServiceManager.get('dbService');
+
+        // `guild.middleware` setzt `res.locals.guild` aus der OAuth-Liste der
+        // Sitzung. Die kann fehlen — etwa wenn jemand über `guild_users` Zugang
+        // hat, aber nicht in der Discord-Liste steht. Dann reicht der Name aus
+        // der Datenbank; die Seite zeigt ohnehin nur Links.
+        let guild = res.locals.guild;
+        if (!guild) {
+            const [zeile] = await dbService.query(
+                "SELECT guild_name FROM guilds WHERE _id = ?",
+                [guildId]
+            );
+            if (!zeile) {
+                return res.status(404).render("error", {
+                    message: "Server nicht gefunden",
+                    error: { status: 404 }
+                });
+            }
+            guild = { id: guildId, name: zeile.guild_name, icon: null };
+        }
+
+        // Das Symbol muss aus dem Hash gebaut werden — `guild.iconURL` gibt es
+        // an diesem Objekt nicht, es kommt roh von der Discord-OAuth-Schnittstelle.
+        const guildIcon = guild.icon
+            ? `https://cdn.discordapp.com/icons/${guild.id || guildId}/${guild.icon}.png?size=128`
+            : null;
+
+        const sprachen = (i18n?.languagesMeta || []).map(eintrag => ({
+            wert: eintrag.name,
+            name: eintrag.nativeName || eintrag.name,
+            kennung: eintrag.svg_code || ''
+        }));
+
+        // Umschalten nur auf eine Sprache, die es wirklich gibt — sonst bleibt
+        // es bei der, die base.middleware gewählt hat.
+        const gewuenscht = String(req.query.sprache || '');
+        const gewaehlt = sprachen.some(s => s.wert === gewuenscht) ? gewuenscht : null;
+
+        if (gewaehlt && i18n?.i18next) {
+            await i18n.i18next.changeLanguage(gewaehlt);
+        }
+
+        const aktuelleSprache = gewaehlt || i18n?.i18next?.language || 'de-DE';
+
+        // Welche Sprache trägt die Guild? Der Bot hat sie beim Beitritt aus der
+        // Discord-Einstellung des Servers übernommen — Schritt 1 nennt sie
+        // beim Namen, damit sichtbar ist, was da automatisch passiert ist.
+        let guildSprache = null;
+        try {
+            const [zeile] = await dbService.query(
+                "SELECT config_value FROM configs WHERE plugin_name = 'core' AND config_key = 'LOCALE' AND guild_id = ? AND context = 'shared'",
+                [guildId]
+            );
+            const wert = zeile?.config_value || null;
+            guildSprache = sprachen.find(s => s.wert === wert)?.name || wert;
+        } catch (err) {
+            Logger.warn('[Willkommen] Sprache der Guild nicht lesbar:', err.message);
+        }
+
+        // Support-Server nur zeigen, wenn wirklich einer eingetragen ist.
+        // `guild.middleware` setzt sonst '#', und ein Knopf ins Leere ist
+        // schlimmer als kein Knopf.
+        const supportUrl = res.locals.supportUrl && res.locals.supportUrl !== '#'
+            ? res.locals.supportUrl
+            : null;
+
+        await themeManager.renderView(res, 'guild/willkommen', {
+            // Titel über req.translate, nicht fest verdrahtet: er steht in der
+            // Titelleiste und muss der Sprachumschaltung oben folgen.
+            title: req.translate ? req.translate('WILLKOMMEN.TITEL') : 'Willkommen',
+            activeMenu: `/guild/${guildId}/willkommen`,
+            user: res.locals.user || req.session?.user?.info || null,
+            guild,
+            guildId,
+            guildIcon,
+            sprachen,
+            aktuelleSprache,
+            guildSprache,
+            supportUrl,
+            supportName: res.locals.supportName || null
+        });
+    } catch (error) {
+        Logger.error('Fehler beim Rendern der Willkommensseite:', error);
+        res.status(500).render("error", {
+            message: "Ein Fehler ist aufgetreten.",
+            error
+        });
+    }
+};
+
+/**
  * Guild Locales anzeigen
  * @author firedervil
  * @param {import('express').Request} req - Express Request Objekt

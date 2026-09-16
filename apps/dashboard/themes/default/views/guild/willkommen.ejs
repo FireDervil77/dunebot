@@ -1,0 +1,114 @@
+<%#
+ * Willkommensseite nach dem Einladen des Bots (Baustelle 129)
+ *
+ * Kein eigener Seitenrahmen und keine eigene Titelzeile: beides stellt das
+ * Layout des Themes. Der Titel kommt aus `locals.title`.
+ *
+ * Die Texte stehen in `apps/dashboard/locales/*.json` unter `WILLKOMMEN` —
+ * wie die Rechtstexte, nicht im CMS. Die Sprachumschaltung oben ändert nur
+ * diese Seite (`?sprache=…`), nicht die Einstellung der Guild.
+ *
+ * @context {Object}  guild           - Die Guild (id, name, icon-Hash)
+ * @context {string}  guildIcon       - fertige Symbol-Adresse, oder null
+ * @context {string}  guildId
+ * @context {Array}   sprachen        - [{ wert, name, kennung }]
+ * @context {string}  aktuelleSprache - in welcher die Seite gerade steht
+ * @context {string}  guildSprache    - Klarname der Sprache der Guild, oder null
+ * @context {string}  supportUrl      - nur gesetzt, wenn wirklich eingetragen
+%>
+
+<%# ── Begrüßung ───────────────────────────────────────────────────────────── %>
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="row align-items-center">
+            <div class="col-auto">
+                <span class="avatar avatar-lg"
+                      style="background-image: url(<%= guildIcon || '/images/DuneBot.png' %>)"></span>
+            </div>
+            <div class="col">
+                <h2 class="mb-1"><%= tr('WILLKOMMEN.BEGRUESSUNG', { server: guild.name }) %></h2>
+                <p class="text-secondary mb-0"><%= tr('WILLKOMMEN.EINLEITUNG') %></p>
+            </div>
+            <div class="col-12 col-md-auto mt-3 mt-md-0">
+                <div class="text-secondary small mb-1"><%= tr('WILLKOMMEN.SPRACHE_LABEL') %></div>
+                <div class="btn-group" role="group">
+                    <% sprachen.forEach(function (sprache) { %>
+                        <a class="btn btn-sm <%= sprache.wert === aktuelleSprache ? 'btn-primary' : 'btn-outline-secondary' %>"
+                           href="/guild/<%= guildId %>/willkommen?sprache=<%= sprache.wert %>">
+                            <%= sprache.name %>
+                        </a>
+                    <% }); %>
+                </div>
+                <div class="text-secondary small mt-1" style="max-width: 22rem;">
+                    <%= tr('WILLKOMMEN.SPRACHE_HINWEIS') %>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%# ── Erste Schritte ──────────────────────────────────────────────────────── %>
+<h3 class="mb-3"><%= tr('WILLKOMMEN.SCHRITTE_TITEL') %></h3>
+
+<%
+/**
+ * Eine Schrittkarte. `zusatz` ist optional und steht als eigener Absatz unter
+ * dem Text — dort landet, was der Bot schon von allein getan hat.
+ */
+function _schritt(nummer, symbol, titel, text, zusatz, knopf, ziel) {
+    return `<div class="col-md-6">
+      <div class="card h-100">
+        <div class="card-body d-flex flex-column">
+          <div class="d-flex align-items-center mb-2">
+            <span class="badge bg-primary-lt me-2">${nummer}</span>
+            <span class="text-primary me-2"><i class="fa-solid ${symbol}"></i></span>
+            <h4 class="card-title mb-0">${titel}</h4>
+          </div>
+          <p class="text-secondary">${text}</p>
+          ${zusatz ? `<p class="text-secondary small">${zusatz}</p>` : ''}
+          <div class="mt-auto">
+            <a href="${ziel}" class="btn btn-outline-primary w-100">${knopf}</a>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+const _uebernommen = guildSprache
+    ? tr('WILLKOMMEN.SCHRITT1_UEBERNOMMEN', { sprache: guildSprache })
+    : null;
+%>
+
+<div class="row row-cards mb-3">
+    <%- _schritt(1, 'fa-language',
+        tr('WILLKOMMEN.SCHRITT1_TITEL'), tr('WILLKOMMEN.SCHRITT1_TEXT'), _uebernommen,
+        tr('WILLKOMMEN.SCHRITT1_KNOPF'), `/guild/${guildId}/settings/general`) %>
+
+    <%- _schritt(2, 'fa-puzzle-piece',
+        tr('WILLKOMMEN.SCHRITT2_TITEL'), tr('WILLKOMMEN.SCHRITT2_TEXT'), null,
+        tr('WILLKOMMEN.SCHRITT2_KNOPF'), `/guild/${guildId}/plugins`) %>
+
+    <%- _schritt(3, 'fa-user-shield',
+        tr('WILLKOMMEN.SCHRITT3_TITEL'), tr('WILLKOMMEN.SCHRITT3_TEXT'), null,
+        tr('WILLKOMMEN.SCHRITT3_KNOPF'), `/guild/${guildId}/permissions`) %>
+
+    <%- _schritt(4, 'fa-book-open',
+        tr('WILLKOMMEN.SCHRITT4_TITEL'), tr('WILLKOMMEN.SCHRITT4_TEXT'), null,
+        tr('WILLKOMMEN.SCHRITT4_KNOPF'), '/docs') %>
+</div>
+
+<%# ── Abschluss ───────────────────────────────────────────────────────────── %>
+<div class="card">
+    <div class="card-body">
+        <h3 class="card-title"><%= tr('WILLKOMMEN.FERTIG_TITEL') %></h3>
+        <p class="text-secondary"><%= tr('WILLKOMMEN.FERTIG_TEXT') %></p>
+        <a href="/guild/<%= guildId %>" class="btn btn-primary">
+            <i class="fa-solid fa-gauge me-1"></i> <%= tr('WILLKOMMEN.FERTIG_KNOPF') %>
+        </a>
+        <% if (supportUrl) { %>
+            <a href="<%= supportUrl %>" class="btn btn-outline-secondary ms-2" target="_blank" rel="noopener">
+                <i class="fa-brands fa-discord me-1"></i> <%= tr('WILLKOMMEN.SUPPORT_KNOPF') %>
+            </a>
+        <% } %>
+    </div>
+</div>

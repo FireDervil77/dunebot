@@ -40,4 +40,23 @@ function ohneKommentare(quelltext) {
         .replace(/(^|[^:])\/\/.*$/gm, '$1');
 }
 
-module.exports = { ohneKommentare };
+/**
+ * Dasselbe fuer eine EJS-Ansicht.
+ *
+ * Ansichten tragen zwei Sorten Prosa: den EJS-Kommentar `<%# … %>` ganz oben
+ * (dort steht bei uns der Kopf mit `@context`) und gewoehnliche
+ * JavaScript-Kommentare innerhalb der `<% … %>`-Bloecke. Wer in einer Ansicht
+ * nach Code sucht — „steht hier wirklich `guild.iconURL`?" — trifft sonst die
+ * Zeile, die erklaert, dass man es gerade NICHT benutzen soll.
+ *
+ * Angelegt am 2026-09-16 beim Bau der Willkommensseite, als check-waechter-prosa
+ * genau diese Stelle anmerkte.
+ *
+ * @param {string} inhalt Roher Inhalt einer .ejs-Datei
+ * @returns {string} derselbe Text ohne Kommentare
+ */
+function ohneKommentareEjs(inhalt) {
+    return ohneKommentare(String(inhalt).replace(/<%#[\s\S]*?%>/g, ' '));
+}
+
+module.exports = { ohneKommentare, ohneKommentareEjs };

@@ -1,6 +1,7 @@
 const path = require("path");
 const ServiceManager = require("./ServiceManager");
 const defaultConfig = require("../config/guild-defaults.json");
+const { spracheAusDiscord } = require("./Sprachwahl");
 
 /**
  * GuildManager – Zentraler Service für Guild-Registrierung und -Verwaltung
@@ -69,6 +70,7 @@ class GuildManager {
         if (!existing || existing[0].count === 0) {
             Logger.info(`Neue Guild – initialisiere Config für ${guild.id}`);
             await this.initGuildConfigs(guild.id);
+            await this.spracheAusDiscordUebernehmen(guild);
             await this._seedDefaultGroups(guild.id);
             await this.ensureGuildPlugins(guild.id, guild.client);
         } else {
@@ -76,7 +78,20 @@ class GuildManager {
             await this._seedDefaultGroups(guild.id);
         }
 
-        // 3. IPC-Event an Dashboard senden
+        // 3. Sprache ans Guild-Objekt haengen
+        //
+        // Bei einer neuen Guild hat das `spracheAusDiscordUebernehmen()` schon
+        // getan. Bei einem **Re-Join** steht die Sprache seit damals in der
+        // Datenbank, das frische Guild-Objekt kennt sie aber nicht: `getT()`
+        // liest `guild.locale`, und ohne diese Zeile faellt es auf
+        // `client.defaultLanguage` zurueck — die Begruessung einer englischen
+        // Guild kaeme auf Deutsch.
+        if (!guild.locale) {
+            const konfiguration = await dbService.getConfigs(guild.id);
+            guild.locale = konfiguration?.LOCALE || guild.client?.defaultLanguage || "de-DE";
+        }
+
+        // 4. IPC-Event an Dashboard senden
         this._notifyDashboardJoined(guild);
     }
 
@@ -110,6 +125,7 @@ class GuildManager {
         if (!existing || existing[0].count === 0) {
             Logger.info(`Initialisiere Config für Guild "${guild.name}" (${guild.id})`);
             await this.initGuildConfigs(guild.id);
+            await this.spracheAusDiscordUebernehmen(guild);
             await dbService.enablePluginForGuild(guild.id, "core", null, null);
         } else {
             Logger.debug(`Guild "${guild.name}" (${guild.id}) bereits konfiguriert`);
@@ -161,6 +177,37 @@ class GuildManager {
         const stats = await dbService.ensureConfigs("core", flatConfig, "shared", guildId);
 
         Logger.info(`Guild-Config für ${guildId}: ${stats.created} erstellt, ${stats.existing} vorhanden`);
+    }
+
+    /**
+     * Uebernimmt die in Discord eingestellte Sprache der Guild als `LOCALE`.
+     *
+     * Laeuft **nur fuer neue Guilds**, direkt nach `initGuildConfigs()`. Der
+     * Aufruf danach ist Absicht: `initGuildConfigs` schreibt die Vorgabe
+     * `de-DE` aus `guild-defaults.json` und ueberschreibt nichts Vorhandenes —
+     * hier wird sie einmalig durch die Einstellung des Servers ersetzt. Eine
+     * spaeter von Hand gewaehlte Sprache ruehrt niemand mehr an, weil diese
+     * Methode bei einem Re-Join nicht laeuft.
+     *
+     * Setzt zusaetzlich `guild.locale` am Objekt, damit die Begruessung im
+     * selben Durchlauf schon in der richtigen Sprache herausgeht. Ohne diese
+     * Zeile bliebe es bis zum naechsten Bot-Start bei `client.defaultLanguage`.
+     *
+     * @param {import('discord.js').Guild} guild
+     */
+    async spracheAusDiscordUebernehmen(guild) {
+        const Logger = ServiceManager.get("Logger");
+        const dbService = ServiceManager.get("dbService");
+
+        const sprache = spracheAusDiscord(guild.preferredLocale);
+
+        await dbService.setConfig("core", "LOCALE", sprache, "shared", guild.id, false);
+        guild.locale = sprache;
+
+        Logger.info(
+            `Sprache fuer neue Guild ${guild.id}: ${sprache} ` +
+            `(Discord meldet "${guild.preferredLocale || "nichts"}")`
+        );
     }
 
     /**

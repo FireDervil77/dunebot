@@ -67,6 +67,11 @@ router.post("/:guildId/plugins", CheckGuildAccess, guildController.updatePlugins
 // Plugin Update Route
 router.post("/:guildId/plugins/:pluginName/update", CheckGuildAccess, guildController.updatePluginVersion);
 
+// Willkommensseite nach dem Einladen. **Kein requirePermission** — wer den Bot
+// gerade eingeladen hat, hat noch keine Gruppe in dieser Guild; CheckGuildAccess
+// prueft, dass er dort ueberhaupt etwas zu sagen hat. Die Seite zeigt nur Links.
+router.get("/:guildId/willkommen", CheckAuth, CheckGuildAccess, guildController.getWillkommen);
+
 // Guild locales
 router.get("/:guildId/locales", CheckGuildAccess, guildController.getLocales);
 
