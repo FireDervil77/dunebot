@@ -884,7 +884,31 @@ async getAllConfigs() {
                     ELSE 0
                 END as has_active_badge
             FROM guild_plugins gp
-            LEFT JOIN plugin_badges pb ON gp.plugin_name = pb.plugin_name
+            /*
+             * Hoechstens EINE Badge-Zeile je Plugin.
+             *
+             * Vorher stand hier "LEFT JOIN plugin_badges pb ON
+             * gp.plugin_name = pb.plugin_name". Hat ein Plugin mehrere
+             * Badge-Zeilen, liefert der Join es mehrfach — und das Dashboard
+             * zeigte die Kachel doppelt. Am 2026-09-16 gemessen: "music" hatte
+             * zwei Zeilen (beta bis 21.08., updated bis 30.08., beide laengst
+             * abgelaufen) und stand zweimal im Raster.
+             *
+             * Genommen wird die neueste noch gueltige. Abgelaufene fallen ganz
+             * weg — "has_active_badge" haette sie ohnehin verworfen, nur eben
+             * nach dem Vervielfachen.
+             */
+             /* Keine Backticks hier: Der Block steht in einem
+              * Template-Literal und wuerde es sonst beenden. */
+            LEFT JOIN plugin_badges pb
+                   ON pb.id = (
+                        SELECT p2.id
+                        FROM plugin_badges p2
+                        WHERE p2.plugin_name = gp.plugin_name
+                          AND (p2.badge_until IS NULL OR p2.badge_until >= CURDATE())
+                        ORDER BY p2.badge_until IS NULL DESC, p2.badge_until DESC, p2.id DESC
+                        LIMIT 1
+                   )
             WHERE gp.guild_id = ? AND gp.is_enabled = 1
             ORDER BY pb.is_featured DESC, gp.plugin_name
         `, [guildId]);

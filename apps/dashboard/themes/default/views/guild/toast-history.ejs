@@ -148,7 +148,7 @@ function renderToastTable(toasts) {
         tbody.innerHTML = `
             <tr>
                 <td colspan="6" class="text-center text-secondary py-4">
-                    <i class="bi bi-check-circle text-success me-2" style="font-size: 2rem;"></i>
+                    <i class="fa-solid fa-circle-check text-success me-2" style="font-size: 2rem;"></i>
                     <div class="mt-2">Keine Benachrichtigungen gefunden</div>
                     <small class="text-secondary">Toast-Benachrichtigungen werden hier angezeigt</small>
                 </td>
@@ -164,27 +164,27 @@ function renderToastTable(toasts) {
         switch(toast.type) {
             case 'error':
                 typeBadge = 'danger';
-                typeIcon = '<i class="bi bi-x-circle-fill"></i>';
+                typeIcon = '<i class="fa-solid fa-circle-xmark"></i>';
                 typeName = 'Fehler';
                 break;
             case 'warning':
                 typeBadge = 'warning';
-                typeIcon = '<i class="bi bi-exclamation-triangle-fill"></i>';
+                typeIcon = '<i class="fa-solid fa-triangle-exclamation"></i>';
                 typeName = 'Warnung';
                 break;
             case 'success':
                 typeBadge = 'success';
-                typeIcon = '<i class="bi bi-check-circle-fill"></i>';
+                typeIcon = '<i class="fa-solid fa-circle-check"></i>';
                 typeName = 'Erfolg';
                 break;
             case 'info':
                 typeBadge = 'info';
-                typeIcon = '<i class="bi bi-info-circle-fill"></i>';
+                typeIcon = '<i class="fa-solid fa-circle-info"></i>';
                 typeName = 'Info';
                 break;
             default:
                 typeBadge = 'secondary';
-                typeIcon = '<i class="bi bi-question-circle-fill"></i>';
+                typeIcon = '<i class="fa-solid fa-circle-question"></i>';
                 typeName = toast.type;
         }
         
@@ -207,7 +207,7 @@ function renderToastTable(toasts) {
                 <button class="btn btn-sm btn-outline-danger show-metadata-btn" 
                         data-metadata='${JSON.stringify(toast.metadata).replace(/'/g, "&#39;")}'
                         title="Fehler-Details anzeigen">
-                    <i class="bi bi-bug"></i> ${metaKeys.length} Details
+                    <i class="fa-solid fa-bug"></i> ${metaKeys.length} Details
                 </button>
             `;
         }
@@ -223,7 +223,7 @@ function renderToastTable(toasts) {
                     <button class="btn btn-sm btn-danger delete-toast-btn" 
                             data-id="${toast.id}" 
                             title="Löschen">
-                        <i class="bi bi-trash"></i>
+                        <i class="fa-solid fa-trash"></i>
                     </button>
                 </td>
             </tr>
@@ -328,7 +328,7 @@ function showError(message) {
     tbody.innerHTML = `
         <tr>
             <td colspan="6" class="text-center text-danger py-4">
-                <i class="bi bi-exclamation-triangle me-2" style="font-size: 2rem;"></i>
+                <i class="fa-solid fa-triangle-exclamation me-2" style="font-size: 2rem;"></i>
                 <div class="mt-2">${message}</div>
             </td>
         </tr>

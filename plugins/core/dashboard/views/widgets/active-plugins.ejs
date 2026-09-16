@@ -1,4 +1,31 @@
-<!--  Aktivierte Plugins -->
+<%#
+ * Aktivierte Plugins — Kachelraster auf dem Guild-Dashboard
+ *
+ * **Symbole sind Bilder oder Font Awesome, nie Bootstrap Icons.** Hier standen
+ * bis zum 2026-09-16 vier `bi`-Symbole. Bootstrap Icons wird im Guild-Bereich
+ * aber gar nicht geladen — `themes/default/theme.js` reiht es nur ein, wenn
+ * `section !== 'guild'`. Font Awesome (`fa-css`) reiht dieselbe Datei in JEDEM
+ * Bereich ein, Zeile 220. Ergebnis war: leere graue Kreise auf jeder Kachel und
+ * Knöpfe ohne Zahnrad. Das Backend läuft auf Tabler, das Frontend auf
+ * Bootstrap — `bi` gehört nur dorthin.
+ *
+ * Die runden FireBot-Motive liegen bei den Marken-Bildern des Themes. Die
+ * Zuordnung unten ist bewusst kurz und leicht zu ändern: Wer ein Plugin anders
+ * einsortieren will, ergänzt eine Zeile.
+ *
+ * @context {Array}  enabledPlugins - [{ name, version, badge }]
+ * @context {string} guildId
+%>
+<%
+/** Welches runde FireBot-Motiv passt zu diesem Plugin? */
+const _MOTIVE = {
+    gameserver: 'server', masterserver: 'server',
+    music: 'gaming', streaming: 'gaming', giveaway: 'gaming',
+    information: 'news', greeting: 'news',
+};
+const _motiv = (name) =>
+    `/themes/default/assets/images/firebot-${_MOTIVE[name] || 'logo'}-rund-256.png`;
+%>
 <% if (locals.enabledPlugins && enabledPlugins.length > 0) { %>
   <div class="row">
     <% enabledPlugins.forEach(plugin => { %>
@@ -20,16 +47,17 @@
           <% } %>
           <% if (plugin.badge && plugin.badge.featured) { %>
             <div class="plugin-featured-star">
-              <i class="bi bi-star-fill text-warning"></i>
+              <i class="fa-solid fa-star text-warning"></i>
             </div>
           <% } %>
           <div class="plugin-icon mb-2">
-            <i class="bi bi-puzzle fs-3 text-primary"></i>
+            <img src="<%= _motiv(plugin.name) %>" alt=""
+                 width="56" height="56" class="rounded-circle" loading="lazy">
           </div>
           <h5 class="plugin-name mb-1"><%= plugin.name %></h5>
           <div class="d-flex gap-1 justify-content-center">
             <a href="/guild/<%= guildId %>/plugins/<%= plugin.name %>" class="btn btn-sm btn-primary">
-              <i class="bi bi-gear-fill me-1"></i> <%= tr('core:WIDGETS.ACTIVE_PLUGINS.BTN_CONFIGURE') %>
+              <i class="fa-solid fa-gear me-1"></i> <%= tr('core:WIDGETS.ACTIVE_PLUGINS.BTN_CONFIGURE') %>
             </a>
             <%# Reload-Button komplett deaktiviert (auch für Core) %>
             <%# if (locals.isSuperAdmin) { %>
@@ -42,7 +70,7 @@
   </div>
 <% } else { %>
   <div class="alert alert-info">
-    <i class="bi bi-info-circle me-2"></i>
+    <i class="fa-solid fa-circle-info me-2"></i>
     <%= tr('core:WIDGETS.ACTIVE_PLUGINS.NO_PLUGINS') %>
     <a href="/guild/<%= guildId %>/plugins" class="alert-link"><%= tr('core:WIDGETS.ACTIVE_PLUGINS.ACTIVATE_NOW') %></a>
   </div>

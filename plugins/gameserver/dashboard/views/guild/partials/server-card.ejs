@@ -61,7 +61,7 @@ const connectionString = `${server.server_ip || 'N/A'}:${server.game_port || 'N/
                  class="game-icon"
                  style="max-height: 70px; max-width: 100%; object-fit: contain;">
         <% } else { %>
-            <i class="bi bi-controller" style="font-size: 3rem; color: rgba(255,255,255,0.8);"></i>
+            <i class="fa-solid fa-gamepad" style="font-size: 3rem; color: rgba(255,255,255,0.8);"></i>
         <% } %>
     </div>
     
@@ -121,7 +121,7 @@ const connectionString = `${server.server_ip || 'N/A'}:${server.game_port || 'N/
                 <!-- Players -->
                 <div class="d-flex justify-content-between">
                     <small class="text-secondary">
-                        <i class="bi bi-people-fill me-1"></i>Spieler
+                        <i class="fa-solid fa-users me-1"></i>Spieler
                     </small>
                     <small class="server-players">
                         <% if (displayStatus === 'online' && server.current_players !== undefined && server.current_players !== null) { %>
@@ -143,7 +143,7 @@ const connectionString = `${server.server_ip || 'N/A'}:${server.game_port || 'N/
                 <button class="btn btn-sm btn-outline-secondary ms-2" 
                         onclick="event.stopPropagation(); event.preventDefault(); copyToClipboard('<%= connectionString %>')"
                         title="In Zwischenablage kopieren">
-                    <i class="bi bi-clipboard"></i>
+                    <i class="fa-solid fa-clipboard"></i>
                 </button>
             </div>
         </div>
@@ -159,7 +159,7 @@ const connectionString = `${server.server_ip || 'N/A'}:${server.game_port || 'N/
                         onclick="event.stopPropagation(); event.preventDefault(); serverAction('<%= server.id %>', 'start')"
                         title="Server starten"
                         style="display: <%= (displayStatus === 'offline' || displayStatus === 'error' || displayStatus === 'installed') ? '' : 'none' %>;">
-                    <i class="bi bi-play-fill"></i>
+                    <i class="fa-solid fa-play"></i>
                 </button>
             <% } %>
             
@@ -169,7 +169,7 @@ const connectionString = `${server.server_ip || 'N/A'}:${server.game_port || 'N/
                         onclick="event.stopPropagation(); event.preventDefault(); serverAction('<%= server.id %>', 'stop')"
                         title="Server stoppen"
                         style="display: <%= (displayStatus === 'online' || displayStatus === 'starting') ? '' : 'none' %>;">
-                    <i class="bi bi-stop-fill"></i>
+                    <i class="fa-solid fa-stop"></i>
                 </button>
             <% } %>
             
@@ -179,7 +179,7 @@ const connectionString = `${server.server_ip || 'N/A'}:${server.game_port || 'N/
                         onclick="event.stopPropagation(); event.preventDefault(); serverAction('<%= server.id %>', 'restart')"
                         title="Server neu starten"
                         style="display: <%= displayStatus === 'online' ? '' : 'none' %>;">
-                    <i class="bi bi-arrow-repeat"></i>
+                    <i class="fa-solid fa-arrows-rotate"></i>
                 </button>
             <% } %>
             
@@ -189,7 +189,7 @@ const connectionString = `${server.server_ip || 'N/A'}:${server.game_port || 'N/
                         onclick="event.stopPropagation(); event.preventDefault(); deleteServer('<%= server.id %>', '<%= server.name %>')"
                         title="Server deinstallieren"
                         style="display: <%= (displayStatus === 'offline' || displayStatus === 'error' || displayStatus === 'installed') ? '' : 'none' %>;">
-                    <i class="bi bi-trash-fill"></i>
+                    <i class="fa-solid fa-trash"></i>
                 </button>
             <% } %>
         </div>

@@ -34,7 +34,7 @@
                     <!-- Error-Meldung -->
                     <% if (error) { %>
                         <div class="alert alert-danger">
-                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            <i class="fa-solid fa-triangle-exclamation me-2"></i>
                             <%= error %>
                         </div>
                     <% } else { %>
@@ -42,15 +42,15 @@
                         <div class="alert alert-info mb-3">
                             <div class="row">
                                 <div class="col-md-6">
-                                    <i class="bi bi-file-earmark-text me-2"></i>
+                                    <i class="fa-solid fa-file-lines me-2"></i>
                                     <strong>Datei:</strong> <%= filePath %>
                                 </div>
                                 <div class="col-md-3">
-                                    <i class="bi bi-hdd me-2"></i>
+                                    <i class="fa-solid fa-hard-drive me-2"></i>
                                     <strong>Größe:</strong> <%= (fileContent.length / 1024).toFixed(2) %> KB
                                 </div>
                                 <div class="col-md-3">
-                                    <i class="bi bi-code-square me-2"></i>
+                                    <i class="fa-solid fa-code me-2"></i>
                                     <strong>Zeilen:</strong> <%= fileContent.split('\n').length %>
                                 </div>
                             </div>
@@ -58,7 +58,7 @@
 
                         <!-- Unsaved-Changes-Warnung -->
                         <div id="unsavedAlert" class="alert alert-warning" style="display: none;">
-                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            <i class="fa-solid fa-triangle-exclamation me-2"></i>
                             <strong>Ungespeicherte Änderungen!</strong> Bitte speichern Sie Ihre Änderungen.
                         </div>
 

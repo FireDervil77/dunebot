@@ -119,6 +119,48 @@ for (const theme of fs.readdirSync(THEMES)) {
     }
 }
 
+// ── 4. Symbolschriften, die im Guild-Bereich gar nicht geladen sind ────────
+//
+// Dieselbe Fehlerart eine Ebene hoeher: `<i class="bi bi-puzzle">` wirft keinen
+// Fehler, es zeigt einfach **nichts**. Bootstrap Icons wird nur eingereiht,
+// wenn `section !== 'guild'` — im Dashboard fehlt es. Am 2026-09-16 standen so
+// 34 unsichtbare Symbole in sechs Dateien; die Plugin-Kacheln zeigten leere
+// graue Kreise und die Knoepfe kein Zahnrad.
+//
+// Das Backend laeuft auf Tabler, das Frontend auf Bootstrap. Font Awesome
+// (`fa-css`) reiht `theme.js` in JEDEM Bereich ein — im Guild-Bereich gehoert
+// `fa-*` hin, `bi-*` nur ins Frontend.
+{
+    const GUILD_ANSICHTEN = [
+        path.join(WURZEL, 'apps/dashboard/themes/default/views/guild'),
+        ...fs.readdirSync(path.join(WURZEL, 'plugins'), { withFileTypes: true })
+            .filter((e) => e.isDirectory())
+            .map((e) => path.join(WURZEL, 'plugins', e.name, 'dashboard/views')),
+    ];
+
+    const sammeln = (verzeichnis, treffer = []) => {
+        if (!fs.existsSync(verzeichnis)) return treffer;
+        for (const eintrag of fs.readdirSync(verzeichnis, { withFileTypes: true })) {
+            const voll = path.join(verzeichnis, eintrag.name);
+            if (eintrag.isDirectory()) { sammeln(voll, treffer); continue; }
+            if (!eintrag.name.endsWith('.ejs')) continue;
+            const inhalt = fs.readFileSync(voll, 'utf8');
+            // Nur echte Klassenangaben, nicht die Erklaerung im Kopf der Datei.
+            for (const m of inhalt.matchAll(/class="[^"]*\bbi bi-([a-z0-9-]+)/g)) {
+                treffer.push({ datei: path.relative(WURZEL, voll), symbol: m[1] });
+            }
+        }
+        return treffer;
+    };
+
+    const unsichtbar = GUILD_ANSICHTEN.flatMap((v) => sammeln(v));
+    if (unsichtbar.length > 0) {
+        console.log(`\n  ${unsichtbar.length} Bootstrap-Icon(s) im Guild-Bereich — dort nicht geladen:`);
+        for (const t of unsichtbar.slice(0, 15)) console.log(`    ${t.datei}: bi-${t.symbol}`);
+        befunde += unsichtbar.length;
+    }
+}
+
 console.log(befunde === 0
     ? '\n  Keine Befunde — jede eingereihte Kennung ist registriert und aufloesbar.\n'
     : `\n  ${befunde} Befund(e).\n`);

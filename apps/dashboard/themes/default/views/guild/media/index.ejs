@@ -105,7 +105,7 @@
             <i class="fa-solid fa-cloud-arrow-up fa-3x mb-3 text-secondary"></i>
             <p class="mb-1">Dateien hier ablegen oder <strong>klicken</strong> zum Auswählen</p>
             <small class="text-secondary">
-                Max. <%= (maxFileSize / 1024 / 1024) %> MB pro Datei &bull; <%= erlaubteEndungen.map(e => e.slice(1).toUpperCase()).join(', ') %>
+                Max. <%= (maxFileSize / 1024 / 1024) %> MB pro Datei &bull; max. <%= maxDateien %> Dateien auf einmal &bull; <%= erlaubteEndungen.map(e => e.slice(1).toUpperCase()).join(', ') %>
             </small>
             <input type="file" id="file-input" multiple accept="<%= allowedTypes.join(',') %>" class="d-none">
         </div>
@@ -334,7 +334,25 @@
     });
 
     // ── Hochladen ──
+    // Der Server nimmt hoechstens so viele Dateien je Anfrage. Ohne diese
+    // Pruefung schickte die Seite beliebig viele los: multer schrieb die
+    // ersten auf die Platte, brach dann ab, und der Benutzer sah nur
+    // „Unexpected field". Am 2026-09-16 im Apache-Log aufgefallen.
+    const MAX_DATEIEN = <%= maxDateien %>;
+
     function uploadFiles(files) {
+        if (files.length > MAX_DATEIEN) {
+            uploadProgress.classList.add('active');
+            progressBar.style.width = '100%';
+            progressBar.className = 'progress-bar bg-danger';
+            progressBar.textContent = '';
+            uploadStatus.textContent =
+                `${files.length} Dateien ausgewählt — es gehen höchstens ${MAX_DATEIEN} auf einmal. `
+                + `Bitte in mehreren Schritten hochladen.`;
+            fileInput.value = '';
+            return;
+        }
+
         const folder = document.getElementById('upload-folder').value.trim() || 'general';
         const formData = new FormData();
         for (const f of files) formData.append('files', f);

@@ -41,7 +41,11 @@ const ERLAUBTE_TYPEN = {
 };
 const ALLOWED_MIME_TYPES = Object.keys(ERLAUBTE_TYPEN);
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
-const MAX_FILES_PER_UPLOAD = 10;
+// 30 statt 10 seit dem 2026-09-16: Ein Satz Marken-Bilder (rund/card/social/
+// section/hero in mehreren Groessen) sind gut dreissig Dateien. Bei 10 brach
+// der Upload mitten drin ab. Die Groesse je Datei bleibt bei 5 MB — sie ist
+// die Grenze, die wirklich schuetzt.
+const MAX_FILES_PER_UPLOAD = 30;
 
 // ── Multer Storage: Guild-basierte Ordner ──
 const storage = multer.diskStorage({
@@ -99,6 +103,12 @@ router.get('/', requirePermission('CORE.MEDIA.VIEW'), async (req, res) => {
             activeMenu: `/guild/${guildId}/media`,
             guildId,
             maxFileSize: MAX_FILE_SIZE,
+            // Dieselbe Begruendung wie bei den Endungen eine Zeile tiefer, nur
+            // wurde sie fuer die ANZAHL vergessen: Die Seite schickte beliebig
+            // viele Dateien los, der Server nahm 30. Am 2026-09-16 im
+            // Apache-Log aufgefallen — sechs 400er beim Hochladen eines
+            // Bildersatzes.
+            maxDateien: MAX_FILES_PER_UPLOAD,
             allowedTypes: ALLOWED_MIME_TYPES,
             // Damit die Seite nicht anbietet, was der Server ablehnt — beide
             // kommen aus ERLAUBTE_TYPEN, es gibt also nur eine Wahrheit.
@@ -190,15 +200,42 @@ router.get('/api/:id', requirePermission('CORE.MEDIA.VIEW'), async (req, res) =>
 // =====================================================
 // POST /guild/:guildId/media/api/upload — Dateien hochladen
 // =====================================================
+/**
+ * Bereits auf die Platte geschriebene Dateien dieser Anfrage wegraeumen.
+ *
+ * **Multer schreibt, bevor es abbricht.** Wer 40 Dateien schickt, hat 30 auf
+ * der Platte, wenn die 31. den Fehler ausloest — und ohne diesen Aufruf bleiben
+ * sie dort. Am 2026-09-16 nachgemessen: 33 verwaiste Dateien, 8,1 MB, die zu
+ * keiner Zeile in `guild_media` gehoeren. Aufgeraeumt wurde bis dahin nur im
+ * 500er-Zweig, nicht auf den 400ern.
+ *
+ * @param {Object} req
+ */
+function hochgeladenesWegraeumen(req) {
+    for (const datei of req.files || []) {
+        try { fs.unlinkSync(datei.path); } catch { /* schon weg */ }
+    }
+}
+
 router.post('/api/upload', requirePermission('CORE.MEDIA.UPLOAD'), (req, res, next) => {
     upload.array('files', MAX_FILES_PER_UPLOAD)(req, res, (err) => {
+        const abbruch = (nachricht) => {
+            hochgeladenesWegraeumen(req);
+            return res.status(400).json({ success: false, message: nachricht });
+        };
         if (err instanceof multer.MulterError) {
             if (err.code === 'LIMIT_FILE_SIZE') {
-                return res.status(400).json({ success: false, message: `Datei zu groß (max. ${MAX_FILE_SIZE / 1024 / 1024} MB)` });
+                return abbruch(`Datei zu groß (max. ${MAX_FILE_SIZE / 1024 / 1024} MB)`);
             }
-            return res.status(400).json({ success: false, message: err.message });
+            // „Unexpected field" ist die Meldung, die multer beim Ueberschreiten
+            // der Dateianzahl ausgibt. Sie sagt niemandem etwas — deshalb hier
+            // im Klartext, was wirklich los ist.
+            if (err.code === 'LIMIT_FILE_COUNT' || err.code === 'LIMIT_UNEXPECTED_FILE') {
+                return abbruch(`Zu viele Dateien auf einmal (max. ${MAX_FILES_PER_UPLOAD})`);
+            }
+            return abbruch(err.message);
         }
-        if (err) return res.status(400).json({ success: false, message: err.message });
+        if (err) return abbruch(err.message);
         next();
     });
 }, async (req, res) => {
@@ -210,6 +247,7 @@ router.post('/api/upload', requirePermission('CORE.MEDIA.UPLOAD'), (req, res, ne
 
     // Ordner-Name validieren
     if (!/^[a-z0-9-]{1,50}$/.test(folder)) {
+        hochgeladenesWegraeumen(req);
         return res.status(400).json({ success: false, message: 'Ungültiger Ordnername' });
     }
 
@@ -258,10 +296,7 @@ router.post('/api/upload', requirePermission('CORE.MEDIA.UPLOAD'), (req, res, ne
         return res.json({ success: true, data: results });
     } catch (error) {
         Logger.error('[Media] Upload-Fehler:', error);
-        // Hochgeladene Dateien aufräumen bei DB-Fehler
-        for (const file of req.files) {
-            try { fs.unlinkSync(file.path); } catch { /* ignore */ }
-        }
+        hochgeladenesWegraeumen(req);
         res.status(500).json({ success: false, message: 'Upload fehlgeschlagen' });
     }
 });
