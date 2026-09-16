@@ -646,11 +646,18 @@ exports.getWillkommen = async (req, res) => {
         const dbService = ServiceManager.get('dbService');
 
         // `guild.middleware` setzt `res.locals.guild` aus der OAuth-Liste der
-        // Sitzung. Die kann fehlen — etwa wenn jemand über `guild_users` Zugang
-        // hat, aber nicht in der Discord-Liste steht. Dann reicht der Name aus
-        // der Datenbank; die Seite zeigt ohnehin nur Links.
+        // Sitzung. Genau die fehlt im wichtigsten Fall dieser Seite: Wer sich
+        // **einen neuen Server baut** und den Bot einlädt, hat ihn nicht in der
+        // Liste, die beim Anmelden geholt wurde. Zugang bekommt er über
+        // `guild_users`, der Name fehlt.
+        //
+        // **Auf `!guild` zu prüfen reicht dafür nicht.** `base.middleware`
+        // setzt vorher `res.locals.guild = res.locals.guild || { name: '',
+        // id: guildId }` — ein Platzhalter, der immer wahr ist. Am 2026-09-16
+        // stand deshalb „ist eingerichtet" ohne Servernamen auf der Seite.
+        // Gefragt ist also der Name, nicht das Objekt.
         let guild = res.locals.guild;
-        if (!guild) {
+        if (!guild?.name) {
             const [zeile] = await dbService.query(
                 "SELECT guild_name FROM guilds WHERE _id = ?",
                 [guildId]
@@ -661,7 +668,7 @@ exports.getWillkommen = async (req, res) => {
                     error: { status: 404 }
                 });
             }
-            guild = { id: guildId, name: zeile.guild_name, icon: null };
+            guild = { id: guildId, name: zeile.guild_name, icon: guild?.icon || null };
         }
 
         // Das Symbol muss aus dem Hash gebaut werden — `guild.iconURL` gibt es

@@ -10,6 +10,12 @@
  *
  * @context {Object}  guild           - Die Guild (id, name, icon-Hash)
  * @context {string}  guildIcon       - fertige Symbol-Adresse, oder null
+ *
+ * Ersatzbild: `/themes/default/assets/images/firebot-logo-rund-256.png`.
+ * Ausdruecklich **nicht** `/images/DuneBot.png` — diesen Pfad gibt es auf dem
+ * Server nicht (`apps/dashboard/public/images/` existiert gar nicht), er stand
+ * am 2026-09-16 als weisser Kasten auf der Seite. Er steckt leider auch in
+ * `guild-defaults.json` als `DASHBOARD_LOGO_URL`.
  * @context {string}  guildId
  * @context {Array}   sprachen        - [{ wert, name, kennung }]
  * @context {string}  aktuelleSprache - in welcher die Seite gerade steht
@@ -23,7 +29,7 @@
         <div class="row align-items-center">
             <div class="col-auto">
                 <span class="avatar avatar-lg"
-                      style="background-image: url(<%= guildIcon || '/images/DuneBot.png' %>)"></span>
+                      style="background-image: url(<%= guildIcon || '/themes/default/assets/images/firebot-logo-rund-256.png' %>)"></span>
             </div>
             <div class="col">
                 <h2 class="mb-1"><%= tr('WILLKOMMEN.BEGRUESSUNG', { server: guild.name }) %></h2>

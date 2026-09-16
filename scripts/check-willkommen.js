@@ -328,5 +328,31 @@ console.log('\n10. Liegt ein Text ungenutzt herum?');
         /req\.translate\('WILLKOMMEN\.TITEL'\)/.test(controller));
 }
 
+console.log('\n11. Die zwei Fehler vom ersten echten Lauf (2026-09-16)');
+{
+    // (a) Der Name. `base.middleware` setzt vorher einen Platzhalter
+    //     `{ name: '', id }`. Wer auf `!guild` prueft, trifft ihn nie — auf der
+    //     Seite stand „ist eingerichtet" ohne Servernamen.
+    pruefeWahr('der Rueckfall fragt nach dem NAMEN, nicht nach dem Objekt',
+        /if \(!guild\?\.name\)/.test(controller));
+    pruefeWahr('… und holt ihn aus `guilds.guild_name`',
+        /SELECT guild_name FROM guilds/.test(controller));
+
+    // (b) Das Ersatzbild. `/images/DuneBot.png` gibt es auf dem Server nicht —
+    //     es stand als weisser Kasten auf der Seite. Hier wird nicht geprueft,
+    //     WELCHER Pfad dasteht, sondern ob die Datei wirklich da ist.
+    const BASIS = path.join(WURZEL, 'apps/dashboard');
+    const bildpfade = [...ansicht.matchAll(/url\(\s*<%=[^%]*?'(\/[^']+\.(?:png|jpg|jpeg|svg|gif|webp))'/g)]
+        .map(m => m[1]);
+    pruefeWahr('die Ansicht nennt ueberhaupt ein Ersatzbild', bildpfade.length > 0);
+    for (const bild of bildpfade) {
+        // `/themes/...` und `/public/...` werden als statische Ordner unter
+        // apps/dashboard ausgeliefert (app.js).
+        const aufPlatte = path.join(BASIS, bild.replace(/^\/public\//, '/'));
+        pruefeWahr(`Ersatzbild ${bild} liegt wirklich auf der Platte`, fs.existsSync(aufPlatte),
+            `gesucht: ${aufPlatte}`);
+    }
+}
+
 console.log(`\nErgebnis: ${geprueft} Pruefungen, ${gescheitert} Abweichungen.`);
 process.exit(gescheitert > 0 ? 1 : 0);
