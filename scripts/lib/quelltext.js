@@ -34,7 +34,20 @@
 function ohneKommentare(quelltext) {
     return String(quelltext)
         // Blockkommentare zuerst — sonst zerlegt die Zeilenregel ihre Innereien.
-        .replace(/\/\*[\s\S]*?\*\//g, ' ')
+        //
+        // **Das vorangestellte Zeichen ist der Punkt.** Bis zum 2026-09-16 stand
+        // hier `/\*[\s\S]*?\*\//g` ohne Vorbedingung. In `apps/dashboard/app.js`
+        // riss das 11.799 Zeichen echten Code heraus: Die CSP-Zeile
+        // `"https://*.google-analytics.com"` enthaelt in `//*` ein `/*` und
+        // eroeffnete einen Kommentar, den erst `type: '*/*'` sechzig Zeilen
+        // spaeter wieder schloss. Jede Pruefung auf Code dazwischen meldete
+        // gruen, weil sie ins Leere lief — die gefaehrlichere Richtung.
+        //
+        // Ein echter Blockkommentar steht am Zeilenanfang oder hinter
+        // Leerraum/Klammer/Komma. Innerhalb einer Zeichenkette steht vor dem
+        // `/*` dagegen ein `/` oder `*`. Das reicht als Unterscheidung, ohne
+        // einen Parser zu bauen.
+        .replace(/(^|[\s(,;{=])\/\*[\s\S]*?\*\//g, '$1 ')
         // Zeilenkommentare, auch angehaengte. Das `[^:]` haelt `https://` heraus;
         // das Zeichen davor wird wieder eingesetzt, damit keine Luecke entsteht.
         .replace(/(^|[^:])\/\/.*$/gm, '$1');

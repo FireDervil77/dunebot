@@ -626,19 +626,22 @@ module.exports = class App {
             }
         }));
         
-        // 2. Exploit-Blocker (PHP-Scans, Path-Traversal, SQL-Injection)
+        // 2. Exploit-Blocker (PHP-Scans, Path-Traversal, SQL-Injection,
+        //    sowie sensible Dateien wie .env, .git, node_modules)
+        //
+        // Hier stand bis zum 2026-09-16 eine zweite Schicht `blockSensitiveFiles`
+        // mit einer eigenen Musterliste und einer anderen Folge (403 ohne
+        // Zaehlung). `.env` und `.git` standen in beiden Listen. Die Muster sind
+        // in den Exploit-Blocker gewandert, die Middleware ist entfernt —
+        // ein Gegenstand, ein Ort. Siehe docs/Sperrsystem.md.
         const exploitBlocker = require('./middlewares/security/exploit-blocker.middleware');
         this.app.use(exploitBlocker);
-        
-        // 3. Block Sensitive Files (.env, .git, node_modules, etc.)
-        const blockSensitiveFiles = require('./middlewares/blockSensitiveFiles');
-        this.app.use(blockSensitiveFiles);
-        
-        // 4. Eingehende Webhooks von Plugins (und kuenftig vom Kern)
+
+        // 3. Eingehende Webhooks von Plugins (und kuenftig vom Kern)
         //
         // Steht bewusst GENAU hier:
         //
-        //   - **nach** helmet, Exploit-Blocker und blockSensitiveFiles: Der
+        //   - **nach** helmet und Exploit-Blocker: Der
         //     Exploit-Blocker prueft nur `req.path`, kostet also nichts und
         //     bleibt wirksam.
         //   - **vor** `generalLimiter`: Der laesst in Produktion 60 Anfragen

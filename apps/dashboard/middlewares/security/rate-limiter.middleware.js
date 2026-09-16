@@ -61,29 +61,14 @@ const apiLimiter = rateLimit({
     }
 });
 
-/**
- * Strikte Limits für sensitive Guild-Actions (Delete, Kick, Ban)
- * Verhindert Missbrauch von Admin-Funktionen
+/*
+ * `guildActionLimiter` stand hier bis zum 2026-09-16: 20 Aktionen je 5 Minuten
+ * fuer „sensitive Guild-Actions". Er hatte in der ganzen Anlage **keinen
+ * einzigen Aufrufer** — die Wirkung war seit jeher null, der Eindruck von
+ * Schutz nicht. Entfernt bei der Zusammenlegung des Sperrsystems
+ * (docs/Sperrsystem.md). Wer solche Aktionen begrenzen will, haengt sie an
+ * `apiLimiter`, statt einen sechsten Begrenzer anzulegen.
  */
-const guildActionLimiter = rateLimit({
-    windowMs: 5 * 60 * 1000, // 5 Minuten
-    max: 20, // Max 20 Actions in 5 Minuten
-    message: {
-        success: false,
-        message: 'Zu viele Admin-Aktionen. Bitte warte 5 Minuten.'
-    },
-    standardHeaders: true,
-    legacyHeaders: false,
-    skipSuccessfulRequests: false, // Auch erfolgreiche Requests zählen
-    handler: (req, res) => {
-        const Logger = ServiceManager.get('Logger');
-        Logger.warn(`[Security] Guild action rate limit: ${req.ip} -> ${req.path}`);
-        res.status(429).json({
-            success: false,
-            message: 'Zu viele Admin-Aktionen. Bitte verlangsame dich.'
-        });
-    }
-});
 
 /**
  * Lockere Limits für normale Page-Views
@@ -143,7 +128,6 @@ const webhookLimiter = rateLimit({
 module.exports = {
     authLimiter,
     apiLimiter,
-    guildActionLimiter,
     generalLimiter,
     webhookLimiter
 };
