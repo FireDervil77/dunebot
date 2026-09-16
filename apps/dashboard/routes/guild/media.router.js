@@ -6,6 +6,10 @@
  * GET  /media/api/:id       → JSON API: Einzelne Datei-Details
  * POST /media/api/upload    → Datei(en) hochladen
  * PUT  /media/api/:id       → Metadaten updaten (alt_text, title, folder)
+ * POST /media/api/verschieben         → mehrere Dateien in einen Ordner
+ * POST /media/api/loeschen            → mehrere Dateien löschen
+ * POST /media/api/ordner/umbenennen   → Ordner umbenennen oder zusammenführen
+ * POST /media/api/ordner/loeschen     → Ordner auflösen (Dateien bleiben)
  * DELETE /media/api/:id     → Datei löschen
  */
 
@@ -41,6 +45,33 @@ const ERLAUBTE_TYPEN = {
 };
 const ALLOWED_MIME_TYPES = Object.keys(ERLAUBTE_TYPEN);
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+
+/** Der Ordner, in dem alles landet, was keinen eigenen hat. */
+const VORGABE_ORDNER = 'general';
+
+/**
+ * Prueft einen Ordnernamen und sagt im Fehlerfall, was erlaubt ist.
+ *
+ * Die Regel stand vorher dreimal als blosses `/^[a-z0-9-]{1,50}$/` im Code, und
+ * die Meldung lautete jedes Mal nur „Ungueltiger Ordnername" — ohne zu sagen,
+ * woran es lag. Hier steht sie einmal, mit Begruendung.
+ *
+ * @param {*} name
+ * @returns {{ok: true, name: string} | {ok: false, fehler: string}}
+ */
+function ordnernamePruefen(name) {
+    const wert = String(name ?? '').trim();
+    if (!wert) return { ok: false, fehler: 'Bitte einen Ordnernamen angeben.' };
+    if (wert.length > 50) return { ok: false, fehler: 'Der Ordnername ist zu lang (höchstens 50 Zeichen).' };
+    if (!/^[a-z0-9-]+$/.test(wert)) {
+        return {
+            ok: false,
+            fehler: 'Erlaubt sind nur Kleinbuchstaben, Ziffern und Bindestriche — ' +
+                    'also z. B. "icons" oder "banner-gross".'
+        };
+    }
+    return { ok: true, name: wert };
+}
 // 30 statt 10 seit dem 2026-09-16: Ein Satz Marken-Bilder (rund/card/social/
 // section/hero in mehreren Groessen) sind gut dreissig Dateien. Bei 10 brach
 // der Upload mitten drin ab. Die Groesse je Datei bleibt bei 5 MB — sie ist
@@ -246,9 +277,10 @@ router.post('/api/upload', requirePermission('CORE.MEDIA.UPLOAD'), (req, res, ne
     const folder = req.body.folder || 'general';
 
     // Ordner-Name validieren
-    if (!/^[a-z0-9-]{1,50}$/.test(folder)) {
+    const ordner = ordnernamePruefen(folder);
+    if (!ordner.ok) {
         hochgeladenesWegraeumen(req);
-        return res.status(400).json({ success: false, message: 'Ungültiger Ordnername' });
+        return res.status(400).json({ success: false, message: ordner.fehler });
     }
 
     if (!req.files || req.files.length === 0) {
@@ -287,7 +319,7 @@ router.post('/api/upload', requirePermission('CORE.MEDIA.UPLOAD'), (req, res, ne
                 stored_name: file.filename,
                 mime_type: file.mimetype,
                 file_size: file.size,
-                width, height, folder,
+                width, height, folder: ordner.name,
                 url: `/uploads/media/${guildId}/${file.filename}`
             });
         }
@@ -321,10 +353,9 @@ router.put('/api/:id', requirePermission('CORE.MEDIA.UPLOAD'), async (req, res) 
     if (alt_text !== undefined) { updates.push('alt_text = ?'); params.push(alt_text.substring(0, 255)); }
     if (title !== undefined) { updates.push('title = ?'); params.push(title.substring(0, 255)); }
     if (folder !== undefined) {
-        if (!/^[a-z0-9-]{1,50}$/.test(folder)) {
-            return res.status(400).json({ success: false, message: 'Ungültiger Ordnername' });
-        }
-        updates.push('folder = ?'); params.push(folder);
+        const ordner = ordnernamePruefen(folder);
+        if (!ordner.ok) return res.status(400).json({ success: false, message: ordner.fehler });
+        updates.push('folder = ?'); params.push(ordner.name);
     }
 
     if (updates.length === 0) return res.json({ success: true, message: 'Nichts zu aktualisieren' });
@@ -358,6 +389,205 @@ router.delete('/api/:id', requirePermission('CORE.MEDIA.DELETE'), async (req, re
 
     Logger.info(`[Media] Datei ${media.filename} gelöscht (Guild ${guildId})`);
     return res.json({ success: true, message: 'Datei gelöscht' });
+});
+
+// =====================================================
+// Ordnerverwaltung
+// =====================================================
+//
+// Ein „Ordner" ist keine eigene Zeile irgendwo, sondern die Spalte `folder`
+// je Datei. Er entsteht, sobald ihn eine Datei traegt, und verschwindet, wenn
+// die letzte ihn verlaesst. Das ist Absicht: Es gibt keine leeren Ordner, die
+// jemand pflegen muesste.
+//
+// Genau daraus kam aber das Aergernis: Wer sich vertippte, legte still einen
+// neuen an. Am 2026-09-16 lagen deshalb „icons" (18 Dateien) und „newicons"
+// (65) nebeneinander — derselbe Ordner, zweimal. Die drei Wege hier sind das
+// Werkzeug dagegen.
+
+/**
+ * Holt die Kennungen aus dem Rumpf und prueft, dass sie zu dieser Guild
+ * gehoeren. Ohne diese Pruefung koennte jemand mit Kennungen einer fremden
+ * Guild schreiben — die Kennungen sind fortlaufend und leicht zu raten.
+ *
+ * @param {*} ids
+ * @param {string} guildId
+ * @returns {Promise<{ok: true, ids: number[]} | {ok: false, fehler: string}>}
+ */
+async function eigeneKennungen(ids, guildId) {
+    const dbService = ServiceManager.get('dbService');
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+        return { ok: false, fehler: 'Keine Dateien ausgewählt.' };
+    }
+    if (ids.length > 500) {
+        return { ok: false, fehler: 'Zu viele Dateien auf einmal (höchstens 500).' };
+    }
+
+    const zahlen = ids.map(Number).filter(Number.isInteger);
+    if (zahlen.length !== ids.length) {
+        return { ok: false, fehler: 'Ungültige Auswahl.' };
+    }
+
+    const platzhalter = zahlen.map(() => '?').join(',');
+    const zeilen = await dbService.query(
+        `SELECT id FROM guild_media WHERE guild_id = ? AND id IN (${platzhalter})`,
+        [guildId, ...zahlen]
+    );
+
+    if (zeilen.length !== zahlen.length) {
+        return { ok: false, fehler: 'Einige Dateien gehören nicht zu diesem Server.' };
+    }
+    return { ok: true, ids: zahlen };
+}
+
+// POST /api/verschieben — mehrere Dateien in einen Ordner
+router.post('/api/verschieben', requirePermission('CORE.MEDIA.UPLOAD'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    const guildId = res.locals.guildId;
+
+    const ordner = ordnernamePruefen(req.body?.ordner);
+    if (!ordner.ok) return res.status(400).json({ success: false, message: ordner.fehler });
+
+    const auswahl = await eigeneKennungen(req.body?.ids, guildId);
+    if (!auswahl.ok) return res.status(400).json({ success: false, message: auswahl.fehler });
+
+    const platzhalter = auswahl.ids.map(() => '?').join(',');
+    await dbService.query(
+        `UPDATE guild_media SET folder = ? WHERE guild_id = ? AND id IN (${platzhalter})`,
+        [ordner.name, guildId, ...auswahl.ids]
+    );
+
+    Logger.info(`[Media] ${auswahl.ids.length} Datei(en) nach "${ordner.name}" verschoben (Guild ${guildId})`);
+    return res.json({
+        success: true,
+        message: `${auswahl.ids.length} Datei(en) nach „${ordner.name}" verschoben`,
+        anzahl: auswahl.ids.length
+    });
+});
+
+// POST /api/loeschen — mehrere Dateien löschen
+router.post('/api/loeschen', requirePermission('CORE.MEDIA.DELETE'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    const guildId = res.locals.guildId;
+
+    const auswahl = await eigeneKennungen(req.body?.ids, guildId);
+    if (!auswahl.ok) return res.status(400).json({ success: false, message: auswahl.fehler });
+
+    const platzhalter = auswahl.ids.map(() => '?').join(',');
+    const zeilen = await dbService.query(
+        `SELECT id, stored_name, filename FROM guild_media WHERE guild_id = ? AND id IN (${platzhalter})`,
+        [guildId, ...auswahl.ids]
+    );
+
+    // Erst die Zeilen, dann die Dateien: Bleibt eine Datei liegen, findet sie
+    // `scripts/medien-verwaiste.js`. Bliebe umgekehrt eine Zeile ohne Datei
+    // stehen, zeigte die Galerie ein kaputtes Bild.
+    await dbService.query(
+        `DELETE FROM guild_media WHERE guild_id = ? AND id IN (${platzhalter})`,
+        [guildId, ...auswahl.ids]
+    );
+
+    for (const zeile of zeilen) {
+        const pfad = path.join(__dirname, '../../uploads/media', guildId, zeile.stored_name);
+        try { fs.unlinkSync(pfad); } catch { /* evtl. schon weg */ }
+    }
+
+    Logger.info(`[Media] ${zeilen.length} Datei(en) gelöscht (Guild ${guildId})`);
+    return res.json({ success: true, message: `${zeilen.length} Datei(en) gelöscht`, anzahl: zeilen.length });
+});
+
+// POST /api/ordner/umbenennen — Ordner umbenennen ODER zusammenführen
+//
+// Beides ist derselbe Vorgang: Zeigt der neue Name auf einen vorhandenen
+// Ordner, wandern die Dateien dorthin. Das ist kein Unfall, sondern der Weg,
+// ein verdoppeltes Paar wie „icons"/„newicons" wieder zusammenzubringen — die
+// Antwort sagt deshalb, was passiert ist.
+router.post('/api/ordner/umbenennen', requirePermission('CORE.MEDIA.UPLOAD'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    const guildId = res.locals.guildId;
+
+    const von = ordnernamePruefen(req.body?.von);
+    const nach = ordnernamePruefen(req.body?.nach);
+    if (!von.ok) return res.status(400).json({ success: false, message: von.fehler });
+    if (!nach.ok) return res.status(400).json({ success: false, message: nach.fehler });
+    if (von.name === nach.name) {
+        return res.status(400).json({ success: false, message: 'Alter und neuer Name sind gleich.' });
+    }
+
+    const [vorhanden] = await dbService.query(
+        'SELECT COUNT(*) AS n FROM guild_media WHERE guild_id = ? AND folder = ?',
+        [guildId, von.name]
+    );
+    if (!vorhanden || vorhanden.n === 0) {
+        return res.status(404).json({ success: false, message: `Den Ordner „${von.name}" gibt es nicht.` });
+    }
+
+    const [ziel] = await dbService.query(
+        'SELECT COUNT(*) AS n FROM guild_media WHERE guild_id = ? AND folder = ?',
+        [guildId, nach.name]
+    );
+    const zusammengefuehrt = Boolean(ziel && ziel.n > 0);
+
+    await dbService.query(
+        'UPDATE guild_media SET folder = ? WHERE guild_id = ? AND folder = ?',
+        [nach.name, guildId, von.name]
+    );
+
+    Logger.info(
+        `[Media] Ordner "${von.name}" → "${nach.name}" ` +
+        `(${vorhanden.n} Datei(en)${zusammengefuehrt ? ', zusammengeführt' : ''}, Guild ${guildId})`
+    );
+    return res.json({
+        success: true,
+        zusammengefuehrt,
+        message: zusammengefuehrt
+            ? `${vorhanden.n} Datei(en) aus „${von.name}" nach „${nach.name}" zusammengeführt`
+            : `Ordner „${von.name}" heißt jetzt „${nach.name}" (${vorhanden.n} Datei(en))`
+    });
+});
+
+// POST /api/ordner/loeschen — Ordner auflösen
+//
+// **Löscht keine Datei.** Der Ordner ist nur ein Name an den Dateien; sie
+// wandern in den Vorgabe-Ordner und bleiben alle erhalten. Wer Dateien
+// loswerden will, waehlt sie aus und loescht sie — das ist ein anderer Knopf,
+// und das soll man auch merken.
+router.post('/api/ordner/loeschen', requirePermission('CORE.MEDIA.UPLOAD'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    const guildId = res.locals.guildId;
+
+    const ordner = ordnernamePruefen(req.body?.ordner);
+    if (!ordner.ok) return res.status(400).json({ success: false, message: ordner.fehler });
+    if (ordner.name === VORGABE_ORDNER) {
+        return res.status(400).json({
+            success: false,
+            message: `„${VORGABE_ORDNER}" ist der Vorgabe-Ordner und lässt sich nicht auflösen.`
+        });
+    }
+
+    const [vorhanden] = await dbService.query(
+        'SELECT COUNT(*) AS n FROM guild_media WHERE guild_id = ? AND folder = ?',
+        [guildId, ordner.name]
+    );
+    if (!vorhanden || vorhanden.n === 0) {
+        return res.status(404).json({ success: false, message: `Den Ordner „${ordner.name}" gibt es nicht.` });
+    }
+
+    await dbService.query(
+        'UPDATE guild_media SET folder = ? WHERE guild_id = ? AND folder = ?',
+        [VORGABE_ORDNER, guildId, ordner.name]
+    );
+
+    Logger.info(`[Media] Ordner "${ordner.name}" aufgelöst, ${vorhanden.n} Datei(en) nach "${VORGABE_ORDNER}" (Guild ${guildId})`);
+    return res.json({
+        success: true,
+        message: `Ordner „${ordner.name}" aufgelöst — ${vorhanden.n} Datei(en) liegen jetzt in „${VORGABE_ORDNER}"`
+    });
 });
 
 // =====================================================
@@ -476,4 +706,8 @@ function getImageDimensions(filePath, mimeType, existingBuffer) {
     }
 }
 
+// Nur zum Pruefen nach aussen gegeben (scripts/check-medienordner.js). Die
+// Anwendung benutzt den Export nicht — sie haengt den Router ein.
 module.exports = router;
+module.exports.ordnernamePruefen = ordnernamePruefen;
+module.exports.VORGABE_ORDNER = VORGABE_ORDNER;

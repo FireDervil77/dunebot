@@ -45,8 +45,12 @@
     .media-overlay .media-meta { font-size: 10px; color: rgba(255,255,255,.7); margin-top: 2px; }
 
     /* ── Haken auf der gewaehlten Kachel ── */
-    .media-check { position: absolute; top: 6px; right: 6px; display: none; z-index: 2; }
-    .media-item.selected .media-check { display: block; }
+    /* Der Haken ist die MEHRFACHAUSWAHL, nicht „gerade geoeffnet".
+       Bis zum 2026-09-16 hing er an `.selected` — also an der Datei, deren
+       Detailfenster offen war. Er sah aus wie eine Auswahl und war keine. */
+    .media-check { position: absolute; top: 6px; right: 6px; display: none; z-index: 3; cursor: pointer; }
+    .media-item:hover .media-check, .media-item.gewaehlt .media-check { display: block; }
+    .media-item.gewaehlt { outline: 3px solid var(--fb-primary, #007bff); outline-offset: -3px; }
 
     /* ── Ordnerkennzeichen ── */
     .media-folder-tag { position: absolute; top: 6px; left: 6px; z-index: 2; }
@@ -110,11 +114,17 @@
             <input type="file" id="file-input" multiple accept="<%= allowedTypes.join(',') %>" class="d-none">
         </div>
         <div class="row mt-2">
-            <div class="col-md-4">
+            <div class="col-md-5">
+                <%# Auswahl statt Freitext: Wer tippte, legte still einen neuen
+                    Ordner an — so entstanden „icons" und „newicons" nebeneinander.
+                    Das Textfeld kommt nur zurueck, wenn man „Neuer Ordner…" waehlt. %>
                 <div class="input-group input-group-sm">
                     <span class="input-group-text">Ordner</span>
-                    <input type="text" id="upload-folder" class="form-control" value="general" placeholder="z. B. icons, banners">
+                    <select id="upload-folder-select" class="form-select"></select>
+                    <input type="text" id="upload-folder-neu" class="form-control d-none"
+                           placeholder="neuer Ordner, z. B. banner-gross" maxlength="50">
                 </div>
+                <small class="text-secondary" id="upload-folder-hinweis"></small>
             </div>
         </div>
         <div class="upload-progress mt-3" id="upload-progress">
@@ -127,10 +137,57 @@
 </div>
 
 <%# ── Ordner-Filter (wird per Skript gefuellt) ────────────────────────────── %>
-<div class="mb-3 d-flex flex-wrap gap-1" id="folder-filter">
+<div class="d-flex flex-wrap align-items-center gap-1 mb-2" id="folder-filter">
     <span class="badge bg-secondary-lt folder-badge active" data-folder="all">
         <i class="fa-solid fa-images me-1"></i>Alle
     </span>
+</div>
+
+<%# ── Ordner verwalten ────────────────────────────────────────────────────── %>
+<div class="card mb-3 d-none" id="ordner-verwaltung">
+    <div class="card-body py-2">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small mb-1" for="ordner-quelle">Ordner</label>
+                <select id="ordner-quelle" class="form-select form-select-sm"></select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small mb-1" for="ordner-neuer-name">Neuer Name</label>
+                <input type="text" id="ordner-neuer-name" class="form-control form-control-sm"
+                       placeholder="z. B. icons" maxlength="50">
+            </div>
+            <div class="col-md-6">
+                <button class="btn btn-sm btn-primary" id="btn-ordner-umbenennen">
+                    <i class="fa-solid fa-pen me-1"></i>Umbenennen
+                </button>
+                <button class="btn btn-sm btn-outline-danger ms-1" id="btn-ordner-aufloesen">
+                    <i class="fa-solid fa-folder-minus me-1"></i>Auflösen
+                </button>
+                <small class="text-secondary d-block mt-1">
+                    Gibt es den neuen Namen schon, werden beide Ordner zusammengeführt.
+                    „Auflösen" verschiebt die Dateien nach „general" — gelöscht wird nichts.
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%# ── Leiste für die Mehrfachauswahl (nur sichtbar, wenn etwas gewählt ist) ── %>
+<div class="card mb-3 d-none" id="auswahl-leiste">
+    <div class="card-body py-2 d-flex flex-wrap align-items-center gap-2">
+        <strong id="auswahl-anzahl">0 ausgewählt</strong>
+        <div class="input-group input-group-sm" style="max-width: 20rem;">
+            <span class="input-group-text">Verschieben nach</span>
+            <select id="auswahl-ziel" class="form-select"></select>
+            <input type="text" id="auswahl-ziel-neu" class="form-control d-none"
+                   placeholder="neuer Ordner" maxlength="50">
+            <button class="btn btn-primary" id="btn-auswahl-verschieben">Los</button>
+        </div>
+        <button class="btn btn-sm btn-outline-danger" id="btn-auswahl-loeschen">
+            <i class="fa-solid fa-trash me-1"></i>Löschen
+        </button>
+        <button class="btn btn-sm btn-link text-secondary" id="btn-auswahl-leeren">Auswahl aufheben</button>
+    </div>
 </div>
 
 <%# ── Galerie und Detailspalte ────────────────────────────────────────────── %>
@@ -186,7 +243,11 @@
                     </div>
                     <div class="mb-2">
                         <label class="form-label small" for="detail-folder-edit">Ordner</label>
-                        <input type="text" class="form-control form-control-sm" id="detail-folder-edit" placeholder="general">
+                        <%# `list` statt reinem Freitext: Die vorhandenen Ordner
+                            stehen als Vorschlag da, damit man sie nicht abtippt. %>
+                        <input type="text" class="form-control form-control-sm" id="detail-folder-edit"
+                               placeholder="general" list="ordner-vorschlaege" maxlength="50">
+                        <datalist id="ordner-vorschlaege"></datalist>
                     </div>
 
                     <div class="mb-2">
@@ -271,6 +332,21 @@
     let currentFolder = 'all';
     let currentPage = 1;
     let selectedMedia = null;
+
+    /** Die Ordner, wie sie zuletzt vom Server kamen: [{ folder, count }]. */
+    let ordnerListe = [];
+
+    /**
+     * Die mehrfach gewaehlten Dateien.
+     *
+     * Bewusst getrennt von `selectedMedia`: Das ist die Datei, deren
+     * Detailfenster offen ist — etwas voellig anderes. Dass beides frueher
+     * dieselbe Markierung benutzte, war der irrefuehrendste Teil der Seite.
+     */
+    const gewaehlt = new Set();
+
+    /** Kennzeichen fuer „ich will einen neuen Ordner anlegen". */
+    const NEUER_ORDNER = '__neu__';
     let debounceTimer = null;
     let cropper = null;
     let editorFlipH = 1;
@@ -353,7 +429,13 @@
             return;
         }
 
-        const folder = document.getElementById('upload-folder').value.trim() || 'general';
+        const folder = ordnerAusFeldern('upload-folder-select', 'upload-folder-neu');
+        if (!folder) {
+            document.getElementById('upload-folder-hinweis').textContent =
+                'Bitte einen Ordnernamen angeben — Kleinbuchstaben, Ziffern, Bindestriche.';
+            return;
+        }
+        document.getElementById('upload-folder-hinweis').textContent = '';
         const formData = new FormData();
         for (const f of files) formData.append('files', f);
         formData.append('folder', folder);
@@ -410,7 +492,66 @@
         } catch (err) { console.error('Fehler beim Laden:', err); }
     }
 
+    /**
+     * Fuellt ein Auswahlfeld mit den vorhandenen Ordnern.
+     *
+     * @param {HTMLSelectElement} feld
+     * @param {boolean} mitNeu   - „Neuer Ordner…" als letzte Zeile anbieten
+     * @param {string}  vorwahl  - welcher Ordner vorgewaehlt sein soll
+     */
+    function ordnerfeldFuellen(feld, mitNeu, vorwahl) {
+        if (!feld) return;
+        const namen = ordnerListe.map(f => f.folder);
+        if (!namen.includes('general')) namen.unshift('general');
+
+        feld.innerHTML = namen.map(n =>
+            `<option value="${esc(n)}"${n === vorwahl ? ' selected' : ''}>${esc(n)}</option>`
+        ).join('') + (mitNeu ? `<option value="${NEUER_ORDNER}">+ Neuer Ordner…</option>` : '');
+    }
+
+    /** Alle Ordnerfelder auf einmal nachziehen. */
+    function ordnerfelderNachziehen() {
+        ordnerfeldFuellen(document.getElementById('upload-folder-select'), true, 'general');
+        ordnerfeldFuellen(document.getElementById('auswahl-ziel'), true, 'general');
+        ordnerfeldFuellen(document.getElementById('ordner-quelle'), false,
+            currentFolder !== 'all' ? currentFolder : undefined);
+
+        const vorschlaege = document.getElementById('ordner-vorschlaege');
+        if (vorschlaege) {
+            vorschlaege.innerHTML = ordnerListe.map(f => `<option value="${esc(f.folder)}">`).join('');
+        }
+    }
+
+    /**
+     * Liest den gewaehlten Ordner aus einem Paar Auswahlfeld + Textfeld.
+     * @returns {string|null} null, wenn nichts Brauchbares dasteht
+     */
+    function ordnerAusFeldern(selectId, neuId) {
+        const feld = document.getElementById(selectId);
+        const neu = document.getElementById(neuId);
+        if (feld.value !== NEUER_ORDNER) return feld.value;
+        const wert = neu.value.trim().toLowerCase();
+        return wert || null;
+    }
+
+    /** Textfeld nur zeigen, wenn „Neuer Ordner…" gewaehlt ist. */
+    function neuesFeldUmschalten(selectId, neuId) {
+        const feld = document.getElementById(selectId);
+        const neu = document.getElementById(neuId);
+        feld.addEventListener('change', () => {
+            const anzeigen = feld.value === NEUER_ORDNER;
+            neu.classList.toggle('d-none', !anzeigen);
+            if (anzeigen) neu.focus();
+        });
+    }
+    neuesFeldUmschalten('upload-folder-select', 'upload-folder-neu');
+    neuesFeldUmschalten('auswahl-ziel', 'auswahl-ziel-neu');
+
     function renderFolders(folders) {
+        ordnerListe = folders;
+        ordnerfelderNachziehen();
+        document.getElementById('ordner-verwaltung')
+            .classList.toggle('d-none', folders.length === 0);
         const totalCount = folders.reduce((sum, f) => sum + f.count, 0);
         let html = `<span class="badge bg-secondary-lt folder-badge ${currentFolder === 'all' ? 'active' : ''}" data-folder="all">
             <i class="fa-solid fa-images me-1"></i>Alle (${totalCount})</span>`;
@@ -437,10 +578,10 @@
             const dims = item.width ? `${item.width}×${item.height}` : '';
             const size = formatSize(item.file_size);
             return `
-            <div class="media-item ${selectedMedia?.id === item.id ? 'selected' : ''}" data-id="${item.id}">
+            <div class="media-item ${selectedMedia?.id === item.id ? 'selected' : ''}${gewaehlt.has(item.id) ? ' gewaehlt' : ''}" data-id="${item.id}">
                 <img src="${item.url}" alt="${esc(item.alt_text || item.filename)}" loading="lazy"
                      ${isSvg ? 'style="padding:15%; background:#fff;"' : ''}>
-                <div class="media-check"><span class="badge bg-primary"><i class="fa-solid fa-check"></i></span></div>
+                <div class="media-check" title="Für die Mehrfachauswahl an- oder abwählen"><span class="badge ${gewaehlt.has(item.id) ? 'bg-primary' : 'bg-secondary-lt'}"><i class="fa-solid fa-check"></i></span></div>
                 <span class="media-folder-tag"><span class="badge bg-dark" style="font-size:9px; opacity:.8;">${esc(item.folder)}</span></span>
                 <div class="media-overlay">
                     <div class="media-name">${esc(item.filename)}</div>
@@ -450,7 +591,21 @@
         }).join('');
 
         grid.querySelectorAll('.media-item').forEach(el => {
-            el.addEventListener('click', () => selectMedia(parseInt(el.dataset.id)));
+            el.addEventListener('click', (ereignis) => {
+                const id = parseInt(el.dataset.id);
+                // Der Haken waehlt aus, der Rest der Kachel oeffnet die Details.
+                // Zwei Dinge auf einer Flaeche, aber an klar getrennten Stellen.
+                if (ereignis.target.closest('.media-check')) {
+                    ereignis.stopPropagation();
+                    if (gewaehlt.has(id)) gewaehlt.delete(id); else gewaehlt.add(id);
+                    el.classList.toggle('gewaehlt', gewaehlt.has(id));
+                    el.querySelector('.media-check .badge')
+                      .className = `badge ${gewaehlt.has(id) ? 'bg-primary' : 'bg-secondary-lt'}`;
+                    auswahlLeisteNachziehen();
+                    return;
+                }
+                selectMedia(id);
+            });
         });
     }
 
@@ -469,6 +624,98 @@
             link.addEventListener('click', e => { e.preventDefault(); currentPage = parseInt(link.dataset.page); loadMedia(); });
         });
     }
+
+    // ══════════════════════════════════════════════════
+    // MEHRFACHAUSWAHL UND ORDNERVERWALTUNG
+    // ══════════════════════════════════════════════════
+
+    const auswahlLeiste = document.getElementById('auswahl-leiste');
+
+    /** Leiste ein-/ausblenden und die Zahl nachziehen. */
+    function auswahlLeisteNachziehen() {
+        auswahlLeiste.classList.toggle('d-none', gewaehlt.size === 0);
+        document.getElementById('auswahl-anzahl').textContent =
+            `${gewaehlt.size} ausgewählt`;
+    }
+
+    /**
+     * Schickt etwas an den Server und meldet das Ergebnis.
+     *
+     * Ueber `showToast`, nicht ueber `alert` — der Rest des Hauses macht es so,
+     * und ein `alert` blockiert die Seite.
+     *
+     * @param {string} weg    - Pfad hinter /media
+     * @param {Object} rumpf
+     * @returns {Promise<boolean>} ob es geklappt hat
+     */
+    async function anServer(weg, rumpf) {
+        try {
+            const res = await fetch(`${baseUrl}${weg}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(rumpf)
+            });
+            const daten = await res.json();
+            showToast(daten.success ? 'success' : 'error', daten.message || 'Unbekannte Antwort');
+            return Boolean(daten.success);
+        } catch {
+            showToast('error', 'Der Server hat nicht geantwortet.');
+            return false;
+        }
+    }
+
+    document.getElementById('btn-auswahl-leeren').addEventListener('click', () => {
+        gewaehlt.clear();
+        auswahlLeisteNachziehen();
+        loadMedia();
+    });
+
+    document.getElementById('btn-auswahl-verschieben').addEventListener('click', async () => {
+        const ordner = ordnerAusFeldern('auswahl-ziel', 'auswahl-ziel-neu');
+        if (!ordner) { showToast('error', 'Bitte einen Ordnernamen angeben.'); return; }
+        if (await anServer('/api/verschieben', { ids: [...gewaehlt], ordner })) {
+            gewaehlt.clear();
+            auswahlLeisteNachziehen();
+            loadMedia();
+        }
+    });
+
+    document.getElementById('btn-auswahl-loeschen').addEventListener('click', async () => {
+        // Loeschen ist der einzige Weg hier, der Dateien wirklich entfernt —
+        // deshalb eine Rueckfrage, die die Zahl nennt.
+        if (!confirm(`${gewaehlt.size} Datei(en) endgültig löschen? Das lässt sich nicht rückgängig machen.`)) return;
+        if (await anServer('/api/loeschen', { ids: [...gewaehlt] })) {
+            gewaehlt.clear();
+            auswahlLeisteNachziehen();
+            loadMedia();
+        }
+    });
+
+    document.getElementById('btn-ordner-umbenennen').addEventListener('click', async () => {
+        const von = document.getElementById('ordner-quelle').value;
+        const nach = document.getElementById('ordner-neuer-name').value.trim().toLowerCase();
+        if (!nach) { showToast('error', 'Bitte einen neuen Namen angeben.'); return; }
+
+        const zielGibtEs = ordnerListe.some(f => f.folder === nach);
+        if (zielGibtEs && !confirm(
+            `„${nach}" gibt es schon. Die Dateien aus „${von}" werden dorthin verschoben — zusammenführen?`
+        )) return;
+
+        if (await anServer('/api/ordner/umbenennen', { von, nach })) {
+            document.getElementById('ordner-neuer-name').value = '';
+            if (currentFolder === von) currentFolder = nach;
+            loadMedia();
+        }
+    });
+
+    document.getElementById('btn-ordner-aufloesen').addEventListener('click', async () => {
+        const ordner = document.getElementById('ordner-quelle').value;
+        if (!confirm(`Ordner „${ordner}" auflösen? Die Dateien wandern nach „general" — gelöscht wird nichts.`)) return;
+        if (await anServer('/api/ordner/loeschen', { ordner })) {
+            if (currentFolder === ordner) currentFolder = 'all';
+            loadMedia();
+        }
+    });
 
     // ══════════════════════════════════════════════════
     // DETAILSPALTE
