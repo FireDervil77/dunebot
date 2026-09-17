@@ -52,12 +52,49 @@
         <a href="?ansicht=fachlich" class="<%= hoehe === 'fachlich' ? 'an' : '' %>">Fachlich</a>
       </div>
 
-      <% if (server.status === 'online') { %>
-        <button class="btn btn-white btn-sm" onclick="serverAction('<%= server.id %>', 'restart')">Neu starten</button>
-        <button class="btn btn-white btn-sm" onclick="serverAction('<%= server.id %>', 'stop')">Stoppen</button>
-      <% } else { %>
-        <button class="btn btn-primary btn-sm" onclick="serverAction('<%= server.id %>', 'start')">Starten</button>
-      <% } %>
+      <%# ── Die Knopfzeile (Baustelle 134, 2026-09-17) ───────────────────────
+          Vorher stand hier ein `if (server.status === 'online')`, das beim
+          Rendern ENTSCHIED, welche Knoepfe es ueberhaupt gibt. Der Statustext
+          sprang daneben live auf "Laeuft" — und der Knopf sagte weiter
+          "Starten", bis jemand neu lud. Die Seite widersprach sich selbst.
+
+          Jetzt stehen alle drei Knoepfe da. Sichtbarkeit und Sperre kommen aus
+          `u.knoepfe` — gerechnet von `knopfZustand()` in `gameserver-live.js`,
+          also von DERSELBEN Funktion, die sie danach im Browser weiterschaltet.
+          Hier etwas nachzurechnen hiesse, zwei Regeln zu haben, und die eine
+          wuerde irgendwann von der anderen abweichen. Genau das war der Fehler.
+      %>
+      <%# Die drei Knoepfe stehen AUSGESCHRIEBEN da, nicht in einer Schleife.
+          Eine Schleife spart drei Zeilen und kostet die Pruefbarkeit:
+          `scripts/check-live-anzeige.js` liest `data-fb-aktion="…"` aus der
+          Vorlage und haelt es gegen die Faelle im Modul. Steht dort eine
+          EJS-Ausgabe statt des Namens, sieht der Waechter nichts mehr und
+          meldet gruen — und dann faellt eine umbenannte Aktion erst im
+          Betrieb auf. %>
+      <% const k = (u && u.knoepfe) || { start: { sichtbar: true, aktiv: true, grund: '' },
+                                         restart: { sichtbar: false, aktiv: false, grund: '' },
+                                         stop:    { sichtbar: false, aktiv: false, grund: '' } }; %>
+      <div class="fb-aktionen" style="display:flex;gap:8px"
+           data-fb-live="aktionen" data-fb-server="<%= server.id %>">
+
+        <button class="btn btn-primary btn-sm" data-fb-aktion="start"
+                onclick="serverAction('<%= server.id %>', 'start')"
+                <%= k.start.sichtbar ? '' : 'hidden' %>
+                <%= k.start.aktiv ? '' : 'disabled' %>
+                <% if (!k.start.aktiv && k.start.grund) { %>title="<%= k.start.grund %>"<% } %>>Starten</button>
+
+        <button class="btn btn-white btn-sm" data-fb-aktion="restart"
+                onclick="serverAction('<%= server.id %>', 'restart')"
+                <%= k.restart.sichtbar ? '' : 'hidden' %>
+                <%= k.restart.aktiv ? '' : 'disabled' %>
+                <% if (!k.restart.aktiv && k.restart.grund) { %>title="<%= k.restart.grund %>"<% } %>>Neu starten</button>
+
+        <button class="btn btn-white btn-sm" data-fb-aktion="stop"
+                onclick="serverAction('<%= server.id %>', 'stop')"
+                <%= k.stop.sichtbar ? '' : 'hidden' %>
+                <%= k.stop.aktiv ? '' : 'disabled' %>
+                <% if (!k.stop.aktiv && k.stop.grund) { %>title="<%= k.stop.grund %>"<% } %>>Stoppen</button>
+      </div>
 
       <div class="dropdown">
         <button class="btn btn-white btn-sm" data-bs-toggle="dropdown" aria-expanded="false">Mehr</button>

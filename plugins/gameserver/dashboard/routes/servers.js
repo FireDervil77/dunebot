@@ -19,7 +19,8 @@ const Inhalte = require('../helpers/Inhalte');
 const Quellen = require('../helpers/Quellen');
 const ServerStopp = require('../helpers/ServerStopp');
 const { baueUebersicht, baueServerListe, bauePaketAuswahl,
-        baueMaschinenAuswahl, baueWerteSchritt } = require('../helpers/Serverseite');
+        baueMaschinenAuswahl, baueWerteSchritt,
+        baueBereitschaftAuskunft } = require('../helpers/Serverseite');
 const { resolveStatusConfig } = require('../helpers/StatusSchema');
 const PanelService = require('../helpers/PanelService');
 const { validateCommand, rateLimiter } = require('../helpers/CommandFilter');
@@ -50,6 +51,43 @@ function toBool(value, fallback = false) {
     if (typeof value === 'number') return value !== 0;
     const v = String(value).trim().toLowerCase();
     return v === '1' || v === 'true' || v === 'on' || v === 'yes';
+}
+
+/**
+ * Die Pakete zu einer Menge Server laden — in EINEM Zug, nicht je Zeile eine
+ * Abfrage.
+ *
+ * Herausgezogen am 2026-09-17 (Baustelle 134): Bis dahin stand diese Abfrage
+ * nur in der Übersichtsroute. Die Live-Route `/status` brauchte dieselben
+ * Pakete, um dieselbe Bereitschaft zu rechnen — und ohne sie hätte sie die
+ * Regel im Browser nachbauen müssen. Das wäre der zweite Weg gewesen.
+ *
+ * @param {object} dbService
+ * @param {Array<{addon_marketplace_id: number}>} servers
+ * @returns {Promise<Object<number, object>>} Addon-Kennung → FBPKG-Paket
+ */
+async function ladePaketeZuServern(dbService, servers) {
+    const ids = [...new Set((servers || []).map(x => x.addon_marketplace_id).filter(Boolean))];
+    const paketNachAddon = {};
+    if (!ids.length) return paketNachAddon;
+
+    const zeilen = await dbService.query(`
+        SELECT pk.id, pv.fbpkg
+          FROM packages pk
+          LEFT JOIN package_versions pv ON pv.id = (
+              SELECT v.id FROM package_versions v
+               WHERE v.package_id = pk.id
+               ORDER BY (v.channel = 'stable') DESC, v.published_at DESC, v.id DESC
+               LIMIT 1)
+         WHERE pk.id IN (${ids.map(() => '?').join(',')})`, ids);
+
+    for (const z of zeilen) {
+        if (!z.fbpkg) continue;
+        try {
+            paketNachAddon[z.id] = typeof z.fbpkg === 'string' ? JSON.parse(z.fbpkg) : z.fbpkg;
+        } catch { /* ein unlesbares Paket kostet eine Zeile, nicht die Seite */ }
+    }
+    return paketNachAddon;
 }
 
 /**
@@ -203,25 +241,7 @@ router.get('/', requirePermission('GAMESERVER.VIEW'), async (req, res) => {
             // Die Pakete zu allen vorkommenden Addons in EINEM Zug — nicht je
             // Zeile eine Abfrage. Bei acht Servern fiele das nicht auf, bei
             // achtzig schon.
-            const ids = [...new Set((servers || []).map(x => x.addon_marketplace_id).filter(Boolean))];
-            const paketNachAddon = {};
-            if (ids.length) {
-                const zeilen = await dbService.query(`
-                    SELECT pk.id, pv.fbpkg
-                      FROM packages pk
-                      LEFT JOIN package_versions pv ON pv.id = (
-                          SELECT v.id FROM package_versions v
-                           WHERE v.package_id = pk.id
-                           ORDER BY (v.channel = 'stable') DESC, v.published_at DESC, v.id DESC
-                           LIMIT 1)
-                     WHERE pk.id IN (${ids.map(() => '?').join(',')})`, ids);
-                for (const z of zeilen) {
-                    if (!z.fbpkg) continue;
-                    try {
-                        paketNachAddon[z.id] = typeof z.fbpkg === 'string' ? JSON.parse(z.fbpkg) : z.fbpkg;
-                    } catch { /* ein unlesbares Paket kostet eine Zeile, nicht die Seite */ }
-                }
-            }
+            const paketNachAddon = await ladePaketeZuServern(dbService, servers);
             liste = baueServerListe(servers, paketNachAddon);
         } catch (err) {
             Logger.error('[Gameserver] Serverliste konnte nicht aufbereitet werden', err);
@@ -1299,16 +1319,52 @@ router.get('/status', requirePermission('GAMESERVER.VIEW'), async (req, res) => 
         // id und status. Die Live-Anzeige braucht nach einem Verbindungsabriss
         // aber den GANZEN Zustand — ein verpasstes Ereignis lässt sich nicht
         // nachträglich empfangen, nur nachholen.
+        //
+        // ── Zwei Spalten mehr, und warum sie hier fehlten (Baustelle 134) ────
+        //
+        // `bereitschaft_am` und `last_started_at` entscheiden, ob eine Meldung
+        // zu DIESEM Lauf gehört (Baustelle 105). Ohne sie konnte der Browser
+        // diese Prüfung nicht führen — er zeigte nach einem Neustart die Stufe
+        // des vorigen Laufs weiter als erreicht. Die Serverseite prüfte es, der
+        // Live-Weg nicht: dieselbe Frage, zwei Antworten.
+        //
+        // Deshalb liefert diese Route jetzt nicht mehr Rohspalten, sondern die
+        // fertige Auskunft aus `baueBereitschaftAuskunft()` — dieselbe Funktion,
+        // aus der auch die Liste und die Serverseite zeichnen.
         const servers = await dbService.query(
             `SELECT id, status, current_players, max_players,
-                    bereitschaft_stufe, bereitschaft_grund
+                    addon_marketplace_id,
+                    bereitschaft_stufe, bereitschaft_grund, bereitschaft_am,
+                    last_started_at
                FROM gameservers WHERE guild_id = ?`,
             [guildId]
         );
 
+        const paketNachAddon = await ladePaketeZuServern(dbService, servers);
+
         res.json({
             success: true,
-            servers: servers || []
+            servers: (servers || []).map((s) => {
+                const a = baueBereitschaftAuskunft(paketNachAddon[s.addon_marketplace_id] || null, s);
+                return {
+                    id:              s.id,
+                    status:          s.status,
+                    current_players: s.current_players,
+                    max_players:     s.max_players,
+                    // Roh — die Ansicht zeigt die gemeldete Stufe weiterhin an.
+                    bereitschaft_stufe: s.bereitschaft_stufe,
+                    bereitschaft_grund: s.bereitschaft_grund,
+                    // Beurteilt — hier steckt die Regel, nicht im Browser.
+                    bereitschaft: {
+                        messbar: a.messbar,
+                        bereit:  a.bereit,
+                        stufe:   a.stufe,
+                        grund:   a.grund,
+                        text:    a.text,
+                        stufen:  a.stufen,
+                    },
+                };
+            })
         });
 
     } catch (error) {

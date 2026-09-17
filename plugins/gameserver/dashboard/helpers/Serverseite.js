@@ -117,6 +117,9 @@ function baueUebersicht(server, paket, zusatz = {}) {
         ports:         bauePorts(server, paket),
         paket:         bauePaketkarte(server, paket, zusatz.paketZeile),
         bereitschaft:  baueBereitschaft(paket, server),
+        // Der ANFANGSZUSTAND der Knopfzeile — gerechnet mit derselben Funktion,
+        // die der Browser danach benutzt (Baustelle 134).
+        knoepfe:       baueKnopfzeile(paket, server),
         kennzahlen:    baueKennzahlen(server),
         welt:          baueWelt(zusatz.sicherungen ?? zusatz.letzteSicherung),
     };
@@ -704,29 +707,110 @@ module.exports = { baueUebersicht, HOEHE, WIRKUNG, RISIKO, GRUPPE, BEFEHL_NAME, 
  * Die Legende der Ansicht sagt weiterhin, was ein grauer Balken heisst:
  * „nicht gemessen heisst: wir wissen es nicht. 0 heisst: gemessen, niemand da."
  */
-function baueServerListe(zeilen, paketNachAddon = {}) {
-    const liste = (zeilen || []).map((s) => {
-        const paket = paketNachAddon[s.addon_marketplace_id] || null;
-        const zustand = baueZustand(s);
+/**
+ * Die Bereitschaft als fertige Auskunft — eine Rechnung fuer alle Wege.
+ *
+ * ── Warum das hier steht (Baustelle 134, 2026-09-17) ─────────────────────────
+ *
+ * Bis heute rechnete die Liste diesen Text selbst und das Browser-Modul
+ * `gameserver-live.js` noch einmal anders: Es pruefte `stufe === 'query'`.
+ * **Das ist falsch, sobald ein Paket keine Abfrage verlangt** — dann wird die
+ * letzte Stufe nie `query`, und der Server galt im Browser nie als bereit,
+ * obwohl er es war. Die richtige Frage ist „sind alle VERLANGTEN Stufen
+ * erreicht", und die beantwortet `baueBereitschaft().bereit`.
+ *
+ * Zweitens fehlte dem Browser `last_started_at`. Die Pruefung „gilt die Meldung
+ * fuer DIESEN Lauf" (Baustelle 105) lief dort also gar nicht — nach einem
+ * Neustart zeigte er die Stufe des vorigen Laufs weiter als erreicht.
+ *
+ * Deshalb: gerechnet wird hier, gezeichnet wird im Browser. Wer das aendert,
+ * baut die Regel zum dritten Mal.
+ *
+ * @param {object|null} paket   Das FBPKG-Paket des Servers
+ * @param {object} s            Die Serverzeile — braucht `status`,
+ *                              `bereitschaft_stufe`, `bereitschaft_am` und
+ *                              `last_started_at`
+ * @returns {{messbar: boolean, bereit: boolean, stufe: string|null,
+ *            grund: string|null, text: string, stufen: Array}}
+ */
+/**
+ * Die Knopfregel kommt aus dem Browser-Modul — absichtlich.
+ *
+ * `gameserver-live.js` exportiert `knopfZustand()` als reine Rechnung. Wer sie
+ * hier nachbaute, haette zwei Regeln: eine fuer das erste Rendern und eine fuer
+ * jede spaetere Aenderung. Genau dieses Auseinanderlaufen war Baustelle 134 —
+ * die Seite sagte "Laeuft" und der Knopf daneben "Starten".
+ */
+const { knopfZustand } = require('../assets/js/gameserver-live.js');
 
-        const laeuft  = ['online', 'starting'].includes(s.status);
-        const gefragt = s.current_players !== null && s.current_players !== undefined;
+/**
+ * Welcher Knopf steht beim ERSTEN Rendern wie da?
+ *
+ * Dieselbe Rechnung wie im Browser, mit denselben Eingaben: Status, ob das
+ * Paket ueberhaupt eine Bereitschaft misst, und ob sie erreicht ist.
+ *
+ * @param {object|null} paket
+ * @param {object} server
+ * @returns {{start: object, restart: object, stop: object}}
+ */
+function baueKnopfzeile(paket, server) {
+    const a = baueBereitschaftAuskunft(paket, server);
+    return knopfZustand({
+        status:  server.status,
+        bereit:  a.bereit,
+        messbar: a.messbar,
+        text:    a.text,
+    });
+}
 
-        // Dieselbe Leiter wie auf der Serverseite — nicht dieselbe Rechnung
-        // noch einmal. `null` heisst: Das Paket verlangt keine Bereitschaft.
-        const leiter = baueBereitschaft(paket, s);
+function baueBereitschaftAuskunft(paket, s) {
+    const leiter  = baueBereitschaft(paket, s);
+    const laeuft  = ['online', 'starting'].includes(s.status);
+    const zustand = baueZustand(s);
 
-        const stufen = (leiter?.stufen || []).map(st => ({
+    // Auf welche Stufe wartet er? Der Name gehoert in den Text — "wartet"
+    // allein sagt einem Betreiber nicht, wo er nachsehen soll.
+    const wartetAuf = (leiter?.stufen || []).find(st => st.wartet)?.name || null;
+
+    return {
+        // `null` heisst: Das Paket verlangt keine Bereitschaft. Das ist KEIN
+        // Mangel — und es darf die Knoepfe nicht sperren.
+        messbar: Boolean(leiter),
+        bereit:  Boolean(leiter?.bereit),
+        stufe:   leiter?.stufe || null,
+        grund:   leiter?.grund || null,
+        text:
+            !leiter                 ? 'nicht messbar'
+          : leiter.bereit           ? 'bereit'
+          : !laeuft                 ? (s.status === 'offline' ? 'aus' : zustand.text)
+          : leiter.veraltet         ? 'seit dem Start nichts gemeldet'
+          : !leiter.gemessen        ? 'noch nichts gemeldet'
+          : wartetAuf               ? 'wartet auf ' + wartetAuf
+          : 'startet',
+        stufen: (leiter?.stufen || []).map(st => ({
+            // Der Schluessel ist die eindeutige Zuordnung fuer den Live-Weg —
+            // `name` ist deutsch und uebersetzbar, `schluessel` nicht.
+            schluessel: st.schluessel,
             name:     st.name,
             erfuellt: st.erreicht,
             wartet:   st.wartet,
             verlangt: st.verlangt,
             titel:    st.erklaerung,
-        }));
+        })),
+    };
+}
 
-        // Auf welche Stufe wartet er? Der Name gehört in den Text — „wartet"
-        // allein sagt einem Betreiber nicht, wo er nachsehen soll.
-        const wartetAuf = (leiter?.stufen || []).find(st => st.wartet)?.name || null;
+function baueServerListe(zeilen, paketNachAddon = {}) {
+    const liste = (zeilen || []).map((s) => {
+        const paket = paketNachAddon[s.addon_marketplace_id] || null;
+        const zustand = baueZustand(s);
+
+        const gefragt = s.current_players !== null && s.current_players !== undefined;
+
+        // Dieselbe Leiter wie auf der Serverseite UND wie im Live-Weg — nicht
+        // dieselbe Rechnung noch einmal (Baustelle 134).
+        const auskunft = baueBereitschaftAuskunft(paket, s);
+        const stufen = auskunft.stufen;
 
         return {
             id:      s.id,
@@ -734,18 +818,12 @@ function baueServerListe(zeilen, paketNachAddon = {}) {
             spiel:   paket?.identity?.name || s.game_name || s.template_name || '—',
             zustand,
             stufen,
-            bereit:  Boolean(leiter?.bereit),
+            bereit:  auskunft.bereit,
+            messbar: auskunft.messbar,
             // Der Erklärsatz von fb-init — in der Liste als Titel am Balken,
             // auf der Serverseite im Klartext. Dieselbe Quelle.
-            bereitschaftGrund: leiter?.grund || null,
-            bereitschaftText:
-                !leiter                 ? 'nicht messbar'
-              : leiter.bereit           ? 'bereit'
-              : !laeuft                 ? (s.status === 'offline' ? 'aus' : zustand.text)
-              : leiter.veraltet         ? 'seit dem Start nichts gemeldet'
-              : !leiter.gemessen        ? 'noch nichts gemeldet'
-              : wartetAuf               ? 'wartet auf ' + wartetAuf
-              : 'startet',
+            bereitschaftGrund: auskunft.grund,
+            bereitschaftText:  auskunft.text,
             spieler: {
                 jetzt: gefragt ? s.current_players : null,
                 max:   s.max_players ?? null,
@@ -777,6 +855,10 @@ function baueServerListe(zeilen, paketNachAddon = {}) {
 }
 
 module.exports.baueServerListe = baueServerListe;
+// Die eine Bereitschaftsrechnung — Liste, Serverseite und der Live-Weg teilen
+// sie sich. `scripts/check-bereitschaft.js` prueft sie direkt.
+module.exports.baueBereitschaftAuskunft = baueBereitschaftAuskunft;
+module.exports.baueKnopfzeile = baueKnopfzeile;
 // Ausdruecklich exportiert, damit scripts/check-bereitschaft.js die Leiter
 // pruefen kann, ohne eine ganze Seite zu bauen.
 module.exports.baueBereitschaft = baueBereitschaft;

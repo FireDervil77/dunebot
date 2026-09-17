@@ -46,14 +46,88 @@
     /** Die Leiter in der Reihenfolge, in der fb-init sie meldet. */
     const LEITER = ['process', 'port', 'query'];
 
+    /**
+     * Welcher Knopf ist sichtbar, welcher aktiv? — eine reine Rechnung.
+     *
+     * ── Warum das eine eigene Funktion ist (Baustelle 134) ──────────────────
+     *
+     * Weil sie sonst nur im Browser existiert und niemand sie messen kann.
+     * `scripts/check-knopfzeile.js` ruft genau diese Funktion auf; stuende die
+     * Regel im `switch`, waere sie "vorhanden, aber ungeprueft" — und genau
+     * solche Stellen fallen hier beim ersten Einsatz um.
+     *
+     * Die Regeln:
+     *   Starten     nur wenn nichts laeuft und nichts werkelt
+     *   Neu starten erst wenn der Server wirklich steht (bereit ODER das Paket
+     *               misst gar keine Bereitschaft)
+     *   Stoppen     solange irgendetwas laeuft — auch beim Starten, denn ein
+     *               haengender Start braucht einen Weg zurueck
+     *
+     * @param {{status?: string, bereit?: boolean, messbar?: boolean, text?: string}} z
+     * @returns {{start: object, restart: object, stop: object}}
+     */
+    function knopfZustand(z = {}) {
+        const laeuft  = z.status === 'online' || z.status === 'starting';
+        const werkelt = z.status === 'stopping'
+                     || z.status === 'installing'
+                     || z.status === 'updating';
+        // Kein `ready_when` heisst NICHT "nicht bereit" — sonst waere so ein
+        // Server nie neu startbar.
+        const steht = z.bereit === true || z.messbar === false;
+
+        const neustartbar = z.status === 'online' && steht;
+
+        // `grund` steht nur an einem GESPERRTEN Knopf. Ein Grund neben einem
+        // aktiven Knopf waere ein Hinweis auf ein Hindernis, das es nicht gibt.
+        return {
+            // Sichtbar, sobald nichts laeuft — auch waehrend er werkelt, dann
+            // aber gesperrt. Ihn ganz auszublenden liesse die Knopfzeile beim
+            // Installieren und Stoppen LEER, und eine leere Zeile sagt einem
+            // Betreiber nicht, ob er etwas uebersehen hat. Ein gesperrter Knopf
+            // mit Begruendung sagt "gleich wieder".
+            start: {
+                sichtbar: !laeuft,
+                aktiv:    !werkelt,
+                grund:    werkelt ? 'Der Server ist gerade beschäftigt.' : '',
+            },
+            restart: {
+                sichtbar: laeuft,
+                aktiv:    neustartbar,
+                grund:    neustartbar ? ''
+                        : z.status === 'starting'
+                            ? (z.text ? `Startet noch — ${z.text}.` : 'Der Server startet noch.')
+                            : 'Der Server ist noch nicht bereit.',
+            },
+            stop: {
+                sichtbar: laeuft,
+                aktiv:    laeuft,
+                grund:    '',
+            },
+        };
+    }
+
     class LiveAnzeige {
         constructor(sse, guildId) {
             this.sse = sse;
             this.guildId = guildId;
             this.zustand = new Map();   // serverId → { status, stufe, grund, spieler, max }
 
-            sse.on('status_changed', (d) => this.uebernimm(d.server_id, { status: d.status }));
-            sse.on('readiness',      (d) => this.uebernimm(d.server_id, { stufe: d.stufe, grund: d.grund }));
+            // Diese zwei Ereignisse aendern die BEURTEILUNG (bereit / nicht
+            // bereit), und die rechnet der Server. Also erst den Rohwert
+            // uebernehmen, damit die Anzeige sofort reagiert, dann die
+            // Beurteilung nachholen. Ohne das Nachholen stuenden die Knoepfe
+            // auf dem Stand von vor dem Ereignis.
+            sse.on('status_changed', (d) => {
+                this.uebernimm(d.server_id, { status: d.status });
+                this.holeBald();
+            });
+            sse.on('readiness', (d) => {
+                this.uebernimm(d.server_id, { stufe: d.stufe, grund: d.grund });
+                this.holeBald();
+            });
+            // Die Spielerzahl aendert keine Beurteilung — hier wird NICHT
+            // nachgeholt. Sie kommt im Sekundentakt; ein Abruf je Messwert
+            // waere eine Last ohne Gegenwert.
             sse.on('resource_usage', (d) => this.uebernimm(d.server_id, {
                 spieler: d.current_players, max: d.max_players }));
 
@@ -74,6 +148,16 @@
             this.zeichne(id);
         }
 
+        /**
+         * Bald nachholen — mehrere Ereignisse kurz hintereinander kosten einen
+         * Abruf, nicht fuenf. Ein Statuswechsel zieht meist eine Bereitschafts-
+         * meldung nach sich; beide zusammen sollen EINEN Abruf ausloesen.
+         */
+        holeBald() {
+            clearTimeout(this._holeGleich);
+            this._holeGleich = setTimeout(() => this.holeAlles(), 250);
+        }
+
         async holeAlles() {
             try {
                 const r = await fetch(
@@ -82,12 +166,21 @@
                 if (!r.ok) return;
                 const d = await r.json();
                 for (const s of (d.servers || [])) {
+                    // `bereitschaft` ist die BEURTEILUNG vom Server (seit
+                    // Baustelle 134). Sie hier nachzurechnen waere der zweite
+                    // Weg — und der erste war schon falsch: Das Modul pruefte
+                    // `stufe === 'query'` und hielt damit jeden Server, dessen
+                    // Paket keine Abfrage verlangt, fuer nie bereit.
+                    const b = s.bereitschaft || null;
                     this.uebernimm(s.id, {
                         status:  s.status,
-                        stufe:   s.bereitschaft_stufe,
-                        grund:   s.bereitschaft_grund,
+                        stufe:   b ? b.stufe : s.bereitschaft_stufe,
+                        grund:   b ? b.grund : s.bereitschaft_grund,
                         spieler: s.current_players,
                         max:     s.max_players,
+                        bereit:  b ? b.bereit  : undefined,
+                        messbar: b ? b.messbar : undefined,
+                        text:    b ? b.text    : undefined,
                     });
                 }
             } catch (_) {
@@ -118,21 +211,63 @@
                     }
 
                     case 'bereitschaft-pille': {
-                        const laeuft = z.status === 'online' || z.status === 'starting';
-                        const wieWeit = LEITER.indexOf(z.stufe);
-                        if (!laeuft || wieWeit < 0) {
+                        // ── Baustelle 134: Hier stand `z.stufe === 'query'` ──
+                        //
+                        // Das war falsch fuer jedes Paket, das keine Abfrage
+                        // verlangt: Dessen letzte Stufe ist `port` oder
+                        // `process`, also wurde es NIE als bereit angezeigt,
+                        // obwohl der Server lief. Die richtige Frage — "sind
+                        // alle VERLANGTEN Stufen erreicht" — beantwortet der
+                        // Server in `bereitschaft.bereit`.
+                        if (z.messbar === false) {
+                            el.textContent = 'nicht messbar';
+                            el.className = 'fb-pille';
+                            el.title = 'Das Paket verlangt keine Bereitschaftspruefung.';
+                        } else if (z.bereit === true) {
+                            el.textContent = 'Spieler können rein';
+                            el.className = 'fb-pille fb-pille-gut';
+                            el.title = 'Alle verlangten Stufen sind erreicht.';
+                        } else if (z.text) {
+                            // Derselbe Satz, den die Liste zeigt — eine Quelle.
+                            el.textContent = z.text;
+                            el.className = 'fb-pille fb-pille-warn';
+                            el.title = z.grund || '';
+                        } else {
                             el.textContent = 'Bereitschaft noch nicht gemeldet';
                             el.className = 'fb-pille';
                             el.title = 'Der Server hat noch keine Bereitschaftsstufe gemeldet.';
-                        } else if (z.stufe === LEITER[LEITER.length - 1]) {
-                            el.textContent = 'Spieler können rein';
-                            el.className = 'fb-pille fb-pille-gut';
-                            el.title = 'fb-init hat die letzte Stufe erreicht.';
-                        } else {
-                            el.textContent = `startet — Stufe ${z.stufe}`;
-                            el.className = 'fb-pille fb-pille-warn';
-                            el.title = z.grund || 'Der Server ist noch nicht auf der letzten Stufe.';
                         }
+                        break;
+                    }
+
+                    case 'aktionen': {
+                        // ── Die Knoepfe (Baustelle 134) ─────────────────────
+                        //
+                        // Vorher entschied die Vorlage beim Rendern, welche
+                        // Knoepfe es GIBT. Der Statustext sprang live auf
+                        // "Laeuft", und daneben stand weiter "Starten".
+                        //
+                        // Regeln, dieselben wie serverseitig:
+                        //   Starten     — nur wenn nichts laeuft und nichts werkelt
+                        //   Neu starten — erst wenn der Server wirklich steht
+                        //   Stoppen     — solange irgendetwas laeuft
+                        //
+                        // "Stoppen" bleibt beim Starten ABSICHTLICH aktiv: Ein
+                        // haengender Start braucht einen Weg zurueck. Gesperrt
+                        // wird nur "Neu starten".
+                        const soll = knopfZustand(z);
+                        const setze = (aktion) => {
+                            const b = el.querySelector(`[data-fb-aktion="${aktion}"]`);
+                            if (!b) return;
+                            const s = soll[aktion];
+                            b.hidden = !s.sichtbar;
+                            b.disabled = !s.aktiv;
+                            // Ein gesperrter Knopf ohne Grund ist eine Sackgasse.
+                            b.title = s.aktiv ? '' : (s.grund || '');
+                        };
+                        setze('start');
+                        setze('restart');
+                        setze('stop');
                         break;
                     }
 
@@ -140,17 +275,61 @@
                         // Dieselben drei Farben mit denselben drei Bedeutungen
                         // wie beim serverseitigen Zeichnen — sonst springt die
                         // Karte beim Neuladen um.
-                        const meine   = LEITER.indexOf(el.dataset.fbStufe);
-                        const laeuft  = z.status === 'online' || z.status === 'starting';
-                        const wieWeit = LEITER.indexOf(z.stufe);
-                        const verlangt = el.dataset.fbVerlangt !== 'nein';
+                        //
+                        // Baustelle 134: Hier wurde die Leiter fruehr selbst
+                        // nachgerechnet (`LEITER.indexOf`). Jetzt kommt sie
+                        // fertig beurteilt vom Server; nachgerechnet wird nur
+                        // noch, wenn sie (aus einem Ereignis) fehlt.
+                        const meineStufe = el.dataset.fbStufe;
+                        const verlangt   = el.dataset.fbVerlangt !== 'nein';
+                        const laeuft = z.status === 'online' || z.status === 'starting';
+
+                        let erreicht, wartet;
+                        const geliefert = (z.stufen || []).find(st => st.schluessel === meineStufe);
+                        if (geliefert) {
+                            erreicht = geliefert.erfuellt;
+                            wartet   = geliefert.wartet;
+                        } else {
+                            const meine   = LEITER.indexOf(meineStufe);
+                            const wieWeit = LEITER.indexOf(z.stufe);
+                            erreicht = laeuft && wieWeit >= 0 && meine >= 0 && meine <= wieWeit;
+                            wartet   = laeuft && wieWeit >= 0 && meine === wieWeit + 1;
+                        }
 
                         let farbe;
-                        if (!verlangt)                              farbe = '#f1f3f5';
-                        else if (laeuft && wieWeit >= 0 && meine <= wieWeit) farbe = 'var(--fb-success)';
-                        else if (laeuft && wieWeit >= 0 && meine === wieWeit + 1) farbe = 'var(--fb-warning)';
-                        else                                        farbe = 'var(--fb-border)';
+                        if (!verlangt)   farbe = '#f1f3f5';
+                        else if (erreicht) farbe = 'var(--fb-success)';
+                        else if (wartet)   farbe = 'var(--fb-warning)';
+                        else               farbe = 'var(--fb-border)';
                         el.style.background = farbe;
+                        break;
+                    }
+
+                    case 'bereitschaft-text': {
+                        // Der Satz unter den Balken in der Uebersicht —
+                        // dieselbe Quelle wie `bereitschaftText` der Liste.
+                        if (z.text) el.textContent = z.text;
+                        break;
+                    }
+
+                    case 'zustand-pille': {
+                        const e = ZUSTAende[z.status] || { text: z.status || '—' };
+                        el.textContent = e.text;
+                        // Gruen heisst hier "laeuft", genau wie serverseitig
+                        // (`baueZustand().gut`).
+                        el.className = 'fb-pille' + (z.status === 'online' ? ' fb-pille-gut' : '');
+                        break;
+                    }
+
+                    case 'spieler-paar': {
+                        // "3 / 8" — und "nicht gemessen" ist etwas anderes als
+                        // "0". Die Legende der Uebersicht sagt das ausdruecklich,
+                        // also darf hier keine 0 stehen, wo nichts gemessen wurde.
+                        if (z.spieler === null || z.spieler === undefined) {
+                            el.innerHTML = '<span class="fb-muted" style="font-family:inherit">nicht gemessen</span>';
+                        } else {
+                            el.textContent = `${z.spieler} / ${(z.max === null || z.max === undefined) ? '?' : z.max}`;
+                        }
                         break;
                     }
 
@@ -171,7 +350,17 @@
         }
     }
 
+    // Damit `scripts/check-knopfzeile.js` dieselbe Rechnung pruefen kann, die
+    // der Browser benutzt — nicht eine nachgebaute daneben. Im Browser aendert
+    // sich dadurch nichts; in node gibt es kein `window` und kein `document`,
+    // deshalb steigt die Datei hier sauber aus, statt zu werfen.
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = { knopfZustand };
+    }
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+
     window.GameserverLiveAnzeige = LiveAnzeige;
+    window.GameserverKnopfZustand = knopfZustand;
 
     // ── Selbst starten — und den eigenen Empfaenger bauen ───────────────────
     //

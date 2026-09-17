@@ -8,7 +8,11 @@
   sondern die Spalte, die es vorher nicht gab: BEREITSCHAFT. „Läuft" beantwortet
   nicht die Frage, die ein Betreiber wirklich hat — nämlich ob jemand rein kann.
 -%>
-<div class="fb-seite">
+<%# `data-fb-live-guild` haengt `gameserver-live.js` ein (Baustelle 134,
+    2026-09-17). Die Route reiht das Skript seit dem 2026-09-08 ein, aber der
+    Haken stand NUR in `server-detail.ejs` — diese Seite lud das Modul also und
+    liess es beim ersten `if` wieder aussteigen. Sie stand still, ohne Fehler. %>
+<div class="fb-seite" data-fb-live-guild="<%= guildId %>">
 
   <div class="fb-seitenkopf">
     <div>
@@ -70,16 +74,21 @@
                   <div style="display:flex;gap:3px;margin-bottom:3px">
                     <% s.stufen.forEach(function (st) { %>
                       <span title="<%= st.name %><%= st.titel ? ' — ' + st.titel : '' %>"
+                            data-fb-live="stufe-punkt" data-fb-server="<%= s.id %>"
+                            data-fb-stufe="<%= st.schluessel %>"
+                            data-fb-verlangt="<%= st.verlangt ? 'ja' : 'nein' %>"
                             style="width:22px;height:5px;border-radius:100rem;background:<%=
                         st.erfuellt ? 'var(--fb-success)' : st.wartet ? 'var(--fb-warning)' : '#e6e7e9'
                       %>"></span>
                     <% }); %>
                   </div>
                 <% } %>
-                <div class="fb-muted" style="font-size:12px"><%= s.bereitschaftText %></div>
+                <div class="fb-muted" style="font-size:12px"
+                     data-fb-live="bereitschaft-text" data-fb-server="<%= s.id %>"><%= s.bereitschaftText %></div>
               </td>
-              <td><span class="fb-pille<%= s.zustand.gut ? ' fb-pille-gut' : '' %>"><%= s.zustand.text %></span></td>
-              <td class="fb-mono">
+              <td><span class="fb-pille<%= s.zustand.gut ? ' fb-pille-gut' : '' %>"
+                        data-fb-live="zustand-pille" data-fb-server="<%= s.id %>"><%= s.zustand.text %></span></td>
+              <td class="fb-mono" data-fb-live="spieler-paar" data-fb-server="<%= s.id %>">
                 <% if (s.spieler.jetzt !== null) { %>
                   <%= s.spieler.jetzt %> / <%= s.spieler.max !== null ? s.spieler.max : '?' %>
                 <% } else { %>
