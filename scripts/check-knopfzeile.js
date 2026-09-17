@@ -27,7 +27,7 @@
  */
 'use strict';
 const path = require('path');
-const { knopfZustand } = require(path.join(
+const { knopfZustand, pillenZustand } = require(path.join(
     __dirname, '..', 'plugins/gameserver/dashboard/assets/js/gameserver-live.js'));
 
 let fehler = 0;
@@ -121,7 +121,70 @@ for (const [lage, z] of faelle) {
 }
 pruefe(true, 'geprueft');
 
+// ── Die Bereitschaftspille ──────────────────────────────────────────────────
+//
+// Der Betreiber, 2026-09-17 nach dem ersten Rollout: "das 'noch nichts
+// gemeldet' erscheint leider auch nicht von alleine, nur nach Seite neu
+// laden." Die Vorlage rendert die Pille frueher nur `if (online || starting)`
+// - wer die Seite bei ausgeschaltetem Server oeffnet, hatte das Element gar
+// nicht im DOM. Dieselbe Falle wie bei den Knoepfen.
+console.log('\n▸ Die Bereitschaftspille');
+
+const pillenFaelle = [
+    ['Server aus', { status: 'offline' },
+     { sichtbar: false, wartet: false },
+     'Steht der Server, sagt die Bereitschaft nichts ueber jetzt.'],
+
+    ['Startet, noch nichts gemeldet',
+     { status: 'starting', messbar: true, bereit: false, text: 'noch nichts gemeldet' },
+     { sichtbar: true, wartet: true },
+     'HIER gehoert die Wartemarke hin - das ist der gemeldete Fall.'],
+
+    ['Laeuft, wartet auf Port',
+     { status: 'online', messbar: true, bereit: false, text: 'wartet auf Port' },
+     { sichtbar: true, wartet: true },
+     'Laeuft ist nicht bereit - es passiert noch etwas.'],
+
+    ['Laeuft und ist bereit',
+     { status: 'online', messbar: true, bereit: true },
+     { sichtbar: true, wartet: false },
+     'Fertig - keine Marke mehr.'],
+
+    ['Paket misst keine Bereitschaft',
+     { status: 'online', messbar: false },
+     { sichtbar: true, wartet: false },
+     'KEINE Sanduhr: sie hiesse "gleich", und es kaeme nie.'],
+
+    ['Wird gestoppt', { status: 'stopping' },
+     { sichtbar: false, wartet: false },
+     'Beim Stoppen ist die Bereitschaft keine Auskunft.'],
+];
+
+for (const [lage, z, erwartet, warum] of pillenFaelle) {
+    const s = pillenZustand(z);
+    const ok = s.sichtbar === erwartet.sichtbar && s.wartet === erwartet.wartet;
+    pruefe(ok, `${lage}: sichtbar=${s.sichtbar} wartet=${s.wartet}`,
+        ok ? warum
+           : `erwartet sichtbar=${erwartet.sichtbar} wartet=${erwartet.wartet}\n       ${warum}`);
+}
+
+console.log('\n▸ Eine sichtbare Pille hat immer einen Text');
+for (const [lage, z] of pillenFaelle) {
+    const s = pillenZustand(z);
+    if (!s.sichtbar) continue;
+    pruefe(Boolean(s.text), `${lage} → "${s.text}"`,
+        s.text ? '' : 'sichtbar, aber leer - eine leere Pille ist ein Fleck, keine Auskunft');
+}
+
+console.log('\n▸ Gewartet wird nur, wo es auch etwas zu messen gibt');
+for (const [lage, z] of pillenFaelle) {
+    const s = pillenZustand(z);
+    if (!s.wartet) continue;
+    pruefe(z.messbar !== false, `${lage}`,
+        z.messbar !== false ? '' : 'Wartemarke bei einem Paket ohne ready_when - das Warten endete nie');
+}
+
 console.log(fehler === 0
-    ? `\n✅ Knopfzeile: ${faelle.length} Lagen, alle richtig geschaltet\n`
+    ? `\n✅ Kopfzeile: ${faelle.length} Knopf-Lagen und ${pillenFaelle.length} Pillen-Lagen richtig\n`
     : `\n❌ ${fehler} Abweichung(en)\n`);
 process.exit(fehler === 0 ? 0 : 1);

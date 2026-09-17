@@ -47,6 +47,66 @@
     const LEITER = ['process', 'port', 'query'];
 
     /**
+     * Wie steht die Bereitschaftspille? — eine reine Rechnung.
+     *
+     * ── Warum sie hier steht und nicht in der Vorlage (2026-09-17) ──────────
+     *
+     * Der Betreiber nach dem ersten Rollout: *"das 'noch nichts gemeldet'
+     * erscheint leider auch nicht von alleine, nur nach Seite neu laden."*
+     *
+     * Ursache war dieselbe wie bei den Knoepfen: Die Vorlage rendert die Pille
+     * nur `if (online || starting)`. Wer die Seite bei ausgeschaltetem Server
+     * oeffnet und dann auf Starten klickt, hat das Element gar nicht im DOM —
+     * das Modul sucht es, findet nichts und zeichnet nichts. Kein Fehler,
+     * keine Meldung, genau wie beim ersten Mal.
+     *
+     * Jetzt steht die Pille immer da und wird hier geschaltet.
+     *
+     * `wartet` ist der Wunsch des Betreibers: *"wenn da steht, es wurde noch
+     * nichts gemeldet, koennte man dort eine Sanduhr einblenden. Dann weiss
+     * man ohne auf die Konsole zu schauen, dass der Server gerade etwas tut."*
+     *
+     * @param {{status?: string, bereit?: boolean, messbar?: boolean,
+     *          text?: string, grund?: string}} z
+     * @returns {{sichtbar: boolean, text: string, klasse: string,
+     *            titel: string, wartet: boolean}}
+     */
+    function pillenZustand(z = {}) {
+        const laeuft = z.status === 'online' || z.status === 'starting';
+
+        // Steht der Server, sagt die Bereitschaft nichts ueber jetzt. Eine
+        // Pille mit dem Stand von vorhin waere schlimmer als keine.
+        if (!laeuft) {
+            return { sichtbar: false, text: '', klasse: 'fb-pille', titel: '', wartet: false };
+        }
+
+        // Kein `ready_when` im Paket: Es gibt nichts zu messen, also wird auch
+        // nicht gewartet. Eine Sanduhr hier hiesse "gleich", und es kaeme nie.
+        if (z.messbar === false) {
+            return {
+                sichtbar: true, text: 'nicht messbar', klasse: 'fb-pille',
+                titel: 'Das Paket verlangt keine Bereitschaftspruefung.', wartet: false,
+            };
+        }
+
+        if (z.bereit === true) {
+            return {
+                sichtbar: true, text: 'Spieler können rein',
+                klasse: 'fb-pille fb-pille-gut',
+                titel: 'Alle verlangten Stufen sind erreicht.', wartet: false,
+            };
+        }
+
+        return {
+            sichtbar: true,
+            text:   z.text || 'noch nichts gemeldet',
+            klasse: 'fb-pille fb-pille-warn',
+            titel:  z.grund || 'Der Server hat noch keine Bereitschaftsstufe gemeldet.',
+            wartet: true,
+        };
+    }
+
+    /**
      * Welcher Knopf ist sichtbar, welcher aktiv? — eine reine Rechnung.
      *
      * ── Warum das eine eigene Funktion ist (Baustelle 134) ──────────────────
@@ -215,28 +275,22 @@
                         //
                         // Das war falsch fuer jedes Paket, das keine Abfrage
                         // verlangt: Dessen letzte Stufe ist `port` oder
-                        // `process`, also wurde es NIE als bereit angezeigt,
-                        // obwohl der Server lief. Die richtige Frage — "sind
-                        // alle VERLANGTEN Stufen erreicht" — beantwortet der
-                        // Server in `bereitschaft.bereit`.
-                        if (z.messbar === false) {
-                            el.textContent = 'nicht messbar';
-                            el.className = 'fb-pille';
-                            el.title = 'Das Paket verlangt keine Bereitschaftspruefung.';
-                        } else if (z.bereit === true) {
-                            el.textContent = 'Spieler können rein';
-                            el.className = 'fb-pille fb-pille-gut';
-                            el.title = 'Alle verlangten Stufen sind erreicht.';
-                        } else if (z.text) {
-                            // Derselbe Satz, den die Liste zeigt — eine Quelle.
-                            el.textContent = z.text;
-                            el.className = 'fb-pille fb-pille-warn';
-                            el.title = z.grund || '';
-                        } else {
-                            el.textContent = 'Bereitschaft noch nicht gemeldet';
-                            el.className = 'fb-pille';
-                            el.title = 'Der Server hat noch keine Bereitschaftsstufe gemeldet.';
-                        }
+                        // `process`, also wurde es NIE als bereit angezeigt.
+                        // Die richtige Frage — "sind alle VERLANGTEN Stufen
+                        // erreicht" — beantwortet der Server.
+                        const s = pillenZustand(z);
+                        el.hidden = !s.sichtbar;
+                        el.className = s.klasse;
+                        el.title = s.titel;
+
+                        // Text und Wartemarke sind KINDER, nicht der Inhalt der
+                        // Pille selbst: Ein `textContent` auf der Pille wuerde
+                        // die Sanduhr bei jedem Zeichnen mit wegwerfen.
+                        const textEl  = el.querySelector('[data-fb-pille="text"]');
+                        const warteEl = el.querySelector('[data-fb-pille="warte"]');
+                        if (textEl) textEl.textContent = s.text;
+                        else el.textContent = s.text;   // alte Auszeichnung ohne Kinder
+                        if (warteEl) warteEl.hidden = !s.wartet;
                         break;
                     }
 
@@ -307,8 +361,16 @@
 
                     case 'bereitschaft-text': {
                         // Der Satz unter den Balken in der Uebersicht —
-                        // dieselbe Quelle wie `bereitschaftText` der Liste.
-                        if (z.text) el.textContent = z.text;
+                        // dieselbe Quelle wie `bereitschaftText` der Liste,
+                        // und dieselbe Wartemarke wie auf der Serverseite.
+                        // Zwei Darstellungen desselben Zustands waeren genau
+                        // das, was hier gerade abgebaut wird.
+                        const s = pillenZustand(z);
+                        const textEl  = el.querySelector('[data-fb-live-text]');
+                        const warteEl = el.querySelector('[data-fb-pille="warte"]');
+                        if (textEl) textEl.textContent = z.text || s.text;
+                        else if (z.text) el.textContent = z.text;
+                        if (warteEl) warteEl.hidden = !s.wartet;
                         break;
                     }
 
@@ -355,12 +417,13 @@
     // sich dadurch nichts; in node gibt es kein `window` und kein `document`,
     // deshalb steigt die Datei hier sauber aus, statt zu werfen.
     if (typeof module !== 'undefined' && module.exports) {
-        module.exports = { knopfZustand };
+        module.exports = { knopfZustand, pillenZustand };
     }
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
 
     window.GameserverLiveAnzeige = LiveAnzeige;
     window.GameserverKnopfZustand = knopfZustand;
+    window.GameserverPillenZustand = pillenZustand;
 
     // ── Selbst starten — und den eigenen Empfaenger bauen ───────────────────
     //

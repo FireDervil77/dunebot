@@ -226,6 +226,30 @@ for (const datei of routenDateien) {
 pruefe(gefunden > 0, 'Mindestens eine Route reiht das Modul ein',
     gefunden > 0 ? '' : 'keine gefunden - dann laeuft die Live-Anzeige nirgends');
 
+// ── 4b. Wer Kinder bedient, muss sie auch haben ─────────────────────────────
+//
+// `bereitschaft-pille` und `bereitschaft-text` schreiben ihren Text in ein
+// KIND (`data-fb-pille="text"` bzw. `data-fb-live-text`) und schalten die
+// Wartemarke (`data-fb-pille="warte"`). Fehlt ein Kind, faellt das Modul beim
+// Text auf die Pille selbst zurueck - die Wartemarke aber verschwindet
+// ersatzlos, und zwar lautlos.
+console.log('\n▸ Elemente mit Kindern haben ihre Kinder');
+const MIT_KINDERN = {
+    'bereitschaft-pille': ['data-fb-pille="text"', 'data-fb-pille="warte"'],
+    'bereitschaft-text':  ['data-fb-live-text', 'data-fb-pille="warte"'],
+};
+for (const datei of dateien) {
+    const text = vorlageCode(datei);
+    const kurz = path.relative(WURZEL, datei);
+    for (const [art, kinder] of Object.entries(MIT_KINDERN)) {
+        if (!text.includes(`data-fb-live="${art}"`)) continue;
+        for (const kind of kinder) {
+            pruefe(text.includes(kind), `${kurz}: "${art}" hat ${kind}`,
+                text.includes(kind) ? '' : `das Modul bedient ${kind}, die Vorlage hat es nicht`);
+        }
+    }
+}
+
 // ── 5. Die Aktionsnamen stimmen ueberein ────────────────────────────────────
 console.log('\n▸ Knopfzeile: Vorlage und Modul meinen dieselben Aktionen');
 const inVorlagen = new Set();

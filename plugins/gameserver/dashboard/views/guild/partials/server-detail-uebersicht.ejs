@@ -38,31 +38,32 @@
                 data-fb-live="status-punkt" data-fb-server="<%= server.id %>"></span>
           <div style="font-size:20px;font-weight:600;letter-spacing:-.01em"
                data-fb-live="status-text" data-fb-server="<%= server.id %>"><%= u.zustand.text %></div>
-          <% if (u.zustand.stufe) { %>
-            <span class="fb-pille"><%= u.zustand.stufe %></span>
-          <% } else if (u.zustand.schluessel === 'online' || u.zustand.schluessel === 'starting') { %>
-            <%# Der Entwurf verspricht hier „Spieler können rein".
-                Seit Baustelle 62f (2026-08-23) wird das gemessen statt behauptet:
-                fb-init meldet die Stufe über den Agent-Socket, der Daemon reicht
-                sie hoch, das Dashboard nimmt sie an. Was hier steht, ist also
-                eine Messung — oder ehrlich gesagt, dass noch keine vorliegt. %>
-            <%# Ein Element, drei Zustände — das Live-Modul schreibt Text, Klasse
-                und Titel. Drei getrennte Elemente hiessen, dass die Ansicht und
-                das Skript sich einig sein müssten, welches gerade sichtbar ist. %>
-            <% if (u.bereitschaft && u.bereitschaft.bereit) { %>
-              <span class="fb-pille fb-pille-gut" data-fb-live="bereitschaft-pille"
-                    data-fb-server="<%= server.id %>"
-                    title="fb-init hat die letzte Stufe erreicht.">Spieler können rein</span>
-            <% } else if (u.bereitschaft && u.bereitschaft.gemessen) { %>
-              <span class="fb-pille fb-pille-warn" data-fb-live="bereitschaft-pille"
-                    data-fb-server="<%= server.id %>"
-                    title="<%= u.bereitschaft.grund || 'Der Server ist noch nicht auf der letzten Stufe.' %>">startet — Stufe <%= u.bereitschaft.stufe %></span>
-            <% } else { %>
-              <span class="fb-pille" data-fb-live="bereitschaft-pille"
-                    data-fb-server="<%= server.id %>"
-                    title="Der Server hat noch keine Bereitschaftsstufe gemeldet.">Bereitschaft noch nicht gemeldet</span>
-            <% } %>
-          <% } %>
+          <%# ── Die Bereitschaftspille (Baustelle 134, 2026-09-17) ───────────
+              Vorher hing dieser ganze Block an
+              `if (online || starting)` — und davor stand noch ein Zweig
+              `if (u.zustand.stufe)`, den es nie gab: `baueZustand()` setzt
+              `stufe` ausnahmslos auf `null`.
+
+              Der Betreiber nach dem Rollout: *"das 'noch nichts gemeldet'
+              erscheint leider auch nicht von alleine, nur nach Seite neu
+              laden."* Genau daran lag es: Wer die Seite bei ausgeschaltetem
+              Server oeffnet und dann auf Starten klickt, hatte die Pille gar
+              nicht im DOM. Das Modul sucht sie, findet nichts, zeichnet nichts
+              — lautlos, wie beim ersten Mal.
+
+              Jetzt steht sie immer da. Sichtbarkeit, Text, Klasse und die
+              Wartemarke kommen aus `u.pille` — gerechnet von
+              `pillenZustand()` in `gameserver-live.js`, also von DERSELBEN
+              Funktion, die sie danach weiterschaltet. %>
+          <% const pz = (u && u.pille) || { sichtbar: false, text: '', klasse: 'fb-pille', titel: '', wartet: false }; %>
+          <span class="<%= pz.klasse %>" data-fb-live="bereitschaft-pille"
+                data-fb-server="<%= server.id %>"
+                title="<%= pz.titel %>"<%= pz.sichtbar ? '' : ' hidden' %>>
+            <%# Der drehende Ring sagt "es passiert gerade etwas" — ohne dass
+                man die Konsole aufmachen muss. Er ist ein KIND der Pille,
+                damit ihn das Neuschreiben des Textes nicht mit wegwirft. %>
+            <span class="fb-warte" data-fb-pille="warte"<%= pz.wartet ? '' : ' hidden' %>></span><span data-fb-pille="text"><%= pz.text %></span>
+          </span>
         </div>
 
 <%# B93: Serverliste und Direktverbindung sind zwei verschiedene Adressen.

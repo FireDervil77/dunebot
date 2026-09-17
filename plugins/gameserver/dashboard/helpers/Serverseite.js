@@ -120,6 +120,9 @@ function baueUebersicht(server, paket, zusatz = {}) {
         // Der ANFANGSZUSTAND der Knopfzeile — gerechnet mit derselben Funktion,
         // die der Browser danach benutzt (Baustelle 134).
         knoepfe:       baueKnopfzeile(paket, server),
+        // Der ANFANGSZUSTAND der Bereitschaftspille — ebenfalls aus der
+        // Funktion, die der Browser danach weiterschaltet.
+        pille:         bauePille(paket, server),
         kennzahlen:    baueKennzahlen(server),
         welt:          baueWelt(zusatz.sicherungen ?? zusatz.letzteSicherung),
     };
@@ -741,7 +744,7 @@ module.exports = { baueUebersicht, HOEHE, WIRKUNG, RISIKO, GRUPPE, BEFEHL_NAME, 
  * jede spaetere Aenderung. Genau dieses Auseinanderlaufen war Baustelle 134 —
  * die Seite sagte "Laeuft" und der Knopf daneben "Starten".
  */
-const { knopfZustand } = require('../assets/js/gameserver-live.js');
+const { knopfZustand, pillenZustand } = require('../assets/js/gameserver-live.js');
 
 /**
  * Welcher Knopf steht beim ERSTEN Rendern wie da?
@@ -753,6 +756,24 @@ const { knopfZustand } = require('../assets/js/gameserver-live.js');
  * @param {object} server
  * @returns {{start: object, restart: object, stop: object}}
  */
+/**
+ * Wie steht die Bereitschaftspille beim ERSTEN Rendern?
+ *
+ * @param {object|null} paket
+ * @param {object} server
+ * @returns {{sichtbar: boolean, text: string, klasse: string, titel: string, wartet: boolean}}
+ */
+function bauePille(paket, server) {
+    const a = baueBereitschaftAuskunft(paket, server);
+    return pillenZustand({
+        status:  server.status,
+        bereit:  a.bereit,
+        messbar: a.messbar,
+        text:    a.text,
+        grund:   a.grund,
+    });
+}
+
 function baueKnopfzeile(paket, server) {
     const a = baueBereitschaftAuskunft(paket, server);
     return knopfZustand({
@@ -824,6 +845,13 @@ function baueServerListe(zeilen, paketNachAddon = {}) {
             // auf der Serverseite im Klartext. Dieselbe Quelle.
             bereitschaftGrund: auskunft.grund,
             bereitschaftText:  auskunft.text,
+            // Dieselbe Wartemarke wie auf der Serverseite — aus derselben
+            // Rechnung, damit nicht zwei Darstellungen desselben Zustands
+            // entstehen (Baustelle 134).
+            wartet: pillenZustand({
+                status: s.status, bereit: auskunft.bereit,
+                messbar: auskunft.messbar, text: auskunft.text,
+            }).wartet,
             spieler: {
                 jetzt: gefragt ? s.current_players : null,
                 max:   s.max_players ?? null,
@@ -859,6 +887,7 @@ module.exports.baueServerListe = baueServerListe;
 // sie sich. `scripts/check-bereitschaft.js` prueft sie direkt.
 module.exports.baueBereitschaftAuskunft = baueBereitschaftAuskunft;
 module.exports.baueKnopfzeile = baueKnopfzeile;
+module.exports.bauePille = bauePille;
 // Ausdruecklich exportiert, damit scripts/check-bereitschaft.js die Leiter
 // pruefen kann, ohne eine ganze Seite zu bauen.
 module.exports.baueBereitschaft = baueBereitschaft;

@@ -83,8 +83,13 @@
                     <% }); %>
                   </div>
                 <% } %>
+                <%# Die Wartemarke wie auf der Serverseite: ein drehender Ring
+                    heisst "da passiert gerade etwas". Text als eigenes Kind,
+                    sonst wirft ihn das Neuschreiben mit weg. %>
                 <div class="fb-muted" style="font-size:12px"
-                     data-fb-live="bereitschaft-text" data-fb-server="<%= s.id %>"><%= s.bereitschaftText %></div>
+                     data-fb-live="bereitschaft-text" data-fb-server="<%= s.id %>"><span
+                     class="fb-warte" data-fb-pille="warte"<%= s.wartet ? '' : ' hidden' %>></span><span
+                     data-fb-live-text><%= s.bereitschaftText %></span></div>
               </td>
               <td><span class="fb-pille<%= s.zustand.gut ? ' fb-pille-gut' : '' %>"
                         data-fb-live="zustand-pille" data-fb-server="<%= s.id %>"><%= s.zustand.text %></span></td>

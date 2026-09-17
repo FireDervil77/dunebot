@@ -66,6 +66,40 @@
 .fb-pille-gut  { background: #e9f7ec; color: #1a7f37; }
 .fb-pille-warn { background: #fdf0e6; color: #b35309; }
 
+/* ── Die Wartemarke (Baustelle 134, Wunsch des Betreibers 2026-09-17) ───────
+   „wenn da steht, es wurde noch nichts gemeldet, koennte man dort eine
+   Sanduhr einblenden. Dann weiss man ohne auf die Konsole zu schauen, dass
+   der Server gerade etwas tut."
+
+   Ein drehender Ring statt eines Sanduhr-Zeichens: Eine Sanduhr steht still
+   und sieht damit aus wie ein Zustand. Der Ring dreht sich — das ist der
+   Unterschied zwischen „es wartet jemand" und „es passiert gerade etwas".
+
+   Eigene Animation statt `fa-spin`, damit die Marke nicht daran haengt, dass
+   Font Awesome geladen ist. */
+.fb-warte {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    margin-right: 5px;
+    vertical-align: -1px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 100rem;
+    opacity: .75;
+    animation: fb-warte-dreh .8s linear infinite;
+}
+.fb-warte[hidden] { display: none; }
+
+@keyframes fb-warte-dreh { to { transform: rotate(360deg); } }
+
+/* Wer Bewegung im System abgestellt hat, bekommt sie hier auch nicht. Der
+   Ring bleibt sichtbar — er sagt dann „wartet" statt „arbeitet", und das ist
+   immer noch mehr als nichts. */
+@media (prefers-reduced-motion: reduce) {
+    .fb-warte { animation: none; }
+}
+
 /* ── Werte und Felder ───────────────────────────────────────────────────── */
 .fb-chip {
   font-size: 15px; padding: 7px 12px; background: #f1f4f8;
