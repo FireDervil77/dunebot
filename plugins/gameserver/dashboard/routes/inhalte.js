@@ -551,7 +551,23 @@ router.get('/:serverId/inhalte/ladestand', requirePermission('GAMESERVER.VIEW'),
             return nicht('Die Logdatei ließ sich nicht lesen: ' + (gelesen?.error || 'keine Antwort'));
         }
 
-        const ergebnis = BepInExLog.werteAus(gelesen.data?.content || '');
+        // ── Der Daemon liefert Base64, immer (Baustelle 135, 2026-09-17) ────
+        //
+        // `HandleFileRead` in `internal/gameserver/files.go` endet mit
+        // `base64.StdEncoding.EncodeToString(content)`. Hier stand bis heute
+        // der rohe Wert im Parser — der findet in Base64 keine einzige
+        // `[Message: BepInEx]`-Zeile und kein `Chainloader startup complete`.
+        //
+        // Folge: `vollstaendig` war IMMER false, jede Modzeile bekam „kommt im
+        // Log nicht vor", und die Seite schrieb bei jedem Server und jedem
+        // Start „das Laden wurde nicht abgeschlossen". Eine falsche Auskunft,
+        // die wie eine richtige aussah — der Betreiber hat ihr geglaubt und
+        // nach einem Mod-Fehler gesucht, den es an der Stelle nicht gab.
+        //
+        // Die beiden anderen Aufrufer derselben Antwort (`routes/files.js`,
+        // Zeile 164 und 505) dekodieren seit jeher. Nur dieser nicht.
+        const text = Buffer.from(String(gelesen.data?.content || ''), 'base64').toString('utf8');
+        const ergebnis = BepInExLog.werteAus(text);
         const zuordnung = BepInExLog.ordneZu(ergebnis, await Inhalte.fuerServer(req.params.serverId), eintrag.mod_time);
 
         return res.json({
