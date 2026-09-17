@@ -1041,7 +1041,14 @@ class IPCServer {
                     this.Logger.info(`[IPCServer] SERVER_MIGRATE request: Server ${serverId} -> RootServer ${target_rootserver_id} (User: ${user_id})`);
 
                     try {
-                        const MigrationManager = require(path.join(__dirname, '../../../plugins/gameserver/dashboard/helpers/MigrationManager.js'));
+                        // Relativ, wie die uebrigen requires dieser Datei.
+                        // Vorher stand hier `require(path.join(__dirname, …))`,
+                        // und `path` war NIRGENDS importiert (Baustelle 137):
+                        // Dieser Zweig warf `ReferenceError: path is not
+                        // defined`, sobald jemand einen Server verschieben
+                        // wollte. Einmal benutzt, nie geladen — der Fehler
+                        // faellt in JavaScript erst beim Ausfuehren auf.
+                        const MigrationManager = require('../../../plugins/gameserver/dashboard/helpers/MigrationManager.js');
                         const result = await MigrationManager.startMigration(serverId, target_rootserver_id, user_id, guildId);
 
                         if (!result.success) {

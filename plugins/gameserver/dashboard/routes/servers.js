@@ -22,6 +22,19 @@ const { baueUebersicht, baueServerListe, bauePaketAuswahl,
         baueMaschinenAuswahl, baueWerteSchritt,
         baueBereitschaftAuskunft } = require('../helpers/Serverseite');
 const { resolveStatusConfig } = require('../helpers/StatusSchema');
+// ── Wieder eingehaengt am 2026-09-17 (Baustelle 137) ────────────────────────
+//
+// `69bedad` ("Egg-Weg raus", 2026-09-11) hat diesen Import entfernt und den
+// AUFRUF in der Bearbeiten-Route stehen lassen. Seither warf `GET
+// /:serverId/edit` einen ReferenceError und antwortete mit 500 — bei jedem
+// Server, eine Woche lang, bis es jemand anklickte.
+//
+// Der Aufruf gehoert dorthin: Die Bearbeiten-Seite zeigt den ALTBESTAND
+// (`frozen_game_data`) und kennzeichnet, welche Variablen nirgends vorkommen
+// (Konzept 23.2 — kennzeichnen, nicht verstecken). Das ist eine Hilfe beim
+// Aufraeumen und nicht der Egg-Weg beim Anlegen oder Starten, den 69bedad
+// beseitigt hat.
+const { beurteileVariablen } = require('../helpers/EggVariables');
 const PanelService = require('../helpers/PanelService');
 const { validateCommand, rateLimiter } = require('../helpers/CommandFilter');
 const { resolveConsoleTransport } = require('../helpers/ConsoleTransport');
