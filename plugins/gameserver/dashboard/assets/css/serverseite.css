@@ -225,3 +225,37 @@
 .fb-maschine.aus { opacity: .62; }
 .fb-spiel.aus { opacity: .55; cursor: default; }
 .fb-spiel.aus:hover { border-color: var(--fb-border); }
+
+/* ── Kennzahl-Kacheln (Baustelle 140, 2026-09-19) ───────────────────────────
+ *
+ * Sie kamen von der alten Dashboard-Seite, die dafuer Tabler-Karten
+ * (`card card-sm` mit `avatar`) benutzte. Die eins zu eins zu uebernehmen
+ * haette auf dieser Seite zwei Formensprachen nebeneinandergestellt — oben
+ * Tabler, darunter der Entwurf vom 2026-08-18. Deshalb hier nachgebaut, mit
+ * den Marken dieser Datei.
+ */
+.fb-kacheln {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px; margin-bottom: 16px;
+}
+@media (max-width: 992px) { .fb-kacheln { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .fb-kacheln { grid-template-columns: 1fr; } }
+
+.fb-kachel {
+  display: flex; align-items: center; gap: 14px;
+  padding: 16px 18px;
+  background: var(--fb-surface-bg);
+  border: 1px solid var(--fb-border);
+  border-radius: var(--fb-radius-card);
+  box-shadow: 0 1px 2px rgba(16,24,40,.06);
+}
+.fb-kachel-zeichen {
+  width: 40px; height: 40px; flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--fb-radius); color: #fff; font-size: 16px;
+}
+.fb-kachel-zahl {
+  font-size: 24px; font-weight: 600; line-height: 1.1;
+  font-variant-numeric: tabular-nums;  /* sonst huepft die Kachel beim Mitzaehlen */
+}
+.fb-kachel-wort { color: var(--fb-text-muted); font-size: 13px; }

@@ -519,21 +519,33 @@ class GameserverPlugin extends DashboardPlugin {
         
         try {
             // === GUILD-LEVEL ROUTES ===
-            const dashboardRouter = require('./routes/dashboard');
             const addonsRouter = require('./routes/addons');
             const serversRouter = require('./routes/servers');
             const settingsRouter = require('./routes/settings');
             const filesRouter = require('./routes/files');
             const consoleRouter = require('./routes/console');
             
-            // Root-Route: Redirect zu Dashboard
+            // Root-Route: die Serveruebersicht IST der Einstieg (B140).
+            //
+            // Bis zum 2026-09-19 fuehrte sie auf `/dashboard` — eine zweite
+            // Uebersicht mit eigenen Kacheln, eigener Tabelle und einem
+            // ZWEITEN Live-Weg (SSE plus Inline-Skript, waehrend die
+            // Uebersicht `gameserver-live.js` benutzt). Die Kacheln und die
+            // rechte Spalte stehen jetzt auf der Uebersicht, die Seite ist weg.
+            //
+            // Die Umleitung bleibt: Lesezeichen und aeltere Verweise zeigen
+            // hierher.
             this.guildRouter.get('/', (req, res) => {
                 const guildId = res.locals.guildId;
-                res.redirect(`/guild/${guildId}/plugins/gameserver/dashboard`);
+                res.redirect(`/guild/${guildId}/plugins/gameserver/servers`);
             });
-            
-            // Haupt-Route: Dashboard
-            this.guildRouter.use('/dashboard', dashboardRouter);
+
+            // `/dashboard` ebenso — es war ein Jahr lang DIE Adresse des
+            // Bereichs. Ein 404 darauf waere eine Ueberraschung ohne Nutzen.
+            this.guildRouter.get('/dashboard', (req, res) => {
+                const guildId = res.locals.guildId;
+                res.redirect(301, `/guild/${guildId}/plugins/gameserver/servers`);
+            });
             
             // Addon Marketplace
             this.guildRouter.use('/addons', addonsRouter);
@@ -1195,7 +1207,16 @@ class GameserverPlugin extends DashboardPlugin {
             // Hauptmenü-Item: gameserver
             {
                 title: 'gameserver:NAV.GAMESERVER',
-                url: `/guild/${guildId}/plugins/gameserver`,
+                // **Zeigt auf die Übersicht, nicht auf die Wurzel** (2026-09-19,
+                // Baustelle 140). Damit ist die Entscheidung vom 2026-08-18
+                // abgeschlossen: Es gibt EINEN Eintrag, der zu „Server ansehen"
+                // führt. Vorher zeigte dieser Punkt auf die Wurzel, die zum
+                // Dashboard umleitete — und NAV.SERVERS daneben auf dieselbe
+                // Liste. Zwei Einträge, ein Ziel.
+                //
+                // Die Wurzel leitet weiter hierher, damit alte Lesezeichen und
+                // Verweise nicht ins Leere laufen.
+                url: `/guild/${guildId}/plugins/gameserver/servers`,
                 icon: 'fa-solid fa-server',
                 // **Fester Platz in der Seitenleiste** (2026-09-04).
                 //
@@ -1240,20 +1261,19 @@ class GameserverPlugin extends DashboardPlugin {
                 capability: 'GAMESERVER.EDIT', // Addons verwalten erfordert Edit-Rechte
                 visible: true,
                 guildId,
-                parent: `/guild/${guildId}/plugins/gameserver`
+                // Muss dem `url` des Elternpunktes ZEICHENGLEICH entsprechen -
+                // `NavigationManager.js:536` vergleicht genau so. Wer oben die
+                // Adresse aendert und hier nicht, haengt den Punkt ab.
+                parent: `/guild/${guildId}/plugins/gameserver/servers`
             },
-            // Submenü: Server-Registry
-            {
-                title: 'gameserver:NAV.SERVERS',
-                url: `/guild/${guildId}/plugins/gameserver/servers`,
-                icon: 'fa-solid fa-server',
-                order: 10,
-                type: navigationManager.menuTypes.MAIN,
-                capability: 'GAMESERVER.VIEW', // Server-Liste ansehen
-                visible: true,
-                guildId,
-                parent: `/guild/${guildId}/plugins/gameserver`
-            },    
+            // ── NAV.SERVERS ist entfallen (2026-09-19, Baustelle 140) ───────
+            //
+            // Er zeigte auf dieselbe Seite wie der Elternpunkt darueber. Die
+            // Seitenleiste haette beides untereinander angezeigt: "Gameserver"
+            // und "Server", beide zur Serveruebersicht. Genau das Doppel, das
+            // am 2026-09-03 schon bei `core` auffiel ("Themes / Uebersicht").
+            //
+            // Der Elternpunkt TRAEGT die Uebersicht jetzt selbst.    
             {
                 title: 'gameserver:NAV.GAMESERVER',
                 path: `/guild/${guildId}/plugins/gameserver/settings`,
@@ -1267,6 +1287,18 @@ class GameserverPlugin extends DashboardPlugin {
         ];
 
         try {
+            // **Erst raeumen, dann anmelden** (2026-09-19, Baustelle 140).
+            //
+            // `registerNavigation` ueberspringt Vorhandenes und LOESCHT NIE —
+            // ein entfernter oder umgehaengter Punkt stand deshalb weiter in
+            // der Leiste, bis jemand eine Migration dafuer schrieb. Genau
+            // deswegen gibt es `20260819_190000_navigation_zusammenlegen.js`.
+            //
+            // Die anderen fuenf Plugins mit Navigation (music, streaming,
+            // discord, moderation, masterserver) raeumen hier vorher auf.
+            // Gameserver war der Ausreisser. Mit dieser Zeile traegt jede
+            // Aenderung an `navItems` sich selbst — ohne eine weitere Migration.
+            await navigationManager.removeNavigation(this.name, guildId);
             await navigationManager.registerNavigation(this.name, guildId, navItems);
             Logger.debug('[Gameserver] Navigation registriert (inkl. Settings unter Core)');
         } catch (error) {

@@ -117,7 +117,11 @@
                                     <button type="submit" class="btn btn-primary">
                                         <i class="fa-solid fa-save"></i> <%= tr('gameserver:SETTINGS.SAVE') %>
                                     </button>
-                                    <a href="/guild/<%= guildId %>/plugins/gameserver/dashboard" class="btn btn-secondary">
+                                    <%# Zeigte auf `/dashboard`. Die Seite ist am 2026-09-19 in die
+                                        Serverübersicht aufgegangen (B140); die Adresse leitet zwar
+                                        weiter, aber ein Abbrechen-Knopf über eine Umleitung ist eine
+                                        Altlast, die beim nächsten Aufräumen wieder auffällt. %>
+                                    <a href="/guild/<%= guildId %>/plugins/gameserver/servers" class="btn btn-secondary">
                                         <i class="fa-solid fa-times"></i> <%= tr('gameserver:SETTINGS.CANCEL') %>
                                     </a>
                                 </div>

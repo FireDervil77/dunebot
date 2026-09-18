@@ -871,12 +871,46 @@ function baueServerListe(zeilen, paketNachAddon = {}) {
     });
 
     const maschinen = new Set(liste.map(x => x.maschine).filter(Boolean));
+
+    // **Die Kacheln rechnen aus DERSELBEN Liste** (2026-09-19, Baustelle 140).
+    // Die alte Dashboard-Seite hatte dafuer eine eigene SQL-Abfrage. Zwei
+    // Quellen fuer dieselbe Zahl heisst frueher oder spaeter: Die Kachel sagt
+    // "1 Online", und die Zeile darunter sagt "Aus". Hier kann das nicht
+    // passieren.
+    //
+    // `alle` ist NICHT `online + aus`: Ein Server, der gerade startet, zaehlt
+    // in keiner der beiden Kacheln. Das war auf der alten Seite schon so und
+    // ist richtig - "startet" ist weder das eine noch das andere.
+    const online = liste.filter(x => x.zustand.schluessel === 'online').length;
+
+    // Nur GEMESSENE Spieler. `null` heisst "nicht gemessen" und darf nicht als
+    // 0 in eine Summe wandern - genau der Unterschied, den die Legende der
+    // Seite ausdruecklich benennt.
+    const spieler = liste.reduce((summe, x) =>
+        summe + (typeof x.spieler.jetzt === 'number' ? x.spieler.jetzt : 0), 0);
+
+    // Welche Spiele laufen hier, meistgenutztes zuerst.
+    const jeSpiel = new Map();
+    for (const x of liste) {
+        if (!x.spiel || x.spiel === '—') continue;
+        jeSpiel.set(x.spiel, (jeSpiel.get(x.spiel) || 0) + 1);
+    }
+    const spiele = [...jeSpiel.entries()]
+        .map(([name, anzahl]) => ({ name, anzahl }))
+        // Bei Gleichstand nach Namen, sonst entscheidet die Reihenfolge der
+        // Datenbank, welches Spiel oben steht - und die wechselt.
+        .sort((a, b) => (b.anzahl - a.anzahl) || a.name.localeCompare(b.name))
+        .slice(0, 5);
+
     return {
         liste,
+        spiele,
         zahlen: {
             alle:   liste.length,
             bereit: liste.filter(x => x.bereit).length,
             aus:    liste.filter(x => x.zustand.schluessel === 'offline').length,
+            online,
+            spieler,
             maschinen: maschinen.size,
         },
     };

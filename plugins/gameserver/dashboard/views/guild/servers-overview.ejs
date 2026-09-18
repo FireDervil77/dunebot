@@ -31,10 +31,41 @@
           abgeblendeter Knopf, weil er beim Klicken nichts erklaert. %>
       <span class="btn btn-white btn-sm disabled" aria-disabled="true"
             title="Der Verlauf wird seit dem 2026-09-08 gesammelt. Die Seite kommt, sobald genug Messwerte da sind.">Kennzahlen</span>
+      <a class="btn btn-white btn-sm" href="/guild/<%= guildId %>/plugins/gameserver/addons">Spiele durchsuchen</a>
       <a class="btn btn-primary btn-sm" href="/guild/<%= guildId %>/plugins/gameserver/servers/create">Server anlegen</a>
     </div>
   </div>
 
+  <%# ── Kennzahlen (Baustelle 140, 2026-09-19) ────────────────────────────
+      Von der alten Dashboard-Seite hierher geholt, die damit entfaellt.
+
+      **Die Zahlen kommen aus DERSELBEN Liste wie die Tabelle darunter.** Die
+      alte Seite hatte dafuer eine eigene SQL-Abfrage — zwei Quellen fuer
+      dieselbe Zahl, und damit die Aussicht, dass die Kachel „1 Online" sagt,
+      waehrend die Zeile darunter „Aus" zeigt.
+
+      `data-fb-live-summe` sagt nur, WO die Zahl steht. Gezaehlt wird in
+      `gameserver-live.js:summen()`, sobald Live-Daten da sind; bis dahin gilt,
+      was hier steht. Beide Rechnungen haelt `scripts/check-live-zahlen.js`
+      gegeneinander. %>
+  <div class="fb-kacheln">
+    <% [['alle',    liste.zahlen.alle,    'Gesamte Server',  'var(--fb-info)',    'fa-server'],
+        ['online',  liste.zahlen.online,  'Online',          'var(--fb-success)', 'fa-circle-check'],
+        ['aus',     liste.zahlen.aus,     'Offline',         'var(--fb-warning)', 'fa-circle-xmark'],
+        ['spieler', liste.zahlen.spieler, 'Spieler',         'var(--fb-danger)',  'fa-users']
+       ].forEach(function (k) { %>
+      <div class="fb-kachel">
+        <span class="fb-kachel-zeichen" style="background:<%= k[3] %>"><i class="fa-solid <%= k[4] %>"></i></span>
+        <div>
+          <div class="fb-kachel-zahl" data-fb-live-summe="<%= k[0] %>"><%= k[1] %></div>
+          <div class="fb-kachel-wort"><%= k[2] %></div>
+        </div>
+      </div>
+    <% }); %>
+  </div>
+
+  <div class="fb-raster">
+   <div>
   <div class="fb-karte">
     <div class="fb-kopf">
       <span>Deine Server</span>
@@ -153,6 +184,60 @@
         </div>
       </div>
     </div>
+  </div>
+   </div>
+
+   <%# ── Rechte Spalte ─────────────────────────────────────────────────────
+       Beides von der alten Dashboard-Seite. „Alle Server anzeigen" ist dabei
+       weggefallen: Der Verweis zeigte auf DIESE Seite, und sein
+       Uebersetzungsschluessel `DASHBOARD.ALL_SERVERS` stand in keiner
+       Sprachdatei — im Schnellzugriff las man den rohen Schluessel. %>
+   <div>
+     <div class="fb-karte">
+       <div class="fb-kopf"><i class="fa-solid fa-trophy fb-muted"></i> <span>Top Spiele</span></div>
+       <div class="fb-koerper">
+         <% if (!liste.spiele.length) { %>
+           <div class="fb-muted" style="font-size:13px">Noch kein Server angelegt.</div>
+         <% } else { %>
+           <% liste.spiele.forEach(function (sp, i) { %>
+             <div style="margin-bottom:<%= i === liste.spiele.length - 1 ? '0' : '14px' %>">
+               <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+                 <span style="font-weight:600">#<%= i + 1 %> <%= sp.name %></span>
+                 <span class="fb-pille" style="margin-left:auto"><%= sp.anzahl %><%= sp.anzahl === 1 ? ' Server' : ' Server' %></span>
+               </div>
+               <%# Der Balken misst gegen das haeufigste Spiel, nicht gegen die
+                   Gesamtzahl: Sonst waere der erste Balken bei zwei Spielen
+                   halb leer und saehe aus wie eine Warnung. %>
+               <div style="height:5px;border-radius:100rem;background:#e6e7e9;overflow:hidden">
+                 <div style="height:100%;border-radius:100rem;background:var(--fb-primary);width:<%=
+                   Math.round(sp.anzahl / liste.spiele[0].anzahl * 100) %>%"></div>
+               </div>
+             </div>
+           <% }); %>
+         <% } %>
+       </div>
+     </div>
+
+     <div class="fb-karte">
+       <div class="fb-kopf"><i class="fa-solid fa-link fb-muted"></i> <span>Schnellzugriff</span></div>
+       <div class="fb-koerper">
+         <%# **Die Namen sind die der Navigation.** Erst stand hier
+             „Addon-Marktplatz" neben „Spiele" — zwei Namen fuer /addons — und
+             ein dritter Punkt auf /games, das es gar nicht gibt. Genau der
+             tote Verweis, vor dem der Kommentar am Kennzahlen-Knopf warnt. %>
+         <% [['Spiele',        'addons',   'fa-gamepad'],
+             ['Einstellungen', 'settings', 'fa-gear']
+            ].forEach(function (v, i) { %>
+           <div style="margin-bottom:<%= i === 1 ? '0' : '10px' %>">
+             <a href="/guild/<%= guildId %>/plugins/gameserver/<%= v[1] %>"
+                style="display:flex;align-items:center;gap:9px;text-decoration:none;color:var(--fb-primary)">
+               <i class="fa-solid <%= v[2] %>" style="width:16px"></i><%= v[0] %>
+             </a>
+           </div>
+         <% }); %>
+       </div>
+     </div>
+   </div>
   </div>
 
 </div>

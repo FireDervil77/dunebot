@@ -166,6 +166,44 @@
         };
     }
 
+    /**
+     * Die vier Kachelzahlen aus allen bekannten Serverzustaenden.
+     *
+     * ── Warum das hier steht und nicht auf dem Server (2026-09-19, B140) ────
+     *
+     * Die Kacheln kamen von der alten Dashboard-Seite, die dafuer eine eigene
+     * SQL-Abfrage hatte. Beim Zusammenlegen rechnet sie serverseitig
+     * `baueServerListe` aus DERSELBEN Liste, die auch die Tabelle fuellt — und
+     * hier noch einmal aus den Live-Zustaenden, damit die Kachel mitzaehlt,
+     * ohne dass jemand neu laedt.
+     *
+     * **Beide Rechnungen muessen dieselbe sein**, sonst springt die Zahl beim
+     * ersten Live-Abruf. Deshalb steht sie hier so ausgeschrieben wie dort:
+     *
+     *   - `alle` ist NICHT `online + aus` — wer gerade startet, zaehlt in
+     *     keiner der beiden Kacheln.
+     *   - Nur GEMESSENE Spieler summieren. `null` heisst „nicht gemessen" und
+     *     darf nicht als 0 durchgehen.
+     *
+     * Reine Rechnung, keine Beruehrung mit dem Dokument — deshalb in node
+     * pruefbar (`scripts/check-live-zahlen.js`).
+     *
+     * @param {Iterable<{status?: string, spieler?: number}>} zustaende
+     * @returns {{alle: number, online: number, aus: number, spieler: number}}
+     */
+    function summen(zustaende) {
+        let alle = 0, online = 0, aus = 0, spieler = 0;
+
+        for (const z of zustaende) {
+            alle++;
+            if (z.status === 'online') online++;
+            else if (z.status === 'offline') aus++;
+            if (typeof z.spieler === 'number') spieler += z.spieler;
+        }
+
+        return { alle, online, aus, spieler };
+    }
+
     class LiveAnzeige {
         constructor(sse, guildId) {
             this.sse = sse;
@@ -206,6 +244,46 @@
             }
             this.zustand.set(id, alt);
             this.zeichne(id);
+            this.summenBald();
+        }
+
+        /**
+         * Die Kacheln einmal nachziehen, nicht je Server.
+         *
+         * `holeAlles` ruft `uebernimm` in einer Schleife. Wer die Summe dort
+         * direkt zeichnet, rechnet sie bei achtzig Servern achtzigmal ueber
+         * achtzig Eintraege. Ein Sprung ans Ende der Warteschlange reicht: Die
+         * Schleife ist dann durch, und gezeichnet wird genau einmal.
+         */
+        summenBald() {
+            if (this._summenGeplant) return;
+            this._summenGeplant = true;
+            Promise.resolve().then(() => {
+                this._summenGeplant = false;
+                this.zeichneSummen();
+            });
+        }
+
+        /**
+         * Die Kachelzahlen ins Dokument schreiben.
+         *
+         * **Nur wenn ueberhaupt ein Zustand bekannt ist.** Vor dem ersten
+         * Abruf ist `zustand` leer, und `summen` gaebe dafuer lauter Nullen
+         * zurueck. Die wuerden die serverseitig gerenderten Zahlen ueberschreiben
+         * — die Seite zeigte kurz "0 Server", obwohl zwei dastehen. Was der
+         * Server gerendert hat, ist bis zum ersten Abruf der bessere Wert.
+         */
+        zeichneSummen() {
+            if (!this.zustand.size) return;
+
+            const s = summen(this.zustand.values());
+
+            for (const el of document.querySelectorAll('[data-fb-live-summe]')) {
+                const wert = s[el.dataset.fbLiveSumme];
+                if (wert === undefined) continue;
+                const neu = String(wert);
+                if (el.textContent !== neu) el.textContent = neu;
+            }
         }
 
         /**
@@ -417,13 +495,14 @@
     // sich dadurch nichts; in node gibt es kein `window` und kein `document`,
     // deshalb steigt die Datei hier sauber aus, statt zu werfen.
     if (typeof module !== 'undefined' && module.exports) {
-        module.exports = { knopfZustand, pillenZustand };
+        module.exports = { knopfZustand, pillenZustand, summen };
     }
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
 
     window.GameserverLiveAnzeige = LiveAnzeige;
     window.GameserverKnopfZustand = knopfZustand;
     window.GameserverPillenZustand = pillenZustand;
+    window.GameserverSummen = summen;
 
     // ── Selbst starten — und den eigenen Empfaenger bauen ───────────────────
     //

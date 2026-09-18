@@ -249,7 +249,18 @@ router.get('/', requirePermission('GAMESERVER.VIEW'), async (req, res) => {
         // Sie zeigt eine Spalte, die es vorher nicht gab: BEREITSCHAFT.
         // „Läuft" beantwortet nicht die Frage, die ein Betreiber wirklich hat —
         // ob jemand rein kann.
-        let liste = { liste: [], zahlen: { alle: 0, bereit: 0, aus: 0, maschinen: 0 } };
+        // **Der Rueckfall muss dieselbe FORM haben wie das Ergebnis.** Er ist
+        // dafuer da, dass die Seite auch dann etwas zeigt, wenn die
+        // Aufbereitung scheitert. Fehlt darin ein Feld, das die Ansicht
+        // anfasst, macht genau dieser Rueckfall aus einer halben Seite einen
+        // 500er - er richtet dann mehr Schaden an als der Fehler, den er
+        // abfangen soll. `spiele`, `online` und `spieler` kamen mit den
+        // Kennzahl-Kacheln dazu (Baustelle 140).
+        let liste = {
+            liste: [],
+            spiele: [],
+            zahlen: { alle: 0, bereit: 0, aus: 0, online: 0, spieler: 0, maschinen: 0 },
+        };
         try {
             // Die Pakete zu allen vorkommenden Addons in EINEM Zug — nicht je
             // Zeile eine Abfrage. Bei acht Servern fiele das nicht auf, bei
