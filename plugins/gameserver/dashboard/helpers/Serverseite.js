@@ -872,7 +872,7 @@ function baueServerListe(zeilen, paketNachAddon = {}) {
 
     const maschinen = new Set(liste.map(x => x.maschine).filter(Boolean));
 
-    // **Die Kacheln rechnen aus DERSELBEN Liste** (2026-09-19, Baustelle 140).
+    // **Die Kacheln rechnen aus DERSELBEN Liste** (2026-09-18, Baustelle 140).
     // Die alte Dashboard-Seite hatte dafuer eine eigene SQL-Abfrage. Zwei
     // Quellen fuer dieselbe Zahl heisst frueher oder spaeter: Die Kachel sagt
     // "1 Online", und die Zeile darunter sagt "Aus". Hier kann das nicht

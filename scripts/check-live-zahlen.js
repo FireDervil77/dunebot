@@ -2,7 +2,7 @@
 /**
  * Rechnen Server und Browser dieselben Kachelzahlen?
  *
- * ── Warum es die Rechnung zweimal gibt (2026-09-19, Baustelle 140) ──────────
+ * ── Warum es die Rechnung zweimal gibt (2026-09-18, Baustelle 140) ──────────
  *
  * Beim Zusammenlegen der beiden Serveruebersichten wanderten die vier Kacheln
  * („Gesamte Server", „Online", „Offline", „Spieler") auf die Seite

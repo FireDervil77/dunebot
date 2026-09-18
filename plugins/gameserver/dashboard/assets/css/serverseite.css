@@ -226,7 +226,7 @@
 .fb-spiel.aus { opacity: .55; cursor: default; }
 .fb-spiel.aus:hover { border-color: var(--fb-border); }
 
-/* ── Kennzahl-Kacheln (Baustelle 140, 2026-09-19) ───────────────────────────
+/* ── Kennzahl-Kacheln (Baustelle 140, 2026-09-18) ───────────────────────────
  *
  * Sie kamen von der alten Dashboard-Seite, die dafuer Tabler-Karten
  * (`card card-sm` mit `avatar`) benutzte. Die eins zu eins zu uebernehmen

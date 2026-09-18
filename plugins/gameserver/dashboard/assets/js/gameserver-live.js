@@ -169,7 +169,7 @@
     /**
      * Die vier Kachelzahlen aus allen bekannten Serverzustaenden.
      *
-     * ── Warum das hier steht und nicht auf dem Server (2026-09-19, B140) ────
+     * ── Warum das hier steht und nicht auf dem Server (2026-09-18, B140) ────
      *
      * Die Kacheln kamen von der alten Dashboard-Seite, die dafuer eine eigene
      * SQL-Abfrage hatte. Beim Zusammenlegen rechnet sie serverseitig

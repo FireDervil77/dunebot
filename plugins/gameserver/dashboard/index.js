@@ -527,7 +527,7 @@ class GameserverPlugin extends DashboardPlugin {
             
             // Root-Route: die Serveruebersicht IST der Einstieg (B140).
             //
-            // Bis zum 2026-09-19 fuehrte sie auf `/dashboard` — eine zweite
+            // Bis zum 2026-09-18 fuehrte sie auf `/dashboard` — eine zweite
             // Uebersicht mit eigenen Kacheln, eigener Tabelle und einem
             // ZWEITEN Live-Weg (SSE plus Inline-Skript, waehrend die
             // Uebersicht `gameserver-live.js` benutzt). Die Kacheln und die
@@ -1207,7 +1207,7 @@ class GameserverPlugin extends DashboardPlugin {
             // Hauptmenü-Item: gameserver
             {
                 title: 'gameserver:NAV.GAMESERVER',
-                // **Zeigt auf die Übersicht, nicht auf die Wurzel** (2026-09-19,
+                // **Zeigt auf die Übersicht, nicht auf die Wurzel** (2026-09-18,
                 // Baustelle 140). Damit ist die Entscheidung vom 2026-08-18
                 // abgeschlossen: Es gibt EINEN Eintrag, der zu „Server ansehen"
                 // führt. Vorher zeigte dieser Punkt auf die Wurzel, die zum
@@ -1266,7 +1266,7 @@ class GameserverPlugin extends DashboardPlugin {
                 // Adresse aendert und hier nicht, haengt den Punkt ab.
                 parent: `/guild/${guildId}/plugins/gameserver/servers`
             },
-            // ── NAV.SERVERS ist entfallen (2026-09-19, Baustelle 140) ───────
+            // ── NAV.SERVERS ist entfallen (2026-09-18, Baustelle 140) ───────
             //
             // Er zeigte auf dieselbe Seite wie der Elternpunkt darueber. Die
             // Seitenleiste haette beides untereinander angezeigt: "Gameserver"
@@ -1287,7 +1287,7 @@ class GameserverPlugin extends DashboardPlugin {
         ];
 
         try {
-            // **Erst raeumen, dann anmelden** (2026-09-19, Baustelle 140).
+            // **Erst raeumen, dann anmelden** (2026-09-18, Baustelle 140).
             //
             // `registerNavigation` ueberspringt Vorhandenes und LOESCHT NIE —
             // ein entfernter oder umgehaengter Punkt stand deshalb weiter in
