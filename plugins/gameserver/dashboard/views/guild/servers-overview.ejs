@@ -64,8 +64,6 @@
     <% }); %>
   </div>
 
-  <div class="fb-raster">
-   <div>
   <div class="fb-karte">
     <div class="fb-kopf">
       <span>Deine Server</span>
@@ -185,14 +183,21 @@
       </div>
     </div>
   </div>
-   </div>
 
-   <%# ── Rechte Spalte ─────────────────────────────────────────────────────
+   <%# ── Unter der Tabelle ─────────────────────────────────────────────────
        Beides von der alten Dashboard-Seite. „Alle Server anzeigen" ist dabei
        weggefallen: Der Verweis zeigte auf DIESE Seite, und sein
        Uebersetzungsschluessel `DASHBOARD.ALL_SERVERS` stand in keiner
-       Sprachdatei — im Schnellzugriff las man den rohen Schluessel. %>
-   <div>
+       Sprachdatei — im Schnellzugriff las man den rohen Schluessel.
+
+       **Unter, nicht neben der Tabelle** (Betreiber, 2026-09-19): Als rechte
+       Spalte nahmen die beiden Kaesten der Tabelle ein Drittel der Breite —
+       und die Tabelle hat sechs Spalten, darunter Adresse und Bereitschaft,
+       die Platz brauchen. Die Kaesten sind Nebensache, die Liste nicht.
+
+       `fb-raster` (2fr/1fr) passt auch hier: „Top Spiele" traegt Balken und
+       profitiert von Breite, der Schnellzugriff sind zwei Verweise. %>
+  <div class="fb-raster">
      <div class="fb-karte">
        <div class="fb-kopf"><i class="fa-solid fa-trophy fb-muted"></i> <span>Top Spiele</span></div>
        <div class="fb-koerper">
@@ -237,7 +242,6 @@
          <% }); %>
        </div>
      </div>
-   </div>
   </div>
 
 </div>
