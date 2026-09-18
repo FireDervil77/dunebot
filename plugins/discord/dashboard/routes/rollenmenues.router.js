@@ -153,6 +153,12 @@ router.get('/:menuId/bearbeiten', requirePermission('DISCORD.ROLEMENUS.VIEW'), a
 
         return await renderView(res, 'guild/discord-rollenmenue-bearbeiten', {
             guildId,
+            // **Ohne diese Zeile klappt der Abschnitt zu.** Die Vorgabe aus
+            // `base.middleware.js` setzt `activeMenu` auf die aufgerufene
+            // Adresse - das traegt jede Seite, deren Adresse selbst ein
+            // Menuepunkt ist. Diese hier traegt eine Nummer und kann deshalb
+            // nie einen treffen. Der Punkt ist die Uebersicht darueber.
+            activeMenu: `/guild/${guildId}/plugins/discord/rollenmenues`,
             menu,
             eintraege,
             channels: kanalAntwort?.channels || [],
