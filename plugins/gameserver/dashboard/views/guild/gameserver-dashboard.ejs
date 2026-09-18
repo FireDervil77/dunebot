@@ -550,7 +550,15 @@ function showToast(type, message) {
         return;
     }
     
-    // Fallback: Browser-Alert
+    // Letzter Ausweg: nur ins Protokoll. Ein `alert()` stand hier bis zum
+    // 2026-03-18 und wurde zu Recht entfernt - es reisst den Betrieb auf.
+    // Entfernt wurde damals aber auch die schliessende Klammer dieser
+    // Funktion, und damit war der GANZE Block hier ein Syntaxfehler: Der
+    // Browser fuehrte davon nichts mehr aus, also weder die Start/Stopp-Knoepfe
+    // noch die Live-Anzeige. Sechs Monate lang.
+    console.warn('[Gameserver] Kein Toast-System geladen:', type, message);
+}
+
 // ========================================
 // Live-Query: Spieleranzahl für Online-Server
 // ========================================
