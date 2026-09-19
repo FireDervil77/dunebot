@@ -240,6 +240,19 @@ pruefe(chatansage.ansage({ streamer: s, zustand: {}, vorlage: 'Live — {titel} 
     `bekommen: "${chatansage.ansage({ streamer: s, zustand: {}, vorlage: 'Live — {titel} ({kategorie})' })}" — ` +
     'ein "Live —  ()" stuende unter dem NAMEN des Streamers und saehe nach kaputtem Bot aus');
 
+// **Ein Befehl im Satz behaelt sein Leerzeichen** (2026-09-19). Die Regel fuer
+// " ." nach einem weggefallenen Wort nahm vorher jedes Leerzeichen vor `!` mit.
+// Gefunden in check-streaming-befehle an `!request`: "such mit!request".
+pruefe(chatansage.saubern('Hier geht: !uptime · !spiel') === 'Hier geht: !uptime · !spiel',
+    'Befehle in einer Aufzaehlung behalten ihr Leerzeichen',
+    `bekommen: "${chatansage.saubern('Hier geht: !uptime · !spiel')}"`);
+pruefe(chatansage.ansage({ streamer: s, zustand: { titel: 'Rust' }, vorlage: 'Live! Tippe !los zum Mitmachen' })
+        === 'Live! Tippe !los zum Mitmachen',
+    'eine Ansage mit Befehl bleibt, wie sie geschrieben wurde');
+pruefe(chatansage.saubern('FireDervil spielt .') === 'FireDervil spielt.'
+        && chatansage.saubern('Hallo Anna , schön') === 'Hallo Anna, schön',
+    'das Leerzeichen vor einem Satzzeichen am Ende oder vor Leerraum faellt weiter weg');
+
 pruefe(chatansage.ansage({ streamer: s, zustand: { titel: 'X' }, vorlage: '{url}' })
         === 'https://twitch.tv/firedervil',
     'die Adresse kommt aus Plattform und Login');

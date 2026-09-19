@@ -77,7 +77,11 @@ function saubern(text) {
         .replace(/\(\s*[-–—:|,]*\s*\)/g, '')   // "()" und "( — )"
         .replace(/\[\s*[-–—:|,]*\s*\]/g, '')
         .replace(/\s{2,}/g, ' ')
-        .replace(/\s+([,.!?])/g, '$1')          // " ." nach weggefallenem Wort
+        // " ." nach weggefallenem Wort - aber nur, wenn danach Leerraum oder
+        // das Ende kommt. Bis zum 2026-09-19 fehlte die Bedingung, und jeder
+        // Befehl im Satz verlor sein Leerzeichen: `!befehle` schrieb
+        // "Hier geht:!uptime ·!spiel", eine Ansage "Tippe!los".
+        .replace(/\s+([,.!?])(?=\s|$)/g, '$1')
         .replace(/[\s]*[-–—:|,]+[\s]*$/g, '')
         .replace(/^[\s]*[-–—:|,]+[\s]*/g, '')
         .trim();
