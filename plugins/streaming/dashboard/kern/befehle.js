@@ -69,7 +69,15 @@ const PRAEFIX = '!';
  *                    aufmachen kann der Streamer ihn auf der Befehlsseite.
  *   `abkuehlung_s`   Ebenso ein Anfangswert. `!clip` schneidet einen echten
  *                    Clip - fuenf Sekunden Abstand waeren hier zu wenig.
+ *
+ * `braucht` nennt das Plugin, ohne das der Befehl nichts tun kann: `plugin` ist
+ * seine Kennung, `name` sein Anzeigename ("Dafür muss das Plugin „Musik" aktiv
+ * sein"), `sache` das Wort fuer den Satz im Chat ("Musikbefehle sind hier gerade
+ * nicht eingerichtet"). Bis zum 2026-09-19 stand dort `name` - und der Chat
+ * schrieb "Musik sind hier gerade nicht eingerichtet".
  */
+const BRAUCHT_MUSIK = Object.freeze({ plugin: 'music', name: 'Musik', sache: 'Musikbefehle' });
+
 const FERTIG = {
     uptime: {
         beschreibung: 'Wie lange der Stream schon läuft.',
@@ -183,7 +191,7 @@ const FERTIG = {
         beschreibung: 'Beim laufenden Gewinnspiel mitmachen.',
         wer: 'alle',
         abkuehlung_s: 0,
-        braucht: { plugin: 'giveaway', name: 'Verlosungen' },
+        braucht: { plugin: 'giveaway', name: 'Verlosungen', sache: 'Verlosungen' },
         tun: (k) => require('./mitmachen').losZiehen(k)
     },
 
@@ -203,10 +211,10 @@ const FERTIG = {
     // ================================================================
 
     request: {
-        beschreibung: 'Wuenscht einen Titel aus der freigegebenen Ablage.',
+        beschreibung: 'Wünscht einen Titel aus der freigegebenen Ablage.',
         wer: 'alle',
         abkuehlung_s: 5,
-        braucht: { plugin: 'music', name: 'Musik' },
+        braucht: BRAUCHT_MUSIK,
         tun: async (k) => {
             const musik = require('../../shared/musikwunsch');
             const guildId = k.streamerZeile.heim_guild_id;
@@ -236,48 +244,48 @@ const FERTIG = {
             }
             if (e.grund === 'keine_ablage') {
                 log().warn(`[Streaming] ${PRAEFIX}request: keine Musikablage eingetragen`);
-                return 'Musikwuensche sind gerade nicht moeglich.';
+                return 'Musikwünsche sind gerade nicht möglich.';
             }
-            return 'Musikwuensche sind gerade nicht moeglich.';
+            return 'Musikwünsche sind gerade nicht möglich.';
         }
     },
 
     song: {
-        beschreibung: 'Sagt, welcher Titel gerade laeuft.',
+        beschreibung: 'Sagt, welcher Titel gerade läuft.',
         wer: 'alle',
         abkuehlung_s: 10,
-        braucht: { plugin: 'music', name: 'Musik' },
+        braucht: BRAUCHT_MUSIK,
         tun: async (k) => {
             const musik = require('../../shared/musikwunsch');
             const zeile = await musik.aktueller(k.streamerZeile.heim_guild_id);
 
-            if (!zeile) return 'Gerade laeuft nichts.';
+            if (!zeile) return 'Gerade läuft nichts.';
             return zeile.gewuenscht_von
-                ? `Laeuft: ${zeile.titel} — gewuenscht von ${zeile.gewuenscht_von}`
-                : `Laeuft: ${zeile.titel}`;
+                ? `Läuft: ${zeile.titel} — gewünscht von ${zeile.gewuenscht_von}`
+                : `Läuft: ${zeile.titel}`;
         }
     },
 
     playlist: {
-        beschreibung: 'Zeigt die naechsten Titel.',
+        beschreibung: 'Zeigt die nächsten Titel.',
         wer: 'alle',
         abkuehlung_s: 15,
-        braucht: { plugin: 'music', name: 'Musik' },
+        braucht: BRAUCHT_MUSIK,
         tun: async (k) => {
             const musik = require('../../shared/musikwunsch');
             const offen = await musik.warteschlange(k.streamerZeile.heim_guild_id,
                 { nurOffene: true, grenze: 5 });
 
             if (!offen.length) return 'Danach ist die Liste leer.';
-            return 'Als naechstes: ' + offen.map((z, i) => `${i + 1}. ${z.titel}`).join(' · ');
+            return 'Als Nächstes: ' + offen.map((z, i) => `${i + 1}. ${z.titel}`).join(' · ');
         }
     },
 
     skip: {
-        beschreibung: 'Ueberspringt den laufenden Titel.',
+        beschreibung: 'Überspringt den laufenden Titel.',
         wer: 'moderator',
         abkuehlung_s: 0,
-        braucht: { plugin: 'music', name: 'Musik' },
+        braucht: BRAUCHT_MUSIK,
         tun: async (k) => {
             const musik = require('../../shared/musikwunsch');
             const e = await musik.springen(k.streamerZeile.heim_guild_id, +1);
@@ -286,14 +294,14 @@ const FERTIG = {
     },
 
     prev: {
-        beschreibung: 'Geht einen Titel zurueck.',
+        beschreibung: 'Geht einen Titel zurück.',
         wer: 'moderator',
         abkuehlung_s: 0,
-        braucht: { plugin: 'music', name: 'Musik' },
+        braucht: BRAUCHT_MUSIK,
         tun: async (k) => {
             const musik = require('../../shared/musikwunsch');
             const e = await musik.springen(k.streamerZeile.heim_guild_id, -1);
-            return e.ok ? `Zurueck zu: ${e.titel}` : 'Davor war nichts.';
+            return e.ok ? `Zurück zu: ${e.titel}` : 'Davor war nichts.';
         }
     },
 
@@ -302,10 +310,10 @@ const FERTIG = {
     // druecken muss, damit etwas passiert, das ohnehin passieren soll.
     // Gebraucht wird das Gegenteil: anhalten, wenn geredet wird.
     pause: {
-        beschreibung: 'Haelt die Musik an.',
+        beschreibung: 'Hält die Musik an.',
         wer: 'moderator',
         abkuehlung_s: 0,
-        braucht: { plugin: 'music', name: 'Musik' },
+        braucht: BRAUCHT_MUSIK,
         tun: async (k) => {
             const musik = require('../../shared/musikwunsch');
             await musik.abspielen(k.streamerZeile.heim_guild_id, false);
@@ -327,7 +335,7 @@ const FERTIG = {
         beschreibung: 'Beendet die Wiedergabe.',
         wer: 'moderator',
         abkuehlung_s: 0,
-        braucht: { plugin: 'music', name: 'Musik' },
+        braucht: BRAUCHT_MUSIK,
         tun: async (k) => {
             const musik = require('../../shared/musikwunsch');
             await musik.beenden(k.streamerZeile.heim_guild_id);
@@ -336,14 +344,14 @@ const FERTIG = {
     },
 
     play: {
-        beschreibung: 'Laesst die Musik weiterlaufen.',
+        beschreibung: 'Lässt die Musik weiterlaufen.',
         wer: 'moderator',
         abkuehlung_s: 0,
-        braucht: { plugin: 'music', name: 'Musik' },
+        braucht: BRAUCHT_MUSIK,
         tun: async (k) => {
             const musik = require('../../shared/musikwunsch');
             const e = await musik.abspielen(k.streamerZeile.heim_guild_id, true);
-            return e.titel ? `Weiter mit: ${e.titel}` : 'Musik laeuft — sobald etwas gewuenscht wird.';
+            return e.titel ? `Weiter mit: ${e.titel}` : 'Musik läuft — sobald etwas gewünscht wird.';
         }
     },
 
@@ -351,7 +359,7 @@ const FERTIG = {
         beschreibung: 'Leert die Warteschlange.',
         wer: 'moderator',
         abkuehlung_s: 0,
-        braucht: { plugin: 'music', name: 'Musik' },
+        braucht: BRAUCHT_MUSIK,
         tun: async (k) => {
             const musik = require('../../shared/musikwunsch');
             const weg = await musik.leeren(k.streamerZeile.heim_guild_id);
@@ -360,10 +368,10 @@ const FERTIG = {
     },
 
     vote: {
-        beschreibung: 'Stimmt dafuer, den laufenden Titel zu ueberspringen.',
+        beschreibung: 'Stimmt dafür, den laufenden Titel zu überspringen.',
         wer: 'alle',
         abkuehlung_s: 0,
-        braucht: { plugin: 'music', name: 'Musik' },
+        braucht: BRAUCHT_MUSIK,
         tun: async (k) => {
             const musik = require('../../shared/musikwunsch');
             const guildId = k.streamerZeile.heim_guild_id;
@@ -372,20 +380,20 @@ const FERTIG = {
             // Stimme, die ins Leere gezaehlt wird, faellt beim naechsten Titel
             // als Geisterstimme auf.
             const laeuft = await musik.aktueller(guildId);
-            if (!laeuft) return 'Gerade laeuft nichts.';
+            if (!laeuft) return 'Gerade läuft nichts.';
 
             // **Die Kennung, nicht der Name.** Ein Anzeigename ist aenderbar;
             // wer zweimal stimmen will, braeuchte nur einen Namenswechsel.
             const stand = musik.stimmeAbgeben(guildId, k.absenderId);
-            if (stand.schon) return `Deine Stimme zaehlt schon (${stand.stimmen}/${stand.noetig}).`;
+            if (stand.schon) return `Deine Stimme zählt schon (${stand.stimmen}/${stand.noetig}).`;
 
             if (!stand.reicht) {
-                return `${stand.stimmen}/${stand.noetig} fuer Ueberspringen.`;
+                return `${stand.stimmen}/${stand.noetig} für Überspringen.`;
             }
 
             const e = await musik.springen(guildId, +1);
             return e.ok
-                ? `Uebersprungen — weiter mit: ${e.titel}`
+                ? `Übersprungen — weiter mit: ${e.titel}`
                 : 'Genug Stimmen, aber danach kommt nichts mehr.';
         }
     }
@@ -422,7 +430,7 @@ async function verfuegbar(guildId, wort) {
     if (!ServiceManager.has('pluginManager')) {
         // Ohne Auskunft nicht raten. "Verfuegbar" waere die bequeme Annahme
         // und die falsche: Der Befehl liefe dann ins Leere.
-        return { ok: false, grund: `${braucht.name} lassen sich gerade nicht pruefen.`, braucht };
+        return { ok: false, grund: `${braucht.sache} lassen sich gerade nicht prüfen.`, braucht };
     }
     const pluginManager = ServiceManager.get('pluginManager');
 
@@ -488,7 +496,7 @@ async function fertigAntwort(wort, k) {
         if (!stand.ok) {
             // Der Zuschauer bekommt einen Satz, keine Stille: Ein Befehl, der
             // in der Liste steht und schweigt, sieht aus wie ein kaputter Bot.
-            return `${eintrag.braucht.name} sind hier gerade nicht eingerichtet.`;
+            return `${eintrag.braucht.sache} sind hier gerade nicht eingerichtet.`;
         }
     }
 

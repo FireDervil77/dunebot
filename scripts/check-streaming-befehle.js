@@ -1193,12 +1193,219 @@ console.log('\n!los braucht ein anderes Plugin — und sagt das');
     LosquellenRegistry.leeren();
 }
 
+// Wird von den Musikfaellen gefuellt: Ein Wort kommt erst hinein, wenn sein
+// Block durchgelaufen ist. Faellt ein Block weg, faellt das Wort mit heraus.
+const musikGeprueft = new Set();
+
+console.log('\nMusikbefehle: jeder der zehn kommt an, und nur, wo er darf');
+{
+    // ── Die Attrappe fuer `shared/musikwunsch` ────────────────────────────
+    //
+    // **Sie prueft, sie bildet nicht nach** (2026-09-19). Der alte Plan war,
+    // die Datenbank-Attrappe oben um die Abfragen der Warteschlange zu
+    // erweitern. Das hiesse, Positionen, Endlosmodus und Zurueckspringen per
+    // Regex nachzubauen - eine zweite Warteschlange, die dann statt der
+    // echten getestet wird. Hier geht es um die Schicht darueber: Kommt jeder
+    // Befehl beim richtigen Aufruf an, mit der Heim-Guild und den richtigen
+    // Argumenten, darf nur, wer darf, und wird aus jeder Antwort der richtige
+    // Satz? Ob die SQL darunter stimmt, braucht das echte Schema.
+    //
+    // Jede Funktion muss es im ECHTEN Modul geben, und asynchron ist, was
+    // dort asynchron ist - sonst bliebe ein vergessenes `await` gruen und im
+    // Chat stuende `[object Promise]`.
+    const musikPfad = require.resolve(path.join(WURZEL, 'plugins/streaming/shared/musikwunsch.js'));
+    const echteMusik = require(musikPfad);
+    const musik = { aufrufe: [], antwort: {}, einwaende: [] };
+    const bekannt = ['wuenschen', 'ablageAufzaehlen', 'aktueller', 'warteschlange', 'springen',
+                     'abspielen', 'beenden', 'leeren', 'stimmeAbgeben'];
+    const attrappe = {};
+    for (const name of bekannt) {
+        attrappe[name] = (...arg) => {
+            const einwand = typeof echteMusik[name] !== 'function'
+                ? `musikwunsch.${name} gibt es im echten Modul nicht`
+                : (arg[0] !== 'g1' ? `musikwunsch.${name} mit Guild ${arg[0]} statt der Heim-Guild` : null);
+            if (einwand) { musik.einwaende.push(einwand); throw new Error(einwand); }
+            musik.aufrufe.push({ name, arg });
+            const a = musik.antwort[name];
+            const wert = typeof a === 'function' ? a(...arg) : a;
+            return echteMusik[name].constructor.name === 'AsyncFunction' ? Promise.resolve(wert) : wert;
+        };
+    }
+    require.cache[musikPfad].exports = new Proxy(attrappe, {
+        get(ziel, name) {
+            if (name in ziel) return ziel[name];
+            // Unbekanntes wird gemeldet, nicht still mit `undefined` beantwortet.
+            if (typeof name === 'string') musik.einwaende.push(`musikwunsch.${name} kennt die Attrappe nicht`);
+            return undefined;
+        }
+    });
+
+    const plugins = { music: false };
+    ServiceManager.register('pluginManager', {
+        async isPluginEnabledForGuild(plugin, guildId) {
+            if (guildId !== 'g1') musik.einwaende.push(`Plugin-Abfrage fuer Guild ${guildId}`);
+            return Boolean(plugins[plugin]);
+        }
+    });
+
+    const WORTE = Object.keys(befehle.FERTIG).filter(w => befehle.FERTIG[w].braucht?.plugin === 'music');
+    pruefe(WORTE.length === 10, 'es sind zehn Musikbefehle', WORTE.join(', '));
+    const MODERATOR = ['skip', 'prev', 'pause', 'stop', 'play', 'clear'];
+    pruefe(MODERATOR.every(w => befehle.FERTIG[w]?.wer === 'moderator'),
+        'die sechs, die die Wiedergabe veraendern, fangen bei Moderatoren an',
+        MODERATOR.filter(w => befehle.FERTIG[w]?.wer !== 'moderator').join(', '));
+
+    // Die Zeilen tragen den Rang, mit dem der Befehl in die Welt kommt.
+    neuAufsetzen(WORTE.map(w => ({ wort: w, art: 'fertig', wer: befehle.FERTIG[w].wer, abkuehlung_s: 0 })));
+
+    /** Eine Nachricht auswerten, danach steht der gesendete Satz da. */
+    const sag = async (text, extra = { istModerator: true }) => {
+        mitschrift.gesendet.length = 0;
+        musik.aufrufe.length = 0;
+        await befehle.auswerten(nachricht(text, extra));
+        return mitschrift.gesendet.at(-1)?.text ?? null;
+    };
+    const aufruf = (name) => musik.aufrufe.find(a => a.name === name);
+
+    // --- Das Musik-Plugin ist aus -------------------------------------
+    const aus = [];
+    for (const w of WORTE) {
+        const satz = await sag('!' + w);
+        if (satz !== 'Musikbefehle sind hier gerade nicht eingerichtet.' || musik.aufrufe.length) aus.push(`${w}: ${satz}`);
+    }
+    pruefe(aus.length === 0, 'ist das Plugin aus, sagt jeder der zehn einen Satz — und ruft nichts',
+        aus.join(' | '));
+    const stand = await befehle.verfuegbarkeiten('g1');
+    pruefe(WORTE.every(w => stand[w]?.ok === false && stand[w].grund === 'Dafür muss das Plugin „Musik" aktiv sein.'),
+        'und die Befehlsseite nennt das Plugin beim Namen');
+
+    plugins.music = true;
+
+    // --- request -------------------------------------------------------
+    musik.antwort.wuenschen = { ok: true, titel: 'Lied A', offen: 2 };
+    pruefe(await sag('!request lied a', {}) === '„Lied A" ist drin — 2 vor dir.',
+        '!request: der Wunsch ist drin, mit Platz in der Schlange', mitschrift.gesendet.at(-1)?.text);
+    const w = aufruf('wuenschen')?.arg || [];
+    pruefe(w[1] === 1 && w[2] === 'lied a' && w[3] === 'Anna',
+        '!request: gewuenscht wird mit Kanal, Suchbegriff und Absender', JSON.stringify(w));
+
+    musik.antwort.wuenschen = { ok: false, grund: 'nicht_gefunden' };
+    musik.antwort.ablageAufzaehlen = { anzahl: 2, text: 'Lied A · Lied B' };
+    pruefe(await sag('!request xyz', {}) === 'Das habe ich hier nicht. Da ist: Lied A · Lied B',
+        '!request: ein Fehlgriff zaehlt auf, was es gibt', mitschrift.gesendet.at(-1)?.text);
+    musik.antwort.wuenschen = { ok: false, grund: 'kein_begriff' };
+    musik.antwort.ablageAufzaehlen = { anzahl: 40, text: null };
+    pruefe(await sag('!request', {}) === '40 Titel da — such mit !request <Teil des Namens>.',
+        '!request: zu viele fuer eine Zeile — die Zahl statt einer abgeschnittenen Liste',
+        mitschrift.gesendet.at(-1)?.text);
+    musik.antwort.ablageAufzaehlen = { anzahl: 0, text: null };
+    pruefe(await sag('!request', {}) === 'Es ist noch nichts freigegeben.',
+        '!request: leere Ablage', mitschrift.gesendet.at(-1)?.text);
+    musik.antwort.wuenschen = { ok: false, grund: 'keine_ablage' };
+    pruefe(await sag('!request lied', {}) === 'Musikwünsche sind gerade nicht möglich.',
+        '!request: ohne Ablage', mitschrift.gesendet.at(-1)?.text);
+    musikGeprueft.add('request');
+
+    // --- song ----------------------------------------------------------
+    musik.antwort.aktueller = null;
+    pruefe(await sag('!song', {}) === 'Gerade läuft nichts.', '!song: nichts laeuft',
+        mitschrift.gesendet.at(-1)?.text);
+    musik.antwort.aktueller = { titel: 'Lied A', gewuenscht_von: 'Anna' };
+    pruefe(await sag('!song', {}) === 'Läuft: Lied A — gewünscht von Anna', '!song: mit Wunschgeber',
+        mitschrift.gesendet.at(-1)?.text);
+    musik.antwort.aktueller = { titel: 'Lied A', gewuenscht_von: null };
+    pruefe(await sag('!song', {}) === 'Läuft: Lied A', '!song: aus der Ablage, ohne erfundenen Namen',
+        mitschrift.gesendet.at(-1)?.text);
+    musikGeprueft.add('song');
+
+    // --- playlist ------------------------------------------------------
+    musik.antwort.warteschlange = [];
+    pruefe(await sag('!playlist', {}) === 'Danach ist die Liste leer.', '!playlist: leer',
+        mitschrift.gesendet.at(-1)?.text);
+    musik.antwort.warteschlange = [{ titel: 'A' }, { titel: 'B' }];
+    pruefe(await sag('!playlist', {}) === 'Als Nächstes: 1. A · 2. B', '!playlist: nummeriert',
+        mitschrift.gesendet.at(-1)?.text);
+    const wie = aufruf('warteschlange')?.arg?.[1] || {};
+    pruefe(wie.nurOffene === true && wie.grenze === 5, '!playlist: nur offene, hoechstens fuenf',
+        JSON.stringify(wie));
+    musikGeprueft.add('playlist');
+
+    // --- skip / prev ---------------------------------------------------
+    musik.antwort.springen = (_g, richtung) => ({ ok: true, titel: richtung > 0 ? 'B' : 'A' });
+    pruefe(await sag('!skip') === 'Weiter mit: B' && aufruf('springen')?.arg[1] === 1,
+        '!skip: einen Schritt vor', mitschrift.gesendet.at(-1)?.text);
+    pruefe(await sag('!prev') === 'Zurück zu: A' && aufruf('springen')?.arg[1] === -1,
+        '!prev: einen Schritt zurueck', mitschrift.gesendet.at(-1)?.text);
+    musik.antwort.springen = { ok: false };
+    pruefe(await sag('!skip') === 'Danach kommt nichts mehr.', '!skip: am Ende der Liste',
+        mitschrift.gesendet.at(-1)?.text);
+    pruefe(await sag('!prev') === 'Davor war nichts.', '!prev: am Anfang der Liste',
+        mitschrift.gesendet.at(-1)?.text);
+    musikGeprueft.add('skip').add('prev');
+
+    // --- pause / play / stop -------------------------------------------
+    musik.antwort.abspielen = (_g, an) => (an ? { titel: 'A' } : {});
+    pruefe(await sag('!pause') === 'Musik angehalten.' && aufruf('abspielen')?.arg[1] === false,
+        '!pause: haelt an', mitschrift.gesendet.at(-1)?.text);
+    pruefe(await sag('!play') === 'Weiter mit: A' && aufruf('abspielen')?.arg[1] === true,
+        '!play: laeuft weiter', mitschrift.gesendet.at(-1)?.text);
+    musik.antwort.abspielen = {};
+    pruefe(await sag('!play') === 'Musik läuft — sobald etwas gewünscht wird.',
+        '!play: ohne Titel sagt es, worauf es wartet', mitschrift.gesendet.at(-1)?.text);
+    musik.antwort.beenden = undefined;
+    pruefe(await sag('!stop') === 'Musik beendet.' && Boolean(aufruf('beenden')) && !aufruf('abspielen'),
+        '!stop: beendet — und ist nicht dasselbe wie !pause', mitschrift.gesendet.at(-1)?.text);
+    musikGeprueft.add('pause').add('play').add('stop');
+
+    // --- clear ---------------------------------------------------------
+    musik.antwort.leeren = 3;
+    pruefe(await sag('!clear') === 'Warteschlange geleert (3).', '!clear: nennt, wie viel weg ist',
+        mitschrift.gesendet.at(-1)?.text);
+    musik.antwort.leeren = 0;
+    pruefe(await sag('!clear') === 'Die Warteschlange war schon leer.', '!clear: schon leer',
+        mitschrift.gesendet.at(-1)?.text);
+    musikGeprueft.add('clear');
+
+    // --- vote ----------------------------------------------------------
+    musik.antwort.aktueller = null;
+    pruefe(await sag('!vote', {}) === 'Gerade läuft nichts.' && !aufruf('stimmeAbgeben'),
+        '!vote: ohne laufenden Titel wird keine Geisterstimme gezaehlt', mitschrift.gesendet.at(-1)?.text);
+    musik.antwort.aktueller = { titel: 'Lied A' };
+    musik.antwort.stimmeAbgeben = { schon: false, reicht: false, stimmen: 1, noetig: 3 };
+    pruefe(await sag('!vote', {}) === '1/3 für Überspringen.', '!vote: zaehlt die Stimme',
+        mitschrift.gesendet.at(-1)?.text);
+    pruefe(aufruf('stimmeAbgeben')?.arg[1] === '9', '!vote: gestimmt wird mit der Kennung, nicht dem Namen',
+        JSON.stringify(aufruf('stimmeAbgeben')?.arg));
+    musik.antwort.stimmeAbgeben = { schon: true, reicht: false, stimmen: 1, noetig: 3 };
+    pruefe(await sag('!vote', {}) === 'Deine Stimme zählt schon (1/3).', '!vote: zweimal zaehlt einmal',
+        mitschrift.gesendet.at(-1)?.text);
+    musik.antwort.stimmeAbgeben = { schon: false, reicht: true, stimmen: 3, noetig: 3 };
+    musik.antwort.springen = { ok: true, titel: 'B' };
+    pruefe(await sag('!vote', {}) === 'Übersprungen — weiter mit: B' && aufruf('springen')?.arg[1] === 1,
+        '!vote: genug Stimmen springen weiter', mitschrift.gesendet.at(-1)?.text);
+    musikGeprueft.add('vote');
+
+    // --- Wer nicht darf, bewirkt nichts --------------------------------
+    const durch = [];
+    for (const w of MODERATOR) {
+        const satz = await sag('!' + w, {});   // gewoehnlicher Zuschauer
+        if (satz !== null || musik.aufrufe.length) durch.push(w);
+    }
+    pruefe(durch.length === 0, 'ein gewoehnlicher Zuschauer veraendert die Wiedergabe nicht — und bekommt keine Absage',
+        durch.join(', '));
+
+    pruefe(musik.einwaende.length === 0, 'die Attrappe hatte keinen Einwand',
+        [...new Set(musik.einwaende)].join(' | '));
+
+    require.cache[musikPfad].exports = echteMusik;
+}
+
 console.log('\nKein abhaengiger Befehl bleibt ungeprueft');
 {
     // **Die Liste haelt sich selbst aktuell.** Ohne diesen Fall waere der
     // naechste Befehl mit `braucht` still ungeprueft: Der Waechter bliebe
     // gruen, weil er ihn gar nicht kennt.
-    const geprueft = new Set(['los']);
+    const geprueft = new Set(['los', ...musikGeprueft]);
     const abhaengig = Object.keys(befehle.FERTIG).filter(w => befehle.FERTIG[w].braucht);
     const fehlend = abhaengig.filter(w => !geprueft.has(w));
     pruefe(fehlend.length === 0,
