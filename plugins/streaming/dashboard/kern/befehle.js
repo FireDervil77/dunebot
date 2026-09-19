@@ -745,6 +745,17 @@ async function auswerten(kanal) {
     const zerlegt = zerlegen(kanal.text);
     if (!zerlegt) return null;
 
+    // **Geteilter Chat: nur der eigene Kanal loest aus.** Twitch reicht im
+    // geteilten Chat auch Nachrichten aus fremden Kanaelen an dieses Abo
+    // weiter (`ausFremdemKanal`, uebersetzt in `twitch.chatAus`). Ohne diese
+    // Zeile zoegen Zuschauer eines anderen Streamers hier ein Los, schnitten
+    // einen Clip oder fragten die Umfrage ab, und ein Textbefehl bekaeme die
+    // Antwort dieses Kanals obendrein. Vorgabe ist "ablehnen"; ein Schalter
+    // fuer gemeinsame Events gehoerte hierher. Steht vor der Datenbank, weil
+    // die Entscheidung nicht von ihr abhaengt. Das getippte Wort kommt nicht
+    // ins Protokoll: Es ist ungeprueft und damit Chattext.
+    if (kanal.ausFremdemKanal) return 'geteilter Chat: Befehl aus einem fremden Kanal - nicht ausgewertet';
+
     // Erst jetzt wird die Datenbank gefragt. Bei jeder Chatnachricht eine
     // Abfrage waere der Preis dafuer, dass jemand "hallo" schreibt.
     const streamer = (await db().query(

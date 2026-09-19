@@ -857,6 +857,49 @@ console.log('\nWer nicht darf, loest auch nichts aus');
     pruefe(mitschrift.gesendet.length === 0, 'und es geht auch keine Absage in den Chat');
 }
 
+console.log('\nGeteilter Chat: nur der eigene Kanal loest aus');
+{
+    // Der Uebersetzer am echten `chatAus`, nicht an einer Nachbildung: Die
+    // Attrappe oben ersetzt nur das Senden, `chatAus` ist Twitchs Original.
+    const { chatAus } = require(twitchPfad);
+    const roh = (quelle) => ({ event: {
+        broadcaster_user_id: '111', broadcaster_user_login: 'firedervil',
+        chatter_user_id: '9', chatter_user_name: 'Anna',
+        message: { text: '!los' }, badges: [],
+        ...(quelle === undefined ? {} : { source_broadcaster_user_id: quelle })
+    } });
+    pruefe(chatAus(roh('222'))?.ausFremdemKanal === true,
+        'eine Nachricht aus einem anderen Kanal ist fremd');
+    pruefe(chatAus(roh(null))?.ausFremdemKanal === false,
+        'null heisst laut Twitch: im eigenen Kanal geschrieben');
+    pruefe(chatAus(roh('111'))?.ausFremdemKanal === false,
+        'die eigene Kennung als Herkunft ist ebenfalls eigen');
+    pruefe(chatAus(roh(undefined))?.ausFremdemKanal === false,
+        'ohne das Feld (kein geteilter Chat) auch');
+
+    // Die drei, die etwas BEWIRKEN oder Twitch fragen — und ein Textbefehl.
+    // Mit Moderator-Abzeichen: Auch das oeffnet keinen fremden Kanal.
+    neuAufsetzen([{ wort: 'uptime', art: 'fertig' },
+                  { wort: 'clip', art: 'fertig', abkuehlung_s: 0 },
+                  { wort: 'umfrage', art: 'fertig', abkuehlung_s: 0 }]);
+    for (const wort of ['uptime', 'clip', 'umfrage']) {
+        await befehle.auswerten(nachricht('!' + wort, { ausFremdemKanal: true, istModerator: true }));
+    }
+    pruefe(mitschrift.gesendet.length === 0, 'aus einem fremden Kanal geht keine Antwort in den Chat',
+        `${mitschrift.gesendet.length} Zeile(n)`);
+    pruefe(mitschrift.clips.length === 0, 'es wird kein Clip geschnitten',
+        String(mitschrift.clips.length));
+    pruefe(mitschrift.umfrageAbfragen.length === 0, 'und Twitch nicht einmal nach der Umfrage gefragt',
+        String(mitschrift.umfrageAbfragen.length));
+
+    // Gegenprobe im selben Aufbau: Dieselbe Nachricht aus dem eigenen Kanal
+    // wird beantwortet. Sonst waere der Fall darueber auch gruen, wenn
+    // schlicht gar nichts antwortete.
+    await befehle.auswerten(nachricht('!uptime'));
+    pruefe(mitschrift.gesendet.length === 1, 'aus dem eigenen Kanal antwortet derselbe Befehl',
+        `${mitschrift.gesendet.length} Zeile(n)`);
+}
+
 console.log('\n!umfrage sagt den Stand, oder dass keine laeuft');
 {
     neuAufsetzen([{ wort: 'umfrage', art: 'fertig', abkuehlung_s: 0 }]);
@@ -1133,6 +1176,19 @@ console.log('\n!los braucht ein anderes Plugin — und sagt das');
         `${vorUnbekannt} -> ${daten.lose.size}`);
     pruefe(/nicht hinterlegt/.test(mitschrift.gesendet.at(-1)?.text || ''),
         'und der Grund nennt genau das', mitschrift.gesendet.at(-1)?.text);
+
+    // --- Geteilter Chat: ein Zuschauer aus einem fremden Kanal ----------
+    // Die Verlosung laeuft und steht allen offen. Ohne die Sperre bekaeme er
+    // hier ein Los; die zweite Zeile zeigt, dass der Aufbau es sonst zuliesse.
+    welt.verlosung.offen.bedingungen = [];
+    daten.lose.clear();
+    require('../plugins/streaming/dashboard/kern/mitmachen').taktLeeren();
+    await befehle.auswerten(nachricht('!los', { absenderId: '70', ausFremdemKanal: true }));
+    pruefe(daten.lose.size === 0, 'ein Zuschauer aus einem fremden Kanal bekommt kein Los',
+        `${daten.lose.size} Lose`);
+    await befehle.auswerten(nachricht('!los', { absenderId: '70' }));
+    pruefe(daten.lose.size === 1, 'derselbe Zuschauer im eigenen Kanal schon',
+        `${daten.lose.size} Lose`);
 
     LosquellenRegistry.leeren();
 }

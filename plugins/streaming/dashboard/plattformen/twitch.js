@@ -456,7 +456,8 @@ async function chatAbonnieren(kanalId, botKontoId, conduitId) {
  * @param {Object} koerper Twitchs `payload`
  * @returns {{kanalId: string, kanalName: string|null, text: string|null,
  *            absender: string|null, absenderId: string|null,
- *            istInhaber: boolean, istModerator: boolean, istAbonnent: boolean}|null}
+ *            istInhaber: boolean, istModerator: boolean, istAbonnent: boolean,
+ *            ausFremdemKanal: boolean}|null}
  *          Kanal und Nachricht, oder null
  */
 function chatAus(koerper) {
@@ -489,7 +490,18 @@ function chatAus(koerper) {
 
         istInhaber:   abzeichen.has('broadcaster'),
         istModerator: abzeichen.has('moderator'),
-        istAbonnent:  abzeichen.has('subscriber') || abzeichen.has('founder')
+        istAbonnent:  abzeichen.has('subscriber') || abzeichen.has('founder'),
+
+        // **Geteilter Chat.** Teilen sich Kanaele einen Chat, liefert Twitch
+        // die Nachrichten der ANDEREN Kanaele auch an dieses Abo:
+        // `broadcaster_user_id` bleibt der abonnierte Kanal, die Herkunft
+        // steht in `source_broadcaster_user_id`. Laut Twitchs Referenz ist das
+        // Feld null, wenn die Nachricht im eigenen Kanal geschrieben wurde.
+        // Gewertet wird "gesetzt UND ein anderer Kanal" - dann ist es gleich,
+        // ob Twitch fuer eigene Nachrichten waehrend einer geteilten Sitzung
+        // null schickt oder die eigene Kennung.
+        ausFremdemKanal: Boolean(e.source_broadcaster_user_id)
+            && String(e.source_broadcaster_user_id) !== String(e.broadcaster_user_id)
     };
 }
 
