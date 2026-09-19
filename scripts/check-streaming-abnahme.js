@@ -162,8 +162,17 @@ async function zustellen(opt) {
         zeilen.length === 1 && zeilen[0].zustand !== 'dublette',
         zeilen[0] ? `zustand = ${zeilen[0].zustand}` : '—');
 
+    // **Nur die Auftraege DIESES Streamers.** Bis zum 2026-09-19 zaehlte die
+    // Abfrage jeden Auftrag der letzten zwei Minuten - und war rot, sobald ein
+    // anderer Streamer live war: Dessen Takt legt alle paar Minuten ein
+    // `bearbeiten` an. Gemessen wurde dann der Livebetrieb, nicht die Probe.
+    // Jeder Auftrag traegt `streamer_id` in der Nutzlast, ausser
+    // `serverhinweis` (Server-Stopp nach Sendeschluss) - den loest ein
+    // `channel.update` nicht aus.
     const auftraege = await q(
-        "SELECT COUNT(*) n FROM streaming_outbox WHERE angelegt_am >= DATE_SUB(NOW(), INTERVAL 2 MINUTE)");
+        `SELECT COUNT(*) n FROM streaming_outbox
+          WHERE angelegt_am >= DATE_SUB(NOW(), INTERVAL 2 MINUTE)
+            AND JSON_EXTRACT(nutzlast, '$.streamer_id') = ?`, [s.id]);
     pruefe('kein Auftrag entstanden (Streamer ist offline)', auftraege[0].n === 0, `${auftraege[0].n} Auftrag/Auftraege`);
 
     // ---------------------------------------------------------------- 18
