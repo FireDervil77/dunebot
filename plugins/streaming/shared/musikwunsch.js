@@ -671,22 +671,25 @@ async function leeren(guildId) {
 /**
  * Gespielte Zeilen wegraeumen, die niemand mehr braucht.
  *
- * @returns {Promise<number>} Wie viele weg sind
+ * Gerufen vom taeglichen Lauf (`dashboard/kern/aufraeumen.js`). Bis zum
+ * 2026-09-19 rief sie niemand - die Frist stand hier, lief aber nie, und am
+ * 19. lagen 141 von 426 Zeilen darueber (Baustelle 142).
+ *
+ * **Fehler gehen nach oben.** Hier stand ein `catch`, das `0` zurueckgab: Im
+ * Bericht des Laufs haette dann "0 geloescht" gestanden statt eines Fehlers.
+ * Das Abfangen ist Sache des Laufs, der jeden Schritt einzeln faengt.
+ *
+ * @returns {Promise<{geloescht: number, aelter_als_tage: number}>} Ergebnis
  */
 async function aufraeumen() {
-    try {
-        const weg = await db().query(
-            `DELETE q FROM streaming_music_queue q
-               LEFT JOIN streaming_music_state s
-                      ON s.guild_id = q.guild_id AND s.aktuelle_id = q.id
-              WHERE s.guild_id IS NULL
-                AND q.angelegt_am < (NOW() - INTERVAL ? DAY)`,
-            [AUFBEWAHRUNG_TAGE]);
-        return Number(weg?.affectedRows || 0);
-    } catch (fehler) {
-        log().error('[Streaming] Musikwuensche konnten nicht aufgeraeumt werden:', fehler);
-        return 0;
-    }
+    const weg = await db().query(
+        `DELETE q FROM streaming_music_queue q
+           LEFT JOIN streaming_music_state s
+                  ON s.guild_id = q.guild_id AND s.aktuelle_id = q.id
+          WHERE s.guild_id IS NULL
+            AND q.angelegt_am < (NOW() - INTERVAL ? DAY)`,
+        [AUFBEWAHRUNG_TAGE]);
+    return { geloescht: Number(weg?.affectedRows || 0), aelter_als_tage: AUFBEWAHRUNG_TAGE };
 }
 
 /* ======================================================================

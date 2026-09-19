@@ -3,9 +3,15 @@
 /**
  * Streaming - was taeglich weggeraeumt wird.
  *
- * Vier Laeufe, und **einer davon raeumt bewusst nicht auf**: Was schiefging,
+ * Sechs Laeufe, und **einer davon raeumt bewusst nicht auf**: Was schiefging,
  * bleibt liegen. Ein Aufraeumlauf, der auch die Fehler mitnimmt, macht aus
  * einem Problem eine leere Tabelle - und die sieht aus wie "alles in Ordnung".
+ *
+ * **Lose und Musikwuensche seit dem 2026-09-19.** Beide Module hatten ihre
+ * Frist samt `aufraeumen()` von Anfang an, aber keinen Aufrufer - die Frist,
+ * die gespeicherte Twitch-Namen wieder loescht, lief nie (Baustelle 142).
+ * Jede exportierte `aufraeumen` im Plugin muss hier gerufen werden; das prueft
+ * `scripts/check-streaming-aufraeumer.js`.
  *
  * Der fuenfte Lauf aus dem Arbeitsplan (Zustand: "live" seit ueber 24 Stunden
  * gegen die Plattform pruefen) **fehlt hier mit Absicht**: Den gibt es schon.
@@ -55,7 +61,11 @@ async function lauf() {
         ['posteingang', posteingang],
         ['ausgang',     ausgang],
         ['nachrichten', nachrichten],
-        ['streamer',    streamer]
+        ['streamer',    streamer],
+        // Die Fristen stehen in den Modulen selbst, neben den Tabellen, die
+        // sie betreffen: Lose 30 Tage, Musikwuensche 7.
+        ['lose',          () => require('../../shared/lose').aufraeumen()],
+        ['musikwuensche', () => require('../../shared/musikwunsch').aufraeumen()]
     ];
 
     for (const [name, schritt] of schritte) {

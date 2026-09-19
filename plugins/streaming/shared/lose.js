@@ -127,13 +127,18 @@ async function ansageEinreihen(guildId, streamerId, text) {
 /**
  * Verwaiste und alte Lose wegraeumen.
  *
- * @returns {Promise<{geloescht: number}>} Ergebnis
+ * Gerufen vom taeglichen Lauf (`dashboard/kern/aufraeumen.js`). Bis zum
+ * 2026-09-19 rief sie niemand, und mit ihr lief auch die Frist nie, die die
+ * Twitch-Kennung und den Namen eines Teilnehmers wieder loescht
+ * (Baustelle 142).
+ *
+ * @returns {Promise<{geloescht: number, aelter_als_tage: number}>} Ergebnis
  */
 async function aufraeumen() {
     const ergebnis = await db().query(
         'DELETE FROM streaming_lose WHERE angelegt_am < DATE_SUB(NOW(), INTERVAL ? DAY)',
         [AUFBEWAHRUNG_TAGE]);
-    return { geloescht: Number(ergebnis?.affectedRows || 0) };
+    return { geloescht: Number(ergebnis?.affectedRows || 0), aelter_als_tage: AUFBEWAHRUNG_TAGE };
 }
 
 /**

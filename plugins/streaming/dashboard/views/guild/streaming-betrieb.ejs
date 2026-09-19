@@ -294,10 +294,29 @@
           <p class="text-secondary small">zuletzt <%= vorWieLange(a.gelaufen_am) || '—' %></p>
           <table class="table table-sm">
             <tbody>
-              <tr><td>Posteingang (erledigt, alt)</td><td class="text-end"><%= a.posteingang?.geloescht ?? '—' %></td></tr>
-              <tr><td>Ausgang (erledigt, alt)</td><td class="text-end"><%= a.ausgang?.geloescht ?? '—' %></td></tr>
-              <tr><td>Nachrichten ohne Ziel</td><td class="text-end"><%= a.nachrichten?.geloescht ?? '—' %></td></tr>
-              <tr><td>Streamer ohne Ziel und Abo</td><td class="text-end"><%= a.streamer?.geloescht ?? '—' %></td></tr>
+              <%# **Ein Fehler ist kein Strich.** Bis zum 2026-09-19 stand hier
+                  `?.geloescht ?? '—'` — ein gescheiterter Schritt sah genauso
+                  aus wie einer, der nie lief. Die Frist steht im Bericht, nicht
+                  hier: Sie gehört dem Modul, das die Tabelle kennt. %>
+              <% for (const [schluessel, text] of [
+                   ['posteingang',   'Posteingang (erledigt, alt)'],
+                   ['ausgang',       'Ausgang (erledigt, alt)'],
+                   ['nachrichten',   'Nachrichten ohne Ziel'],
+                   ['streamer',      'Streamer ohne Ziel und Abo'],
+                   ['lose',          'Lose aus dem Chat'],
+                   ['musikwuensche', 'Musikwünsche, gespielt']
+                 ]) { const s = a[schluessel]; %>
+                <tr>
+                  <td><%= text %><% if (s && s.aelter_als_tage && ['lose', 'musikwuensche'].includes(schluessel)) { %>, älter als <%= s.aelter_als_tage %> Tage<% } %></td>
+                  <td class="text-end">
+                    <% if (s && s.fehler) { %>
+                      <span class="text-danger" title="<%= s.fehler %>">Fehler</span>
+                    <% } else { %>
+                      <%= s?.geloescht ?? '—' %>
+                    <% } %>
+                  </td>
+                </tr>
+              <% } %>
             </tbody>
           </table>
           <p class="text-secondary small mb-0">
