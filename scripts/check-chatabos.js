@@ -31,6 +31,7 @@ const fs = require('fs');
 const path = require('path');
 const Module = require('module');
 const { ServiceManager } = require('dunebot-core');
+const { ohneKommentare } = require('./lib/quelltext');
 
 const WURZEL = path.join(__dirname, '..');
 
@@ -365,17 +366,38 @@ pruefe(/chatGezaehlt\(nutz\)/.test(conduitQuelle),
 pruefe(!/message\.text|chatter_user|message_id|broadcaster_user_id/.test(ohneErklaerung),
     'der Eingang fasst weder Twitchs Feldnamen noch Text oder Absender an',
     'ob Chatverlaeufe gespeichert werden duerfen, gehoert zur Rechtspruefung — nicht in einen Zaehler');
-pruefe(/chatter_user/.test(conduitQuelle),
-    'und die Datei sagt ausdruecklich, dass sie es nicht tut',
+// **Seit Stufe 15 (2026-09-05) reicht der Uebersetzer Text und Absender
+// weiter** - Befehle brauchen beides. Bis zum 2026-09-19 standen hier zwei
+// Regeln von davor ("`chatAus` nimmt nur die Kanalkennung", "die Datei nennt
+// `chatter_user`") und waren seit zwei Wochen rot, ohne dass der Code falsch
+// war. Die Zusage ist geblieben, nur ihr Ort hat sich verschoben: Was der
+// Auswerter mit Text und Absender macht, prueft `check-streaming-befehle` am
+// VERHALTEN (Kennwerte durchschicken, jeden Schreibzugriff mitschreiben).
+// Hier bleibt die Schicht davor - Empfang und Uebersetzer halten nichts fest.
+const code = (quelle, von, bis) => {
+    const ohne = ohneKommentare(quelle);
+    const a = ohne.indexOf(von), b = ohne.indexOf(bis, a + 1);
+    return (a < 0 || b < 0) ? null : ohne.slice(a, b);
+};
+
+const empfang = code(conduitQuelle, 'function chatGezaehlt', 'function befehle');
+pruefe(empfang !== null && !/\bdb\(\)|\.query\(/.test(empfang),
+    'der Empfang schreibt nichts in die Datenbank',
+    empfang === null ? '`chatGezaehlt` nicht gefunden' : 'gezaehlt wird im Speicher, sonst nirgends');
+pruefe(empfang !== null && !/\.text\b|absender/i.test(empfang),
+    'und er liest weder Text noch Absender - er reicht sie nur durch',
+    'wer hier den Text anfasst, hat einen zweiten Ort geschaffen, an dem er landen kann');
+pruefe(/check-streaming-befehle/.test(conduitQuelle),
+    'die Datei sagt, wo die Zusage geprueft wird',
     'eine Regel, die nur im Kopf des Erbauers steht, ueberlebt die naechste Aenderung nicht');
 
-// Der Uebersetzer selbst: Er darf die Kennung mitnehmen und sonst nichts.
+// Der Uebersetzer selbst: Er uebersetzt - festhalten darf er nichts.
 const twitchQuelle = lies('plugins/streaming/dashboard/plattformen/twitch.js');
-const chatAus = twitchQuelle.slice(twitchQuelle.indexOf('function chatAus'),
-                                  twitchQuelle.indexOf('function abbestellen'));
-pruefe(/broadcaster_user_id/.test(chatAus) && !/message|chatter_user/.test(chatAus),
-    '`chatAus` uebersetzt nur die Kanalkennung, nicht den Inhalt',
-    'ein Uebersetzer, der schon mal alles mitnimmt, macht die Entscheidung fuer die Rechtspruefung');
+const chatAus = code(twitchQuelle, 'function chatAus', 'function abbestellen');
+pruefe(chatAus !== null && /broadcaster_user_id/.test(chatAus)
+        && !/\bdb\(\)|\.query\(|\blog\(\)|Logger/.test(chatAus),
+    '`chatAus` uebersetzt und haelt nichts fest - keine Datenbank, kein Protokoll',
+    chatAus === null ? '`chatAus` nicht gefunden' : 'ein Protokolleintrag mit dem Text waere ein Chatverlauf');
 pruefe(/twitch\.EREIGNIS_CHAT\.typ/.test(conduitQuelle),
     'der Ereignistyp kommt aus einer Stelle, nicht aus zwei Zeichenketten');
 

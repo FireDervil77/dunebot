@@ -124,7 +124,8 @@ const daemon = {
         }
         if (befehl === 'gameserver.files.read') {
             this.gelesen.push(nutzlast.path);
-            return { success: true, data: { content: this.logInhalt } };
+            // Wie `HandleFileRead` im Daemon: immer Base64 (Baustelle 135).
+            return { success: true, data: { content: Buffer.from(this.logInhalt, 'utf8').toString('base64') } };
         }
         throw new Error('Unerwarteter Befehl: ' + befehl);
     },

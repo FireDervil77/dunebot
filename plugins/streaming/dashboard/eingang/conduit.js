@@ -131,10 +131,14 @@ function zustand() {
  * **Text und Absender kommen seit Stufe 15 mit** (2026-09-05). Hier stand
  * vorher, der Uebersetzer liefere sie bewusst nicht — „wer das spaeter
  * braucht, baut es mit einer Rechtsgrundlage und einer Aufbewahrungsfrist,
- * nicht nebenbei in einem Zaehler". Der Satz bleibt richtig; die
- * Aufbewahrungsfrist ist **null**. Der Befehlsauswerter liest den Text,
- * antwortet und vergisst ihn — gezaehlt wird weiterhin nur die Menge, und
- * gespeichert wird von der Nachricht gar nichts.
+ * nicht nebenbei in einem Zaehler". Der Satz bleibt richtig. **Dieser
+ * Empfang** zaehlt nur die Menge und schreibt nichts. Der Befehlsauswerter
+ * liest den Text, antwortet und vergisst ihn. Den **Absender** behalten genau
+ * die Befehle, die ihn brauchen: `!los` (`streaming_lose`) und der
+ * Musikwunsch (`streaming_music_queue.gewuenscht_von`). Hier stand bis zum
+ * 2026-09-19 „gespeichert wird von der Nachricht gar nichts" — das stimmte
+ * seit `!los` nicht mehr. Geprueft am Verhalten, nicht an diesem Satz:
+ * `scripts/check-streaming-befehle.js`.
  *
  * @param {Object} nutz Der Nutzteil der Nachricht
  * @returns {void}

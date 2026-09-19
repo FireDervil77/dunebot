@@ -449,13 +449,15 @@ async function chatAbonnieren(kanalId, botKontoId, conduitId) {
  * (`scripts/check-streaming-schichten.js`). Dieselbe Aufgabe wie
  * `abonnentAus` und `melderAus`, nur fuer den Chat.
  *
- * **Der Inhalt kommt bewusst nicht mit.** `event.message.text` und
- * `event.chatter_user_*` bleiben liegen, wo sie sind. Wer Chatverlaeufe
- * speichern will, braucht eine Rechtsgrundlage und eine Aufbewahrungsfrist -
- * nicht einen Uebersetzer, der schon mal alles mitnimmt.
+ * **Text und Absender kommen mit, seit Stufe 15** — die Begruendung steht
+ * unten im Rumpf. Festhalten darf der Uebersetzer nichts: keine Datenbank,
+ * kein Protokoll (`scripts/check-chatabos.js`, Abschnitt 8).
  *
  * @param {Object} koerper Twitchs `payload`
- * @returns {{kanalId: string, kanalName: string|null}|null} Kanal oder null
+ * @returns {{kanalId: string, kanalName: string|null, text: string|null,
+ *            absender: string|null, absenderId: string|null,
+ *            istInhaber: boolean, istModerator: boolean, istAbonnent: boolean}|null}
+ *          Kanal und Nachricht, oder null
  */
 function chatAus(koerper) {
     const e = koerper?.event;
@@ -466,9 +468,10 @@ function chatAus(koerper) {
     // Bis dahin liess der Uebersetzer beides bewusst weg, mit der Begruendung
     // "wer das braucht, baut es mit einer Rechtsgrundlage und einer
     // Aufbewahrungsfrist, nicht nebenbei in einem Zaehler". Der Satz bleibt
-    // richtig — nur ist die Aufbewahrungsfrist hier **null**: Der Auswerter
-    // liest den Text, antwortet und vergisst ihn. Gespeichert wird nichts
-    // davon, und `streaming_commands` hat fuer beides gar keine Spalte.
+    // richtig — fuer den **Text** ist die Aufbewahrungsfrist **null**: Der
+    // Auswerter liest ihn, antwortet und vergisst ihn, und `streaming_commands`
+    // hat dafuer gar keine Spalte. Den **Absender** behalten `!los` und der
+    // Musikwunsch, weil sie ohne ihn nicht funktionieren (Baustelle 142).
     //
     // Die Abzeichen sind Twitchs Wort fuer "wer darf was". Sie werden HIER
     // uebersetzt und nicht im Kern verglichen — sonst zoege sich `set_id`
