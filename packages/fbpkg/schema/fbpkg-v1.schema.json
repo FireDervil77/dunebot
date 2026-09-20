@@ -978,6 +978,43 @@
         "description": "Nur Zeichenketten. Zahlen und Ja/Nein waren bis zum 2026-09-12 erlaubt, kamen aber in keinem Paket vor — und eine Zahl hier haette den Daemon beim Einlesen des GANZEN Pakets scheitern lassen (map[string]string). Wer eine Zahl braucht, schreibt sie als \"7\"."
       }
     },
+    "config": {
+      "description": "Was das PAKET in Konfigurationsdateien festlegt — im Unterschied zu `settings`, die dem BETREIBER gehoeren. Ein Port ist keine Einstellung: Er wird vergeben, nicht eingestellt. Ihn als Einstellung zu tarnen hiesse, im Panel ein Feld zu zeigen, dessen Wert beim naechsten Start ueberschrieben wird. Gebraucht fuer jedes Spiel, das einen Wert nur in einer eigenen Datei erwartet — Minecraft liest `rcon.port` ausschliesslich aus server.properties, es gibt keinen Startparameter dafuer und keine Umgebungsvariable. Wird bei JEDEM Start angewandt, wie die Einstellungen auch: fb-cfg patcht je Schluessel, und ein umgezogener Server bekommt seine neue Portnummer damit von selbst.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "file",
+          "parser",
+          "set"
+        ],
+        "properties": {
+          "file": {
+            "type": "string",
+            "description": "Pfad relativ zum Arbeitsverzeichnis des Spiels."
+          },
+          "parser": {
+            "enum": [
+              "ini",
+              "json",
+              "yaml",
+              "properties",
+              "xml",
+              "text"
+            ],
+            "description": "Wie die Datei aufgebaut ist — dieselben Namen wie bei `settings[].apply`. Nur die strukturierten Schreiber legen eine fehlende Datei an; `text` findet und ersetzt und braucht deshalb etwas zum Finden."
+          },
+          "set": {
+            "type": "object",
+            "description": "Schluesselpfad innerhalb der Datei → Wert. Der Wert darf Verweise tragen: {{port:<zweck>}}, {{setting:<key>}}, {{content:<auswahl>}}, {{env:<VAR>}} — dieselbe Form wie in `start.args` und im `env`-Abschnitt. Ein Verweis, der sich nicht aufloesen laesst, wird gemeldet und der Schluessel UEBERSPRUNGEN: Ein halb eingesetzter Wert in der Datei waere schlimmer als ein fehlender.",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
     "settings": {
       "type": "array",
       "items": {
