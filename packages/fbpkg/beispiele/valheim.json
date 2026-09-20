@@ -3,7 +3,7 @@
   "identity": {
     "slug": "valheim",
     "name": "Valheim",
-    "version": "1.0.14",
+    "version": "1.0.15",
     "author": "firenetworks",
     "category": "survival",
     "description": {
@@ -162,8 +162,8 @@
       {
         "key": "resetmodifiers",
         "form": "-resetmodifiers",
-        "from": "setting:mod_verwalten",
-        "when": "true"
+        "from": "setting:mod_nicht_anfassen",
+        "when": "false"
       },
       {
         "key": "preset",
@@ -588,7 +588,7 @@
         "en": "World preset"
       },
       "description": {
-        "de": "Setzt alle Modifikatoren auf einen Satz. Die Einzelwerte darunter überschreiben ihn — sie stehen in der Startzeile dahinter und gewinnen deshalb.",
+        "de": "Setzt alle Modifikatoren auf einen Satz. Die Einzelwerte darunter überschreiben ihn — sie stehen in der Startzeile dahinter und gewinnen deshalb.\n\n⚠ **Ein Preset räumt von sich aus auf** — auch wenn „aus dem Panel verwalten\" aus ist. Valheim löscht beim Anwenden eines Presets zuerst alle Modifikator-Schlüssel, auch die, die jemand über die Konsole gesetzt hat, und setzt danach die des Presets. Wer die Welt wirklich unberührt lassen will, lässt dieses Feld leer.",
         "en": "Sets all modifiers at once. The individual values below override it — they come later on the command line and therefore win."
       },
       "type": "choice",
@@ -976,15 +976,15 @@
       "role": "owner"
     },
     {
-      "key": "mod_verwalten",
+      "key": "mod_nicht_anfassen",
       "group": "world",
       "name": {
-        "de": "Weltmodifikatoren aus dem Panel verwalten",
-        "en": "Manage world modifiers from the panel"
+        "de": "Weltmodifikatoren NICHT aus dem Panel steuern",
+        "en": "Do NOT manage world modifiers from the panel"
       },
       "description": {
-        "de": "Aus: Wir fassen die Modifikatoren dieser Welt nicht an — sie bleiben, wie sie sind. An: Bei JEDEM Start wird der Stand aus den Feldern hier neu aufgebaut. ⚠ Damit verschwindet auch, was jemand im Spiel über die Konsole gesetzt hat.",
-        "en": "Off: we do not touch this world's modifiers. On: the state is rebuilt from these fields on EVERY start — including discarding anything set in-game via the console."
+        "de": "**Normalfall ist AUS — dann gilt, was hier im Panel steht.** Bei jedem Start räumt `-resetmodifiers` die Welt zuerst ab, danach wird genau das gesetzt, was in den Feldern steht. Auch „gar nichts\": Ein Feld zu leeren nimmt den Modifikator damit wirklich aus der Welt.\n\n⚠ Damit ist das Panel die Wahrheit. Was ein Admin im Spiel über die Konsole setzt (`setworldmodifier`, `setworldpreset`), wird beim nächsten Start überschrieben. Der Boss-Fortschritt bleibt unberührt — `-resetmodifiers` fasst nur die Modifikatoren an.\n\nAN heißt: Wir fassen die Welt nicht an. Dann wirkt nur noch das SETZEN, nicht das Wegnehmen — Valheim speichert Modifikatoren dauerhaft, und ohne Aufräumen fügt ein Start nur hinzu. Nur einschalten, wenn die Welt bewusst außerhalb des Panels gepflegt wird.",
+        "en": "Normally OFF — then the panel is the source of truth: every start clears the world's modifiers first and sets exactly what the fields say, including nothing. ON means we never touch the world; then only setting works, not removing."
       },
       "type": "boolean",
       "default": false,
@@ -1005,7 +1005,7 @@
         "en": "No build cost"
       },
       "description": {
-        "de": "Bauen kostet kein Material. Praktisch zum Einrichten, und der Grund, warum es den Hammermodus gibt. Wirkt nur, wenn oben „aus dem Panel verwalten“ an ist.",
+        "de": "Bauen kostet kein Material. Praktisch zum Einrichten, und der Grund, warum es den Hammermodus gibt. Leeren nimmt ihn beim nächsten Start wieder aus der Welt — außer „NICHT aus dem Panel steuern“ ist an.",
         "en": "Building costs no materials. Only has an effect while „manage from the panel“ is on."
       },
       "type": "boolean",
@@ -1027,7 +1027,7 @@
         "en": "Player-based raids"
       },
       "description": {
-        "de": "Überfälle richten sich nach dem Fortschritt einzelner Spieler statt nach dem der Welt. Wirkt nur, wenn oben „aus dem Panel verwalten“ an ist.",
+        "de": "Überfälle richten sich nach dem Fortschritt einzelner Spieler statt nach dem der Welt. Leeren nimmt ihn beim nächsten Start wieder aus der Welt — außer „NICHT aus dem Panel steuern“ ist an.",
         "en": "Raids follow individual players' progress instead of the world's. Only has an effect while „manage from the panel“ is on."
       },
       "type": "boolean",
@@ -1049,7 +1049,7 @@
         "en": "Fire risks"
       },
       "description": {
-        "de": "Feuer greift auf Bauten über. Aus der immersiven Voreinstellung. Wirkt nur, wenn oben „aus dem Panel verwalten“ an ist.",
+        "de": "Feuer greift auf Bauten über. Aus der immersiven Voreinstellung. Leeren nimmt ihn beim nächsten Start wieder aus der Welt — außer „NICHT aus dem Panel steuern“ ist an.",
         "en": "Fire spreads to buildings. From the immersive preset. Only has an effect while „manage from the panel“ is on."
       },
       "type": "boolean",
@@ -1071,7 +1071,7 @@
         "en": "Passive enemies"
       },
       "description": {
-        "de": "Gegner greifen nicht von sich aus an. Wirkt nur, wenn oben „aus dem Panel verwalten“ an ist.",
+        "de": "Gegner greifen nicht von sich aus an. Leeren nimmt ihn beim nächsten Start wieder aus der Welt — außer „NICHT aus dem Panel steuern“ ist an.",
         "en": "Enemies do not attack on their own. Only has an effect while „manage from the panel“ is on."
       },
       "type": "boolean",
@@ -1093,7 +1093,7 @@
         "en": "No map"
       },
       "description": {
-        "de": "Es gibt keine Karte — weder eigene Position noch Erkundetes. Wirkt nur, wenn oben „aus dem Panel verwalten“ an ist.",
+        "de": "Es gibt keine Karte — weder eigene Position noch Erkundetes. Leeren nimmt ihn beim nächsten Start wieder aus der Welt — außer „NICHT aus dem Panel steuern“ ist an.",
         "en": "No map at all — no position, no explored terrain. Only has an effect while „manage from the panel“ is on."
       },
       "type": "boolean",
@@ -1204,6 +1204,8 @@
   "status": {
     "complete": false,
     "open": [
+      "WELTMODIFIKATOREN — im Netz nachgelesen am 2026-09-20, und es korrigiert zwei Annahmen von hier. (1) ADMIN-KONSOLENBEFEHLE GEHEN DOCH auf dedizierten Servern, wenn die Steam-ID in adminlist.txt steht: `setworldmodifier <name> <wert>`, `setworldpreset <name>` und `resetworldkeys` (entfernt NUR die Modifikator-Schluessel; `resetkeys` loescht dagegen ALLE globalen Schluessel inklusive Boss-Kills). Es gibt seit 0.217.22. Nur die CHEAT-Befehle (`setkey`) sind auf dedizierten Servern gesperrt. Damit hat der Betreiber einen Weg, eine verklemmte Welt OHNE Neustart aufzuraeumen — das stand hier nirgends. (2) EIN -preset RAEUMT VON SICH AUS AUF: Valheim loescht beim Anwenden eines Presets zuerst alle Modifikator-Schluessel, auch fremde, und setzt danach die des Presets. Die Zusage des Schalters „Ist er aus, fassen wir die Welt nicht an\" gilt also NICHT, wenn world_preset gesetzt ist. In den Beschreibungen steht das jetzt. Quellen: gameserverkings.com und low.ms, beide am 2026-09-20 gelesen, in den beiden Punkten uebereinstimmend.",
+      "⚠ DIE MESSUNG VOM 2026-09-06/07 WAR AM ALTEN WELTFORMAT. Damals wurde „die .fwl danach ausgelesen\", und daraus stammt die ganze Bauform (setkey/resetmodifiers, der Schalter). Valheim 1.0 hat das Format gewechselt: Server 190 traegt `_main.38.fwl2` (53 Bytes: Name, Seed, vier Zahlenfelder) und `_main.38.db2` — Letztere ist ab Offset 16 GZIP-KOMPRIMIERT. Am 2026-09-20 nachgesehen: entpackt 208 982 Bytes, darin KEIN lesbarer Klartext (983 strings-Fundstellen sind Binaerrauschen). Ob und wo die Schluessel dort stehen, ist damit UNGEMESSEN — „nichts gefunden\" ist hier keine Aussage. Wer es wissen will, braucht einen Probelauf mit gesetztem Schluessel als Positivkontrolle. Lehrgeld dabei: Der erste Versuch suchte in einer alten .db und fand 5 Treffer fuer „combat\" — es war der Ortsname `CombatRuin01`. Eine Suche ohne Positivkontrolle beweist nichts.",
       "requirements: Mindest-RAM und Plattenbedarf nicht gemessen — nicht geraten.",
       "content.loader: ZWEI Doorstop-Fassungen im Umlauf, deshalb stehen BEIDE Namenssaetze in adds.env - GEMESSEN am 2026-09-13 an Server 189, nicht aus der Doku. Der Pack denikson-BepInExPack_Valheim liefert je nach Fassung unterschiedliche Doorstop-Binaerdateien: 5.4.2333 bringt Doorstop 4 (DOORSTOP_ENABLED, DOORSTOP_TARGET_ASSEMBLY), 5.4.2200 bringt Doorstop 3 (DOORSTOP_ENABLE, DOORSTOP_INVOKE_DLL_PATH, DOORSTOP_CORLIB_OVERRIDE_PATH). Nachgesehen wurde in der Bibliothek selbst (welche DOORSTOP_*-Namen sie nachschlaegt), nicht in .doorstop_version - die Datei log: Sie blieb als Waise von 5.4.2333 liegen und wies 4.4.0 aus, waehrend Doorstop 3 installiert war. DER PREIS EINES FEHLENDEN NAMENS IST KEIN STILLES NICHTLADEN, SONDERN EIN ABSTURZ: Ist DOORSTOP_ENABLE bei Doorstop 3 nicht gesetzt, faellt der per LD_PRELOAD vorgeladene Doorstop mit SIGSEGV (Exit 139) um - und zwar bevor irgendein Programm laeuft. Im Container stand nur 'fb-init: [started]/[exited]', kein Wort vom Spiel. Nachgestellt mit einem blossen 'echo' im selben Image: ohne DOORSTOP_ENABLE 139, mit ihm 0. Doorstop 4 vertraegt die alten Namen anstandslos (alle vier Kombinationen 0), deshalb ist das Setzen beider Saetze sicher und nicht bloss bequem. Was NICHT gemacht wurde: die Doorstop-Fassung beim Installieren auslesen und den Namenssatz danach waehlen - richtiger, aber mehr Maschinerie; wenn ein dritter Satz auftaucht, ist das der Weg. NICHT UEBERNOMMEN, obwohl das Startskript des Packs es setzt: DOORSTOP_CORLIB_OVERRIDE_PATH=./unstripped_corlib. Es ZERLEGT dieses Valheim. Gemessen am 2026-09-13 im echten Lauf: Doorstop meldet 'Got override: ./unstripped_corlib', und Mono bricht danach mit 'Your mono runtime and class libraries are out of sync - the out of sync library is unstripped_corlib/mscorlib.dll' ab. Der unstripped_corlib des Packs gehoert zu einer aelteren Unity-Fassung. OHNE die Variable laeuft BepInEx.Preloader.Entrypoint.Main() durch - ebenfalls im echten Lauf belegt. Lehre: Der erste Test lief gegen ein blosses 'echo' und meldete fuer beide Varianten Erfolg, weil dort nie Mono geladen wurde. Ein gruener Test ohne die Maschinerie, um die es geht, ist kein Beweis.",
       "management.saves: Pfad aus der Spieldokumentation übernommen, am laufenden Server noch nicht geprüft.",
