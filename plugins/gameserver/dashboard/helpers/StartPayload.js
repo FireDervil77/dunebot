@@ -158,7 +158,36 @@ function werteFuerDaemon(paket, werte) {
         if (wert === undefined || wert === null) {
             if (eintrag.risk === 'progress' || eintrag.risk === 'world_reset') {
                 gefaehrlich.push(eintrag.key);
+                continue;
             }
+            // ── Die Vorgabe des Pakets gilt (2026-09-20) ────────────────────
+            //
+            // Hier stand bis dahin nur `continue` — die Einstellung wurde
+            // still weggelassen, und der Daemon setzt KEINE Vorgabe ein
+            // (`holeWert` meldet schlicht „fehlt", das Argument entfaellt).
+            // Damit wirkte `default` im Paket beim Start ueberhaupt nicht; es
+            // war nur Vorbelegung im Formular.
+            //
+            // **Das Panel zeigt die Vorgabe aber an.** Wer sie dort liest,
+            // glaubt, sie gelte — und sie galt nicht. Das ist der Unterschied
+            // zwischen einer Luecke und einer Luege in der Oberflaeche.
+            //
+            // Gefunden an Server 186 (Valheim, 2026-09-20): Er wurde am 18.08.
+            // mit Paketfassung 1.0.0 angelegt. `mod_verwalten` kam spaeter
+            // dazu und stand deshalb NIE in seinen Werten — also kam
+            // `-resetmodifiers` nie an, waehrend `-modifier deathpenalty
+            // veryeasy` bei jedem Start mitging. Valheim schreibt
+            // Modifikatoren dauerhaft in die Welt; nur `-resetmodifiers`
+            // raeumt auf. Rein ja, raus nie, und niemand sah warum.
+            //
+            // Das trifft JEDEN Bestandsserver, dessen Paket spaeter eine
+            // Einstellung dazubekommt — nicht nur Valheim.
+            //
+            // Riskante Einstellungen bleiben ausgenommen (oben): Dort kostet
+            // eine Vorgabe einen Weltstand, und dann ist ein abgelehnter Start
+            // die richtige Antwort.
+            if (eintrag.default === undefined || eintrag.default === null) continue;
+            settings[eintrag.key] = String(eintrag.default);
             continue;
         }
         settings[eintrag.key] = String(wert);
@@ -437,4 +466,7 @@ async function ladePaketFuerAddon(dbService, addonId) {
 module.exports = {
     buildStartPayload, baueInstallNutzlast, paketWerteAnlegen, autoUpdateAus, istWahr,
     loadServerForStart, ladePaketFuerAddon, imageAusPaket, ladeUebergang,
+    // Nur fuer scripts/check-startpayload.js: Die Regel, welcher Wert beim
+    // Start gilt, ist zu teuer erkauft, um sie nur indirekt zu pruefen.
+    werteFuerDaemon,
 };

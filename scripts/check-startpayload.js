@@ -26,7 +26,7 @@ if (!ServiceManager.has('Logger')) {
 }
 
 const HELPERS = path.join(__dirname, '../plugins/gameserver/dashboard/helpers');
-const { buildStartPayload, baueInstallNutzlast, paketWerteAnlegen, autoUpdateAus } =
+const { buildStartPayload, baueInstallNutzlast, paketWerteAnlegen, autoUpdateAus, werteFuerDaemon } =
     require(path.join(HELPERS, 'StartPayload'));
 
 let passed = 0;
@@ -187,6 +187,68 @@ function ohneEgg(payload) {
         assert.deepStrictEqual(werte, {
             name: 'Mein Server', world_name: 'Neu', password: '', auto_update: '1', beta_branch: '',
         });
+    });
+
+    console.log('\nEine Einstellung, die dem Server fehlt (Baustelle Weltmodifikatoren)');
+
+    // ── Der Fall, der das gekostet hat ──────────────────────────────────────
+    //
+    // Server 186 wurde am 2026-08-18 mit Paketfassung 1.0.0 angelegt.
+    // `mod_verwalten` kam erst spaeter ins Paket und stand deshalb NIE in
+    // seinen Werten. Bis zum 2026-09-20 liess `werteFuerDaemon` solche
+    // Einstellungen still weg — und der Daemon setzt keine Vorgabe ein.
+    //
+    // Folge am laufenden Server: `-modifier deathpenalty veryeasy` ging bei
+    // jedem Start mit, `-resetmodifiers` nie. Valheim schreibt Modifikatoren
+    // dauerhaft in die Welt; nur `-resetmodifiers` raeumt auf. Rein ja, raus
+    // nie — und im Panel stand die ganze Zeit die Vorgabe, als gaelte sie.
+
+    await check('Fehlt der Wert, gilt die Vorgabe des Pakets', async () => {
+        const p = paket((x) => {
+            x.settings.push({ key: 'mod_verwalten', type: 'boolean', default: false, role: 'owner' });
+            x.settings.push({ key: 'autosave_seconds', type: 'number', default: 1800, role: 'owner' });
+        });
+        // Genau der Bestand von 186: der spaetere Schluessel fehlt.
+        const { settings } = werteFuerDaemon(p, { name: 'Bude', world_name: 'BoomTown' });
+        assert.strictEqual(settings.mod_verwalten, 'false',
+            'die Vorgabe des Pakets kam nicht an');
+        assert.strictEqual(settings.autosave_seconds, '1800',
+            'eine Zahl-Vorgabe kam nicht an');
+    });
+
+    await check('Ein gespeicherter Wert sticht gegen die Vorgabe', async () => {
+        const p = paket((x) => {
+            x.settings.push({ key: 'mod_verwalten', type: 'boolean', default: false, role: 'owner' });
+        });
+        const { settings } = werteFuerDaemon(p, { mod_verwalten: '1' });
+        assert.strictEqual(settings.mod_verwalten, '1');
+    });
+
+    await check('Ein leerer Text bleibt ein Wert und wird nicht ueberschrieben', async () => {
+        // beta_branch "" heisst „kein Beta-Zweig" — die Vorgabe ist hier
+        // ebenfalls "", aber der Unterschied muss bestehen bleiben: Ein
+        // gespeichertes "" ist eine Aussage des Betreibers.
+        const { settings } = werteFuerDaemon(paket(), { beta_branch: '' });
+        assert.strictEqual(settings.beta_branch, '');
+    });
+
+    await check('Ohne Vorgabe bleibt die Einstellung weg, statt "undefined" zu senden', async () => {
+        const p = paket((x) => {
+            x.settings.push({ key: 'rcon_password', type: 'password', default: null, role: 'owner' });
+        });
+        const { settings } = werteFuerDaemon(p, {});
+        assert.ok(!('rcon_password' in settings),
+            `rcon_password kam als ${JSON.stringify(settings.rcon_password)} an`);
+    });
+
+    await check('Riskante Einstellungen nehmen KEINE Vorgabe — sie halten den Start an', async () => {
+        // world_name traegt risk: progress. Eine Vorgabe kostet hier einen
+        // Weltstand: Der Server erzeugte still eine neue Welt namens
+        // „Dedicated" und liesse die bespielte liegen.
+        const { settings, gefaehrlich } = werteFuerDaemon(paket(), {});
+        assert.deepStrictEqual(gefaehrlich, ['world_name']);
+        assert.ok(!('world_name' in settings),
+            'die riskante Vorgabe wurde eingesetzt, statt den Start anzuhalten');
     });
 
     console.log(`\n${passed} Prüfung(en) bestanden.`);
