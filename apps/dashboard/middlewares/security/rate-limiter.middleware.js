@@ -38,36 +38,27 @@ const authLimiter = rateLimit({
     }
 });
 
-/**
- * Moderate Limits für API-Routes
- * Verhindert API-Spam und übermäßige Datenabfragen
- */
-const apiLimiter = rateLimit({
-    windowMs: 1 * 60 * 1000, // 1 Minute
-    max: process.env.NODE_ENV === 'production' ? 60 : 200, // Dev: 200 req/min, Prod: 60 req/min
-    message: {
-        success: false,
-        message: 'Zu viele API-Anfragen. Bitte verlangsame dich.'
-    },
-    standardHeaders: true,
-    legacyHeaders: false,
-    handler: (req, res) => {
-        const Logger = ServiceManager.get('Logger');
-        Logger.warn(`[Security] API rate limit exceeded: ${req.ip} -> ${req.path}`);
-        res.status(429).json({
-            success: false,
-            message: 'Zu viele Anfragen. Bitte verlangsame dich.'
-        });
-    }
-});
-
 /*
- * `guildActionLimiter` stand hier bis zum 2026-09-16: 20 Aktionen je 5 Minuten
- * fuer „sensitive Guild-Actions". Er hatte in der ganzen Anlage **keinen
- * einzigen Aufrufer** — die Wirkung war seit jeher null, der Eindruck von
- * Schutz nicht. Entfernt bei der Zusammenlegung des Sperrsystems
- * (docs/Sperrsystem.md). Wer solche Aktionen begrenzen will, haengt sie an
- * `apiLimiter`, statt einen sechsten Begrenzer anzulegen.
+ * Zwei Begrenzer standen hier und stehen nicht mehr hier — beide entfernt bei
+ * der Zusammenlegung des Sperrsystems (docs/Sperrsystem.md):
+ *
+ * `guildActionLimiter` (bis 2026-09-16): 20 Aktionen je 5 Minuten fuer
+ * „sensitive Guild-Actions". Er hatte in der ganzen Anlage **keinen einzigen
+ * Aufrufer** — die Wirkung war seit jeher null, der Eindruck von Schutz nicht.
+ *
+ * `apiLimiter` (bis 2026-09-20): 60 Anfragen je Minute, an genau vier
+ * Schreibrouten in `routes/admin/docs.router.js`. Er war kein Blindgaenger,
+ * sondern ein **zweiter Weg**: `generalLimiter` haengt global in `app.js` und
+ * lief denselben vier Routen ohnehin voran. Der strengere gewann, also war die
+ * Wirkung 60/min — aber bei einer 429 stand nicht fest, welcher von beiden sie
+ * geschickt hatte, und die Routen tragen `requirePermission` davor.
+ *
+ * **Wer kuenftig einzelne Routen enger fassen will, legt keinen weiteren
+ * Begrenzer an, ohne ihn ueberall dort zu verwenden, wo die Begruendung gilt.**
+ * Ein Begrenzer an vier von hunderten Routen misst nicht das, was sein Name
+ * verspricht. `scripts/check-sperrkette.js` prueft jeden exportierten
+ * Begrenzer auf einen Aufrufer — er faellt auf, wenn er keinen hat, aber nicht,
+ * wenn er zu wenige hat.
  */
 
 /**
@@ -127,7 +118,6 @@ const webhookLimiter = rateLimit({
 
 module.exports = {
     authLimiter,
-    apiLimiter,
     generalLimiter,
     webhookLimiter
 };

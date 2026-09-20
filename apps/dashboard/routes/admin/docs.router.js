@@ -22,7 +22,6 @@ const path = require('path');
 const fs = require('fs').promises;
 
 const router = Router();
-const { apiLimiter } = require('../../middlewares/security/rate-limiter.middleware');
 
 // Docs-Basisverzeichnis (absolut)
 const DOCS_ROOT = path.resolve(__dirname, '..', '..', '..', '..', 'documentation');
@@ -158,7 +157,7 @@ router.get('/api/file', async (req, res) => {
 // ================================================================
 // API: PUT /admin/docs/api/file — Datei speichern
 // ================================================================
-router.put('/api/file', apiLimiter, async (req, res) => {
+router.put('/api/file', async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const { path: filePath, content } = req.body;
 
@@ -188,7 +187,7 @@ router.put('/api/file', apiLimiter, async (req, res) => {
 // ================================================================
 // API: POST /admin/docs/api/file — Neue Datei erstellen
 // ================================================================
-router.post('/api/file', apiLimiter, async (req, res) => {
+router.post('/api/file', async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const { path: filePath, content } = req.body;
 
@@ -221,7 +220,7 @@ router.post('/api/file', apiLimiter, async (req, res) => {
 // ================================================================
 // API: DELETE /admin/docs/api/file — Datei löschen
 // ================================================================
-router.delete('/api/file', apiLimiter, async (req, res) => {
+router.delete('/api/file', async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const { path: filePath } = req.body;
 
@@ -250,7 +249,7 @@ router.delete('/api/file', apiLimiter, async (req, res) => {
 // ================================================================
 // API: POST /admin/docs/api/folder — Ordner erstellen
 // ================================================================
-router.post('/api/folder', apiLimiter, async (req, res) => {
+router.post('/api/folder', async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const { path: folderPath } = req.body;
 
