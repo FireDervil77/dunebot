@@ -831,6 +831,15 @@
             "$ref": "#/definitions/installStep"
           }
         },
+        "entfernen": {
+          "description": "Was das Spiel mitbringt und unser System nie anfasst — wird NACH allen Schritten entfernt, ausschliesslich innerhalb von game/. Beispiel Valheim: ein eigenes Docker-Beispiel (33 MB samt dritter steamclient.so), ein Handbuch als PDF, vier Startskripte, die nie laufen (wir starten das Binary direkt). Laeuft beim Update erneut, weil `validate` sonst alles zurueckholt. ERLAUBT: Namen direkt in game/, hoechstens ein `*` je Eintrag. NICHT erlaubt: Pfadtrenner, `..`, `*` allein — ein Paket soll aufraeumen, was sein Spiel mitbringt, und nicht in data/ greifen, wo die Spielstaende liegen. Die Feinregel „hoechstens ein `*` je Eintrag\" prueft der Daemon (pkgspec.PruefeEntfernen) — dort, wo geloescht wird.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^(?!\\*$)(?!.*\\.\\.)[^/\\\\]+$",
+            "minLength": 1
+          }
+        },
         "cache": {
           "type": "object",
           "additionalProperties": false,
