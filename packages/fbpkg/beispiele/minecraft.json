@@ -1,0 +1,674 @@
+{
+  "format": "FBPKG_v1",
+  "identity": {
+    "slug": "minecraft",
+    "name": "Minecraft",
+    "version": "1.0.0",
+    "author": "firenetworks",
+    "category": "sandbox",
+    "description": {
+      "de": "Der Java-Server von Mojang. Bauen, Erkunden und Überleben in einer Welt aus Blöcken.",
+      "en": "Mojang's Java Edition server. Build, explore and survive in a world of blocks."
+    },
+    "origin": {
+      "type": "manual",
+      "source": "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json",
+      "imported_at": "2026-09-20"
+    }
+  },
+  "image": {
+    "ref": "registry.firenetworks.de/fb/java",
+    "tag": "2026.08-25",
+    "digest": "sha256:83345f86e03313d623a32c94a2929731f41e337875600968b033f4e8efad8470",
+    "pinned_at": "2026-09-20",
+    "platform": "linux",
+    "arch": [
+      "amd64"
+    ]
+  },
+  "ports": [
+    {
+      "purpose": "game",
+      "protocol": "tcp",
+      "assign": "pool",
+      "required": true,
+      "description": {
+        "de": "Spielport. Minecraft liest ihn ausschließlich aus server.properties — dorthin schreibt ihn der config-Abschnitt.",
+        "en": "Game port. Minecraft reads it only from server.properties, where the config section writes it."
+      }
+    },
+    {
+      "purpose": "rcon",
+      "protocol": "tcp",
+      "assign": "pool",
+      "required": true,
+      "description": {
+        "de": "Fernsteuerung. Ohne sie gäbe es keinen sauberen Stopp — das Spiel speichert dann nur, was der Absturzschutz rettet.",
+        "en": "Remote console. Without it there is no clean shutdown."
+      }
+    }
+  ],
+  "install": {
+    "steps": [
+      {
+        "type": "script",
+        "description": {
+          "de": "Serverdatei bei Mojang holen, Prüfsumme kontrollieren, eula.txt anlegen.",
+          "en": "Fetch the server jar from Mojang, verify its checksum, create eula.txt."
+        },
+        "script": "set -euo pipefail\n\n# Mojangs Kette, am 2026-09-20 live nachgemessen:\n#   version_manifest_v2.json  ->  .latest.release + je Ausgabe eine .url\n#   diese Datei               ->  .downloads.server.{url,sha1} + .javaVersion\n# Die Pruefsumme liefert Mojang mit; sie wird geprueft und nicht geglaubt.\n\nMANIFEST=\"https://piston-meta.mojang.com/mc/game/version_manifest_v2.json\"\nAUSGABE=\"${MC_VERSION:-latest}\"\n\necho \"==> Versionsliste von Mojang holen\"\nLISTE=\"$(curl -fsSL --retry 3 --max-time 60 \"$MANIFEST\")\"\n\nif [ -z \"$AUSGABE\" ] || [ \"$AUSGABE\" = \"latest\" ]; then\n    AUSGABE=\"$(printf '%s' \"$LISTE\" | jq -r '.latest.release')\"\n    echo \"    neueste Ausgabe: $AUSGABE\"\nfi\n\nURL=\"$(printf '%s' \"$LISTE\" | jq -r --arg v \"$AUSGABE\" \\\n    '.versions[] | select(.id == $v) | .url')\"\nif [ -z \"$URL\" ] || [ \"$URL\" = \"null\" ]; then\n    echo \"FEHLER: Mojang kennt keine Ausgabe \\\"$AUSGABE\\\".\" >&2\n    echo \"        Die neuesten sind: $(printf '%s' \"$LISTE\" | jq -r '[.versions[0:5][].id] | join(\", \")')\" >&2\n    exit 1\nfi\n\necho \"==> Angaben zu $AUSGABE holen\"\nMETA=\"$(curl -fsSL --retry 3 --max-time 60 \"$URL\")\"\nJAR_URL=\"$(printf '%s' \"$META\" | jq -r '.downloads.server.url // \"\"')\"\nJAR_SHA=\"$(printf '%s' \"$META\" | jq -r '.downloads.server.sha1 // \"\"')\"\nBRAUCHT_JAVA=\"$(printf '%s' \"$META\" | jq -r '.javaVersion.majorVersion // 8')\"\n\nif [ -z \"$JAR_URL\" ]; then\n    echo \"FEHLER: Ausgabe $AUSGABE liefert keine Serverdatei.\" >&2\n    echo \"        Vor 1.2.5 gab es keinen eigenen Server von Mojang.\" >&2\n    exit 1\nfi\n\n# Java: lieber hier abbrechen als beim Start.\n#\n# Aeltere Ausgaben verlangen aelteres Java (21/17/8), neuere ein neueres. Ein\n# zu altes Abbild meldet beim Start nur \"UnsupportedClassVersionError\" mit zwei\n# Zahlen, die niemand zuordnet. Die zweite Achse - das passende Abbild je\n# Ausgabe waehlen - kommt mit den Ladern (Paper, Fabric); bis dahin ist eine\n# klare Absage besser als ein Server, der nicht hochkommt.\nHAT_JAVA=\"$(java -version 2>&1 | head -1 | sed -E 's/[^\"]*\"([0-9]+).*/\\1/')\"\nif [ -n \"$HAT_JAVA\" ] && [ \"$BRAUCHT_JAVA\" -gt \"$HAT_JAVA\" ]; then\n    echo \"FEHLER: Minecraft $AUSGABE verlangt Java $BRAUCHT_JAVA, dieses Abbild hat Java $HAT_JAVA.\" >&2\n    exit 1\nfi\n\necho \"==> Serverdatei laden ($AUSGABE, Java $BRAUCHT_JAVA)\"\ncurl -fSL --retry 3 -o server.jar \"$JAR_URL\"\n\necho \"==> Pruefsumme kontrollieren\"\nprintf '%s  server.jar\\n' \"$JAR_SHA\" | sha1sum -c -\n\n# Die EULA wird mit \"false\" angelegt - NICHT mit \"true\".\n#\n# Wer den Server betreibt, nimmt Mojangs Bedingungen an, nicht wir. Im Panel\n# steht dafuer ein Haken; er schreibt \"eula=true\" in diese Datei. Ohne ihn\n# beendet sich der Server beim Start mit einem Hinweis, und das ist richtig so.\nif [ ! -f eula.txt ]; then\n    printf 'eula=false\\n' > eula.txt\n    echo \"==> eula.txt angelegt (eula=false - Haken im Panel setzen)\"\nfi\n\n# Eine leere server.properties, damit der erste Start sie nicht selbst mit\n# Vorgaben fuellt, bevor unsere Werte drin stehen. Der Rest kommt aus dem\n# `config`-Abschnitt und den Einstellungen - bei JEDEM Start.\n[ -f server.properties ] || : > server.properties\n\nprintf '%s\\n' \"$AUSGABE\" > .fb-minecraft-version\necho \"==> Minecraft $AUSGABE ist installiert.\"\n",
+        "env": {
+          "MC_VERSION": "{{setting:version}}"
+        },
+        "reason": {
+          "de": "Mojang hat kein SteamCMD und keine feste Adresse je Ausgabe: Erst die Versionsliste, dann die Versionsdatei, dann die Serverdatei — drei Abrufe, deren Ergebnis die nächste Adresse bestimmt. Ein download-Schritt kann das nicht, weil die URL erst zur Laufzeit feststeht. Die mitgelieferte sha1 wird geprüft, nicht geglaubt.",
+          "en": "Mojang has no SteamCMD and no fixed per-version URL: the manifest names the version file, which names the jar. A download step cannot express that chain."
+        }
+      }
+    ]
+  },
+  "start": {
+    "program": "java",
+    "workdir": ".",
+    "args": [
+      {
+        "key": "xms",
+        "form": "-Xms128M",
+        "from": "fixed"
+      },
+      {
+        "key": "xmx",
+        "form": [
+          "-Xmx{{value}}M"
+        ],
+        "from": "setting:memory"
+      },
+      {
+        "key": "jar",
+        "form": [
+          "-jar",
+          "server.jar"
+        ],
+        "from": "fixed"
+      },
+      {
+        "key": "nogui",
+        "form": "nogui",
+        "from": "fixed"
+      }
+    ],
+    "ready_when": {
+      "log_line": "Done (",
+      "timeout_sec": 600
+    },
+    "stop": {
+      "sequence": [
+        {
+          "step": "rcon:save-all",
+          "timeout_sec": 30,
+          "terminates": false
+        },
+        {
+          "step": "rcon:stop",
+          "timeout_sec": 60,
+          "terminates": true
+        },
+        {
+          "step": "sigterm",
+          "timeout_sec": 30,
+          "terminates": true
+        },
+        {
+          "step": "sigkill",
+          "timeout_sec": 10,
+          "terminates": true
+        }
+      ]
+    }
+  },
+  "env": {
+    "RCON_PASSWORD": "{{setting:rcon_password}}"
+  },
+  "config": [
+    {
+      "file": "server.properties",
+      "parser": "properties",
+      "set": {
+        "server-port": "{{port:game}}",
+        "enable-rcon": "true",
+        "rcon.port": "{{port:rcon}}",
+        "rcon.password": "{{setting:rcon_password}}"
+      }
+    }
+  ],
+  "settings": [
+    {
+      "key": "eula",
+      "group": "start",
+      "name": {
+        "de": "Mojangs Nutzungsbedingungen annehmen",
+        "en": "Accept Mojang's EULA"
+      },
+      "description": {
+        "de": "Ohne diesen Haken startet der Server nicht — er schreibt einen Hinweis ins Log und beendet sich. Die Bedingungen nimmt an, wer den Server betreibt, also du: https://aka.ms/MinecraftEULA. Der Haken schreibt eula=true in eula.txt.",
+        "en": "Without this the server refuses to start. You are the one accepting Mojang's terms: https://aka.ms/MinecraftEULA"
+      },
+      "type": "boolean",
+      "default": false,
+      "apply": [
+        {
+          "target": "file",
+          "file": "eula.txt",
+          "parser": "properties",
+          "path": "eula",
+          "as": "true_false"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "owner"
+    },
+    {
+      "key": "rcon_password",
+      "group": "start",
+      "name": {
+        "de": "Kennwort der Fernsteuerung",
+        "en": "Remote console password"
+      },
+      "description": {
+        "de": "Ohne dieses Kennwort gibt es keinen sauberen Stopp: Der Daemon beendet den Server dann hart, und nur was der Absturzschutz gerettet hat, ist gespeichert. Es geht nie an Spieler — nur der Daemon benutzt es.",
+        "en": "Without it there is no clean shutdown: the daemon has to kill the server. Players never see it."
+      },
+      "type": "password",
+      "default": null,
+      "apply": [
+        {
+          "target": "env",
+          "variable": "RCON_PASSWORD"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "owner"
+    },
+    {
+      "key": "version",
+      "group": "start",
+      "name": {
+        "de": "Ausgabe",
+        "en": "Version"
+      },
+      "description": {
+        "de": "Welche Ausgabe installiert wird — „latest\" nimmt die neueste Vollversion. Wirkt NUR beim Anlegen: Eine Änderung danach lädt nichts nach, weil ein Wechsel der Ausgabe eine Neuinstallation wäre. Zu alte Ausgaben können an der Java-Fassung des Abbilds scheitern; die Installation sagt es dann und bricht ab.",
+        "en": "Which version to install; \"latest\" takes the newest release. Only applies at creation time."
+      },
+      "type": "text",
+      "default": "latest",
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "owner",
+      "apply": [
+        {
+          "target": "env",
+          "variable": "MC_VERSION"
+        }
+      ]
+    },
+    {
+      "key": "memory",
+      "group": "start",
+      "name": {
+        "de": "Arbeitsspeicher (MB)",
+        "en": "Memory (MB)"
+      },
+      "description": {
+        "de": "Obergrenze für die Java-Halde (-Xmx). Zu wenig heißt Ruckeln und Abstürze beim Erzeugen von Gelände; mehr als der Rootserver hat, lässt den Server vom System abgeräumt werden.",
+        "en": "Upper bound for the Java heap (-Xmx)."
+      },
+      "type": "number",
+      "default": 2048,
+      "min": 512,
+      "max": 32768,
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "owner",
+      "apply": [
+        {
+          "target": "arg"
+        }
+      ]
+    },
+    {
+      "key": "motd",
+      "group": "anzeige",
+      "name": {
+        "de": "Servernachricht",
+        "en": "MOTD"
+      },
+      "description": {
+        "de": "Die Zeile unter dem Servernamen in der Serverliste.",
+        "en": "The line shown under the server name."
+      },
+      "type": "text",
+      "default": "Ein Firebot-Server",
+      "apply": [
+        {
+          "target": "file",
+          "file": "server.properties",
+          "parser": "properties",
+          "path": "motd"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "player"
+    },
+    {
+      "key": "max_players",
+      "group": "anzeige",
+      "name": {
+        "de": "Höchstzahl Spieler",
+        "en": "Max players"
+      },
+      "description": {
+        "de": "Wie viele gleichzeitig spielen dürfen.",
+        "en": "How many players may join at once."
+      },
+      "type": "number",
+      "default": 20,
+      "min": 1,
+      "max": 1000,
+      "apply": [
+        {
+          "target": "file",
+          "file": "server.properties",
+          "parser": "properties",
+          "path": "max-players"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "player"
+    },
+    {
+      "key": "gamemode",
+      "group": "welt",
+      "name": {
+        "de": "Spielmodus",
+        "en": "Game mode"
+      },
+      "description": {
+        "de": "Womit neue Spieler anfangen.",
+        "en": "The mode new players start in."
+      },
+      "type": "choice",
+      "default": "survival",
+      "choices": [
+        {
+          "value": "survival",
+          "name": {
+            "de": "Überleben",
+            "en": "Survival"
+          }
+        },
+        {
+          "value": "creative",
+          "name": {
+            "de": "Kreativ",
+            "en": "Creative"
+          }
+        },
+        {
+          "value": "adventure",
+          "name": {
+            "de": "Abenteuer",
+            "en": "Adventure"
+          }
+        },
+        {
+          "value": "spectator",
+          "name": {
+            "de": "Zuschauen",
+            "en": "Spectator"
+          }
+        }
+      ],
+      "apply": [
+        {
+          "target": "file",
+          "file": "server.properties",
+          "parser": "properties",
+          "path": "gamemode"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "player"
+    },
+    {
+      "key": "difficulty",
+      "group": "welt",
+      "name": {
+        "de": "Schwierigkeit",
+        "en": "Difficulty"
+      },
+      "description": {
+        "de": "Wie hart die Welt zu den Spielern ist.",
+        "en": "How hard the world is on players."
+      },
+      "type": "choice",
+      "default": "easy",
+      "choices": [
+        {
+          "value": "peaceful",
+          "name": {
+            "de": "Friedlich",
+            "en": "Peaceful"
+          }
+        },
+        {
+          "value": "easy",
+          "name": {
+            "de": "Leicht",
+            "en": "Easy"
+          }
+        },
+        {
+          "value": "normal",
+          "name": {
+            "de": "Normal",
+            "en": "Normal"
+          }
+        },
+        {
+          "value": "hard",
+          "name": {
+            "de": "Schwer",
+            "en": "Hard"
+          }
+        }
+      ],
+      "apply": [
+        {
+          "target": "file",
+          "file": "server.properties",
+          "parser": "properties",
+          "path": "difficulty"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "player"
+    },
+    {
+      "key": "pvp",
+      "group": "welt",
+      "name": {
+        "de": "Spieler gegen Spieler",
+        "en": "PvP"
+      },
+      "description": {
+        "de": "Dürfen Spieler einander Schaden zufügen?",
+        "en": "May players damage each other?"
+      },
+      "type": "boolean",
+      "default": true,
+      "apply": [
+        {
+          "target": "file",
+          "file": "server.properties",
+          "parser": "properties",
+          "path": "pvp",
+          "as": "true_false"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "player"
+    },
+    {
+      "key": "hardcore",
+      "group": "welt",
+      "name": {
+        "de": "Hardcore",
+        "en": "Hardcore"
+      },
+      "description": {
+        "de": "Wer stirbt, bleibt Zuschauer. Gilt für die ganze Welt.",
+        "en": "Death puts a player into spectator mode permanently."
+      },
+      "type": "boolean",
+      "default": false,
+      "apply": [
+        {
+          "target": "file",
+          "file": "server.properties",
+          "parser": "properties",
+          "path": "hardcore",
+          "as": "true_false"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "progress",
+      "role": "player"
+    },
+    {
+      "key": "white_list",
+      "group": "welt",
+      "name": {
+        "de": "Nur Zugelassene",
+        "en": "Whitelist"
+      },
+      "description": {
+        "de": "Nur wer auf der Liste steht, kommt herein. Die Liste pflegst du über die Konsole (/whitelist add).",
+        "en": "Only listed players may join."
+      },
+      "type": "boolean",
+      "default": false,
+      "apply": [
+        {
+          "target": "file",
+          "file": "server.properties",
+          "parser": "properties",
+          "path": "white-list",
+          "as": "true_false"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "player"
+    },
+    {
+      "key": "online_mode",
+      "group": "welt",
+      "name": {
+        "de": "Mojang-Konten prüfen",
+        "en": "Online mode"
+      },
+      "description": {
+        "de": "AUS heißt: Jeder kann sich unter jedem Namen anmelden, auch unter deinem. Nur ausschalten, wenn der Server nicht aus dem Netz erreichbar ist.",
+        "en": "OFF lets anyone join under any name. Only for closed networks."
+      },
+      "type": "boolean",
+      "default": true,
+      "apply": [
+        {
+          "target": "file",
+          "file": "server.properties",
+          "parser": "properties",
+          "path": "online-mode",
+          "as": "true_false"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "progress",
+      "role": "owner"
+    },
+    {
+      "key": "view_distance",
+      "group": "welt",
+      "name": {
+        "de": "Sichtweite (Chunks)",
+        "en": "View distance"
+      },
+      "description": {
+        "de": "Wie weit Spieler sehen. Der größte einzelne Hebel für die Last des Servers.",
+        "en": "How far players can see; the biggest single lever on server load."
+      },
+      "type": "number",
+      "default": 10,
+      "min": 3,
+      "max": 32,
+      "apply": [
+        {
+          "target": "file",
+          "file": "server.properties",
+          "parser": "properties",
+          "path": "view-distance"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "player"
+    },
+    {
+      "key": "level_name",
+      "group": "welt",
+      "name": {
+        "de": "Name der Welt",
+        "en": "World name"
+      },
+      "description": {
+        "de": "Der Ordner, in dem die Welt liegt. Ein anderer Name erzeugt eine NEUE Welt — die alte bleibt liegen.",
+        "en": "The folder holding the world. A different name creates a NEW world."
+      },
+      "type": "text",
+      "default": "welt",
+      "apply": [
+        {
+          "target": "file",
+          "file": "server.properties",
+          "parser": "properties",
+          "path": "level-name"
+        }
+      ],
+      "takes_effect": "new_world",
+      "risk": "world_reset",
+      "role": "owner"
+    },
+    {
+      "key": "level_seed",
+      "group": "welt",
+      "name": {
+        "de": "Startwert der Welt",
+        "en": "Level seed"
+      },
+      "description": {
+        "de": "Bestimmt, wie das Gelände erzeugt wird. Wirkt nur, solange die Welt noch nicht existiert; leer heißt zufällig.",
+        "en": "Determines terrain generation; only applies before the world exists."
+      },
+      "type": "text",
+      "default": "",
+      "apply": [
+        {
+          "target": "file",
+          "file": "server.properties",
+          "parser": "properties",
+          "path": "level-seed"
+        }
+      ],
+      "takes_effect": "new_world",
+      "risk": "world_reset",
+      "role": "owner"
+    },
+    {
+      "key": "spawn_protection",
+      "group": "welt",
+      "name": {
+        "de": "Geschützter Bereich am Startpunkt",
+        "en": "Spawn protection"
+      },
+      "description": {
+        "de": "Radius in Blöcken, in dem nur Betreiber bauen dürfen. 0 schaltet es aus.",
+        "en": "Radius in blocks where only operators may build. 0 disables it."
+      },
+      "type": "number",
+      "default": 16,
+      "min": 0,
+      "max": 1000,
+      "apply": [
+        {
+          "target": "file",
+          "file": "server.properties",
+          "parser": "properties",
+          "path": "spawn-protection"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "player"
+    }
+  ],
+  "commands": {
+    "players.list": {
+      "via": "rcon",
+      "command": "list",
+      "parse": "minecraft:list"
+    },
+    "players.kick": {
+      "via": "rcon",
+      "command": "kick {{player_id}} {{reason}}"
+    },
+    "players.ban": {
+      "via": "rcon",
+      "command": "ban {{player_id}} {{reason}}"
+    },
+    "world.save": {
+      "via": "rcon",
+      "command": "save-all"
+    },
+    "broadcast": {
+      "via": "rcon",
+      "command": "say {{message}}"
+    }
+  },
+  "content": {
+    "supported": false
+  },
+  "management": {
+    "rcon": {
+      "protocol": "source",
+      "port": "rcon",
+      "password_variable": "RCON_PASSWORD"
+    },
+    "saves": [
+      "{{setting:level_name}}"
+    ]
+  },
+  "files": {
+    "denylist": [
+      "server.jar",
+      "eula.txt",
+      "firebot.lock",
+      "firebot.pid"
+    ]
+  },
+  "requirements": {
+    "os_packages": []
+  },
+  "status": {
+    "complete": false,
+    "open": [
+      "GEMESSEN am 2026-09-20 an einem echten Lauf, nicht aus der Dokumentation: Ausgabe 26.3 im Abbild fb/java:2026.08-25 (Java 25.0.4). Installation 59,4 MB, sha1 gepruft, OK. Start bis 'Done (5.243s)! For help, type \"help\"'. Fernsteuerung uber fb-rcon -protocol srcds: 'list' -> 'There are 0 of a max of 8 players online:', 'save-all' -> 'Saved the game', 'say' -> leere Antwort (richtig, der Befehl gibt nichts zurueck). Stopp uber rcon:save-all + rcon:stop -> 'Stopping the server', der Container beendete sich in ~2 s SELBST mit Rueckgabewert 0, alle drei Dimensionen gespeichert. Weder sigterm noch sigkill kamen zum Einsatz.",
+      "install benutzt den Notausgang `script` — hier vermerkt, wie es die Regel verlangt. Der Grund steht am Schritt selbst: Mojang hat kein SteamCMD und keine feste Adresse je Ausgabe. Erst die Versionsliste nennen die Versionsdatei, diese nennt die Serverdatei; ein `download`-Schritt kann diese Kette nicht ausdruecken, weil die URL erst zur Laufzeit feststeht. Was das Skript tut, ist eng: drei Abrufe, eine sha1-Pruefung, zwei angelegte Dateien. Es installiert nichts ueber apt und laedt nichts von Dritten.",
+      "management.query: FEHLT, und zwar bewusst. Minecraft antwortet auf Server List Ping (SLP) am SPIELPORT; einen SLP-Treiber gibt es im Daemon heute nicht (bekannt: srcds, palworld_rest fuer rcon; GameDig fuer query). Ein erfundener Protokollname wuerde still nie antworten. Solange der Treiber fehlt, hat dieses Paket keine Spielerzahl-Abfrage — das ist eine Aussage, keine Luecke. Der Bedarf ist breiter als dieses Paket: alle Minecraft-Pakete haben heute gar keine Abfrage.",
+      "commands.players.list: `parse: minecraft:list` ist ANGEMELDET, nicht gebaut. Die Antwort lautet 'There are 0 of a max of 8 players online: ' und danach die Namen — ein eigenes Format, weder table: noch json:. Wer den Knopf baut, misst das Format mit Spielern auf dem Server nach; mit null Spielern ist die Liste leer und beweist nichts.",
+      "commands.players.kick/ban: Die Befehle sind Minecrafts eigene und stehen so in der Konsole; an einem Lauf mit echtem Spieler sind sie NICHT gemessen. Insbesondere ungeprueft: was passiert, wenn {{reason}} leer ist, und ob ein Name mit Leerzeichen durchkommt.",
+      "settings.version: wirkt nur beim Anlegen. Das Format kennt `takes_effect: reinstall` nicht — deshalb steht hier `restart`, und die Beschreibung sagt die Wahrheit. Sobald es die Formaterweiterung gibt, gehoert der Wert richtiggestellt.",
+      "Java-Achse: Die Installation bricht ab, wenn eine Ausgabe MEHR Java verlangt als das Abbild hat. Der umgekehrte Fall wird NICHT geprueft, und das ist gemessen und nicht vergessen: 1.16.5 (verlangt Java 8) startete am 2026-09-20 auf Java 25 durch — mit Warnungen zu sun.misc.Unsafe, aber bis 'Starting Minecraft server on *:25565'. Eine Obergrenze haette diesen Fall zu Unrecht abgelehnt. Wo die Grenze wirklich liegt, ist ungemessen; sehr alte Ausgaben (1.8, 1.12) sind nicht probiert.",
+      "content.supported=false: Mods und Plugins kommen mit den Ladern (Paper, Fabric) — Stufe 3 des Minecraft-Plans. Bei Vanilla gibt es keinen Ort, an den ein Mod gehoerte.",
+      "requirements: Mindest-RAM und Plattenbedarf nicht gemessen. Die Serverdatei ist 59,4 MB; was eine Welt im Betrieb braucht, haengt daran, wie weit gespielt wird.",
+      "files.denylist enthaelt server.jar, damit niemand sie per SFTP gegen eine andere austauscht — dann stimmte die Ausgabe im Panel nicht mehr mit der auf der Platte ueberein. Ob die Sperre im SFTP-Weg wirklich greift, ist an diesem Paket nicht nachgemessen."
+    ]
+  }
+}
