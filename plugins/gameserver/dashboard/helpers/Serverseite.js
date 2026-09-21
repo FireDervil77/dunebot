@@ -510,8 +510,22 @@ function bauePlatz(server, stand) {
         ergebnis.text = `${gebuchtGiB} GiB gebucht, noch nicht gemessen`;
     }
 
+    // Der Ton, nicht die Farbe: Die Schwellen stehen HIER und nur hier. Gäbe es
+    // sie auch im Browser, sähe derselbe Zustand nach dem ersten Nachladen
+    // anders aus als beim Aufbau der Seite — dieselbe Falle wie bei der
+    // Knopfzeile (Baustelle 134).
+    ergebnis.ton = ergebnis.ueber ? 'rot'
+        : (ergebnis.prozent !== null && ergebnis.prozent >= 90 ? 'orange' : 'gruen');
+    // Die Farbe kommt MIT. Eine Tafel „Ton → Farbe" im Browser wäre die zweite
+    // Kopie, und Kopien driften: Nach dem ersten Nachladen hätte derselbe
+    // Zustand anders ausgesehen als beim Aufbau der Seite.
+    ergebnis.farbe = PLATZ_FARBE[ergebnis.ton];
+
     return ergebnis;
 }
+
+/** Ton → Farbe. Die einzige Tafel; sie verlässt den Server nur als Wert. */
+const PLATZ_FARBE = { rot: '#d63939', orange: '#f76707', gruen: '#2fb344' };
 
 /**
  * Ports mit ihrem ZWECK und ihrer Belegungsregel.
@@ -988,6 +1002,10 @@ module.exports.baueServerListe = baueServerListe;
 // Die eine Bereitschaftsrechnung — Liste, Serverseite und der Live-Weg teilen
 // sie sich. `scripts/check-bereitschaft.js` prueft sie direkt.
 module.exports.baueBereitschaftAuskunft = baueBereitschaftAuskunft;
+// Damit der Live-Weg (`/status`) DIESELBE Rechnung liefert, aus der die
+// Serverseite zeichnet — nicht eine nachgebaute daneben.
+module.exports.bauePlatz = bauePlatz;
+module.exports.PLATZ_FARBE = PLATZ_FARBE;
 module.exports.baueKnopfzeile = baueKnopfzeile;
 module.exports.bauePille = bauePille;
 // Ausdruecklich exportiert, damit scripts/check-bereitschaft.js die Leiter

@@ -20,7 +20,7 @@ const Quellen = require('../helpers/Quellen');
 const ServerStopp = require('../helpers/ServerStopp');
 const { baueUebersicht, baueServerListe, bauePaketAuswahl,
         baueMaschinenAuswahl, baueWerteSchritt,
-        baueBereitschaftAuskunft } = require('../helpers/Serverseite');
+        baueBereitschaftAuskunft, bauePlatz } = require('../helpers/Serverseite');
 const { resolveStatusConfig } = require('../helpers/StatusSchema');
 // ── Wieder eingehaengt am 2026-09-17 (Baustelle 137) ────────────────────────
 //
@@ -142,6 +142,44 @@ async function lesePlatzstand(dbService, serverId) {
         ServiceManager.get('Logger').debug(
             `[Gameserver] Platzstand für Server ${serverId} nicht lesbar: ${err.message}`);
         return null;
+    }
+}
+
+/**
+ * Die gemessenen Plaetze mehrerer Server in EINER Abfrage.
+ *
+ * `/status` laeuft im Sekundentakt und deckt alle Server einer Guild ab — je
+ * Server eine Abfrage waere dort die falsche Form. Gibt eine Tafel
+ * `serverId → Stand` mit nur den Servern, zu denen es eine Messung gibt.
+ */
+async function lesePlatzstaende(dbService, serverIds) {
+    const ids = [...new Set((serverIds || []).map(String))].filter(Boolean);
+    if (!ids.length) return {};
+    try {
+        const zeilen = await dbService.query(
+            `SELECT server_id, platz_belegt_bytes, platz_grenze_bytes,
+                    platz_gemessen_am, platz_ueber, platz_geschaetzt
+               FROM server_registry
+              WHERE server_id IN (${ids.map(() => '?').join(',')})
+                AND platz_belegt_bytes IS NOT NULL`,
+            ids
+        );
+        const tafel = {};
+        for (const z of zeilen || []) {
+            tafel[String(z.server_id)] = {
+                belegtBytes: Number(z.platz_belegt_bytes),
+                grenzeBytes: z.platz_grenze_bytes === null ? 0 : Number(z.platz_grenze_bytes),
+                gemessenAm:  z.platz_gemessen_am || null,
+                ueber:       !!z.platz_ueber,
+                geschaetzt:  !!z.platz_geschaetzt,
+            };
+        }
+        return tafel;
+    } catch (err) {
+        // Vor der Migration 20260921_120000 gibt es die Spalten nicht.
+        ServiceManager.get('Logger').debug(
+            `[Gameserver] Platzstände nicht lesbar: ${err.message}`);
+        return {};
     }
 }
 
@@ -1401,12 +1439,18 @@ router.get('/status', requirePermission('GAMESERVER.VIEW'), async (req, res) => 
             `SELECT id, status, current_players, max_players,
                     addon_marketplace_id,
                     bereitschaft_stufe, bereitschaft_grund, bereitschaft_am,
-                    last_started_at
+                    last_started_at,
+                    -- Fuer den Platz (B101): gebucht und ob die harte Grenze greift.
+                    -- Der gemessene Wert kommt aus server_registry, siehe darunter.
+                    allocated_disk_gb, disk_quota_enforced, disk_quota_note
                FROM gameservers WHERE guild_id = ?`,
             [guildId]
         );
 
         const paketNachAddon = await ladePaketeZuServern(dbService, servers);
+        // Eine Abfrage fuer alle Server dieser Guild, nicht eine je Server:
+        // diese Route laeuft im Sekundentakt.
+        const platzNachId = await lesePlatzstaende(dbService, (servers || []).map(s => s.id));
 
         res.json({
             success: true,
@@ -1429,6 +1473,9 @@ router.get('/status', requirePermission('GAMESERVER.VIEW'), async (req, res) => 
                         text:    a.text,
                         stufen:  a.stufen,
                     },
+                    // Derselbe Aufruf, aus dem die Serverseite zeichnet. Der
+                    // Browser bekommt Text und Ton, nicht die Schwellen.
+                    platz: bauePlatz(s, platzNachId[String(s.id)] || null),
                 };
             })
         });

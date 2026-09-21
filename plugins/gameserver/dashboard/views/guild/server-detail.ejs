@@ -424,32 +424,12 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        // Platz (Baustelle 101, weiche Grenze)
-        //
-        // Nur anfassen, wenn der Herzschlag wirklich eine Messung mitbrachte.
-        // `platz_belegt_bytes` fehlt, solange der Waechter noch nicht gemessen
-        // hat — dann bleibt stehen, was die Seite beim Aufbau gerechnet hat.
-        if (msg.platz_belegt_bytes != null) {
-            const platzText = document.querySelector('[data-fb-live="platz-text"]');
-            const platzBalken = document.querySelector('[data-fb-live="platz-balken"]');
-            const gib = (b) => Math.round((Number(b) / 1024 ** 3) * 10) / 10;
-            const belegt = gib(msg.platz_belegt_bytes);
-            const grenze = msg.platz_grenze_bytes > 0 ? gib(msg.platz_grenze_bytes) : null;
-
-            if (platzText) {
-                platzText.textContent = grenze
-                    ? belegt + ' von ' + grenze + ' GiB belegt'
-                    : belegt + ' GiB belegt, keine Grenze';
-            }
-            if (platzBalken && msg.platz_grenze_bytes > 0) {
-                const pct = Math.min(100, Math.round((msg.platz_belegt_bytes / msg.platz_grenze_bytes) * 100));
-                platzBalken.style.width = pct + '%';
-                // Dieselben Schwellen wie im Server (bauePlatz) — eine andere
-                // Farbgrenze hier hiesse: derselbe Zustand sieht nach dem ersten
-                // Herzschlag anders aus als beim Aufbau der Seite.
-                platzBalken.style.background = msg.platz_ueber ? '#d63939' : (pct >= 90 ? '#f76707' : '#2fb344');
-            }
-        }
+        // Der Platz wird hier NICHT gezeichnet, obwohl der Herzschlag ihn
+        // mitbringt: Das tut `gameserver-live.js` an `data-fb-live="platz-text"`
+        // und `"platz-balken"`, mit Text und Farbe, die der Server gerechnet hat
+        // (`bauePlatz`). Ein zweiter Zeichner hier hatte in der ersten Fassung
+        // dieser Anzeige gestanden — und `scripts/check-live-anzeige.js` hat ihn
+        // zu Recht gemeldet: Marker nach der Konvention, aber kein Fall im Modul.
 
         // Players (optional, falls im gleichen Event)
         if (msg.current_players != null) {

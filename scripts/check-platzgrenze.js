@@ -40,6 +40,9 @@
 
 const fs = require('fs');
 const path = require('path');
+// Die gemeinsame Fassung, nicht eine eigene: Es gab einmal vier Kopien in sieben
+// Skripten, und sie verhielten sich verschieden (Baustelle 89).
+const { ohneKommentare, ohneKommentareEjs } = require('./lib/quelltext');
 
 const WURZEL = path.join(__dirname, '..');
 const DAEMON = '/home/firedervil/firebot_daemon';
@@ -52,17 +55,28 @@ const pruefe = (ok, was, zusatz = '') => {
 };
 const skip = (was, warum) => { uebersprungen++; console.log(`  ⏭  ${was} — ${warum}`); };
 
-/** Kommentare weg — sonst zählt eine Begründung als Verdrahtung. */
-function ohneKommentare(text) {
-    return text
-        .replace(/\/\*[\s\S]*?\*\//g, '')
-        .split('\n').map(z => z.replace(/(^|[^:])\/\/.*$/, '$1')).join('\n');
+/**
+ * Roher Dateiinhalt, oder null.
+ *
+ * Absichtlich OHNE Kommentarfilter: Den setzt jeder Aufrufer selbst davor
+ * (`ohneKommentare(roh(...))`). So steht an jeder Bindung, ob nach Code oder
+ * nach Text gesucht wird — und `check-waechter-prosa` kann es lesen.
+ */
+function roh(datei) {
+    if (!fs.existsSync(datei)) return null;
+    return fs.readFileSync(datei, 'utf8');
 }
 
-function lies(datei) {
-    if (!fs.existsSync(datei)) return null;
-    return ohneKommentare(fs.readFileSync(datei, 'utf8'));
-}
+/**
+ * Wie `roh`, aber ohne Kommentare — für alles, wo nach CODE gesucht wird.
+ *
+ * Der Aufruf steht bewusst als `ohneKommentare(roh(...))` an jeder Bindung und
+ * nicht versteckt in einem Helfer: `check-waechter-prosa` liest die
+ * **Bindungsanweisung** und kann eine Indirektion nicht sehen. Ein Helfer, der
+ * schützt, ohne es zu zeigen, sieht für den nächsten Durchgang aus wie eine
+ * ungeschützte Suche — und die eine, die es wirklich ist, geht in der Liste
+ * unter.
+ */
 
 (async () => {
     console.log('\n▸ Die weiche Platzgrenze, von der Messung bis zur Anzeige\n');
@@ -70,8 +84,8 @@ function lies(datei) {
     // ════════════════════════════════════════════════════════════════════════
     console.log('Daemon — der Wächter selbst');
     // ════════════════════════════════════════════════════════════════════════
-    const waechter = lies(path.join(DAEMON, 'internal/gameserver/platz/waechter.go'));
-    if (waechter === null) {
+    const waechter = ohneKommentare(roh(path.join(DAEMON, 'internal/gameserver/platz/waechter.go')) || '');
+    if (!waechter) {
         pruefe(false, 'internal/gameserver/platz/waechter.go liegt im Daemon',
             `nicht gefunden unter ${DAEMON}`);
     } else {
@@ -102,8 +116,8 @@ function lies(datei) {
     // ════════════════════════════════════════════════════════════════════════
     console.log('\nDaemon — wo die Grenze beißt');
     // ════════════════════════════════════════════════════════════════════════
-    const main = lies(path.join(DAEMON, 'cmd/daemon/main.go'));
-    if (main === null) {
+    const main = ohneKommentare(roh(path.join(DAEMON, 'cmd/daemon/main.go')) || '');
+    if (!main) {
         pruefe(false, 'cmd/daemon/main.go liegt im Daemon');
     } else {
         pruefe(/platz\.Neu\(/.test(main) && /SetzePlatzwaechter\(/.test(main),
@@ -124,8 +138,8 @@ function lies(datei) {
           + 'Daemon-Neustart würde er gegen 0 prüfen und alles durchlassen.');
     }
 
-    const files = lies(path.join(DAEMON, 'internal/gameserver/files.go'));
-    if (files === null) {
+    const files = ohneKommentare(roh(path.join(DAEMON, 'internal/gameserver/files.go')) || '');
+    if (!files) {
         pruefe(false, 'internal/gameserver/files.go liegt im Daemon');
     } else {
         pruefe(/platzwaechter\.DarfSchreiben\(/.test(files),
@@ -138,13 +152,13 @@ function lies(datei) {
             'der Zuwachs wird gemerkt (sonst kommt ein Massen-Upload an jeder Datei vorbei)');
     }
 
-    const nutzlast = lies(path.join(DAEMON, 'internal/gameserver/nutzlast.go'));
-    pruefe(nutzlast !== null && /SetzeGrenzeGiB\(srv\.ID\(\), DiskGBAus\(grenzen\)\)/.test(nutzlast),
+    const nutzlast = ohneKommentare(roh(path.join(DAEMON, 'internal/gameserver/nutzlast.go')) || '');
+    pruefe(nutzlast && /SetzeGrenzeGiB\(srv\.ID\(\), DiskGBAus\(grenzen\)\)/.test(nutzlast),
         'die Grenze kommt aus dem Auftrag — an der einen Stelle, die jeden Auftrag anwendet',
         'nutzlast.go');
 
-    const client = lies(path.join(DAEMON, 'internal/websocket/client.go'));
-    if (client === null) {
+    const client = ohneKommentare(roh(path.join(DAEMON, 'internal/websocket/client.go')) || '');
+    if (!client) {
         pruefe(false, 'internal/websocket/client.go liegt im Daemon');
     } else {
         pruefe(/SetzeGrenzeGiB\(serverID, int64\(diskLimit\)\)/.test(client),
@@ -161,8 +175,8 @@ function lies(datei) {
     // ════════════════════════════════════════════════════════════════════════
     console.log('\nDashboard — wegschreiben und anzeigen');
     // ════════════════════════════════════════════════════════════════════════
-    const ipm = lies(path.join(WURZEL, 'apps/dashboard/helpers/IPMServer.js'));
-    if (ipm === null) {
+    const ipm = ohneKommentare(roh(path.join(WURZEL, 'apps/dashboard/helpers/IPMServer.js')) || '');
+    if (!ipm) {
         pruefe(false, 'apps/dashboard/helpers/IPMServer.js');
     } else {
         pruefe(/platz_belegt_bytes = IF\(\?, \?, platz_belegt_bytes\)/.test(ipm),
@@ -173,17 +187,17 @@ function lies(datei) {
             'der Herzschlag unterscheidet „nicht gemessen" von „0 Bytes"');
     }
 
-    const msgTypes = lies(path.join(WURZEL, 'packages/dunebot-sdk/lib/ipm/MessageTypes.js'));
-    pruefe(msgTypes !== null && /GAMESERVER_PLATZSTAND\s*=\s*'platzstand'/.test(msgTypes),
+    const msgTypes = ohneKommentare(roh(path.join(WURZEL, 'packages/dunebot-sdk/lib/ipm/MessageTypes.js')) || '');
+    pruefe(msgTypes && /GAMESERVER_PLATZSTAND\s*=\s*'platzstand'/.test(msgTypes),
         'das Ereignis platzstand ist auf der Dashboard-Seite bekannt');
 
-    const protokoll = lies(path.join(DAEMON, 'pkg/protocol/messages.go'));
-    pruefe(protokoll !== null && /GameServerPlatzstand\s*=\s*"platzstand"/.test(protokoll),
+    const protokoll = ohneKommentare(roh(path.join(DAEMON, 'pkg/protocol/messages.go')) || '');
+    pruefe(protokoll && /GameServerPlatzstand\s*=\s*"platzstand"/.test(protokoll),
         'und im Daemon heißt es genauso',
         'Zwei Schreibweisen für ein Ereignis heissen: der Empfänger hört nie.');
 
-    const gsIndex = lies(path.join(WURZEL, 'plugins/gameserver/dashboard/index.js'));
-    if (gsIndex === null) {
+    const gsIndex = ohneKommentare(roh(path.join(WURZEL, 'plugins/gameserver/dashboard/index.js')) || '');
+    if (!gsIndex) {
         pruefe(false, 'plugins/gameserver/dashboard/index.js');
     } else {
         pruefe(/GAMESERVER_PLATZSTAND/.test(gsIndex) && /_handlePlatzstand/.test(gsIndex),
@@ -203,31 +217,49 @@ function lies(datei) {
             'Zwei Schreiber auf eine Wahrheit: der seltenere überschreibt den häufigeren.');
     }
 
-    const seite = lies(path.join(WURZEL, 'plugins/gameserver/dashboard/helpers/Serverseite.js'));
-    pruefe(seite !== null && /function bauePlatz\(/.test(seite) && /platz:\s*bauePlatz\(/.test(seite),
+    const seite = ohneKommentare(roh(path.join(WURZEL, 'plugins/gameserver/dashboard/helpers/Serverseite.js')) || '');
+    pruefe(seite && /function bauePlatz\(/.test(seite) && /platz:\s*bauePlatz\(/.test(seite),
         'die Übersichtskarte rechnet den Platz im Server (bauePlatz)');
-    pruefe(seite !== null && /ueber:\s*stand\.ueber|ergebnis\.ueber = stand\.ueber/.test(seite),
+
+    // Die Schwellen (90 %, über der Grenze) und die Farbe dürfen nur EINMAL
+    // stehen. Stünden sie auch im Browser, sähe derselbe Zustand nach dem ersten
+    // Nachladen anders aus als beim Aufbau der Seite (Baustelle 134).
+    const live = ohneKommentare(roh(path.join(WURZEL, 'plugins/gameserver/dashboard/assets/js/gameserver-live.js')) || '');
+    pruefe(live && /case 'platz-text'/.test(live) && /case 'platz-balken'/.test(live),
+        'das Live-Modul zeichnet platz-text und platz-balken',
+        'Ein Marker `data-fb-live` ohne Fall im Modul ist ein Feld, das nie nachgeführt wird — '
+      + 'genau das meldet scripts/check-live-anzeige.js.');
+    pruefe(live && !/#d63939|#f76707|#2fb344/.test(live),
+        'die Farbtafel steht nicht auch im Browser',
+        'Der Server liefert `platz.farbe` mit — eine zweite Tafel driftet.');
+    pruefe(live && !/>=\s*90/.test(live.slice(live.indexOf("case 'platz-balken'"), live.indexOf("case 'platz-balken'") + 600)),
+        'die 90-%-Schwelle steht nicht im Browser');
+    pruefe(seite && /farbe = PLATZ_FARBE\[ergebnis\.ton\]/.test(seite),
+        'die Farbe kommt aus der einen Tafel im Server');
+    pruefe(seite && /ueber:\s*stand\.ueber|ergebnis\.ueber = stand\.ueber/.test(seite),
         'das Urteil „über der Grenze" kommt vom Daemon, es wird nicht nachgerechnet',
         'Eine Anzeige, die anders rechnet als der Torwächter, widerspricht ihm irgendwann.');
 
-    const routen = lies(path.join(WURZEL, 'plugins/gameserver/dashboard/routes/servers.js'));
-    pruefe(routen !== null && /lesePlatzstand\(dbService, server\.id\)/.test(routen),
+    const routen = ohneKommentare(roh(path.join(WURZEL, 'plugins/gameserver/dashboard/routes/servers.js')) || '');
+    pruefe(routen && /lesePlatzstand\(dbService, server\.id\)/.test(routen),
         'die Serverseite liest den gemessenen Stand');
-    pruefe(routen !== null && !/JOIN server_registry/.test(routen),
+    pruefe(routen && !/JOIN server_registry/.test(routen),
         'ohne JOIN auf server_registry (varchar gegen int, und die Kollationsgrenze)');
 
-    const uebersichtVorlage = lies(path.join(WURZEL,
-        'plugins/gameserver/dashboard/views/guild/partials/server-detail-uebersicht.ejs'));
-    pruefe(uebersichtVorlage !== null && /u\.platz/.test(uebersichtVorlage),
+    const uebersichtVorlage = ohneKommentareEjs(roh(path.join(WURZEL,
+        'plugins/gameserver/dashboard/views/guild/partials/server-detail-uebersicht.ejs')) || '');
+    pruefe(/u\.platz/.test(uebersichtVorlage),
         'die Übersichtskarte zeichnet den Platz');
 
-    const editVorlage = fs.existsSync(path.join(WURZEL, 'plugins/gameserver/dashboard/views/guild/gameserver-edit.ejs'))
-        ? fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/views/guild/gameserver-edit.ejs'), 'utf8')
-        : null;
-    pruefe(editVorlage !== null && !/hindert den Server\s*\n?\s*aber nicht daran/.test(editVorlage),
+    // Hier wird nach TEXT gesucht, den ein Kunde liest — nicht nach Code. Der
+    // EJS-Filter nimmt die Kommentare weg, damit die Begruendung IM Kopf der
+    // Vorlage (die den alten Satz zitiert) den Waechter nicht gruen haelt.
+    const editVorlage = ohneKommentareEjs(roh(path.join(WURZEL,
+        'plugins/gameserver/dashboard/views/guild/gameserver-edit.ejs')) || '');
+    pruefe(!/hindert den Server\s*\n?\s*aber nicht daran/.test(editVorlage),
         'die Bearbeitungsseite behauptet nicht mehr, die Grenze hindere den Server an nichts',
         'Seit Weg C ist das falsch: sie verweigert Start und Uploads.');
-    pruefe(editVorlage !== null && /es gilt die weiche/.test(editVorlage),
+    pruefe(/es gilt die weiche/.test(editVorlage),
         'sie sagt stattdessen, dass die weiche Grenze gilt');
 
     // ════════════════════════════════════════════════════════════════════════

@@ -970,14 +970,13 @@ class IPMServer {
                     ram_total_mb: server.ram_total_mb ?? null,
                     current_players: server.players ?? null,
                     max_players: server.max_players ?? null,
-                    // Nur mitschicken, wenn gemessen: ein `null` im Push würde
-                    // im Browser eine vorhandene Anzeige leeren.
-                    ...(hatPlatz ? {
-                        platz_belegt_bytes: server.platz_belegt_bytes,
-                        platz_grenze_bytes: server.platz_grenze_bytes ?? null,
-                        platz_ueber: !!server.platz_ueber,
-                        platz_geschaetzt: !!server.platz_geschaetzt,
-                    } : {}),
+                    // Der Platz (B101) geht hier NICHT mit. Gezeichnet wird er
+                    // von `gameserver-live.js` aus `/servers/status`, weil dort
+                    // Text und Farbe aus `bauePlatz` kommen — derselben
+                    // Rechnung, aus der die Serverseite zeichnet. Rohe Bytes
+                    // hier hätten einen zweiten Zeichner gebraucht, und der
+                    // hätte andere Schwellen gehabt. Was hier zählt, ist der
+                    // UPDATE oben: er macht den Stand überhaupt lesbar.
                     timestamp: Date.now()
                 });
             }

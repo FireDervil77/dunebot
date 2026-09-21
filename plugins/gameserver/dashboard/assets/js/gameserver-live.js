@@ -229,6 +229,26 @@
             sse.on('resource_usage', (d) => this.uebernimm(d.server_id, {
                 spieler: d.current_players, max: d.max_players }));
 
+            // Der Platzstand (Baustelle 101) kommt nur bei einem Wechsel ueber die
+            // Grenze und wenn ein Start deshalb verweigert wurde. Uebernommen
+            // wird der Rohwert sofort, damit die Anzeige reagiert; die
+            // Beurteilung (Ton, Text) rechnet der Server, also nachholen.
+            sse.on('platzstand', (d) => {
+                this.uebernimm(d.server_id, {
+                    platz: {
+                        belegtGiB: d.belegt_bytes  != null ? Math.round((d.belegt_bytes / 1024 ** 3) * 10) / 10 : null,
+                        prozent:   d.prozent != null ? d.prozent : null,
+                        ueber:     !!d.ueber,
+                        geschaetzt: !!d.geschaetzt,
+                        // Kein `text` und kein `ton`: die rechnet der Server.
+                        // Bis `holeBald` antwortet, bleibt der alte Text stehen —
+                        // besser als ein hier zusammengesetzter, der anders
+                        // aussieht als der von der Seite.
+                    },
+                });
+                this.holeBald();
+            });
+
             // Nach JEDEM Verbinden nachholen — auch nach einem Wiederverbinden.
             sse.on('connected', () => this.holeAlles());
             this.holeAlles();
@@ -319,6 +339,9 @@
                         bereit:  b ? b.bereit  : undefined,
                         messbar: b ? b.messbar : undefined,
                         text:    b ? b.text    : undefined,
+                        // Fertig gerechnet vom Server (bauePlatz): Text und Ton.
+                        // null heisst "keine Grenze gebucht und nichts gemessen".
+                        platz:   s.platz || null,
                     });
                 }
             } catch (_) {
@@ -483,6 +506,25 @@
                     case 'spieler': {
                         el.textContent = (z.spieler === null || z.spieler === undefined)
                             ? '—' : String(z.spieler);
+                        break;
+                    }
+
+                    // ── Platz (Baustelle 101, weiche Grenze) ────────────────
+                    //
+                    // Text und Ton kommen fertig vom Server. Ohne Platzangabe
+                    // wird NICHT geleert: Was dasteht, ist der letzte bekannte
+                    // Stand, und der ist ehrlicher als ein leeres Feld.
+                    case 'platz-text': {
+                        if (z.platz && z.platz.text) el.textContent = z.platz.text;
+                        break;
+                    }
+
+                    case 'platz-balken': {
+                        if (!z.platz || z.platz.prozent === null || z.platz.prozent === undefined) break;
+                        el.style.width = Math.min(100, z.platz.prozent) + '%';
+                        // Die Farbe kommt fertig vom Server (bauePlatz). Eine
+                        // Tafel hier waere die zweite Kopie der Schwellen.
+                        if (z.platz.farbe) el.style.background = z.platz.farbe;
                         break;
                     }
                 }

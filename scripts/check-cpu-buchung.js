@@ -39,6 +39,8 @@
 
 const fs   = require('fs');
 const path = require('path');
+// Die gemeinsame Fassung, nicht eine eigene (Baustelle 89).
+const { ohneKommentare, ohneKommentareEjs } = require('./lib/quelltext');
 
 const WURZEL = path.join(__dirname, '..');
 
@@ -66,17 +68,11 @@ function lies(schluessel) {
 }
 
 /**
- * Kommentare entfernen, bevor gesucht wird.
- *
- * Ohne das trifft jedes grep auch die Prosa — und genau dieser Wächter erklärt
- * seine Zustandsliste in Kommentaren. Er würde sich selbst bestätigen.
+ * Ohne Kommentarfilter würde jedes grep auch die Prosa treffen — und genau
+ * dieser Wächter erklärt seine Zustandsliste in Kommentaren. Er würde sich
+ * selbst bestätigen. Der Filter kommt aus `scripts/lib/quelltext.js`; eine
+ * eigene Kopie war der Befund von Baustelle 89.
  */
-function ohneKommentare(quelle) {
-    return quelle
-        .replace(/\/\*[\s\S]*?\*\//g, ' ')   // Blockkommentare
-        .replace(/^[ \t]*\/\/.*$/gm, ' ')    // ganze Zeilenkommentare
-        .replace(/<%#[\s\S]*?%>/g, ' ');     // EJS-Kommentare
-}
 
 /** Findet jede `status IN ('a','b',…)`-Liste und gibt sie als Mengen zurück. */
 function zustandslisten(quelle) {
@@ -107,9 +103,9 @@ function gleicheMenge(a, b) {
         // ServiceManager. Die Konstante wird deshalb aus dem Quelltext gelesen —
         // das prüft zugleich, dass sie dort wörtlich steht und nicht erst zur
         // Laufzeit zusammengesetzt wird.
-        const quelle = lies('model');
+        const quelle = ohneKommentare(lies('model') || '');
         if (quelle) {
-            const m = ohneKommentare(quelle).match(/ZUSTAENDE_MIT_CPU\s*=\s*\[([^\]]*)\]/);
+            const m = quelle.match(/ZUSTAENDE_MIT_CPU\s*=\s*\[([^\]]*)\]/);
             if (!m) {
                 nein('RootServer.ZUSTAENDE_MIT_CPU nicht gefunden');
             } else {
@@ -127,9 +123,9 @@ function gleicheMenge(a, b) {
     // ── 2. Dieselbe Liste im SQL ────────────────────────────────────────────
     console.log('\nDieselbe Liste im SQL');
     for (const schluessel of ['migration', 'quotas']) {
-        const quelle = lies(schluessel);
+        const quelle = ohneKommentare(lies(schluessel) || '');
         if (!quelle) continue;
-        const listen = zustandslisten(ohneKommentare(quelle));
+        const listen = zustandslisten(quelle);
         if (listen.length === 0) {
             nein(`${DATEIEN[schluessel]}: keine \`status IN (…)\`-Liste gefunden`);
             continue;
@@ -143,9 +139,8 @@ function gleicheMenge(a, b) {
 
     // ── 4./5./6./7. Wer welche Zahl benutzt ─────────────────────────────────
     console.log('\nWer welche Zahl benutzt');
-    const model = lies('model');
-    if (model) {
-        const nackt = ohneKommentare(model);
+    const nackt = ohneKommentare(lies('model') || '');
+    if (nackt) {
 
         // Geprüft wird der **Vergleich**, nicht die Zeile. Die erste Fassung
         // dieses Wächters suchte `available_cpu_cores_running` irgendwo in der
@@ -174,9 +169,9 @@ function gleicheMenge(a, b) {
             `Platte vergleicht mit ${diskOperand || '(kein Vergleich gefunden)'} — voll ist voll`);
     }
 
-    const edit = lies('edit');
-    if (edit) {
-        const nackt = ohneKommentare(edit);
+    const editQuelle = ohneKommentare(lies('edit') || '');
+    if (editQuelle) {
+        const nackt = editQuelle;
         pruef(/available_cpu_cores_running/.test(nackt),
             'Bearbeitungsformular bietet die laufende Zahl an',
             'Bearbeitungsformular rechnet weiter mit available_cpu_cores');
@@ -186,9 +181,9 @@ function gleicheMenge(a, b) {
           + 'ein ausgeschalteter Server bekäme seine Kerne zweimal angeboten');
     }
 
-    const quotasEjs = lies('quotasEjs');
+    const quotasEjs = ohneKommentareEjs(lies('quotasEjs') || '');
     if (quotasEjs) {
-        const nackt = ohneKommentare(quotasEjs);
+        const nackt = quotasEjs;
         pruef(/allocated_cpu_cores_running/.test(nackt),
             'Ressourcen-Seite zeigt die laufende Zahl',
             'Ressourcen-Seite zeigt nur die gebuchte Zahl — sie widerspricht dann dem Torwächter');
