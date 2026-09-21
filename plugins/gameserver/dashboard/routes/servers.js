@@ -2019,9 +2019,22 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
         // SFTP-Verbindungsinfo anfügen (IP bevorzugen – Hostname ist oft nicht konfiguriert)
         server.sftp_host = server.rootserver_ip || server.rootserver_hostname || 'N/A';
         // Der Port kommt vom Daemon, der ihn aus seinem laufenden Listener liest.
-        // Fehlt er, ist der Daemon zu alt oder SFTP dort abgeschaltet — dann gilt
-        // 2022, der Wert, der hier bis dahin fest im Code stand.
-        server.sftp_port = server.rootserver_sftp_port || 2022;
+        // Fehlt er, laeuft dort KEIN SFTP-Server — dann bleibt das Feld leer
+        // (Baustelle 144).
+        //
+        // Hier stand `|| 2022`, gedacht als Verbesserung gegenueber einem fest
+        // eingebauten Port. Der Rueckfall macht aber aus „niemand lauscht" eine
+        // plausible Zahl. Am 2026-09-21 gemessen: `sftp_port` ist bei BEIDEN
+        // Rootservern NULL, es laeuft also nirgends einer — der Rueckfall haette
+        // in genau dem Fall eine Verbindung versprochen, die nicht zustande
+        // kommt.
+        //
+        // ⚠ Diese drei Felder werden heute von KEINER Vorlage angezeigt (am
+        // 2026-09-21 gesucht: kein Treffer in `views/`, auch kein Knopf fuer
+        // `POST /:serverId/sftp/reset-password`). Sie stehen hier fuer den Tag,
+        // an dem SFTP wieder angeboten wird — und dann darf keines von ihnen
+        // eine Zahl erfinden. Der Zustand von SFTP steht in Baustelle 144.
+        server.sftp_port = server.rootserver_sftp_port || null;
         // Der Fingerabdruck kommt vom Daemon bei jeder Anmeldung. Fehlt er, ist
         // der Daemon zu alt oder SFTP dort abgeschaltet — dann sagt die Anzeige
         // das auch, statt ein leeres Feld zu zeigen.

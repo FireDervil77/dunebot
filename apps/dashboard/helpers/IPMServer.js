@@ -445,7 +445,7 @@ class IPMServer {
 
     async _handleRegister(ws, payload, clientIp) {
         const { token, daemon_id, version, hardware, sftp_fingerprint, sftp_port,
-                abruf_port } = payload;
+                abruf_port, base_directory } = payload;
 
         if (!token || !daemon_id) {
             return { success: false, error: 'Missing token or daemon_id' };
@@ -492,6 +492,10 @@ class IPMServer {
                         sessionToken: newSessionToken,
                         sftpFingerprint: sftp_fingerprint || null,
                         sftpPort:        sftp_port || null,
+                        // Der Daemon meldet sein Basis-Verzeichnis seit 1.0.75
+                        // (B143). Ein älterer meldet nichts — dann bleibt der
+                        // Wert stehen, statt durch NULL ersetzt zu werden.
+                        baseDirectory:   base_directory || null,
                         // `?? null` und nicht `|| null`: Der Wert soll auch
                         // dann gesetzt werden, wenn er fehlt — dann als NULL.
                         abrufPort:       abruf_port ?? null,
@@ -605,6 +609,7 @@ class IPMServer {
                 installStatus:   'completed',
                 sftpFingerprint: sftp_fingerprint || null,
                 sftpPort:        sftp_port || null,
+                baseDirectory:   base_directory || null,
                 abrufPort:       abruf_port ?? null,
             });
 

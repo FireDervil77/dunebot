@@ -563,9 +563,26 @@ sudo journalctl -u firebot-daemon -n 50</code></pre>
                                             <td class="text-secondary">Verpasste Heartbeats</td>
                                             <td><%= rootserver.missed_heartbeats || 0 %></td>
                                         </tr>
+                                        <%#
+                                          Kein Rueckfall auf einen geratenen Pfad (Baustelle 143).
+                                          Hier stand `|| '/opt/firebot-daemon'` — ein Pfad, den es
+                                          WIRKLICH gibt, der aber das falsche Ding ist: dort liegt
+                                          der Daemon selbst, nicht das Verzeichnis der Kundendaten.
+                                          Ein nicht existierender Pfad faellt beim ersten `ls` auf;
+                                          ein existierender mit anderer Bedeutung fuehrt jemanden
+                                          bis in ein `rm` hinein. Gemeldet wird er vom Daemon seit
+                                          1.0.75; solange nichts kam, sagt die Zeile das.
+                                        %>
                                         <tr>
                                             <td class="text-secondary">Basis-Verzeichnis</td>
-                                            <td><code><%= rootserver.base_directory || '/opt/firebot-daemon' %></code></td>
+                                            <td>
+                                                <% if (rootserver.base_directory) { %>
+                                                    <code><%= rootserver.base_directory %></code>
+                                                <% } else { %>
+                                                    <span class="text-secondary">vom Daemon nicht gemeldet
+                                                        <small>(ab Daemon 1.0.75)</small></span>
+                                                <% } %>
+                                            </td>
                                         </tr>
                                         <tr>
                                             <td class="text-secondary">Betriebssystem</td>

@@ -208,6 +208,12 @@ class RootServer {
         // daemon.yaml anpasste — der Kunde bekam dann einen Port angezeigt,
         // an dem niemand antwortet.
         if (daten.sftpPort) { fields.push('sftp_port = ?'); values.push(parseInt(daten.sftpPort, 10)); }
+        // Das Verzeichnis, unter dem die Volumes wirklich liegen (B143). Der
+        // Daemon meldet es seit 1.0.75; vorher stand hier der Vorgabewert der
+        // Baseline (`/opt/firebot`), einen Pfad, den es auf keiner Maschine gibt.
+        // Meldet ein aelterer Daemon nichts, bleibt der Wert NULL — und die
+        // Anzeige sagt „nicht gemeldet" statt einen Pfad zu erfinden.
+        if (daten.baseDirectory) { fields.push('base_directory = ?'); values.push(String(daten.baseDirectory).slice(0, 512)); }
         // Port des Sicherungsabrufs (B106) — **immer** geschrieben, auch als
         // NULL. Anders als beim SFTP-Port darf hier kein alter Wert
         // stehenbleiben: Meldet der Daemon nichts (aeltere Bauart, oder der
