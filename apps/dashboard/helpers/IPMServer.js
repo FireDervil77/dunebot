@@ -1147,6 +1147,11 @@ class IPMServer {
             `UPDATE gameservers 
              SET status = 'offline', 
                  install_phase = NULL,
+                 -- 100 und nicht 0: Der Balken soll volllaufen und dann
+                 -- verschwinden, nicht zurueckschnappen. Sichtbar ist er nur,
+                 -- solange der Status installing oder updating ist.
+                 -- (Keine Backticks: Das SQL steht in einem Template-Literal.)
+                 install_progress = 100,
                  updated_at = NOW() 
              WHERE id = ?`,
             [server_id]
@@ -1191,6 +1196,11 @@ class IPMServer {
             `UPDATE gameservers 
              SET status = 'error', 
                  install_phase = NULL,
+                 -- Der Fortschritt bleibt stehen: Er sagt, WIE WEIT es kam, und
+                 -- das ist bei einem Fehlschlag die nuetzlichste Zahl (bricht es
+                 -- bei 3 % ab oder bei 97 %?).
+                 -- install_progress bleibt also absichtlich unberuehrt.
+                 last_status_update = NOW(),
                  updated_at = NOW() 
              WHERE id = ?`,
             [server_id]
@@ -1714,12 +1724,16 @@ class IPMServer {
         
         // ✅ Handler für install.status (granulare Phasen: pulling_image, installing_game, cleanup)
         eventRouter.register('install', 'status', async (payload, message, context) => {
-            const { server_id, phase, message: phaseMsg } = payload;
+            const { server_id, phase, message: phaseMsg, step, steps, step_type } = payload;
             if (!server_id || !phase) return;
 
-            // install_phase in DB aktualisieren
+            // Phase UND Fortschritt: Ein Phasenwechsel setzt die Prozente
+            // zurueck, denn sie gelten je Schritt. Ohne das stuende der Balken
+            // beim naechsten Schritt bei 100 %, bis SteamCMD die erste neue Zahl
+            // schickt — und ein Balken, der von 100 auf 3 springt, sieht wie ein
+            // Fehler aus statt wie ein neuer Schritt.
             await this.dbService.query(
-                'UPDATE gameservers SET install_phase = ? WHERE id = ?',
+                'UPDATE gameservers SET install_phase = ?, install_progress = 0 WHERE id = ?',
                 [phase, server_id]
             );
 
@@ -1736,6 +1750,14 @@ class IPMServer {
                         server_id: String(server_id),
                         phase,
                         message:   phaseMsg || phase,
+                        // Schritt und Schrittzahl kamen bisher nicht mit —
+                        // „Schritt 3 von 7" ist die Auskunft, die einen langen
+                        // Lauf erträglich macht.
+                        ...(Number.isInteger(step)  ? { step }  : {}),
+                        ...(Number.isInteger(steps) ? { steps } : {}),
+                        ...(step_type ? { step_type } : {}),
+                        // Der Fortschritt gilt je Schritt, also von vorn.
+                        percent: 0,
                     });
                 }
             }
@@ -1782,20 +1804,51 @@ class IPMServer {
         }, { priority: 1 });
 
         // ✅ Handler für install.output (Console-Lines während Installation)
+        // ── install/output: Zeile, Fortschritt, Befund (Baustelle 44) ────────
+        //
+        // Bis zum 2026-09-21 reichte dieser Handler **nur `line`** weiter. Der
+        // Daemon schickt im selben Payload aber zwei Dinge mehr:
+        //
+        //   `percent`  die Prozente von SteamCMD — und zwar nur, wenn sie sich
+        //              geaendert haben (SteamCMD schreibt sie mehrmals je
+        //              Sekunde, `install_paket.go` filtert das)
+        //   `finding`  ein gekennzeichneter Befund in der Zeile (E-18)
+        //
+        // Beide fielen hier auf den Boden, und `install_progress` wurde nirgends
+        // im Repo geschrieben — die Spalte gibt es seit der Baseline. Folge:
+        // Server 160 stand auf `starting`, waehrend SteamCMD 21,4 GiB lud. Wer
+        // das Panel ansah, dachte der Server startet und wartete auf einen
+        // Beitritt, der nicht kommen konnte.
         eventRouter.register('install', 'output', async (payload, message, context) => {
             const [server] = await this.dbService.query(
                 'SELECT guild_id FROM gameservers WHERE id = ?',
                 [payload.server_id]
             );
-            if (server) {
-                const sseManager = ServiceManager.get('sseManager');
-                if (sseManager) {
-                    sseManager.broadcast(server.guild_id, 'install', {
-                        action: 'output',
-                        server_id: String(payload.server_id),
-                        line: payload.line,
-                    });
-                }
+            if (!server) return;
+
+            // Nur schreiben, wenn eine Zahl kam. Jede Zeile ohne Prozente wuerde
+            // sonst den Stand auf NULL setzen — und der Balken zuckte bei jeder
+            // Protokollzeile auf 0 zurueck.
+            const prozent = Number.isInteger(payload.percent) ? payload.percent
+                : (typeof payload.percent === 'number' ? Math.round(payload.percent) : null);
+            if (prozent !== null && prozent >= 0 && prozent <= 100) {
+                await this.dbService.query(
+                    'UPDATE gameservers SET install_progress = ? WHERE id = ?',
+                    [prozent, payload.server_id]
+                );
+            }
+
+            const sseManager = ServiceManager.get('sseManager');
+            if (sseManager) {
+                sseManager.broadcast(server.guild_id, 'install', {
+                    action: 'output',
+                    server_id: String(payload.server_id),
+                    line: payload.line,
+                    // Nur mitschicken, was da ist: `null` im Push wuerde im
+                    // Browser eine vorhandene Anzeige leeren.
+                    ...(prozent !== null ? { percent: prozent } : {}),
+                    ...(payload.finding ? { finding: payload.finding } : {}),
+                });
             }
         }, { priority: 1 });
 

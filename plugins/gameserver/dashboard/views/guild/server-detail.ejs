@@ -144,6 +144,26 @@
       <div class="fb-messstreifen-grund" data-fb-live="messwerte-grund" data-fb-server="<%= server.id %>"
            style="<%= mw.frisch ? 'display:none' : '' %>"><%= mw.grund || 'Keine Messwerte.' %></div>
 
+      <%# Die Installationsbahn (Baustelle 44). Sie steht IMMER im Text, nur
+          versteckt — ein Element, das es je nach Zustand gar nicht gibt, findet
+          das Live-Modul spaeter nicht, und genau waehrend einer Installation
+          will man nicht neu laden muessen. %>
+      <div class="fb-messbahn" data-fb-live="installbahn" data-fb-server="<%= server.id %>"
+           style="<%= mw.installation ? '' : 'display:none' %>">
+        <div class="fb-messbahn-kopf">
+          <span data-fb-live="installtext" data-fb-server="<%= server.id %>"><%=
+            mw.installation
+              ? mw.installation.art + (mw.installation.phaseText ? ' — ' + mw.installation.phaseText : '')
+              : '' %></span>
+          <span class="fb-mono" data-fb-live="installprozent" data-fb-server="<%= server.id %>"><%=
+            mw.installation && mw.installation.prozent !== null ? mw.installation.prozent + ' %' : '' %></span>
+        </div>
+        <div class="fb-messzelle-balken">
+          <div data-fb-live="installbalken" data-fb-server="<%= server.id %>"
+               style="width:<%= mw.installation && mw.installation.prozent !== null ? mw.installation.prozent : 0 %>%;background:var(--fb-primary)"></div>
+        </div>
+      </div>
+
       <div class="fb-messzelle" style="<%= mw.frisch ? '' : 'display:none' %>">
         <div class="fb-messzelle-name">CPU</div>
         <div class="fb-messzelle-wert fb-mono"

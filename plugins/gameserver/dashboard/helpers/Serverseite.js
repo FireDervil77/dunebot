@@ -523,12 +523,17 @@ function baueMesswerte(server) {
     const txGesamt = zahlOderNull(server.net_tx_bytes);
 
     const nieGemessen = cpu === null && ram === null && rxGesamt === null;
-    if (nieGemessen && !laeuft) return null;
+    // Waehrend einer Installation zeigt der Streifen etwas, auch wenn noch keine
+    // Last gemessen wurde — der Fortschritt ist dann das Einzige, was zaehlt.
+    if (nieGemessen && !laeuft && !baueInstallation(server)) return null;
 
     const ergebnis = {
         laeuft,
         frisch,
         alterSekunden,
+        // Solange installiert oder aktualisiert wird, ist die wichtigste Zahl
+        // nicht die Last, sondern WIE WEIT (Baustelle 44).
+        installation: baueInstallation(server),
         // Ein Satz, der erklärt, warum keine Zahlen dastehen — oder null.
         grund: !laeuft ? 'Der Server läuft nicht — es wird nichts gemessen.'
             : (alterSekunden === null ? 'Noch keine Messung angekommen.'
@@ -575,6 +580,56 @@ function baueMesswerte(server) {
 
     return ergebnis;
 }
+
+/**
+ * Läuft gerade eine Installation, und wie weit ist sie? (Baustelle 44)
+ *
+ * ── Warum der Fortschritt je SCHRITT gilt ───────────────────────────────────
+ *
+ * SteamCMD zählt innerhalb eines Schrittes von 0 auf 100. Ein Paket hat mehrere
+ * Schritte („Schritt 3/7"), und bei jedem Wechsel fängt die Zahl von vorn an —
+ * deshalb setzt der Phasenwechsel sie im Dashboard auf 0 zurück. Ein Balken, der
+ * von 100 auf 3 springt, sieht wie ein Fehler aus; einer, der bei 100 stehen
+ * bleibt und dann weiterläuft, wie ein Hänger.
+ *
+ * ── Warum die Phasennamen hier übersetzt werden ─────────────────────────────
+ *
+ * Der Daemon schickt Kennungen (`pulling_image`, `installing_game`). Sie im
+ * Browser zu übersetzen hieße, die Tafel dort zu haben — und dann steht auf der
+ * Seite ein anderer Text als in der Live-Meldung. Eine Tafel, ein Ort.
+ *
+ * @returns {object|null} null, wenn gerade nicht installiert wird
+ */
+function baueInstallation(server) {
+    const status = String(server.status || '');
+    if (status !== 'installing' && status !== 'updating') return null;
+
+    const prozent = zahlOderNull(server.install_progress);
+    const phase = server.install_phase ? String(server.install_phase) : null;
+
+    return {
+        prozent: prozent === null ? null : Math.max(0, Math.min(100, Math.round(prozent))),
+        phase,
+        phaseText: INSTALL_PHASE[phase] || (phase ? phase : null),
+        // „wird aktualisiert" ist etwas anderes als „wird installiert", und der
+        // Unterschied ist für den Betreiber wichtig: Beim Aktualisieren gibt es
+        // schon eine Welt, die er verlieren könnte.
+        art: status === 'updating' ? 'Aktualisierung' : 'Installation',
+    };
+}
+
+/**
+ * Die Phasenkennungen des Daemons in Sätze.
+ *
+ * Unbekannte Kennungen werden **durchgereicht**, nicht verschwiegen: Kommt im
+ * Daemon eine neue Phase dazu, steht hier ihre Kennung — hässlich, aber wahr.
+ * Ein leeres Feld hätte niemandem gesagt, dass etwas Neues passiert.
+ */
+const INSTALL_PHASE = {
+    pulling_image:   'Laufzeit-Abbild wird geholt',
+    installing_game: 'Spiel wird installiert',
+    cleanup:         'wird aufgeräumt',
+};
 
 /** MiB/GiB für Menschen. */
 function mib(mbWert) {
@@ -1198,6 +1253,7 @@ module.exports.baueMesswerte = baueMesswerte;
 module.exports.ZUSTAENDE_MIT_CONTAINER = ZUSTAENDE_MIT_CONTAINER;
 module.exports.PLATZ_FARBE = PLATZ_FARBE;
 module.exports.TON_FARBE = TON_FARBE;
+module.exports.INSTALL_PHASE = INSTALL_PHASE;
 module.exports.baueKnopfzeile = baueKnopfzeile;
 module.exports.bauePille = bauePille;
 // Ausdruecklich exportiert, damit scripts/check-bereitschaft.js die Leiter

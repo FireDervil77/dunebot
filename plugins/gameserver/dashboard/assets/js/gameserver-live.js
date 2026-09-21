@@ -249,9 +249,53 @@
                 this.holeBald();
             });
 
+            // ── Installation: der Fortschritt kommt oft, die Beurteilung selten ──
+            //
+            // `install`/`output` traegt die Prozente (nur wenn sie sich geaendert
+            // haben, der Daemon filtert das) — die werden SOFORT gezeichnet, ohne
+            // Nachholen: Es ist eine Zahl, und der Text steht schon da.
+            //
+            // `install`/`status` wechselt den Schritt. Dort wird nachgeholt, weil
+            // sich der Satz aendert und den rechnet der Server (die Phasentafel
+            // liegt in `Serverseite.js`, nicht hier).
+            // Die Namen heissen `install_output` und `install_status`, nicht
+            // `output`/`status`: Der SSE-Verteiler stellt bei Install-Ereignissen
+            // `install_` voran, damit sie eindeutig sind (`output` benutzt sonst
+            // auch die Konsole). Ohne die Vorsilbe feuert hier nie etwas — und
+            // zwar lautlos, weil ein Handler ohne Ereignis genauso aussieht wie
+            // ein Ereignis ohne Handler.
+            sse.on('install_output', (d) => {
+                if (d.percent === undefined || d.percent === null) return;
+                this.uebernimmInstallProzent(d.server_id, d.percent);
+            });
+            sse.on('install_status', (d) => {
+                this.uebernimmInstallProzent(d.server_id, 0);
+                this.holeBald();
+            });
+
             // Nach JEDEM Verbinden nachholen — auch nach einem Wiederverbinden.
             sse.on('connected', () => this.holeAlles());
             this.holeAlles();
+        }
+
+        /**
+         * Nur die Prozentzahl einer laufenden Installation fortschreiben.
+         *
+         * Getrennt von `uebernimm`, weil dort ein ganzer Teil-Zustand
+         * uebernommen wird: `messwerte` wuerde als Block ersetzt und dabei Text
+         * und Farbe verlieren, die der Server gerechnet hat. Hier wird EIN Feld
+         * in einem vorhandenen Block geaendert — und wenn es den Block noch nicht
+         * gibt, passiert nichts, statt einen halben zu erfinden.
+         */
+        uebernimmInstallProzent(serverId, prozent) {
+            if (serverId === undefined || serverId === null) return;
+            const id = String(serverId);
+            const z = this.zustand.get(id);
+            if (!z || !z.messwerte || !z.messwerte.installation) return;
+            const n = Number(prozent);
+            if (!Number.isFinite(n)) return;
+            z.messwerte.installation.prozent = Math.max(0, Math.min(100, Math.round(n)));
+            this.zeichne(id);
         }
 
         uebernimm(serverId, teil) {
@@ -564,6 +608,34 @@
                             zeile(m.cpu ? m.cpu.text : '—', '', null)
                           + zeile(m.ram ? m.ram.text : '—', 'fb-muted', null)
                           + zeile(m.netz ? m.netz.text : '—', 'fb-muted', '11px');
+                        break;
+                    }
+
+                    // ── Installationsbahn (Baustelle 44) ────────────────────
+                    case 'installbahn': {
+                        const i = z.messwerte && z.messwerte.installation;
+                        el.style.display = i ? '' : 'none';
+                        break;
+                    }
+
+                    case 'installtext': {
+                        const i = z.messwerte && z.messwerte.installation;
+                        if (!i) break;
+                        el.textContent = i.art + (i.phaseText ? ' — ' + i.phaseText : '');
+                        break;
+                    }
+
+                    case 'installprozent': {
+                        const i = z.messwerte && z.messwerte.installation;
+                        if (!i) break;
+                        el.textContent = (i.prozent === null || i.prozent === undefined) ? '' : i.prozent + ' %';
+                        break;
+                    }
+
+                    case 'installbalken': {
+                        const i = z.messwerte && z.messwerte.installation;
+                        if (!i || i.prozent === null || i.prozent === undefined) break;
+                        el.style.width = i.prozent + '%';
                         break;
                     }
 

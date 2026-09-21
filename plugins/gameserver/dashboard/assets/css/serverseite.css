@@ -188,6 +188,16 @@
   font-size: 11px; color: var(--fb-text-muted); margin-top: 4px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+/* Die Installationsbahn laeuft ueber die ganze Breite: Waehrend einer
+   Installation ist "wie weit" die Hauptauskunft, nicht die Last daneben. */
+.fb-messbahn { grid-column: 1 / -1; background: #fff; padding: 10px 14px; }
+.fb-messbahn-kopf {
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: 12px; font-size: 12.5px; margin-bottom: 6px;
+}
+.fb-messbahn-kopf > span:first-child { color: var(--fb-text); font-weight: 500; }
+.fb-messbahn-kopf > span:last-child { color: var(--fb-text-muted); }
+
 /* Kein Messwert: der GRUND steht da, nicht eine Null. */
 .fb-messstreifen-grund {
   grid-column: 1 / -1; background: #fff;

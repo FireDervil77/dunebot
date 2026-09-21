@@ -169,6 +169,8 @@ router.get('/', requirePermission('GAMESERVER.VIEW'), async (req, res) => {
                 gs.net_tx_bytes,
                 gs.net_rx_rate,
                 gs.net_tx_rate,
+                gs.install_progress,
+                gs.install_phase,
                 gs.paket_werte,
                 gs.update_available,
                 gs.created_at,
@@ -1388,7 +1390,11 @@ router.get('/status', requirePermission('GAMESERVER.VIEW'), async (req, res) => 
                     platz_ueber, platz_geschaetzt,
                     -- Die Live-Messwerte für den Streifen über den Bereichen.
                     cpu_percent, ram_used_mb, ram_total_mb, last_heartbeat,
-                    net_rx_bytes, net_tx_bytes, net_rx_rate, net_tx_rate
+                    net_rx_bytes, net_tx_bytes, net_rx_rate, net_tx_rate,
+                    -- Und der Install-Fortschritt (B44): Er reitet auf demselben
+                    -- Weg, damit ein Nachholen nach einem Verbindungsabriss auch
+                    -- die Bahn wieder richtig setzt.
+                    install_progress, install_phase
                FROM gameservers WHERE guild_id = ?`,
             [guildId]
         );
@@ -1838,6 +1844,9 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
                 -- Platz und Live-Messwerte (B101, B146) — sie standen bis zum
                 -- 2026-09-21 in der toten server_registry. Ohne sie zeigt die
                 -- Serverseite weder den Platzbalken noch den Messstreifen.
+                -- install_progress/-phase tragen die Installationsbahn (B44).
+                gs.install_progress,
+                gs.install_phase,
                 gs.platz_belegt_bytes,
                 gs.platz_grenze_bytes,
                 gs.platz_gemessen_am,
