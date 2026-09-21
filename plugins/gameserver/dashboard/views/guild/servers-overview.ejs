@@ -80,7 +80,7 @@
         <thead>
           <tr>
             <th>Server</th><th>Bereitschaft</th><th>Zustand</th>
-            <th>Spieler</th><th>Adresse</th><th>Maschine</th>
+            <th>Spieler</th><th>Last</th><th>Adresse</th><th>Maschine</th>
           </tr>
         </thead>
         <tbody>
@@ -129,6 +129,29 @@
                   <%# „nicht gemessen" ist etwas anderes als „0" — die Legende
                       unten sagt es ausdrücklich. %>
                   <span class="fb-muted" style="font-family:inherit">nicht gemessen</span>
+                <% } %>
+              </td>
+              <%# Last: CPU, Arbeitsspeicher, Verkehr — aus derselben Rechnung wie
+                  der Messstreifen auf der Serverseite (baueMesswerte). Eine
+                  knappere Rechnung hier haette denselben Server mit zwei Zahlen
+                  gezeigt, und jemand haette zu Recht gefragt, welche stimmt.
+
+                  Kein Balken in der Liste: Bei zwoelf Zeilen wird aus zwoelf
+                  Balken ein Muster, keine Auskunft. Die Zahl reicht; wer mehr
+                  will, klickt den Server auf.
+
+                  Drei Striche, wenn nicht gemessen wird — und der GRUND im
+                  Titel, damit man nicht raten muss, ob der Server aus ist oder
+                  die Maschine schweigt. %>
+              <td class="fb-mono" style="font-size:12px"
+                  data-fb-live="last-zeile" data-fb-server="<%= s.id %>"
+                  <% if (s.messwerte && !s.messwerte.frisch && s.messwerte.grund) { %>title="<%= s.messwerte.grund %>"<% } %>>
+                <% if (!s.messwerte || !s.messwerte.frisch) { %>
+                  <span class="fb-muted" style="font-family:inherit">—</span>
+                <% } else { %>
+                  <div><%= s.messwerte.cpu ? s.messwerte.cpu.text : '—' %></div>
+                  <div class="fb-muted"><%= s.messwerte.ram ? s.messwerte.ram.text : '—' %></div>
+                  <div class="fb-muted" style="font-size:11px"><%= s.messwerte.netz ? s.messwerte.netz.text : '—' %></div>
                 <% } %>
               </td>
               <%# Dieselben Zeilen wie auf der Serverseite (B93) — sonst haette

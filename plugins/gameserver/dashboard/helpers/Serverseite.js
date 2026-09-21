@@ -124,6 +124,7 @@ function baueUebersicht(server, paket, zusatz = {}) {
         // Funktion, die der Browser danach weiterschaltet.
         pille:         bauePille(paket, server),
         kennzahlen:    baueKennzahlen(server),
+        messwerte:     baueMesswerte(server),
         platz:         bauePlatz(server),
         welt:          baueWelt(zusatz.sicherungen ?? zusatz.letzteSicherung),
     };
@@ -439,11 +440,169 @@ function baueBefehle(paket) {
  * 2026-08-18); hier steht nur der Augenblick.
  */
 function baueKennzahlen(server) {
-    const cpu = Number.isFinite(server.cpu_percent) ? server.cpu_percent : null;
-    const ram = Number.isFinite(server.ram_used_mb) ? server.ram_used_mb : null;
-    const ramMax = Number.isFinite(server.ram_total_mb) ? server.ram_total_mb : null;
+    const cpu = zahlOderNull(server.cpu_percent);
+    const ram = zahlOderNull(server.ram_used_mb);
+    const ramMax = zahlOderNull(server.ram_total_mb);
     if (cpu === null && ram === null) return null;
     return { cpu, ram, ramMax };
+}
+
+/**
+ * Eine Zahl aus der Datenbank, oder null.
+ *
+ * ── Warum nicht `Number.isFinite(wert)` ─────────────────────────────────────
+ *
+ * **mysql2 liefert DECIMAL als ZEICHENKETTE.** `cpu_percent` ist
+ * `DECIMAL(5,2)`, kommt also als `"12.50"` an — und `Number.isFinite("12.50")`
+ * ist `false`. Genau so stand es bis zum 2026-09-21 in `baueKennzahlen`: Selbst
+ * mit angekommenen Werten hätte die Funktion `null` geliefert, und die
+ * CPU-Anzeige wäre leer geblieben. Am 2026-09-21 gemessen, nicht vermutet:
+ * `SELECT CAST(12.50 AS DECIMAL(5,2))` → `"12.50"`, `CAST(42 AS SIGNED)` → `42`.
+ *
+ * Die dritte Schicht derselben Sache: Die Spalten fehlten (B146), die Abfrage
+ * holte sie nicht (B145) — und dann hätte die Prüfung sie verworfen.
+ */
+function zahlOderNull(wert) {
+    if (wert === null || wert === undefined || wert === '') return null;
+    const n = Number(wert);
+    return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Zustände, in denen ein Container läuft — und die Live-Messwerte deshalb
+ * aktuell sind.
+ *
+ * ⚠ Dieselbe Menge steht als `RootServer.ZUSTAENDE_MIT_CPU` im
+ * masterserver-Plugin (dort für die Frage „belegt der Server Rechenzeit?").
+ * Es ist dieselbe Frage — „läuft ein Container?" — und beide Listen hält
+ * `scripts/check-cpu-buchung.js` zusammen. Hier eine eigene Konstante, weil ein
+ * reiner Rechner nicht über die Plugin-Grenze greifen soll (B116).
+ */
+const ZUSTAENDE_MIT_CONTAINER = ['installing', 'starting', 'online', 'stopping', 'updating'];
+
+/**
+ * Die Live-Messwerte eines Servers: CPU, Arbeitsspeicher, Verkehr.
+ *
+ * ── Warum „aus" keine Zahlen zeigt ──────────────────────────────────────────
+ *
+ * Ein gestoppter Container hat keinen Stats-Strom. Die letzten Werte stehen
+ * weiter in der Zeile — sie sind aber von **vor** dem Stoppen. Sie anzuzeigen
+ * hieße, eine Momentaufnahme von vorhin als „jetzt" auszugeben, und zwar genau
+ * dann, wenn jemand nachsieht, warum der Server nichts tut.
+ *
+ * Dasselbe für einen Server, der laufen SOLL, dessen Herzschlag aber alt ist:
+ * Dann ist nicht der Server still, sondern die Leitung — und das ist eine andere
+ * Auskunft.
+ *
+ * ── Warum der Verkehr zwei Zahlen hat ──────────────────────────────────────
+ *
+ * Docker zählt Summen seit dem Containerstart. „1,2 GB" sagt nicht, ob gerade
+ * etwas passiert; „180 KB/s" sagt es. Die Rate rechnet der Daemon aus zwei
+ * Messungen (~2 s); aus zwei Herzschlägen (30 s) käme nur ein Mittelwert, der
+ * jede Spitze verschluckt.
+ *
+ * @param {object} server Zeile aus `gameservers`
+ * @returns {object|null} null, wenn es nichts zu sagen gibt
+ */
+function baueMesswerte(server) {
+    const laeuft = ZUSTAENDE_MIT_CONTAINER.includes(String(server.status || ''));
+
+    const alterSekunden = server.last_heartbeat
+        ? Math.max(0, Math.round((Date.now() - new Date(server.last_heartbeat).getTime()) / 1000))
+        : null;
+    // Der Herzschlag kommt alle 30 s. Ab 120 s ist er nicht „etwas spät",
+    // sondern weg — dann steht die Leitung, nicht der Server.
+    const frisch = laeuft && alterSekunden !== null && alterSekunden <= 120;
+
+    const cpu   = zahlOderNull(server.cpu_percent);
+    const ram   = zahlOderNull(server.ram_used_mb);
+    const ramMax = zahlOderNull(server.ram_total_mb);
+    const rxRate = zahlOderNull(server.net_rx_rate);
+    const txRate = zahlOderNull(server.net_tx_rate);
+    const rxGesamt = zahlOderNull(server.net_rx_bytes);
+    const txGesamt = zahlOderNull(server.net_tx_bytes);
+
+    const nieGemessen = cpu === null && ram === null && rxGesamt === null;
+    if (nieGemessen && !laeuft) return null;
+
+    const ergebnis = {
+        laeuft,
+        frisch,
+        alterSekunden,
+        // Ein Satz, der erklärt, warum keine Zahlen dastehen — oder null.
+        grund: !laeuft ? 'Der Server läuft nicht — es wird nichts gemessen.'
+            : (alterSekunden === null ? 'Noch keine Messung angekommen.'
+            : (!frisch ? `Letzte Meldung vor ${alterSekunden} s — die Maschine meldet sich nicht.` : null)),
+        cpu:  null,
+        ram:  null,
+        netz: null,
+    };
+
+    if (!frisch) return ergebnis;
+
+    if (cpu !== null) {
+        // Über 100 % ist richtig und kein Fehler: 100 % = ein Kern, und ein
+        // Server darf mehrere haben.
+        ergebnis.cpu = {
+            prozent: Math.round(cpu * 10) / 10,
+            text: `${(Math.round(cpu * 10) / 10).toLocaleString('de-DE')} %`,
+            ton: cpu >= 90 ? 'rot' : cpu >= 70 ? 'orange' : 'gruen',
+            farbe: TON_FARBE[cpu >= 90 ? 'rot' : cpu >= 70 ? 'orange' : 'gruen'],
+        };
+    }
+
+    if (ram !== null) {
+        const anteil = (ramMax && ramMax > 0) ? Math.round((ram / ramMax) * 100) : null;
+        ergebnis.ram = {
+            benutztMB: ram,
+            grenzeMB: ramMax,
+            prozent: anteil,
+            text: ramMax ? `${mib(ram)} von ${mib(ramMax)}` : mib(ram),
+            ton: anteil === null ? 'gruen' : anteil >= 90 ? 'rot' : anteil >= 75 ? 'orange' : 'gruen',
+            farbe: TON_FARBE[anteil === null ? 'gruen' : anteil >= 90 ? 'rot' : anteil >= 75 ? 'orange' : 'gruen'],
+        };
+    }
+
+    if (rxRate !== null || txRate !== null) {
+        ergebnis.netz = {
+            rxRate, txRate, rxGesamt, txGesamt,
+            text: `↓ ${rate(rxRate)}  ↑ ${rate(txRate)}`,
+            gesamtText: (rxGesamt !== null || txGesamt !== null)
+                ? `${bytes(rxGesamt)} empfangen · ${bytes(txGesamt)} gesendet`
+                : null,
+        };
+    }
+
+    return ergebnis;
+}
+
+/** MiB/GiB für Menschen. */
+function mib(mbWert) {
+    if (mbWert === null || mbWert === undefined) return '—';
+    return mbWert >= 1024
+        ? `${(mbWert / 1024).toFixed(1).replace('.', ',')} GiB`
+        : `${Math.round(mbWert)} MiB`;
+}
+
+/** Bytes für Menschen (Summen). */
+function bytes(b) {
+    if (b === null || b === undefined) return '—';
+    const stufen = [[1024 ** 3, 'GB'], [1024 ** 2, 'MB'], [1024, 'KB']];
+    for (const [teiler, name] of stufen) {
+        if (b >= teiler) return `${(b / teiler).toFixed(1).replace('.', ',')} ${name}`;
+    }
+    return `${b} B`;
+}
+
+/** Bytes je Sekunde für Menschen. */
+function rate(b) {
+    if (b === null || b === undefined) return '—';
+    if (b === 0) return '0';
+    const stufen = [[1024 ** 2, 'MB/s'], [1024, 'KB/s']];
+    for (const [teiler, name] of stufen) {
+        if (b >= teiler) return `${(b / teiler).toFixed(1).replace('.', ',')} ${name}`;
+    }
+    return `${b} B/s`;
 }
 
 /**
@@ -539,8 +698,19 @@ function bauePlatz(server) {
     return ergebnis;
 }
 
-/** Ton → Farbe. Die einzige Tafel; sie verlässt den Server nur als Wert. */
-const PLATZ_FARBE = { rot: '#d63939', orange: '#f76707', gruen: '#2fb344' };
+/**
+ * Ton → Farbe. Die einzige Tafel; sie verlässt den Server nur als **Wert**.
+ *
+ * Sie dient inzwischen zwei Anzeigen (Platz und Messstreifen). Eine Kopie im
+ * Browser wäre die zweite Wahrheit über dieselbe Schwelle — und nach dem ersten
+ * Nachladen sähe derselbe Zustand anders aus als beim Aufbau der Seite. Deshalb
+ * liefert jede Rechnung ihre `farbe` gleich mit; `scripts/check-platzgrenze.js`
+ * prüft, dass keine Farbe im Browser steht.
+ */
+const TON_FARBE = { rot: '#d63939', orange: '#f76707', gruen: '#2fb344' };
+// Der alte Name bleibt als Verweis: `bauePlatz` benutzt ihn, und ein
+// Suchlauf nach „PLATZ_FARBE" soll hier landen.
+const PLATZ_FARBE = TON_FARBE;
 
 /**
  * Ports mit ihrem ZWECK und ihrer Belegungsregel.
@@ -964,6 +1134,10 @@ function baueServerListe(zeilen, paketNachAddon = {}) {
             }),
             maschine: s.rootserver_name || null,
             paket:    paket ? `${paket.identity.slug} ${paket.identity.version || ''}`.trim() : null,
+            // Dieselbe Rechnung wie der Messstreifen auf der Serverseite — nicht
+            // eine zweite, knappere daneben. Sonst zeigt die Liste 12 % und die
+            // Serverseite 12,5 %, und jemand fragt zu Recht, welche stimmt.
+            messwerte: baueMesswerte(s),
         };
     });
 
@@ -1020,7 +1194,10 @@ module.exports.baueBereitschaftAuskunft = baueBereitschaftAuskunft;
 // Damit der Live-Weg (`/status`) DIESELBE Rechnung liefert, aus der die
 // Serverseite zeichnet — nicht eine nachgebaute daneben.
 module.exports.bauePlatz = bauePlatz;
+module.exports.baueMesswerte = baueMesswerte;
+module.exports.ZUSTAENDE_MIT_CONTAINER = ZUSTAENDE_MIT_CONTAINER;
 module.exports.PLATZ_FARBE = PLATZ_FARBE;
+module.exports.TON_FARBE = TON_FARBE;
 module.exports.baueKnopfzeile = baueKnopfzeile;
 module.exports.bauePille = bauePille;
 // Ausdruecklich exportiert, damit scripts/check-bereitschaft.js die Leiter

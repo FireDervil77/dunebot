@@ -109,6 +109,76 @@
     </div>
   </div>
 
+  <%# ── Der Messstreifen: CPU, Arbeitsspeicher, Verkehr ──────────────────
+      Wunsch des Betreibers (2026-09-21): "zwischen den Tabs und den Koepfen
+      genau eine solche Anzeige pro Gameserver, und zwar CPU, Traffic und Memory
+      von dem jeweiligen Gameserver auf dem man gerade sitzt. […] sowas fehlt
+      dort naemlich gaenzlich."
+
+      Er steht HIER, ueber den Bereichen: Damit bleibt er sichtbar, egal in
+      welchem Bereich man arbeitet — auch in der Konsole und im Dateimanager,
+      also genau dort, wo man wissen will, was der Server gerade tut.
+
+      Gerechnet wird im Server (`baueMesswerte`), gezeichnet hier und vom
+      Live-Modul nachgefuehrt. Wenn nichts gemessen wird, steht der GRUND da und
+      keine Zahl: Ein gestoppter Container hat keinen Stats-Strom, und die
+      letzten Werte sind von VOR dem Stoppen. %>
+  <% const mw = locals.uebersicht ? locals.uebersicht.messwerte : null; %>
+  <% if (mw) { %>
+    <%# Die drei Zellen stehen AUSGESCHRIEBEN da, nicht in einer Schleife.
+        Grund: `scripts/check-live-anzeige.js` sucht `data-fb-live="…"` im Text
+        der Vorlage. Ein Name, der erst zur Laufzeit zusammengesetzt wird, ist
+        fuer ihn unsichtbar — die Schleife spart sechs Zeilen und kostet die
+        Pruefbarkeit aller drei Felder.
+
+        (Und in DIESEM Kommentar steht deshalb kein EJS-Zeichen: Kommentare
+        verschachteln sich nicht, ein Ausgabe-Tag darin beendet die Vorlage.
+        Genau daran liess sich server-detail.ejs schon einmal nicht mehr
+        uebersetzen, und alle Waechter blieben gruen.)
+
+        Und der Grund-Kasten wird IMMER gerendert, nur versteckt: Ein Element,
+        das es je nach Zustand gar nicht gibt, findet das Live-Modul spaeter
+        nicht (dieselbe Falle wie bei den Knoepfen, Baustelle 134). %>
+    <div class="fb-messstreifen" data-fb-live="messstreifen" data-fb-server="<%= server.id %>">
+
+      <div class="fb-messstreifen-grund" data-fb-live="messwerte-grund" data-fb-server="<%= server.id %>"
+           style="<%= mw.frisch ? 'display:none' : '' %>"><%= mw.grund || 'Keine Messwerte.' %></div>
+
+      <div class="fb-messzelle" style="<%= mw.frisch ? '' : 'display:none' %>">
+        <div class="fb-messzelle-name">CPU</div>
+        <div class="fb-messzelle-wert fb-mono"
+             data-fb-live="messwert-cpu" data-fb-server="<%= server.id %>"><%= mw.cpu ? mw.cpu.text : '—' %></div>
+        <div class="fb-messzelle-balken">
+          <div data-fb-live="messbalken-cpu" data-fb-server="<%= server.id %>"
+               style="width:<%= mw.cpu && mw.cpu.prozent !== null ? Math.min(100, mw.cpu.prozent) : 0 %>%;background:<%= mw.cpu ? mw.cpu.farbe : 'transparent' %>"></div>
+        </div>
+        <div class="fb-messzelle-fuss">100 % ist ein Kern</div>
+      </div>
+
+      <div class="fb-messzelle" style="<%= mw.frisch ? '' : 'display:none' %>">
+        <div class="fb-messzelle-name">Arbeitsspeicher</div>
+        <div class="fb-messzelle-wert fb-mono"
+             data-fb-live="messwert-ram" data-fb-server="<%= server.id %>"><%= mw.ram ? mw.ram.text : '—' %></div>
+        <div class="fb-messzelle-balken">
+          <div data-fb-live="messbalken-ram" data-fb-server="<%= server.id %>"
+               style="width:<%= mw.ram && mw.ram.prozent !== null ? Math.min(100, mw.ram.prozent) : 0 %>%;background:<%= mw.ram ? mw.ram.farbe : 'transparent' %>"></div>
+        </div>
+        <div class="fb-messzelle-fuss"><%= mw.ram && mw.ram.prozent !== null ? mw.ram.prozent + ' % der Buchung' : 'keine Grenze gebucht' %></div>
+      </div>
+
+      <div class="fb-messzelle" style="<%= mw.frisch ? '' : 'display:none' %>">
+        <div class="fb-messzelle-name">Verkehr</div>
+        <div class="fb-messzelle-wert fb-mono"
+             data-fb-live="messwert-netz" data-fb-server="<%= server.id %>"><%= mw.netz ? mw.netz.text : '—' %></div>
+        <%# Kein Balken: Es gibt keine Grenze, gegen die man den Verkehr messen
+            koennte. Ein Balken ohne Bezugsgroesse waere eine erfundene Skala. %>
+        <div class="fb-messzelle-fuss" data-fb-live="messfuss-netz" data-fb-server="<%= server.id %>"><%=
+          mw.netz && mw.netz.gesamtText ? mw.netz.gesamtText : 'seit dem Start des Containers' %></div>
+      </div>
+
+    </div>
+  <% } %>
+
   <%# ── Bereiche als Navigation ──────────────────────────────────────────
       Sie stehen NICHT in der linken Seitenleiste: Es gibt sie nur im
       Zusammenhang eines Servers, dort staenden sie auch ohne offenen Server.

@@ -164,8 +164,12 @@ function roh(datei) {
         pruefe(/SetzeGrenzeGiB\(serverID, int64\(diskLimit\)\)/.test(client),
             'die Grenze steht schon nach der Registrierung, nicht erst nach dem ersten Start',
             'Sonst kennt der Dateimanager bei einem nie gestarteten Server keine Grenze.');
-        pruefe(/platz_belegt_bytes/.test(client) && /platz_grenze_bytes/.test(client),
-            'der Herzschlag trägt den Platzstand je Server');
+        // Die Felder heissen in der Liste `belegt_bytes`/`grenze_bytes` — ohne
+        // Vorsilbe, weil der Name der Liste (`platzstaende`) schon sagt, wovon
+        // die Rede ist. Die Vorsilbe stand in der ersten Fassung, als die Felder
+        // an den Server-Eintraegen hingen.
+        pruefe(/"belegt_bytes":/.test(client) && /"grenze_bytes":/.test(client),
+            'der Herzschlag trägt Belegung und Grenze in der Liste');
         pruefe(/func \(c \*Client\) MeldePlatzstand\(/.test(client),
             'es gibt eine Meldung für den Augenblick, in dem ein Start verweigert wird');
         pruefe(/w\.Vergiss\(id\)/.test(client),
@@ -197,9 +201,22 @@ function roh(datei) {
           + '2026-09-21 — die Zahl entstand und kam nicht weg.');
 
         // Und die Gegenrichtung: in der Server-Schleife darf der Platz NICHT stehen.
-        const serverSchleife = (ipm.match(/UPDATE gameservers\s+SET cpu_percent[\s\S]{0,400}?WHERE id = \?/) || [])[0] || '';
+        //
+        // Das Fenster war auf 400 Zeichen begrenzt und wurde zu klein, als der
+        // Verkehr dazukam — dann fand der Ausdruck gar nichts, und „nichts
+        // gefunden" sah aus wie „Befund". Geschnitten wird jetzt bis zum
+        // naechsten `WHERE id = ?`, ohne Laengengrenze.
+        // Geankert an `SET cpu_percent`, nicht an `UPDATE gameservers`: Seit
+        // `_schreibePlatzstaende` in der Datei DAVOR steht, findet der zweite
+        // Anker den Platz-Schreiber — und der enthaelt naturgemaess `platz_`.
+        // Der Waechter meldete daraufhin genau das, was er verhindern soll.
+        const iCpu = ipm.indexOf('SET cpu_percent');
+        const iSchleife = iCpu > -1 ? ipm.lastIndexOf('UPDATE gameservers', iCpu) : -1;
+        const iEnde = iCpu > -1 ? ipm.indexOf('WHERE id = ?', iCpu) : -1;
+        const serverSchleife = (iSchleife > -1 && iEnde > -1) ? ipm.slice(iSchleife, iEnde) : '';
         pruefe(serverSchleife && !/platz_/.test(serverSchleife),
-            'die Server-Schleife schreibt nur CPU und RAM, keinen Platz');
+            'die Server-Schleife schreibt nur CPU, RAM und Verkehr, keinen Platz',
+            serverSchleife ? 'dort steht platz_…' : 'die Server-Schleife wurde nicht gefunden');
 
         pruefe(/payloadPlatz|platzstaende/.test(client),
             'der Daemon schickt die Platzstände als eigene Liste');
@@ -272,10 +289,40 @@ function roh(datei) {
       + 'erwartet `ergebnis.ueber = !!server.platz_ueber`.');
 
     const routen = ohneKommentare(roh(path.join(WURZEL, 'plugins/gameserver/dashboard/routes/servers.js')) || '');
-    pruefe(routen && /gs\.platz_belegt_bytes/.test(routen),
-        'die Serverseite holt den gemessenen Stand aus derselben Zeile');
-    pruefe(routen && /platz_belegt_bytes, platz_grenze_bytes/.test(routen),
-        '/status ebenso — eine Abfrage, keine zweite daneben');
+    // ── Je ABFRAGE prüfen, nicht je Datei ───────────────────────────────────
+    //
+    // `servers.js` enthält drei Abfragen auf `gameservers`: Übersicht, Serverseite
+    // und `/status`. Ein `grep` über die Datei ist gruen, sobald EINE davon die
+    // Spalte holt — am 2026-09-21 landeten beide Ergänzungen versehentlich in der
+    // Übersicht (sie steht weiter oben und hat denselben Anker), und die
+    // Serverseite bekam nichts. Der Waechter war gruen, der Streifen leer.
+    // Geschnitten wird an der WHERE-Zeile, die jede Abfrage eindeutig macht.
+    // Geschnitten wird das ganze SQL-Literal: vom Backtick vor dem Merkmal bis
+    // zum Backtick danach. Der erste Entwurf nahm `lastIndexOf('SELECT')` und
+    // Merkmale wie `WHERE gs.id = ?` — die gibt es mehrfach, `indexOf` fand die
+    // erste, und geprüft wurde eine ganz andere Abfrage. Deshalb hier Merkmale,
+    // die im Repo genau EINMAL vorkommen.
+    const abfrage = (merkmal) => {
+        const i = routen.indexOf(merkmal);
+        if (i < 0) return '';
+        const auf = routen.lastIndexOf('`', i);
+        const zu  = routen.indexOf('`', i);
+        return (auf < 0 || zu < 0) ? '' : routen.slice(auf, zu);
+    };
+    const serverseite = abfrage('gs.sftp_password_seen_at');
+    const uebersicht  = abfrage("JSON_EXTRACT(gs.ports, '$.game.internal')");
+    const status      = abfrage('disk_quota_enforced, disk_quota_note,');
+
+    for (const [name, sql] of [['Serverseite', serverseite], ['/status', status]]) {
+        pruefe(sql && /platz_belegt_bytes/.test(sql),
+            `${name} holt den gemessenen Platz`,
+            sql ? 'die Abfrage holt die Spalte nicht' : 'die Abfrage wurde nicht gefunden');
+        pruefe(sql && /cpu_percent/.test(sql) && /net_rx_rate/.test(sql),
+            `${name} holt die Live-Messwerte (CPU, RAM, Verkehr)`,
+            sql ? 'die Abfrage holt die Spalten nicht' : 'die Abfrage wurde nicht gefunden');
+    }
+    pruefe(uebersicht && /cpu_percent/.test(uebersicht),
+        'die Übersicht holt sie ebenfalls (für die Spalte je Server)');
     pruefe(routen && !/lesePlatzstand/.test(routen),
         'die Sonderabfrage auf server_registry ist weg',
         'Sie las eine Tabelle mit null Zeilen.');
@@ -354,10 +401,13 @@ function roh(datei) {
 
     if (db) {
         try {
+            // ALLE Spalten holen, nicht nur `platz_%`: Der erste Entwurf filterte
+            // auf `platz_` und prüfte dann `cpu_percent` gegen diese Liste — vier
+            // rote Punkte für Spalten, die längst da waren. Ein Wächter, der
+            // gegen die falsche Liste prüft, meldet einen Rollout als fehlend.
             const [spalten] = await db.query(
                 `SELECT COLUMN_NAME FROM information_schema.COLUMNS
-                  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'gameservers'
-                    AND COLUMN_NAME LIKE 'platz\\_%'`);
+                  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'gameservers'`);
             const da = spalten.map(s => s.COLUMN_NAME);
             for (const n of ['platz_belegt_bytes', 'platz_grenze_bytes', 'platz_gemessen_am',
                              'platz_ueber', 'platz_geschaetzt']) {
@@ -369,6 +419,11 @@ function roh(datei) {
             for (const n of ['cpu_percent', 'ram_used_mb', 'ram_total_mb', 'last_heartbeat']) {
                 pruefe(da.includes(n), `gameservers.${n}`,
                     'Migration 20260921_180000 ist nicht gelaufen — sie kommt mit dem Dashboard-Neustart.');
+            }
+            // Und der Verkehr (Wunsch des Betreibers, 2026-09-21).
+            for (const n of ['net_rx_bytes', 'net_tx_bytes', 'net_rx_rate', 'net_tx_rate']) {
+                pruefe(da.includes(n), `gameservers.${n}`,
+                    'Migration 20260921_200000 ist nicht gelaufen — sie kommt mit dem Dashboard-Neustart.');
             }
 
             // Und die Tabelle ist weg. Sie stehenzulassen hiesse, zwei Orte fuer

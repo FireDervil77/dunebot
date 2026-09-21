@@ -1022,17 +1022,32 @@ class IPMServer {
             // Manager des Daemons stehen — und das sind die laufenden. Die
             // Platzmessung gibt es für jeden Server mit Grenze, also kommt sie
             // als eigene Liste (`platzstaende`, siehe `_schreibePlatzstaende`).
+            // Der Verkehr geht nur mit, wenn der Daemon ihn gemessen hat. Vier
+            // Nullen sähen aus wie „nichts gelaufen" — eine Aussage, die niemand
+            // machen soll, der nicht gemessen hat. Deshalb `IF(?, …)` je Spalte
+            // und nicht `?? null`.
+            const hatVerkehr = server.net_rx_bytes !== undefined
+                            && server.net_rx_bytes !== null;
+
             await this.dbService.query(
                 `UPDATE gameservers
                     SET cpu_percent    = ?,
                         ram_used_mb    = ?,
                         ram_total_mb   = ?,
-                        last_heartbeat = NOW()
+                        last_heartbeat = NOW(),
+                        net_rx_bytes = IF(?, ?, net_rx_bytes),
+                        net_tx_bytes = IF(?, ?, net_tx_bytes),
+                        net_rx_rate  = IF(?, ?, net_rx_rate),
+                        net_tx_rate  = IF(?, ?, net_tx_rate)
                   WHERE id = ?`,
                 [
                     server.cpu_percent ?? null,
                     server.ram_used_mb ?? null,
                     server.ram_total_mb ?? null,
+                    hatVerkehr ? 1 : 0, server.net_rx_bytes ?? null,
+                    hatVerkehr ? 1 : 0, server.net_tx_bytes ?? null,
+                    hatVerkehr ? 1 : 0, server.net_rx_rate ?? null,
+                    hatVerkehr ? 1 : 0, server.net_tx_rate ?? null,
                     server.server_id,
                 ]
             );
@@ -1054,6 +1069,13 @@ class IPMServer {
                     ram_total_mb: server.ram_total_mb ?? null,
                     current_players: server.players ?? null,
                     max_players: server.max_players ?? null,
+                    // Nur mitschicken, wenn gemessen — siehe `hatVerkehr`.
+                    ...(hatVerkehr ? {
+                        net_rx_bytes: server.net_rx_bytes,
+                        net_tx_bytes: server.net_tx_bytes,
+                        net_rx_rate:  server.net_rx_rate,
+                        net_tx_rate:  server.net_tx_rate,
+                    } : {}),
                     // Der Platz (B101) geht hier NICHT mit. Gezeichnet wird er
                     // von `gameserver-live.js` aus `/servers/status`, weil dort
                     // Text und Farbe aus `bauePlatz` kommen — derselben

@@ -342,6 +342,10 @@
                         // Fertig gerechnet vom Server (bauePlatz): Text und Ton.
                         // null heisst "keine Grenze gebucht und nichts gemessen".
                         platz:   s.platz || null,
+                        // Ebenso fertig gerechnet (baueMesswerte): CPU,
+                        // Arbeitsspeicher, Verkehr — samt Farbe und dem GRUND,
+                        // falls gerade nichts gemessen wird.
+                        messwerte: s.messwerte || null,
                     });
                 }
             } catch (_) {
@@ -516,6 +520,86 @@
                     // Stand, und der ist ehrlicher als ein leeres Feld.
                     case 'platz-text': {
                         if (z.platz && z.platz.text) el.textContent = z.platz.text;
+                        break;
+                    }
+
+                    // ── Messstreifen (CPU, Arbeitsspeicher, Verkehr) ────────
+                    //
+                    // Text und Farbe kommen fertig vom Server. Der Streifen
+                    // schaltet sich als GANZES um: Faellt die Messung aus (Server
+                    // gestoppt, Maschine still), steht dort der Grund statt
+                    // dreier Striche — sonst liest man einen alten Wert als
+                    // aktuellen.
+                    case 'messstreifen': {
+                        const m = z.messwerte;
+                        if (!m) break;
+                        // Der Grund-Kasten ist IMMER da (die Vorlage rendert ihn
+                        // versteckt) — deshalb wird hier nur umgeschaltet und
+                        // nichts angelegt. Ein Element, das es je nach Zustand
+                        // gar nicht gibt, findet dieses Modul spaeter nicht.
+                        const zellen = el.querySelectorAll('.fb-messzelle');
+                        zellen.forEach(c => { c.style.display = m.frisch ? '' : 'none'; });
+                        break;
+                    }
+
+                    // Die Zelle „Last" in der Uebersicht. Sie traegt drei Zeilen;
+                    // der ganze Inhalt wird ersetzt, weil er als Block gilt:
+                    // Entweder es wird gemessen (drei Zahlen) oder nicht (ein
+                    // Strich plus Grund im Titel). Halb ausgetauscht saehe aus
+                    // wie eine Messung, die es nicht gibt.
+                    case 'last-zeile': {
+                        const m = z.messwerte;
+                        if (!m) break;
+                        if (!m.frisch) {
+                            el.innerHTML = '<span class="fb-muted" style="font-family:inherit">—</span>';
+                            if (m.grund) el.title = m.grund; else el.removeAttribute('title');
+                            break;
+                        }
+                        el.removeAttribute('title');
+                        const zeile = (wert, klasse, groesse) =>
+                            '<div class="' + klasse + '"' + (groesse ? ' style="font-size:' + groesse + '"' : '') + '>'
+                            + String(wert).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+                            + '</div>';
+                        el.innerHTML =
+                            zeile(m.cpu ? m.cpu.text : '—', '', null)
+                          + zeile(m.ram ? m.ram.text : '—', 'fb-muted', null)
+                          + zeile(m.netz ? m.netz.text : '—', 'fb-muted', '11px');
+                        break;
+                    }
+
+                    case 'messwerte-grund': {
+                        const m = z.messwerte;
+                        if (!m) break;
+                        el.textContent = m.grund || 'Keine Messwerte.';
+                        el.style.display = m.frisch ? 'none' : '';
+                        break;
+                    }
+
+                    case 'messwert-cpu':
+                    case 'messwert-ram':
+                    case 'messwert-netz': {
+                        const m = z.messwerte;
+                        if (!m || !m.frisch) break;
+                        const teil = { 'messwert-cpu': m.cpu, 'messwert-ram': m.ram, 'messwert-netz': m.netz }[el.dataset.fbLive];
+                        if (teil && teil.text) el.textContent = teil.text;
+                        break;
+                    }
+
+                    case 'messbalken-cpu':
+                    case 'messbalken-ram': {
+                        const m = z.messwerte;
+                        if (!m || !m.frisch) break;
+                        const teil = el.dataset.fbLive === 'messbalken-cpu' ? m.cpu : m.ram;
+                        if (!teil || teil.prozent === null || teil.prozent === undefined) break;
+                        el.style.width = Math.min(100, teil.prozent) + '%';
+                        if (teil.farbe) el.style.background = teil.farbe;
+                        break;
+                    }
+
+                    case 'messfuss-netz': {
+                        const m = z.messwerte;
+                        if (!m || !m.frisch || !m.netz) break;
+                        if (m.netz.gesamtText) el.textContent = m.netz.gesamtText;
                         break;
                     }
 

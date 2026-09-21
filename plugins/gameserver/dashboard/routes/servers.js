@@ -20,7 +20,8 @@ const Quellen = require('../helpers/Quellen');
 const ServerStopp = require('../helpers/ServerStopp');
 const { baueUebersicht, baueServerListe, bauePaketAuswahl,
         baueMaschinenAuswahl, baueWerteSchritt,
-        baueBereitschaftAuskunft, bauePlatz } = require('../helpers/Serverseite');
+        baueBereitschaftAuskunft, bauePlatz,
+        baueMesswerte } = require('../helpers/Serverseite');
 const { resolveStatusConfig } = require('../helpers/StatusSchema');
 // ── Wieder eingehaengt am 2026-09-17 (Baustelle 137) ────────────────────────
 //
@@ -156,6 +157,18 @@ router.get('/', requirePermission('GAMESERVER.VIEW'), async (req, res) => {
                 gs.platz_gemessen_am,
                 gs.platz_ueber,
                 gs.platz_geschaetzt,
+                -- Die Live-Messwerte (CPU, RAM, Verkehr). Sie standen bis zum
+                -- 2026-09-21 in der toten server_registry und wurden hier nie
+                -- geholt — baueKennzahlen lieferte deshalb immer null.
+                -- (Keine Backticks in dieser Abfrage: Template-Literal.)
+                gs.cpu_percent,
+                gs.ram_used_mb,
+                gs.ram_total_mb,
+                gs.last_heartbeat,
+                gs.net_rx_bytes,
+                gs.net_tx_bytes,
+                gs.net_rx_rate,
+                gs.net_tx_rate,
                 gs.paket_werte,
                 gs.update_available,
                 gs.created_at,
@@ -1372,7 +1385,10 @@ router.get('/status', requirePermission('GAMESERVER.VIEW'), async (req, res) => 
                     -- Grenze greift — alles in derselben Zeile.
                     allocated_disk_gb, disk_quota_enforced, disk_quota_note,
                     platz_belegt_bytes, platz_grenze_bytes, platz_gemessen_am,
-                    platz_ueber, platz_geschaetzt
+                    platz_ueber, platz_geschaetzt,
+                    -- Die Live-Messwerte für den Streifen über den Bereichen.
+                    cpu_percent, ram_used_mb, ram_total_mb, last_heartbeat,
+                    net_rx_bytes, net_tx_bytes, net_rx_rate, net_tx_rate
                FROM gameservers WHERE guild_id = ?`,
             [guildId]
         );
@@ -1403,6 +1419,7 @@ router.get('/status', requirePermission('GAMESERVER.VIEW'), async (req, res) => 
                     // Derselbe Aufruf, aus dem die Serverseite zeichnet. Der
                     // Browser bekommt Text und Farbe, nicht die Schwellen.
                     platz: bauePlatz(s),
+                    messwerte: baueMesswerte(s),
                 };
             })
         });
@@ -1818,6 +1835,22 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
                 gs.bereitschaft_stufe,
                 gs.bereitschaft_grund,
                 gs.bereitschaft_am,
+                -- Platz und Live-Messwerte (B101, B146) — sie standen bis zum
+                -- 2026-09-21 in der toten server_registry. Ohne sie zeigt die
+                -- Serverseite weder den Platzbalken noch den Messstreifen.
+                gs.platz_belegt_bytes,
+                gs.platz_grenze_bytes,
+                gs.platz_gemessen_am,
+                gs.platz_ueber,
+                gs.platz_geschaetzt,
+                gs.cpu_percent,
+                gs.ram_used_mb,
+                gs.ram_total_mb,
+                gs.last_heartbeat,
+                gs.net_rx_bytes,
+                gs.net_tx_bytes,
+                gs.net_rx_rate,
+                gs.net_tx_rate,
                 gs.created_at,
                 gs.updated_at,
                 gs.sftp_username,
