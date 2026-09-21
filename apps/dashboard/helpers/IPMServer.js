@@ -791,7 +791,8 @@ class IPMServer {
 
         // Optional: Server-Registry-Status aktualisieren + SSE-Broadcast pro Gameserver
         if (payload.servers) {
-            await this._updateServerRegistry(daemonId, payload.servers, conn.metadata.guild_id);
+            await this._updateServerRegistry(daemonId, payload.servers, conn.metadata.guild_id,
+                                             payload.platzstaende);
         }
     }
 
@@ -813,7 +814,8 @@ class IPMServer {
      * von hier aus noch einmal als Ereignis zu verschicken, damit das Plugin
      * sie zurueckbekommt, waere ein zweiter Weg fuer Daten, die schon in der
      * Hand liegen. Diese Datei schreibt aus demselben Grund bereits
-     * `server_registry` (masterserver) und `daemon_logs`.
+     * `gameservers` (Messwerte je Server, seit B146 — vorher `server_registry`,
+     * die null Zeilen hatte) und `daemon_logs`.
      *
      * ── Eine Anweisung, nicht eine je Server ────────────────────────────────
      *
@@ -908,60 +910,37 @@ class IPMServer {
     }
 
     /**
-     * Server-Registry aktualisieren
+     * Die gemessenen Platzstände wegschreiben (Baustelle 101, weiche Grenze).
+     *
+     * ── Warum das eine eigene Liste ist ─────────────────────────────────────
+     *
+     * `payload.servers` trägt nur, was im Manager des Daemons steht — und das
+     * sind die **laufenden** Server. Die Platzmessung gibt es für jeden Server
+     * mit Grenze, und bei einem ausgeschalteten ist sie besonders interessant:
+     * Dort entscheidet man, ob aufgeräumt werden muss, und dort verweigert die
+     * Grenze den Start.
+     *
+     * Am 2026-09-21 gemessen, bevor das getrennt war: Server 186 (läuft) bekam
+     * seine Zahl, Server 190 (aus) nicht — obwohl der Wächter ihn misst. Die
+     * Zahl entstand im Daemon und kam nicht weg.
+     *
+     * Ein Stand ohne Messung schickt der Daemon gar nicht. Was hier ankommt, ist
+     * also immer gemessen — deshalb braucht es hier kein `IF(?, …)`.
+     *
+     * @param {Array|null} staende Aus dem Herzschlag (`platzstaende`)
+     * @param {string} guildId Für den SSE-Push
      * @private
      */
-    async _updateServerRegistry(daemonId, servers, guildId) {
-        // Der Verlauf zuerst: Er braucht dieselben Werte, und ein Fehler beim
-        // Registry-Schreiben soll ihn nicht mitnehmen.
-        await this._schreibeKennzahlen(servers);
+    async _schreibePlatzstaende(staende, guildId) {
+        if (!Array.isArray(staende) || !staende.length) return;
 
-        // Status-Mapping: Daemon-States → MySQL ENUM (online,offline,starting,stopping,error)
-        const registryStatusMap = { running: 'online', stopped: 'offline', crashed: 'error' };
         const sseManager = ServiceManager.get('sseManager');
 
-        for (const server of servers) {
-            const rawStatus = server.status || 'offline';
-            const dbStatus = registryStatusMap[rawStatus] ?? rawStatus;
+        for (const s of staende) {
+            const id = Number(s.server_id);
+            if (!Number.isInteger(id) || id <= 0) continue;
 
-            await this.dbService.query(
-                `UPDATE server_registry 
-                 SET status = ?, 
-                     current_players = ?,
-                     cpu_percent = ?,
-                     ram_used_mb = ?,
-                     ram_total_mb = ?,
-                     last_heartbeat = NOW()
-                 WHERE daemon_id = ? AND server_id = ?`,
-                [
-                    dbStatus,
-                    server.players ?? null,
-                    server.cpu_percent ?? null,
-                    server.ram_used_mb ?? null,
-                    server.ram_total_mb ?? null,
-                    daemonId, 
-                    server.server_id
-                ]
-            );
-
-            // ── Der gemessene Platz (B101, weiche Grenze) ────────────────────
-            //
-            // In `gameservers`, NICHT in `server_registry`: Die Tabelle darüber
-            // hat null Zeilen und bekommt nirgends im Repo ein INSERT
-            // (Baustelle 146) — jedes UPDATE dort trifft 0 Zeilen, seit jeher.
-            // Die erste Fassung dieser Zeile schrieb den Platz genau dorthin,
-            // mit der richtigen Begründung („dort stehen die Messungen") und der
-            // falschen Voraussetzung. `gameservers` hat Zeilen, und die
-            // Bereitschaftsmessung des Daemons steht dort schon.
-            //
-            // Der Daemon schickt `platz_*` nur, wenn er wirklich gemessen hat.
-            // Fehlt das Feld, bleibt der alte Wert stehen — `?? null` würde
-            // sonst bei jedem Herzschlag dazwischen eine vorhandene Messung
-            // löschen, und das sähe aus wie „nie gemessen".
-            const hatPlatz = server.platz_belegt_bytes !== undefined
-                          && server.platz_belegt_bytes !== null;
-
-            if (hatPlatz) {
+            try {
                 await this.dbService.query(
                     `UPDATE gameservers
                         SET platz_belegt_bytes = ?,
@@ -971,15 +950,98 @@ class IPMServer {
                             platz_geschaetzt   = ?
                       WHERE id = ?`,
                     [
-                        server.platz_belegt_bytes,
-                        server.platz_grenze_bytes ?? null,
-                        server.platz_gemessen_am ?? null,
-                        server.platz_ueber ? 1 : 0,
-                        server.platz_geschaetzt ? 1 : 0,
-                        server.server_id,
+                        s.belegt_bytes ?? null,
+                        s.grenze_bytes ?? null,
+                        s.gemessen_am ?? null,
+                        s.ueber ? 1 : 0,
+                        s.geschaetzt ? 1 : 0,
+                        id,
                     ]
                 );
+            } catch (error) {
+                // Vor der Migration 20260921_160000 gibt es die Spalten nicht.
+                // Der Herzschlag darf daran nicht ausfallen — an ihm hängt der
+                // Zustand aller Server.
+                this.Logger.error(`[IPMServer] Platzstand für Server ${id} nicht gespeichert:`, error);
+                continue;
             }
+
+            // Der Push geht an die Live-Anzeige. Text und Farbe rechnet die
+            // Seite (`bauePlatz`), hier gehen nur die Zahlen raus.
+            if (guildId && sseManager) {
+                sseManager.broadcast(guildId, 'gameserver', {
+                    action: 'platzstand',
+                    server_id: id,
+                    belegt_bytes: s.belegt_bytes ?? null,
+                    grenze_bytes: s.grenze_bytes ?? null,
+                    prozent: (s.grenze_bytes > 0)
+                        ? Math.min(999, Math.round((s.belegt_bytes / s.grenze_bytes) * 100))
+                        : null,
+                    ueber: !!s.ueber,
+                    geschaetzt: !!s.geschaetzt,
+                });
+            }
+        }
+    }
+
+    /**
+     * Server-Registry aktualisieren
+     * @private
+     */
+    async _updateServerRegistry(daemonId, servers, guildId, platzstaende = null) {
+        // Der Verlauf zuerst: Er braucht dieselben Werte, und ein Fehler beim
+        // Registry-Schreiben soll ihn nicht mitnehmen.
+        await this._schreibeKennzahlen(servers);
+
+        // Die Platzstände unabhängig davon: Sie kommen auch für Server, die
+        // nicht in `servers` stehen (ausgeschaltete).
+        await this._schreibePlatzstaende(platzstaende, guildId);
+
+        // Status-Mapping: Daemon-States → MySQL ENUM (online,offline,starting,stopping,error)
+        const registryStatusMap = { running: 'online', stopped: 'offline', crashed: 'error' };
+        const sseManager = ServiceManager.get('sseManager');
+
+        for (const server of servers) {
+            const rawStatus = server.status || 'offline';
+            const dbStatus = registryStatusMap[rawStatus] ?? rawStatus;
+
+            // ── Die Messwerte des Daemons landen in `gameservers` ────────────
+            //
+            // Bis zum 2026-09-21 ging dieser Block nach `server_registry`. Diese
+            // Tabelle hatte **null Zeilen** und nirgends im Repo ein `INSERT` —
+            // jedes UPDATE traf 0 Zeilen, seit jeher, und das ist in MySQL kein
+            // Fehler. Status, CPU, RAM und Spielerzahl wurden also bei jedem
+            // Herzschlag geschrieben und weggeworfen (Baustelle 146). Die
+            // Tabelle ist zurückgezogen (Migration 20260921_180000).
+            //
+            // `gameservers` hat eine Zeile je Server, und dort stehen schon
+            // Messungen desselben Daemons über dieselbe Leitung:
+            // `bereitschaft_*` und `platz_*`.
+            //
+            // Der Platz steht NICHT hier: Diese Liste trägt nur Server, die im
+            // Manager des Daemons stehen — und das sind die laufenden. Die
+            // Platzmessung gibt es für jeden Server mit Grenze, also kommt sie
+            // als eigene Liste (`platzstaende`, siehe `_schreibePlatzstaende`).
+            await this.dbService.query(
+                `UPDATE gameservers
+                    SET cpu_percent    = ?,
+                        ram_used_mb    = ?,
+                        ram_total_mb   = ?,
+                        last_heartbeat = NOW()
+                  WHERE id = ?`,
+                [
+                    server.cpu_percent ?? null,
+                    server.ram_used_mb ?? null,
+                    server.ram_total_mb ?? null,
+                    server.server_id,
+                ]
+            );
+
+            // Der Status bleibt, wo er ist: Ihn schreibt der Ereignisweg
+            // (`status_changed` → `gameservers.status`), und zwar mit den
+            // Übergängen, die dazugehören. Ihn hier aus dem Herzschlag
+            // mitzuschreiben wäre ein zweiter Schreiber auf dieselbe Spalte —
+            // der langsamere würde den schnelleren gelegentlich überholen.
 
             // ✅ SSE-Broadcast: Per-Gameserver Metriken an Browser pushen
             if (guildId && sseManager) {

@@ -61,18 +61,23 @@ async function getAllocatedResources(rootserverId, dbService) {
 // Ausgangspunkt ist `gameservers` (nach rootserver_id), nicht mehr
 // `server_registry` (nach daemon_id): ein Daemon kann mehrere RootServer
 // bedienen, die Zuordnung über die daemon_id warf deren Server zusammen.
-// `server_registry` liefert nur noch die Live-Messwerte dazu.
+// ~~`server_registry` liefert nur noch die Live-Messwerte dazu.~~ Seit dem
+// 2026-09-21 auch die nicht mehr — die Tabelle ist zurückgezogen (B146), sie
+// hatte null Zeilen. Gebucht und gemessen stehen jetzt in derselben Zeile.
 // ─────────────────────────────────────────────────────────────────────────────
 async function getGameserversWithQuotas(rootserverId, dbService) {
     try {
         return await dbService.query(
+            // Gebucht und gemessen stehen in derselben Zeile (B146). Der
+            // LEFT JOIN auf `server_registry` traf nie etwas: null Zeilen, und
+            // die Verbindung verglich `varchar(36)` mit `int`.
             `SELECT gs.id, gs.id AS server_id, gs.name AS server_name,
                     gs.template_name AS server_type, gs.status,
                     gs.allocated_ram_mb, gs.allocated_cpu_percent, gs.allocated_disk_gb,
-                    sr.ram_used_mb  AS current_ram_usage_mb,
-                    sr.cpu_percent  AS current_cpu_usage_percent
+                    gs.ram_used_mb  AS current_ram_usage_mb,
+                    gs.cpu_percent  AS current_cpu_usage_percent,
+                    gs.platz_belegt_bytes, gs.platz_ueber
              FROM gameservers gs
-             LEFT JOIN server_registry sr ON sr.server_id = gs.id
              WHERE gs.rootserver_id = ?
              ORDER BY gs.name ASC`,
             [rootserverId]

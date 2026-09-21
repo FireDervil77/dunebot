@@ -190,10 +190,31 @@ function roh(datei) {
           + 'und bekommt nirgends ein INSERT (Baustelle 146).');
         pruefe(!/UPDATE server_registry[\s\S]{0,400}?platz_belegt_bytes/.test(ipm),
             'und nicht nach server_registry');
-        pruefe(/if \(hatPlatz\)/.test(ipm),
-            'ohne Messung wird gar nicht geschrieben — der letzte Stand bleibt stehen',
-            'Sonst leert jeder Herzschlag zwischen zwei Messungen den Wert, und das sieht aus '
-          + 'wie „nie gemessen".');
+        pruefe(/_schreibePlatzstaende\(/.test(ipm),
+            'die Platzstände haben einen eigenen Schreiber (nicht die Server-Schleife)',
+            'In der Server-Schleife geschrieben, erreicht der Platz nur LAUFENDE Server: Diese '
+          + 'Liste trägt nur, was im Manager des Daemons steht. Genau so fehlte Server 190 am '
+          + '2026-09-21 — die Zahl entstand und kam nicht weg.');
+
+        // Und die Gegenrichtung: in der Server-Schleife darf der Platz NICHT stehen.
+        const serverSchleife = (ipm.match(/UPDATE gameservers\s+SET cpu_percent[\s\S]{0,400}?WHERE id = \?/) || [])[0] || '';
+        pruefe(serverSchleife && !/platz_/.test(serverSchleife),
+            'die Server-Schleife schreibt nur CPU und RAM, keinen Platz');
+
+        pruefe(/payloadPlatz|platzstaende/.test(client),
+            'der Daemon schickt die Platzstände als eigene Liste');
+
+        // Geschnitten auf den Block, der die Liste baut — nicht die ganze Datei.
+        // Der erste Entwurf suchte `s.GemessenAm.IsZero()` irgendwo in
+        // client.go und blieb in der Gegenprobe gruen: Dieselbe Zeile steht in
+        // `MeldePlatzstand`, wo sie eine andere Frage beantwortet. Ein Waechter,
+        // der die Datei durchsucht statt die Stelle, misst den Nachbarn.
+        const iListe = client.indexOf('for _, s := range waechter.Alle()');
+        const listenBlock = iListe > -1 ? client.slice(iListe, iListe + 700) : '';
+        pruefe(/GemessenAm\.IsZero\(\)/.test(listenBlock) && /continue/.test(listenBlock),
+            'und überspringt in dieser Schleife, was nie gemessen wurde',
+            'Sonst kommt eine 0 an, die wie eine Messung aussieht. '
+          + (iListe > -1 ? '' : 'Die Schleife über waechter.Alle() wurde nicht gefunden.'));
     }
 
     const msgTypes = ohneKommentare(roh(path.join(WURZEL, 'packages/dunebot-sdk/lib/ipm/MessageTypes.js')) || '');
@@ -278,6 +299,43 @@ function roh(datei) {
         'sie sagt stattdessen, dass die weiche Grenze gilt');
 
     // ════════════════════════════════════════════════════════════════════════
+    console.log('\nKeine Reste von server_registry (B146)');
+    // ════════════════════════════════════════════════════════════════════════
+    //
+    // Die Tabelle hatte null Zeilen und nirgends ein INSERT; sie ist am
+    // 2026-09-21 zurückgezogen. Ein übersehener Leser wirft danach nicht — er
+    // liefert `undefined`, und die Seite zeigt eine Lücke. Deshalb wird hier
+    // gezählt statt gehofft.
+    const REGISTRY_ERLAUBT = [
+        // Die Migrationen sind der Verlauf. Sie MÜSSEN den Namen nennen.
+        'plugins/masterserver/migrations/',
+        'plugins/gameserver/migrations/',
+        // Dieser Wächter selbst.
+        'scripts/check-platzgrenze.js',
+    ];
+    const { execSync } = require('child_process');
+    let treffer = [];
+    try {
+        const roh = execSync(
+            `grep -rn "server_registry" --include=*.js --include=*.ejs apps plugins packages scripts 2>/dev/null || true`,
+            { cwd: WURZEL, encoding: 'utf8' });
+        treffer = roh.split('\n').filter(Boolean)
+            .filter(z => !REGISTRY_ERLAUBT.some(a => z.startsWith(a)));
+    } catch (e) {
+        pruefe(false, 'nach Resten gesucht', e.message);
+    }
+
+    // Kommentare zählen nicht als Leser — sie erklären den Umbau. Gefiltert wird
+    // an der Zeile: `//` oder `*` am Anfang, oder `--` im SQL.
+    const echteTreffer = treffer.filter(z => {
+        const code = z.replace(/^[^:]*:\d+:/, '').trim();
+        return !/^(\/\/|\*|\/\*|--|#|<%#)/.test(code);
+    });
+    pruefe(echteTreffer.length === 0,
+        `kein Code nennt server_registry mehr (${treffer.length - echteTreffer.length} Erwähnung(en) in Kommentaren)`,
+        'noch benutzt in:\n       ' + echteTreffer.slice(0, 6).join('\n       '));
+
+    // ════════════════════════════════════════════════════════════════════════
     console.log('\nGegen die Datenbank');
     // ════════════════════════════════════════════════════════════════════════
     let db = null;
@@ -307,16 +365,21 @@ function roh(datei) {
                     'Migration 20260921_160000 ist nicht gelaufen — sie kommt mit dem Dashboard-Neustart.');
             }
 
-            // Die alten Spalten muessen WEG sein: zwei Orte fuer dieselbe Frage,
-            // und der tote wuerde beim naechsten Durchgang fuer die Wahrheit
-            // gehalten.
-            const [alteSpalten] = await db.query(
-                `SELECT COUNT(*) AS n FROM information_schema.COLUMNS
-                  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'server_registry'
-                    AND COLUMN_NAME LIKE 'platz\\_%'`);
-            pruefe(Number(alteSpalten[0].n) === 0,
-                'und in server_registry stehen keine platz-Spalten mehr',
-                `dort stehen noch ${alteSpalten[0].n} — Migration 20260921_160000 nicht gelaufen`);
+            // Die Live-Messwerte wohnen jetzt daneben (B146).
+            for (const n of ['cpu_percent', 'ram_used_mb', 'ram_total_mb', 'last_heartbeat']) {
+                pruefe(da.includes(n), `gameservers.${n}`,
+                    'Migration 20260921_180000 ist nicht gelaufen — sie kommt mit dem Dashboard-Neustart.');
+            }
+
+            // Und die Tabelle ist weg. Sie stehenzulassen hiesse, zwei Orte fuer
+            // dieselbe Frage zu haben — der tote wuerde beim naechsten Durchgang
+            // fuer die Wahrheit gehalten.
+            const [tabelle] = await db.query(
+                `SELECT COUNT(*) AS n FROM information_schema.TABLES
+                  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'server_registry'`);
+            pruefe(Number(tabelle[0].n) === 0,
+                'server_registry ist zurückgezogen',
+                'sie steht noch — Migration 20260921_180000 nicht gelaufen');
 
             // Und die Probe aufs Ganze: kommt wirklich etwas an? Eigener
             // try-Block, damit ein fehlendes Feld VOR der Migration als „wartet"

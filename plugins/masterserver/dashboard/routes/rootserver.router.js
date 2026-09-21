@@ -375,15 +375,19 @@ router.get('/:id', requirePermission('MASTERSERVER.ROOTSERVER.VIEW'), async (req
         // Gameserver-Statistiken und Liste für diesen RootServer laden
         const dbService = ServiceManager.get('dbService');
         const gameservers = await dbService.query(
+            // Die Messwerte stehen in derselben Zeile (B146). Der LEFT JOIN auf
+            // `server_registry` verglich `varchar(36)` mit `int` und traf nie
+            // etwas — die Tabelle hatte null Zeilen. CPU und RAM je Gameserver
+            // waren auf dieser Seite deshalb immer leer.
             `SELECT gs.id AS server_id, gs.name AS server_name, gs.name AS display_name,
                     gs.template_name AS game_name, gs.status,
                     gs.current_players, gs.max_players,
-                    sr.cpu_percent, sr.ram_used_mb, sr.ram_total_mb, sr.last_heartbeat
+                    gs.cpu_percent, gs.ram_used_mb, gs.ram_total_mb, gs.last_heartbeat,
+                    gs.platz_belegt_bytes, gs.platz_grenze_bytes, gs.platz_ueber
              FROM gameservers gs
-             LEFT JOIN server_registry sr ON sr.server_id = gs.id AND sr.daemon_id = ?
              WHERE gs.rootserver_id = ?
              ORDER BY gs.name ASC`,
-            [rootserver.daemon_id, rootserverId]
+            [rootserverId]
         );
 
         const gameserverStats = {

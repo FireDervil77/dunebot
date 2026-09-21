@@ -966,20 +966,29 @@ class GameserverPlugin extends DashboardPlugin {
         Logger.debug(`[Gameserver] Resource Usage: Server ${server_id} - CPU: ${cpu}%, RAM: ${ram}MB`);
         
         try {
-            // Resource-Metriken in DB speichern (optional)
-            // TODO: Metrics-Tabelle anlegen für Zeitreihen-Daten
-            
-            // Für jetzt: In gameservers-Tabelle aktualisieren
-            await dbService.query(
-                `UPDATE gameservers 
-                 SET last_cpu_usage = ?, 
-                     last_ram_usage = ?,
-                     last_disk_usage = ?,
-                     updated_at = NOW() 
-                 WHERE id = ?`,
-                [cpu, ram, disk, server_id]
-            );
-            
+            // ── Hier stand ein UPDATE auf drei Spalten, die es nicht gibt ─────
+            //
+            // `last_cpu_usage`, `last_ram_usage`, `last_disk_usage` — am
+            // 2026-09-21 in `information_schema` nachgesehen: **keine der drei
+            // existiert in `gameservers`.** Das UPDATE hätte also geworfen, und
+            // weil es vor dem SSE-Broadcast stand, wäre auch der ausgefallen:
+            // ein Handler, der beim ersten Aufruf komplett umfällt.
+            //
+            // Aufgefallen ist es nie, weil der Daemon dieses Ereignis **nicht
+            // schickt**: `SendGameServerResourceUsage` hat dort keinen Aufrufer
+            // (gesucht am 2026-09-21, der einzige Treffer ist die Definition).
+            // Zwei Blindgänger, die sich gegenseitig verdeckt haben.
+            //
+            // Die Werte gibt es trotzdem: Der Herzschlag trägt CPU und RAM je
+            // Server (`srv.ResourceStats()` aus dem Docker-Stats-Strom), und
+            // seit B146 landen sie in `gameservers.cpu_percent` /
+            // `ram_used_mb`. **Deshalb schreibt dieser Handler nichts mehr** —
+            // zwei Schreiber auf dieselben Spalten wären der nächste Befund,
+            // und der seltenere würde den häufigeren gelegentlich überholen.
+            //
+            // Was bleibt, ist das Weiterschieben an den Browser: Sollte je ein
+            // Sender dazukommen, ist die Anzeige sofort dran.
+
             // ✅ SSE-Broadcasting für Live-Monitoring
             const [server] = await dbService.query(
                 'SELECT guild_id FROM gameservers WHERE id = ?',

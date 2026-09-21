@@ -479,9 +479,19 @@ class RootServer {
              FROM rootserver WHERE guild_id = ?`,
             [guildId]
         );
+        // Gezählt aus `gameservers`, nicht aus `server_registry` (B146).
+        //
+        // Die alte Fassung zählte über `server_registry` — eine Tabelle mit null
+        // Zeilen. Diese Kachel stand damit **immer auf 0**, gemessen am
+        // 2026-09-21: 0 gezählt, 2 vorhanden. Ein Zähler, der immer 0 sagt, sieht
+        // aus wie „noch keine Server", nicht wie ein Defekt.
+        //
+        // Über `rootserver_id` statt über `daemon_id`: Ein Daemon kann mehrere
+        // Rootserver bedienen; die Zuordnung über die daemon_id warf deren Server
+        // zusammen (dieselbe Berichtigung wie am 2026-08-02 in quotas.router).
         const [gsRow] = await dbService.query(
-            `SELECT COUNT(*) AS total FROM server_registry sr
-             JOIN rootserver rs ON sr.daemon_id = rs.daemon_id
+            `SELECT COUNT(*) AS total FROM gameservers gs
+             JOIN rootserver rs ON gs.rootserver_id = rs.id
              WHERE rs.guild_id = ?`,
             [guildId]
         );

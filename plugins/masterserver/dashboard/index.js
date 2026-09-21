@@ -228,7 +228,21 @@ class MasterserverDashboardPlugin extends DashboardPlugin {
             }
 
             // ════════════════════════════════════════════════════════════
-            // 5. Rootserver löschen (CASCADE löscht server_registry, Quotas etc.)
+            // 5. Rootserver löschen (CASCADE löscht Quotas, Logs, Ports etc.)
+            //
+            // `server_registry` stand hier mit in der Aufzählung — die Tabelle ist
+            // seit dem 2026-09-21 zurückgezogen (B146, sie hatte null Zeilen).
+            // Die Gameserver-ZEILEN werden dabei nicht gelöscht, sondern
+            // entwurzelt: `fk_gameservers_rootserver` hat `ON DELETE SET NULL`
+            // (am 2026-09-21 in `information_schema.REFERENTIAL_CONSTRAINTS`
+            // nachgesehen, nicht angenommen). Ihr Löschen ist der eigene Schritt
+            // weiter oben — mit Volume. Bleibt einer übrig, hat er danach
+            // `rootserver_id = NULL` und gehört zu keiner Maschine mehr.
+            //
+            // ⚠ `gameserver_migrations` steht auf `RESTRICT`: Gibt es einen
+            // Umzugseintrag auf diese Maschine, scheitert das Löschen des
+            // Rootservers — und die Meldung nennt den Fremdschlüssel, nicht den
+            // Grund. Ungeprüft, ob dieser Fall im Betrieb schon vorkam.
             //    daemon_instances existiert nicht mehr (seit Migration 2.0.0)
             // ════════════════════════════════════════════════════════════
 
