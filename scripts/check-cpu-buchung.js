@@ -74,10 +74,18 @@ function lies(schluessel) {
  * eigene Kopie war der Befund von Baustelle 89.
  */
 
-/** Findet jede `status IN ('a','b',…)`-Liste und gibt sie als Mengen zurück. */
+/**
+ * Findet jede `status IN ('a','b',…)`-Liste und gibt sie als Mengen zurück.
+ *
+ * Das Backtick ist nicht kosmetisch: MariaDB gibt eine View normalisiert zurück,
+ * als `` `gs`.`status` in ('…') ``. Der erste Entwurf suchte `status\s+IN` und
+ * fand deshalb im lebenden Bestand **keine** Liste — gemeldet als „die View
+ * benutzt eine andere Zustandsliste als der Code", während beide gleich waren.
+ * Ein Fehlalarm genau dort, wo der Wächter den Rollout bestätigen sollte.
+ */
 function zustandslisten(quelle) {
     const listen = [];
-    const re = /status\s+IN\s*\(([^)]*)\)/gi;
+    const re = /status`?\s+IN\s*\(([^)]*)\)/gi;
     let m;
     while ((m = re.exec(quelle)) !== null) {
         const werte = m[1].match(/'([^']+)'/g) || [];

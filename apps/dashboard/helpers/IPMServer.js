@@ -919,16 +919,6 @@ class IPMServer {
             const rawStatus = server.status || 'offline';
             const dbStatus = registryStatusMap[rawStatus] ?? rawStatus;
 
-            // ── Der gemessene Platz (B101, weiche Grenze) ────────────────
-            //
-            // Der Daemon schickt `platz_*` nur, wenn er wirklich gemessen hat.
-            // Fehlt das Feld, bleibt der alte Wert stehen — `?? null` würde
-            // sonst bei jedem Herzschlag eine vorhandene Messung löschen, bis
-            // der Wächter in fünf Minuten wieder misst. Genau so sähe es aus
-            // wie „nie gemessen".
-            const hatPlatz = server.platz_belegt_bytes !== undefined
-                          && server.platz_belegt_bytes !== null;
-
             await this.dbService.query(
                 `UPDATE server_registry 
                  SET status = ?, 
@@ -936,11 +926,6 @@ class IPMServer {
                      cpu_percent = ?,
                      ram_used_mb = ?,
                      ram_total_mb = ?,
-                     platz_belegt_bytes = IF(?, ?, platz_belegt_bytes),
-                     platz_grenze_bytes = IF(?, ?, platz_grenze_bytes),
-                     platz_gemessen_am  = IF(?, FROM_UNIXTIME(?), platz_gemessen_am),
-                     platz_ueber        = IF(?, ?, platz_ueber),
-                     platz_geschaetzt   = IF(?, ?, platz_geschaetzt),
                      last_heartbeat = NOW()
                  WHERE daemon_id = ? AND server_id = ?`,
                 [
@@ -949,15 +934,47 @@ class IPMServer {
                     server.cpu_percent ?? null,
                     server.ram_used_mb ?? null,
                     server.ram_total_mb ?? null,
-                    hatPlatz ? 1 : 0, server.platz_belegt_bytes ?? null,
-                    hatPlatz ? 1 : 0, server.platz_grenze_bytes ?? null,
-                    hatPlatz ? 1 : 0, server.platz_gemessen_am ?? null,
-                    hatPlatz ? 1 : 0, server.platz_ueber ? 1 : 0,
-                    hatPlatz ? 1 : 0, server.platz_geschaetzt ? 1 : 0,
                     daemonId, 
                     server.server_id
                 ]
             );
+
+            // ── Der gemessene Platz (B101, weiche Grenze) ────────────────────
+            //
+            // In `gameservers`, NICHT in `server_registry`: Die Tabelle darüber
+            // hat null Zeilen und bekommt nirgends im Repo ein INSERT
+            // (Baustelle 146) — jedes UPDATE dort trifft 0 Zeilen, seit jeher.
+            // Die erste Fassung dieser Zeile schrieb den Platz genau dorthin,
+            // mit der richtigen Begründung („dort stehen die Messungen") und der
+            // falschen Voraussetzung. `gameservers` hat Zeilen, und die
+            // Bereitschaftsmessung des Daemons steht dort schon.
+            //
+            // Der Daemon schickt `platz_*` nur, wenn er wirklich gemessen hat.
+            // Fehlt das Feld, bleibt der alte Wert stehen — `?? null` würde
+            // sonst bei jedem Herzschlag dazwischen eine vorhandene Messung
+            // löschen, und das sähe aus wie „nie gemessen".
+            const hatPlatz = server.platz_belegt_bytes !== undefined
+                          && server.platz_belegt_bytes !== null;
+
+            if (hatPlatz) {
+                await this.dbService.query(
+                    `UPDATE gameservers
+                        SET platz_belegt_bytes = ?,
+                            platz_grenze_bytes = ?,
+                            platz_gemessen_am  = FROM_UNIXTIME(?),
+                            platz_ueber        = ?,
+                            platz_geschaetzt   = ?
+                      WHERE id = ?`,
+                    [
+                        server.platz_belegt_bytes,
+                        server.platz_grenze_bytes ?? null,
+                        server.platz_gemessen_am ?? null,
+                        server.platz_ueber ? 1 : 0,
+                        server.platz_geschaetzt ? 1 : 0,
+                        server.server_id,
+                    ]
+                );
+            }
 
             // ✅ SSE-Broadcast: Per-Gameserver Metriken an Browser pushen
             if (guildId && sseManager) {

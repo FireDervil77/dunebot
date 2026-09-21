@@ -179,12 +179,21 @@ function roh(datei) {
     if (!ipm) {
         pruefe(false, 'apps/dashboard/helpers/IPMServer.js');
     } else {
-        pruefe(/platz_belegt_bytes = IF\(\?, \?, platz_belegt_bytes\)/.test(ipm),
-            'eine fehlende Messung löscht den gespeicherten Stand nicht',
-            '`?? null` würde bei jedem Herzschlag ohne Messung den letzten Wert leeren — '
-          + 'und das sieht aus wie „nie gemessen".');
-        pruefe(/hatPlatz/.test(ipm),
-            'der Herzschlag unterscheidet „nicht gemessen" von „0 Bytes"');
+        // Die Tabelle ist der Punkt. Die erste Fassung schrieb nach
+        // `server_registry` — null Zeilen, kein INSERT irgendwo, jedes UPDATE
+        // trifft nichts (Baustelle 146). Ein Waechter, der nur „schreibt er?"
+        // fragt, waere damals gruen geblieben.
+        const platzSchreiber = (ipm.match(/UPDATE gameservers[\s\S]{0,400}?platz_belegt_bytes/) || [])[0];
+        pruefe(!!platzSchreiber,
+            'der Herzschlag schreibt den Platz nach gameservers',
+            'Nach server_registry geschrieben trifft das UPDATE 0 Zeilen: die Tabelle ist leer '
+          + 'und bekommt nirgends ein INSERT (Baustelle 146).');
+        pruefe(!/UPDATE server_registry[\s\S]{0,400}?platz_belegt_bytes/.test(ipm),
+            'und nicht nach server_registry');
+        pruefe(/if \(hatPlatz\)/.test(ipm),
+            'ohne Messung wird gar nicht geschrieben — der letzte Stand bleibt stehen',
+            'Sonst leert jeder Herzschlag zwischen zwei Messungen den Wert, und das sieht aus '
+          + 'wie „nie gemessen".');
     }
 
     const msgTypes = ohneKommentare(roh(path.join(WURZEL, 'packages/dunebot-sdk/lib/ipm/MessageTypes.js')) || '');
@@ -236,13 +245,19 @@ function roh(datei) {
         'die 90-%-Schwelle steht nicht im Browser');
     pruefe(seite && /farbe = PLATZ_FARBE\[ergebnis\.ton\]/.test(seite),
         'die Farbe kommt aus der einen Tafel im Server');
-    pruefe(seite && /ueber:\s*stand\.ueber|ergebnis\.ueber = stand\.ueber/.test(seite),
+    pruefe(seite && /ergebnis\.ueber\s*=\s*!!server\.platz_ueber/.test(seite),
         'das Urteil „über der Grenze" kommt vom Daemon, es wird nicht nachgerechnet',
-        'Eine Anzeige, die anders rechnet als der Torwächter, widerspricht ihm irgendwann.');
+        'Eine Anzeige, die anders rechnet als der Torwächter, widerspricht ihm irgendwann — '
+      + 'erwartet `ergebnis.ueber = !!server.platz_ueber`.');
 
     const routen = ohneKommentare(roh(path.join(WURZEL, 'plugins/gameserver/dashboard/routes/servers.js')) || '');
-    pruefe(routen && /lesePlatzstand\(dbService, server\.id\)/.test(routen),
-        'die Serverseite liest den gemessenen Stand');
+    pruefe(routen && /gs\.platz_belegt_bytes/.test(routen),
+        'die Serverseite holt den gemessenen Stand aus derselben Zeile');
+    pruefe(routen && /platz_belegt_bytes, platz_grenze_bytes/.test(routen),
+        '/status ebenso — eine Abfrage, keine zweite daneben');
+    pruefe(routen && !/lesePlatzstand/.test(routen),
+        'die Sonderabfrage auf server_registry ist weg',
+        'Sie las eine Tabelle mit null Zeilen.');
     pruefe(routen && !/JOIN server_registry/.test(routen),
         'ohne JOIN auf server_registry (varchar gegen int, und die Kollationsgrenze)');
 
@@ -283,13 +298,47 @@ function roh(datei) {
         try {
             const [spalten] = await db.query(
                 `SELECT COLUMN_NAME FROM information_schema.COLUMNS
-                  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'server_registry'
+                  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'gameservers'
                     AND COLUMN_NAME LIKE 'platz\\_%'`);
             const da = spalten.map(s => s.COLUMN_NAME);
             for (const n of ['platz_belegt_bytes', 'platz_grenze_bytes', 'platz_gemessen_am',
                              'platz_ueber', 'platz_geschaetzt']) {
-                pruefe(da.includes(n), `server_registry.${n}`,
-                    'Migration 20260921_120000 ist nicht gelaufen — sie kommt mit dem Dashboard-Neustart.');
+                pruefe(da.includes(n), `gameservers.${n}`,
+                    'Migration 20260921_160000 ist nicht gelaufen — sie kommt mit dem Dashboard-Neustart.');
+            }
+
+            // Die alten Spalten muessen WEG sein: zwei Orte fuer dieselbe Frage,
+            // und der tote wuerde beim naechsten Durchgang fuer die Wahrheit
+            // gehalten.
+            const [alteSpalten] = await db.query(
+                `SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+                  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'server_registry'
+                    AND COLUMN_NAME LIKE 'platz\\_%'`);
+            pruefe(Number(alteSpalten[0].n) === 0,
+                'und in server_registry stehen keine platz-Spalten mehr',
+                `dort stehen noch ${alteSpalten[0].n} — Migration 20260921_160000 nicht gelaufen`);
+
+            // Und die Probe aufs Ganze: kommt wirklich etwas an? Eigener
+            // try-Block, damit ein fehlendes Feld VOR der Migration als „wartet"
+            // gemeldet wird und nicht als Lesefehler — sonst verdeckt der eine
+            // Befund den anderen.
+            if (da.includes('platz_belegt_bytes')) {
+                const [messungen] = await db.query(
+                    `SELECT COUNT(*) AS mit_messung,
+                            SUM(platz_belegt_bytes IS NOT NULL) AS gemessen
+                       FROM gameservers WHERE allocated_disk_gb > 0`);
+                const m = messungen[0] || {};
+                if (Number(m.mit_messung) === 0) {
+                    skip('ob eine Messung ankommt', 'kein Server mit gebuchter Platzgrenze');
+                } else {
+                    pruefe(Number(m.gemessen) > 0,
+                        `${m.gemessen} von ${m.mit_messung} Servern mit Grenze haben eine Messung`,
+                        `keiner von ${m.mit_messung} Servern mit Grenze hat eine Messung — der Waechter im `
+                      + `Daemon misst alle 5 Minuten, der Herzschlag traegt sie. Bleibt es leer, reisst die `
+                      + `Kette zwischen Daemon und Datenbank.`);
+                }
+            } else {
+                skip('ob eine Messung ankommt', 'die Spalten kommen erst mit dem Dashboard-Neustart');
             }
         } catch (e) {
             pruefe(false, 'Spalten nicht lesbar', e.message);

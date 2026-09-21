@@ -104,86 +104,6 @@ async function ladePaketeZuServern(dbService, servers) {
 }
 
 /**
- * Der gemessene Platz eines Servers (Baustelle 101, weiche Grenze).
- *
- * ── Warum eine eigene Abfrage und kein JOIN ─────────────────────────────────
- *
- * `server_registry.server_id` ist `varchar(36)`, `gameservers.id` ein `int` —
- * ein JOIN darüber vergleicht Text mit Zahl und liefe je nach Kollation ins
- * Leere oder würfe. Und die grosse Detailabfrage um eine fremde Plugin-Tabelle
- * zu erweitern, hiesse die Kollationsgrenze mitzuschleppen. Eine Zeile mehr
- * kostet weniger als beides.
- *
- * Gibt null, wenn nie gemessen wurde — das ist etwas anderes als „0 Bytes
- * belegt" und steht auf der Seite deshalb auch anders da.
- */
-async function lesePlatzstand(dbService, serverId) {
-    try {
-        const [z] = await dbService.query(
-            `SELECT platz_belegt_bytes, platz_grenze_bytes, platz_gemessen_am,
-                    platz_ueber, platz_geschaetzt
-               FROM server_registry
-              WHERE server_id = ?
-              ORDER BY last_heartbeat DESC
-              LIMIT 1`,
-            [String(serverId)]
-        );
-        if (!z || z.platz_belegt_bytes === null || z.platz_belegt_bytes === undefined) return null;
-        return {
-            belegtBytes: Number(z.platz_belegt_bytes),
-            grenzeBytes: z.platz_grenze_bytes === null ? 0 : Number(z.platz_grenze_bytes),
-            gemessenAm:  z.platz_gemessen_am || null,
-            ueber:       !!z.platz_ueber,
-            geschaetzt:  !!z.platz_geschaetzt,
-        };
-    } catch (err) {
-        // Vor der Migration 20260921_120000 gibt es die Spalten nicht. Die Seite
-        // soll deshalb nicht ausfallen — sie zeigt dann keinen Platz.
-        ServiceManager.get('Logger').debug(
-            `[Gameserver] Platzstand für Server ${serverId} nicht lesbar: ${err.message}`);
-        return null;
-    }
-}
-
-/**
- * Die gemessenen Plaetze mehrerer Server in EINER Abfrage.
- *
- * `/status` laeuft im Sekundentakt und deckt alle Server einer Guild ab — je
- * Server eine Abfrage waere dort die falsche Form. Gibt eine Tafel
- * `serverId → Stand` mit nur den Servern, zu denen es eine Messung gibt.
- */
-async function lesePlatzstaende(dbService, serverIds) {
-    const ids = [...new Set((serverIds || []).map(String))].filter(Boolean);
-    if (!ids.length) return {};
-    try {
-        const zeilen = await dbService.query(
-            `SELECT server_id, platz_belegt_bytes, platz_grenze_bytes,
-                    platz_gemessen_am, platz_ueber, platz_geschaetzt
-               FROM server_registry
-              WHERE server_id IN (${ids.map(() => '?').join(',')})
-                AND platz_belegt_bytes IS NOT NULL`,
-            ids
-        );
-        const tafel = {};
-        for (const z of zeilen || []) {
-            tafel[String(z.server_id)] = {
-                belegtBytes: Number(z.platz_belegt_bytes),
-                grenzeBytes: z.platz_grenze_bytes === null ? 0 : Number(z.platz_grenze_bytes),
-                gemessenAm:  z.platz_gemessen_am || null,
-                ueber:       !!z.platz_ueber,
-                geschaetzt:  !!z.platz_geschaetzt,
-            };
-        }
-        return tafel;
-    } catch (err) {
-        // Vor der Migration 20260921_120000 gibt es die Spalten nicht.
-        ServiceManager.get('Logger').debug(
-            `[Gameserver] Platzstände nicht lesbar: ${err.message}`);
-        return {};
-    }
-}
-
-/**
  * GET /guild/:guildId/plugins/gameserver/servers
  * Server-Übersicht - Card-Grid mit Live-Status (NEU!)
  */
@@ -228,6 +148,14 @@ router.get('/', requirePermission('GAMESERVER.VIEW'), async (req, res) => {
                 gs.bereitschaft_stufe,
                 gs.bereitschaft_grund,
                 gs.bereitschaft_am,
+                -- Der gemessene Platz (B101). Er steht seit der Migration
+                -- 20260921_160000 in derselben Zeile; vorher lag er in
+                -- server_registry und kam dort nie an (Baustelle 146).
+                gs.platz_belegt_bytes,
+                gs.platz_grenze_bytes,
+                gs.platz_gemessen_am,
+                gs.platz_ueber,
+                gs.platz_geschaetzt,
                 gs.paket_werte,
                 gs.update_available,
                 gs.created_at,
@@ -1440,17 +1368,16 @@ router.get('/status', requirePermission('GAMESERVER.VIEW'), async (req, res) => 
                     addon_marketplace_id,
                     bereitschaft_stufe, bereitschaft_grund, bereitschaft_am,
                     last_started_at,
-                    -- Fuer den Platz (B101): gebucht und ob die harte Grenze greift.
-                    -- Der gemessene Wert kommt aus server_registry, siehe darunter.
-                    allocated_disk_gb, disk_quota_enforced, disk_quota_note
+                    -- Fuer den Platz (B101): gebucht, gemessen, und ob die harte
+                    -- Grenze greift — alles in derselben Zeile.
+                    allocated_disk_gb, disk_quota_enforced, disk_quota_note,
+                    platz_belegt_bytes, platz_grenze_bytes, platz_gemessen_am,
+                    platz_ueber, platz_geschaetzt
                FROM gameservers WHERE guild_id = ?`,
             [guildId]
         );
 
         const paketNachAddon = await ladePaketeZuServern(dbService, servers);
-        // Eine Abfrage fuer alle Server dieser Guild, nicht eine je Server:
-        // diese Route laeuft im Sekundentakt.
-        const platzNachId = await lesePlatzstaende(dbService, (servers || []).map(s => s.id));
 
         res.json({
             success: true,
@@ -1474,8 +1401,8 @@ router.get('/status', requirePermission('GAMESERVER.VIEW'), async (req, res) => 
                         stufen:  a.stufen,
                     },
                     // Derselbe Aufruf, aus dem die Serverseite zeichnet. Der
-                    // Browser bekommt Text und Ton, nicht die Schwellen.
-                    platz: bauePlatz(s, platzNachId[String(s.id)] || null),
+                    // Browser bekommt Text und Farbe, nicht die Schwellen.
+                    platz: bauePlatz(s),
                 };
             })
         });
@@ -2168,7 +2095,6 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
 
             uebersicht = baueUebersicht(server, paket, {
                 sicherungen: sicherungen || [],
-                platz: await lesePlatzstand(dbService, server.id),
             });
         } catch (err) {
             Logger.error('[Gameserver] Übersichtskarte konnte nicht gebaut werden', err);

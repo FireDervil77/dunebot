@@ -124,7 +124,7 @@ function baueUebersicht(server, paket, zusatz = {}) {
         // Funktion, die der Browser danach weiterschaltet.
         pille:         bauePille(paket, server),
         kennzahlen:    baueKennzahlen(server),
-        platz:         bauePlatz(server, zusatz.platz),
+        platz:         bauePlatz(server),
         welt:          baueWelt(zusatz.sicherungen ?? zusatz.letzteSicherung),
     };
 }
@@ -464,16 +464,29 @@ function baueKennzahlen(server) {
  * neben einem Server, der nicht startet. Dieselbe Regel wie bei der
  * Knopfzeile (Baustelle 134): eine Rechnung, zwei Zeichner.
  *
- * @param {object} server Zeile aus `gameservers`
- * @param {object|null} stand Aus `lesePlatzstand` — oder null
+ * ── Warum nur EIN Argument ───────────────────────────────────────────────────
+ *
+ * Bis zum 2026-09-21 mittags kam der gemessene Stand als zweites Argument aus
+ * einer eigenen Abfrage auf `server_registry`. Diese Tabelle hat null Zeilen und
+ * bekommt nie ein INSERT (Baustelle 146) — die Messung konnte dort nie ankommen.
+ * Seit der Migration `20260921_160000` stehen die Werte in `gameservers`, also in
+ * derselben Zeile wie die Buchung. Damit faellt die zweite Abfrage weg, und mit
+ * ihr die Frage, ob beide denselben Server meinen.
+ *
+ * @param {object} server Zeile aus `gameservers` (mit `platz_*`)
  */
-function bauePlatz(server, stand) {
+function bauePlatz(server) {
     const gebuchtGiB = Number(server.allocated_disk_gb) > 0 ? Number(server.allocated_disk_gb) : null;
     const hart = server.disk_quota_enforced === null || server.disk_quota_enforced === undefined
         ? null
         : !!server.disk_quota_enforced;
 
-    if (!gebuchtGiB && !stand) return null;
+    // Gemessen ist, was der Daemon gemeldet hat. `null` heisst „noch nie
+    // gemessen" — etwas anderes als „0 Bytes belegt", und die Seite sagt es
+    // auch anders.
+    const gemessen = server.platz_belegt_bytes !== null && server.platz_belegt_bytes !== undefined;
+
+    if (!gebuchtGiB && !gemessen) return null;
 
     const giB = (bytes) => Math.round((Number(bytes) / 1024 ** 3) * 10) / 10;
 
@@ -491,14 +504,16 @@ function bauePlatz(server, stand) {
         text: null,
     };
 
-    if (stand) {
-        ergebnis.belegtGiB = giB(stand.belegtBytes);
-        ergebnis.geschaetzt = stand.geschaetzt;
-        ergebnis.gemessenAm = stand.gemessenAm;
-        ergebnis.ueber = stand.ueber;
-        const grenze = stand.grenzeBytes > 0 ? stand.grenzeBytes : (gebuchtGiB ? gebuchtGiB * 1024 ** 3 : 0);
+    if (gemessen) {
+        const belegtBytes = Number(server.platz_belegt_bytes);
+        ergebnis.belegtGiB  = giB(belegtBytes);
+        ergebnis.geschaetzt = !!server.platz_geschaetzt;
+        ergebnis.gemessenAm = server.platz_gemessen_am || null;
+        ergebnis.ueber      = !!server.platz_ueber;
+        const gemeldeteGrenze = Number(server.platz_grenze_bytes) || 0;
+        const grenze = gemeldeteGrenze > 0 ? gemeldeteGrenze : (gebuchtGiB ? gebuchtGiB * 1024 ** 3 : 0);
         if (grenze > 0) {
-            ergebnis.prozent = Math.min(999, Math.round((stand.belegtBytes / grenze) * 100));
+            ergebnis.prozent = Math.min(999, Math.round((belegtBytes / grenze) * 100));
         }
     }
 
