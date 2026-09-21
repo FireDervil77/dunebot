@@ -83,14 +83,21 @@
                 setzt — nicht das Paket: Der Bedarf steht dort ausdruecklich als
                 „nicht gemessen — nicht geraten". %>
             <div class="fb-abschnitt">Was der Server bekommen darf</div>
-            <% [['allocated_ram_mb','Arbeitsspeicher','MB',4096],
-                ['allocated_cpu_percent','CPU','%',200],
-                ['allocated_disk_gb','Platte','GB',20]].forEach(function (r) { %>
+            <%# Der Hinweis steht je Zeile, weil die drei sich nicht gleich verhalten:
+                CPU belegt die Maschine nur, solange der Server laeuft (B54,
+                entschieden 2026-09-21) — RAM und Platte sind streng gebucht. %>
+            <% [['allocated_ram_mb','Arbeitsspeicher','MB',4096,
+                 'Wird auf der Maschine gebucht, auch wenn der Server gerade weniger braucht.'],
+                ['allocated_cpu_percent','CPU','%',200,
+                 'Wird nur belegt, solange der Server läuft. Ein ausgeschalteter Server nimmt niemandem Rechenzeit weg.'],
+                ['allocated_disk_gb','Platte','GB',20,
+                 'Wird auf der Maschine gebucht, auch wenn der Server aus ist — die Spieldateien liegen weiter da.']
+               ].forEach(function (r) { %>
               <div class="fb-zeile">
                 <div>
                   <div style="font-weight:500"><%= r[1] %></div>
                   <div class="fb-muted" style="font-size:13px;margin-top:2px">
-                    Wird auf der Maschine gebucht, auch wenn der Server gerade weniger braucht.
+                    <%= r[4] %>
                   </div>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px">

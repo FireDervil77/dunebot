@@ -2228,9 +2228,15 @@ router.get('/:serverId/edit', requirePermission('GAMESERVER.EDIT'), async (req, 
             const RootServerModel = require('../../../masterserver/dashboard/models/RootServer');
             const frei = await RootServerModel.getAvailableResources(server.rootserver_id);
             if (frei?.hasQuota) {
+                // Bei der CPU zählt nur, was läuft (B54). Der eigene Anteil darf
+                // deshalb auch nur dann zurückgerechnet werden, wenn dieser Server
+                // in der laufenden Summe überhaupt drinsteckt — sonst bekäme ein
+                // ausgeschalteter Server seine Kerne zweimal angeboten.
+                const laeuft = RootServerModel.ZUSTAENDE_MIT_CPU.includes(server.status);
                 kapazitaet = {
                     ramMB:    Math.floor(Number(frei.available_ram_mb    || 0)) + (server.allocated_ram_mb      || 0),
-                    cpuCores: Number(frei.available_cpu_cores || 0) + ((server.allocated_cpu_percent || 0) / 100),
+                    cpuCores: Number(frei.available_cpu_cores_running || 0)
+                              + (laeuft ? (server.allocated_cpu_percent || 0) / 100 : 0),
                     diskGB:   Math.floor(Number(frei.available_disk_gb   || 0)) + (server.allocated_disk_gb     || 0),
                 };
             }

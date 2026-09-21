@@ -150,20 +150,27 @@
                             <span class="text-sm fw-bold">
                                 <i class="fas fa-microchip me-1 text-secondary"></i>CPU-Kerne
                             </span>
-                            <span class="text-sm text-secondary">
-                                <%= node.allocated.allocated_cpu_cores || 0 %> / <%= l.totalCpuCores %>
+                            <span class="text-sm text-secondary"
+                                  title="Nur laufende Server belegen Rechenzeit. Ein ausgeschalteter Server blockiert keine Neuanlage mehr.">
+                                <%= node.allocated.allocated_cpu_cores_running || 0 %> / <%= l.totalCpuCores %>
                             </span>
                         </div>
                         <div class="progress" style="height:14px;">
                             <div class="progress-bar bg-<%= cpuBarClass %>"
                                  style="width:<%= u.cpuPct %>%"
-                                 title="<%= u.cpuPct %>%">
+                                 title="<%= u.cpuPct %>% durch laufende Server belegt">
                                 <% if (u.cpuPct >= 15) { %><%= u.cpuPct %>%<% } %>
                             </div>
                         </div>
                         <div class="d-flex justify-content-between mt-1">
-                            <small class="text-secondary">Server: <%= node.allocated.server_count || 0 %></small>
-                            <small class="text-secondary">Kerne: <%= l.totalCpuCores %></small>
+                            <small class="text-secondary">
+                                Laufend: <%= node.allocated.server_count_running || 0 %> von <%= node.allocated.server_count || 0 %>
+                            </small>
+                            <%# Gebucht steht daneben, damit die Seite nicht "nichts verplant"
+                                behauptet, während ausgeschaltete Server ihre Kerne halten. %>
+                            <small class="text-secondary">
+                                Gebucht: <%= node.allocated.allocated_cpu_cores || 0 %> von <%= l.totalCpuCores %> Kernen
+                            </small>
                         </div>
                     </div>
 

@@ -25,14 +25,27 @@ const autoInitQuota = (rootserver) => RootServer.ensureQuota(rootserver);
 // RootServer-Quota zählt Kerne — daher die Division.
 // ─────────────────────────────────────────────────────────────────────────────
 async function getAllocatedResources(rootserverId, dbService) {
-    const leer = { allocated_ram_mb: 0, allocated_cpu_cores: 0, allocated_disk_gb: 0, server_count: 0 };
+    const leer = {
+        allocated_ram_mb: 0, allocated_cpu_cores: 0, allocated_disk_gb: 0,
+        allocated_cpu_cores_running: 0, server_count: 0, server_count_running: 0
+    };
     try {
+        // `allocated_cpu_cores_running` zählt nur laufende Server (B54): das ist
+        // die Zahl, gegen die eine Neuanlage geprüft wird. Die Gesamtsumme bleibt
+        // daneben stehen, sonst sähe die Seite aus wie „nichts verplant", während
+        // ein ausgeschalteter Server seine Kerne weiter gebucht hat.
+        // Die Zustandsliste gehört RootServer.ZUSTAENDE_MIT_CPU — hier als SQL,
+        // geprüft von `scripts/check-cpu-buchung.js`.
         const [row] = await dbService.query(
             `SELECT
                 COALESCE(SUM(allocated_ram_mb),      0)       AS allocated_ram_mb,
                 COALESCE(SUM(allocated_cpu_percent), 0) / 100 AS allocated_cpu_cores,
                 COALESCE(SUM(allocated_disk_gb),     0)       AS allocated_disk_gb,
-                COUNT(*)                                      AS server_count
+                COALESCE(SUM(CASE WHEN status IN ('installing','starting','online','stopping','updating')
+                                  THEN allocated_cpu_percent ELSE 0 END), 0) / 100 AS allocated_cpu_cores_running,
+                COUNT(*)                                      AS server_count,
+                COALESCE(SUM(CASE WHEN status IN ('installing','starting','online','stopping','updating')
+                                  THEN 1 ELSE 0 END), 0)      AS server_count_running
              FROM gameservers WHERE rootserver_id = ?`,
             [rootserverId]
         );
@@ -104,7 +117,11 @@ router.get('/', requirePermission('MASTERSERVER.RESOURCES.VIEW'), async (req, re
 
             const ramPct  = usableRamMB  > 0 ? Math.min(100, Math.round((allocated.allocated_ram_mb  / usableRamMB)  * 100)) : 0;
             const diskPct = usableDiskGB > 0 ? Math.min(100, Math.round((allocated.allocated_disk_gb / usableDiskGB) * 100)) : 0;
-            const cpuPct  = totalCpuCores > 0 ? Math.min(100, Math.round((allocated.allocated_cpu_cores / totalCpuCores) * 100)) : 0;
+            // Der Balken zeigt, was eine Neuanlage blockiert — also die laufenden
+            // Server (B54). Die Gesamtbuchung steht als Zahl daneben; ein voller
+            // Balken neben einer gelungenen Neuanlage wäre ein Widerspruch.
+            const cpuPct  = totalCpuCores > 0 ? Math.min(100, Math.round((allocated.allocated_cpu_cores_running / totalCpuCores) * 100)) : 0;
+            const cpuPctGebucht = totalCpuCores > 0 ? Math.min(100, Math.round((allocated.allocated_cpu_cores / totalCpuCores) * 100)) : 0;
 
             return {
                 ...rs,
@@ -112,7 +129,7 @@ router.get('/', requirePermission('MASTERSERVER.RESOURCES.VIEW'), async (req, re
                 allocated,
                 gameservers,
                 limits: { totalRamMB, usableRamMB, reservedRamMB, totalCpuCores, totalDiskGB, usableDiskGB, reservedDiskGB, overRam, overDisk },
-                usage:  { ramPct, diskPct, cpuPct }
+                usage:  { ramPct, diskPct, cpuPct, cpuPctGebucht }
             };
         }));
 

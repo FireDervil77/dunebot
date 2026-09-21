@@ -16,6 +16,28 @@ const crypto = require('crypto');
 
 class RootServer {
 
+    /**
+     * Welche Serverzustände Rechenzeit belegen (Baustelle 54).
+     *
+     * ENUM in `gameservers.status`: installing, installed, starting, online,
+     * stopping, offline, error, updating.
+     *
+     *   belegt CPU:    installing, starting, online, stopping, updating
+     *   belegt nicht:  installed, offline, error
+     *
+     * `installing` und `updating` zählen mit, weil dort ein Container läuft —
+     * SteamCMD verbraucht CPU unter demselben Limit wie das Spiel. `error`
+     * zählt nicht: ein Server im Fehlerzustand läuft nicht, und ihn
+     * mitzuzählen würde eine Neuanlage wegen eines kaputten Nachbarn
+     * blockieren.
+     *
+     * ⚠ Dieselbe Liste steht ein zweites Mal in SQL, in der Migration
+     * `20260921_090000_cpu_zaehlt_nur_laufende.js` — eine View kann keine
+     * JS-Konstante lesen. Dass beide gleich bleiben, prüft
+     * `scripts/check-cpu-buchung.js`.
+     */
+    static ZUSTAENDE_MIT_CPU = ['installing', 'starting', 'online', 'stopping', 'updating'];
+
     // =========================================================
     // CRUD
     // =========================================================
@@ -587,14 +609,35 @@ class RootServer {
             'SELECT * FROM rootserver_resource_summary WHERE rootserver_id = ?', [rootserverId]
         );
         if (!row) return { available_ram_mb: 0, available_cpu_cores: 0, available_disk_gb: 0, hasQuota: false };
+
+        // CPU wird nur von laufenden Servern belegt (B54, entschieden 2026-09-21).
+        // Fehlt die Spalte, ist die Migration 20260921_090000 nicht gelaufen —
+        // dann gilt die alte Rechnung weiter, aber nicht stillschweigend.
+        let available_cpu_cores_running = row.available_cpu_cores_running;
+        if (available_cpu_cores_running === undefined) {
+            if (ServiceManager.has('Logger')) {
+                ServiceManager.get('Logger').warn(
+                    '[RootServer] rootserver_resource_summary ohne Spalte available_cpu_cores_running — '
+                  + 'Migration 20260921_090000 fehlt, CPU zählt weiter auch ausgeschaltete Server (B54)');
+            }
+            available_cpu_cores_running = row.available_cpu_cores;
+        }
+
         return {
             available_ram_mb:    row.available_ram_mb    || 0,
             available_cpu_cores: row.available_cpu_cores || 0,
             available_disk_gb:   row.available_disk_gb   || 0,
+            // Die Zahl, gegen die eine Neuanlage geprüft wird. Die Zeile darüber
+            // bleibt „gebucht insgesamt" — dieselbe Frage hat zwei Antworten,
+            // und beide gehören angezeigt.
+            available_cpu_cores_running: available_cpu_cores_running || 0,
             total_ram_mb: row.total_ram_mb, total_cpu_cores: row.total_cpu_cores, total_disk_gb: row.total_disk_gb,
             allocated_ram_mb: row.allocated_ram_mb, allocated_cpu_cores: row.allocated_cpu_cores, allocated_disk_gb: row.allocated_disk_gb,
+            allocated_cpu_cores_running: row.allocated_cpu_cores_running ?? row.allocated_cpu_cores,
             ram_usage_percent: row.ram_usage_percent, cpu_usage_percent: row.cpu_usage_percent, disk_usage_percent: row.disk_usage_percent,
+            cpu_usage_percent_running: row.cpu_usage_percent_running ?? row.cpu_usage_percent,
             gameserver_count: row.gameserver_count, max_gameservers: row.max_gameservers,
+            gameserver_count_running: row.gameserver_count_running ?? null,
             hasQuota: true
         };
     }
@@ -604,7 +647,12 @@ class RootServer {
         if (!available.hasQuota) return { available: false, reason: 'Kein Quota konfiguriert', missing: null };
         const missing = {}; let ok = true;
         if (required.ramMB    > available.available_ram_mb)    { missing.ram  = { required: required.ramMB,    available: available.available_ram_mb    }; ok = false; }
-        if (required.cpuCores > available.available_cpu_cores) { missing.cpu  = { required: required.cpuCores, available: available.available_cpu_cores }; ok = false; }
+        // CPU gegen die laufenden Server, nicht gegen alle erstellten (B54,
+        // entschieden 2026-09-21): ein ausgeschalteter Server verbraucht keine
+        // Rechenzeit, und CPU ist überbuchbar — der Scheduler teilt. RAM und
+        // Platte bleiben bewusst streng: Überbuchung endet dort im OOM-Killer
+        // bzw. auf einer vollen Platte.
+        if (required.cpuCores > available.available_cpu_cores_running) { missing.cpu  = { required: required.cpuCores, available: available.available_cpu_cores_running }; ok = false; }
         if (required.diskGB   > available.available_disk_gb)   { missing.disk = { required: required.diskGB,   available: available.available_disk_gb   }; ok = false; }
         if (available.max_gameservers !== null && available.gameserver_count >= available.max_gameservers) {
             missing.gameserver_limit = { current: available.gameserver_count, max: available.max_gameservers }; ok = false;
