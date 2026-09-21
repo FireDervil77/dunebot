@@ -919,6 +919,16 @@ class IPMServer {
             const rawStatus = server.status || 'offline';
             const dbStatus = registryStatusMap[rawStatus] ?? rawStatus;
 
+            // ── Der gemessene Platz (B101, weiche Grenze) ────────────────
+            //
+            // Der Daemon schickt `platz_*` nur, wenn er wirklich gemessen hat.
+            // Fehlt das Feld, bleibt der alte Wert stehen — `?? null` würde
+            // sonst bei jedem Herzschlag eine vorhandene Messung löschen, bis
+            // der Wächter in fünf Minuten wieder misst. Genau so sähe es aus
+            // wie „nie gemessen".
+            const hatPlatz = server.platz_belegt_bytes !== undefined
+                          && server.platz_belegt_bytes !== null;
+
             await this.dbService.query(
                 `UPDATE server_registry 
                  SET status = ?, 
@@ -926,6 +936,11 @@ class IPMServer {
                      cpu_percent = ?,
                      ram_used_mb = ?,
                      ram_total_mb = ?,
+                     platz_belegt_bytes = IF(?, ?, platz_belegt_bytes),
+                     platz_grenze_bytes = IF(?, ?, platz_grenze_bytes),
+                     platz_gemessen_am  = IF(?, FROM_UNIXTIME(?), platz_gemessen_am),
+                     platz_ueber        = IF(?, ?, platz_ueber),
+                     platz_geschaetzt   = IF(?, ?, platz_geschaetzt),
                      last_heartbeat = NOW()
                  WHERE daemon_id = ? AND server_id = ?`,
                 [
@@ -934,6 +949,11 @@ class IPMServer {
                     server.cpu_percent ?? null,
                     server.ram_used_mb ?? null,
                     server.ram_total_mb ?? null,
+                    hatPlatz ? 1 : 0, server.platz_belegt_bytes ?? null,
+                    hatPlatz ? 1 : 0, server.platz_grenze_bytes ?? null,
+                    hatPlatz ? 1 : 0, server.platz_gemessen_am ?? null,
+                    hatPlatz ? 1 : 0, server.platz_ueber ? 1 : 0,
+                    hatPlatz ? 1 : 0, server.platz_geschaetzt ? 1 : 0,
                     daemonId, 
                     server.server_id
                 ]
@@ -950,6 +970,14 @@ class IPMServer {
                     ram_total_mb: server.ram_total_mb ?? null,
                     current_players: server.players ?? null,
                     max_players: server.max_players ?? null,
+                    // Nur mitschicken, wenn gemessen: ein `null` im Push würde
+                    // im Browser eine vorhandene Anzeige leeren.
+                    ...(hatPlatz ? {
+                        platz_belegt_bytes: server.platz_belegt_bytes,
+                        platz_grenze_bytes: server.platz_grenze_bytes ?? null,
+                        platz_ueber: !!server.platz_ueber,
+                        platz_geschaetzt: !!server.platz_geschaetzt,
+                    } : {}),
                     timestamp: Date.now()
                 });
             }

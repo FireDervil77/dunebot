@@ -116,6 +116,23 @@ const GAMESERVER_CRASHED = 'crashed';
 const GAMESERVER_QUOTA_STATUS = 'quota_status';
 
 /**
+ * Event: Wie voll ein Server ist — belegte Bytes, Grenze, und ob er darüber
+ * liegt. Kommt nur bei einem Wechsel über die Grenze und wenn ein Start deshalb
+ * verweigert wurde, nicht bei jeder Messung.
+ *
+ * Bewusst getrennt von `quota_status`: Das beantwortet die Frage des Betreibers
+ * „greift die Grenze überhaupt?" und kommt einmal beim Start. Dieses beantwortet
+ * die Frage des Kunden „wie viel habe ich noch?".
+ *
+ * Die laufenden Zahlen kommen im Herzschlag (`platz_*` je Server) — dieses
+ * Ereignis ist der Stoß für die Warnung, nicht die Quelle der Werte.
+ *
+ * Payload: { server_id, belegt_bytes, grenze_bytes, prozent, ueber,
+ *            geschaetzt, gemessen_am }
+ */
+const GAMESERVER_PLATZSTAND = 'platzstand';
+
+/**
  * Die Bereitschaftsleiter von fb-init: process → port → query.
  *
  * Bewusst getrennt von `status_changed`. Das sagt, ob der Container laeuft —
@@ -304,6 +321,7 @@ module.exports = {
   GAMESERVER_RESOURCE_USAGE,
   GAMESERVER_CRASHED,
   GAMESERVER_QUOTA_STATUS,
+  GAMESERVER_PLATZSTAND,
   GAMESERVER_READINESS,
   
   // Console Actions

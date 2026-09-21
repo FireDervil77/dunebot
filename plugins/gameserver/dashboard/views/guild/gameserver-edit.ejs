@@ -175,15 +175,31 @@
                                     <% } else if (server.disk_quota_enforced) { %>
                                         <div class="alert alert-success py-2 mt-2 mb-0">
                                             <i class="fas fa-shield-halved me-1"></i>
-                                            <strong>Platzgrenze wird durchgesetzt.</strong>
-                                            Schreibversuche über die Grenze hinaus schlagen fehl.
+                                            <strong>Harte Platzgrenze wird durchgesetzt.</strong>
+                                            Eine Projekt-Quota im Dateisystem — Schreibversuche über die
+                                            Grenze hinaus schlagen sofort fehl, auf das Byte.
                                         </div>
                                     <% } else { %>
+                                        <%#
+                                          Seit dem 2026-09-21 (Baustelle 101, Weg C) ist „greift nicht"
+                                          nicht mehr die ganze Wahrheit: Wo die harte Quota nicht
+                                          moeglich ist, uebernimmt eine weiche Grenze im Daemon. Sie
+                                          ist keine Zusage aufs Byte, aber sie verweigert den Start,
+                                          lehnt Uploads ab und haelt einen Server an, der darueber
+                                          hinauswaechst. Der alte Text behauptete das Gegenteil.
+                                        %>
                                         <div class="alert alert-warning py-2 mt-2 mb-0">
-                                            <i class="fas fa-triangle-exclamation me-1"></i>
-                                            <strong>Die Platzgrenze greift nicht.</strong>
-                                            Die GiB-Angabe bucht Platz in der Rechnung, hindert den Server
-                                            aber nicht daran, die Platte vollzuschreiben.
+                                            <i class="fas fa-shield-halved me-1"></i>
+                                            <strong>Die harte Platzgrenze greift hier nicht — es gilt die weiche.</strong>
+                                            Das Dateisystem dieser Maschine kann keine Projekt-Quota setzen.
+                                            Stattdessen misst der Daemon den belegten Platz und
+                                            <strong>verweigert den Start</strong>, lehnt Uploads ab und hält einen
+                                            laufenden Server an, der über der Grenze bleibt. Löschen bleibt
+                                            immer möglich.
+                                            <br><small>
+                                                Das ist keine Zusage auf das Byte: zwischen zwei Messungen kann
+                                                das Spiel darüber hinaus schreiben. Gemessen wird alle fünf Minuten.
+                                            </small>
                                             <% if (server.disk_quota_note) { %>
                                                 <br><small><%= server.disk_quota_note %></small>
                                             <% } %>

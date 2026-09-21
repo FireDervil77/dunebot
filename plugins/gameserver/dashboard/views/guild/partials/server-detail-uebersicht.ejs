@@ -99,6 +99,45 @@
             <% if (u.kennzahlen.ram !== null) { %>&nbsp; RAM <span class="fb-mono"><%= Math.round(u.kennzahlen.ram) %><%= u.kennzahlen.ramMax ? '/' + Math.round(u.kennzahlen.ramMax) : '' %>&nbsp;MB</span><% } %>
           <% } %>
         </div>
+
+        <%# ── Platz (Baustelle 101, weiche Grenze) ─────────────────────────────
+            Die Zahlen rechnet `bauePlatz` im Server, hier wird nur gezeichnet.
+            „noch nicht gemessen" steht ausdrücklich da: ein leerer Balken wäre
+            eine Aussage, und zwar die falsche. %>
+        <% if (u.platz && u.platz.text) { %>
+          <div style="margin-top:10px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+              <div style="font-size:13px">
+                Platz
+                <span class="fb-mono" data-fb-live="platz-text" data-fb-server="<%= server.id %>"><%= u.platz.text %></span>
+                <% if (u.platz.geschaetzt) { %>
+                  <span class="fb-muted" style="font-size:12px" title="Seit der letzten Messung wurde ein Upload dazugerechnet.">(geschätzt)</span>
+                <% } %>
+              </div>
+              <% if (u.platz.durchsetzung === 'weich') { %>
+                <span class="fb-muted" style="font-size:12px"
+                      title="<%= u.platz.grund || '' %>">weiche Grenze</span>
+              <% } else if (u.platz.durchsetzung === 'hart') { %>
+                <span class="fb-muted" style="font-size:12px" title="Projekt-Quota im Dateisystem">harte Grenze</span>
+              <% } else if (u.platz.durchsetzung === 'keine') { %>
+                <span class="fb-muted" style="font-size:12px">keine Grenze gebucht</span>
+              <% } %>
+            </div>
+            <% if (u.platz.prozent !== null) { %>
+              <div style="height:6px;border-radius:100rem;background:#f1f3f5;overflow:hidden;margin-top:6px">
+                <div data-fb-live="platz-balken" data-fb-server="<%= server.id %>"
+                     style="height:100%;width:<%= Math.min(100, u.platz.prozent) %>%;background:<%=
+                       u.platz.ueber ? '#d63939' : (u.platz.prozent >= 90 ? '#f76707' : '#2fb344') %>"></div>
+              </div>
+            <% } %>
+            <% if (u.platz.ueber) { %>
+              <div style="font-size:12px;color:#d63939;margin-top:6px">
+                Über der Grenze. Der Server startet nicht, und Uploads werden abgelehnt,
+                bis Platz frei ist. Löschen geht weiter.
+              </div>
+            <% } %>
+          </div>
+        <% } %>
       </div>
 
       <div style="width:268px;flex:0 0 268px;padding:20px 24px;border-left:1px solid var(--fb-border);background:#fbfcfd">

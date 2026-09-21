@@ -124,6 +124,7 @@ function baueUebersicht(server, paket, zusatz = {}) {
         // Funktion, die der Browser danach weiterschaltet.
         pille:         bauePille(paket, server),
         kennzahlen:    baueKennzahlen(server),
+        platz:         bauePlatz(server, zusatz.platz),
         welt:          baueWelt(zusatz.sicherungen ?? zusatz.letzteSicherung),
     };
 }
@@ -443,6 +444,73 @@ function baueKennzahlen(server) {
     const ramMax = Number.isFinite(server.ram_total_mb) ? server.ram_total_mb : null;
     if (cpu === null && ram === null) return null;
     return { cpu, ram, ramMax };
+}
+
+/**
+ * Der Platz: was gebucht ist, was belegt ist, und wer die Grenze durchsetzt.
+ *
+ * ── Warum drei Fälle und nicht zwei ─────────────────────────────────────────
+ *
+ * „Gebucht" (`allocated_disk_gb`) weiss die Seite immer. „Belegt" weiss sie nur,
+ * wenn der Daemon gemessen hat — und das tut er erst, seit es eine Grenze gibt,
+ * die er beobachten soll. Ein fehlender Messwert als „0 belegt" anzuzeigen wäre
+ * die falsche Sorte Auskunft: Der Balken stünde auf leer, während der Server
+ * voll ist.
+ *
+ * ── Warum `ueber` vom Daemon kommt und nicht hier gerechnet wird ────────────
+ *
+ * Der Daemon verweigert den Start. Würde die Seite selbst rechnen, könnten
+ * Anzeige und Torwächter auseinanderlaufen — und der Kunde sähe „alles gut"
+ * neben einem Server, der nicht startet. Dieselbe Regel wie bei der
+ * Knopfzeile (Baustelle 134): eine Rechnung, zwei Zeichner.
+ *
+ * @param {object} server Zeile aus `gameservers`
+ * @param {object|null} stand Aus `lesePlatzstand` — oder null
+ */
+function bauePlatz(server, stand) {
+    const gebuchtGiB = Number(server.allocated_disk_gb) > 0 ? Number(server.allocated_disk_gb) : null;
+    const hart = server.disk_quota_enforced === null || server.disk_quota_enforced === undefined
+        ? null
+        : !!server.disk_quota_enforced;
+
+    if (!gebuchtGiB && !stand) return null;
+
+    const giB = (bytes) => Math.round((Number(bytes) / 1024 ** 3) * 10) / 10;
+
+    const ergebnis = {
+        gebuchtGiB,
+        // Wer die Grenze durchsetzt: 'hart' (Projekt-Quota), 'weich' (der
+        // Wächter im Daemon), oder null — noch nicht gemeldet.
+        durchsetzung: gebuchtGiB === null ? 'keine' : (hart === null ? null : (hart ? 'hart' : 'weich')),
+        grund: server.disk_quota_note || null,
+        belegtGiB: null,
+        prozent: null,
+        ueber: false,
+        geschaetzt: false,
+        gemessenAm: null,
+        text: null,
+    };
+
+    if (stand) {
+        ergebnis.belegtGiB = giB(stand.belegtBytes);
+        ergebnis.geschaetzt = stand.geschaetzt;
+        ergebnis.gemessenAm = stand.gemessenAm;
+        ergebnis.ueber = stand.ueber;
+        const grenze = stand.grenzeBytes > 0 ? stand.grenzeBytes : (gebuchtGiB ? gebuchtGiB * 1024 ** 3 : 0);
+        if (grenze > 0) {
+            ergebnis.prozent = Math.min(999, Math.round((stand.belegtBytes / grenze) * 100));
+        }
+    }
+
+    if (ergebnis.belegtGiB !== null && gebuchtGiB) {
+        ergebnis.text = `${ergebnis.belegtGiB} von ${gebuchtGiB} GiB belegt`;
+    } else if (ergebnis.belegtGiB !== null) {
+        ergebnis.text = `${ergebnis.belegtGiB} GiB belegt, keine Grenze`;
+    } else if (gebuchtGiB) {
+        ergebnis.text = `${gebuchtGiB} GiB gebucht, noch nicht gemessen`;
+    }
+
+    return ergebnis;
 }
 
 /**

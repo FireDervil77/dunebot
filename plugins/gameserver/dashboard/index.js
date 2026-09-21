@@ -628,6 +628,22 @@ class GameserverPlugin extends DashboardPlugin {
             );
 
             // ════════════════════════════════════════════════════════════
+            // Platzstand: wie voll ist der Server? (Baustelle 101, Weg C)
+            // ════════════════════════════════════════════════════════════
+            //
+            // Die laufenden Zahlen kommen im Herzschlag (`platz_*` je Server,
+            // IPMServer._updateServerRegistry). Dieses Ereignis ist der Stoß
+            // für die Warnung: Es kommt beim Wechsel über die Grenze und in dem
+            // Augenblick, in dem ein Start deshalb verweigert wurde — und der
+            // liegt zwischen zwei Herzschlägen.
+            eventRouter.register(
+                MessageTypes.NS_GAMESERVER,
+                MessageTypes.GAMESERVER_PLATZSTAND,
+                this._handlePlatzstand.bind(this),
+                { priority: 1 }
+            );
+
+            // ════════════════════════════════════════════════════════════
             // Bereitschaft: kann jemand rein? (Baustellen 58 und 62f)
             // ════════════════════════════════════════════════════════════
             //
@@ -724,6 +740,57 @@ class GameserverPlugin extends DashboardPlugin {
             }
         } catch (error) {
             Logger.error('[Gameserver] Quota-Meldung konnte nicht gespeichert werden:', error);
+        }
+    }
+
+    /**
+     * Handler: wie voll ein Server ist (Baustelle 101, weiche Grenze).
+     *
+     * ── Warum hier nichts in die Datenbank geschrieben wird ─────────────────
+     *
+     * Die Werte stehen schon in `server_registry`, geschrieben vom Herzschlag —
+     * dort kommen sie regelmäßig und vollständig an. Sie hier ein zweites Mal
+     * zu schreiben hieße, zwei Schreiber auf eine Wahrheit zu setzen, und der
+     * seltenere (dieses Ereignis) würde den häufigeren gelegentlich
+     * überschreiben. Dieser Handler tut deshalb genau zwei Dinge: Er
+     * protokolliert, und er stößt die Anzeige an.
+     *
+     * @private
+     */
+    async _handlePlatzstand(payload, message, context) {
+        const Logger = ServiceManager.get('Logger');
+        const dbService = ServiceManager.get('dbService');
+
+        const { server_id, belegt_bytes, grenze_bytes, prozent, ueber, geschaetzt } = payload || {};
+        if (!server_id) return;
+
+        try {
+            const gib = (b) => (Number.isFinite(Number(b)) ? (Number(b) / 1024 ** 3).toFixed(1) : '?');
+
+            if (ueber) {
+                Logger.warn(`[Gameserver] Server ${server_id} über seiner Platzgrenze: `
+                          + `${gib(belegt_bytes)} von ${gib(grenze_bytes)} GiB (${prozent} %)`);
+            } else {
+                Logger.info(`[Gameserver] Server ${server_id} wieder unter seiner Platzgrenze: `
+                          + `${gib(belegt_bytes)} von ${gib(grenze_bytes)} GiB (${prozent} %)`);
+            }
+
+            const [server] = await dbService.query(
+                'SELECT guild_id FROM gameservers WHERE id = ?', [server_id]
+            );
+            if (server) {
+                ServiceManager.get('sseManager')?.broadcast(String(server.guild_id), 'gameserver', {
+                    action: 'platzstand',
+                    server_id,
+                    belegt_bytes: belegt_bytes ?? null,
+                    grenze_bytes: grenze_bytes ?? null,
+                    prozent: prozent ?? null,
+                    ueber: !!ueber,
+                    geschaetzt: !!geschaetzt,
+                });
+            }
+        } catch (error) {
+            Logger.error('[Gameserver] Platzstand konnte nicht verarbeitet werden:', error);
         }
     }
 
