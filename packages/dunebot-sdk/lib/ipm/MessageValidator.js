@@ -106,76 +106,28 @@ class MessageValidator {
   }
 
   /**
-   * Validiert einen Namespace
-   * 
-   * @param {string} namespace - Zu prüfender Namespace
-   * @returns {boolean} Valid?
+   * ── Hier standen `isValidNamespace` und `isValidAction` ────────────────────
+   *
+   * Zwei Erlaubnislisten (Namensräume, und je Namensraum die Aktionen). Beide
+   * ohne einen einzigen Aufrufer — am 2026-09-21 in `apps`, `plugins` und
+   * `packages` gesucht, der einzige Treffer war die Definition selbst.
+   *
+   * **Entfernt, weil eine tote Erlaubnisliste eine Falle ist, kein Schutz.**
+   * Sie war unvollständig, und zwar nachweislich: `GAMESERVER_READINESS` stand
+   * nicht darin und kommt seit dem 2026-09-08 an (die Bereitschaftsstufe füllt
+   * `bereitschaft_stufe`). Wäre die Prüfung verdrahtet gewesen, hätte sie
+   * genau diese Meldung verworfen — still, denn eine abgewiesene Aktion sieht
+   * aus wie eine, die nie geschickt wurde.
+   *
+   * Wer sie wieder einführt, tut zwei Dinge in dieser Reihenfolge: erst die
+   * Listen aus den heute WIRKLICH ankommenden Ereignissen füllen (messen, nicht
+   * aus `MessageTypes` ableiten — dort steht auch, was niemand schickt), dann
+   * verdrahten. Umgekehrt fällt beim ersten Rollout Post aus, die niemand
+   * vermisst, bis etwas Wichtiges fehlt.
+   *
+   * `validate()` darüber prüft weiterhin, DASS `namespace` und `action` da sind.
+   * Das ist die Prüfung, die einen Aufrufer hat (`IPMEventRouter`).
    */
-  static isValidNamespace(namespace) {
-    const validNamespaces = [
-      MessageTypes.NS_GAMESERVER,
-      MessageTypes.NS_CONSOLE,
-      MessageTypes.NS_LOGS,
-      MessageTypes.NS_SFTP,
-      MessageTypes.NS_SYSTEM,
-      MessageTypes.NS_INSTALL,
-    ];
-    return validNamespaces.includes(namespace);
-  }
-
-  /**
-   * Validiert eine Action für einen Namespace
-   * 
-   * @param {string} namespace - Namespace
-   * @param {string} action - Action
-   * @returns {boolean} Valid?
-   */
-  static isValidAction(namespace, action) {
-    const actionMap = {
-      [MessageTypes.NS_GAMESERVER]: [
-        MessageTypes.GAMESERVER_START,
-        MessageTypes.GAMESERVER_STOP,
-        MessageTypes.GAMESERVER_RESTART,
-        MessageTypes.GAMESERVER_STATUS_CHANGED,
-        MessageTypes.GAMESERVER_RESOURCE_USAGE,
-        MessageTypes.GAMESERVER_CRASHED,
-        MessageTypes.GAMESERVER_QUOTA_STATUS,
-      ],
-      [MessageTypes.NS_CONSOLE]: [
-        MessageTypes.CONSOLE_ATTACH,
-        MessageTypes.CONSOLE_DETACH,
-        MessageTypes.CONSOLE_OUTPUT,
-        MessageTypes.CONSOLE_INPUT,
-      ],
-      [MessageTypes.NS_LOGS]: [
-        MessageTypes.LOGS_FETCH,
-        MessageTypes.LOGS_STREAM,
-        MessageTypes.LOGS_SEARCH,
-      ],
-      [MessageTypes.NS_SFTP]: [
-        MessageTypes.SFTP_LIST,
-        MessageTypes.SFTP_UPLOAD,
-        MessageTypes.SFTP_DOWNLOAD,
-        MessageTypes.SFTP_DELETE,
-        MessageTypes.SFTP_CREATE_DIR,
-        MessageTypes.SFTP_CHMOD,
-      ],
-      [MessageTypes.NS_SYSTEM]: [
-        MessageTypes.SYSTEM_STATS,
-        MessageTypes.SYSTEM_DAEMON_STATUS,
-        MessageTypes.SYSTEM_UPDATE_AVAILABLE,
-      ],
-      [MessageTypes.NS_INSTALL]: [
-        MessageTypes.INSTALL_PROGRESS,
-        MessageTypes.INSTALL_LOGS,
-        MessageTypes.INSTALL_COMPLETED,
-        MessageTypes.INSTALL_FAILED,
-      ],
-    };
-
-    const validActions = actionMap[namespace];
-    return validActions ? validActions.includes(action) : false;
-  }
 
   /**
    * Sanitize eine Message (XSS-Prevention, etc.)
@@ -225,23 +177,13 @@ class MessageValidator {
   }
 
   /**
-   * Quick-Validate (nur Pflichtfelder, für Performance)
-   * 
-   * @param {Object} message - Zu validierende Message
-   * @returns {boolean} Valid?
+   * ── Hier stand `quickValidate` ────────────────────────────────────────────
+   *
+   * "Nur Pflichtfelder, für Performance" — und ohne Aufrufer, wie die beiden
+   * Listen darüber. Entfernt aus demselben Grund: Ein zweiter, schnellerer Weg
+   * zu derselben Frage driftet vom ersten weg, sobald einer von beiden
+   * angefasst wird. `validate()` ist der eine Weg.
    */
-  static quickValidate(message) {
-    if (!message || typeof message !== 'object') return false;
-    if (!message.type || !message.timestamp) return false;
-    
-    const validTypes = [
-      MessageTypes.TYPE_COMMAND,
-      MessageTypes.TYPE_EVENT,
-      MessageTypes.TYPE_RESPONSE
-    ];
-    
-    return validTypes.includes(message.type);
-  }
 }
 
 module.exports = MessageValidator;
