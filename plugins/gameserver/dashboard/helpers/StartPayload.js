@@ -28,6 +28,7 @@
 
 'use strict';
 
+const { loeseInhaltAuf } = require('./InhaltJeLader');
 const fs   = require('fs');
 const path = require('path');
 
@@ -232,7 +233,11 @@ function grenzenAus(server) {
 async function buildStartPayload(server, guildId, Logger = null) {
     const serverId = server.id;
 
-    const paket = parseJson(server.paket_json, null);
+    // Der Inhaltsvertrag wird HIER aufgeloest, nicht im Daemon: Er bekommt das
+    // Paket des gewaehlten Laders, nicht die Auswahl. Sonst muesste er dieselbe
+    // Regel ein zweites Mal kennen — und zwei Regeln driften (Stufe 3).
+    const paket = loeseInhaltAuf(parseJson(server.paket_json, null),
+        parseJson(server.paket_werte, {}) || {});
     if (!paket) {
         return {
             payload: null, dockerImage: null,
@@ -324,7 +329,11 @@ async function buildStartPayload(server, guildId, Logger = null) {
 function baueInstallNutzlast(server, guildId, optionen = {}) {
     if (!server) return { payload: null, error: 'Server nicht gefunden.' };
 
-    const paket = parseJson(server.paket_json, null);
+    // Der Inhaltsvertrag wird HIER aufgeloest, nicht im Daemon: Er bekommt das
+    // Paket des gewaehlten Laders, nicht die Auswahl. Sonst muesste er dieselbe
+    // Regel ein zweites Mal kennen — und zwei Regeln driften (Stufe 3).
+    const paket = loeseInhaltAuf(parseJson(server.paket_json, null),
+        parseJson(server.paket_werte, {}) || {});
     if (!paket) {
         return {
             payload: null,

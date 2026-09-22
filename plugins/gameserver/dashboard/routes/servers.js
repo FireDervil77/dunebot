@@ -761,6 +761,10 @@ router.get('/create', requirePermission('GAMESERVER.CREATE'), async (req, res) =
                 title: 'Server anlegen — Werte',
                 werte,
                 inhalte,
+                // Haengt der Inhalt am Lader, kann diese Seite ihn noch nicht
+                // kennen — er wird hier gerade gewaehlt. Dann steht dort ein
+                // Satz statt einer stillen Luecke (Stufe 3).
+                inhalteAmLader: Boolean(paketFuerWerte?.content?.variants),
                 addonId: addonData.id,
                 addonSlug: addonData.slug,
                 rootserverId: req.query.rootserver_id || '',

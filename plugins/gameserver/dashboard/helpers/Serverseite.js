@@ -45,6 +45,11 @@ const WIRKUNG = {
     instant:   { text: 'wirkt sofort',            ton: 'green'  },
     restart:   { text: 'wirkt beim Neustart',     ton: 'blue'   },
     new_world: { text: 'erzeugt eine neue Welt',  ton: 'orange' },
+    // Seit dem 2026-09-22 (Minecraft, Stufe 3). Bis dahin fehlte diese Stufe im
+    // Format, und Einstellungen, die eine Neuinstallation brauchen, standen als
+    // „wirkt beim Neustart" da — das Paket hat den Mangel selbst vermerkt
+    // (`settings.version`). Ein Neustart aendert am Server-Jar nichts.
+    reinstall: { text: 'nur mit Neuinstallation', ton: 'red'    },
 };
 
 /**

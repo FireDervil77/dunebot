@@ -393,11 +393,20 @@
                 "type": "string"
               },
               "when": {
-                "enum": [
-                  "true",
-                  "false",
-                  "not_empty",
-                  "empty"
+                "description": "Bedingung: 'true'/'false' (Schalterstellung), 'not_empty'/'empty' (Wert gesetzt oder nicht), '=wert'/'!=wert' (Gleichheit — seit 2026-09-22 fuer Auswahlen wie den Minecraft-Lader; verglichen wird der Wert von `from`). Fehlt = immer.",
+                "oneOf": [
+                  {
+                    "enum": [
+                      "true",
+                      "false",
+                      "not_empty",
+                      "empty"
+                    ]
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^!?=.+$"
+                  }
                 ]
               }
             }
@@ -424,12 +433,20 @@
           "pattern": "^(fixed|free|setting:[a-z][a-z0-9_]*|port:[a-z][a-z0-9_]*|content:[a-z][a-z0-9_]*)$"
         },
         "when": {
-          "description": "Bedingung: 'true'/'false' (Schalterstellung), 'not_empty'/'empty' (Wert gesetzt oder nicht). Fehlt = immer.",
-          "enum": [
-            "true",
-            "false",
-            "not_empty",
-            "empty"
+          "description": "Bedingung: 'true'/'false' (Schalterstellung), 'not_empty'/'empty' (Wert gesetzt oder nicht), '=wert'/'!=wert' (Gleichheit — seit 2026-09-22 fuer Auswahlen wie den Minecraft-Lader; verglichen wird der Wert von `from`). Fehlt = immer.",
+          "oneOf": [
+            {
+              "enum": [
+                "true",
+                "false",
+                "not_empty",
+                "empty"
+              ]
+            },
+            {
+              "type": "string",
+              "pattern": "^!?=.+$"
+            }
           ]
         }
       }
@@ -569,9 +586,11 @@
           "enum": [
             "instant",
             "restart",
-            "new_world"
+            "new_world",
+            "reinstall"
           ],
-          "default": "restart"
+          "default": "restart",
+          "description": "Wann die Aenderung greift. `reinstall` seit 2026-09-22: Der Wert entscheidet, WAS installiert wird (Minecraft-Lader, Spielfassung) — ein Neustart aendert daran nichts. Vorher stand dort `restart`, und das Paket hat den Mangel selbst vermerkt."
         },
         "risk": {
           "enum": [
@@ -1170,6 +1189,18 @@
         "client_side": {
           "type": "boolean",
           "description": "Müssen Mitspieler dasselbe installieren? (B.12)"
+        },
+        "by_setting": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "Welche Einstellung entscheidet, WELCHER Inhaltsvertrag gilt. Seit 2026-09-22 (Minecraft, Stufe 3): Ein Spiel kann mehrere Lader kennen, die sich in Ablageort und Katalograum unterscheiden — Paper nimmt Plugins nach `plugins/`, Fabric Mods nach `mods/`, Vanilla gar nichts. Ohne dieses Feld bleibt `variants` unbenutzbar, und das Dashboard setzt `supported` auf false, statt einen Ablageort zu raten."
+        },
+        "variants": {
+          "type": "object",
+          "description": "Je Wert der Einstellung aus `by_setting` ein Inhaltsvertrag. Was AUSSERHALB steht, gilt fuer alle (z. B. `needs_restart`); die Variante gewinnt. Das Dashboard loest EINMAL auf, direkt nachdem das Paket aus der Datenbank kommt — danach sieht jeder Leser (und der Daemon) einen gewoehnlichen `content`-Block. Ein Wert ohne Eintrag bekommt keine Inhalte.",
+          "additionalProperties": {
+            "$ref": "#/properties/content"
+          }
         }
       }
     },

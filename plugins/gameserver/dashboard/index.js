@@ -1125,17 +1125,26 @@ class GameserverPlugin extends DashboardPlugin {
         const dbService = ServiceManager.get('dbService');
 
         try {
+            // `paket_werte` MUSS mit: Der Inhaltsvertrag haengt seit Stufe 3 am
+            // gewaehlten Lader (Minecraft).
             const [server] = await dbService.query(
-                `SELECT id, guild_id, rootserver_id, install_path, addon_marketplace_id
+                `SELECT id, guild_id, rootserver_id, install_path, addon_marketplace_id, paket_werte
                    FROM gameservers WHERE id = ?`, [serverId]);
             if (!server) return;
 
             const { ladePaketFuerAddon } = require('./helpers/StartPayload');
+            const { loeseInhaltAuf } = require('./helpers/InhaltJeLader');
             const paketZeile = await ladePaketFuerAddon(dbService, server.addon_marketplace_id);
-            const paket = paketZeile
+            const roh = paketZeile
                 ? (typeof paketZeile.paket_json === 'string'
                     ? JSON.parse(paketZeile.paket_json) : paketZeile.paket_json)
                 : null;
+            let werte = {};
+            try {
+                werte = typeof server.paket_werte === 'string'
+                    ? JSON.parse(server.paket_werte) : (server.paket_werte || {});
+            } catch { werte = {}; }
+            const paket = loeseInhaltAuf(roh, werte);
             const inhalt = paket?.content || null;
             if (!inhalt?.supported) return;
 

@@ -25,6 +25,7 @@ const { ServiceManager } = require('dunebot-core');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 const { nimmDatei } = require('../helpers/DateiAnnahme');
 const { ladePaketFuerAddon } = require('../helpers/StartPayload');
+const { loeseInhaltAuf } = require('../helpers/InhaltJeLader');
 const Inhalte = require('../helpers/Inhalte');
 const InhalteHolen = require('../helpers/InhalteHolen');
 const Quellen = require('../helpers/Quellen');
@@ -36,17 +37,30 @@ const BepInExLog = require('../helpers/BepInExLog');
  * @returns {Promise<{server: object, paket: object|null}|null>}
  */
 async function ladeServerUndPaket(dbService, serverId, guildId) {
+    // `paket_werte` MUSS mit: Seit Stufe 3 haengt der Inhaltsvertrag am
+    // gewaehlten Lader (Minecraft), und der steht dort.
     const [server] = await dbService.query(
-        `SELECT id, name, guild_id, rootserver_id, install_path, addon_marketplace_id, status
+        `SELECT id, name, guild_id, rootserver_id, install_path, addon_marketplace_id, status,
+                paket_werte
            FROM gameservers WHERE id = ? AND guild_id = ?`,
         [serverId, guildId]
     );
     if (!server) return null;
 
     const zeile = await ladePaketFuerAddon(dbService, server.addon_marketplace_id);
-    const paket = zeile
+    const roh = zeile
         ? (typeof zeile.paket_json === 'string' ? JSON.parse(zeile.paket_json) : zeile.paket_json)
         : null;
+
+    // Einmal aufloesen, direkt an der Quelle: Danach sehen alle zwoelf Leser in
+    // dieser Datei einen gewoehnlichen `content`-Block — den des Laders, den
+    // dieser Server benutzt.
+    let werte = {};
+    try {
+        werte = typeof server.paket_werte === 'string'
+            ? JSON.parse(server.paket_werte) : (server.paket_werte || {});
+    } catch { werte = {}; }
+    const paket = loeseInhaltAuf(roh, werte);
 
     return { server, paket };
 }
@@ -303,10 +317,16 @@ router.get('/mods/suche', requirePermission('GAMESERVER.CREATE'), async (req, re
 
     try {
         const paketZeile = await ladePaketFuerAddon(dbService, parseInt(req.query.addon_id, 10));
-        const paket = paketZeile
+        const roh = paketZeile
             ? (typeof paketZeile.paket_json === 'string'
                 ? JSON.parse(paketZeile.paket_json) : paketZeile.paket_json)
             : null;
+        // Hier gibt es noch keinen Server und also keine `paket_werte` — der
+        // Lader steht im Formular und kommt als Abfrageteil mit. Ohne ihn bleibt
+        // `content` auf `supported: false`, und die Suche sagt „dieses Spiel
+        // nennt keinen Katalog": richtig, solange niemand einen Lader gewaehlt
+        // hat (Stufe 3, Minecraft).
+        const paket = loeseInhaltAuf(roh, req.query.lader ? { loader: req.query.lader } : {});
         const inhalt = paket?.content || null;
 
         const gewaehlt = quelleWaehlen(res, inhalt, req.query.quelle);
