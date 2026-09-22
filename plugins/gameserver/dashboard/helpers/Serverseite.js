@@ -32,6 +32,7 @@
  * @module helpers/Serverseite
  */
 
+const { lesePortzwecke } = require('./Portvergabe');
 const { ladeUebergang } = require('./StartPayload');
 
 /** Höhenstufen (B.7): wer welche Einstellungen zu sehen bekommt. */
@@ -1402,12 +1403,18 @@ module.exports.bauePaketAuswahl = bauePaketAuswahl;
  * zweites Mal vergeben.
  */
 function baueMaschinenAuswahl(maschinen, gebucht, vorrat, paket) {
-    // Welche Zwecke braucht das Paket, und wie hängen sie zusammen?
-    const ports = paket?.ports || [];
-    const spielPort = ports.find(p => p.assign === 'pool') || ports[0] || null;
-    const gekoppelt = ports
-        .filter(p => typeof p.assign === 'string' && p.assign.includes('+'))
-        .map(p => ({ zweck: p.purpose, abstand: parseInt(p.assign.split('+')[1], 10) || 0 }));
+    // ── Die Regel steht in Portvergabe.js, nicht hier (2026-09-22) ──────────
+    //
+    // Bis heute rechnete diese Funktion die Zwecke selbst aus — mit demselben
+    // Ausdruck wie die Vergabe, und mit demselben Fehler: Nur EIN Pool-Port
+    // wurde gesehen, alles Weitere musste `game+N` sein. Minecraft nennt zwei
+    // unabhaengige (`game`, `rcon`), und der zweite fiel bei BEIDEN auf den
+    // Boden.
+    //
+    // Zwei Kopien derselben Regel sind schlimmer als eine falsche: Wer die eine
+    // repariert, laesst die andere stehen, und dann bietet die Auswahl eine
+    // Maschine an, an der das Anlegen scheitert. Also eine Quelle.
+    const { basis: spielPort, weiterePool, gekoppelt } = lesePortzwecke(paket);
 
     // Vorrat je Maschine aufschlüsseln: was steht drin, und was davon ist frei?
     const jeMaschine = new Map();
@@ -1437,18 +1444,35 @@ function baueMaschinenAuswahl(maschinen, gebucht, vorrat, paket) {
             // Aufsteigend, damit die Vergabe vorhersagbar bleibt: Wer zweimal
             // dasselbe Spiel anlegt, bekommt benachbarte Ports und keine
             // Streuung über den ganzen Vorrat.
-            for (const n of [...v.frei].sort((a, b) => a - b)) {
+            const freiAufsteigend = [...v.frei].sort((a, b) => a - b);
+            for (const n of freiAufsteigend) {
                 const noetig = gekoppelt.map(k => n + k.abstand);
                 if (noetig.some(x => !v.frei.has(x))) continue;
-                paar = { spiel: n, weitere: gekoppelt.map(k => ({ zweck: k.zweck, port: n + k.abstand })) };
+                // Die unabhaengigen Pool-Ports duerfen irgendwo liegen, muessen
+                // aber da sein — sonst sagt die Auswahl „passt" und das Anlegen
+                // gibt danach einen halb gebuchten Server.
+                const imPaar = new Set([n, ...noetig]);
+                const uebrig = freiAufsteigend.filter(x => !imPaar.has(x));
+                if (uebrig.length < weiterePool.length) continue;
+                paar = {
+                    spiel: n,
+                    weitere: [
+                        ...gekoppelt.map(k => ({ zweck: k.zweck, port: n + k.abstand })),
+                        ...weiterePool.map((w, i) => ({ zweck: w.zweck, port: uebrig[i] })),
+                    ],
+                };
                 break;
             }
             if (!paar) {
-                grund = gekoppelt.length
-                    ? `Kein freies Portpaar. ${paket?.identity?.name || 'Das Spiel'} verlangt ` +
-                      gekoppelt.map(k => 'Spielport+' + k.abstand).join(' und ') +
-                      ' — und beide müssen im Vorrat stehen und frei sein. ' +
-                      'Wir weichen bewusst nicht auf einen anderen Port aus.'
+                const verlangt = [
+                    ...gekoppelt.map(k => 'Spielport+' + k.abstand),
+                    ...weiterePool.map(w => `einen weiteren freien Port für „${w.zweck}"`),
+                ];
+                grund = verlangt.length
+                    ? `Nicht genug freie Ports. ${paket?.identity?.name || 'Das Spiel'} verlangt ` +
+                      verlangt.join(' und ') +
+                      '. Gekoppelte Ports müssen im Vorrat stehen und frei sein; ' +
+                      'wir weichen bewusst nicht auf einen anderen aus.'
                     : 'Kein freier Port im Vorrat dieser Maschine.';
             }
         }

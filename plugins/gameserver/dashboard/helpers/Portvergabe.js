@@ -37,7 +37,34 @@
  */
 function lesePortzwecke(paket) {
     const ports = Array.isArray(paket?.ports) ? paket.ports : [];
-    const basis = ports.find(p => p.assign === 'pool') || null;
+
+    // ── Warum hier ALLE Pool-Zwecke stehen (Befund vom 2026-09-22) ──────────
+    //
+    // Bis heute nahm diese Funktion `ports.find(p => p.assign === 'pool')` —
+    // also GENAU EINEN. Alles Weitere musste die Form `game+N` haben.
+    //
+    // Das ging gut, solange jedes Paket so gebaut war: Valheim und Astro Colony
+    // nennen `game(pool)` und `query(game+1)`. **Minecraft nennt zwei
+    // unabhaengige Pool-Ports — `game` und `rcon` — und der zweite fiel auf den
+    // Boden.** Gebucht wurde nur der Spielport.
+    //
+    // Die Folge sah der Betreiber als „rcon port problem": Der Daemon meldet
+    // „die Fernsteuerung soll auf 'rcon' laufen, fuer diesen Server ist aber
+    // kein solcher Port belegt", und in `server.properties` landet
+    // `rcon.port={{port:rcon}}` als Text, weil es keine Nummer einzusetzen gibt.
+    //
+    // Ein gekoppelter Port ist etwas anderes als ein zweiter Pool-Port, und
+    // beides gibt es: `query` MUSS neben dem Spielport liegen (das Spiel
+    // rechnet es sich aus), `rcon` darf irgendwo liegen (es steht in einer
+    // Datei). Deshalb zwei Listen statt einer.
+    const ausPool = ports.filter(p => p.assign === 'pool');
+    const basis = ausPool[0] || null;
+    const weiterePool = ausPool.slice(1).map(p => ({
+        zweck: p.purpose,
+        // Anders als beim Spielport ist tcp die richtige Vorgabe: Was frei
+        // liegen darf, ist in aller Regel eine Fernsteuerung.
+        protokoll: p.protocol || 'tcp',
+    }));
     const gekoppelt = ports
         .filter(p => typeof p.assign === 'string' && p.assign.includes('+'))
         .map(p => ({
@@ -45,7 +72,19 @@ function lesePortzwecke(paket) {
             abstand: parseInt(p.assign.split('+')[1], 10) || 0,
             protokoll: p.protocol || 'udp',
         }));
-    return { basis, gekoppelt };
+    return { basis, weiterePool, gekoppelt };
+}
+
+/**
+ * Wie viele Ports braucht dieses Paket insgesamt?
+ *
+ * Eine Zahl, zwei Leser: die Maschinenwahl (reicht der Vorrat?) und die Vergabe
+ * (ist noch genug frei?). Bis zum 2026-09-22 rechneten beide selbst — und beide
+ * falsch, auf dieselbe Weise.
+ */
+function portBedarf(paket) {
+    const { basis, weiterePool, gekoppelt } = lesePortzwecke(paket);
+    return (basis ? 1 : 0) + weiterePool.length + gekoppelt.length;
 }
 
 /**
@@ -64,7 +103,7 @@ function lesePortzwecke(paket) {
  * @throws {Error} mit einem Satz, der sagt, was zu tun ist
  */
 async function vergibPortsAusPaket(dbService, rootserverId, paket, wunschPort = null) {
-    const { basis, gekoppelt } = lesePortzwecke(paket);
+    const { basis, weiterePool, gekoppelt } = lesePortzwecke(paket);
     if (!basis) {
         throw new Error('Das Paket nennt keinen Spielport (kein Zweck mit assign: pool).');
     }
@@ -92,6 +131,12 @@ async function vergibPortsAusPaket(dbService, rootserverId, paket, wunschPort = 
         if (!nachNummer.has(n)) continue;
         const noetig = gekoppelt.map(k => n + k.abstand);
         if (noetig.some(x => !nachNummer.has(x))) continue;
+        // Die weiteren Pool-Ports duerfen irgendwo liegen — aber sie muessen DA
+        // sein. Ohne diese Zaehlung bekaeme der Server einen Spielport und
+        // danach die Absage „kein solcher Port belegt" erst beim Start.
+        const belegtDurchPaar = new Set([n, ...noetig]);
+        const restFrei = frei.filter(z => !belegtDurchPaar.has(Number(z.port))).length;
+        if (restFrei < weiterePool.length) continue;
         gewaehlt = n;
         break;
     }
@@ -104,11 +149,18 @@ async function vergibPortsAusPaket(dbService, rootserverId, paket, wunschPort = 
                                 + gekoppelt.map(k => `Port+${k.abstand}`).join(' und ') + '.'
                               : ''));
         }
-        throw new Error('Kein freies Portpaar im Vorrat dieser Maschine. '
-                      + (gekoppelt.length
+        // Der Satz muss sagen, WAS fehlt. „Kein freies Portpaar" allein liess den
+        // Betreiber am 2026-09-22 raten, warum ein Vorrat mit freien Ports nicht
+        // reichte — es fehlte der zweite, unabhaengige.
+        const verlangt = [
+            ...gekoppelt.map(k => 'Spielport+' + k.abstand),
+            ...weiterePool.map(w => `einen weiteren freien Port für „${w.zweck}"`),
+        ];
+        throw new Error('Nicht genug freie Ports im Vorrat dieser Maschine. '
+                      + (verlangt.length
                           ? `${paket?.identity?.name || 'Das Spiel'} verlangt `
-                            + gekoppelt.map(k => 'Spielport+' + k.abstand).join(' und ')
-                            + ' — und beide müssen im Vorrat stehen und frei sein.'
+                            + verlangt.join(' und ')
+                            + '. Gekoppelte Ports müssen im Vorrat stehen und frei sein.'
                           : ''));
     }
 
@@ -130,8 +182,23 @@ async function vergibPortsAusPaket(dbService, rootserverId, paket, wunschPort = 
     for (const k of gekoppelt) {
         await eintragen(k.zweck, gewaehlt + k.abstand, k.protokoll);
     }
+    // Und die unabhaengigen: die naechsten freien, die nicht schon zum Paar
+    // gehoeren. Aufsteigend, damit die Vergabe nachvollziehbar bleibt.
+    if (weiterePool.length) {
+        const schonBelegt = new Set(Object.values(belegt).map(b => b.port));
+        const uebrig = frei.map(z => Number(z.port)).filter(n => !schonBelegt.has(n));
+        for (const w of weiterePool) {
+            const nummer = uebrig.shift();
+            if (nummer === undefined) {
+                // Kann nach der Zaehlung oben nicht mehr passieren — bliebe es
+                // stumm, waere der Server halb gebucht.
+                throw new Error(`Für „${w.zweck}" ist kein freier Port mehr im Vorrat dieser Maschine.`);
+            }
+            await eintragen(w.zweck, nummer, w.protokoll);
+        }
+    }
 
     return { ports, belegt };
 }
 
-module.exports = { vergibPortsAusPaket, lesePortzwecke };
+module.exports = { vergibPortsAusPaket, lesePortzwecke, portBedarf };

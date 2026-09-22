@@ -115,6 +115,75 @@ function pruefe(ok, was, zusatz = '') {
     pruefe(Number(rest[0].n) === 0, 'Keine verwaisten Buchungen zurückgelassen', `gefunden: ${rest[0].n}`);
 
     await c.end();
+    // ── Jeder Zweck des Pakets bekommt wirklich einen Port (2026-09-22) ─────────
+//
+// Befund des Betreibers: Der Minecraft-Server liess sich „wegen eines rcon port
+// problems" nicht starten. Gemessen: `lesePortzwecke` nahm mit
+// `ports.find(p => p.assign === 'pool')` GENAU EINEN Pool-Port; alles Weitere
+// musste die Form `game+N` haben. Minecraft nennt zwei unabhaengige (`game`,
+// `rcon`) — der zweite fiel auf den Boden, und der Daemon meldete beim Start
+// „fuer diesen Server ist kein solcher Port belegt".
+//
+// Valheim und Astro Colony haben genau einen Pool-Port plus einen gekoppelten
+// und fielen deshalb nie auf. Geprueft wird daher gegen JEDES Handpaket und am
+// Ergebnis: Jeder in `ports` genannte Zweck muss nach der Vergabe eine Nummer
+// haben.
+console.log('\n▸ Jeder Portzweck des Pakets bekommt eine Nummer');
+(async () => {
+    const fs = require('fs');
+    const path = require('path');
+    const { portBedarf } = require('../plugins/gameserver/dashboard/helpers/Portvergabe');
+    const { baueMaschinenAuswahl } = require('../plugins/gameserver/dashboard/helpers/Serverseite');
+
+    const ordner = path.join(__dirname, '../packages/fbpkg/beispiele');
+    const dateien = fs.existsSync(ordner)
+        ? fs.readdirSync(ordner).filter(d => d.endsWith('.json')) : [];
+
+    for (const datei of dateien) {
+        const paket = JSON.parse(fs.readFileSync(path.join(ordner, datei), 'utf8'));
+        const zwecke = (paket.ports || []).map(p => p.purpose);
+        if (!zwecke.length) continue;
+
+        // Ein Vorrat, der reicht: der Bedarf plus zwei, damit auch ein
+        // gekoppelter Nachbar sicher dabei ist.
+        const bedarf = portBedarf(paket);
+        const freiePorts = Array.from({ length: bedarf + 2 }, (_, i) => 25000 + i);
+        const db = { query: async (sql, p) => (/SELECT id, port FROM port_allocations/.test(sql)
+            ? freiePorts.map((n, i) => ({ id: 900 + i, port: n })) : []) };
+
+        let ports = null, fehlgeschlagen = null;
+        try { ports = (await vergibPortsAusPaket(db, 54, paket, null)).ports; }
+        catch (e) { fehlgeschlagen = e.message; }
+
+        pruefe(ports !== null, `${datei}: die Vergabe gelingt mit ${bedarf + 2} freien Ports`,
+            fehlgeschlagen || '');
+        if (!ports) continue;
+
+        for (const zweck of zwecke) {
+            const da = Boolean(ports[zweck] && ports[zweck].internal);
+            pruefe(da, `${datei}: „${zweck}" bekommt eine Nummer`,
+                da ? '' : 'Das Paket nennt den Zweck, die Vergabe bucht ihn nicht — der Daemon meldet '
+                        + 'beim Start „für diesen Server ist kein solcher Port belegt", und in der '
+                        + `Konfiguration bleibt {{port:${zweck}}} als Text stehen.`);
+        }
+
+        // Und die Maschinenwahl muss dieselbe Zahl verlangen: Eine Maschine mit
+        // zu wenig Ports darf nicht als wählbar angeboten werden.
+        const maschine = [{ id: 54, name: 'Probe', host: 'h', daemon_status: 'online',
+                            cpu_cores: 4, ram_total_gb: 16, disk_total_gb: 200 }];
+        const vorrat = (n) => Array.from({ length: n }, (_, i) => (
+            { rootserver_id: 54, port: 25000 + i, server_id: null }));
+        const knapp = baueMaschinenAuswahl(maschine, {}, vorrat(bedarf - 1), paket)[0];
+        const knappOk = Boolean(knapp && knapp.waehlbar === false);
+        pruefe(knappOk, `${datei}: mit ${bedarf - 1} freien Ports ist die Maschine NICHT wählbar`,
+            knappOk ? '' : 'Die Auswahl böte eine Maschine an, an der das Anlegen scheitert — und '
+                         + 'der Betreiber stünde vor einem Widerspruch ohne Erklärung.');
+        const reicht = baueMaschinenAuswahl(maschine, {}, vorrat(bedarf + 2), paket)[0];
+        pruefe(reicht && reicht.waehlbar === true,
+            `${datei}: mit ${bedarf + 2} freien Ports schon`);
+    }
+
     console.log(fehler === 0 ? '\n✅ Portvergabe folgt dem Paket\n' : `\n❌ ${fehler} Abweichung(en)\n`);
     process.exit(fehler === 0 ? 0 : 1);
 })().catch((e) => { console.error('FEHLER:', e.message); process.exit(1); });
+})();
