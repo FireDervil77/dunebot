@@ -254,6 +254,21 @@ console.log('\nModpacks: was hereinkommt, ist fremder Text');
     pruefe(/ausserhalb des Servers/.test(skript),
         'und der Satz dazu nennt den Grund');
 
+    // ── Die Rechte aus dem Archiv sind nicht unsere (2026-09-22) ───────────
+    //
+    // „Horror +" speichert fuer alle 78 Eintraege den Modus 000. `unzip`
+    // uebertraegt das treu, und die Installation brach mit „jq: Permission
+    // denied" und Code 2 ab — zwei Sekunden nach dem Start, ohne dass
+    // irgendetwas nach einem Rechteproblem aussah.
+    //
+    // Der Index ist dabei nur der erste Stolperstein. Ohne die Zeile laegen
+    // Konfigurationsdateien mit Modus 000 im Serververzeichnis, und DAS faellt
+    // erst beim Start auf — mit einer Meldung ueber eine angeblich fehlende
+    // Einstellung.
+    pruefe(/chmod -R u\+rwX "\$AUSPACK"/.test(skript),
+        'die Rechte aus dem Archiv werden nach dem Auspacken geradegezogen',
+        'Ein Modpack darf bestimmen, WAS installiert wird — nicht, ob wir es lesen duerfen.');
+
     pruefe((skript.match(/sha1sum -c/g) || []).length >= 2,
         'Archiv UND jede einzelne Datei werden gegen ihre Pruefsumme gehalten',
         'Modrinth liefert sha1 zu beidem — es nicht zu pruefen waere Fahrlaessigkeit mit Ansage.');

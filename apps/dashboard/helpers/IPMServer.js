@@ -868,7 +868,7 @@ class IPMServer {
         const zahl = (w) => (w === null || w === undefined || w === '' || !Number.isFinite(Number(w)))
             ? null : Number(w);
 
-        const zeilen = [];
+        let zeilen = [];
         for (const s of servers || []) {
             const id = Number(s.server_id);
             if (!Number.isInteger(id) || id <= 0) continue;
@@ -885,6 +885,45 @@ class IPMServer {
                          spieler, spieler === null ? null : Math.round(spieler)]);
         }
 
+        if (!zeilen.length) return;
+
+        // ── Nur Server, die es noch gibt (2026-09-22) ───────────────────────
+        //
+        // Der Daemon meldet im Herzschlag auch Server, die im Panel geloescht
+        // wurden — ihre Container liegen auf der Maschine noch. Fuer den
+        // Verlauf ist das ein Fremdschluesselfehler:
+        //
+        //   Cannot add or update a child row: a foreign key constraint fails
+        //   (`server_metrics`, CONSTRAINT `fk_server_metrics_server`)
+        //
+        // Er stand alle 30 Sekunden im Protokoll. Und er kostet mehr als eine
+        // Zeile Protokoll: Ein INSERT mit mehreren Werten faellt als GANZES aus.
+        // Die Kennzahlen der lebenden Server gingen also mit verloren, weil ein
+        // toter im selben Stapel stand.
+        //
+        // Eine Abfrage je Herzschlag (alle 30 s, eine Handvoll Kennungen) ist
+        // der guenstigere Weg — und sie sagt zugleich, WELCHE Kennung der Daemon
+        // noch meldet. Das ist die Frage dahinter, und sie gehoert ins
+        // Protokoll, nicht in eine Vermutung.
+        const kennungen = zeilen.map(z => z[0]);
+        let bekannt = new Set();
+        try {
+            const vorhanden = await this.dbService.query(
+                `SELECT id FROM gameservers WHERE id IN (${kennungen.map(() => '?').join(',')})`,
+                kennungen);
+            bekannt = new Set((vorhanden || []).map(r => Number(r.id)));
+        } catch (error) {
+            this.Logger.warn('[IPMServer] Kennungen nicht pruefbar, Verlauf ausgelassen:', error);
+            return;
+        }
+
+        const verwaist = kennungen.filter(id => !bekannt.has(id));
+        if (verwaist.length) {
+            this.Logger.warn(`[IPMServer] Der Daemon meldet ${verwaist.length} Server, die es hier `
+                + `nicht mehr gibt: ${verwaist.join(', ')} — ihre Kennzahlen werden ausgelassen. `
+                + 'Auf der Maschine liegt vermutlich noch ein Container.');
+        }
+        zeilen = zeilen.filter(z => bekannt.has(z[0]));
         if (!zeilen.length) return;
 
         const stueck = zeilen.map(() =>
