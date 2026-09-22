@@ -816,20 +816,31 @@ module.exports = class App {
         //
         // 61 Stellen im Haus rufen `render('error', …)`. Sie alle um ein
         // `status:` zu ergaenzen waere ein Durchgang, der beim 62. wieder
-        // vergessen wird — und ueberfluessig, denn Express KENNT den Status. Ein
-        // Zugriffsgeber liefert ihn beim Rendern, nicht beim Anmelden: `locals`
-        // werden hier gesetzt, `res.statusCode` steht erst spaeter fest.
+        // vergessen wird — und ueberfluessig, denn Express KENNT den Status.
+        //
+        // ── Warum ein Ueberzug um `render` und KEIN Zugriffsgeber ────────────
+        //
+        // Der erste Versuch legte `res.locals.httpStatus` als
+        // `Object.defineProperty(..., { get })` an. Das ging im Probelauf mit
+        // einem nackten Express, und es riss die Anlage auf der ersten echten
+        // Seite: `ThemeRenderer.renderView` baut `{ ...res.locals }` und schreibt
+        // das Ergebnis mit `Object.assign(res.locals, viewData)` ZURUECK — eine
+        // Zuweisung auf eine Eigenschaft, die nur einen Geber hat, wirft.
+        // „Cannot set property httpStatus of [object Object] which has only a
+        // getter", und zwar auf jeder Seite, die ueber das Theme rendert.
+        //
+        // Lehre: `res.locals` ist ein Datensack, den fremder Code kopiert und
+        // zurueckschreibt. Da gehoert kein berechneter Wert hinein. Der Status
+        // wird stattdessen im letzten Moment beigelegt, als gewoehnliche Zahl:
+        // beim Rendern selbst, wo `res.statusCode` endgueltig feststeht.
         this.app.use((req, res, next) => {
-            Object.defineProperty(res.locals, 'httpStatus', {
-                get: () => res.statusCode,
-                // `enumerable` ist hier keine Feinheit, sondern die ganze
-                // Wirkung: Express reicht `res.locals` per `merge()` an die
-                // Vorlage weiter, und das kopiert nur AUFZAEHLBARE Eigenschaften.
-                // Ohne diese Zeile war der Wert in der Vorlage nicht vorhanden —
-                // gemessen an einem echten Express-Lauf, nicht vermutet.
-                enumerable: true,
-                configurable: true,
-            });
+            const rendern = res.render.bind(res);
+            res.render = function (view, optionen, rueckruf) {
+                if (typeof optionen === 'function') { rueckruf = optionen; optionen = undefined; }
+                // Eine ausdrueckliche Angabe der Route gewinnt — deshalb steht
+                // `optionen` hinten.
+                return rendern(view, { httpStatus: res.statusCode, ...(optionen || {}) }, rueckruf);
+            };
             next();
         });
 

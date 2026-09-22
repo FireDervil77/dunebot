@@ -103,13 +103,28 @@ const skip = (was, warum) => { uebersprungen++; console.log(`  ⏭  ${was} — $
     // Also wird jetzt das Ergebnis geprueft, nicht die Schreibweise der Aufrufer:
     // Der Zugriffsgeber in `app.js` und dass die Seite nichts erfindet.
     const appjs = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'apps/dashboard/app.js'), 'utf8'));
-    const geber = appjs.match(/defineProperty\(res\.locals,\s*'httpStatus'[\s\S]{0,260}?\}\)/);
-    pruefe(geber !== null, 'app.js gibt jeder Vorlage den echten HTTP-Status');
-    pruefe(geber !== null && /enumerable:\s*true/.test(geber[0]),
-        'und zwar aufzählbar',
-        'Express reicht `res.locals` per `merge()` weiter, und das kopiert nur aufzaehlbare '
-      + 'Eigenschaften. Ohne `enumerable: true` kommt der Wert in der Vorlage nicht an — '
-      + 'gemessen, nicht vermutet.');
+    const ueberzug = appjs.match(/res\.render = function[\s\S]{0,420}?\n            \};/);
+    pruefe(ueberzug !== null,
+        'app.js legt jeder Vorlage den echten HTTP-Status bei',
+        'Ohne ihn haengt die Zahl daran, dass jeder der 61 Aufrufer sie mitgibt.');
+    pruefe(ueberzug !== null && /httpStatus: res\.statusCode/.test(ueberzug[0]),
+        'und nimmt ihn aus `res.statusCode`');
+    pruefe(ueberzug !== null && /\{ httpStatus: res\.statusCode, \.\.\.\(optionen \|\| \{\}\) \}/.test(ueberzug[0]),
+        'eine ausdrückliche Angabe der Route gewinnt (sie steht hinten)');
+
+    // ── Und was hier NICHT stehen darf ──────────────────────────────────────
+    //
+    // Der erste Versuch war `Object.defineProperty(res.locals, 'httpStatus',
+    // { get })`. Er ging im Probelauf mit nacktem Express durch und riss die
+    // Anlage auf der ersten echten Seite: `ThemeRenderer.renderView` baut
+    // `{ ...res.locals }` und schreibt es per `Object.assign(res.locals, …)`
+    // ZURUECK — eine Zuweisung auf eine Eigenschaft mit nur einem Geber wirft.
+    // `res.locals` ist ein Datensack, den fremder Code kopiert und
+    // zurueckschreibt; berechnete Werte gehoeren da nicht hinein.
+    pruefe(!/defineProperty\(res\.locals/.test(appjs),
+        'und `res.locals` bekommt keinen berechneten Wert',
+        'ThemeRenderer schreibt res.locals per Object.assign zurueck — ein Geber ohne Setzer '
+      + 'wirft dort, und zwar auf JEDER Seite, die ueber das Theme rendert.');
 
     const fehlerseite = fs.readFileSync(path.join(WURZEL,
         'apps/dashboard/themes/default/views/error.ejs'), 'utf8');
