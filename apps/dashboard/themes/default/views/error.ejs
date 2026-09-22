@@ -5,16 +5,32 @@
   <%
     const env = locals.environment || process.env.NODE_ENV || 'development';
     const errObj = typeof error !== 'undefined' ? error : (locals.error || {});
-    const statusCode = (typeof status !== 'undefined' ? status : (errObj.status || errObj.statusCode || 500));
+    /* Keine erfundene Zahl.
+     *
+     * Hier stand `|| 500`. Am 2026-09-22 rief eine Route
+     * `res.status(404).render('error', { message })` auf — ohne `status`. Die
+     * Seite schrieb daraufhin „500 - Fehler" ueber eine 404, der Betreiber
+     * meldete einen Serverfehler, und gesucht wurde ein Absturz, den es nicht
+     * gab. Zwei verlorene Viertelstunden fuer ein `||`.
+     *
+     * Eine Statuszeile ist eine Messung. Wer sie nicht bekommt, schreibt keine
+     * hin — dann steht nur „Fehler" da, und das ist wahr. */
+    /* Reihenfolge: was die Route ausdruecklich sagt, dann was Express wirklich
+     * gesendet hat (`httpStatus`, ein Zugriffsgeber aus app.js), dann der
+     * Fehler selbst — und sonst KEINE Zahl. */
+    const statusCode = (typeof status !== 'undefined' && status)
+        ? status
+        : (locals.httpStatus || errObj.status || errObj.statusCode || null);
     const titleText = (errObj.title || errObj.name || 'Fehler');
+    const kopf = statusCode ? statusCode + ' - ' + titleText : titleText;
     const messageText = (locals.message || errObj.message || 'Es ist ein Fehler aufgetreten.');
   %>
-  <title><%= statusCode %> - <%= titleText %></title>
+  <title><%= kopf %></title>
   <link rel="stylesheet" href="/themes/default/assets/css/main.css">
 </head>
 <body class="bg-light">
   <div class="container py-5">
-    <h1 class="display-4 mb-3"><%= statusCode %> - <%= titleText %></h1>
+    <h1 class="display-4 mb-3"><%= kopf %></h1>
     <p class="lead"><%= messageText %></p>
 
     <% if (env !== 'production' && errObj && errObj.stack) { %>

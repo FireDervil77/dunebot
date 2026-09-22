@@ -70,6 +70,9 @@ const PRUEFER    = path.join(__dirname, 'check-pakete.js');
 const args      = process.argv.slice(2);
 const WIRKLICH  = args.includes('--wirklich');
 const dateien   = args.filter(a => !a.startsWith('--'));
+// Nur noetig, wenn `addon_marketplace` leer ist — sonst nimmt `sichereAnker`
+// den Autor, den die vorhandenen Zeilen benutzen.
+const AUTOR     = (args.find(a => a.startsWith('--autor=')) || '').slice('--autor='.length) || null;
 
 // ── Die Kategorien, die `packages.category` kennt ────────────────────────────
 // Was das Paket sonst nennt, landet auf 'other' — mit Meldung, nicht stumm.
@@ -133,6 +136,85 @@ function dokumentUndSumme(paket) {
     return { text, summe };
 }
 
+/**
+ * Den Ankersatz in `addon_marketplace` sicherstellen — und warum es ihn braucht.
+ *
+ * ── Der Befund vom 2026-09-22 ───────────────────────────────────────────────
+ *
+ * Minecraft lag als Paket in `packages` (Kennung 1473) und hatte KEINE Zeile in
+ * `addon_marketplace`. Der Betreiber wollte einen Server anlegen und kam nicht
+ * durch Schritt 2: Die Spielwahl listet PAKETE, der naechste Schritt sucht aber
+ * `addon_marketplace WHERE slug = ?` — und fand nichts.
+ *
+ * Es haette auch nichts genuetzt, das zu umgehen:
+ * `gameservers.addon_marketplace_id` traegt einen Fremdschluessel auf
+ * `addon_marketplace.id` (`gameservers_ibfk_2`). **Ohne Ankersatz laesst sich
+ * kein Server dieses Spiels ueberhaupt anlegen.** Die POST-Route sagt es selbst:
+ * „Die Addon-Zeile ist jetzt nur noch der Fremdschluessel, an dem der Server
+ * haengt; gelesen wird aus dem Paket."
+ *
+ * Der Kopf dieser Datei kannte den Fall („ein Paket, das die Werkbank erzeugt
+ * hat") und liess die Datenbank die Nummer vergeben. Gemessen wurde nie, was
+ * danach passiert — das ist der Fehler, nicht die Zeile.
+ *
+ * ── Warum der Anker aus dem Paket kommt und nicht daneben ───────────────────
+ *
+ * Name, Beschreibung und Kategorie stehen im Paket. Der Anker schreibt sie ab,
+ * er erfindet nichts: eine abgeleitete Zeile, keine zweite Wahrheit. `game_data`
+ * bleibt leer (`{}`), denn dort stand das Egg — dieser Weg ist seit dem
+ * 2026-09-10 entfallen, und ein leeres Objekt ist ehrlicher als eine Kopie des
+ * Pakets in einem alten Format. NULL darf es nicht sein (NOT NULL), also `{}`.
+ *
+ * Der Autor wird nicht geraten: Genommen wird der, den die vorhandenen Zeilen
+ * benutzen (heute alle 25 dieselbe Kennung). Ist die Tabelle leer, bricht das
+ * Werkzeug ab und verlangt `--autor=<discord-id>` — eine erfundene Kennung waere
+ * ein Datensatz, der auf niemanden zeigt.
+ *
+ * @returns {Promise<number|null>} Kennung des Ankers, oder null im Probelauf
+ */
+async function sichereAnker(db, { slug, name, besch, kategorie, version }, wirklich, autorVorgabe) {
+    const [[anker]] = await db.query(
+        'SELECT id FROM addon_marketplace WHERE slug = ?', [slug]);
+    if (anker) return anker.id;
+
+    // Gibt es das Paket schon, MUSS der Anker dessen Kennung bekommen: Das Haus
+    // sucht das Paket ueber `packages.id = addon_marketplace.id`
+    // (`ladePaketFuerAddon`). Eine neue Nummer waere ein zweiter Anker daneben.
+    const [[paketZeile]] = await db.query('SELECT id FROM packages WHERE slug = ?', [slug]);
+    const kennung = paketZeile ? paketZeile.id : null;
+
+    let autor = autorVorgabe;
+    if (!autor) {
+        const [[haus]] = await db.query(
+            `SELECT author_user_id FROM addon_marketplace
+              GROUP BY author_user_id ORDER BY COUNT(*) DESC LIMIT 1`);
+        autor = haus ? haus.author_user_id : null;
+    }
+    if (!autor) {
+        throw new Error('Kein Autor: `addon_marketplace` ist leer und `--autor=<discord-id>` fehlt.');
+    }
+
+    console.log(`    \u2691 Ankersatz in addon_marketplace fehlt \u2014 wird angelegt`
+              + `${kennung ? ` mit Kennung ${kennung} (die des Pakets)` : ' (neue Kennung)'}`
+              + `, Autor ${autor}.`);
+    console.log('      Ohne ihn l\u00e4sst sich kein Server dieses Spiels anlegen:'
+              + ' gameservers.addon_marketplace_id ist ein Fremdschl\u00fcssel.');
+
+    if (!wirklich) return null;
+
+    const spalten = ['name', 'slug', 'description', 'author_user_id', 'visibility', 'status',
+                     'game_data', 'category', 'version'];
+    const werte   = [name, slug, besch, autor, 'public', 'approved', '{}', kategorie,
+                     version || null];
+    if (kennung) { spalten.unshift('id'); werte.unshift(kennung); }
+    await db.query(
+        `INSERT INTO addon_marketplace (${spalten.join(', ')})
+         VALUES (${spalten.map(() => '?').join(', ')})`, werte);
+    const [[neuerAnker]] = await db.query(
+        'SELECT id FROM addon_marketplace WHERE slug = ?', [slug]);
+    return neuerAnker ? neuerAnker.id : null;
+}
+
 (async () => {
     const alle = sammleDateien();
     if (!alle.length) {
@@ -152,7 +234,7 @@ function dokumentUndSumme(paket) {
         database: process.env.MYSQL_DATABASE,
     });
 
-    let neu = 0, unveraendert = 0, abgewiesen = 0;
+    let neu = 0, unveraendert = 0, abgewiesen = 0, ankerNeu = 0;
 
     try {
         for (const datei of alle) {
@@ -186,6 +268,24 @@ function dokumentUndSumme(paket) {
                         ? (id.description.de || id.description.en || null)
                         : (id.description || null);
 
+            // ── Der Ankersatz, VOR der Fassungspruefung ──────────────────────
+            //
+            // Vor der Pruefung und nicht danach: Ein Paket, das schon liegt
+            // (gleiche Nummer, gleicher Inhalt), springt unten per `continue`
+            // heraus — und genau das war der Zustand von Minecraft am
+            // 2026-09-22: Paket da, Anker fehlt, Server nicht anlegbar. Wer den
+            // Anker erst beim Einliefern einer NEUEN Fassung setzt, reicht dem
+            // Betreiber eine Nummer zum Hochzaehlen, um einen Satz nachzutragen.
+            //
+            // Ausserhalb der Transaktion unten: Der Anker muss auch dann
+            // entstehen, wenn es an der Fassung nichts zu tun gibt.
+            const vorher = await db.query(
+                'SELECT id FROM addon_marketplace WHERE slug = ?', [id.slug]);
+            const ankerId = await sichereAnker(
+                db, { slug: id.slug, name, besch, kategorie, version: id.version },
+                WIRKLICH, AUTOR);
+            if (!vorher[0].length) ankerNeu++;
+
             // ── Gibt es die Fassung schon? ───────────────────────────────────
             const [[vorhanden]] = await db.query(
                 `SELECT pv.id, pv.checksum, pv.channel
@@ -218,9 +318,9 @@ function dokumentUndSumme(paket) {
 
             if (!WIRKLICH) { neu++; continue; }
 
-            // Die Kennung des Vorgängers übernehmen, solange es ihn gibt (s.o.)
-            const [[alt]] = await db.query(
-                'SELECT id FROM addon_marketplace WHERE slug = ?', [id.slug]);
+            // Die Kennung des Ankers übernehmen — `sichereAnker` hat sie oben
+            // entweder gefunden oder angelegt.
+            const alt = ankerId ? { id: ankerId } : null;
 
             await db.beginTransaction();
             try {
@@ -260,8 +360,12 @@ function dokumentUndSumme(paket) {
         await db.end();
     }
 
-    console.log(`\nNeu: ${neu} · unverändert: ${unveraendert} · abgewiesen: ${abgewiesen}`);
-    if (!WIRKLICH && neu) {
+    console.log(`\nNeu: ${neu} · unverändert: ${unveraendert} · abgewiesen: ${abgewiesen}`
+              + (ankerNeu ? ` · Ankersätze fehlten: ${ankerNeu}` : ''));
+    // Auch ein fehlender Anker ist etwas zu tun — sonst sagt der Probelauf
+    // „unverändert: 1" und klingt wie „alles in Ordnung", während sich der
+    // Server nicht anlegen lässt.
+    if (!WIRKLICH && (neu || ankerNeu)) {
         console.log('Das war ein Probelauf. Mit --wirklich wird geschrieben.');
     }
     process.exit(abgewiesen ? 1 : 0);

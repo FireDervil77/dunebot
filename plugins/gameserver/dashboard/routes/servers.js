@@ -467,18 +467,37 @@ router.get('/create', requirePermission('GAMESERVER.CREATE'), async (req, res) =
                 WHERE slug = ?
             `, [addon]);
 
+            // ── Kein Ankersatz? Dann sagen, was fehlt ───────────────────────
+            //
+            // Am 2026-09-22 stand der Betreiber genau hier: Minecraft lag als
+            // Paket in `packages`, die Spielwahl zeigte es, und dieser Zweig
+            // fand keine Zeile in `addon_marketplace`. Die Seite sagte „Addon
+            // nicht gefunden" — und weil sie keinen Status mitgab, stand als
+            // Ueberschrift die erfundene 500. Gesucht wurde daraufhin ein
+            // Absturz, den es nie gab.
+            //
+            // Der Satz nennt jetzt die Ursache UND den Griff. `status` geht mit,
+            // damit die Seite die Wahrheit ueber sich selbst sagt.
             if (!addonData) {
+                Logger.warn(`[Gameserver] Schritt 2: kein Ankersatz in addon_marketplace `
+                          + `fuer "${addon}" — Paket ohne Anker ist nicht anlegbar`);
                 return res.status(404).render('error', {
-                    message: 'Addon nicht gefunden'
+                    status: 404,
+                    message: `Für „${addon}" fehlt der Ankersatz in der Spieleliste. `
+                           + `Das Paket ist da, die Zeile in addon_marketplace nicht — und daran `
+                           + `hängt jeder Server (Fremdschlüssel). Abhilfe: `
+                           + `node scripts/liefere-pakete.js packages/fbpkg/beispiele/${addon}.json --wirklich`
                 });
             }
 
-            // game_data parsen
+            // game_data parsen. `?? {}` ist kein Schmuck: Die Spalte kann NULL
+            // sein, und ein `null.variables` weiter unten wirft — dann waere es
+            // wirklich eine 500.
             let gameData = {};
             try {
-                gameData = typeof addonData.game_data === 'string'
+                gameData = (typeof addonData.game_data === 'string'
                     ? JSON.parse(addonData.game_data)
-                    : addonData.game_data;
+                    : addonData.game_data) ?? {};
             } catch (error) {
                 Logger.error(`[Gameserver] Fehler beim Parsen von game_data:`, error);
                 gameData = { templates: [], requirements: {} };
@@ -600,17 +619,21 @@ router.get('/create', requirePermission('GAMESERVER.CREATE'), async (req, res) =
             `, [addon]);
 
             if (!addonData) {
+                Logger.warn(`[Gameserver] Schritt 3: kein Ankersatz in addon_marketplace fuer "${addon}"`);
                 return res.status(404).render('error', {
-                    message: 'Addon nicht gefunden'
+                    status: 404,
+                    message: `Für „${addon}" fehlt der Ankersatz in der Spieleliste `
+                           + `(addon_marketplace). Siehe Schritt 2.`
                 });
             }
 
-            // game_data parsen
+            // game_data parsen — `?? {}`, siehe Schritt 2: NULL ist erlaubt, und
+            // die Migrationszeilen darunter greifen auf `gameData.variables` zu.
             let gameData = {};
             try {
-                gameData = typeof addonData.game_data === 'string'
+                gameData = (typeof addonData.game_data === 'string'
                     ? JSON.parse(addonData.game_data)
-                    : addonData.game_data;
+                    : addonData.game_data) ?? {};
             } catch (error) {
                 Logger.error(`[Gameserver] Fehler beim Parsen von game_data:`, error);
                 gameData = { variables: [], installation: {}, startup: {} };

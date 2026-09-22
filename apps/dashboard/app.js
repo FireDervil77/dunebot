@@ -807,6 +807,32 @@ module.exports = class App {
         // Report-Only bis CSRF_ENFORCE=true gesetzt ist (siehe csrf-protection.middleware.js)
         this.app.use(csrfGlobalProtection);
         
+        // ── Der echte HTTP-Status, lesbar fuer jede Vorlage ─────────────────
+        //
+        // Am 2026-09-22 schrieb `error.ejs` „500 - Fehler" ueber eine 404: Die
+        // Route rief `res.status(404).render('error', { message })` und gab
+        // keinen Status mit, also erfand die Vorlage einen. Der Betreiber meldete
+        // einen Serverfehler, und gesucht wurde ein Absturz, den es nicht gab.
+        //
+        // 61 Stellen im Haus rufen `render('error', …)`. Sie alle um ein
+        // `status:` zu ergaenzen waere ein Durchgang, der beim 62. wieder
+        // vergessen wird — und ueberfluessig, denn Express KENNT den Status. Ein
+        // Zugriffsgeber liefert ihn beim Rendern, nicht beim Anmelden: `locals`
+        // werden hier gesetzt, `res.statusCode` steht erst spaeter fest.
+        this.app.use((req, res, next) => {
+            Object.defineProperty(res.locals, 'httpStatus', {
+                get: () => res.statusCode,
+                // `enumerable` ist hier keine Feinheit, sondern die ganze
+                // Wirkung: Express reicht `res.locals` per `merge()` an die
+                // Vorlage weiter, und das kopiert nur AUFZAEHLBARE Eigenschaften.
+                // Ohne diese Zeile war der Wert in der Vorlage nicht vorhanden —
+                // gemessen an einem echten Express-Lauf, nicht vermutet.
+                enumerable: true,
+                configurable: true,
+            });
+            next();
+        });
+
         // Rest of the middlewares
         this.app.use(hookMiddleware);
         // Eigene Asset-Warteschlange pro Anfrage — muss vor allem stehen,
