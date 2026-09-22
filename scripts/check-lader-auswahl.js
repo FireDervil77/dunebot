@@ -146,6 +146,35 @@ for (const { name, inhalt: paket } of mitVarianten) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+console.log('\nWas nur per Neuinstallation geht, wird beim ANLEGEN gefragt');
+// ════════════════════════════════════════════════════════════════════════════
+//
+// Der Betreiber am 2026-09-22, mit Bildschirmfoto: Auf Schritt 3 stand kein
+// Lader. Grund war `role: owner` — gefragt wurde nur `role: player`, alles
+// andere blieb auf der Vorgabe. Damit legte das Panel still fest, was sich
+// danach nur noch mit Datenverlust zuruecknehmen laesst.
+//
+// Geprueft wird am ERGEBNIS und gegen jedes Handpaket: Jede Einstellung mit
+// `takes_effect: reinstall` muss in den Feldern des Werteschritts auftauchen.
+{
+    const { baueWerteSchritt } = require(path.join(WURZEL,
+        'plugins/gameserver/dashboard/helpers/Serverseite.js'));
+    for (const { name, inhalt: paket } of pakete) {
+        const muessen = (paket.settings || []).filter(e => e.takes_effect === 'reinstall');
+        if (!muessen.length) continue;
+        let felder = [];
+        try { felder = baueWerteSchritt(paket, null, false).felder || []; }
+        catch (e) { pruefe(false, `${name}: Werteschritt baut`, e.message); continue; }
+        const gefragt = new Set(felder.map(f => f.schluessel).filter(Boolean));
+        for (const e of muessen) {
+            pruefe(gefragt.has(e.key), `${name}: „${e.key}" wird beim Anlegen gefragt`,
+                'Sie laesst sich spaeter nur mit einer Neuinstallation aendern — wer sie nicht fragt, '
+              + 'legt sie still fest.');
+        }
+    }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 console.log('\nDer Daemon kennt die Bedingung');
 // ════════════════════════════════════════════════════════════════════════════
 const argv = ohneKommentare(roh(path.join(DAEMON, 'internal/pkgspec/argv.go')) || '');

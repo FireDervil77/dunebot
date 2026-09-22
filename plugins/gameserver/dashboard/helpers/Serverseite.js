@@ -1493,7 +1493,32 @@ module.exports.baueMaschinenAuswahl = baueMaschinenAuswahl;
  */
 function baueWerteSchritt(paket, maschine, imageLiegtDa) {
     const alle = Array.isArray(paket?.settings) ? paket.settings : [];
-    const gefragt = alle.filter(e => (e.role || 'expert') === 'player');
+
+    // ── Was beim ANLEGEN gefragt wird ───────────────────────────────────────
+    //
+    // Bis zum 2026-09-22: nur `role: player` — „was ein Spieler entscheiden
+    // muss". Alles andere blieb auf der Vorgabe und liess sich danach in der
+    // fachlichen Hoehe aendern.
+    //
+    // Der Betreiber hat am selben Tag gezeigt, wo das bricht: Minecrafts Lader
+    // stand als `role: owner` da und wurde deshalb NICHT gefragt — die Seite bot
+    // keine Wahl, und jeder Server wurde Vanilla. Dasselbe traf die Spielfassung
+    // (`version`), seit es das Paket gibt.
+    //
+    // Der Rollen-Tausch waere die falsche Abhilfe gewesen (der Lader IST eine
+    // Betreiberentscheidung). Der richtige Grund steht woanders:
+    //
+    //   **Was sich spaeter nur mit einer NEUINSTALLATION aendern laesst, muss
+    //   beim Anlegen gefragt werden.**
+    //
+    // Sonst legt das Panel eine Entscheidung still fest, die danach nur noch mit
+    // Datenverlust zurueckzunehmen ist. `takes_effect: reinstall` sagt genau
+    // das — seit der Formaterweiterung vom 2026-09-22.
+    //
+    // Die Reihenfolge bleibt die des Pakets: Der Lader steht dort an erster
+    // Stelle, weil er bestimmt, was die anderen Werte ueberhaupt bedeuten.
+    const gefragt = alle.filter(e =>
+        (e.role || 'expert') === 'player' || e.takes_effect === 'reinstall');
 
     // ── Der Servername gehoert dem PANEL, nicht dem Spiel ───────────────────
     //
