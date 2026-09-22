@@ -458,7 +458,19 @@
 
   const laderFeld  = document.querySelector('[name="setting_loader"]');
   const ausgabeFeld = document.querySelector('[name="setting_version"]');
-  const basis = '<%= "/guild/" + guildId + "/plugins/gameserver/inhalte" %>';
+  // ── Der Pfad, nicht der Ordnername (2026-09-22) ─────────────────────────
+  //
+  // Hier stand `.../plugins/gameserver/inhalte` — nach der Datei, in der die
+  // Routen stehen (`routes/inhalte.js`). Eingehaengt sind sie aber unter
+  // `/servers`:
+  //
+  //     this.guildRouter.use('/servers', require('./routes/inhalte'));
+  //
+  // Die Suche haette also 404 bekommen, und zwar lautlos: Ein fetch auf eine
+  // fehlende Route wirft nicht, er liefert eine Antwort, die kein JSON ist.
+  // Dieselbe Adresse benutzt die Mod-Suche zwei Bloecke weiter oben — dort
+  // steht sie richtig, und genau daran ist es aufgefallen.
+  const basis = '/guild/<%= guildId %>/plugins/gameserver/servers';
 
   let takt = null;
 

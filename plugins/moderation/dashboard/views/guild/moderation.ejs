@@ -71,7 +71,14 @@
             <div class="tab-pane fade show active" id="tab-settings" role="tabpanel">
               <form class="guild-ajax-form" 
                     data-form-type="moderation-settings" 
-                    action="/guild/<%= guildId %>/plugins/moderation/save"
+                    <%# Hier stand `/plugins/moderation/save` — eine Route, die es
+                        nicht gibt. Gefunden am 2026-09-22 von
+                        `scripts/check-adressen-inline.js`, und es war kein
+                        Schoenheitsfehler: Der AJAX-Handler postet auf
+                        `form.action` (guild.js), also lief jedes Speichern in
+                        die Fehlerseite. Eingehaengt ist `/settings`
+                        (settings.router mit `router.post('/')`). -%>
+                    action="/guild/<%= guildId %>/plugins/moderation/settings"
                     method="POST">
                 
                 <!-- Basic Settings Section -->
