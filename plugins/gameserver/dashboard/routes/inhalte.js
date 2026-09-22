@@ -130,6 +130,29 @@ router.get('/:serverId/inhalte', requirePermission('GAMESERVER.VIEW'), async (re
             // ueberhaupt etwas anbieten darf.
             unterstuetzt: Boolean(inhalt?.supported),
             lader: inhalt?.loader?.key || null,
+            // ── Kommt der Lader als INHALT oder mit der Installation? ───────
+            //
+            // Valheim holt BepInEx wie eine Mod von Thunderstore — deshalb
+            // steht dort `content.loader`, und die Karte darf sagen „zuerst der
+            // Lader". Minecraft hat keinen solchen Block: Sein Lader IST die
+            // Serverdatei, gewaehlt beim Anlegen und mitinstalliert.
+            //
+            // Ohne diese Unterscheidung erklaerte die Seite einem
+            // Minecraft-Server, er brauche BepInEx von Thunderstore (Betreiber,
+            // 2026-09-22). Beides falsch, und das zweite fuehrt zum Klicken.
+            laderAlsInhalt: Boolean(inhalt?.loader),
+            // Welcher Lader hier tatsaechlich laeuft — aus den Werten des
+            // Servers, nicht geraten.
+            laderGewaehlt: (() => {
+                const schluessel = geladen.paket?.content?.by_setting
+                    || (geladen.paket?.settings || []).some(e => e.key === 'loader') ? 'loader' : null;
+                if (!schluessel) return null;
+                try {
+                    const w = typeof geladen.server?.paket_werte === 'string'
+                        ? JSON.parse(geladen.server.paket_werte) : (geladen.server?.paket_werte || {});
+                    return w[schluessel] || null;
+                } catch { return null; }
+            })(),
             pfad: inhalt?.path || null,
             // Was das Paket WOERTLICH nennt — auch `upload` und Anbieter, die
             // dieses Dashboard noch nicht kann.

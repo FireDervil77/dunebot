@@ -223,7 +223,16 @@
        ['inhalte',      'Mods'],
        ['konsole',      'Konsole'],
        ['rohmodus',     'Rohmodus'],
-       ['fernsteuerung','Fernsteuerung'],
+       // „RCON" statt „Fernsteuerung": Betreiber am 2026-09-22 — „das kennen
+       // alle". Der PFAD bleibt `fernsteuerung`, damit Lesezeichen und Verweise
+       // weiter treffen; nur der Name aendert sich.
+       //
+       // In diesem Kommentar steht KEINE schliessende EJS-Klammer, auch nicht
+       // als Beispiel: Diese Liste liegt innerhalb eines EJS-Blocks, und die
+       // zwei Zeichen beenden ihn — im Kommentar genauso wie im Code, denn
+       // uebersetzt wird der Text, nicht das JavaScript. Zweiter Anlauf hier,
+       // und dieselbe Falle steht schon beim Messstreifen als Warnung.
+       ['fernsteuerung','RCON'],
        ['aufgaben',     'Aufgaben'],
        ['panels',       'Panels'],
        ['oeffentlich',  'Öffentlich'],

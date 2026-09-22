@@ -3,7 +3,7 @@
   "identity": {
     "slug": "minecraft",
     "name": "Minecraft",
-    "version": "1.2.2",
+    "version": "1.2.3",
     "author": "firenetworks",
     "category": "sandbox",
     "description": {
@@ -110,6 +110,7 @@
       }
     ],
     "ready_when": {
+      "port": "game",
       "log_line": "Done (",
       "timeout_sec": 600
     },
@@ -826,7 +827,8 @@
       "OFFEN bei Modpacks: Forge und Quilt werden abgewiesen, nicht umgebogen (die Lader sind untereinander unvertraeglich). Damit faellt ein guter Teil des Bestands bei Modrinth weg — gemessen: Das meistgeladene NeoForge-Modpack der Liste verlangt Forge. Ob Forge dazukommt, ist eine Entscheidung, kein Handgriff.",
       "OFFEN bei Modpacks: Ein spaeterer Wechsel der Modpack-Fassung ist nicht gebaut. `modpack_version` traegt `takes_effect: reinstall`, die Karte sagt es also — aber was mit einer bespielten Welt passiert, wenn Mods wegfallen, ist eine Frage fuer sich.",
       "GEMESSEN und behoben (1.2.1, 2026-09-22): Die vier Merkzettel lagen in `game/` — dem Ordner, den der Vertrag ausdruecklich als ERSETZBAR bezeichnet. Sie gehoeren nach `.fb` (DirFB: „unsere Ablage: Rezeptstand, Pruefsummen, Marker; uebersteht ein Zuruecksetzen\"), und der Pfad stand die ganze Zeit als `FB_STATE_DIR` im Vertrag — von KEINEM Paket benutzt. Das Auspacken des Modpacks geht jetzt nach `$XDG_CACHE_HOME` statt neben die Spieldateien. Nachgestellt mit der echten Ordnerstruktur: `game/` enthaelt danach nur Spieldateien, `.fb/` die vier Zettel, `cache/` ist leer. Altlasten aus frueheren Installationen raeumt das Skript beim naechsten Lauf weg. Waechter: `scripts/check-ablageordnung.js`.",
-      "GEMESSEN und behoben (1.2.2, 2026-09-22): Modpack-Archive koennen fuer ihre Eintraege den Modus 000 speichern — „Horror +\" tut es fuer alle 78. `unzip` uebertraegt das treu, und die Installation brach mit „jq: Permission denied\" und Code 2 ab. Nach dem Auspacken wird jetzt `chmod -R u+rwX` gesetzt. Das rettet nicht nur den Index: Ohne die Zeile laegen Konfigurationsdateien mit Modus 000 im Serververzeichnis, und DAS waere erst beim Start aufgefallen — mit einer Meldung ueber eine angeblich fehlende Einstellung."
+      "GEMESSEN und behoben (1.2.2, 2026-09-22): Modpack-Archive koennen fuer ihre Eintraege den Modus 000 speichern — „Horror +\" tut es fuer alle 78. `unzip` uebertraegt das treu, und die Installation brach mit „jq: Permission denied\" und Code 2 ab. Nach dem Auspacken wird jetzt `chmod -R u+rwX` gesetzt. Das rettet nicht nur den Index: Ohne die Zeile laegen Konfigurationsdateien mit Modus 000 im Serververzeichnis, und DAS waere erst beim Start aufgefallen — mit einer Meldung ueber eine angeblich fehlende Einstellung.",
+      "GEMESSEN und behoben (1.2.3, 2026-09-22): `ready_when` nannte nur die Logzeile. Die Bereitschaftskarte zeigte den Port deshalb blass mit „Kein Port im Paket genannt\" — richtig, aber unnoetig: Minecraft LAUSCHT auf dem Spielport, und der Daemon prueft das (`fb-init/ready.go`: „2 Port lauscht — sagt: es nimmt Verbindungen an\"). Jetzt steht `port: \"game\"` da, und die Stufe wird echt gemessen statt weggelassen. Die Abfrage bleibt blass, und das ist richtig: Minecraft antwortet auf Server List Ping, und einen SLP-Treiber gibt es im Daemon nicht — das steht weiter oben als eigener offener Punkt."
     ]
   }
 }

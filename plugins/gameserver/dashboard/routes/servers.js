@@ -1938,10 +1938,24 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
                 r.daemon_id,
                 r.sftp_fingerprint,
                 r.sftp_port AS rootserver_sftp_port,
-                r.system_user
+                r.system_user,
+                -- Das Spielpaket: Die Fernsteuerung eines Paketservers steht in
+                -- management.rcon, nicht in game_data (2026-09-22). Ohne diese
+                -- Spalte sagte die Seite "keine RCON-Konfiguration", waehrend
+                -- Port und Kennwort laengst da waren.
+                -- (Keine Backticks in diesem Kommentar: Er steht in einem
+                --  Template-Literal, und ein Backtick beendet es. Dritter
+                --  Treffer derselben Falle in diesem Haus.)
+                pv.fbpkg AS paket_json
             FROM gameservers gs
             LEFT JOIN addon_marketplace am ON gs.addon_marketplace_id = am.id
             LEFT JOIN rootserver r ON gs.rootserver_id = r.id
+            LEFT JOIN packages pk ON pk.id = gs.addon_marketplace_id
+            LEFT JOIN package_versions pv ON pv.id = (
+                SELECT v.id FROM package_versions v
+                 WHERE v.package_id = pk.id
+                 ORDER BY (v.channel = 'stable') DESC, v.published_at DESC, v.id DESC
+                 LIMIT 1)
             WHERE gs.id = ? AND gs.guild_id = ?
         `, [serverId, guildId]);
 
@@ -2032,7 +2046,14 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
         // und das Protokoll vom Daemon unterstützt sein. Vorher galt allein die
         // Existenz eines config.rcon-Blocks als "verfügbar" — die RCON-Konsole
         // erschien dadurch auch bei Servern, bei denen sie nicht funktionieren kann.
-        const rcon = StatusService.resolveRcon({ gameData, ports, envVars: envVariables });
+        // Auch hier das Paket: Die Detailseite trifft sonst eine andere Aussage
+        // als der Sendeweg — „keine RCON-Konfiguration" auf der Seite, waehrend
+        // der Befehl durchginge. Zwei Wahrheiten ueber dieselbe Sache.
+        const rconPaket = ladePaketUndWerte(server);
+        const rcon = StatusService.resolveRcon({
+            gameData, ports, envVars: envVariables,
+            paket: rconPaket.paket, paketWerte: rconPaket.werte,
+        });
         server.rcon_available = rcon.available;
         server.rcon_configured = rcon.configured;
         server.rcon_reason = rcon.reason;
@@ -2210,7 +2231,7 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
         // Kein Bereich heisst: die Serverseite selbst.
         const BEREICHE = {
             dateien: 'Dateien', sicherungen: 'Sicherungen', inhalte: 'Mods', konsole: 'Konsole',
-            rohmodus: 'Einstellungen — Rohmodus', fernsteuerung: 'Fernsteuerung',
+            rohmodus: 'Einstellungen — Rohmodus', fernsteuerung: 'RCON',
             aufgaben: 'Wiederkehrende Aufgaben', panels: 'Discord-Panels',
             oeffentlich: 'Öffentliche Seite',
         };
@@ -3929,6 +3950,24 @@ async function _setzeSftpPasswort(dbService, { serverId, username, daemonId, gui
 }
 
 // ============================================================
+/**
+ * Paket und Werte einer Serverzeile — beide als Objekt, beide fehlertolerant.
+ *
+ * Steht hier und nicht in jeder Route einzeln: Die Fernsteuerung braucht beide,
+ * und zwei Parse-Stellen mit je eigenem try/catch driften auseinander.
+ */
+function ladePaketUndWerte(zeile) {
+    const lies = (wert, vorgabe) => {
+        try {
+            return typeof wert === 'string' ? JSON.parse(wert) : (wert || vorgabe);
+        } catch { return vorgabe; }
+    };
+    return {
+        paket: lies(zeile?.paket_json, null),
+        werte: lies(zeile?.paket_werte, {}) || {},
+    };
+}
+
 // POST /:serverId/rcon – RCON-Befehl senden
 // ============================================================
 router.post('/:serverId/rcon', requirePermission('GAMESERVER.RCON'), async (req, res) => {
@@ -3959,13 +3998,24 @@ router.post('/:serverId/rcon', requirePermission('GAMESERVER.RCON'), async (req,
             return res.status(429).json({ success: false, message: rateLimitCheck.error });
         }
 
+        // `paket_werte` und das Paket gehoeren dazu: Bei einem Server aus einem
+        // Spielpaket steht die Fernsteuerung dort, nicht in `game_data`
+        // (2026-09-22). Die Fassung waehlt dieselbe Regel wie ueberall:
+        // `stable` vor `test`, danach die neueste.
         const [server] = await dbService.query(`
-            SELECT gs.id, gs.ports, gs.env_variables, gs.bind_ip,
+            SELECT gs.id, gs.ports, gs.env_variables, gs.bind_ip, gs.paket_werte,
                    r.daemon_id, r.host AS rootserver_ip,
-                   am.game_data
+                   am.game_data,
+                   pv.fbpkg AS paket_json
             FROM gameservers gs
             LEFT JOIN rootserver r ON gs.rootserver_id = r.id
             LEFT JOIN addon_marketplace am ON gs.addon_marketplace_id = am.id
+            LEFT JOIN packages pk ON pk.id = gs.addon_marketplace_id
+            LEFT JOIN package_versions pv ON pv.id = (
+                SELECT v.id FROM package_versions v
+                 WHERE v.package_id = pk.id
+                 ORDER BY (v.channel = 'stable') DESC, v.published_at DESC, v.id DESC
+                 LIMIT 1)
             WHERE gs.id = ? AND gs.guild_id = ?
         `, [serverId, guildId]);
 
@@ -3986,8 +4036,17 @@ router.post('/:serverId/rcon', requirePermission('GAMESERVER.RCON'), async (req,
         let envVars = {};
         try { envVars = typeof server.env_variables === 'string' ? JSON.parse(server.env_variables) : (server.env_variables || {}); } catch (_) { /* */ }
 
-        // Port, Passwort und Protokoll zentral auflösen (gleiche Prüfung wie in der View)
-        const rcon = StatusService.resolveRcon({ gameData, ports, envVars });
+        // Port, Passwort und Protokoll zentral auflösen (gleiche Prüfung wie in der View).
+        //
+        // Das PAKET geht mit: Ein Server aus einem Spielpaket hat kein
+        // `game_data.config.rcon` — seine Fernsteuerung steht in
+        // `management.rcon`, der Port als Zweck und das Kennwort als
+        // Einstellung (2026-09-22).
+        const paketFuerRcon = ladePaketUndWerte(server);
+        const rcon = StatusService.resolveRcon({
+            gameData, ports, envVars,
+            paket: paketFuerRcon.paket, paketWerte: paketFuerRcon.werte,
+        });
         if (!rcon.available) {
             return res.status(400).json({ success: false, message: rcon.reason || 'RCON ist für diesen Gameserver nicht verfügbar' });
         }
@@ -4014,7 +4073,10 @@ router.post('/:serverId/rcon', requirePermission('GAMESERVER.RCON'), async (req,
             return res.status(400).json({ success: false, message: validation.error });
         }
 
-        const rconPassword = envVars[gameData.config.rcon.password_var] || '';
+        // Das Kennwort kommt aus derselben Auflösung. Hier stand
+        // `envVars[gameData.config.rcon.password_var]` — die Egg-Schreibweise,
+        // und sie WIRFT bei einem Paketserver, weil `gameData.config` fehlt.
+        const rconPassword = rcon.password || '';
 
         // sendCommand wirft, wenn der Daemon success:false meldet – die eigentliche
         // Meldung ("Verbindung abgelehnt", "falsches Passwort", …) steckt dann in

@@ -89,7 +89,7 @@ const BEFEHL_NAME = {
 const BEFEHL_QUELLE = {
     query:       { text: 'Abfrage',       ton: 'green'  },
     file:        { text: 'Datei',         ton: 'blue'   },
-    rcon:        { text: 'Fernsteuerung', ton: 'green'  },
+    rcon:        { text: 'RCON', ton: 'green'  },
     console:     { text: 'Konsole',       ton: 'green'  },
     unsupported: { text: 'nicht möglich', ton: 'secondary' },
 };
@@ -811,7 +811,7 @@ function bauePorts(server, paket) {
     const uebergang = ladeUebergang(paket?.identity?.slug || '');
     const zweckKey = (zweck) => uebergang?.portzwecke?.[zweck] || zweck;
 
-    const ZWECK = { game: 'Spiel', query: 'Abfrage', rcon: 'Fernsteuerung' };
+    const ZWECK = { game: 'Spiel', query: 'Abfrage', rcon: 'RCON' };
     const liste = [];
 
     for (const p of (paket?.ports || [])) {

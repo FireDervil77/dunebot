@@ -1231,7 +1231,71 @@ class IPMServer {
             // Nicht kritisch - Installation war erfolgreich
         }
 
+        // ── Ein installiertes Modpack ist ein Inhalt, also steht es in der Liste
+        //
+        // Betreiber am 2026-09-22: „Die mod seite zeigt die installierten mods
+        // nicht an die dem paket bekannt sind." Richtig — das Modpack schreibt
+        // seine Dateien im Installationsskript, und das Panel erfuhr nie davon.
+        // Der Reiter „Mods" sagte „Noch nichts installiert", waehrend 48 Dateien
+        // in `mods/` lagen.
+        //
+        // Eingetragen wird EINE Zeile, nicht achtundvierzig: Ein Modpack ist
+        // eine Einheit. Seine Mods einzeln zu fuehren waere eine Luege ueber die
+        // Verwaltbarkeit — wer eine davon aktualisiert, zerlegt das Paket, und
+        // die naechste Fassung des Packs raeumt sie ohnehin weg.
+        //
+        // HIER und nicht beim Anlegen: Vorher waere es eine Behauptung. Erst
+        // wenn die Installation durch ist, liegen die Dateien wirklich da.
+        await this._modpackAlsInhalt(server_id);
+
         this.Logger.success(`[IPMServer] Gameserver ${server_id} Status → offline`);
+    }
+
+    /**
+     * Traegt ein installiertes Modpack als eine Zeile in `gameserver_content` ein.
+     *
+     * Nichts zu tun, wenn der Server keins hat — das ist der Normalfall.
+     *
+     * @private
+     */
+    async _modpackAlsInhalt(serverId) {
+        try {
+            const [zeile] = await this.dbService.query(
+                'SELECT guild_id, paket_werte FROM gameservers WHERE id = ?', [serverId]);
+            if (!zeile) return;
+
+            let werte = {};
+            try {
+                werte = typeof zeile.paket_werte === 'string'
+                    ? JSON.parse(zeile.paket_werte) : (zeile.paket_werte || {});
+            } catch { return; }
+
+            const kennung = String(werte.modpack || '').trim();
+            if (!kennung) return;
+            const fassung = String(werte.modpack_version || '').trim() || null;
+
+            // `art: 'modpack'` — dieselbe Spalte, die schon Mod und Lader
+            // unterscheidet. Der Ablageort bleibt leer: Das Paket verteilt seine
+            // Dateien selbst ueber mehrere Ordner, ein einzelner waere falsch.
+            await this.dbService.query(
+                `INSERT INTO gameserver_content
+                     (server_id, guild_id, art, quelle, kennung, name, fassung,
+                      aktiv, status, installiert_am)
+                 VALUES (?, ?, 'modpack', 'modrinth', ?, ?, ?, 1, 'installiert', NOW())
+                 ON DUPLICATE KEY UPDATE
+                     fassung = VALUES(fassung),
+                     status = 'installiert',
+                     installiert_am = NOW()`,
+                [serverId, zeile.guild_id, kennung, kennung, fassung]);
+
+            this.Logger.success(`[IPMServer] Modpack ${kennung}${fassung ? ' ' + fassung : ''} `
+                + `als Inhalt von Server ${serverId} vermerkt`);
+        } catch (error) {
+            // Der Eintrag ist eine Auskunft, kein Teil der Installation. Faellt
+            // er aus, bleibt der Server benutzbar — die Liste ist dann nur
+            // unvollstaendig, und das steht im Protokoll.
+            this.Logger.warn('[IPMServer] Modpack nicht als Inhalt vermerkt:', error);
+        }
     }
 
     /**

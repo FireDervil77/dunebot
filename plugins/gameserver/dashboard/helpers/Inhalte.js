@@ -20,6 +20,10 @@ const Quellen = require('./Quellen');
 /** Der Lader ist die erste Zeile, kein Sonderfall. */
 const ART_LADER = 'loader';
 const ART_MOD = 'mod';
+// Ein ganzes Paket, als EINE Zeile (2026-09-22). Seine Mods einzeln zu fuehren
+// waere eine Luege ueber die Verwaltbarkeit: Wer eine davon aktualisiert,
+// zerlegt das Paket, und die naechste Fassung raeumt sie ohnehin weg.
+const ART_MODPACK = 'modpack';
 
 /**
  * Alles, was zu einem Server gehoert — auch das Entfernte.
@@ -52,6 +56,7 @@ async function fuerServer(serverId) {
 
     return {
         lader:    laufend.find(z => z.art === ART_LADER) || null,
+        modpack:  laufend.find(z => z.art === ART_MODPACK) || null,
         mods:     laufend.filter(z => z.art === ART_MOD),
         entfernt: (zeilen || []).filter(z => z.status === 'entfernt'),
     };
@@ -238,5 +243,6 @@ function paketAdresse(zeile, raeume) {
 
 module.exports = {
     fuerServer, laderAktiv, eintragen, entfernen, schalten, dateienAus, paketAdresse,
+    ART_LADER, ART_MOD, ART_MODPACK,
     ART_LADER, ART_MOD,
 };

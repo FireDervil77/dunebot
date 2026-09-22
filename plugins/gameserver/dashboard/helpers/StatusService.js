@@ -113,19 +113,66 @@ class StatusService {
      * @returns {{available: boolean, configured: boolean, protocol: string|null,
      *            port: number|null, hasPassword: boolean, reason: string|null}}
      */
-    static resolveRcon({ gameData, ports = {}, envVars = {}, cfg: explicitCfg = null }) {
-        const cfg = explicitCfg || gameData?.config?.rcon;
+    static resolveRcon({ gameData, ports = {}, envVars = {}, cfg: explicitCfg = null,
+                         paket = null, paketWerte = {} }) {
+        // ── Der Paketweg (2026-09-22) ───────────────────────────────────────
+        //
+        // Betreiber: „der tab fernsteuerung zeigt nix an … aber da der rconport
+        // ja gesetzt wurde und auch ein passwort".
+        //
+        // Er hat recht: Diese Funktion las ausschliesslich `game_data.config.rcon`
+        // — die EGG-Struktur. Ein Server aus einem Spielpaket hat dort `{}`, und
+        // die Seite meldete „Dieses Spiel hat keine RCON-Konfiguration", obwohl
+        // das Paket `management.rcon` nennt, ein rcon-Port gebucht ist und ein
+        // Kennwort erzeugt wurde.
+        //
+        // Uebersetzt wird hier, nicht dort: Das Paket sagt `port: "rcon"` (ein
+        // ZWECK, keine Nummer) und `password_variable` (der Name der Variablen,
+        // nicht der Wert). Beides wird aufgeloest, damit der Rest der Funktion
+        // und alle drei Aufrufer unveraendert bleiben.
+        let ausPaket = null;
+        const mr = paket?.management?.rcon;
+        if (!explicitCfg && mr) {
+            const eintrag = (paket.settings || []).find(e =>
+                Array.isArray(e.apply)
+                && e.apply.some(a => a.target === 'env' && a.variable === mr.password_variable));
+            ausPaket = {
+                // Der Daemon kennt den Treibernamen, das Paket die Schreibweise
+                // des Formats — dieselbe Uebersetzung wie in `auftrag/baue.go`.
+                protocol: mr.protocol === 'source' ? 'srcds' : mr.protocol,
+                port: ports?.[mr.port]?.internal ?? null,
+                password: eintrag ? (paketWerte?.[eintrag.key] || '') : '',
+            };
+        }
+
+        const cfg = explicitCfg || ausPaket || gameData?.config?.rcon;
         const result = {
             available:   false,
             configured:  !!cfg,
             protocol:    cfg?.protocol || null,
             port:        null,
             hasPassword: false,
+            // Der Sendeweg holte das Kennwort bisher selbst aus `envVars` — mit
+            // der Egg-Schreibweise, die es beim Paket nicht gibt. Jetzt kommt es
+            // von hier: EINE Stelle, die weiss, wo es steht.
+            password:    '',
             reason:      null,
         };
 
         if (!cfg) {
             result.reason = 'Dieses Spiel hat keine RCON-Konfiguration';
+            return result;
+        }
+
+        // Kommt der Block aus dem PAKET, sind Port und Kennwort schon aufgeloest
+        // — die Egg-Wege darunter (port_var, password_var) gibt es dort nicht.
+        if (ausPaket && !explicitCfg) {
+            result.port = ausPaket.port;
+            result.password = ausPaket.password || '';
+            result.hasPassword = Boolean(ausPaket.password);
+            result.available = Boolean(result.port) && result.hasPassword;
+            if (!result.port) result.reason = 'Für diesen Server ist kein rcon-Port gebucht.';
+            else if (!result.hasPassword) result.reason = 'Für diesen Server ist kein RCON-Kennwort gesetzt.';
             return result;
         }
 
@@ -152,7 +199,8 @@ class StatusService {
             result.port = parseInt(envVars[portVar], 10) || null;
         }
 
-        result.hasPassword = !!(envVars[cfg.password_var || ''] || '').toString().trim();
+        result.password = String(envVars[cfg.password_var || ''] || '');
+        result.hasPassword = !!result.password.trim();
 
         if (!result.port) {
             result.reason = `RCON-Port (${portVar || '?'}) ist nicht konfiguriert`;

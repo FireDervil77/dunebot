@@ -271,7 +271,8 @@
     let html = `
       <div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:6px">
         <span class="fb-muted" style="font-size:13px">
-          ${aktive} aktiv${d.lader ? '' : ' · kein Lader installiert'}
+          ${aktive} aktiv${(d.laderAlsInhalt && !d.lader) ? ' · kein Lader installiert'
+                             : (d.laderGewaehlt ? ` · Lader ${escape(d.laderGewaehlt)}` : '')}
           ${kataloge.length ? ' · Quelle ' + kataloge.map(q => escape(q.titel)).join(', ') : ''}
         </span>
         <span style="margin-left:auto"></span>
@@ -305,13 +306,41 @@
         </div>`;
     }
 
-    if (!d.lader && DARF) {
+    // Der Hinweis gilt NUR, wenn der Lader wie ein Inhalt nachinstalliert wird
+    // (Valheim/BepInEx). Wo er mit der Installation kommt (Minecraft: die
+    // Serverdatei IST der Lader), stand hier bis zum 2026-09-22 dieselbe
+    // Aufforderung — mit „BepInEx" und „über Thunderstore" in einem
+    // Minecraft-Server. Beides falsch, und das zweite führt zum Klicken.
+    if (d.laderAlsInhalt && !d.lader && DARF) {
       html += `
         <div class="fb-muted" style="font-size:12px;margin:8px 0;padding:8px 10px;border:1px solid var(--fb-border);border-radius:6px">
           <strong>Zuerst der Lader.</strong> Ohne ihn lädt kein Mod
           (<span class="fb-mono">${escape(d.lader_key || 'BepInEx')}</span>).
           Über Thunderstore kommt er als Abhängigkeit von selbst mit — beim
           Hochladen wähle „Lader" als Art.
+        </div>`;
+    } else if (!d.laderAlsInhalt && d.laderGewaehlt) {
+      html += `
+        <div class="fb-muted" style="font-size:12px;margin:8px 0;padding:8px 10px;border:1px solid var(--fb-border);border-radius:6px">
+          <strong>Lader: <span class="fb-mono">${escape(d.laderGewaehlt)}</span>.</strong>
+          Er kam mit der Installation — hier ist nichts nachzulegen. Ein Wechsel
+          verlangt eine Neuinstallation, und schon installierte Mods lägen danach
+          im falschen Ordner.
+        </div>`;
+    }
+
+    // Das Modpack steht ganz oben und als EINE Zeile — es bestimmt, was
+    // darunter liegt (2026-09-22).
+    if (d.modpack) {
+      html += `
+        <div style="margin:8px 0;padding:10px 12px;border:1px solid var(--fb-border);border-radius:6px">
+          <div style="font-weight:500">Modpack: ${escape(d.modpack.name || d.modpack.kennung)}${
+            d.modpack.fassung ? ' <span class="fb-mono">' + escape(d.modpack.fassung) + '</span>' : ''}</div>
+          <div class="fb-muted" style="font-size:12px;margin-top:2px">
+            Die Mods dieses Pakets liegen auf der Platte, werden aber nicht
+            einzeln verwaltet: Wer eine davon austauscht, zerlegt das Paket.
+            Ein Wechsel der Fassung verlangt eine Neuinstallation.
+          </div>
         </div>`;
     }
 
