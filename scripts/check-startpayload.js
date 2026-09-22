@@ -189,6 +189,62 @@ function ohneEgg(payload) {
         });
     });
 
+    console.log('\nDas Kennwort der Fernsteuerung wird erzeugt, nicht gefragt');
+
+    // ── Der Fall, der das gekostet hat (2026-09-22) ─────────────────────────
+    //
+    // Am ersten Minecraft-Server fehlte `rcon_password` in den Werten: Es hat
+    // `default: null` und `role: owner`, wurde also weder gefragt noch
+    // vorbelegt. Dann bleibt der Verweis stehen, und in `server.properties`
+    // landet `rcon.password={{setting:rcon_password}}` — ein Platzhalter als
+    // Geheimnis.
+    //
+    // Geprueft wird gegen JEDES Handpaket, das eine Fernsteuerung nennt, und am
+    // ERGEBNIS von `paketWerteAnlegen`.
+    {
+        const fs2 = require('fs');
+        const path2 = require('path');
+        const ordner = path2.join(__dirname, '../packages/fbpkg/beispiele');
+        const dateien = fs2.existsSync(ordner)
+            ? fs2.readdirSync(ordner).filter(d => d.endsWith('.json')) : [];
+        for (const datei of dateien) {
+            const pk = JSON.parse(fs2.readFileSync(path2.join(ordner, datei), 'utf8'));
+            const variable = pk?.management?.rcon?.password_variable;
+            if (!variable) continue;
+            const eintrag = (pk.settings || []).find(e =>
+                Array.isArray(e.apply)
+                && e.apply.some(a => a.target === 'env' && a.variable === variable));
+
+            await check(`${datei}: die Einstellung zu ${variable} ist auffindbar`, async () => {
+                assert.ok(eintrag, `Keine Einstellung schreibt ${variable} — dann kann sie auch `
+                                 + 'niemand fuellen, und der Daemon meldet eine Luecke.');
+            });
+            if (!eintrag) continue;
+
+            await check(`${datei}: sie bekommt beim Anlegen einen Wert`, async () => {
+                const w = paketWerteAnlegen(pk, {}, 'Mein Server');
+                const wert = w[eintrag.key];
+                assert.ok(wert && String(wert).length >= 16,
+                    `${eintrag.key} = ${JSON.stringify(wert)} — ohne Wert bleibt {{setting:`
+                  + `${eintrag.key}}} als Text in der Konfiguration stehen.`);
+                assert.ok(!/\{\{/.test(String(wert)), 'Der Wert ist ein Platzhalter, kein Kennwort.');
+            });
+
+            await check(`${datei}: es ist erzeugt, nicht fest`, async () => {
+                const a = paketWerteAnlegen(pk, {}, 'x')[eintrag.key];
+                const b = paketWerteAnlegen(pk, {}, 'x')[eintrag.key];
+                assert.notStrictEqual(a, b,
+                    'Zweimal dasselbe Kennwort heisst: Es steht im Code. Dann hat jeder Server '
+                  + 'dieses Hauses dasselbe.');
+            });
+
+            await check(`${datei}: ein eingetippter Wert gewinnt`, async () => {
+                const w = paketWerteAnlegen(pk, { [eintrag.key]: 'von-hand' }, 'x');
+                assert.strictEqual(w[eintrag.key], 'von-hand');
+            });
+        }
+    }
+
     console.log('\nEine Einstellung, die dem Server fehlt (Baustelle Weltmodifikatoren)');
 
     // ── Der Fall, der das gekostet hat ──────────────────────────────────────

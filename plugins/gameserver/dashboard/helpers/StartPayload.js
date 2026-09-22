@@ -28,6 +28,7 @@
 
 'use strict';
 
+const crypto = require('crypto');
 const { loeseInhaltAuf } = require('./InhaltJeLader');
 const fs   = require('fs');
 const path = require('path');
@@ -392,6 +393,37 @@ function paketWerteAnlegen(paket, eingaben = {}, serverName = null) {
         // Discord-Modal kommt Freitext („true", „on").
         werte[eintrag.key] = eintrag.type === 'boolean' ? (istWahr(wert) ? '1' : '0') : String(wert);
     }
+
+    // ── Das Kennwort der Fernsteuerung wird ERZEUGT (2026-09-22) ────────────
+    //
+    // Befund am ersten Minecraft-Server: `rcon_password` hat `default: null`
+    // und `role: owner` — es wurde also weder gefragt noch vorbelegt und fehlte
+    // in den Werten. Dann bleibt der Verweis stehen, und in `server.properties`
+    // landet `rcon.password={{setting:rcon_password}}` als TEXT. Ein Platzhalter
+    // als Geheimnis.
+    //
+    // Es abzufragen waere die falsche Abhilfe: **Dieses Kennwort sieht nie ein
+    // Mensch.** Das Paket sagt es selbst — „Es geht nie an Spieler, nur der
+    // Daemon benutzt es." Wer es tippen muss, tippt beim zehnten Server
+    // „test123" und hat nichts gewonnen ausser einem Formularfeld mehr.
+    //
+    // Die Regel ist eng gefasst und folgt dem Paket statt einer Vermutung ueber
+    // Feldnamen: Genommen wird genau die Einstellung, die die Variable fuellt,
+    // die `management.rcon.password_variable` nennt. Hat sie schon einen Wert
+    // (weil das Paket eine Vorgabe hat oder jemand einen eingetippt hat), bleibt
+    // er stehen.
+    //
+    // base64url, weil `server.properties` ein Zeichen wie `\` oder `:` nicht
+    // verzeiht und die Datei zeilenweise gelesen wird.
+    const rconVariable = paket?.management?.rcon?.password_variable;
+    if (rconVariable) {
+        const eintrag = (paket.settings || []).find(e =>
+            Array.isArray(e.apply) && e.apply.some(a => a.target === 'env' && a.variable === rconVariable));
+        if (eintrag && !werte[eintrag.key]) {
+            werte[eintrag.key] = crypto.randomBytes(18).toString('base64url');
+        }
+    }
+
     return werte;
 }
 
