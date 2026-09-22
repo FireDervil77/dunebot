@@ -114,6 +114,19 @@ global.fetch = async (adresse) => {
         const eintrag = Object.entries(PROJEKTE).find(([, p]) => p.slug === projekt[1]);
         if (eintrag) return antwort([NUR_FASSUNG(eintrag[1].slug, eintrag[0])]);
     }
+    // Ein Modpack — seit 2026-09-22 in der Attrappe, weil es der Fall ist, den
+    // das Panel abweisen MUSS. Die echte `.mrpack` im Beispiel war 355 MB.
+    if (pfad === '/v2/project/grosses-paket') {
+        return antwort({ slug: 'grosses-paket', title: 'Grosses Paket',
+                         client_side: 'required', project_type: 'modpack' });
+    }
+    if (pfad === '/v2/project/grosses-paket/version') {
+        return antwort([{ version_number: '1.0.0', date_published: '2026-09-01T00:00:00Z',
+                          loaders: ['neoforge'], game_versions: ['26.2'], dependencies: [],
+                          files: [{ filename: 'Grosses Paket 1.0.0.mrpack', url: 'https://cdn.modrinth.com/x.mrpack',
+                                    size: 355708364, primary: true, hashes: {} }] }]);
+    }
+
     // Die echte API nimmt ID ODER Slug — die Attrappe auch, sonst prueft sie
     // einen Weg, den es so nicht gibt.
     const einzeln = pfad.match(/^\/v2\/project\/([^/]+)$/);
@@ -190,8 +203,12 @@ async function pruefe(name, fn) {
         assert.strictEqual(s.treffer[0].kennung, 'essentialsx', 'die Kennung ist der Slug');
         assert.strictEqual(s.treffer[0].clientSeitig, false, 'client_side: unsupported');
         const u = new URL(abrufe[0]);
-        assert.strictEqual(u.searchParams.get('facets'), '[["categories:paper"]]',
-            'ohne Lader-Facette kaemen Fabric-Mods in eine Paper-Liste');
+        // Zwei Gruppen: Die erste ist der Lader, die zweite haelt Modpacks
+        // heraus (2026-09-22). Gruppen sind ein UND, Werte darin ein ODER.
+        assert.strictEqual(u.searchParams.get('facets'),
+            '[["categories:paper"],["project_type:mod","project_type:plugin"]]',
+            'ohne Lader-Facette kaemen Fabric-Mods in eine Paper-Liste; ohne die zweite Gruppe '
+          + 'Modpacks, die sich nicht installieren lassen');
         assert.strictEqual(u.searchParams.get('index'), 'relevance', 'mit Begriff nach Trefferguete');
         const stoebern = await Modrinth.suche('paper', '', {});
         assert.strictEqual(new URL(abrufe[1]).searchParams.get('index'), 'downloads',
@@ -383,5 +400,40 @@ async function pruefe(name, fn) {
             'dieses Spiel hat keine Thunderstore-Gemeinschaft — dann gibt es auch keine Adresse');
     });
 
-    console.log(`\n${bestanden} Pruefung(en) bestanden.\n`);
+    // ── Modpacks: gesucht werden sie nicht, installiert erst recht nicht ────────
+//
+// Betreiberfrage am 2026-09-22: „kann man bei jedem modloader dann nur einzelne
+// mods suchen oder ist der auch in der lage modpacks zu suchen?"
+//
+// Gemessen an der echten API: Zur Kategorie `neoforge` gehoeren 31 407
+// Projekte, davon **2418 Modpacks** — sie standen mit in der Suche. Ein Modpack
+// ist aber keine Mod, sondern ein Archiv mit einer Dateiliste und einem
+// `overrides/`-Ordner (im Beispiel 355 MB), und es bestimmt Lader UND
+// Spielfassung selbst. In `mods/` abgelegt tut es nichts.
+//
+// Zwei Tore, weil eine Kennung nicht nur aus der Suche kommt.
+await pruefe('Die Suche fragt ausdruecklich nach Mods und Plugins', async () => {
+    await Modrinth.suche('paper', '', {});
+    const url = abrufe.find(a => a.includes('/v2/search'));
+    assert.ok(url, 'Keine Suchanfrage abgesetzt');
+    const facets = decodeURIComponent(new URL(url).searchParams.get('facets') || '');
+    assert.ok(facets.includes('project_type:mod'), `facets ohne project_type:mod — ${facets}`);
+    assert.ok(facets.includes('project_type:plugin'), `facets ohne project_type:plugin — ${facets}`);
+    assert.ok(facets.includes('categories:paper'), 'die Lader-Kategorie fehlt');
+});
+
+await pruefe('Ein Modpack wird beim Installieren abgewiesen', async () => {
+    await assert.rejects(
+        () => Modrinth.paket('neoforge', 'grosses-paket'),
+        (e) => /MODPACK/.test(e.message),
+        'Ein Modpack ging durch — dann liegt eine Archivdatei in mods/, und niemand sieht ihr an, '
+      + 'warum das Spiel die Mods nicht hat.');
+});
+
+await pruefe('Eine gewoehnliche Mod geht weiterhin durch', async () => {
+    const p = await Modrinth.paket('paper', 'essentialsx');
+    assert.strictEqual(p.kennung, 'essentialsx');
+});
+
+console.log(`\n${bestanden} Pruefung(en) bestanden.\n`);
 })();

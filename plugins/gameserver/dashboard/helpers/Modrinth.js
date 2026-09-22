@@ -126,9 +126,32 @@ async function suche(raum, begriff, optionen = {}) {
 
     const seite = Math.max(1, parseInt(optionen.seite, 10) || 1);
     const text = String(begriff || '').trim();
+    // ── Modpacks gehoeren NICHT in diese Liste (2026-09-22) ────────────────
+    //
+    // Gemessen: Zur Kategorie `neoforge` gehoeren 31 407 Projekte, davon **2418
+    // Modpacks**. Sie standen bisher mit in der Suche — nicht auf Seite 1 (die
+    // sortiert nach Downloads und zeigt die grossen Mods), aber jeder, der nach
+    // einem Namen sucht, traf sie.
+    //
+    // Ein Modpack ist keine Mod, sondern eine `.mrpack` — ein Archiv mit einer
+    // Liste von Dateien (`modrinth.index.json`) und einem `overrides/`-Ordner.
+    // Gemessen an einem Beispiel: **355 MB**. In `mods/` abgelegt tut sie
+    // nichts: Der Lader ignoriert sie, der Platz ist weg, und niemand sieht der
+    // Zeile an, warum das Spiel die Mods nicht hat.
+    //
+    // `project_type:!=modpack` lehnt die API ab („failed to parse facets",
+    // gemessen). Die Aufzaehlung geht: Eine zweite Facettengruppe ist ein UND,
+    // die Werte darin sind ein ODER. 28 891 Treffer statt 31 407 — genau die
+    // Modpacks und die Ressourcenpakete weniger.
+    //
+    // `plugin` steht mit in der Liste, obwohl der paper-Raum heute nur `mod`
+    // liefert (40 von 40 auf Seite 1 gemessen): Modrinth fuehrt beide Arten,
+    // und EssentialsX meldet sich als `mod`, obwohl es ein Plugin ist. Wer sich
+    // auf EINE Art verlaesst, verliert die andere, sobald Modrinth aufraeumt.
     const abfrage = new URLSearchParams({
         query: text,
-        facets: `[${alsListe([`categories:${raum}`])}]`,
+        facets: `[${alsListe([`categories:${raum}`])},`
+              + `${alsListe(['project_type:mod', 'project_type:plugin'])}]`,
         index: text ? 'relevance' : 'downloads',
         limit: String(PRO_SEITE),
         offset: String((seite - 1) * PRO_SEITE),
@@ -217,6 +240,18 @@ async function paket(raum, kennung, fassung = null, optionen = {}) {
     if (raum) abfrage.set('loaders', alsListe([raum]));
     if (optionen.spielfassung) abfrage.set('game_versions', alsListe([optionen.spielfassung]));
 
+    // Das zweite Tor. Die Suche haelt Modpacks heraus — aber eine Kennung kann
+    // auch von Hand kommen (Adresszeile, Discord-Befehl, alte Zeile in der
+    // Datenbank). Ohne diese Pruefung landete eine 355-MB-`.mrpack` in `mods/`
+    // und taete dort nichts.
+    const art = (await projekt(slug))?.art || null;
+    if (art === 'modpack') {
+        throw new Error(`„${slug}" ist ein MODPACK, keine einzelne Mod. Ein Modpack ist ein Archiv `
+            + 'mit einer Liste von Dateien und einem overrides-Ordner; es bestimmt ausserdem Lader '
+            + 'und Spielfassung selbst. Dieses Panel kann das noch nicht installieren — es würde '
+            + 'nur die Archivdatei ablegen, wo das Spiel sie nie liest.');
+    }
+
     const liste = await hole(`/project/${encodeURIComponent(slug)}/version?${abfrage}`);
     if (!Array.isArray(liste) || !liste.length) {
         throw new Error(`${slug}: keine Fassung für ${raum || 'diesen Server'}`
@@ -249,7 +284,15 @@ async function paket(raum, kennung, fassung = null, optionen = {}) {
  */
 async function projekt(id) {
     const p = await hole(`/project/${encodeURIComponent(id)}`);
-    return { slug: p.slug, name: p.title, clientSeitig: p.client_side === 'required' };
+    return {
+        slug: p.slug,
+        name: p.title,
+        clientSeitig: p.client_side === 'required',
+        // `project_type` sagt, WAS das ist: mod, plugin, modpack, resourcepack,
+        // shader. Gebraucht wird es, um ein Modpack abzuweisen, bevor jemand
+        // eine 355-MB-Archivdatei nach `mods/` laedt (2026-09-22).
+        art: p.project_type || null,
+    };
 }
 
 /**
