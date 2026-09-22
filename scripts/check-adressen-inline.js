@@ -37,7 +37,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { ohneKommentareEjs } = require('./lib/quelltext');
+const { ohneKommentare, ohneKommentareEjs } = require('./lib/quelltext');
 
 const WURZEL = path.join(__dirname, '..');
 const PLUGINS = path.join(WURZEL, 'plugins');
@@ -77,7 +77,10 @@ for (const plugin of fs.readdirSync(PLUGINS, { withFileTypes: true })) {
     if (!plugin.isDirectory()) continue;
     const index = path.join(PLUGINS, plugin.name, 'dashboard/index.js');
     if (!fs.existsSync(index)) continue;
-    const quelle = fs.readFileSync(index, 'utf8');
+    // Ohne Kommentare: Ein auskommentiertes `Router.use('/alt', …)` zaehlte
+    // sonst als erreichbar — und der Waechter waere zu NACHSICHTIG. Das ist die
+    // gefaehrlichere Richtung: Er winkt eine Adresse durch, die ins Leere geht.
+    const quelle = ohneKommentare(fs.readFileSync(index, 'utf8'));
 
     // ── Erreichbar ist mehr als der Einhängepunkt ───────────────────────────
     //
@@ -123,7 +126,7 @@ for (const plugin of fs.readdirSync(PLUGINS, { withFileTypes: true })) {
         if (!datei) continue;
         const pfad = path.join(PLUGINS, plugin.name, 'dashboard', datei.endsWith('.js') ? datei : datei + '.js');
         if (!fs.existsSync(pfad)) continue;
-        const inhalt = fs.readFileSync(pfad, 'utf8');
+        const inhalt = ohneKommentare(fs.readFileSync(pfad, 'utf8'));
         for (const r of inhalt.matchAll(/router\.(?:get|post|put|patch|delete)\(\s*'([^']+)'/gi)) {
             const a = ersterAbschnitt(r[1]);
             if (a && !a.startsWith(':')) erreichbar.add(a);
