@@ -1490,12 +1490,64 @@ function baueWerteSchritt(paket, maschine, imageLiegtDa) {
     const alle = Array.isArray(paket?.settings) ? paket.settings : [];
     const gefragt = alle.filter(e => (e.role || 'expert') === 'player');
 
+    // ── Der Servername gehoert dem PANEL, nicht dem Spiel ───────────────────
+    //
+    // Befund vom 2026-09-22, gemeldet vom Betreiber: Beim Anlegen eines
+    // Minecraft-Servers fehlte das Namensfeld ganz, und die Anlegeroute
+    // antwortete „Pflichtfelder fehlen: server_name". Obendrein stand als erstes
+    // Feld „Servernachricht" da, wo der Betreiber den Namen erwartete.
+    //
+    // Der Grund: Das Feld hing an `e.key === 'name'`. Valheim HAT eine solche
+    // Einstellung („Servername", sie wird zum Startparameter). Minecraft hat
+    // keine — seine erste Spielerfrage ist `motd`. Damit trug kein einziges Feld
+    // den Namen `server_name`, und das Formular konnte die Pflicht nicht
+    // erfuellen, die die Route danach einfordert.
+    //
+    // Die Lehre steckt in der Ursache: **Der Name der Zeile in `gameservers` ist
+    // eine Eigenschaft des Servers, keine des Spiels.** Dass Valheim ihn
+    // zufaellig auch als Einstellung fuehrt, ist eine gluecklich passende
+    // Doppelung — kein Grund, das Panel davon abhaengig zu machen. Jedes Paket,
+    // das kein `name` kennt, waere sonst unanlegbar. Beim naechsten (Palworld,
+    // Rust) faellt es wieder auf.
+    //
+    // Also: Gibt es eine Einstellung `name`, fuellt sie weiter beide Rollen
+    // (einmal fragen, nicht zweimal) — und zwar auch dann, wenn ihre Rolle
+    // `owner` ist, sonst waere sie nicht gefragt und der Name stuende doppelt
+    // verschieden. Gibt es sie nicht, stellt der Schritt ein eigenes Feld voran.
+    const namensEinstellung = alle.find(e => e.key === 'name') || null;
+    if (namensEinstellung && !gefragt.includes(namensEinstellung)) {
+        gefragt.unshift(namensEinstellung);
+    }
+
     // Gespeichert wird unter dem Schlüssel des PAKETS (`setting_<schlüssel>`).
     // Bis zum 2026-09-10 hießen die Felder nach dem Egg (`variable_SERVER_NAME`),
     // und die Anlegeroute übersetzte über die Übergangsdatei zurück.
 
+    // Das eigene Namensfeld. Es traegt KEINEN Paketschluessel: Die Ansicht nennt
+    // es `server_name`, und die Route sammelt Paketwerte nur aus `setting_*` —
+    // es landet also nicht versehentlich als Einstellung in einem Spiel, das
+    // davon nichts weiss.
+    const eigenesNamensfeld = namensEinstellung ? null : {
+        schluessel: null,
+        istServerName: true,
+        name: 'Servername',
+        beschreibung: 'Der Name dieses Servers im Panel. '
+                    + (paket?.identity?.name ? `${paket.identity.name} kennt daf\u00fcr keine eigene `
+                       + 'Einstellung — er wirkt also nicht im Spiel.' : ''),
+        typ: 'text',
+        vorgabe: '',
+        pflicht: true,
+        warnung: null,
+        geheim: false,
+        wirkung: null,
+        hinweis: null,
+        auswahl: null,
+        min: null,
+        max: null,
+    };
+
     return {
-        felder: gefragt.map(e => ({
+        felder: (eigenesNamensfeld ? [eigenesNamensfeld] : []).concat(gefragt.map(e => ({
             schluessel: e.key,
             // Der Servername ist zugleich der Name des Servers in der Datenbank.
             // Die Anlegeroute verlangt ihn als `server_name`; ihn zweimal
@@ -1559,7 +1611,9 @@ function baueWerteSchritt(paket, maschine, imageLiegtDa) {
             })) : null,
             min: Number.isFinite(e.min) ? e.min : null,
             max: Number.isFinite(e.max) ? e.max : null,
-        })),
+        }))),
+        // Wieviele Einstellungen NICHT gefragt werden. Das eigene Namensfeld
+        // zaehlt hier nicht mit: Es ist keine Einstellung des Pakets.
         aufVorgabe: alle.length - gefragt.length,
 
         passiert: {

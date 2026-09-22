@@ -168,6 +168,58 @@ const skip = (was, warum) => { uebersprungen++; console.log(`  ⏭  ${was} — $
         'Ein `null.variables` weiter unten ist dann eine echte 500.');
 
     // ════════════════════════════════════════════════════════════════════════
+    console.log('\nDer Werteschritt kann die Pflicht der Route erfüllen');
+    // ════════════════════════════════════════════════════════════════════════
+    //
+    // Befund vom 2026-09-22, gemeldet vom Betreiber: Beim Anlegen eines
+    // Minecraft-Servers fehlte das Namensfeld, die Route antwortete
+    // „Pflichtfelder fehlen: server_name", und als erstes Feld stand
+    // „Servernachricht" da. Das Feld hing an `e.key === 'name'` — eine
+    // Einstellung, die Valheim hat und Minecraft nicht.
+    //
+    // Geprüft wird deshalb gegen JEDES Handpaket und am ERGEBNIS: Genau ein Feld
+    // muss `server_name` füllen, und es muss Pflicht sein. Nicht „steht der
+    // Sonderfall im Code" — sondern „kommt bei jedem Paket ein Namensfeld heraus".
+    {
+        const { baueWerteSchritt } = require(path.join(WURZEL,
+            'plugins/gameserver/dashboard/helpers/Serverseite.js'));
+        const ordner = path.join(WURZEL, 'packages/fbpkg/beispiele');
+        const dateien = fs.existsSync(ordner)
+            ? fs.readdirSync(ordner).filter(d => d.endsWith('.json')) : [];
+        pruefe(dateien.length > 0, `${dateien.length} Handpaket(e) gefunden`,
+            'Ohne Pakete prueft dieser Abschnitt nichts.');
+        for (const datei of dateien) {
+            let paket = null;
+            try { paket = JSON.parse(fs.readFileSync(path.join(ordner, datei), 'utf8')); }
+            catch (e) { pruefe(false, `${datei}: lesbar`, e.message); continue; }
+
+            let felder = [];
+            try { felder = baueWerteSchritt(paket, null, false).felder || []; }
+            catch (e) { pruefe(false, `${datei}: Werteschritt baut`, e.message); continue; }
+
+            const namensfelder = felder.filter(f => f.istServerName);
+            pruefe(namensfelder.length === 1,
+                `${datei}: genau ein Feld füllt \`server_name\` (${namensfelder.length})`,
+                namensfelder.length === 0
+                    ? 'Kein Namensfeld — die Route antwortet „Pflichtfelder fehlen: server_name", '
+                      + 'und das Formular hat die Sperre nicht angekuendigt.'
+                    : 'Zwei Felder mit demselben Namen: Der Browser schickt beide, der letzte gewinnt.');
+            if (namensfelder.length !== 1) continue;
+            pruefe(namensfelder[0].pflicht === true,
+                `${datei}: und es ist Pflicht`,
+                'Sonst steht es als optional da und die Route weist danach ab.');
+            // Kein Paketschluessel heisst: Es geht nicht als `setting_*` mit.
+            const eigen = namensfelder[0].schluessel === null;
+            const hatEinstellung = (paket.settings || []).some(e => e.key === 'name');
+            pruefe(eigen === !hatEinstellung,
+                `${datei}: ${hatEinstellung ? 'die Einstellung `name` füllt beide Rollen'
+                                            : 'das Panel stellt ein eigenes Feld voran'}`,
+                'Hat das Paket eine Einstellung `name`, soll sie einmal gefragt werden und '
+              + 'beides sein. Hat es keine, darf das Feld KEINEN Paketschluessel tragen.');
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
     console.log('\nGegen die Datenbank');
     // ════════════════════════════════════════════════════════════════════════
     let db = null;
