@@ -19,7 +19,9 @@ const jwt = require('jsonwebtoken');
 const fs = require('fs');
 const path = require('path');
 const { ServiceManager } = require('dunebot-core');
-const { MessageValidator, MessageBuilder } = require('dunebot-sdk');
+// Hier stand `const { MessageValidator, MessageBuilder } = require('dunebot-sdk')`
+// — beide Namen kamen in dieser Datei kein zweites Mal vor (2026-09-22 gesucht).
+// Validiert wird im `IPMEventRouter`, gebaut wird mit `JSON.stringify`.
 const eventRouter = require('./IPMEventRouter');
 // Alle Schreibzugriffe auf `rootserver` laufen ueber dieses Modell. Bis zum
 // 2026-08-02 stand das SQL hier in der Datei verstreut und das Modell wurde nur

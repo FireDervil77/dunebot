@@ -132,6 +132,10 @@ class IPMEventRouter extends EventEmitter {
         return;
       }
 
+      // Dieselbe Nachricht, nicht eine bereinigte Kopie: `validate()` prueft nur
+      // die Form. Bis zum 2026-09-22 schnitt es hier `<…>` aus jeder Zeichenkette
+      // der Nutzlast — und nahm damit dem Minecraft-Chat den Absender
+      // (Baustelle 148). Wer Text in HTML einsetzt, escapet an der Anzeige.
       const validatedMessage = validation.message;
 
       // 2. Nur Commands und Events routen (Responses werden direkt behandelt)

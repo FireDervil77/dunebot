@@ -12,11 +12,14 @@ const MessageTypes = require('./MessageTypes');
  * @typedef {Object} ValidationResult
  * @property {boolean} valid - Message ist valide?
  * @property {Array<string>} errors - Liste der Validierungs-Fehler
- * @property {Object|null} message - Validierte/bereinigte Message
+ * @property {Object|null} message - dieselbe Nachricht, unveraendert (null, wenn ungueltig)
  */
 
 /**
- * MessageValidator - Validiert und bereinigt eingehende Messages
+ * MessageValidator - prueft eingehende Messages auf Wohlgeformtheit.
+ *
+ * Er VERAENDERT sie nicht. Bereinigen gehoert an die Anzeige, nicht in den
+ * Transport — die Begruendung steht unten beim Grabstein von `_sanitize`.
  */
 class MessageValidator {
   /**
@@ -97,11 +100,12 @@ class MessageValidator {
       }
     }
 
-    // Ergebnis
+    // Ergebnis. Die Nachricht kommt UNVERAENDERT zurueck — siehe den Block
+    // „Hier stand `_sanitize`" weiter unten.
     return {
       valid: errors.length === 0,
       errors,
-      message: errors.length === 0 ? this._sanitize(message) : null
+      message: errors.length === 0 ? message : null
     };
   }
 
@@ -130,51 +134,60 @@ class MessageValidator {
    */
 
   /**
-   * Sanitize eine Message (XSS-Prevention, etc.)
-   * 
-   * @private
-   * @param {Object} message - Original-Message
-   * @returns {Object} Bereinigte Message
+   * ── Hier standen `_sanitize` und `_sanitizeObject` ────────────────────────
+   *
+   * Sie taten genau eines: In jeder Zeichenkette der Nutzlast
+   *
+   *     value.replace(/<[^>]*>/g, '')
+   *
+   * und `validate()` gab den Aufrufern diese bereinigte Fassung. Damit verlor
+   * **jede eingehende Daemon-Nachricht alles in spitzen Klammern.** Gemessen am
+   * 2026-09-22 mit echten Nachrichten (Baustelle 148):
+   *
+   *   `[Server thread/INFO]: <Fire> hallo`  →  `[Server thread/INFO]:  hallo`
+   *   "`tune2fs -O project,quota <geraet>`" →  "`tune2fs -O project,quota `"
+   *
+   * **Minecraft schreibt Chat als `<Name> Text`.** In der Konsole fiel damit
+   * der Absender jeder Chatzeile weg. Und in `gameservers.disk_quota_note`
+   * stand seither ein Befehl, den der Betreiber abschreiben kann und der dann
+   * fehlschlaegt, weil ihm das Geraet fehlt. Eine Anleitung, die aussieht wie
+   * eine Anleitung.
+   *
+   * ── Warum das kein Schutz war ────────────────────────────────────────────
+   *
+   * Es sollte HTML entschaerfen. Nur wird an keiner Stelle HTML daraus:
+   *
+   *   * **Konsole:** xterm.js, `terminal.write(...)` — Text in Zellen, kein
+   *     HTML-Parser.
+   *   * **Live-Anzeige:** `el.textContent = …`. Die einzige Stelle mit
+   *     `innerHTML` (die Zelle „Last") escapet selbst, Zeichen fuer Zeichen.
+   *   * **Vorlagen:** `<%= %>`, und das escapet. `<%-` steht in den
+   *     Gameserver-Ansichten nur vor `include`.
+   *
+   * Und er war nicht einmal in sich schluessig — zwei Beweise, beide gemessen:
+   *
+   *   1. Eine Zeichenkette **in einem Array** blieb unberuehrt (der Zweig
+   *      pruefte `typeof item === 'object'`). Die Konsolen-Vorgeschichte kommt
+   *      als `lines: [...]` — dort stand `<Fire>` also noch, waehrend dieselbe
+   *      Zeile live gekuerzt ankam. Im selben Fenster, zwei Wahrheiten.
+   *   2. Der alte `switch`-Pfad in `IPMServer` arbeitet mit der **originalen**
+   *      Nachricht weiter. Nur der Weg ueber den Ereignis-Verteiler war
+   *      bereinigt. Zwei Wege, ein Gegenstand.
+   *
+   * ── Der Grundsatz ────────────────────────────────────────────────────────
+   *
+   * **Beim Anzeigen escapen, nicht beim Transport verstuemmeln.** Escapen ist
+   * umkehrbar und steht dort, wo man sieht, wohin der Text geht. Wegschneiden
+   * ist endgueltig, trifft jeden Leser — auch die, die kein HTML rendern — und
+   * passiert drei Schichten vor der Anzeige, lautlos.
+   *
+   * Wer hier wieder bereinigen will, tut es NICHT hier: `validate()` prueft,
+   * ob eine Nachricht wohlgeformt ist, und gibt sie unveraendert zurueck. Wer
+   * Text in HTML einsetzt, escapet an dieser Stelle.
+   *
+   * Festgehalten von `scripts/check-nutzlast-unverstuemmelt.js` — samt der
+   * Frage, ob die Anzeigestellen noch escapen.
    */
-  static _sanitize(message) {
-    // Deep-Clone um Original nicht zu ändern
-    const sanitized = JSON.parse(JSON.stringify(message));
-
-    // String-Felder bereinigen (XSS-Prevention)
-    if (sanitized.payload && typeof sanitized.payload === 'object') {
-      sanitized.payload = this._sanitizeObject(sanitized.payload);
-    }
-
-    return sanitized;
-  }
-
-  /**
-   * Sanitize ein Object rekursiv
-   * 
-   * @private
-   * @param {Object} obj - Zu bereinigendes Object
-   * @returns {Object} Bereinigtes Object
-   */
-  static _sanitizeObject(obj) {
-    const sanitized = {};
-
-    for (const [key, value] of Object.entries(obj)) {
-      if (typeof value === 'string') {
-        // Basis-Sanitization (HTML-Tags entfernen)
-        sanitized[key] = value.replace(/<[^>]*>/g, '');
-      } else if (Array.isArray(value)) {
-        sanitized[key] = value.map(item => 
-          typeof item === 'object' ? this._sanitizeObject(item) : item
-        );
-      } else if (typeof value === 'object' && value !== null) {
-        sanitized[key] = this._sanitizeObject(value);
-      } else {
-        sanitized[key] = value;
-      }
-    }
-
-    return sanitized;
-  }
 
   /**
    * ── Hier stand `quickValidate` ────────────────────────────────────────────
