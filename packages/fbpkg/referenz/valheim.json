@@ -162,6 +162,16 @@
       }
     },
     {
+      "name": "-resetmodifiers",
+      "takes": "none",
+      "since": null,
+      "note": {
+        "de": "Nimmt alle gesetzten Weltmodifikatoren zurueck. Ohne ihn bleiben sie fuer immer in der `.fwl2` stehen — weglassen genuegt NICHT, weil die Welt sie speichert. Muss deshalb vor `-preset` und `-modifier` stehen. Nachgetragen am 2026-09-22: Der Parameter war seit Paket 1.0.15 in Benutzung und stand nicht in der Referenz, die vom 2026-08-16 stammt. Nicht mit `gemessen_am` versehen: Dass er wirklich abraeumt, ist an einem laufenden Server noch nicht nachgeprueft — dafuer muss jemand die `.fwl2` lesen (scripts/valheim-weltmodifikatoren.py, nur auf Rootserver 55).",
+        "en": "Resets all world modifiers. Omitting them is NOT enough — the world keeps them in its `.fwl2` forever. Must come before `-preset` and `-modifier`."
+      },
+      "source": "https://nodecraft.com/support/games/valheim/adding-world-modifiers-to-your-valheim-server"
+    },
+    {
       "name": "-setkey",
       "takes": "enum",
       "values": [

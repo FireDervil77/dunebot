@@ -100,12 +100,45 @@ for (const datei of routerDateien()) {
         const nr = i + 1;
         const pfad = (zeile.match(/router\.\w+\('([^']*)'/) || [])[1] || '?';
 
-        // Der Webhook-Eingang ist die eine bewusste Ausnahme: Er wird von
-        // Twitch aufgerufen, nicht von einem angemeldeten Menschen. Seine
-        // Sperre ist die Signaturpruefung.
+        // ── Die zwei bewussten Ausnahmen, beide mit Bedingung ───────────────
+        //
+        // Eine Ausnahme ohne Bedingung waere ein Freibrief fuer die ganze Datei:
+        // Wer morgen eine schreibende Route dazulegt, kaeme lautlos mit durch.
+        // Deshalb steht hier jeweils, WAS an ihrer Stelle die Sperre ist — und
+        // sie gilt nur fuer die Aufrufe, auf die das zutrifft.
+
+        // 1. Der Webhook-Eingang: Twitch ruft ihn, kein angemeldeter Mensch.
+        //    Seine Sperre ist die Signaturpruefung.
         if (kurz.includes('webhook.router')) {
             console.log(`  – ${pfad} (Eingang: Signatur statt Recht)`);
             return;
+        }
+
+        // 2. Der OBS-Player: Die Adresse IST der Nachweis (2026-09-22
+        //    eingetragen, vorher stand dieser Waechter deswegen dauerhaft rot).
+        //
+        //    Nachgemessen, statt der Absicht geglaubt:
+        //      * `neuerSchluessel()` = `crypto.randomBytes(32).toString('hex')`
+        //        — 256 Bit, nicht zu erraten, nicht hochzuzaehlen.
+        //      * `guildZuSchluessel()` verlangt genau 64 Zeichen, bevor es
+        //        ueberhaupt eine Abfrage stellt.
+        //      * `schluesselNeu()` dreht ihn um; danach spielt eine offene
+        //        Browserquelle nicht weiter. Das ist der Widerruf.
+        //      * Die Seite setzt `X-Robots-Tag: noindex` und `Cache-Control:
+        //        no-store`.
+        //
+        //    Und sie MUSS ohne Anmeldung gehen: In OBS ist keine Sitzung, und
+        //    ein Rechtebaum haette dort niemanden zu fragen.
+        //
+        //    Die Bedingung: nur LESEND und nur unter `/:schluessel`. Eine
+        //    schreibende Route in derselben Datei faellt weiterhin auf, und eine
+        //    lesende ohne Schluessel im Pfad ebenfalls.
+        if (kurz.includes('player.router')) {
+            if (!schreibend && pfad.startsWith('/:schluessel')) {
+                console.log(`  – ${pfad.padEnd(24)} (Adresse ist der Nachweis: 64 Hex, widerrufbar)`);
+                return;
+            }
+            // Faellt durch: Der Rest der Datei wird geprueft wie jede andere.
         }
 
         const hatAdmin = zeile.includes('CheckAdmin');

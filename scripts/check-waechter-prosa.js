@@ -39,18 +39,71 @@ const SELBST = path.basename(__filename);
 const ALLE = process.argv.includes('--alle');
 
 /**
- * Referenzstand: so viele Waechter suchen im rohen Inhalt.
+ * Die BEKANNTEN Waechter, die im rohen Inhalt suchen — namentlich.
  *
- * Gemessen, nicht gesetzt — die Zahl kommt aus dem ersten vollstaendigen Lauf
- * dieses Skripts. Rot wird es, wenn sie STEIGT: dann ist ein neuer dazu-
- * gekommen. Sie zu senken ist Arbeit, kein Alarm; wer senkt, traegt hier nach.
+ * ── Warum eine Liste und nicht mehr eine Zahl (2026-09-22) ──────────────────
  *
- * Erster Lauf 2026-08-31: 21 von 62 Waechtern, 144 Stellen. Darunter beide, die
- * am 2026-08-30 als repariert galten — dort waren nur die zwei Stellen
- * nachgezogen worden, die falschen Alarm geschlagen hatten. Die uebrigen 15 in
- * derselben Datei blieben, wie sie waren. Ein Erfolg laedt zum Aufhoeren ein.
+ * Hier stand `const REFERENZ = 21`, gemessen am 2026-08-31 — damals bei **62**
+ * Waechtern. Heute sind es 103, und damit war die Zahl kein Mass mehr, sondern
+ * ein Datum: Jeder neue Waechter, der aus gutem Grund im Rohtext liest, machte
+ * diesen hier rot. Er stand drei Tage rot, und der Betreiber hat es zu Recht
+ * angesprochen: **Ein Waechter, der dauerhaft rot steht, erzieht dazu, Rot zu
+ * uebersehen.**
+ *
+ * Eine Zahl ist hier auch die falsche Form. 34 von 103 ist ein besseres
+ * Verhaeltnis als 21 von 62 — trotzdem war die Zahl gestiegen. Und umgekehrt:
+ * Wer einen Waechter repariert und gleichzeitig einen neuen mit derselben
+ * Schwaeche dazulegt, haelt die Zahl und hat nichts gewonnen.
+ *
+ * Also die Namen. Dann gilt:
+ *
+ *   * **Ein NEUER Name ist ein Fehler** — auch wenn gleichzeitig einer wegfiel.
+ *   * **Ein Name, der nicht mehr zutrifft, ist auch ein Fehler**, aber einer mit
+ *     Gluecksgefuehl: Die Zeile hier gehoert geloescht. Sonst verrottet die
+ *     Liste zu einer Behauptung ueber einen Zustand von vorgestern.
+ *
+ * Stand aufgenommen am 2026-09-22 (36 von 103). Nicht als Freispruch: Jeder
+ * dieser Namen bleibt eine offene Aufgabe (B89). Die Liste sagt nur, dass sie
+ * BEKANNT ist — nicht, dass sie in Ordnung ist.
  */
-const REFERENZ = Number(process.env.FB_PROSA_REFERENZ || 21);
+const BEKANNT = new Set([
+    'check-adminlte.js',
+    'check-anlagenkonten.js',
+    'check-chatabos.js',
+    'check-chatansage.js',
+    'check-conduit.js',
+    'check-consent.js',
+    'check-entwurfszustaende.js',
+    'check-funktionskarte.js',
+    'check-heimguild.js',
+    'check-herkunftsliste.js',
+    'check-html-balance.js',
+    'check-inhalte-holen.js',
+    'check-inline-skripte.js',
+    'check-ipc-frist.js',
+    'check-lader-vertrag.js',
+    'check-live-anzeige.js',
+    'check-meinkanal.js',
+    'check-mitglieder-frist.js',
+    'check-navigation-abschnitt.js',
+    'check-paket-anlegbar.js',
+    'check-panel-bauteile.js',
+    'check-profil.js',
+    'check-render-settings.js',
+    'check-schalter.js',
+    'check-seitenkopf.js',
+    'check-sicherungsabruf.js',
+    'check-sperrkette.js',
+    'check-streaming-ansagen.js',
+    'check-streaming-befehle.js',
+    'check-streaming-melder.js',
+    'check-streaming-mitmachen.js',
+    'check-streaming-probe.js',
+    'check-streaming-rechte.js',
+    'check-streaming-schichten.js',
+    'check-theme-assets.js',
+    'check-verbindungen.js',
+]);
 
 // Nur Quelltext hat Kommentare in dieser Form. Ein Lesevorgang auf eine .json
 // oder .md wird gar nicht erst gewertet: Dort gibt es kein `//`.
@@ -204,6 +257,8 @@ console.log(`\nWaechter durchgesehen: ${dateien.length}\n`);
 
 let mitBefund = 0;
 let stellen = 0;
+// Die Namen, nicht nur ihre Anzahl — der Vergleich unten laeuft ueber sie.
+const mitNamen = [];
 const eigeneKopien = [];
 
 for (const name of dateien) {
@@ -216,6 +271,7 @@ for (const name of dateien) {
     }
     mitBefund++;
     stellen += befunde.length;
+    mitNamen.push(name);
     console.log(`  ✗ ${name} — ${befunde.length} Stelle(n) im rohen Inhalt`);
     for (const b of befunde) {
         console.log(`      Zeile ${b.zeile}: ${b.name}${b.pfad ? `  ← ${b.pfad}` : ''}`);
@@ -223,7 +279,7 @@ for (const name of dateien) {
     }
 }
 
-console.log(`\nWaechter mit Suche im rohen Inhalt: ${mitBefund} (${stellen} Stellen) · Referenzstand ${REFERENZ}`);
+console.log(`\nWaechter mit Suche im rohen Inhalt: ${mitBefund} (${stellen} Stellen) · bekannt ${BEKANNT.size}`);
 
 if (eigeneKopien.length) {
     console.log(`\nEigene Kopie von ohneKommentare (gehoert nach scripts/lib/quelltext.js): ${eigeneKopien.length}`);
@@ -236,7 +292,28 @@ sucht, hat recht — dann gehoert der Grund an die Stelle, damit der naechste
 Durchgang nicht dieselbe Frage neu stellt.
 `);
 
-if (mitBefund > REFERENZ) {
-    console.error(`✘ Es sind MEHR geworden: ${mitBefund} statt ${REFERENZ}.`);
-    process.exit(1);
+// ── Namen vergleichen, nicht zaehlen ────────────────────────────────────────
+const gefundeneNamen = new Set(mitNamen);
+const neueNamen  = [...gefundeneNamen].filter(n => !BEKANNT.has(n)).sort();
+const alteNamen  = [...BEKANNT].filter(n => !gefundeneNamen.has(n)).sort();
+
+let raus = 0;
+if (neueNamen.length) {
+    raus = 1;
+    console.error(`✘ NEU dazugekommen (${neueNamen.length}) — sie lesen den rohen Inhalt:`);
+    for (const n of neueNamen) console.error(`    ${n}`);
+    console.error('  Entweder `ohneKommentare` benutzen, oder — wenn der Rohtext gewollt ist —');
+    console.error('  den Grund an die Stelle schreiben und den Namen oben in BEKANNT aufnehmen.');
 }
+if (alteNamen.length) {
+    raus = 1;
+    console.error(`${neueNamen.length ? '\n' : ''}✘ Diese Namen treffen nicht mehr zu (${alteNamen.length}) — Zeile oben loeschen:`);
+    for (const n of alteNamen) console.error(`    '${n}',`);
+    console.error('  Das ist die angenehme Sorte Rot: Jemand hat einen Waechter repariert.');
+    console.error('  Eine Liste, die das nicht mitschreibt, behauptet einen Zustand von vorgestern.');
+}
+
+if (!raus) {
+    console.log(`✅ Keine neuen, keine veralteten — die ${mitBefund} bekannten stehen als offene Aufgabe (B89).`);
+}
+process.exit(raus);
