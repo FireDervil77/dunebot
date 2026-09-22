@@ -182,6 +182,110 @@ async function suche(raum, begriff, optionen = {}) {
     };
 }
 
+/**
+ * Modpacks suchen — ohne Lader-Facette, und das ist der Punkt.
+ *
+ * ── Warum ohne Lader (gemessen 2026-09-22) ──────────────────────────────────
+ *
+ * Ein Modpack BESTIMMT den Lader, es waehlt ihn nicht aus. Beim Anlegen steht
+ * es deshalb vor der Laderfrage, und eine Filterung nach Lader waere hier
+ * falsch herum.
+ *
+ * Schlimmer noch: **die Kategorie luegt.** Das Paket „MAX FPS" steht bei
+ * Modrinth unter `categories:neoforge`, und sein Index verlangt
+ * `fabric-loader`. Wahr ist, was an der FASSUNG steht (`loaders`,
+ * `game_versions`) — danach richtet sich dieses Haus.
+ */
+async function sucheModpacks(begriff, optionen = {}) {
+    const seite = Math.max(1, parseInt(optionen.seite, 10) || 1);
+    const text = String(begriff || '').trim();
+    const abfrage = new URLSearchParams({
+        query: text,
+        facets: `[${alsListe(['project_type:modpack'])}]`,
+        index: text ? 'relevance' : 'downloads',
+        limit: String(PRO_SEITE),
+        offset: String((seite - 1) * PRO_SEITE),
+    });
+
+    const daten = await hole(`/search?${abfrage}`);
+    const gesamt = Number(daten.total_hits) || 0;
+    return {
+        treffer: (daten.hits || []).map(t => ({
+            kennung:      t.slug,
+            name:         t.title,
+            beschreibung: t.description || '',
+            bild:         t.icon_url || null,
+            downloads:    t.downloads || 0,
+            geaendert:    t.date_modified || null,
+        })),
+        gesamt,
+        seite,
+        weiter:  (seite * PRO_SEITE) < gesamt,
+        zurueck: seite > 1,
+        proSeite: PRO_SEITE,
+    };
+}
+
+/**
+ * Welche Lader kennt dieses Haus — und wie heissen sie bei Modrinth?
+ *
+ * Modrinth fuehrt auch `forge` und `quilt`. Wir nicht: Das Minecraft-Paket
+ * kennt vanilla, paper, fabric, neoforge. Ein Paket fuer Forge wird deshalb
+ * ABGEWIESEN und nicht auf NeoForge umgebogen — die beiden sind nicht
+ * vertraeglich, und ein stillschweigender Tausch gaebe einen Server, der
+ * startet und die Haelfte der Mods nicht laedt.
+ */
+const LADER_BEI_UNS = { fabric: 'fabric', neoforge: 'neoforge' };
+
+/**
+ * Die gewaehlte Fassung eines Modpacks — samt dem, was sie VORSCHREIBT.
+ *
+ * Der Lader und die Spielfassung stehen an der Fassung selbst; das Archiv muss
+ * dafuer nicht geladen werden (gemessen: `loaders: ["fabric"]`,
+ * `game_versions: ["26.3"]`). Das Dashboard kann damit die Einstellungen des
+ * Servers setzen, bevor irgendetwas heruntergeladen wird.
+ *
+ * @returns {Promise<object>} { kennung, name, fassung, url, sha1, bytes, lader, spielfassung }
+ */
+async function modpackFassung(kennung, fassung = null) {
+    const slug = String(kennung || '').trim();
+    if (!slug) throw new Error('Keine Kennung');
+
+    const projektDaten = await projekt(slug);
+    if (projektDaten?.art !== 'modpack') {
+        throw new Error(`„${slug}" ist kein Modpack (Modrinth fuehrt es als ${projektDaten?.art || 'unbekannt'}).`);
+    }
+
+    const liste = await hole(`/project/${encodeURIComponent(slug)}/version`);
+    if (!Array.isArray(liste) || !liste.length) throw new Error(`${slug}: keine Fassung`);
+    const gewaehlt = fassung ? liste.find(v => v.version_number === fassung) : liste[0];
+    if (!gewaehlt) throw new Error(`${slug}: Fassung ${fassung} gibt es nicht (mehr)`);
+
+    // Die Hauptdatei ist die `.mrpack`. `primary` markiert sie; hat keine das
+    // Merkmal, gilt die erste — so steht es auch bei den Mods.
+    const datei = (gewaehlt.files || []).find(f => f.primary) || (gewaehlt.files || [])[0];
+    if (!datei) throw new Error(`${slug} ${gewaehlt.version_number}: keine Datei`);
+
+    const fremd = (gewaehlt.loaders || []).filter(l => !LADER_BEI_UNS[l]);
+    const unser = (gewaehlt.loaders || []).map(l => LADER_BEI_UNS[l]).filter(Boolean)[0] || null;
+    if (!unser) {
+        throw new Error(`„${projektDaten.name}" verlangt ${fremd.join(' oder ') || 'einen Lader'}. `
+            + 'Dieses Panel kennt fuer Minecraft Fabric und NeoForge — Forge und Quilt nicht. '
+            + 'Ein Tausch waere kein Tausch: Die Lader sind untereinander unvertraeglich.');
+    }
+
+    return {
+        kennung: slug,
+        name: projektDaten.name,
+        fassung: gewaehlt.version_number,
+        url: datei.url,
+        sha1: datei.hashes?.sha1 || null,
+        bytes: datei.size || 0,
+        lader: unser,
+        spielfassung: (gewaehlt.game_versions || [])[0] || null,
+    };
+}
+
 /** Die Seite zum Stoebern — Plugins und Mods liegen bei Modrinth getrennt. */
 function verzeichnis(raum) {
     if (!raum) return null;
@@ -458,6 +562,7 @@ async function aktualisierungen(raum, zeilen) {
 }
 
 module.exports = {
+    sucheModpacks, modpackFassung,
     KENNUNG, TITEL, RAUM_NAME, HERKUNFT, PRO_SEITE,
     istErlaubt, suche, verzeichnis, adresse, paket, aufloesen, aktualisierungen,
     hoeher, neuerAls,

@@ -311,6 +311,52 @@ function quelleWaehlen(res, inhalt, gewuenscht) {
  * Muss VOR den `/:serverId/...`-Routen stehen: `mods` waere sonst eine
  * Server-Kennung.
  */
+/**
+ * Modpacks suchen — beim Anlegen, bevor ein Lader feststeht.
+ *
+ * ── Warum eine eigene Route und nicht `mods/suche` mit einem Schalter ───────
+ *
+ * Ein Modpack ist kein Inhalt eines Servers, sondern eine Bauentscheidung: Es
+ * bestimmt Lader UND Spielfassung (gemessen am 2026-09-22: `loaders:
+ * ["fabric"], game_versions: ["26.3"]`). Es hat deshalb keinen Raum, keinen
+ * Ablageort und keinen Server — die drei Dinge, um die sich `mods/suche` dreht.
+ *
+ * Und es braucht KEINEN Lader als Eingabe. Im Gegenteil: Nach Lader zu filtern
+ * waere hier falsch herum, und die Kategorie bei Modrinth luegt ohnehin — das
+ * Paket „MAX FPS" steht unter `categories:neoforge` und verlangt `fabric-loader`.
+ */
+router.get('/modpacks/suche', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    try {
+        const Modrinth = require('../helpers/Modrinth');
+        const treffer = await Modrinth.sucheModpacks(req.query.q, { seite: req.query.seite });
+        return res.json({ success: true, ...treffer });
+    } catch (error) {
+        Logger.warn('[Gameserver/Inhalte] Modpack-Suche fehlgeschlagen:', error);
+        return res.status(502).json({ success: false, message: error.message });
+    }
+});
+
+/**
+ * Was dieses Modpack VORSCHREIBT — Lader und Spielfassung.
+ *
+ * Die Auswahlseite fragt hier nach, sobald jemand ein Paket anklickt: Sie zeigt
+ * danach „Fabric · 26.3" statt eines leeren Laderfeldes. Die Anlegeroute
+ * fragt dieselbe Stelle noch einmal — was der Browser schickt, ist ein
+ * Vorschlag, keine Auskunft.
+ */
+router.get('/modpacks/fassung', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    try {
+        const Modrinth = require('../helpers/Modrinth');
+        const f = await Modrinth.modpackFassung(req.query.kennung, req.query.fassung || null);
+        return res.json({ success: true, modpack: f });
+    } catch (error) {
+        Logger.warn('[Gameserver/Inhalte] Modpack-Fassung fehlgeschlagen:', error);
+        return res.status(400).json({ success: false, message: error.message });
+    }
+});
+
 router.get('/mods/suche', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');

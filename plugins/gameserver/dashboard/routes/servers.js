@@ -1011,6 +1011,30 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
         if (auto_update !== undefined && eingaben.auto_update === undefined) {
             eingaben.auto_update = toBool(auto_update, false) ? '1' : '0';
         }
+        // ── Ein Modpack bestimmt Lader und Ausgabe — der Browser nicht ─────
+        //
+        // Die Auswahlseite zeigt beides an, sobald jemand ein Paket anklickt.
+        // Verlassen wird sich darauf NICHT: Was im Formular steht, hat den Weg
+        // durch einen fremden Rechner genommen. Gefragt wird hier noch einmal,
+        // und das Ergebnis ueberschreibt, was mitgeschickt wurde.
+        //
+        // Ein Paket fuer Forge oder Quilt wirft dabei — dann bricht das Anlegen
+        // ab, statt einen Server zu bauen, der die Haelfte der Mods nicht laedt.
+        if (eingaben.modpack) {
+            try {
+                const Modrinth = require('../helpers/Modrinth');
+                const mp = await Modrinth.modpackFassung(eingaben.modpack, eingaben.modpack_version || null);
+                eingaben.loader = mp.lader;
+                if (mp.spielfassung) eingaben.version = mp.spielfassung;
+                eingaben.modpack_version = mp.fassung;
+                Logger.info(`[Gameserver] Modpack „${mp.name}" ${mp.fassung}: Lader ${mp.lader}, `
+                          + `Ausgabe ${mp.spielfassung || '?'} (${Math.round(mp.bytes / 1024)} KB)`);
+            } catch (fehler) {
+                Logger.warn('[Gameserver] Modpack abgelehnt:', fehler);
+                return res.status(400).json({ success: false, message: fehler.message });
+            }
+        }
+
         const paketWerte = paketWerteAnlegen(paket, eingaben, server_name);
         const autoAktualisieren = autoUpdateAus(paket, paketWerte);
         Logger.info(`[Gameserver] Paketwerte festgehalten: ${Object.keys(paketWerte).length} von `

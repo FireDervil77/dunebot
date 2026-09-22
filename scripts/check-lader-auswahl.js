@@ -210,6 +210,75 @@ for (const [datei, mindestens] of [
       + 'aus wie „keine Mods".');
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+console.log('\nModpacks: was hereinkommt, ist fremder Text');
+// ════════════════════════════════════════════════════════════════════════════
+//
+// Betreiber am 2026-09-22: „es waere schon ein geiles feature fuer minecraft
+// oder?" — ja. Gemessen an einem echten Paket („MAX FPS", 15 KB):
+//
+//   modrinth.index.json
+//     dependencies: { minecraft: "26.3", fabric-loader: "0.19.5" }
+//     files[]: { path, hashes{sha1}, downloads[], fileSize, env{client,server} }
+//   overrides/
+//
+// Drei Dinge daran sind gefaehrlich, und alle drei stehen hier:
+//
+//  1. **`path` kommt von Fremden.** `../../../etc/cron.d/x` schriebe ausserhalb
+//     des Servers. Das ganze Paket wird abgewiesen, nicht nur die Zeile.
+//  2. **`env.server`.** Im gemessenen Paket standen NEUN von zwoelf Dateien auf
+//     `unsupported` — reine Client-Mods. Wer alles laedt, baut einen Server,
+//     der nicht startet.
+//  3. **Der Lader steht im Paket, nicht in der Kategorie.** „MAX FPS" steht bei
+//     Modrinth unter `categories:neoforge` und verlangt `fabric-loader`.
+{
+    const paket = pakete.find(x => x.name === 'minecraft.json');
+    const skript = paket ? (paket.inhalt.install?.steps || []).map(s2 => s2.script || '').join('\n') : '';
+
+    pruefe(/if \[ -n "\$\{MC_MODPACK:-\}" \]/.test(skript),
+        'das Skript hat einen Modpack-Zweig, und er ist freiwillig',
+        'Ohne die Pruefung auf einen leeren Wert liefe er bei jedem Server.');
+
+    pruefe(/\(\.env\.server \/\/ "required"\) != "unsupported"/.test(skript),
+        'es laedt NUR, was auf einem Server laeuft',
+        'Neun von zwoelf Dateien des gemessenen Pakets sind Client-Mods. Alle zu laden gibt einen '
+      + 'Server, der nicht startet — und die Ursache steht in einem Absturzprotokoll, nicht im Panel.');
+    pruefe(/weggelassen/.test(skript),
+        'und sagt, wie viele es weglaesst',
+        'Still weglassen heisst: Jemand wundert sich, warum sein Paket fast nichts tut.');
+
+    pruefe(/\/\*\|\*\.\.\*\)/.test(skript),
+        'ein Pfad mit `..` oder fuehrendem `/` bricht ab',
+        'Der Pfad steht im Archiv eines Dritten. Ohne diese Pruefung schreibt ein Modpack dorthin, '
+      + 'wohin es will.');
+    pruefe(/ausserhalb des Servers/.test(skript),
+        'und der Satz dazu nennt den Grund');
+
+    pruefe((skript.match(/sha1sum -c/g) || []).length >= 2,
+        'Archiv UND jede einzelne Datei werden gegen ihre Pruefsumme gehalten',
+        'Modrinth liefert sha1 zu beidem — es nicht zu pruefen waere Fahrlaessigkeit mit Ansage.');
+
+    // Die Auswahl darf nicht auf einen fremden Lader umbiegen.
+    const modrinth = ohneKommentare(roh(path.join(WURZEL,
+        'plugins/gameserver/dashboard/helpers/Modrinth.js')) || '');
+    pruefe(/const LADER_BEI_UNS = \{ fabric: 'fabric', neoforge: 'neoforge' \}/.test(modrinth),
+        'nur Fabric und NeoForge gelten als unsere Lader',
+        'Forge und Quilt sind mit NeoForge NICHT vertraeglich. Ein stillschweigender Tausch gaebe '
+      + 'einen Server, der startet und die Haelfte der Mods nicht laedt.');
+
+    // Und der Server glaubt dem Browser nicht.
+    const routen2 = ohneKommentare(roh(path.join(WURZEL,
+        'plugins/gameserver/dashboard/routes/servers.js')) || '');
+    const iMp = routen2.indexOf('if (eingaben.modpack)');
+    const block = iMp > -1 ? routen2.slice(iMp, iMp + 900) : '';
+    pruefe(Boolean(block), 'die Anlegeroute loest das Modpack selbst auf');
+    pruefe(/eingaben\.loader = mp\.lader/.test(block),
+        'und ueberschreibt den Lader mit dem des Pakets',
+        'Was im Formular steht, hat den Weg durch einen fremden Rechner genommen.');
+    pruefe(/eingaben\.version = mp\.spielfassung/.test(block),
+        'und die Ausgabe ebenso');
+}
+
 console.log(`\n${fehler === 0 ? '✅' : '❌'} ${geprueft - fehler} von ${geprueft} Prüfungen bestanden`);
 console.log(fehler === 0 ? '   Der Lader trägt: Installation, Start und Inhalt meinen denselben.\n' : '');
 process.exit(fehler === 0 ? 0 : 1);

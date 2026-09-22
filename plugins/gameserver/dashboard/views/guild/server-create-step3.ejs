@@ -28,7 +28,35 @@
         <div class="fb-karte">
           <div class="fb-kopf"><span>Werte</span></div>
           <div style="padding:4px 20px 20px">
+            <%# ── Das Feld `modpack` ist kein Textfeld, sondern eine Suche ──
+                Eine Ausnahme fuer GENAU EINEN Schluessel, und sie steht hier
+                begruendet, statt sich zu verstecken: Ein Modpack ist eine
+                Kennung bei Modrinth („fabulously-optimized"), die niemand
+                auswendig kann. Ein Freitextfeld dafuer waere ein Feld, in das
+                man raten muss.
+
+                Es bestimmt ausserdem Lader UND Ausgabe (gemessen 2026-09-22).
+                Beide Felder darueber werden beim Anlegen daraus gesetzt — die
+                Seite zeigt es an, entschieden wird es aber auf dem Server. -%>
             <% werte.felder.forEach(function (f) { %>
+              <% if (f.schluessel === 'modpack_version') { %>
+                <input type="hidden" name="setting_modpack_version" id="fb-modpack-fassung" value="">
+              <% } else if (f.schluessel === 'modpack') { %>
+                <div class="fb-zeile">
+                  <div>
+                    <div style="font-weight:500"><%= f.name %></div>
+                    <div class="fb-muted" style="font-size:13px;margin-top:2px;text-wrap:pretty"><%= f.beschreibung %></div>
+                  </div>
+                  <div>
+                    <input type="hidden" name="setting_modpack" id="fb-modpack-kennung" value="">
+                    <input class="fb-feld" style="width:100%" type="search" id="fb-modpack-suche"
+                           autocomplete="off" placeholder="Modpack suchen — leer lassen für einzelne Mods">
+                    <div id="fb-modpack-gewaehlt" class="fb-muted" style="font-size:13px;margin-top:6px"></div>
+                    <div id="fb-modpack-treffer"
+                         style="margin-top:6px;max-height:260px;overflow:auto;display:none"></div>
+                  </div>
+                </div>
+              <% } else { %>
               <div class="fb-zeile">
                 <div>
                   <div style="font-weight:500">
@@ -75,6 +103,7 @@
                   <% } %>
                 </div>
               </div>
+              <% } %>
             <% }); %>
 
             <%# ── Was der Server bekommen darf ─────────────────────────────
@@ -409,3 +438,102 @@
   }
 })();
 </script>
+
+<%# ── Die Modpack-Auswahl ──────────────────────────────────────────────────
+    Sie steht hier und nicht in einer eigenen Datei: Sie gehoert zu genau
+    diesem Schritt, und `check-inline-skripte.js` haelt sie im Blick.
+
+    Ein Syntaxfehler hier legt den GANZEN Block still (Baustelle: „Inline-Skript
+    reisst alles mit") — deshalb bleibt sie klein und hat keine Abhaengigkeiten
+    ausser fetch. -%>
+<% if (werte.felder.some(function (f) { return f.schluessel === 'modpack'; })) { %>
+<script>
+(function () {
+  const suche    = document.getElementById('fb-modpack-suche');
+  const kennung  = document.getElementById('fb-modpack-kennung');
+  const fassung  = document.getElementById('fb-modpack-fassung');
+  const gewaehlt = document.getElementById('fb-modpack-gewaehlt');
+  const treffer  = document.getElementById('fb-modpack-treffer');
+  if (!suche || !kennung) return;
+
+  const laderFeld  = document.querySelector('[name="setting_loader"]');
+  const ausgabeFeld = document.querySelector('[name="setting_version"]');
+  const basis = '<%= "/guild/" + guildId + "/plugins/gameserver/inhalte" %>';
+
+  let takt = null;
+
+  function zeigeGewaehlt(text, ton) {
+    gewaehlt.textContent = text;
+    gewaehlt.style.color = ton === 'rot' ? 'var(--fb-danger)' : '';
+  }
+
+  // Ohne Paket entscheidet wieder der Betreiber.
+  function zuruecksetzen() {
+    kennung.value = ''; fassung.value = '';
+    zeigeGewaehlt('', null);
+    if (laderFeld)   laderFeld.disabled = false;
+    if (ausgabeFeld) ausgabeFeld.readOnly = false;
+  }
+
+  async function waehle(slug, name) {
+    treffer.style.display = 'none';
+    zeigeGewaehlt('… ' + name + ' wird geprüft', null);
+    try {
+      const a = await fetch(basis + '/modpacks/fassung?kennung=' + encodeURIComponent(slug));
+      const d = await a.json();
+      if (!d.success) throw new Error(d.message || 'unbekannt');
+      const m = d.modpack;
+      kennung.value = m.kennung;
+      fassung.value = m.fassung;
+      suche.value = m.name;
+      // Anzeigen, nicht behaupten: Entschieden wird es beim Anlegen noch einmal.
+      if (laderFeld) { laderFeld.value = m.lader; laderFeld.disabled = true; }
+      if (ausgabeFeld) { ausgabeFeld.value = m.spielfassung || ''; ausgabeFeld.readOnly = true; }
+      zeigeGewaehlt(m.name + ' ' + m.fassung + ' — Lader ' + m.lader
+                  + (m.spielfassung ? ', Ausgabe ' + m.spielfassung : '')
+                  + ' (' + Math.max(1, Math.round(m.bytes / 1024)) + ' KB). '
+                  + 'Lader und Ausgabe kommen aus dem Paket.', null);
+    } catch (f) {
+      zuruecksetzen();
+      zeigeGewaehlt(f.message, 'rot');
+    }
+  }
+
+  suche.addEventListener('input', function () {
+    if (kennung.value) zuruecksetzen();
+    clearTimeout(takt);
+    const begriff = suche.value.trim();
+    takt = setTimeout(async function () {
+      try {
+        const a = await fetch(basis + '/modpacks/suche?q=' + encodeURIComponent(begriff));
+        const d = await a.json();
+        if (!d.success) throw new Error(d.message || 'unbekannt');
+        treffer.innerHTML = '';
+        (d.treffer || []).slice(0, 12).forEach(function (t) {
+          const z = document.createElement('button');
+          z.type = 'button';
+          z.className = 'fb-feld';
+          z.style.cssText = 'display:block;width:100%;text-align:left;margin-bottom:4px;cursor:pointer';
+          // textContent, nicht innerHTML: Titel und Beschreibung kommen von
+          // Fremden. Escapen gehoert an die Anzeige (Baustelle 148).
+          const kopf = document.createElement('div');
+          kopf.style.fontWeight = '500';
+          kopf.textContent = t.name;
+          const rumpf = document.createElement('div');
+          rumpf.className = 'fb-muted';
+          rumpf.style.fontSize = '12px';
+          rumpf.textContent = (t.beschreibung || '').slice(0, 120);
+          z.appendChild(kopf); z.appendChild(rumpf);
+          z.addEventListener('click', function () { waehle(t.kennung, t.name); });
+          treffer.appendChild(z);
+        });
+        treffer.style.display = (d.treffer || []).length ? '' : 'none';
+      } catch (f) {
+        treffer.style.display = 'none';
+        zeigeGewaehlt(f.message, 'rot');
+      }
+    }, 300);
+  });
+})();
+</script>
+<% } %>
