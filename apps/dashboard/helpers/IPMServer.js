@@ -673,7 +673,18 @@ class IPMServer {
         // Validierung + Routing für Command/Event Messages
         if (message.namespace && message.action) {
             // Standardisierte IPM-Message → Event-Router
-            await eventRouter.route(message, { daemonId });
+            // Die Guild-Kennung geht MIT in den Kontext (2026-09-22).
+            //
+            // Sie steht in der Verbindung, seit sich der Daemon angemeldet hat.
+            // Ohne sie muss jeder Handler sie sich mit einem `SELECT guild_id
+            // FROM gameservers` holen — bei einem Ereignis, das alle drei
+            // Sekunden je Server kommt (Live-Messwerte, B147), waere das eine
+            // Abfrage je Messung fuer einen Wert, der sich nie aendert.
+            const conn = this.connections.get(daemonId);
+            await eventRouter.route(message, {
+                daemonId,
+                guildId: conn?.metadata?.guild_id ?? null,
+            });
             
             // Bei Commands: Auch alte Logik beibehalten (für Rückwärtskompatibilität)
             if (normalizedType === 'command' || normalizedType === 'response') {

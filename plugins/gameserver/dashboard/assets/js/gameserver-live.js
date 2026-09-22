@@ -223,11 +223,35 @@
                 this.uebernimm(d.server_id, { stufe: d.stufe, grund: d.grund });
                 this.holeBald();
             });
-            // Die Spielerzahl aendert keine Beurteilung — hier wird NICHT
-            // nachgeholt. Sie kommt im Sekundentakt; ein Abruf je Messwert
-            // waere eine Last ohne Gegenwert.
-            sse.on('resource_usage', (d) => this.uebernimm(d.server_id, {
-                spieler: d.current_players, max: d.max_players }));
+            // ── Live-Messwerte (Baustelle 147, Weg B) ───────────────────────
+            //
+            // Dieser Zuhoerer war bis zum 2026-09-22 tot: Der Daemon schickte
+            // `resource_usage` nie (kein Aufrufer), und das Dashboard haette es
+            // an drei nicht existierenden Spalten zerrissen. Jetzt kommt es alle
+            // drei Sekunden je laufendem Server — mit FERTIGEM Text und fertiger
+            // Farbe, gerechnet von derselben Funktion, aus der die Seite ihren
+            // Streifen baut.
+            //
+            // Kein Nachholen: Das Ereignis traegt alles, was gezeichnet wird. Ein
+            // Abruf je Messwert waere alle drei Sekunden eine Runde durch die
+            // Datenbank fuer Zahlen, die schon da sind.
+            //
+            // `installation` bleibt stehen: Der Push kennt sie nicht, und
+            // `uebernimm` ersetzt `messwerte` als Block. Ohne das Zusammenlegen
+            // verschwaende die Installationsbahn bei der ersten Messung.
+            sse.on('resource_usage', (d) => {
+                const alt = (this.zustand.get(String(d.server_id)) || {}).messwerte;
+                const neu = d.messwerte
+                    ? { ...d.messwerte, installation: (alt && alt.installation) || d.messwerte.installation }
+                    : undefined;
+                this.uebernimm(d.server_id, {
+                    messwerte: neu,
+                    // Die Spielerzahl kam auf demselben Weg, bevor es Messwerte
+                    // gab. Sie aendert keine Beurteilung — hier wird NICHT
+                    // nachgeholt.
+                    spieler: d.current_players, max: d.max_players,
+                });
+            });
 
             // Der Platzstand (Baustelle 101) kommt nur bei einem Wechsel ueber die
             // Grenze und wenn ein Start deshalb verweigert wurde. Uebernommen

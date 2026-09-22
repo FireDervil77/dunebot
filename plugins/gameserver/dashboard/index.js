@@ -2,6 +2,10 @@ const { DashboardPlugin, VersionHelper } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
 
 const path = require('path');
+// Dieselbe Rechnung, aus der die Serverseite ihren Messstreifen baut (B147):
+// Der Live-Push schickt fertigen Text und fertige Farbe, damit im Browser keine
+// zweite Formatierung entsteht, die von dieser abdriftet.
+const { baueMesswerte } = require('./helpers/Serverseite');
 
 class GameserverPlugin extends DashboardPlugin {
     constructor(app) {
@@ -959,57 +963,70 @@ class GameserverPlugin extends DashboardPlugin {
      */
     async _handleResourceUsage(payload, message, context) {
         const Logger = ServiceManager.get('Logger');
-        const dbService = ServiceManager.get('dbService');
-        
-        const { server_id, cpu, ram, disk } = payload;
-        
-        Logger.debug(`[Gameserver] Resource Usage: Server ${server_id} - CPU: ${cpu}%, RAM: ${ram}MB`);
-        
-        try {
-            // ── Hier stand ein UPDATE auf drei Spalten, die es nicht gibt ─────
-            //
-            // `last_cpu_usage`, `last_ram_usage`, `last_disk_usage` — am
-            // 2026-09-21 in `information_schema` nachgesehen: **keine der drei
-            // existiert in `gameservers`.** Das UPDATE hätte also geworfen, und
-            // weil es vor dem SSE-Broadcast stand, wäre auch der ausgefallen:
-            // ein Handler, der beim ersten Aufruf komplett umfällt.
-            //
-            // Aufgefallen ist es nie, weil der Daemon dieses Ereignis **nicht
-            // schickt**: `SendGameServerResourceUsage` hat dort keinen Aufrufer
-            // (gesucht am 2026-09-21, der einzige Treffer ist die Definition).
-            // Zwei Blindgänger, die sich gegenseitig verdeckt haben.
-            //
-            // Die Werte gibt es trotzdem: Der Herzschlag trägt CPU und RAM je
-            // Server (`srv.ResourceStats()` aus dem Docker-Stats-Strom), und
-            // seit B146 landen sie in `gameservers.cpu_percent` /
-            // `ram_used_mb`. **Deshalb schreibt dieser Handler nichts mehr** —
-            // zwei Schreiber auf dieselben Spalten wären der nächste Befund,
-            // und der seltenere würde den häufigeren gelegentlich überholen.
-            //
-            // Was bleibt, ist das Weiterschieben an den Browser: Sollte je ein
-            // Sender dazukommen, ist die Anzeige sofort dran.
 
-            // ✅ SSE-Broadcasting für Live-Monitoring
-            const [server] = await dbService.query(
-                'SELECT guild_id FROM gameservers WHERE id = ?',
-                [server_id]
-            );
-            
-            if (server) {
-                const sseManager = ServiceManager.get('sseManager');
-                sseManager.broadcast(server.guild_id, 'gameserver', {
-                    action: 'resource_usage',
-                    server_id,
-                    cpu,
-                    ram,
-                    disk,
-                    timestamp: Date.now()
-                });
+        const { server_id } = payload;
+        if (!server_id) return;
+
+        try {
+            // ── Der Live-Kanal (Baustelle 147, Weg B) ─────────────────────────
+            //
+            // Bis zum 2026-09-22 war dieser Handler ein Blindgänger neben einem
+            // zweiten: Er schrieb in drei Spalten, die es nicht gibt — und
+            // aufgefallen ist es nie, weil der Daemon das Ereignis gar nicht
+            // schickte. Jetzt schickt er es, alle drei Sekunden je laufendem
+            // Server, flüchtig (nicht gepuffert, nicht protokolliert).
+            //
+            // **Dieser Handler schreibt nichts in die Datenbank.** Das tut der
+            // Herzschlag alle 30 s. Zwei Schreiber auf dieselben Spalten wären
+            // der nächste Befund — und bei drei Sekunden wären es 1200 UPDATEs
+            // die Stunde je Server für einen Wert, den niemand später liest.
+            // Zwei Wege, zwei Aufgaben: der eine bewahrt auf, der andere zeigt.
+            //
+            // ── Warum die Guild aus dem Kontext kommt ────────────────────────
+            //
+            // Vorher stand hier `SELECT guild_id FROM gameservers` — bei einem
+            // Ereignis alle drei Sekunden eine Abfrage je Messung, für einen Wert,
+            // der sich nie ändert. Die Kennung steht in der Daemon-Verbindung und
+            // geht seit dem 2026-09-22 im Kontext mit.
+            const guildId = context?.guildId || null;
+            if (!guildId) {
+                // Ohne Guild kann niemand zuschauen. Gemeldet, nicht verschwiegen:
+                // Es hieße, die Verbindung kennt ihre Guild nicht.
+                Logger.warn(`[Gameserver] Messwerte für Server ${server_id} ohne Guild im Kontext — nicht gesendet`);
+                return;
             }
-            
+
+            const sseManager = ServiceManager.get('sseManager');
+            if (!sseManager) return;
+
+            // **Gerechnet wird hier, gezeichnet im Browser** — mit derselben
+            // Funktion, aus der die Serverseite ihren Streifen baut. Eine zweite,
+            // knappere Formatierung im Browser würde driften: Nach dem ersten
+            // Push stünde dort „12.5%" und beim Neuladen „12,5 %".
+            //
+            // Die Zeile wird aus dem Ereignis zusammengesetzt, nicht geladen: Das
+            // Ereignis kommt nur für laufende Container, und `last_heartbeat`
+            // ist in diesem Augenblick genau jetzt.
+            const messwerte = baueMesswerte({
+                status: 'online',
+                last_heartbeat: new Date(),
+                cpu_percent:  payload.cpu,
+                ram_used_mb:  payload.ram,
+                ram_total_mb: payload.ram_total,
+                net_rx_bytes: payload.net_rx_bytes,
+                net_tx_bytes: payload.net_tx_bytes,
+                net_rx_rate:  payload.net_rx_rate,
+                net_tx_rate:  payload.net_tx_rate,
+            });
+
+            sseManager.broadcast(guildId, 'gameserver', {
+                action: 'resource_usage',
+                server_id,
+                // Fertig gerechnet: Text, Prozent, Farbe.
+                messwerte,
+            });
         } catch (error) {
-            Logger.error(`[Gameserver] Fehler beim Resource-Update für Server ${server_id}:`, error);
-            // Nicht werfen - Resource-Updates sind nicht kritisch
+            Logger.error(`[Gameserver] Fehler beim Messwert-Push für Server ${server_id}:`, error);
         }
     }
 
