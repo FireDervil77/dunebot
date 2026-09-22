@@ -501,8 +501,26 @@ const ZUSTAENDE_MIT_CONTAINER = ['installing', 'starting', 'online', 'stopping',
  * Messungen (~2 s); aus zwei Herzschlägen (30 s) käme nur ein Mittelwert, der
  * jede Spitze verschluckt.
  *
+ * ── Warum er NIE null liefert (2026-09-22) ──────────────────────────────────
+ *
+ * Bis heute gab er `null` zurueck, wenn nie gemessen wurde, der Server nicht
+ * laeuft und nichts installiert wird — „es gibt nichts zu sagen". Die Vorlage
+ * hing den ganzen Streifen an dieses Ergebnis (`<% if (mw) { %>`), und damit
+ * stand er bei so einem Server GAR NICHT im Text der Seite.
+ *
+ * Das ist ein Live-Loch, und zwar genau das, wovor der Kommentar im Streifen
+ * selbst warnt: Wer den Server dann startet, bekommt die Messwerte zwar
+ * geschickt — aber es gibt kein Element, in das das Live-Modul sie schreiben
+ * koennte. Der Streifen bleibt bis zum Neuladen weg. Dasselbe gilt fuer die
+ * Installationsbahn: Wer die Seite VOR dem Anstossen oeffnet, saehe den
+ * Fortschritt nie (Baustelle 44).
+ *
+ * Deshalb: immer ein Ergebnis. Dass nichts gemessen wurde, sagt `grund` — und
+ * `frisch: false` haelt die Zellen versteckt. Ein Feld, das es nicht gibt, ist
+ * kein „leer", sondern ein Loch.
+ *
  * @param {object} server Zeile aus `gameservers`
- * @returns {object|null} null, wenn es nichts zu sagen gibt
+ * @returns {object} immer ein Block; `grund` sagt, wenn keine Zahl dasteht
  */
 function baueMesswerte(server) {
     const laeuft = ZUSTAENDE_MIT_CONTAINER.includes(String(server.status || ''));
@@ -522,10 +540,9 @@ function baueMesswerte(server) {
     const rxGesamt = zahlOderNull(server.net_rx_bytes);
     const txGesamt = zahlOderNull(server.net_tx_bytes);
 
-    const nieGemessen = cpu === null && ram === null && rxGesamt === null;
-    // Waehrend einer Installation zeigt der Streifen etwas, auch wenn noch keine
-    // Last gemessen wurde — der Fortschritt ist dann das Einzige, was zaehlt.
-    if (nieGemessen && !laeuft && !baueInstallation(server)) return null;
+    // Hier stand bis zum 2026-09-22 ein `return null` fuer den Fall „nie
+    // gemessen, laeuft nicht, keine Installation". Siehe den Block oben: Der
+    // Streifen muss im Text der Seite stehen, auch wenn keine Zahl darin steht.
 
     const ergebnis = {
         laeuft,

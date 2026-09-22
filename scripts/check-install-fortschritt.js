@@ -134,8 +134,18 @@ const roh = (datei) => fs.existsSync(datei) ? fs.readFileSync(datei, 'utf8') : n
         'plugins/gameserver/dashboard/views/guild/server-detail.ejs')) || '');
     pruefe(/data-fb-live="installbahn"/.test(vorlage) && /data-fb-live="installbalken"/.test(vorlage),
         'die Vorlage zeichnet die Bahn');
+    // ── Was diese Pruefung NICHT beweist (nachgetragen 2026-09-22) ──────────
+    //
+    // Sie sagt: die Bahn traegt `display:none`, ist also versteckt statt
+    // abwesend. Sie sagt NICHT, ob sie ueberhaupt im HTML landet. Genau das war
+    // der Fall: Der ganze Messstreifen hing an einem `<% if (mw) { %>` eine
+    // Bildschirmseite darueber, und bei einem nie gemessenen Server stand die
+    // Bahn nirgends — diese Pruefung blieb gruen, weil sie im QUELLTEXT sucht.
+    //
+    // Die Frage „landet sie im HTML" prueft `check-live-anzeige.js`, indem es
+    // den Block mit `messwerte: null` wirklich rendert. Hier bleibt der Stil.
     pruefe(/data-fb-live="installbahn"[\s\S]{0,400}?display:none/.test(vorlage),
-        'und rendert sie IMMER, nur versteckt',
+        'und traegt `display:none` statt zu fehlen (ob sie im HTML landet: check-live-anzeige)',
         'Ein Element, das es je nach Zustand gar nicht gibt, findet das Live-Modul später nicht — '
       + 'und genau während einer Installation will niemand neu laden.');
 

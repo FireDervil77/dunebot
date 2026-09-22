@@ -250,6 +250,78 @@ for (const datei of dateien) {
     }
 }
 
+// ── 4b. Der Messstreifen steht IMMER da — gemessen am gerenderten Text ──────
+//
+// ── Woher diese Pruefung kommt (2026-09-22) ─────────────────────────────────
+//
+// `check-install-fortschritt` fragte, ob die Installationsbahn im Text der
+// Vorlage steht und `display:none` traegt. Sie stand dort, die Pruefung war
+// gruen — und der ganze Streifen hing trotzdem an einem `<% if (mw) { %>` eine
+// Bildschirmseite darueber. `baueMesswerte` gab null zurueck, solange nie
+// gemessen wurde: Bei einem nie gemessenen, gestoppten Server stand vom
+// Streifen NICHTS in der Seite. Wer ihn startete, bekam die Messwerte
+// geschickt und sah nichts, weil es kein Element gab.
+//
+// Anwesenheit im Quelltext ist also die falsche Frage. Die richtige ist, was
+// im HTML landet — **fuer den unguenstigsten Zustand**. Deshalb wird der Block
+// hier wirklich gerendert, mit `messwerte: null`, und zwar aus der echten
+// Vorlage. Das ist die Uebersetzungsprobe aus Abschnitt 0, eine Stufe scharfer.
+console.log('\n▸ Der Messstreifen steht auch ohne einen einzigen Messwert da');
+(function () {
+    const datei = path.join(ANSICHTEN, 'guild/server-detail.ejs');
+    const roh = fs.readFileSync(datei, 'utf8');
+
+    // Der Block ist selbsttragend: Er braucht nur `locals.uebersicht` und
+    // `server.id`. Geschnitten wird von der Zeile, die `mw` setzt, bis zum
+    // ANFANG DES NAECHSTEN ABSCHNITTS — nicht am `</div>` des Streifens.
+    //
+    // Warum so weit: Der erste Entwurf schnitt am Streifen-Ende. Die Gegenprobe
+    // (das alte `<% if (mw) { %>` zurueckgebaut) liess dann ein `<% } %>`
+    // ausserhalb des Schnitts stehen, der Ausschnitt war nicht mehr uebersetzbar
+    // — und der Waechter meldete „Unexpected token 'catch'" statt „das Feld
+    // fehlt im HTML". Er hat das Loch gefunden und den falschen Grund genannt.
+    // Ein Schnitt, der eine Klammer zerteilt, misst die Klammer.
+    const von = roh.indexOf('<% const mw =');
+    const bis = roh.indexOf('<%# ── Bereiche als Navigation', von);
+    if (von < 0 || bis < 0) {
+        pruefe(false, 'der Streifen-Block ist auffindbar',
+            'Die Marken `<% const mw =` und `<%# ── Bereiche als Navigation` haben sich '
+          + 'verschoben — diese Pruefung misst sonst nichts. Namen nachziehen, nicht weglassen.');
+        return;
+    }
+    const block = roh.slice(von, bis);
+
+    if (!ejs) {
+        pruefe(false, 'EJS ist verfuegbar');
+        return;
+    }
+    let html = null;
+    try {
+        html = ejs.render(block, { server: { id: 999 }, uebersicht: { messwerte: null } },
+            { filename: datei });
+    } catch (e) {
+        pruefe(false, 'der Block laesst sich mit `messwerte: null` rendern',
+            e.message.split('\n')[0]);
+        return;
+    }
+
+    // Jedes Feld, das das Live-Modul spaeter beschreibt, muss JETZT im HTML
+    // stehen. Fehlt eines, schreibt der Push ins Leere — lautlos.
+    for (const feld of ['messstreifen', 'messwerte-grund', 'installbahn', 'installtext',
+                        'installprozent', 'installbalken', 'messwert-cpu', 'messbalken-cpu',
+                        'messwert-ram', 'messbalken-ram', 'messwert-netz', 'messfuss-netz']) {
+        const da = html.includes(`data-fb-live="${feld}"`);
+        pruefe(da, `ohne Messwerte steht "${feld}" trotzdem im HTML`,
+            da ? '' : 'Ein Element, das es je nach Zustand nicht gibt, findet das Live-Modul nie — '
+                    + 'und der Betreiber sieht es erst nach einem Neuladen.');
+    }
+    // Versteckt, nicht weg: Der Kasten mit dem Grund ist sichtbar, die Zellen nicht.
+    pruefe(/data-fb-live="installbahn"[^>]*display:none/.test(html),
+        'die Installationsbahn ist versteckt, nicht abwesend');
+    pruefe(/Der Server l|Keine Messwerte/.test(html),
+        'und statt einer Zahl steht ein Satz da, der es erklaert');
+})();
+
 // ── 5. Die Aktionsnamen stimmen ueberein ────────────────────────────────────
 console.log('\n▸ Knopfzeile: Vorlage und Modul meinen dieselben Aktionen');
 const inVorlagen = new Set();
