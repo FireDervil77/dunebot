@@ -320,12 +320,20 @@
           Hochladen wähle „Lader" als Art.
         </div>`;
     } else if (!d.laderAlsInhalt && d.laderGewaehlt) {
+      // Der erste Satz hier lautete „hier ist nichts nachzulegen" — gemeint war
+      // der LADER, gelesen wurde „du kannst keine Mods laden" (Betreiber,
+      // 2026-09-22). Er hat vollkommen recht: Ein Satz, der zwei Lesarten hat,
+      // hat die falsche.
       html += `
         <div class="fb-muted" style="font-size:12px;margin:8px 0;padding:8px 10px;border:1px solid var(--fb-border);border-radius:6px">
-          <strong>Lader: <span class="fb-mono">${escape(d.laderGewaehlt)}</span>.</strong>
-          Er kam mit der Installation — hier ist nichts nachzulegen. Ein Wechsel
-          verlangt eine Neuinstallation, und schon installierte Mods lägen danach
-          im falschen Ordner.
+          <strong>Lader: <span class="fb-mono">${escape(d.laderGewaehlt)}</span></strong> —
+          er kam mit der Installation, du musst ihn nicht nachlegen.
+          <strong>Mods gehen hier ganz normal:</strong> Die Suche zeigt nur, was zu
+          <span class="fb-mono">${escape(d.laderGewaehlt)}</span> passt${
+            d.spielfassung ? ' und zu Ausgabe <span class="fb-mono">'
+                             + escape(d.spielfassung) + '</span>' : ''}.
+          Nur ein Wechsel des Laders verlangt eine Neuinstallation — schon
+          installierte Mods lägen danach im falschen Ordner.
         </div>`;
     }
 
@@ -593,7 +601,16 @@
           <div class="fb-muted" style="font-size:12px;padding-bottom:4px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap">
             <span>${d.gestoebert ? 'Beliebteste zuerst' : 'Treffer'} —
               Seite ${d.seite} von ${d.seiten}, ${Number(d.gesamt).toLocaleString('de-DE')}
-              ${d.gestoebert ? 'Mods für dieses Spiel' : 'Treffer'} bei ${escape(d.titel)}</span>
+              ${d.gestoebert ? 'Mods für dieses Spiel' : 'Treffer'} bei ${escape(d.titel)}${
+                // Wogegen die Zahl gilt. Ohne diesen Zusatz stand dort eine
+                // Trefferzahl, und niemand wusste, ob sie zum eigenen Server
+                // passt — bei Minecraft ist der Unterschied gross: 28 891 im
+                // Raum, 6 109 fuer Ausgabe 26.2 (gemessen 2026-09-22).
+                d.spielfassung
+                  ? `, gefiltert auf <span class="fb-mono">${escape(d.spielfassung)}</span>`
+                  : ''}</span>
+            ${d.spielfassung ? '' : `<span class="fb-muted" style="font-size:11px">
+                 Ausgabe unbekannt — nicht nach Spielfassung gefiltert</span>`}
             ${d.verzeichnis ? `<a href="${escape(d.verzeichnis)}" target="_blank" rel="noopener noreferrer"
                                  style="margin-left:auto">alle bei ${escape(d.titel)} ansehen</a>` : ''}
           </div>`;

@@ -148,10 +148,29 @@ async function suche(raum, begriff, optionen = {}) {
     // liefert (40 von 40 auf Seite 1 gemessen): Modrinth fuehrt beide Arten,
     // und EssentialsX meldet sich als `mod`, obwohl es ein Plugin ist. Wer sich
     // auf EINE Art verlaesst, verliert die andere, sobald Modrinth aufraeumt.
+    // ── Die Spielfassung, wenn sie bekannt ist (2026-09-22) ────────────────
+    //
+    // Gemessen: Der neoforge-Raum hat 28 891 Projekte, davon passen zu Ausgabe
+    // 26.2 genau 6 109. Ohne diesen Filter sind vier von fuenf Treffern Mods,
+    // die sich nicht installieren lassen — und man erfaehrt es erst beim Klick.
+    //
+    // Die Facette heisst `versions`, nicht `game_versions` (das ist der Name an
+    // der FASSUNG, nicht in der Suche). Beide am 2026-09-22 nachgemessen.
+    //
+    // Ist die Fassung unbekannt („latest", noch nie installiert), wird NICHT
+    // gefiltert: Zu viele Treffer mit einem Hinweis sind besser als zu wenige
+    // ohne Erklaerung.
+    const gruppen = [
+        alsListe([`categories:${raum}`]),
+        alsListe(['project_type:mod', 'project_type:plugin']),
+    ];
+    if (optionen.spielfassung) {
+        gruppen.push(alsListe([`versions:${optionen.spielfassung}`]));
+    }
+
     const abfrage = new URLSearchParams({
         query: text,
-        facets: `[${alsListe([`categories:${raum}`])},`
-              + `${alsListe(['project_type:mod', 'project_type:plugin'])}]`,
+        facets: `[${gruppen.join(',')}]`,
         index: text ? 'relevance' : 'downloads',
         limit: String(PRO_SEITE),
         offset: String((seite - 1) * PRO_SEITE),

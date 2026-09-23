@@ -435,5 +435,36 @@ await pruefe('Eine gewoehnliche Mod geht weiterhin durch', async () => {
     assert.strictEqual(p.kennung, 'essentialsx');
 });
 
+// ── Die Suche filtert nach LADER und FASSUNG (2026-09-22) ──────────────────
+//
+// Betreiber: „eigentlich müsste die modrinth mod seite nun mods aus modrinth
+// zeigen die mit neoforge kompatibel sind." Nach dem Lader filterte sie schon.
+// Nach der Fassung nicht — und das ist der groessere Teil: Gemessen hat der
+// neoforge-Raum 28 891 Projekte, davon passen zu Ausgabe 26.2 genau 6 109.
+// Vier von fuenf Treffern liessen sich nicht installieren, und man erfuehr es
+// erst beim Klick.
+//
+// Die Facette heisst `versions`, NICHT `game_versions` — das ist der Name an
+// der Fassung, nicht in der Suche. Beide gemessen.
+await pruefe('Die Suche filtert nach Lader UND Spielfassung', async () => {
+    await Modrinth.suche('paper', 'essentials', { spielfassung: '1.21.8' });
+    const u = new URL(abrufe[0]);
+    const facets = decodeURIComponent(u.searchParams.get('facets') || '');
+    assert.ok(facets.includes('categories:paper'), `Lader fehlt — ${facets}`);
+    assert.ok(facets.includes('versions:1.21.8'),
+        `Fassung fehlt — ${facets}. Ohne sie zeigt die Karte Mods, die sich nicht `
+      + 'installieren lassen.');
+    assert.ok(!facets.includes('game_versions'),
+        'game_versions ist der Name an der FASSUNG, nicht in der Suche — die API kennt ihn hier nicht.');
+});
+
+await pruefe('Ohne bekannte Fassung wird NICHT gefiltert', async () => {
+    await Modrinth.suche('paper', 'essentials', {});
+    const facets = decodeURIComponent(new URL(abrufe[0]).searchParams.get('facets') || '');
+    assert.ok(!facets.includes('versions:'),
+        'Eine leere Fassung darf keine Facette erzeugen: `versions:` ohne Wert ergibt 0 Treffer, '
+      + 'und das saehe aus wie „es gibt nichts".');
+});
+
 console.log(`\n${bestanden} Pruefung(en) bestanden.\n`);
 })();

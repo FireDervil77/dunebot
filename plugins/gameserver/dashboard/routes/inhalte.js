@@ -401,8 +401,12 @@ router.get('/mods/suche', requirePermission('GAMESERVER.CREATE'), async (req, re
         const gewaehlt = quelleWaehlen(res, inhalt, req.query.quelle);
         if (gewaehlt.absage) return;
 
+        // Die Fassung des Servers geht mit — sonst zeigt die Suche Mods, die sich
+        // gar nicht installieren lassen (2026-09-22).
+        const fassung = await spielfassungVonServer(
+            ServiceManager.get('ipmServer'), dbService, geladen);
         return res.json(await sucheAntwort(inhalt, gewaehlt.quelle, gewaehlt.raum,
-            req.query.q, req.query.seite));
+            req.query.q, req.query.seite, fassung));
     } catch (error) {
         Logger.warn('[Gameserver/Inhalte] Suche fehlgeschlagen:', error);
         return res.status(502).json({ success: false, message: error.message });
@@ -419,11 +423,14 @@ router.get('/mods/suche', requirePermission('GAMESERVER.CREATE'), async (req, re
  * Die Adresse baut der Server, nicht die Ansicht: Sie braucht die Gemeinschaft
  * aus dem Paket, und ohne sie landet man beim falschen Spiel.
  */
-async function sucheAntwort(inhalt, quelle, raum, begriff, seite) {
+async function sucheAntwort(inhalt, quelle, raum, begriff, seite, spielfassung = null) {
     const anbieter = Quellen.fuer(quelle);
-    const roh = await anbieter.suche(raum, begriff || '', { seite });
+    const roh = await anbieter.suche(raum, begriff || '', { seite, spielfassung });
     return {
         success: true,
+        // Was gefiltert wurde, gehoert in die Antwort: Sonst steht in der Karte
+        // eine Trefferzahl, und niemand weiss, wogegen sie gilt.
+        spielfassung: spielfassung || null,
         quelle,
         titel: anbieter.TITEL,
         raum,
@@ -444,6 +451,63 @@ async function sucheAntwort(inhalt, quelle, raum, begriff, seite) {
             url: Inhalte.paketAdresse({ quelle, kennung: t.kennung }, raum),
         })),
     };
+}
+
+/**
+ * Welche Spielfassung laeuft auf diesem Server?
+ *
+ * ── Warum das die Suche braucht (Betreiber, 2026-09-22) ─────────────────────
+ *
+ * *„eigentlich müsste die modrinth mod seite nun mods aus modrinth zeigen die
+ * mit neoforge kompatibel sind."*
+ *
+ * Nach dem LADER filtert sie schon (`content.source_ids.modrinth`). Nach der
+ * FASSUNG nicht — und das ist der groessere Teil: Gemessen am 2026-09-22 hat
+ * der neoforge-Raum 28 891 Projekte, davon passen zu Ausgabe 26.2 genau
+ * **6 109**. Vier von fuenf Treffern liessen sich also gar nicht installieren,
+ * und man erfuehre es erst beim Klick („keine Fassung fuer diesen Server").
+ *
+ * ── Woher die Fassung kommt, in dieser Reihenfolge ──────────────────────────
+ *
+ *  1. Aus den Werten des Servers — aber nur, wenn dort eine ECHTE Nummer steht.
+ *     „latest" ist keine: Es ist ein Wunsch, und was daraus wurde, entscheidet
+ *     die Installation.
+ *  2. Vom Merkzettel `.fb/minecraft-version`, den das Installationsskript
+ *     schreibt. Das ist die einzige Stelle, die die Antwort wirklich kennt.
+ *  3. Gar nicht. Dann wird NICHT gefiltert, und die Karte sagt es — lieber zu
+ *     viele Treffer mit einem Hinweis als zu wenige ohne Erklaerung.
+ *
+ * Der Abruf kostet einen Daemon-Aufruf je Suche. Das ist vertretbar: Eine Suche
+ * stoesst ein Mensch an, kein Takt.
+ */
+async function spielfassungVonServer(ipmServer, dbService, geladen) {
+    let werte = {};
+    try {
+        werte = typeof geladen.server?.paket_werte === 'string'
+            ? JSON.parse(geladen.server.paket_werte) : (geladen.server?.paket_werte || {});
+    } catch { werte = {}; }
+
+    const ausWerten = String(werte.version || '').trim();
+    if (ausWerten && ausWerten !== 'latest') return ausWerten;
+
+    // Der Merkzettel liegt in `.fb` — dort, wo der Vertrag ihn vorsieht.
+    try {
+        const daemonId = await daemonVon(dbService, geladen.server);
+        if (!daemonId || !ipmServer?.isDaemonOnline(daemonId)) return null;
+        const gelesen = await ipmServer.sendCommand(daemonId, 'gameserver.files.read', {
+            server_id: String(geladen.server.id),
+            rootserver_id: String(geladen.server.rootserver_id),
+            install_path: geladen.server.install_path,
+            path: '/.fb/minecraft-version',
+        }, 8000).catch(() => null);
+        if (!gelesen?.success) return null;
+        // Der Daemon liefert Base64, immer (Baustelle 135).
+        const text = Buffer.from(String(gelesen.data?.content || ''), 'base64').toString('utf8');
+        const fassung = text.trim().split(/\s+/)[0];
+        return fassung || null;
+    } catch {
+        return null;
+    }
 }
 
 /** Suchen fuer einen bestehenden Server. */
