@@ -113,30 +113,81 @@ for (const { name, inhalt: paket } of mitVarianten) {
         'Bestandsserver ohne eigenen Wert erben die Vorgabe. Eine, die es nicht gibt, bricht die '
       + 'Installation ab — bei jedem alten Server auf einmal.');
 
-    // 3. Das Installationsskript kennt jeden Wert.
+    // 3. Das INSTALLIERENDE `case` kennt jeden Wert.
+    //
+    // ── Warum nicht einfach „steht `forge)` irgendwo" ──────────────────────
+    //
+    // Genau das stand hier bis zum 2026-09-23, und eine Gegenprobe hat es
+    // entlarvt: Minecrafts Skript hat ZWEI `case "$LADER"`-Bloecke — einen, der
+    // `latest` aufloest, und einen, der installiert. Als der
+    // Installationszweig fuer Forge versuchsweise entfernt wurde, blieb der
+    // Waechter GRUEN: Sein `^forge\)` fand den Zweig im ersten Block.
+    //
+    // Ein Lader ohne Auflösungszweig ist harmlos (dann gilt `latest` eben
+    // wörtlich). Ein Lader ohne INSTALLATIONSZWEIG bekommt keine Serverdatei.
+    // Geprueft wird deshalb der Block, der den Ausgang `*)` mit „Unbekannter
+    // Lader" traegt — daran ist er erkennbar, und nur er.
     const skript = (paket.install?.steps || []).map(s => s.script || '').join('\n');
+    const bloecke = [...skript.matchAll(/case\s+"\$LADER"\s+in\n([\s\S]*?)\nesac/g)]
+        .map(m => m[1]);
+    const installBlock = bloecke.find(b => /Unbekannter Lader/.test(b));
+
+    pruefe(Boolean(installBlock),
+        `${name}: es gibt ein case über den Lader, das installiert`,
+        `${bloecke.length} Block/Bloecke gefunden, keiner mit dem Ausgang „Unbekannter Lader" — `
+      + 'ohne ihn laesst sich nicht sagen, welcher Zweig die Serverdatei holt.');
+
     for (const w of werte) {
-        pruefe(new RegExp(`^${w}\\)`, 'm').test(skript),
-            `${name}: das Skript hat einen Zweig für „${w}"`,
+        // `vanilla|fabric)` ist ein Zweig fuer zwei Werte — das zaehlt.
+        const hat = installBlock
+            && new RegExp(`^(?:[\\w|]*\\|)?${w}(?:\\|[\\w|]*)?\\)`, 'm').test(installBlock);
+        pruefe(Boolean(hat),
+            `${name}: der Installationszweig kennt „${w}"`,
             'Sonst fällt der Lader in den Zweig „unbekannt" und die Installation bricht ab.');
     }
-    pruefe(/\*\)/.test(skript) && /Unbekannter Lader/.test(skript),
+    pruefe(Boolean(installBlock) && /\*\)/.test(installBlock),
         `${name}: und einen Ausgang für alles andere`,
         'Ein unbekannter Wert muss abbrechen, nicht stillschweigend Vanilla installieren.');
 
     // 4. Die Startzeile deckt jeden Wert GENAU EINMAL ab.
     //
-    // Gerechnet wird mit derselben Regel, die der Daemon anwendet
-    // (`gilt` in internal/pkgspec/argv.go): `=wert` / `!=wert`.
+    // ── Diese Regel ist NACHGEBILDET, und das ist die Gefahr ───────────────
+    //
+    // Gerechnet wird mit derselben Regel, die der Daemon anwendet (`gilt` in
+    // `internal/pkgspec/argv.go`). Nachgebildet, weil sie in Go steht — und
+    // genau daran ist dieser Waechter am 2026-09-23 fast gescheitert:
+    //
+    // Als `when` die Listenform `!=neoforge,forge` bekam, verglich die
+    // Nachbildung hier `w !== "neoforge,forge"` — eine Zeichenkette, die kein
+    // Lader je ist. Fuer Forge kam damit ZUFAELLIG das richtige Ergebnis
+    // heraus (ein Treffer), und der Waechter blieb gruen, ohne zu messen, was
+    // er zu messen vorgibt.
+    //
+    // Zwei Lehren stehen jetzt im Code: Die Liste wird verstanden, UND eine
+    // Form, die diese Nachbildung nicht kennt, faellt LAUT auf statt still
+    // `false` zu liefern. Die Regel selbst prueft `zz_startzeile_test.go` im
+    // Daemon gegen das echte `gilt()`.
+    const trifft = (when, wert) => {
+        if (!when) return true;
+        for (const [praefix, erwartet] of [['!=', false], ['=', true]]) {
+            if (!when.startsWith(praefix)) continue;
+            const liste = when.slice(praefix.length).split(',').map(x => x.trim()).filter(Boolean);
+            return liste.includes(wert) === erwartet;
+        }
+        return null;   // unbekannte Form — NICHT stillschweigend "gilt nicht"
+    };
+
     const args = (paket.start?.args || []).filter(a => a.from === `setting:${schluessel}`);
     pruefe(args.length > 0, `${name}: die Startzeile hängt am Lader`);
+
+    const unverstanden = args.filter(a => trifft(a.when, werte[0]) === null);
+    pruefe(unverstanden.length === 0,
+        `${name}: dieser Wächter versteht jede Bedingung der Startzeile`,
+        `nicht verstanden: ${unverstanden.map(a => `${a.key} (when=${a.when})`).join(', ')} — `
+      + 'die Nachbildung hier ist veraltet und misst ab jetzt das Falsche.');
+
     for (const w of werte) {
-        const treffer = args.filter(a => {
-            if (!a.when) return true;
-            if (a.when.startsWith('!=')) return w !== a.when.slice(2);
-            if (a.when.startsWith('=')) return w === a.when.slice(1);
-            return false;
-        });
+        const treffer = args.filter(a => trifft(a.when, w) === true);
         pruefe(treffer.length === 1,
             `${name}: „${w}" bekommt genau ein Startargument (${treffer.length})`,
             treffer.length === 0
@@ -347,10 +398,50 @@ console.log('\nModpacks: was hereinkommt, ist fremder Text');
     // Die Auswahl darf nicht auf einen fremden Lader umbiegen.
     const modrinth = ohneKommentare(roh(path.join(WURZEL,
         'plugins/gameserver/dashboard/helpers/Modrinth.js')) || '');
-    pruefe(/const LADER_BEI_UNS = \{ fabric: 'fabric', neoforge: 'neoforge' \}/.test(modrinth),
-        'nur Fabric und NeoForge gelten als unsere Lader',
-        'Forge und Quilt sind mit NeoForge NICHT vertraeglich. Ein stillschweigender Tausch gaebe '
-      + 'einen Server, der startet und die Haelfte der Mods nicht laedt.');
+    // ── Die Modpack-Lader muessen zum PAKET passen ─────────────────────────
+    //
+    // Hier stand bis zum 2026-09-23 die Liste woertlich (`{ fabric, neoforge }`).
+    // Das war beim ersten neuen Lader rot — und zwar zu Recht, aber aus dem
+    // falschen Grund: Der Waechter haette gemeldet „steht nicht mehr da", nicht
+    // „passt nicht mehr zusammen".
+    //
+    // Geprueft wird deshalb die Eigenschaft: **Jeder Lader, der im Paket Mods
+    // nach `mods/` nimmt, muss als Modpack-Lader gelten — und keiner sonst.**
+    //
+    //   zu wenig   Ein Modpack fuer diesen Lader wird abgewiesen, obwohl es
+    //              einen Server dafuer gibt (so war es fuer Forge)
+    //   zu viel    Die Suche bietet Modpacks fuer einen Lader an, den das Paket
+    //              gar nicht installieren kann
+    //
+    // `paper` gehoert ausdruecklich NICHT dazu: Es nimmt Plugins nach
+    // `plugins/`, und Modpacks gibt es dafuer nicht.
+    {
+        const treffer = modrinth.match(/const LADER_BEI_UNS = \{([^}]*)\}/);
+        pruefe(Boolean(treffer), 'Modrinth fuehrt eine Liste der Modpack-Lader',
+            'LADER_BEI_UNS nicht gefunden — heisst sie noch so?');
+
+        const unsere = treffer
+            ? [...treffer[1].matchAll(/(\w+)\s*:\s*'([^']+)'/g)].map(m => m[2]).sort()
+            : [];
+
+        const mcPaket = pakete.find(x => x.name === 'minecraft.json');
+        const varianten = mcPaket?.inhalt?.content?.variants || {};
+        const modLader = Object.entries(varianten)
+            .filter(([, v]) => v.supported && v.path === 'mods')
+            .map(([k]) => k).sort();
+
+        pruefe(JSON.stringify(unsere) === JSON.stringify(modLader),
+            'jeder Lader mit mods/ gilt als Modpack-Lader — und keiner sonst',
+            `LADER_BEI_UNS: ${unsere.join(', ') || '(leer)'}\n`
+          + `       Paket mit mods/: ${modLader.join(', ') || '(keiner)'}`);
+
+        // Und die Namen muessen die von Modrinth sein: `paket()` setzt sie als
+        // `loaders`-Facette ein. Ein Tippfehler gaebe eine Suche mit null
+        // Treffern und keine Fehlermeldung.
+        pruefe(unsere.every(l => ['fabric', 'neoforge', 'forge', 'quilt'].includes(l)),
+            'und sie heissen so, wie Modrinth sie fuehrt',
+            `unbekannt: ${unsere.filter(l => !['fabric','neoforge','forge','quilt'].includes(l)).join(', ')}`);
+    }
 
     // Und der Server glaubt dem Browser nicht.
     const routen2 = ohneKommentare(roh(path.join(WURZEL,

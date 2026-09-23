@@ -387,13 +387,31 @@ async function passendeFassungen(hits, lader, spielfassung) {
 /**
  * Welche Lader kennt dieses Haus — und wie heissen sie bei Modrinth?
  *
- * Modrinth fuehrt auch `forge` und `quilt`. Wir nicht: Das Minecraft-Paket
- * kennt vanilla, paper, fabric, neoforge. Ein Paket fuer Forge wird deshalb
- * ABGEWIESEN und nicht auf NeoForge umgebogen — die beiden sind nicht
- * vertraeglich, und ein stillschweigender Tausch gaebe einen Server, der
- * startet und die Haelfte der Mods nicht laedt.
+ * ── Forge kam am 2026-09-23 dazu, und die Zahlen sagen warum ────────────────
+ *
+ * Betreiber: *„wie machen wir das mit forge. ist ja was das angeht einer der
+ * groessten versionen."* Nachgezaehlt bei Modrinth, Mods je Spielfassung:
+ *
+ *     MC 1.12.2   forge  2 670   neoforge     83   fabric    165
+ *     MC 1.20.1   forge 24 851   neoforge  5 020   fabric 17 481
+ *     MC 1.21.1   forge  5 279   neoforge 20 742   fabric 19 168
+ *
+ * Der Wendepunkt liegt genau bei der Abspaltung: NeoForge ist nach 1.20.1 aus
+ * Forge hervorgegangen. Ohne Forge war die ganze Welt bis 1.20.1 unerreichbar
+ * — und 1.20.1 ist mit 24 851 Mods die groesste Sammlung ueberhaupt.
+ *
+ * ── `quilt` bleibt draussen ─────────────────────────────────────────────────
+ *
+ * Nicht aus Bequemlichkeit: Das Minecraft-Paket hat keinen Quilt-Zweig, also
+ * gaebe es keinen Server, auf den eine Quilt-Mod passt. Ein Paket dafuer wird
+ * ABGEWIESEN und nicht auf Fabric umgebogen — auch wenn Quilt Fabric-Mods
+ * laedt, gilt das nicht umgekehrt, und ein stillschweigender Tausch gaebe einen
+ * Server, der startet und die Haelfte der Mods nicht laedt.
+ *
+ * Dasselbe galt bis zum 2026-09-23 fuer Forge. Der Unterschied ist nicht die
+ * Regel, sondern dass das Paket jetzt einen Forge-Zweig hat.
  */
-const LADER_BEI_UNS = { fabric: 'fabric', neoforge: 'neoforge' };
+const LADER_BEI_UNS = { fabric: 'fabric', neoforge: 'neoforge', forge: 'forge' };
 
 /** Der Lader dieser Fassung, in unseren Worten — oder null. */
 function laderBeiUns(loaders) {
@@ -446,7 +464,7 @@ async function modpackFassung(kennung, fassung = null) {
     const unser = (gewaehlt.loaders || []).map(l => LADER_BEI_UNS[l]).filter(Boolean)[0] || null;
     if (!unser) {
         throw new Error(`„${projektDaten.name}" verlangt ${fremd.join(' oder ') || 'einen Lader'}. `
-            + 'Dieses Panel kennt fuer Minecraft Fabric und NeoForge — Forge und Quilt nicht. '
+            + 'Dieses Panel kennt fuer Minecraft Fabric, NeoForge und Forge — Quilt nicht. '
             + 'Ein Tausch waere kein Tausch: Die Lader sind untereinander unvertraeglich.');
     }
 
