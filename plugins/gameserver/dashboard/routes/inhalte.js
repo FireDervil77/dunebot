@@ -401,12 +401,12 @@ router.get('/mods/suche', requirePermission('GAMESERVER.CREATE'), async (req, re
         const gewaehlt = quelleWaehlen(res, inhalt, req.query.quelle);
         if (gewaehlt.absage) return;
 
-        // Die Fassung des Servers geht mit — sonst zeigt die Suche Mods, die sich
-        // gar nicht installieren lassen (2026-09-22).
-        const fassung = await spielfassungVonServer(
-            ServiceManager.get('ipmServer'), dbService, geladen);
+        // Hier gibt es noch keinen Server und also keine installierte Ausgabe:
+        // Beim Anlegen ist „latest" noch ein Wunsch. Deshalb KEIN Fassungsfilter
+        // — die Karte sagt das auch („Ausgabe unbekannt"). Fuer den Server
+        // selbst filtert die Suche weiter unten sehr wohl.
         return res.json(await sucheAntwort(inhalt, gewaehlt.quelle, gewaehlt.raum,
-            req.query.q, req.query.seite, fassung));
+            req.query.q, req.query.seite));
     } catch (error) {
         Logger.warn('[Gameserver/Inhalte] Suche fehlgeschlagen:', error);
         return res.status(502).json({ success: false, message: error.message });
@@ -523,8 +523,12 @@ router.get('/:serverId/inhalte/suche', requirePermission('GAMESERVER.VIEW'), asy
         const gewaehlt = quelleWaehlen(res, inhalt, req.query.quelle);
         if (gewaehlt.absage) return;
 
+        // Die Fassung dieses Servers geht mit — sonst zeigt die Suche Mods, die
+        // sich gar nicht installieren lassen (2026-09-22).
+        const fassung = await spielfassungVonServer(
+            ServiceManager.get('ipmServer'), dbService, geladen);
         return res.json(await sucheAntwort(inhalt, gewaehlt.quelle, gewaehlt.raum,
-            req.query.q, req.query.seite));
+            req.query.q, req.query.seite, fassung));
     } catch (error) {
         // 502, nicht 500: Der Fehler liegt beim fremden Dienst, nicht bei uns —
         // und die Meldung sagt das auch, statt „Serverfehler" zu behaupten.
