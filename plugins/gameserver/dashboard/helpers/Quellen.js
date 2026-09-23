@@ -29,6 +29,13 @@
  *   istErlaubt(adresse)
  *   suche(raum, begriff, {seite})    → {treffer, gesamt, seite, weiter, zurueck, proSeite}
  *   paket(raum, kennung, fassung?)   → ein Paket in gemeinsamer Form
+ *   fassungen(raum, kennung, {spielfassung?})
+ *                                    → {liste, vollstaendig, grund}
+ *                                      `vollstaendig: false` heisst: Der Anbieter KANN
+ *                                      seine Fassungen nicht aufzaehlen (Thunderstore),
+ *                                      und `grund` sagt es dem Betreiber. Eine leere
+ *                                      Liste waere die falsche Antwort — sie saehe aus
+ *                                      wie „dieses Paket hat keine Fassungen".
  *   aufloesen(raum, kennung, fassung?) → {pakete, fehlend} — Abhaengigkeiten ZUERST
  *   aktualisierungen(raum, zeilen)   → [{id, kennung, installiert, neueste, neuer, …}]
  *   verzeichnis(raum)                → Seite zum Stoebern

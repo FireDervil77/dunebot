@@ -952,6 +952,118 @@ async function pruefe(name, fn) {
         assert.strictEqual(r.antwort.dateien, undefined, 'das Feld `dateien` hiess wie eine Dateizahl');
     });
 
+    // ════════════════════════════════════════════════════════════════════════
+    // Die Fassungswahl (Betreiber, 2026-09-23)
+    // ════════════════════════════════════════════════════════════════════════
+    //
+    // Betreiber: „muss noch die versionierung ausprobieren. wenn ich mit
+    // verschiedenen versionen anstelle von latest mods mache."
+    //
+    // Es ging nicht — und der Grund ist der interessante Teil: **Jedes einzelne
+    // Stueck war da.** `paket()`, `aufloesen()`, `installiere()`, die Vorschau-
+    // und die Holroute nahmen eine Fassung alle entgegen. Nur nannte sie
+    // niemand: Die Oberflaeche schickte nie eine, und es kam immer die neueste.
+    //
+    // Geprueft wird deshalb die VERBINDUNG, nicht das Vorhandensein der Teile.
+
+    await pruefe('Die gewaehlte Fassung kommt beim Anbieter an', async () => {
+        let gesehen = 'nie aufgerufen';
+        Thunderstore.aufloesen = async (raum, kennung, fassung) => {
+            gesehen = fassung;
+            return { pakete: [JOTUNN], fehlend: [] };
+        };
+        Thunderstore.paket = async () => JOTUNN;
+
+        await rufe('post', '/:serverId/inhalte/holen',
+            { body: { kennung: 'ValheimModding-Jotunn', fassung: '2.29.2' } });
+        assert.strictEqual(gesehen, '2.29.2',
+            `die Fassung kam als ${JSON.stringify(gesehen)} an — der Weg reisst ab`);
+    });
+
+    await pruefe('Ohne Wahl bleibt es ausdruecklich die neueste (null, nicht "")', async () => {
+        let gesehen = 'nie aufgerufen';
+        Thunderstore.aufloesen = async (raum, kennung, fassung) => {
+            gesehen = fassung;
+            return { pakete: [JOTUNN], fehlend: [] };
+        };
+        Thunderstore.paket = async () => JOTUNN;
+
+        await rufe('post', '/:serverId/inhalte/holen', { body: { kennung: 'ValheimModding-Jotunn' } });
+        // `null` heisst „such du die neueste". Ein leerer String waere eine
+        // Fassung mit dem Namen „" und wuerde gesucht werden.
+        assert.strictEqual(gesehen, null, `es kam ${JSON.stringify(gesehen)} statt null an`);
+    });
+
+    await pruefe('Die Oberflaeche schickt die Fassung ueberhaupt mit', async () => {
+        // Der eigentliche Fehler von vorher: Der Knopf schickte nur die
+        // Kennung, und der ganze Unterbau lief darum herum ins Leere.
+        assert.match(reiter, /body: JSON\.stringify\(\{ kennung, quelle: quelleJetzt\(\), fassung: FASSUNG \}\)/,
+            'der Installieren-Knopf schickt keine Fassung — dann waehlt die Auswahl nichts aus');
+        assert.match(reiter, /window\.inhaltVorschau = function \(kennung, knopf, fassung\)/,
+            'die Vorschau nimmt keine Fassung entgegen');
+        assert.match(reiter, /onchange="inhaltVorschau\(/,
+            'das Auswahlfeld laedt die Vorschau nicht neu — die Abhaengigkeiten blieben die der neuesten');
+    });
+
+    await pruefe('Die Wahl gehoert zu EINEM Mod und ueberlebt den Listenwechsel nicht', async () => {
+        // Sonst traegt der naechste Klick auf „Ansehen" die Nummer des vorigen
+        // mit sich, und die Vorschau meldet „Fassung gibt es nicht (mehr)" fuer
+        // ein Paket, das niemand angefasst hat.
+        const i = reiter.indexOf('window.inhaltSuchen = function');
+        assert.ok(i > -1, 'inhaltSuchen gibt es nicht mehr');
+        assert.match(reiter.slice(i, i + 700), /FASSUNG = null;/,
+            'die Fassungswahl wird beim Zurueck zur Liste nicht vergessen');
+    });
+
+    await pruefe('Ein Anbieter, der seine Fassungen nicht nennen kann, sagt das', async () => {
+        // Gemessen am 2026-09-23: Thunderstore hat KEINEN Einzelabruf dafuer.
+        // Die Gesamtliste haette sie (94 853 fuer Valheim), kostet aber 169 MB.
+        //
+        // Die falsche Antwort waere eine leere Liste — sie saehe aus wie „dieses
+        // Paket hat keine Fassungen". Richtig ist: eine Fassung, `vollstaendig:
+        // false` und der Grund im Klartext.
+        // ⚠ `Thunderstore.paket` zu ersetzen greift hier NICHT: `fassungen()`
+        // ruft die modulinterne Funktion, nicht die exportierte. Beim Bauen
+        // dieses Tests ist er deshalb ins ECHTE Netz gegangen und hat Jotunns
+        // wirkliche Fassung geholt (2.30.2 statt der erwarteten 2.29.2). Waere
+        // die Nummer zufaellig dieselbe gewesen, waere er gruen gewesen — und
+        // haette trotzdem das Netz gebraucht, entgegen der Zusage im Kopf
+        // dieser Datei.
+        //
+        // Abgefangen wird deshalb `fetch`, wie in check-quellen.js: Damit
+        // laeuft der echte Weg durch `paket()`, nur die Gegenstelle ist unser.
+        const echtesFetch = global.fetch;
+        global.fetch = async (adresse) => {
+            const u = new URL(String(adresse));
+            if (!/\/api\/experimental\/package\//.test(u.pathname)) {
+                throw new Error('Unerwarteter Abruf: ' + adresse);
+            }
+            return { ok: true, status: 200, json: async () => ({
+                latest: { version_number: JOTUNN.fassung, download_url: JOTUNN.adresse,
+                          file_size: 1, dependencies: [],
+                          date_created: JOTUNN.veroeffentlicht, description: '' },
+            }) };
+        };
+        let f;
+        try {
+            f = await Thunderstore.fassungen('valheim', 'ValheimModding-Jotunn');
+        } finally {
+            global.fetch = echtesFetch;
+        }
+        assert.strictEqual(f.vollstaendig, false, 'Thunderstore behauptet, vollstaendig zu sein');
+        assert.ok(f.liste.length >= 1, 'eine leere Liste sieht aus wie „hat keine Fassungen"');
+        assert.ok(f.grund && f.grund.length > 20, 'der Grund fehlt oder ist zu knapp');
+        assert.strictEqual(f.liste[0].fassung, JOTUNN.fassung);
+    });
+
+    await pruefe('Jeder Anbieter erfuellt den Fassungs-Vertrag', async () => {
+        const Modrinth = require(path.join(HELFER, 'Modrinth.js'));
+        for (const anbieter of [Thunderstore, Modrinth]) {
+            assert.strictEqual(typeof anbieter.fassungen, 'function',
+                `${anbieter.TITEL} hat keine fassungen() — die Route faellt auf „kann er nicht" zurueck`);
+        }
+    });
+
     Object.assign(Thunderstore, ECHT);
     console.log(`\n${bestanden} Pruefung(en) bestanden.\n`);
 })();

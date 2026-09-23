@@ -192,6 +192,54 @@ async function paket(raum, kennung, fassung = null) {
 }
 
 /**
+ * Die Fassungen eines Pakets — und warum hier nur eine steht.
+ *
+ * ── Gemessen am 2026-09-23, und das Ergebnis ist ein Nein ───────────────────
+ *
+ * Thunderstore hat **keinen** Einzelabruf, der die Fassungen eines Pakets
+ * nennt. Nachgemessen wurden vier Wege:
+ *
+ *   /api/experimental/package/<ns>/<name>/            nur `latest`, kein `versions`
+ *   /api/experimental/package/<ns>/<name>/versions/   HTTP 400
+ *   /api/experimental/frontend/c/<c>/p/<ns>/<name>/   HTTP 403
+ *   /c/<community>/api/v1/package/                    **169 MB** (Valheim),
+ *                                                     331 MB (Lethal Company)
+ *
+ * Die Gesamtliste HAT die Fassungen — 94 853 fuer Valheim —, aber 169 MB fuer
+ * die Fassungsliste EINES Mods zu laden, ist kein Weg. Weder fuer uns noch fuer
+ * Thunderstore.
+ *
+ * ── Was daraus folgt, und was NICHT ─────────────────────────────────────────
+ *
+ * Zurueck kommt `vollstaendig: false` mit dem Grund im Klartext. **Keine leere
+ * Liste:** Die sieht aus wie „dieses Paket hat keine Fassungen" und waere eine
+ * falsche Auskunft, die wie eine richtige aussieht.
+ *
+ * Eine bestimmte Fassung ANSTEUERN kann Thunderstore sehr wohl —
+ * `paket(raum, kennung, fassung)` holt sie ueber
+ * `/package/<ns>/<name>/<version>/`. Wer die Nummer von der Paketseite abliest,
+ * kann sie also benutzen; die Oberflaeche bietet dafuer ein Eingabefeld an,
+ * wenn diese Funktion `vollstaendig: false` meldet. Eine falsche Nummer
+ * scheitert dann an der API und nicht still.
+ */
+async function fassungen(raum, kennung) {
+    const p = await paket(raum, kennung);
+    return {
+        liste: [{
+            fassung:        p.fassung,
+            veroeffentlicht: p.veroeffentlicht,
+            bytes:          p.bytes,
+            art:            null,
+            spielfassungen: [],
+        }],
+        vollstaendig: false,
+        grund: 'Thunderstore nennt je Paket nur die neueste Fassung. Eine ältere lässt sich '
+             + 'installieren, wenn du ihre Nummer kennst — sie steht auf der Paketseite unter '
+             + '„Versions".',
+    };
+}
+
+/**
  * `denikson-BepInExPack_Valheim` auseinandernehmen — OHNE Fassung.
  *
  * Gespeichert wird bei uns `namespace-name`, weil die Fassung eine eigene
@@ -386,6 +434,6 @@ function adresse(raum, kennung) {
 
 module.exports = {
     KENNUNG, TITEL, RAUM_NAME, HERKUNFT, PRO_SEITE,
-    istErlaubt, suche, verzeichnis, adresse, paket, aufloesen, aktualisierungen,
+    istErlaubt, suche, verzeichnis, adresse, paket, aufloesen, aktualisierungen, fassungen,
     hoeher, neuerAls, teileKennung, teileOhneFassung,
 };

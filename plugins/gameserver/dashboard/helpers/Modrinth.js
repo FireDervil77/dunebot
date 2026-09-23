@@ -549,6 +549,60 @@ async function paket(raum, kennung, fassung = null, optionen = {}) {
 }
 
 /**
+ * Alle Fassungen, die zu diesem Server passen (Betreiber, 2026-09-23).
+ *
+ * ── Warum es diese Funktion ueberhaupt braucht ──────────────────────────────
+ *
+ * Betreiber: *„muss noch die versionierung ausprobieren. wenn ich mit
+ * verschiedenen versionen anstelle von latest mods mache."* Das ging nicht: Der
+ * Unterbau nahm eine Fassung ueberall entgegen (`paket`, `aufloesen`, die
+ * Vorschau- und die Holroute), aber **niemand konnte sie nennen** — es gab
+ * keine Stelle, die die Auswahl kennt. Die Oberflaeche schickte deshalb nie
+ * eine, und es kam immer die neueste.
+ *
+ * ── Sie kostet nichts extra ─────────────────────────────────────────────────
+ *
+ * `paket()` holt dieselbe Liste und wirft alles bis auf einen Eintrag weg. Hier
+ * wird sie ganz zurueckgegeben — derselbe Abruf, dieselben Facetten.
+ *
+ * ── Gefiltert wird wie ueberall ─────────────────────────────────────────────
+ *
+ * Nach Lader (`raum`) und, wenn bekannt, nach Spielfassung. Eine Fassung, die
+ * sich nicht installieren laesst, ist keine Auswahl — sie waere ein Fehlgriff
+ * mit Ansage. Gemessen am 2026-09-23: Sodium hat fuer fabric/26.2 eben elf
+ * Fassungen, nicht seine ganzen hundert.
+ *
+ * `art` steht an jeder Zeile (`release`, `beta`, `alpha`), weil die Wahl sonst
+ * blind waere: Von den elf gemessenen sind drei Vorabfassungen.
+ */
+async function fassungen(raum, kennung, optionen = {}) {
+    const slug = String(kennung || '').trim();
+    if (!slug) throw new Error('Keine Kennung');
+
+    const abfrage = new URLSearchParams();
+    if (raum) abfrage.set('loaders', alsListe([raum]));
+    if (optionen.spielfassung) abfrage.set('game_versions', alsListe([optionen.spielfassung]));
+
+    const liste = await hole(`/project/${encodeURIComponent(slug)}/version?${abfrage}`);
+    const zeilen = (Array.isArray(liste) ? liste : []).map(v => {
+        const datei = (v.files || []).find(f => f.primary) || (v.files || [])[0];
+        return {
+            fassung:        v.version_number,
+            veroeffentlicht: v.date_published || null,
+            bytes:          datei?.size || 0,
+            // release | beta | alpha — die Wahl waere sonst blind.
+            art:            v.version_type || null,
+            spielfassungen: v.game_versions || [],
+        };
+    });
+
+    // Die Liste kommt neueste zuerst (gemessen) — die Reihenfolge bleibt, wie
+    // der Anbieter sie gibt. Sie selbst zu sortieren hiesse, Fassungsnummern zu
+    // vergleichen, die Modrinth ausdruecklich frei laesst.
+    return { liste: zeilen, vollstaendig: true, grund: null };
+}
+
+/**
  * Das Projekt zu einer ID oder einem Slug.
  *
  * Zwei Dinge stehen NUR hier und nicht an der Fassung: der lesbare Titel
@@ -740,6 +794,6 @@ async function aktualisierungen(raum, zeilen) {
 module.exports = {
     sucheModpacks, modpackFassung, laderBeiUns, laderBeiModrinth,
     KENNUNG, TITEL, RAUM_NAME, HERKUNFT, PRO_SEITE,
-    istErlaubt, suche, verzeichnis, adresse, paket, aufloesen, aktualisierungen,
+    istErlaubt, suche, verzeichnis, adresse, paket, aufloesen, aktualisierungen, fassungen,
     hoeher, neuerAls,
 };

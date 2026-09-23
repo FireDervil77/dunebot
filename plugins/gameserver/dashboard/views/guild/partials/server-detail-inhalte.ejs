@@ -604,6 +604,11 @@
   };
 
   window.inhaltSuchen = function (seite) {
+    // Die Fassungswahl gehoert zu EINEM Mod. Bliebe sie stehen, truege der
+    // naechste Klick auf „Ansehen" die Nummer des vorigen mit sich — und die
+    // Vorschau meldete „Fassung gibt es nicht (mehr)" fuer ein Paket, das
+    // niemand angefasst hat.
+    FASSUNG = null;
     const begriff = (document.getElementById('ts-begriff') || {}).value || '';
     const raum = document.getElementById('ts-treffer');
     raum.innerHTML = '<div class="fb-muted" style="font-size:12px">Wird gesucht …</div>';
@@ -669,18 +674,38 @@
       });
   };
 
-  window.inhaltVorschau = function (kennung, knopf) {
-    knopf.disabled = true;
+  // ── Die gewaehlte Fassung (Betreiber, 2026-09-23) ────────────────────────
+  //
+  // Sie steht in einer Variablen und nicht nur im Auswahlfeld: Beim Wechsel
+  // wird die ganze Vorschau neu gebaut — samt dem Feld selbst —, und was
+  // gewaehlt war, muss den Neubau ueberleben. `null` heisst „die neueste",
+  // und das ist etwas anderes als „noch keine gewaehlt": Der Server setzt
+  // dafuer selbst ein.
+  let FASSUNG = null;
+
+  window.inhaltVorschau = function (kennung, knopf, fassung) {
+    if (knopf) knopf.disabled = true;
+    FASSUNG = fassung === undefined ? FASSUNG : (fassung || null);
     const raum = document.getElementById('ts-treffer');
 
-    fetch(`${BASIS}/vorschau?quelle=${encodeURIComponent(quelleJetzt() || '')}`
-          + `&kennung=${encodeURIComponent(kennung)}`, { headers: { Accept: 'application/json' } })
-      .then(async (a) => {
-        const d = await a.json().catch(() => null);
-        if (!a.ok || !d || !d.success) throw new Error((d && d.message) || `HTTP ${a.status}`);
-        return d;
-      })
-      .then(d => {
+    const mitFassung = FASSUNG ? `&fassung=${encodeURIComponent(FASSUNG)}` : '';
+    Promise.all([
+      fetch(`${BASIS}/vorschau?quelle=${encodeURIComponent(quelleJetzt() || '')}`
+            + `&kennung=${encodeURIComponent(kennung)}${mitFassung}`,
+            { headers: { Accept: 'application/json' } })
+        .then(async (a) => {
+          const d = await a.json().catch(() => null);
+          if (!a.ok || !d || !d.success) throw new Error((d && d.message) || `HTTP ${a.status}`);
+          return d;
+        }),
+      // Die Fassungsliste darf die Vorschau nicht mitreissen: Kann ein Anbieter
+      // sie nicht nennen, ist das eine Auskunft und kein Fehler.
+      fetch(`${BASIS}/fassungen?quelle=${encodeURIComponent(quelleJetzt() || '')}`
+            + `&kennung=${encodeURIComponent(kennung)}`, { headers: { Accept: 'application/json' } })
+        .then(a => a.json()).catch(() => null),
+    ])
+      .then(([d, f]) => {
+        d.fassungen = (f && f.success) ? f : null;
         const liste = d.pakete.map(p => `
           <div style="padding:3px 0">
             <div style="display:flex;gap:8px;font-size:12px">
@@ -694,6 +719,7 @@
 
         raum.innerHTML = `
           <div style="border:1px solid var(--fb-border);border-radius:6px;padding:10px">
+            ${fassungsWahl(kennung, d.fassungen)}
             <div style="font-size:13px;font-weight:600;margin-bottom:6px">
               Das wird installiert (${d.pakete.length}):</div>
             ${liste}
@@ -711,8 +737,72 @@
       .catch(e => {
         raum.innerHTML = `<div style="font-size:12px;color:var(--fb-danger)">${escape(e.message)}</div>`;
       })
-      .finally(() => { knopf.disabled = false; });
+      .finally(() => { if (knopf) knopf.disabled = false; });
   };
+
+  /**
+   * Die Fassungswahl über der Vorschau.
+   *
+   * Drei Fälle, und der dritte ist der, den ein „einfach ein Auswahlfeld"
+   * übersehen hätte:
+   *
+   *   Liste vorhanden      Auswahl. Der erste Eintrag IST die neueste — er
+   *                        heißt trotzdem so, weil „neueste" eine andere Zusage
+   *                        ist als eine Nummer: Sie gilt auch morgen noch.
+   *   Liste unvollständig  Thunderstore kann seine Fassungen nicht aufzählen
+   *                        (gemessen). Statt einer Liste, die wie die ganze
+   *                        aussieht: der Grund und ein Feld für eine bekannte
+   *                        Nummer.
+   *   Gar nichts           Kein Feld, kein leeres Auswahlfeld — sonst sähe es
+   *                        aus, als hätte dieses Paket keine Fassungen.
+   */
+  function fassungsWahl(kennung, f) {
+    if (!f) return '';
+
+    const jetzt = FASSUNG;
+    const zeile = (z) => {
+      const teile = [z.fassung];
+      if (z.art && z.art !== 'release') teile.push(z.art);
+      if (z.bytes) teile.push((z.bytes / 1048576).toFixed(1) + ' MB');
+      if (z.veroeffentlicht) teile.push(z.veroeffentlicht.slice(0, 10));
+      return teile.join(' · ');
+    };
+
+    const auswahl = f.liste && f.liste.length ? `
+      <select class="form-select form-select-sm" style="max-width:340px"
+              onchange="inhaltVorschau('${escape(kennung)}', null, this.value)">
+        <option value="" ${jetzt ? '' : 'selected'}>neueste${
+          f.liste[0] ? ' (' + escape(f.liste[0].fassung) + ')' : ''}</option>
+        ${f.liste.map(z => `<option value="${escape(z.fassung)}" ${
+          jetzt === z.fassung ? 'selected' : ''}>${escape(zeile(z))}</option>`).join('')}
+      </select>` : '';
+
+    // Der Weg für einen Anbieter, der nicht aufzählen kann. Eine falsche Nummer
+    // scheitert an seiner API und nicht still — deshalb darf hier getippt
+    // werden.
+    const eingabe = f.vollstaendig ? '' : `
+      <div style="display:flex;gap:6px;margin-top:6px;align-items:center">
+        <input id="ts-fassung-frei" class="form-control form-control-sm fb-mono"
+               style="max-width:200px" placeholder="z. B. 2.29.2"
+               value="${escape(jetzt || '')}"
+               onkeydown="if(event.key==='Enter')inhaltVorschau('${escape(kennung)}', null, this.value)">
+        <button class="btn btn-white btn-sm"
+                onclick="inhaltVorschau('${escape(kennung)}', null, document.getElementById('ts-fassung-frei').value)"
+          >Fassung laden</button>
+      </div>`;
+
+    return `
+      <div style="padding-bottom:8px;margin-bottom:8px;border-bottom:1px solid var(--fb-border)">
+        <label class="form-label" style="font-size:12px">Fassung</label>
+        ${auswahl}
+        ${f.grund ? `<div class="fb-muted" style="font-size:11px;margin-top:4px">${escape(f.grund)}</div>` : ''}
+        ${eingabe}
+        ${f.vollstaendig && f.spielfassung ? `
+          <div class="fb-muted" style="font-size:11px;margin-top:4px">
+            Nur Fassungen für <span class="fb-mono">${escape(f.spielfassung)}</span> — was nicht
+            passt, steht nicht in der Liste.</div>` : ''}
+      </div>`;
+  }
 
   window.inhaltInstallieren = function (kennung, knopf) {
     const meldung = document.getElementById('ts-meldung');
@@ -723,7 +813,10 @@
     fetch(`${BASIS}/holen`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kennung, quelle: quelleJetzt() })
+      // `FASSUNG` statt eines Blicks ins Auswahlfeld: Bei einem Anbieter ohne
+      // Liste gibt es keines, und `null` heisst ausdruecklich „die neueste" —
+      // die Entscheidung faellt dann auf dem Server, nicht hier.
+      body: JSON.stringify({ kennung, quelle: quelleJetzt(), fassung: FASSUNG })
     })
       .then(async (a) => {
         const d = await a.json().catch(() => null);

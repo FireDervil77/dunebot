@@ -735,6 +735,59 @@ router.get('/:serverId/inhalte/vorschau', requirePermission('GAMESERVER.VIEW'), 
 });
 
 /**
+ * Welche Fassungen gibt es? (Betreiber, 2026-09-23)
+ *
+ * *„muss noch die versionierung ausprobieren. wenn ich mit verschiedenen
+ * versionen anstelle von latest mods mache."*
+ *
+ * Das ging bis heute nicht — nicht, weil der Weg fehlte, sondern weil ihn
+ * niemand kannte: `paket()`, `aufloesen()`, die Vorschau- und die Holroute
+ * nahmen eine Fassung alle entgegen, aber **keine Stelle nannte die Auswahl.**
+ * Die Oberflaeche schickte deshalb nie eine, und es kam immer die neueste.
+ *
+ * Gefiltert wird wie bei der Suche: Lader aus dem Paket, Spielfassung vom
+ * Server. Eine Fassung, die sich nicht installieren laesst, waere keine Auswahl,
+ * sondern ein Fehlgriff mit Ansage.
+ */
+router.get('/:serverId/inhalte/fassungen', requirePermission('GAMESERVER.VIEW'),
+    async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+
+    try {
+        const geladen = await ladeServerUndPaket(dbService, req.params.serverId, res.locals.guildId);
+        if (!geladen) return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
+
+        const inhalt = geladen.paket?.content || null;
+        const gewaehlt = quelleWaehlen(res, inhalt, req.query.quelle);
+        if (gewaehlt.absage) return;
+
+        if (!req.query.kennung) {
+            return res.status(400).json({ success: false, message: 'kennung fehlt' });
+        }
+
+        const anbieter = Quellen.fuer(gewaehlt.quelle);
+        // Ein Anbieter ohne diese Faehigkeit bekommt keine erfundene Antwort:
+        // Der Vertrag sagt, was er kann, und was er nicht kann, steht als Grund
+        // da — nicht als leere Liste.
+        if (typeof anbieter.fassungen !== 'function') {
+            return res.json({ success: true, liste: [], vollstaendig: false,
+                grund: `${anbieter.TITEL} kann seine Fassungen nicht aufzählen.` });
+        }
+
+        const spielfassung = await spielfassungVonServer(
+            ServiceManager.get('ipmServer'), dbService, geladen);
+
+        const ergebnis = await anbieter.fassungen(gewaehlt.raum, String(req.query.kennung),
+            { spielfassung });
+        return res.json({ success: true, spielfassung, ...ergebnis });
+    } catch (error) {
+        Logger.warn('[Gameserver/Inhalte] Fassungen nicht abrufbar:', error);
+        return res.status(502).json({ success: false, message: error.message });
+    }
+});
+
+/**
  * Installieren — das Paket samt allem, was es braucht.
  *
  * Die Route hiess bis zum 2026-09-14 `/thunderstore`. Ein Anbietername im
