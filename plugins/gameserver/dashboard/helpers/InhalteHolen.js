@@ -490,7 +490,193 @@ async function aktualisiere({ server, inhalt, guildId, zeile }) {
     };
 }
 
+
+/**
+ * Ein ganzes Modpack auf einen bestehenden Server (Betreiber, 2026-09-23).
+ *
+ * ── Warum das ueberhaupt geht, ohne neu zu installieren ─────────────────────
+ *
+ * Betreiber: *„da sollte keine neu installation noetig sein bzw ist die
+ * weltgenerierung ja eh dann voellig neu weil sie ja das modpack und seine
+ * daten beinhaltet beim ersten start."*
+ *
+ * Das traegt, aber nur unter EINER Bedingung: Das Modpack muss zum Lader des
+ * Servers passen. Ein Modpack bestimmt Lader und Spielfassung; waehlte man
+ * eines mit einem anderen Lader, waere es sehr wohl eine Neuinstallation. Die
+ * Suche im Mods-Tab filtert deshalb auf beides (`Modrinth.sucheModpacks` mit
+ * `lader`), und hier wird die Bedingung noch einmal geprueft — die Suche ist
+ * die Bequemlichkeit, diese Pruefung die Zusicherung.
+ *
+ * ── Eine Zeile, nicht hundert ───────────────────────────────────────────────
+ *
+ * Das Paket bekommt EINE Zeile (`art = 'modpack'`), nicht eine je enthaltener
+ * Mod. Seine Mods einzeln zu fuehren waere eine Luege ueber die Verwaltbarkeit:
+ * Wer eine davon aktualisiert, zerlegt das Paket, und die naechste Fassung
+ * raeumt sie ohnehin weg. Was wirklich geschrieben wurde, steht in `dateien` —
+ * das ist die Liste, an der spaeter auch wieder aufgeraeumt wird.
+ *
+ * ── Die Frist ist eine andere ───────────────────────────────────────────────
+ *
+ * Gemessen am 2026-09-23: `create_plus` laedt 106 Dateien und 200 MB,
+ * `the-pixelmon-modpack` 608 MB. Die drei Minuten, die fuer eine einzelne Mod
+ * reichen, reichen hier nicht — und eine zu knappe Frist waere hier besonders
+ * teuer: Das Dashboard gaebe auf, waehrend der Daemon weiterlaedt, und die
+ * Zeile bliebe auf „geplant" stehen, obwohl die Dateien ankommen.
+ */
+const MODPACK_FRIST_MS = 1800000; // 30 Minuten
+
+async function installiereModpack({ server, guildId, paket, laderDesServers }) {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    const ipmServer = ServiceManager.get('ipmServer');
+
+    if (!paket?.url) throw new Error('Das Modpack nennt keine Datei');
+
+    // ── Die Bedingung, unter der das ohne Neuinstallation geht ─────────────
+    //
+    // Sie steht hier und nicht nur in der Suche: Eine Kennung kommt nicht nur
+    // aus einer Trefferliste (Adresszeile, spaeterer Discord-Befehl, ein
+    // Wiederholversuch auf einer alten Zeile). Dieselbe Ueberlegung wie bei den
+    // zwei Toren gegen Modpacks in der Mod-Suche.
+    if (laderDesServers && paket.lader && paket.lader !== laderDesServers) {
+        throw new Error(`„${paket.name}" verlangt ${paket.lader}, dieser Server laeuft mit `
+            + `${laderDesServers}. Ein Modpack bestimmt den Lader — das waere eine `
+            + 'Neuinstallation, keine Ergaenzung.');
+    }
+
+    const daemonId = await daemonVon(dbService, server);
+    if (!daemonId) throw new Error('Kein Daemon zugewiesen');
+    if (!ipmServer?.isDaemonOnline(daemonId)) throw new Error('Daemon ist offline');
+
+    const grundzeile = {
+        serverId: server.id, guildId, art: Inhalte.ART_MODPACK,
+        quelle: 'modrinth', kennung: paket.kennung, name: paket.name,
+        fassung: paket.fassung, reihenfolge: 0,
+        // Ein Modpack ist serverseitig: Was die Mitspieler brauchen, steht auf
+        // der Seite des Pakets — und sie brauchen es ohnehin komplett.
+        clientSide: false,
+    };
+
+    // ── Das Alte zuerst weg ────────────────────────────────────────────────
+    //
+    // Sonst liegen zwei Modpacks uebereinander: Die Zeile wird per
+    // ON DUPLICATE KEY UPDATE ueberschrieben, die Dateien der alten Fassung
+    // blieben aber liegen und stuenden in keiner Liste mehr. Genau der Fehler,
+    // der am 2026-09-13 fuenf Waisen hinterlassen hat — nur hier mit hundert
+    // Dateien statt fuenf.
+    let aufgeraeumt = null;
+    const { modpack: altes } = await Inhalte.fuerServer(server.id);
+    if (altes && altes.status === 'installiert') {
+        const inhalt = { path: '' };
+        aufgeraeumt = await entferneDateien({ server, zeile: altes, inhalt });
+        Logger.info(`[Gameserver/Modpack] ${altes.kennung} ${altes.fassung} weicht `
+            + `${paket.kennung} ${paket.fassung}: ${aufgeraeumt.bestaetigt} von `
+            + `${aufgeraeumt.gesamt} Datei(en) bestaetigt weg`);
+    }
+
+    await Inhalte.eintragen({ ...grundzeile, status: 'geplant' });
+
+    const antwort = await ipmServer.sendCommand(daemonId, 'gameserver.content.modpack', {
+        server_id:     String(server.id),
+        rootserver_id: String(server.rootserver_id),
+        install_path:  server.install_path,
+        adresse:       paket.url,
+        sha1:          paket.sha1 || '',
+    }, MODPACK_FRIST_MS).catch(fehler => ({ success: false, error: fehler.message }));
+
+    if (!antwort?.success) {
+        const fehler = antwort?.error || 'Der Daemon hat nicht geantwortet';
+        Logger.warn(`[Gameserver/Modpack] ${paket.kennung} ${paket.fassung} nicht installiert: ${fehler}`);
+        await Inhalte.eintragen({ ...grundzeile, status: 'fehlgeschlagen', fehler });
+        return { success: false, fehler, aufgeraeumt };
+    }
+
+    const daten = antwort.data || {};
+    const dateien = daten.dateien || [];
+    await Inhalte.eintragen({
+        ...grundzeile,
+        status: 'installiert',
+        ablage: `${dateien.length} Datei(en)`,
+        dateien,
+    });
+
+    Logger.info(`[Gameserver/Modpack] ${paket.kennung} ${paket.fassung} auf Server ${server.id}: `
+        + `${dateien.length} Datei(en), ${daten.ausgelassen || 0} ausgelassen`);
+
+    return {
+        success: true,
+        name: daten.name || paket.name,
+        fassung: paket.fassung,
+        // Was der Daemon im Archiv VORGEFUNDEN hat — nicht, was das Dashboard
+        // erwartet hat. Laufen die beiden auseinander, sieht man es hier statt
+        // an einem Server, der nicht startet.
+        lader: daten.lader || null,
+        spielfassung: daten.spielfassung || null,
+        dateien: dateien.length,
+        ausgelassen: daten.ausgelassen || 0,
+        bytes: daten.bytes || 0,
+        aufgeraeumt,
+    };
+}
+
+/**
+ * Das beim Anlegen gewaehlte Modpack holen — nach der Grundinstallation.
+ *
+ * ── Warum erst jetzt und nicht im Installationsskript ───────────────────────
+ *
+ * Bis zum 2026-09-23 tat das Skript es selbst (`MC_MODPACK`). Seit der Mods-Tab
+ * dasselbe koennen muss, gibt es den Ablauf nur noch einmal — im Daemon — und
+ * das Anlegen ruft ihn hier, an derselben Stelle, an der auch die vorgemerkten
+ * Mods geholt werden.
+ *
+ * Die Reihenfolge ist nicht beliebig: **Das Modpack zuerst.** Es bringt
+ * `config/` und andere Beigaben mit, die eine einzeln gewaehlte Mod danach
+ * ueberschreiben darf — umgekehrt haette das Paket die Wahl des Betreibers
+ * ueberschrieben.
+ *
+ * Die Absicht steht in `paket_werte.modpack`: Dort hat die Anlegeroute sie
+ * abgelegt, nachdem sie Lader und Spielfassung daraus gesetzt hat.
+ *
+ * @returns {Promise<object|null>} das Ergebnis, oder null wenn keines gewaehlt war
+ */
+async function holeGeplantesModpack({ server, guildId }) {
+    const Logger = ServiceManager.get('Logger');
+
+    let werte = {};
+    try {
+        werte = typeof server.paket_werte === 'string'
+            ? JSON.parse(server.paket_werte) : (server.paket_werte || {});
+    } catch { werte = {}; }
+
+    const kennung = String(werte.modpack || '').trim();
+    if (!kennung) return null;
+
+    // Liegt es schon? Dann war das hier ein zweiter Anlauf (Wiederanstoss nach
+    // einem Verbindungsabbruch), und ein zweites Mal Installieren waere kein
+    // Nachholen, sondern ein Ueberschreiben — 600 MB fuer nichts.
+    const { modpack: schon } = await Inhalte.fuerServer(server.id);
+    if (schon && schon.status === 'installiert' && schon.kennung === kennung) {
+        Logger.info(`[Gameserver/Modpack] ${kennung} liegt auf Server ${server.id} bereits — nicht erneut geholt`);
+        return null;
+    }
+
+    const Modrinth = require('./Modrinth');
+    const paket = await Modrinth.modpackFassung(
+        kennung, String(werte.modpack_version || '').trim() || null);
+
+    // Der Lader steht hier in den Werten, und er ist verlaesslich: Die
+    // Anlegeroute hat ihn AUS DIESEM Modpack gesetzt. Trotzdem wird er
+    // uebergeben, damit die Pruefung in `installiereModpack` auch auf diesem
+    // Weg laeuft — eine Zusicherung, die nur der eine Aufrufer erfuellt, ist
+    // keine.
+    return installiereModpack({
+        server, guildId, paket,
+        laderDesServers: String(werte.loader || '').trim() || null,
+    });
+}
+
 module.exports = {
     daemonVon, istLader,
     vorschau, installiere, holeGeplante, aktualisiere, entferneDateien,
+    installiereModpack, holeGeplantesModpack,
 };

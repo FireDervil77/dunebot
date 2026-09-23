@@ -1146,9 +1146,41 @@ class GameserverPlugin extends DashboardPlugin {
             } catch { werte = {}; }
             const paket = loeseInhaltAuf(roh, werte);
             const inhalt = paket?.content || null;
+            const InhalteHolen = require('./helpers/InhalteHolen');
+
+            // ── Das Modpack ZUERST (2026-09-23) ────────────────────────────
+            //
+            // Es bringt `config/` und andere Beigaben mit; eine einzeln
+            // gewaehlte Mod darf die danach ueberschreiben, umgekehrt haette
+            // das Paket die Wahl des Betreibers ueberschrieben.
+            //
+            // Eigener try-Block, weil ein gescheitertes Modpack die Mods nicht
+            // mitreissen darf: Was hier misslingt, steht in seiner Zeile
+            // (`status = 'fehlgeschlagen'`) und im Log — die Mods danach sind
+            // eine andere Sache.
+            try {
+                const mp = await InhalteHolen.holeGeplantesModpack({
+                    server, guildId: server.guild_id });
+                if (mp && mp.success) {
+                    Logger.info(`[Gameserver] Server ${serverId}: Modpack „${mp.name}" mit `
+                        + `${mp.dateien} Datei(en) installiert, ${mp.ausgelassen} ausgelassen`);
+                } else if (mp) {
+                    Logger.warn(`[Gameserver] Server ${serverId}: Modpack fehlgeschlagen: ${mp.fehler}`);
+                }
+            } catch (fehler) {
+                Logger.error(`[Gameserver] Modpack für Server ${serverId} nicht geholt:`, fehler);
+            }
+
+
+            // Ab hier geht es um einzelne Mods — und die gibt es nur, wo das
+            // Paket sie kennt. Das Modpack oben haengt bewusst NICHT daran:
+            // `content.supported` ist bei Minecraft eine Eigenschaft des
+            // LADERS (vanilla: false, fabric: true). Dass ein Modpack ohnehin
+            // immer einen modfaehigen Lader verlangt, ist heute wahr und waere
+            // eine stille Abhaengigkeit von einer fremden Bedingung.
             if (!inhalt?.supported) return;
 
-            const InhalteHolen = require('./helpers/InhalteHolen');
+
             const ergebnis = await InhalteHolen.holeGeplante({
                 server, inhalt, guildId: server.guild_id });
             if (!ergebnis) return;

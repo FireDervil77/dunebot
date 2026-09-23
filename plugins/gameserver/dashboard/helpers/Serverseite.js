@@ -351,6 +351,25 @@ function baueEinstellungen(server, paket, hoehe) {
     for (const e of alle) {
         if (!erlaubt.has(e.role || 'expert')) { verborgen++; continue; }
 
+        // ── Was woanders gefuehrt wird, steht hier nicht ────────────────────
+        //
+        // `managed_by: "content"` heisst: Diese Einstellung hat eine eigene
+        // Bedienung im Reiter „Inhalte" — sie gehoert zu einem Mod oder einem
+        // Modpack, nicht zu den Stellschrauben des Spiels.
+        //
+        // Gebraucht seit dem 2026-09-23, als das Modpack im Mods-Tab waehlbar
+        // wurde: `modpack` stand hier als nacktes Textfeld mit dem Vermerk
+        // „nur mit Neuinstallation". Beides war ab da falsch — es liess sich
+        // ohne Neuinstallation wechseln, und wer den Slug von Hand eintippte,
+        // aenderte einen Wert, den niemand mehr ausfuehrt. Ein Feld, das sich
+        // bedienen laesst und nichts bewirkt, ist schlimmer als keines; dieser
+        // Satz stand schon zwanzig Zeilen weiter unten.
+        //
+        // Beim ANLEGEN wird trotzdem gefragt (Serverseite.felderFuerAnlegen):
+        // Dort bestimmt das Modpack den Lader, und danach gibt es noch keinen
+        // Reiter, in dem man es waehlen koennte.
+        if (e.managed_by === 'content') { verborgen++; continue; }
+
         // ── Stufe 5a: Der Wert steht unter dem PAKETSCHLÜSSEL ───────────────
         //
         // Seit dem 2026-08-23 speichert ein Server seine Werte direkt so, wie

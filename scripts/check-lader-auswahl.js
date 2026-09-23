@@ -232,46 +232,117 @@ console.log('\nModpacks: was hereinkommt, ist fremder Text');
 //  3. **Der Lader steht im Paket, nicht in der Kategorie.** „MAX FPS" steht bei
 //     Modrinth unter `categories:neoforge` und verlangt `fabric-loader`.
 {
+    // ── Der Modpack-Weg ist am 2026-09-23 in den Daemon gewandert ──────────
+    //
+    // Bis dahin standen diese Pruefungen am Installationsskript
+    // (`MC_MODPACK`, `jq … env.server`, `chmod -R u+rwX`, `sha1sum -c`). Der
+    // Betreiber wollte Modpacks auch im Mods-Tab eines laufenden Servers
+    // waehlen — und statt denselben Ablauf ein zweites Mal zu bauen, hat das
+    // Skript seinen Zweig verloren.
+    //
+    // Die Pruefungen sind deshalb NICHT gestrichen, sondern umgezogen: Was sie
+    // halten, gilt unveraendert — nur am neuen Ort. Zwei von ihnen entfallen
+    // dabei nicht, sondern werden zu ihrem Gegenteil:
+    //
+    //   `chmod -R u+rwX`   Der Daemon packt nichts auf die Platte aus, sondern
+    //                      liest aus dem Archiv und schreibt mit eigenen
+    //                      Rechten. Der Modus-000-Fall kann gar nicht mehr
+    //                      auftreten — geprueft wird jetzt, dass es so bleibt.
+    //   Reihenfolge        Das Skript pruefte den Pfad beim Schreiben, also
+    //                      nach 154 geladenen Dateien. Der Daemon prueft ALLE
+    //                      Pfade, bevor die erste Datei geladen wird.
     const paket = pakete.find(x => x.name === 'minecraft.json');
     const skript = paket ? (paket.inhalt.install?.steps || []).map(s2 => s2.script || '').join('\n') : '';
 
-    pruefe(/if \[ -n "\$\{MC_MODPACK:-\}" \]/.test(skript),
-        'das Skript hat einen Modpack-Zweig, und er ist freiwillig',
-        'Ohne die Pruefung auf einen leeren Wert liefe er bei jedem Server.');
+    // Zuerst die Gegenprobe zum Umzug: Es darf NICHT beides geben.
+    const imSkript = skript.split('\n').filter(z => !z.trim().startsWith('#')).join('\n');
+    pruefe(!/MC_MODPACK/.test(imSkript),
+        'das Installationsskript installiert KEIN Modpack mehr',
+        'Sonst gaebe es den Ablauf zweimal — einmal in Shell, einmal in Go. Beim naechsten Fund '
+      + 'wuerde einer berichtigt und der andere nicht.');
 
-    pruefe(/\(\.env\.server \/\/ "required"\) != "unsupported"/.test(skript),
-        'es laedt NUR, was auf einem Server laeuft',
-        'Neun von zwoelf Dateien des gemessenen Pakets sind Client-Mods. Alle zu laden gibt einen '
-      + 'Server, der nicht startet — und die Ursache steht in einem Absturzprotokoll, nicht im Panel.');
-    pruefe(/weggelassen/.test(skript),
-        'und sagt, wie viele es weglaesst',
-        'Still weglassen heisst: Jemand wundert sich, warum sein Paket fast nichts tut.');
+    const DAEMON = '/home/firedervil/firebot_daemon';
+    const MODPACK_GO = 'internal/gameserver/modpack.go';
+    const goPfad = path.join(DAEMON, MODPACK_GO);
 
-    pruefe(/\/\*\|\*\.\.\*\)/.test(skript),
-        'ein Pfad mit `..` oder fuehrendem `/` bricht ab',
-        'Der Pfad steht im Archiv eines Dritten. Ohne diese Pruefung schreibt ein Modpack dorthin, '
-      + 'wohin es will.');
-    pruefe(/ausserhalb des Servers/.test(skript),
-        'und der Satz dazu nennt den Grund');
+    if (!fs.existsSync(goPfad)) {
+        // Dieselbe Haltung wie in check-herkunftsliste.js: Eine Pruefung, die
+        // nicht laufen kann, ist eine Luecke und kein bestandener Test.
+        console.log(`  · Daemon-Quelltext nicht gefunden (${goPfad}) — die Pruefung entfaellt.`);
+        console.log('    Das ist kein gruenes Ergebnis, sondern eine Luecke.');
+        fehler++;
+        geprueft++;
+    } else {
+        // Go-Kommentare heraus, ueber dieselbe Funktion wie beim JavaScript:
+        // Go schreibt `//` und `/* */` genauso. Der Kopf von modpack.go
+        // beschreibt den Modus-000-Fall und `env.server` ausfuehrlich in Prosa —
+        // ein grep ueber den rohen Text faende jede Pruefung in der
+        // Beschreibung wieder und meldete gruen, auch wenn der Code fehlte.
+        const goCode = ohneKommentare(roh(goPfad) || '');
 
-    // ── Die Rechte aus dem Archiv sind nicht unsere (2026-09-22) ───────────
-    //
-    // „Horror +" speichert fuer alle 78 Eintraege den Modus 000. `unzip`
-    // uebertraegt das treu, und die Installation brach mit „jq: Permission
-    // denied" und Code 2 ab — zwei Sekunden nach dem Start, ohne dass
-    // irgendetwas nach einem Rechteproblem aussah.
-    //
-    // Der Index ist dabei nur der erste Stolperstein. Ohne die Zeile laegen
-    // Konfigurationsdateien mit Modus 000 im Serververzeichnis, und DAS faellt
-    // erst beim Start auf — mit einer Meldung ueber eine angeblich fehlende
-    // Einstellung.
-    pruefe(/chmod -R u\+rwX "\$AUSPACK"/.test(skript),
-        'die Rechte aus dem Archiv werden nach dem Auspacken geradegezogen',
-        'Ein Modpack darf bestimmen, WAS installiert wird — nicht, ob wir es lesen duerfen.');
+        pruefe(/func \(m \*Manager\) InstalliereModpack\(/.test(goCode),
+            'der Daemon hat einen Weg, ein Modpack zu installieren',
+            `${MODPACK_GO}: InstalliereModpack fehlt`);
 
-    pruefe((skript.match(/sha1sum -c/g) || []).length >= 2,
-        'Archiv UND jede einzelne Datei werden gegen ihre Pruefsumme gehalten',
-        'Modrinth liefert sha1 zu beidem — es nicht zu pruefen waere Fahrlaessigkeit mit Ansage.');
+        pruefe(/d\.Env\.Server != "unsupported"/.test(goCode),
+            'es laedt NUR, was auf einem Server laeuft',
+            'Bei „create_plus" stehen 49 von 155 Dateien auf `server: "unsupported"` — reine '
+          + 'Client-Mods. Alle zu laden gibt einen Server, der nicht startet, und die Ursache steht '
+          + 'in einem Absturzprotokoll statt im Panel.');
+        pruefe(/d\.Env == nil \|\|/.test(goCode),
+            'und eine Datei OHNE env-Angabe gilt als noetig',
+            'Das Feld ist im Format optional. Wer „unbekannt" als „weglassen" liest, installiert bei '
+          + 'einem aelteren Paket NULL Dateien — eine Installation, die gelingt und nichts tut.');
+        const clientGo = ohneKommentare(roh(path.join(DAEMON, 'internal/websocket/client.go')) || '');
+        pruefe(/Ausgelassen\s+int/.test(goCode) && /"ausgelassen":/.test(clientGo),
+            'und sagt, wie viele es weglaesst',
+            'Still weglassen heisst: Jemand wundert sich, warum sein Paket fast nichts tut.');
+
+        pruefe(/func pruefeModpackPfad\(/.test(goCode)
+            && /teil == "\.\."/.test(goCode)
+            && /strings\.HasPrefix\(p, "\/"\)/.test(goCode),
+            'ein Pfad mit `..` oder fuehrendem `/` bricht ab',
+            'Der Pfad steht im Archiv eines Dritten. Ohne diese Pruefung schreibt ein Modpack '
+          + 'dorthin, wohin es will.');
+        pruefe(/ausserhalb des servers/i.test(goCode),
+            'und der Satz dazu nennt den Grund');
+        pruefe(/ReplaceAll\(p, "\\\\", "\/"\)/.test(goCode),
+            'auch ein Windows-Pfad (`..\\..\\x`) wird erkannt',
+            'Ein Vergleich, der nur "/" kennt, sieht den Ausbruch aus einem Archiv aus '
+          + 'Windows-Hand nicht.');
+
+        // ── Die Pfadpruefung laeuft VOR dem ersten Abruf ────────────────────
+        //
+        // Das ist der Gewinn des Umzugs, und er ist messbar: Im Quelltext muss
+        // die Pruefschleife vor der Ladeschleife stehen. Sonst haette ein
+        // Paket, dessen letzte von 155 Dateien ausbricht, 154 Dateien
+        // geschrieben — ein halb bespielter Server, den niemand mehr zuordnet.
+        const iPruef = goCode.indexOf('pruefeModpackPfad(d.Path)');
+        const iLade  = goCode.indexOf('lade(d.Downloads[0], maxInhaltBytes)');
+        pruefe(iPruef > -1 && iLade > -1 && iPruef < iLade,
+            'und zwar BEVOR die erste Datei geladen wird',
+            'Sonst bricht ein Paket mit 155 Dateien nach der 154. ab und laesst den Server halb '
+          + 'bespielt zurueck.');
+
+        pruefe(/func pruefeSHA1\(/.test(goCode)
+            && /pruefeSHA1\(tmp, sha1Erwartet\)/.test(goCode)
+            && /pruefeSHA1\(datei, sha\)/.test(goCode),
+            'Archiv UND jede einzelne Datei werden gegen ihre Pruefsumme gehalten',
+            'Modrinth liefert sha1 zu beidem — es nicht zu pruefen waere Fahrlaessigkeit mit Ansage.');
+
+        // Der Modus-000-Fall, umgedreht: Er kann nicht mehr auftreten, weil
+        // nichts mehr ausgepackt wird. Geprueft wird, dass es so bleibt.
+        pruefe(!/os\.Chmod|exec\.Command\("unzip"/.test(goCode),
+            'die Rechte aus dem Archiv erreichen die Platte gar nicht erst',
+            'Das Skript brauchte `chmod -R u+rwX`, weil `unzip` den Modus 000 aus „Horror +" treu '
+          + 'uebertrug. Der Daemon schreibt aus dem Archiv heraus mit eigenen Rechten — faende sich '
+          + 'hier ein Auspacken auf die Platte, waere die Falle zurueck.');
+
+        pruefe(/erlaubteHerkunft|pruefeHerkunft/.test(goCode),
+            'und jede Adresse des Pakets geht durch die Herkunftsliste',
+            'Ein Modpack nennt bis zu 155 fremde Adressen. Ohne die Liste waere es ein Weg, den '
+          + 'Daemon beliebige Ziele abrufen zu lassen — auch im internen Netz.');
+    }
 
     // Die Auswahl darf nicht auf einen fremden Lader umbiegen.
     const modrinth = ohneKommentare(roh(path.join(WURZEL,

@@ -582,6 +582,13 @@
             "additionalProperties": false
           }
         },
+        "managed_by": {
+          "type": "string",
+          "enum": [
+            "content"
+          ],
+          "description": "Diese Einstellung hat eine eigene Bedienung ausserhalb der Einstellungsseite und wird dort deshalb nicht gezeigt. `content` heisst: Der Reiter „Inhalte\" fuehrt sie (z. B. `modpack`, das dort gesucht und installiert wird). Beim ANLEGEN wird sie trotzdem gefragt — dort gibt es den Reiter noch nicht. Eine so markierte Einstellung braucht kein `apply`: Sie wirkt ueber den Weg, der sie fuehrt, nicht ueber eine Umgebungsvariable."
+        },
         "takes_effect": {
           "enum": [
             "instant",

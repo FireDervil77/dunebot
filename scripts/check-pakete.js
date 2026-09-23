@@ -211,7 +211,18 @@ function pruefeInvarianten(paket) {
                 }
             }
         }
-        if (!s.apply || s.apply.length === 0) {
+        // ── „Kein Ziel" gilt nicht fuer Felder, die woanders gefuehrt werden ──
+        //
+        // `managed_by: "content"` sagt: Diese Einstellung wirkt ueber den Reiter
+        // „Inhalte", nicht ueber eine Umgebungsvariable. Seit dem 2026-09-23
+        // trifft das `modpack` und `modpack_version` — der Mods-Tab sucht und
+        // installiert sie, und das Installationsskript hat seinen Modpack-Zweig
+        // dafuer verloren.
+        //
+        // Ohne diese Ausnahme stuende hier eine Warnung, die das Gegenteil des
+        // Wahren behauptet („bewirkt nichts") — und eine Warnung, der man nicht
+        // glauben darf, ist schlimmer als keine.
+        if ((!s.apply || s.apply.length === 0) && !s.managed_by) {
             hinweise.push(`Einstellung "${s.key}" hat kein Ziel — sie lässt sich ausfüllen und bewirkt nichts.`);
         }
         if (s.type === 'choice' && !(s.choices || []).length) {

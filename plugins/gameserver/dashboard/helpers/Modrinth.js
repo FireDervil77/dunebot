@@ -202,47 +202,186 @@ async function suche(raum, begriff, optionen = {}) {
 }
 
 /**
- * Modpacks suchen — ohne Lader-Facette, und das ist der Punkt.
+ * Modpacks suchen.
  *
- * ── Warum ohne Lader (gemessen 2026-09-22) ──────────────────────────────────
+ * ── Die Lader-Kategorie ist kein Lader (gemessen 2026-09-23) ────────────────
  *
- * Ein Modpack BESTIMMT den Lader, es waehlt ihn nicht aus. Beim Anlegen steht
- * es deshalb vor der Laderfrage, und eine Filterung nach Lader waere hier
- * falsch herum.
+ * Es lag nahe, nach `categories:fabric` zu filtern. Nachgemessen an den je 20
+ * groessten Modpacks je Kategorie, gegen den Lader ihrer neuesten Fassung:
  *
- * Schlimmer noch: **die Kategorie luegt.** Das Paket „MAX FPS" steht bei
- * Modrinth unter `categories:neoforge`, und sein Index verlangt
- * `fabric-loader`. Wahr ist, was an der FASSUNG steht (`loaders`,
- * `game_versions`) — danach richtet sich dieses Haus.
+ *     categories:fabric     20 von 20 richtig
+ *     categories:forge      17 von 20 richtig
+ *     categories:neoforge   10 von 20 richtig
+ *
+ * Die Haelfte daneben — und die Ursache ist NICHT, dass Modrinth luegt (so
+ * stand es hier bis heute). Ein Projekt traegt MEHRERE Kategorien, und Lader
+ * und Themen stehen im selben Feld:
+ *
+ *     battlearmorytacz → combat, forge, multiplayer, neoforge, optimization
+ *
+ * `categories:neoforge` fragt also „hat neoforge irgendwo stehen", nicht „ist
+ * neoforge". Als Filter ist das unbrauchbar, als Facette auch.
+ *
+ * ── Was stattdessen gefragt wird ────────────────────────────────────────────
+ *
+ * Der Lader steht an der FASSUNG (`loaders`), und den gibt es fuer eine ganze
+ * Trefferseite in EINEM Abruf: Jeder Treffer nennt `latest_version`, und
+ * `/versions?ids=[…]` loest bis zu 20 davon auf einmal auf (gemessen: 0,33 s
+ * fuer 20). Nur wo die neueste Fassung nicht zur Spielfassung des Servers
+ * passt, wird das eine Projekt einzeln nachgefragt.
+ *
+ * Die Spielfassung dagegen KANN die Suche selbst (`versions:26.2`) — sie steht
+ * an jedem Treffer und nicht in einem Sammelfeld.
+ *
+ * ── Ohne `lader` bleibt alles wie vorher ────────────────────────────────────
+ *
+ * Beim ANLEGEN gibt es noch keinen Lader; dort bestimmt das Modpack ihn. Diese
+ * Funktion filtert deshalb nur, wenn jemand einen Lader nennt — der Mods-Tab
+ * eines bestehenden Servers tut das, der Anlege-Assistent nicht.
  */
 async function sucheModpacks(begriff, optionen = {}) {
     const seite = Math.max(1, parseInt(optionen.seite, 10) || 1);
     const text = String(begriff || '').trim();
-    const abfrage = new URLSearchParams({
-        query: text,
-        facets: `[${alsListe(['project_type:modpack'])}]`,
-        index: text ? 'relevance' : 'downloads',
-        limit: String(PRO_SEITE),
-        offset: String((seite - 1) * PRO_SEITE),
+    const lader = optionen.lader ? String(optionen.lader) : null;
+    const spielfassung = optionen.spielfassung ? String(optionen.spielfassung) : null;
+
+    const roheSeite = async (nr) => {
+        const gruppen = [alsListe(['project_type:modpack'])];
+        // Die Facette heisst `versions`, nicht `game_versions` — derselbe
+        // Unterschied wie bei den Mods (siehe `suche`).
+        if (spielfassung) gruppen.push(alsListe([`versions:${spielfassung}`]));
+
+        const abfrage = new URLSearchParams({
+            query: text,
+            facets: `[${gruppen.join(',')}]`,
+            index: text ? 'relevance' : 'downloads',
+            limit: String(PRO_SEITE),
+            offset: String((nr - 1) * PRO_SEITE),
+        });
+        return hole(`/search?${abfrage}`);
+    };
+
+    const alsTreffer = (t, passend) => ({
+        kennung:      t.slug,
+        name:         t.title,
+        beschreibung: t.description || '',
+        bild:         t.icon_url || null,
+        downloads:    t.downloads || 0,
+        geaendert:    t.date_modified || null,
+        // Was die Karte anzeigt, wenn gefiltert wurde — und was der Klick
+        // danach nicht noch einmal erfragen muss.
+        lader:        passend ? laderBeiUns(passend.loaders) : null,
+        spielfassung: passend ? (passend.game_versions || [])[0] || null : null,
+        fassung:      passend ? passend.version_number : null,
     });
 
-    const daten = await hole(`/search?${abfrage}`);
-    const gesamt = Number(daten.total_hits) || 0;
+    // Ohne Lader: die alte, ungefilterte Auskunft.
+    if (!lader) {
+        const daten = await roheSeite(seite);
+        const gesamt = Number(daten.total_hits) || 0;
+        return {
+            treffer: (daten.hits || []).map(t => alsTreffer(t, null)),
+            gesamt, seite,
+            weiter:  (seite * PRO_SEITE) < gesamt,
+            zurueck: seite > 1,
+            proSeite: PRO_SEITE,
+            gefiltert: false,
+        };
+    }
+
+    // ── Mit Lader: nachfiltern und die Seite AUFFUELLEN ─────────────────────
+    //
+    // Nachfiltern macht Seiten kurz: Von 20 Rohtreffern bleiben bei neoforge
+    // gemessen 10 uebrig. Eine Trefferliste mit drei Eintraegen und einem
+    // „weiter"-Knopf sieht aber kaputt aus, nicht gefiltert. Deshalb werden
+    // weitere Rohseiten geholt, bis eine volle Seite zusammen ist.
+    //
+    // Die Obergrenze steht, weil sonst eine Suche ohne Treffer den ganzen
+    // Katalog durchginge: Wer „Pixelmon" auf einem Fabric-Server sucht,
+    // bekaeme sonst 100 Abrufe und nach einer Minute eine leere Liste.
+    const MAX_RUNDEN = 4;
+    const gesammelt = [];
+    let rohNr = seite;
+    let erschoepft = false;
+    let gesamtRoh = 0;
+
+    for (let runde = 0; runde < MAX_RUNDEN && gesammelt.length < PRO_SEITE; runde++) {
+        const daten = await roheSeite(rohNr);
+        gesamtRoh = Number(daten.total_hits) || 0;
+        const hits = daten.hits || [];
+        if (!hits.length) { erschoepft = true; break; }
+
+        for (const [t, passend] of await passendeFassungen(hits, lader, spielfassung)) {
+            if (passend) gesammelt.push(alsTreffer(t, passend));
+        }
+        rohNr++;
+        if (rohNr * PRO_SEITE > gesamtRoh + PRO_SEITE) { erschoepft = true; break; }
+    }
+
     return {
-        treffer: (daten.hits || []).map(t => ({
-            kennung:      t.slug,
-            name:         t.title,
-            beschreibung: t.description || '',
-            bild:         t.icon_url || null,
-            downloads:    t.downloads || 0,
-            geaendert:    t.date_modified || null,
-        })),
-        gesamt,
+        treffer: gesammelt.slice(0, PRO_SEITE),
+        // ── Diese Zahl ist die UNGEFILTERTE ────────────────────────────────
+        //
+        // Und sie wird als solche ausgewiesen (`gefiltert: true`), statt eine
+        // genaue zu erfinden: Wie viele Modpacks es fuer Fabric 26.2 wirklich
+        // gibt, weiss man erst, wenn man jede Fassung jedes Pakets gefragt hat
+        // — das waeren tausende Abrufe fuer eine Zahl, die niemand braucht.
+        gesamt: gesamtRoh,
         seite,
-        weiter:  (seite * PRO_SEITE) < gesamt,
+        weiter:  !erschoepft && gesammelt.length >= PRO_SEITE,
         zurueck: seite > 1,
         proSeite: PRO_SEITE,
+        gefiltert: true,
     };
+}
+
+/**
+ * Zu jedem Treffer die Fassung, die zu Lader und Spielfassung passt — oder null.
+ *
+ * Zwei Stufen, und die zweite ist der Grund fuer die erste: Der Sammelabruf
+ * kostet EINEN Aufruf fuer die ganze Seite, kennt aber nur die NEUESTE Fassung
+ * jedes Pakets. Wessen neueste nicht passt, kann trotzdem eine aeltere haben,
+ * die passt — ein Paket, das schon auf 26.3 ist, waehrend der Server noch 26.2
+ * faehrt. Diese und nur diese werden einzeln gefragt.
+ *
+ * @returns {Promise<Array<[object, object|null]>>} Treffer und passende Fassung
+ */
+async function passendeFassungen(hits, lader, spielfassung) {
+    const passt = (v) => {
+        if (!v) return false;
+        if (!laderBeiUns(v.loaders) || laderBeiUns(v.loaders) !== lader) return false;
+        if (spielfassung && !(v.game_versions || []).includes(spielfassung)) return false;
+        return true;
+    };
+
+    // Stufe 1 — eine Abfrage fuer die ganze Seite.
+    const ids = hits.map(t => t.latest_version).filter(Boolean);
+    const neueste = new Map();
+    if (ids.length) {
+        const liste = await hole(`/versions?ids=${encodeURIComponent(alsListe(ids))}`)
+            .catch(() => []);
+        for (const v of Array.isArray(liste) ? liste : []) neueste.set(v.project_id, v);
+    }
+
+    // Stufe 2 — nur fuer die, deren neueste nicht passt.
+    const ergebnis = [];
+    const nachzufragen = [];
+    for (const t of hits) {
+        const v = neueste.get(t.project_id);
+        if (passt(v)) { ergebnis.push([t, v]); continue; }
+        nachzufragen.push(t);
+    }
+
+    const nachgefragt = await Promise.all(nachzufragen.map(async (t) => {
+        const abfrage = new URLSearchParams({ loaders: alsListe(laderBeiModrinth(lader)) });
+        if (spielfassung) abfrage.set('game_versions', alsListe([spielfassung]));
+        const liste = await hole(`/project/${encodeURIComponent(t.slug)}/version?${abfrage}`)
+            .catch(() => []);
+        const treffer = (Array.isArray(liste) ? liste : []).find(passt) || null;
+        return [t, treffer];
+    }));
+
+    return ergebnis.concat(nachgefragt);
 }
 
 /**
@@ -255,6 +394,24 @@ async function sucheModpacks(begriff, optionen = {}) {
  * startet und die Haelfte der Mods nicht laedt.
  */
 const LADER_BEI_UNS = { fabric: 'fabric', neoforge: 'neoforge' };
+
+/** Der Lader dieser Fassung, in unseren Worten — oder null. */
+function laderBeiUns(loaders) {
+    return (loaders || []).map(l => LADER_BEI_UNS[l]).filter(Boolean)[0] || null;
+}
+
+/**
+ * Umgekehrt: unser Name → die Namen, unter denen Modrinth ihn fuehrt.
+ *
+ * Eine Liste und kein einzelner Wert, weil die Zuordnung nicht eins zu eins
+ * bleiben muss: Sollte `fabric` dort einmal zusaetzlich als `fabric-loader`
+ * gefuehrt werden, faengt es diese Stelle ab und nicht jeder Aufrufer.
+ */
+function laderBeiModrinth(unser) {
+    return Object.entries(LADER_BEI_UNS)
+        .filter(([, u]) => u === unser)
+        .map(([bei]) => bei);
+}
 
 /**
  * Die gewaehlte Fassung eines Modpacks — samt dem, was sie VORSCHREIBT.
@@ -581,7 +738,7 @@ async function aktualisierungen(raum, zeilen) {
 }
 
 module.exports = {
-    sucheModpacks, modpackFassung,
+    sucheModpacks, modpackFassung, laderBeiUns, laderBeiModrinth,
     KENNUNG, TITEL, RAUM_NAME, HERKUNFT, PRO_SEITE,
     istErlaubt, suche, verzeichnis, adresse, paket, aufloesen, aktualisierungen,
     hoeher, neuerAls,

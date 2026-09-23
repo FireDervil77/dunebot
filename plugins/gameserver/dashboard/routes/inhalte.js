@@ -158,6 +158,9 @@ router.get('/:serverId/inhalte', requirePermission('GAMESERVER.VIEW'), async (re
             // dieses Dashboard noch nicht kann.
             quellenImPaket: inhalt?.sources || [],
             reihenfolgeZaehlt: Boolean(inhalt?.order_matters),
+            // Kennt dieses Spiel Modpacks? Die Karte bietet den Abschnitt nur
+            // dann an — und zwar auch, wenn noch keines liegt (2026-09-23).
+            modpackMoeglich: kenntModpacks(geladen.paket),
             ...liste,
         });
     } catch (error) {
@@ -481,16 +484,49 @@ async function sucheAntwort(inhalt, quelle, raum, begriff, seite, spielfassung =
  * stoesst ein Mensch an, kein Takt.
  */
 async function spielfassungVonServer(ipmServer, dbService, geladen) {
-    let werte = {};
-    try {
-        werte = typeof geladen.server?.paket_werte === 'string'
-            ? JSON.parse(geladen.server.paket_werte) : (geladen.server?.paket_werte || {});
-    } catch { werte = {}; }
-
-    const ausWerten = String(werte.version || '').trim();
+    const ausWerten = String(paketWerte(geladen).version || '').trim();
     if (ausWerten && ausWerten !== 'latest') return ausWerten;
+    return merkzettel(ipmServer, dbService, geladen, 'minecraft-version');
+}
 
-    // Der Merkzettel liegt in `.fb` — dort, wo der Vertrag ihn vorsieht.
+/**
+ * Mit welchem Lader laeuft dieser Server?
+ *
+ * Dieselben drei Stufen wie bei der Fassung, und aus demselben Grund: Der Wert
+ * in den Einstellungen ist die ABSICHT, der Merkzettel in `.fb` das Ergebnis.
+ * Sie koennen auseinanderlaufen — `latest` ist der offensichtliche Fall, aber
+ * auch ein Server, dessen Einstellung nach der Installation geaendert wurde,
+ * laeuft bis zum naechsten Mal noch mit dem alten Lader.
+ *
+ * Fuer die Modpack-Suche ist das der entscheidende Wert: Ein Paket, das zum
+ * EINGESTELLTEN statt zum LAUFENDEN Lader passt, waere genau die halbe Auskunft,
+ * die schlimmer ist als keine.
+ */
+async function laderVonServer(ipmServer, dbService, geladen) {
+    const vomMerkzettel = await merkzettel(ipmServer, dbService, geladen, 'minecraft-lader');
+    if (vomMerkzettel) return vomMerkzettel;
+    return String(paketWerte(geladen).loader || '').trim() || null;
+}
+
+/** Die Einstellungen dieses Servers, wie sie in `gameservers.paket_werte` stehen. */
+function paketWerte(geladen) {
+    try {
+        return typeof geladen.server?.paket_werte === 'string'
+            ? JSON.parse(geladen.server.paket_werte) : (geladen.server?.paket_werte || {});
+    } catch {
+        return {};
+    }
+}
+
+/**
+ * Ein Merkzettel des Installationsskripts aus `.fb`.
+ *
+ * Eine Funktion statt zweier fast gleicher: Die Fassung und der Lader liegen
+ * nebeneinander im selben Ordner, werden gleich gelesen und gleich zerlegt.
+ * Zwei Fassungen davon waeren zwei Stellen, an denen die Base64-Falle aus
+ * Baustelle 135 wieder einziehen kann — einmal korrigiert, einmal nicht.
+ */
+async function merkzettel(ipmServer, dbService, geladen, name) {
     try {
         const daemonId = await daemonVon(dbService, geladen.server);
         if (!daemonId || !ipmServer?.isDaemonOnline(daemonId)) return null;
@@ -498,13 +534,12 @@ async function spielfassungVonServer(ipmServer, dbService, geladen) {
             server_id: String(geladen.server.id),
             rootserver_id: String(geladen.server.rootserver_id),
             install_path: geladen.server.install_path,
-            path: '/.fb/minecraft-version',
+            path: `/.fb/${name}`,
         }, 8000).catch(() => null);
         if (!gelesen?.success) return null;
         // Der Daemon liefert Base64, immer (Baustelle 135).
         const text = Buffer.from(String(gelesen.data?.content || ''), 'base64').toString('utf8');
-        const fassung = text.trim().split(/\s+/)[0];
-        return fassung || null;
+        return text.trim().split(/\s+/)[0] || null;
     } catch {
         return null;
     }
@@ -536,6 +571,139 @@ router.get('/:serverId/inhalte/suche', requirePermission('GAMESERVER.VIEW'), asy
         return res.status(502).json({ success: false, message: error.message });
     }
 });
+
+/**
+ * Modpacks fuer DIESEN Server suchen (Betreiber, 2026-09-23).
+ *
+ * *„ueber den mods tab. passend zum lader wie das mod pack selbst. also wenn
+ * die such zeile in modrinth eben auch modpacks anzeigen wuerde dann koennte
+ * sie die auf dem gleichen weg filtern wie schon die mods selber nur eben als
+ * paket."*
+ *
+ * Genau so. Der Unterschied zur Suche beim Anlegen (`/modpacks/suche`, weiter
+ * oben) ist nicht die Adresse, sondern die Richtung:
+ *
+ *   Beim Anlegen   das Modpack BESTIMMT Lader und Fassung — nicht filtern
+ *   Hier           der Server HAT beide — filtern, und zwar hart
+ *
+ * „Hart" heisst: Was nicht passt, steht nicht in der Liste. Dieselbe Regel wie
+ * bei der Mod-Suche seit dem 2026-09-22 — ein Treffer, den man nicht
+ * installieren kann, ist kein Treffer.
+ *
+ * Womit gefiltert wird und warum die Modrinth-Kategorie dafuer NICHT taugt,
+ * steht an `Modrinth.sucheModpacks`.
+ */
+router.get('/:serverId/inhalte/modpacks/suche', requirePermission('GAMESERVER.VIEW'),
+    async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    const ipmServer = ServiceManager.get('ipmServer');
+
+    try {
+        const geladen = await ladeServerUndPaket(dbService, req.params.serverId, res.locals.guildId);
+        if (!geladen) return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
+
+        // Nur wo das Paket Modpacks ueberhaupt kennt. Die Einstellung `modpack`
+        // ist der Beleg dafuer — sie steht heute nur im Minecraft-Paket, und
+        // das ist eine Eigenschaft des Pakets, keine Annahme ueber das Spiel.
+        if (!kenntModpacks(geladen.paket)) {
+            return res.json({ success: true, unterstuetzt: false, treffer: [],
+                grund: 'Dieses Spiel kennt laut seinem Paket keine Modpacks.' });
+        }
+
+        const lader = await laderVonServer(ipmServer, dbService, geladen);
+        const spielfassung = await spielfassungVonServer(ipmServer, dbService, geladen);
+
+        // ── Ohne bekannten Lader wird NICHT gesucht ────────────────────────
+        //
+        // Und das ist der Unterschied zur Spielfassung, wo ein Nichtwissen nur
+        // den Filter kostet: Ein Modpack fuer den falschen Lader laesst sich
+        // nicht installieren, sondern nur neu installieren. Eine Liste, die das
+        // nicht wissen kann, waere eine Einladung zum Fehlgriff.
+        if (!lader) {
+            return res.json({ success: true, unterstuetzt: false, treffer: [],
+                grund: 'Der Lader dieses Servers steht noch nicht fest — er wird beim '
+                     + 'Installieren gesetzt. Nach der ersten Installation geht es hier weiter.' });
+        }
+
+        const Modrinth = require('../helpers/Modrinth');
+        const treffer = await Modrinth.sucheModpacks(req.query.q, {
+            seite: req.query.seite, lader, spielfassung,
+        });
+
+        return res.json({ success: true, unterstuetzt: true, lader, spielfassung, ...treffer });
+    } catch (error) {
+        Logger.warn('[Gameserver/Inhalte] Modpack-Suche fehlgeschlagen:', error);
+        return res.status(502).json({ success: false, message: error.message });
+    }
+});
+
+/**
+ * Ein Modpack auf diesen Server legen.
+ *
+ * Kein eigener Vorschau-Schritt wie bei den Mods: Was mitkommt, ist beim
+ * Modpack die ganze Frage — es BESTEHT aus seinen Abhaengigkeiten. Was der
+ * Betreiber vorher wissen muss (Lader, Spielfassung, Groesse), steht schon an
+ * der Karte; was danach zaehlt (wie viele Dateien, wie viele als reine
+ * Client-Dateien ausgelassen wurden), steht in der Antwort.
+ */
+router.post('/:serverId/inhalte/modpack', requirePermission('GAMESERVER.FILES.MANAGE'),
+    async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    const ipmServer = ServiceManager.get('ipmServer');
+
+    try {
+        const geladen = await ladeServerUndPaket(dbService, req.params.serverId, res.locals.guildId);
+        if (!geladen) return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
+
+        if (!kenntModpacks(geladen.paket)) {
+            return res.status(400).json({ success: false,
+                message: 'Dieses Spiel kennt laut seinem Paket keine Modpacks.' });
+        }
+        if (!req.body?.kennung) {
+            return res.status(400).json({ success: false, message: 'kennung fehlt' });
+        }
+
+        // ── Was der Browser schickt, ist ein Vorschlag ─────────────────────
+        //
+        // Die Fassung wird hier NEU erfragt statt aus dem Rumpf uebernommen:
+        // Lader, Spielfassung, Adresse und Pruefsumme kommen damit aus der
+        // Quelle und nicht aus einer Trefferliste, die der Browser seit fuenf
+        // Minuten offen hat. Dieselbe Regel gilt beim Anlegen (Stufe 3).
+        const Modrinth = require('../helpers/Modrinth');
+        const paket = await Modrinth.modpackFassung(
+            String(req.body.kennung), req.body.fassung ? String(req.body.fassung) : null);
+
+        const lader = await laderVonServer(ipmServer, dbService, geladen);
+        const ergebnis = await InhalteHolen.installiereModpack({
+            server: geladen.server, guildId: res.locals.guildId,
+            paket, laderDesServers: lader,
+        });
+
+        if (!ergebnis.success) {
+            return res.status(502).json({ success: false, message: ergebnis.fehler, ...wirkung(geladen) });
+        }
+
+        Logger.info(`[Gameserver/Inhalte] Modpack ${paket.kennung} ${paket.fassung} `
+            + `auf Server ${req.params.serverId}`);
+        return res.json({ success: true, ...ergebnis, ...wirkung(geladen) });
+    } catch (error) {
+        Logger.error('[Gameserver/Inhalte] Modpack-Installation fehlgeschlagen:', error);
+        return res.status(502).json({ success: false, message: error.message });
+    }
+});
+
+/**
+ * Kennt das Paket dieses Spiels ueberhaupt Modpacks?
+ *
+ * Gefragt wird die Einstellung `modpack`, nicht der Spielname. Ein Name im Code
+ * („wenn Minecraft, dann…") waere beim zweiten Spiel mit Modpacks falsch und
+ * beim Umbenennen des ersten auch.
+ */
+function kenntModpacks(paket) {
+    return (paket?.settings || []).some(e => e.key === 'modpack');
+}
 
 /**
  * Was kaeme mit? — die Abhaengigkeiten, bevor jemand klickt.

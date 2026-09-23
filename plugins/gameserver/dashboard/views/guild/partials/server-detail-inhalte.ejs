@@ -337,18 +337,42 @@
         </div>`;
     }
 
-    // Das Modpack steht ganz oben und als EINE Zeile — es bestimmt, was
-    // darunter liegt (2026-09-22).
-    if (d.modpack) {
+    // ── Das Modpack steht ganz oben ────────────────────────────────────────
+    //
+    // Als EINE Zeile, weil es eine Sache ist: Wer eine seiner Mods austauscht,
+    // zerlegt das Paket (2026-09-22).
+    //
+    // Seit dem 2026-09-23 steht der Abschnitt auch da, wenn KEINES liegt — mit
+    // dem Knopf, es zu waehlen. Bis dahin gab es Modpacks nur beim Anlegen, und
+    // wer hier suchte, fand nichts und erfuhr auch nicht, warum.
+    if (d.modpackMoeglich) {
+      const m = d.modpack;
       html += `
-        <div style="margin:8px 0;padding:10px 12px;border:1px solid var(--fb-border);border-radius:6px">
-          <div style="font-weight:500">Modpack: ${escape(d.modpack.name || d.modpack.kennung)}${
-            d.modpack.fassung ? ' <span class="fb-mono">' + escape(d.modpack.fassung) + '</span>' : ''}</div>
-          <div class="fb-muted" style="font-size:12px;margin-top:2px">
-            Die Mods dieses Pakets liegen auf der Platte, werden aber nicht
-            einzeln verwaltet: Wer eine davon austauscht, zerlegt das Paket.
-            Ein Wechsel der Fassung verlangt eine Neuinstallation.
+        <div style="margin:8px 0;padding:10px 12px;border:1px solid var(--fb-border);border-radius:6px"
+             ${m ? `data-modpack="${escape(m.name || m.kennung)}"` : ''}>
+          <div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap">
+            <div style="flex:1 1 auto;min-width:0">
+              ${m ? `
+                <div style="font-weight:500">Modpack: ${escape(m.name || m.kennung)}${
+                  m.fassung ? ' <span class="fb-mono">' + escape(m.fassung) + '</span>' : ''}${
+                  m.status === 'geplant' ? ' ' + marke('wird geholt', 'warn')
+                    : m.status === 'fehlgeschlagen' ? ' ' + marke('fehlgeschlagen', 'warn') : ''}</div>
+                <div class="fb-muted" style="font-size:12px;margin-top:2px">
+                  Die Mods dieses Pakets liegen auf der Platte, werden aber nicht
+                  einzeln verwaltet: Wer eine davon austauscht, zerlegt das Paket.
+                </div>
+                ${m.fehler ? `<div style="font-size:12px;color:var(--fb-danger);margin-top:2px">${escape(m.fehler)}</div>` : ''}`
+              : `
+                <div style="font-weight:500">Kein Modpack</div>
+                <div class="fb-muted" style="font-size:12px;margin-top:2px">
+                  Dieser Server läuft mit einzelnen Mods. Ein Modpack bringt
+                  Mods und ihre Einstellungen in einem Stück mit.
+                </div>`}
+            </div>
+            ${DARF ? `<button class="btn btn-white btn-sm" style="flex:0 0 auto"
+                        onclick="modpackSuche()">${m ? 'Anderes Modpack' : 'Modpack wählen'}</button>` : ''}
           </div>
+          <div id="modpack-suche" style="display:none"></div>
         </div>`;
     }
 
@@ -835,6 +859,157 @@
       // Bis zum 2026-09-13 ohne Fehlerzweig: Scheiterte das Entfernen, kam nichts.
       .catch(e => melde('error', 'Nicht entfernt: ' + e.message))
       .finally(() => window.inhalteLaden());
+  };
+
+  // ── Modpacks (Betreiber, 2026-09-23) ──────────────────────────────────────
+  //
+  // Eigene Ansicht und nicht die Mod-Suche mit einem Umschalter: Ein Modpack
+  // hat keinen Katalog zur Wahl (es gibt es nur bei Modrinth), keinen
+  // Ablageort und keine Vorschau der Abhaengigkeiten — es BESTEHT aus ihnen.
+  // Was es stattdessen hat, steht in keiner Modkarte: den Lader und die
+  // Spielfassung, die es verlangt.
+
+  window.modpackSuche = function () {
+    const feld = document.getElementById('modpack-suche');
+    if (!feld) return;
+    if (feld.style.display !== 'none') { feld.style.display = 'none'; return; }
+
+    feld.style.display = '';
+    feld.innerHTML = `
+      <div style="border-top:1px solid var(--fb-border);margin-top:10px;padding-top:10px">
+        <div style="display:flex;gap:8px;align-items:flex-end">
+          <div style="flex:1 1 auto">
+            <label class="form-label" style="font-size:12px">Modpack suchen</label>
+            <input id="mp-begriff" class="form-control form-control-sm"
+                   placeholder="Name, z. B. Better MC — leer lassen zum Stöbern"
+                   onkeydown="if(event.key==='Enter')modpackSuchen()">
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="modpackSuchen()">Suchen</button>
+        </div>
+        <div id="mp-treffer" style="margin-top:8px"></div>
+      </div>`;
+    document.getElementById('mp-begriff').focus();
+    window.modpackSuchen();
+  };
+
+  window.modpackSuchen = function (seite) {
+    const begriff = (document.getElementById('mp-begriff') || {}).value || '';
+    const raum = document.getElementById('mp-treffer');
+    if (!raum) return;
+    raum.innerHTML = '<div class="fb-muted" style="font-size:12px">Wird gesucht … '
+                   + 'das dauert etwas länger, weil jeder Treffer gegen den Lader geprüft wird.</div>';
+
+    fetch(`${BASIS}/modpacks/suche?q=${encodeURIComponent(begriff)}&seite=${seite || 1}`,
+          { headers: { Accept: 'application/json' } })
+      .then(async (a) => {
+        const d = await a.json().catch(() => null);
+        if (!a.ok || !d || !d.success) throw new Error((d && d.message) || `HTTP ${a.status}`);
+        return d;
+      })
+      .then(d => {
+        // Der Grund steht da, wo sonst die Liste stünde — nicht als leere Liste.
+        if (!d.unterstuetzt) {
+          raum.innerHTML = `<div class="fb-muted" style="font-size:12px">${escape(d.grund || 'Hier gibt es keine Modpacks.')}</div>`;
+          return;
+        }
+        if (!d.treffer.length) {
+          raum.innerHTML = `<div class="fb-muted" style="font-size:12px">
+            Nichts gefunden, das zu <span class="fb-mono">${escape(d.lader)}</span>${
+              d.spielfassung ? ' und <span class="fb-mono">' + escape(d.spielfassung) + '</span>' : ''} passt.</div>`;
+          return;
+        }
+
+        // ── Wogegen gefiltert wurde, steht über der Liste ─────────────────
+        //
+        // Ohne diesen Satz sieht eine kurze Liste nach einem Fehler aus. Sie
+        // ist aber das Ergebnis: Von 20 Rohtreffern bleiben bei NeoForge
+        // gemessen 10 übrig.
+        const kopf = `
+          <div class="fb-muted" style="font-size:12px;padding-bottom:4px">
+            Nur Pakete für <span class="fb-mono">${escape(d.lader)}</span>${
+              d.spielfassung
+                ? ' und Ausgabe <span class="fb-mono">' + escape(d.spielfassung) + '</span>'
+                : ' (Ausgabe unbekannt — nicht danach gefiltert)'}.
+            Alles andere wäre eine Neuinstallation.
+          </div>`;
+
+        const blaettern = (d.zurueck || d.weiter) ? `
+          <div style="display:flex;gap:8px;align-items:center;padding-top:8px;border-top:1px solid var(--fb-border)">
+            <button class="btn btn-white btn-sm" ${d.zurueck ? '' : 'disabled'}
+                    onclick="modpackSuchen(${d.seite - 1})">← Zurück</button>
+            <span class="fb-muted" style="font-size:12px">Seite ${d.seite}</span>
+            <button class="btn btn-white btn-sm" ${d.weiter ? '' : 'disabled'}
+                    onclick="modpackSuchen(${d.seite + 1})">Weiter →</button>
+          </div>` : '';
+
+        raum.innerHTML = kopf + d.treffer.map(t => `
+          <div style="display:flex;gap:10px;padding:8px 0;border-top:1px solid var(--fb-border);align-items:flex-start">
+            ${t.bild ? `<img src="${escape(t.bild)}" alt="" width="32" height="32" style="border-radius:4px;flex:0 0 auto">` : ''}
+            <div style="flex:1 1 auto;min-width:0">
+              <div style="font-weight:600;font-size:13px">${escape(t.name)}</div>
+              <div class="fb-muted" style="font-size:12px">${escape(t.beschreibung).slice(0, 160)}</div>
+              <div class="fb-muted" style="font-size:11px;margin-top:2px">
+                <span class="fb-mono">${escape(t.kennung)}</span> ·
+                ${Number(t.downloads).toLocaleString('de-DE')} Downloads
+                ${t.fassung ? ' · Fassung <span class="fb-mono">' + escape(t.fassung) + '</span>' : ''}
+              </div>
+            </div>
+            ${DARF ? `<button class="btn btn-primary btn-sm" style="flex:0 0 auto"
+                        onclick="modpackInstallieren('${escape(t.kennung)}', '${escape(t.fassung || '')}', this)"
+                      >Installieren</button>` : ''}
+          </div>`).join('') + blaettern;
+      })
+      .catch(e => {
+        raum.innerHTML = `<div style="font-size:12px;color:var(--fb-danger)">Suche fehlgeschlagen: ${escape(e.message)}</div>`;
+      });
+  };
+
+  window.modpackInstallieren = function (kennung, fassung, knopf) {
+    // ── Eine Rückfrage, und zwar nur, wenn schon eines liegt ────────────────
+    //
+    // Ein zweites Modpack ersetzt das erste samt seinen Dateien. Das ist die
+    // einzige Stelle hier, an der etwas Vorhandenes verschwindet — beim ersten
+    // Modpack gibt es nichts zu bestätigen.
+    const altes = document.querySelector('#inhalte-wurzel [data-modpack]');
+    if (altes && !window.confirm(
+        `„${altes.getAttribute('data-modpack')}" wird samt seinen Dateien entfernt `
+        + `und durch dieses Paket ersetzt. Weiter?`)) return;
+
+    knopf.disabled = true;
+    const raum = document.getElementById('mp-treffer');
+    if (raum) {
+      raum.innerHTML = `<div class="fb-muted" style="font-size:12px">
+        „${escape(kennung)}" wird geholt — das kann einige Minuten dauern.
+        Große Pakete bringen hunderte Dateien mit (gemessen: bis 608 MB).
+        Du kannst die Seite offen lassen.</div>`;
+    }
+    melde('info', `„${kennung}“ wird geholt — das dauert bei großen Paketen mehrere Minuten.`, 15000);
+
+    fetch(`${BASIS}/modpack`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ kennung, fassung: fassung || null }),
+    })
+      .then(async (a) => {
+        const d = await a.json().catch(() => null);
+        if (!a.ok || !d || !d.success) throw new Error((d && d.message) || `HTTP ${a.status}`);
+        return d;
+      })
+      .then(d => {
+        // Das Weggelassene wird GENANNT. Sonst hält jemand das Paket für halb
+        // installiert: Bei „Create+" fehlen 49 von 155 Dateien — alles reine
+        // Client-Mods, die einen Server nicht starten ließen.
+        melde('success', `„${d.name}“ ist installiert: ${d.dateien} Datei(en)`
+          + (d.ausgelassen ? `, ${d.ausgelassen} reine Client-Datei(en) ausgelassen.` : '.'),
+          12000);
+        if (d.aufgeraeumt && d.aufgeraeumt.blieb && d.aufgeraeumt.blieb.length) {
+          melde('warning', `${d.aufgeraeumt.blieb.length} Datei(en) des alten Pakets `
+            + 'blieben liegen — sie stehen im Dateimanager.', 12000);
+        }
+        wirkungMelden(d);
+      })
+      .catch(e => melde('error', 'Modpack nicht installiert: ' + e.message, 15000))
+      .finally(() => { knopf.disabled = false; window.inhalteLaden(); });
   };
 
   window.inhaltKopieren = function () {

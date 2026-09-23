@@ -244,5 +244,4 @@ function paketAdresse(zeile, raeume) {
 module.exports = {
     fuerServer, laderAktiv, eintragen, entfernen, schalten, dateienAus, paketAdresse,
     ART_LADER, ART_MOD, ART_MODPACK,
-    ART_LADER, ART_MOD,
 };
