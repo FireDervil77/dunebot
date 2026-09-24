@@ -39,6 +39,8 @@ const db = {
     laeufe: [],              // {id, sitzung_id, status, konsole, ports, ...}
     konsole: [],             // geschriebene Konsolen-Stücke
     entwurf: null,           // zuletzt geschriebener Entwurf
+    pruefungen: [],          // {id, sitzung_id, status, entwurf, entwurf_hash, ergebnis, protokoll}
+    pruefSchreiben: [],      // Protokoll-Stücke mit dem Status der Prüfung in dem Moment
     sitzung: { id: 7, kennung: 'wbprobe', guild_id: 'g1', rootserver_id: 54, image: { ref: 'r/fb/base', tag: '2026.09', digest: 'sha256:x' } },
     async query(sql, p) {
         const t = String(sql).replace(/\s+/g, ' ').trim();
@@ -108,6 +110,28 @@ const db = {
             spalten.forEach((k, i) => { if (l) l[k] = p[i]; });
             return { affectedRows: l ? 1 : 0 };
         }
+        // ── Stufe 3 ──
+        if (/^SELECT p\.id AS pruefId, s\.guild_id AS guildId FROM werkbank_pruefungen p JOIN werkbank_sitzungen s ON s\.id = p\.sitzung_id WHERE s\.kennung = \? AND p\.status = 'laeuft' ORDER BY p\.id DESC LIMIT 1$/.test(t)) {
+            if (p[0] !== this.sitzung.kennung) return [];
+            const x = [...this.pruefungen].reverse().find(y => y.status === 'laeuft' && y.sitzung_id === this.sitzung.id);
+            return x ? [{ pruefId: x.id, guildId: 'g1' }] : [];
+        }
+        if (/^INSERT INTO werkbank_pruefungen \(sitzung_id, status, entwurf, entwurf_hash\) VALUES \(\?, 'laeuft', \?, \?\)$/.test(t)) {
+            const id = this.pruefungen.length + 900;
+            this.pruefungen.push({ id, sitzung_id: p[0], status: 'laeuft', entwurf: p[1], entwurf_hash: p[2], protokoll: '' });
+            return { insertId: id };
+        }
+        if (/^UPDATE werkbank_pruefungen SET protokoll = RIGHT\(CONCAT\(COALESCE\(protokoll, ''\), \?\), \?\) WHERE id = \?$/.test(t)) {
+            const x = this.pruefungen.find(y => y.id === p[2]);
+            this.pruefSchreiben.push({ text: p[0], status: x && x.status });
+            if (x) x.protokoll = (x.protokoll + p[0]).slice(-p[1]);
+            return { affectedRows: 1 };
+        }
+        if (/^UPDATE werkbank_pruefungen SET status = \?, ergebnis = \?, beendet_am = NOW\(\) WHERE id = \? AND status = 'laeuft'$/.test(t)) {
+            const x = this.pruefungen.find(y => y.id === p[2] && y.status === 'laeuft');
+            if (x) Object.assign(x, { status: p[0], ergebnis: p[1] });
+            return { affectedRows: x ? 1 : 0 };
+        }
         if (/^UPDATE werkbank_sitzungen SET entwurf = \? WHERE id = \?$/.test(t)) {
             this.entwurf = JSON.parse(p[0]);
             return { affectedRows: 1 };
@@ -133,10 +157,11 @@ const { schrittAusFormular, startAusFormular, startAlsFormular } = require('../p
 let bestanden = 0;
 async function pruefe(name, fn) {
     db.schritte = []; db.updates = []; daemon.befehle = []; daemon.online = true;
-    db.laeufe = []; db.konsole = []; db.entwurf = null;
+    db.laeufe = []; db.konsole = []; db.entwurf = null; db.pruefungen = []; db.pruefSchreiben = [];
     daemon.antwort = { success: true }; sse.gesendet = [];
     Ereignisse._laufend.clear(); Ereignisse._puffer.clear();
     Ereignisse._laeufe.clear(); Ereignisse._konsolenPuffer.clear();
+    Ereignisse._pruefungen.clear(); Ereignisse._pruefPuffer.clear();
     try { await fn(); console.log(`  ✓ ${name}`); bestanden++; }
     catch (e) { console.error(`  ✗ ${name}\n    ${e.message}`); process.exitCode = 1; }
 }
@@ -156,7 +181,7 @@ async function pruefe(name, fn) {
         const plugin = ohneKommentare(fs.readFileSync(path.join(HELFER, 'Sitzungen.js'), 'utf8'));
         // Zwei Schreibweisen: direkt, und über daemonFuer(...).senden('werkbank.x', …).
         const geschickt = [...plugin.matchAll(/(?:sendCommand\([^,]+,|senden\()\s*'(werkbank\.[a-z]+)'/g)].map(x => x[1]);
-        for (const b of ['werkbank.schritt', 'werkbank.verwerfen', 'werkbank.starten', 'werkbank.stoppen', 'werkbank.eingabe', 'werkbank.dateien']) {
+        for (const b of ['werkbank.schritt', 'werkbank.verwerfen', 'werkbank.starten', 'werkbank.stoppen', 'werkbank.eingabe', 'werkbank.dateien', 'werkbank.pruefen']) {
             assert.ok(geschickt.includes(b), `${b} wird nicht (mehr) geschickt — die Suche sieht ${geschickt}`);
         }
         for (const b of geschickt) assert.ok(client.includes(`case "${b}":`), `${b} fehlt im Daemon`);
@@ -166,7 +191,8 @@ async function pruefe(name, fn) {
         const proto = ohneKommentare(fs.readFileSync(path.join(DAEMON, 'pkg/protocol/messages.go'), 'utf8'));
         assert.match(proto, /NSWerkbank\s+Namespace\s*=\s*"werkbank"/);
         const aktionen = ['WerkbankStatus', 'WerkbankAusgabe', 'WerkbankFertig', 'WerkbankFehlgeschlagen',
-            'WerkbankGestartet', 'WerkbankKonsole', 'WerkbankBereitschaft', 'WerkbankPorts', 'WerkbankBeendet']
+            'WerkbankGestartet', 'WerkbankKonsole', 'WerkbankBereitschaft', 'WerkbankPorts', 'WerkbankBeendet',
+            'WerkbankPruefung']
             .map(k => (proto.match(new RegExp(k + '\\s*=\\s*"([a-z]+)"')) || [])[1]);
         const plugin = ohneKommentare(fs.readFileSync(path.join(HELFER, 'Ereignisse.js'), 'utf8'));
         for (const a of aktionen) {
@@ -413,6 +439,87 @@ async function pruefe(name, fn) {
             const u = Sitzungen.ungenutztePorts(JSON.parse(fs.readFileSync(path.join(ordner, d), 'utf8')));
             assert.deepStrictEqual(u, [], `${d}: ${u} gemeldet — ein Paket, das läuft, ist kein Befund`);
         }
+    });
+
+    console.log('\nPrüfdurchlauf (Stufe 3)');
+
+    await pruefe('der Suffix ist auf beiden Seiten derselbe', async () => {
+        const go = ohneKommentare(fs.readFileSync(path.join(DAEMON, 'internal/gameserver/werkbank_pruefung.go'), 'utf8'));
+        const m = go.match(/PruefSuffix\s*=\s*"([^"]+)"/);
+        assert.ok(m, 'PruefSuffix nicht gefunden');
+        assert.strictEqual(Sitzungen.PRUEF_SUFFIX, m[1]);
+    });
+
+    const pruefbar = () => {
+        const s = sitzungMitStart();
+        s.entwurf.start.args.push({ key: 'arg2', parts: [{ text: '--port' }] });
+        s.entwurf.start.ready_when = { port: 'game' };
+        s.entwurf.start.stop = { sequence: [{ step: 'command:/quit', timeout_sec: 30, terminates: true }, { step: 'sigkill', timeout_sec: 10, terminates: true }] };
+        return s;
+    };
+    const liste = [{ status: 'ok', schritt: { type: 'download' } }, { status: 'herausgenommen', schritt: { type: 'mkdir' } }];
+
+    await pruefe('Durchlauf schickt den Entwurf und hält ihn samt Fingerabdruck fest', async () => {
+        const s = pruefbar();
+        await Sitzungen.pruefen(s, liste);
+        const b = daemon.befehle[0];
+        assert.strictEqual(b.befehl, 'werkbank.pruefen');
+        assert.deepStrictEqual(b.nutzlast.install.steps.map(x => x.type), ['download'], 'nur Schritte im Entwurf');
+        assert.deepStrictEqual(b.nutzlast.portnummern, { game: 34197 });
+        const x = db.pruefungen[0];
+        assert.strictEqual(x.status, 'laeuft');
+        assert.strictEqual(x.entwurf_hash, Sitzungen.fingerabdruck(Sitzungen.entwurfAlsPaket(s, liste)));
+        assert.ok(!JSON.parse(x.entwurf).werkbank, 'geprüft wird das Paket, nicht der Sitzungsteil');
+    });
+
+    await pruefe('was sicher rot würde, wird vorher gesagt — nichts geht an den Daemon', async () => {
+        const ohnePort = pruefbar(); ohnePort.entwurf.start.ready_when = { log_line: 'Hosting game' };
+        await assert.rejects(Sitzungen.pruefen(ohnePort, liste), /Bereit, wenn Port/);
+        const nurKill = pruefbar(); nurKill.entwurf.start.stop = { sequence: [{ step: 'sigkill' }] };
+        await assert.rejects(Sitzungen.pruefen(nurKill, liste), /sigkill/);
+        const ungenutzt = pruefbar(); ungenutzt.entwurf.start.args = [];
+        await assert.rejects(Sitzungen.pruefen(ungenutzt, liste), /verweist nichts/);
+        const ohneNummer = pruefbar(); ohneNummer.entwurf.werkbank.portnummern = {};
+        await assert.rejects(Sitzungen.pruefen(ohneNummer, liste), /keine Nummer/);
+        await assert.rejects(Sitzungen.pruefen(pruefbar(), []), /keinen Schritt/);
+        assert.strictEqual(daemon.befehle.length, 0);
+        assert.strictEqual(db.pruefungen.length, 0);
+    });
+
+    await pruefe('Zwischenmeldungen <kennung>-pruefung landen im Protokoll, nicht bei Schritt oder Lauf', async () => {
+        await Sitzungen.pruefen(pruefbar(), liste);
+        // Ein Probestart der Sitzung selbst gibt es nicht — trotzdem darf nichts verlorengehen.
+        const v = (a, p) => Ereignisse.verteile(a, () => { throw new Error(a + ' ging an den normalen Handler'); })(p);
+        await v('status', { sitzung_id: 'wbprobe-pruefung', message: 'Schritt 1/1: download' });
+        await v('output', { sitzung_id: 'wbprobe-pruefung', line: '==> Lade' });
+        await v('konsole', { sitzung_id: 'wbprobe-pruefung', line: 'Hosting game' });
+        await v('ports', { sitzung_id: 'wbprobe-pruefung', ports: [] });
+        const zeilen = sse.gesendet.filter(x => x.daten.action === 'pruefung_zeile');
+        assert.deepStrictEqual(zeilen.map(x => x.daten.line), ['── Schritt 1/1: download', '==> Lade', 'Hosting game']);
+        assert.ok(zeilen.every(x => x.daten.sitzung_id === 'wbprobe'), 'an die Seite der Sitzung, ohne Suffix');
+        await Ereignisse.beiPruefung({ sitzung_id: 'wbprobe', ergebnis: { gruen: true, gruende: [] } });
+        const x = db.pruefungen[0];
+        assert.strictEqual(x.status, 'gruen');
+        assert.strictEqual(x.protokoll, '── Schritt 1/1: download\n==> Lade\nHosting game\n');
+        assert.strictEqual(db.pruefSchreiben[0].status, 'laeuft', 'Protokoll VOR dem Urteil geschrieben');
+    });
+
+    await pruefe('rotes Urteil, und während des Durchlaufs geht kein Schritt und kein Start', async () => {
+        await Sitzungen.pruefen(pruefbar(), liste);
+        daemon.befehle = [];
+        await assert.rejects(Sitzungen.schrittAusfuehren({ sitzung: db.sitzung, schritt: { type: 'mkdir', path: 'x' } }), /Prüfdurchlauf/);
+        await assert.rejects(Sitzungen.starten(sitzungMitStart(), []), /Prüfdurchlauf/);
+        await assert.rejects(Sitzungen.pruefen(pruefbar(), liste), /Prüfdurchlauf/);
+        assert.strictEqual(daemon.befehle.length, 0);
+        await Ereignisse.beiPruefung({ sitzung_id: 'wbprobe', ergebnis: { gruen: false, gruende: ['erst SIGKILL'] } });
+        assert.strictEqual(db.pruefungen[0].status, 'rot');
+    });
+
+    await pruefe('der Fingerabdruck hängt am Inhalt, nicht an der Reihenfolge der Schlüssel', async () => {
+        const a = { start: { program: 'x', args: [1, 2] }, ports: [{ purpose: 'game', protocol: 'udp' }] };
+        const b = { ports: [{ protocol: 'udp', purpose: 'game' }], start: { args: [1, 2], program: 'x' } };
+        assert.strictEqual(Sitzungen.fingerabdruck(a), Sitzungen.fingerabdruck(b));
+        assert.notStrictEqual(Sitzungen.fingerabdruck(a), Sitzungen.fingerabdruck({ ...a, start: { program: 'x', args: [2, 1] } }));
     });
 
     console.log(`\n${bestanden} Prüfung(en) bestanden.\n`);

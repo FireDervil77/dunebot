@@ -22,6 +22,14 @@
  * `werkbank_laeufe`. Die Konsole wird wie die Schrittausgabe gebündelt; beim
  * Ende zuerst der Puffer, dann der Status — aus demselben Grund.
  *
+ * ## Prüfdurchlauf (Stufe 3)
+ *
+ * Der Daemon meldet alles Zwischendurch unter `<kennung>-pruefung` — dieselben
+ * Aktionen wie Schritt und Probestart. `verteile` fängt sie VOR den Handlern
+ * ab und schreibt sie ins Protokoll des Durchlaufs; sonst suchten die Handler
+ * einen Schritt oder Lauf, den es nicht gibt. Das Urteil kommt als `pruefung`
+ * unter der Kennung der Sitzung.
+ *
  * @module werkbank/helpers/Ereignisse
  */
 
@@ -41,6 +49,12 @@ const konsolenPuffer = new Map();
 
 function merke(kennung, eintrag) { laufend.set(kennung, eintrag); }
 function vergiss(kennung) { laufend.delete(kennung); }
+/** kennung → { pruefId, guildId } — der laufende Prüfdurchlauf. */
+const pruefungen = new Map();
+/** pruefId → { zeilen: [], zeitgeber } */
+const pruefPuffer = new Map();
+function merkePruefung(kennung, eintrag) { pruefungen.set(kennung, eintrag); }
+function vergissPruefung(kennung) { pruefungen.delete(kennung); }
 function merkeLauf(kennung, eintrag) { laeufe.set(kennung, eintrag); }
 function vergissLauf(kennung) { laeufe.delete(kennung); }
 
@@ -197,26 +211,106 @@ const beiBeendet = zumLauf('beendet', async (p, lauf, kennung) => {
     ServiceManager.get('Logger').info(`[Werkbank] Sitzung ${kennung}: Probestart ${lauf.laufId} beendet (Code ${code})`);
 });
 
+// ── Prüfdurchlauf ────────────────────────────────────────────────────────────
+
+async function findePruefung(kennung) {
+    if (pruefungen.has(kennung)) return pruefungen.get(kennung);
+    const z = await Sitzungen.laufendePruefung(kennung);
+    if (z) pruefungen.set(kennung, { pruefId: z.pruefId, guildId: z.guildId });
+    return z ? pruefungen.get(kennung) : null;
+}
+
+async function schreibePruefPuffer(pruefId) {
+    const p = pruefPuffer.get(pruefId);
+    if (!p) return;
+    clearTimeout(p.zeitgeber);
+    pruefPuffer.delete(pruefId);
+    if (p.zeilen.length) await Sitzungen.pruefProtokoll(pruefId, p.zeilen.join(''));
+}
+
+/** Eine Zeile fürs Protokoll aus einer Zwischenmeldung — oder null. */
+function pruefZeile(action, p) {
+    switch (action) {
+        case 'status':       return p.message ? `── ${p.message}` : null;
+        case 'output':       return (p.finding ? '⚑ ' : '') + String(p.line ?? '');
+        case 'konsole':      return String(p.line ?? '');
+        case 'gestartet':    return '── Spiel gestartet';
+        case 'bereitschaft': return `── Bereitschaft: ${p.type || ''}${p.stage ? ' · ' + p.stage : ''}${(p.hinweis || p.note) ? ' — ' + (p.hinweis || p.note) : ''}`;
+        case 'beendet':      return `── Spiel beendet (Code ${p.exit_code ?? '?'})`;
+        case 'fertig':       return '── Schritt fertig';
+        case 'fehlgeschlagen': return `── Schritt gescheitert: ${p.error || ''}`;
+        default:             return null; // ports: steht im Urteil
+    }
+}
+
+async function beiPruefZwischen(action, payload) {
+    const kennung = String(payload.sitzung_id).slice(0, -Sitzungen.PRUEF_SUFFIX.length);
+    const pr = await findePruefung(kennung);
+    if (!pr) return;
+    const zeile = pruefZeile(action, payload);
+    if (zeile === null) return;
+    sende(pr.guildId, { action: 'pruefung_zeile', sitzung_id: kennung, line: zeile });
+    let b = pruefPuffer.get(pr.pruefId);
+    if (!b) {
+        b = { zeilen: [], zeitgeber: null };
+        pruefPuffer.set(pr.pruefId, b);
+    }
+    b.zeilen.push(zeile + '\n');
+    if (!b.zeitgeber) {
+        b.zeitgeber = setTimeout(() => {
+            schreibePruefPuffer(pr.pruefId).catch(fehler =>
+                ServiceManager.get('Logger').error(`[Werkbank] Prüfprotokoll nicht gespeichert (${pr.pruefId}):`, fehler));
+        }, 1000);
+    }
+}
+
+async function beiPruefung(payload) {
+    const kennung = payload?.sitzung_id;
+    const pr = kennung && await findePruefung(kennung);
+    const Logger = ServiceManager.get('Logger');
+    if (!pr) {
+        Logger.warn(`[Werkbank] Urteil für Sitzung ${kennung} ohne laufenden Durchlauf`);
+        return;
+    }
+    await schreibePruefPuffer(pr.pruefId);
+    const ergebnis = payload.ergebnis && typeof payload.ergebnis === 'object' ? payload.ergebnis : { gruen: false, gruende: ['Urteil ohne Inhalt'] };
+    await Sitzungen.pruefungBeenden(pr.pruefId, ergebnis);
+    vergissPruefung(kennung);
+    sende(pr.guildId, { action: 'pruefung', sitzung_id: kennung, gruen: Boolean(ergebnis.gruen) });
+    Logger.info(`[Werkbank] Sitzung ${kennung}: Prüfdurchlauf ${pr.pruefId} ${ergebnis.gruen ? 'GRÜN' : 'rot'}`);
+}
+
+/** Zwischenmeldungen eines Durchlaufs abfangen, alles andere zum Handler. */
+function verteile(action, handler) {
+    return (payload) => {
+        const kennung = String(payload?.sitzung_id || '');
+        if (kennung.endsWith(Sitzungen.PRUEF_SUFFIX)) return beiPruefZwischen(action, payload);
+        return handler(payload);
+    };
+}
+
 let angemeldet = false;
 
 /** Beim Router anmelden — einmal je Prozess. */
 function anmelden() {
     if (angemeldet) return;
     const eventRouter = require('../../../../apps/dashboard/helpers/IPMEventRouter');
-    eventRouter.register(NS, 'status', beiStatus);
-    eventRouter.register(NS, 'output', beiAusgabe);
-    eventRouter.register(NS, 'fertig', (p) => beiEnde(p, true));
-    eventRouter.register(NS, 'fehlgeschlagen', (p) => beiEnde(p, false));
-    eventRouter.register(NS, 'gestartet', beiGestartet);
-    eventRouter.register(NS, 'konsole', beiKonsole);
-    eventRouter.register(NS, 'bereitschaft', beiBereitschaft);
-    eventRouter.register(NS, 'ports', beiPorts);
-    eventRouter.register(NS, 'beendet', beiBeendet);
+    eventRouter.register(NS, 'status', verteile('status', beiStatus));
+    eventRouter.register(NS, 'output', verteile('output', beiAusgabe));
+    eventRouter.register(NS, 'fertig', verteile('fertig', (p) => beiEnde(p, true)));
+    eventRouter.register(NS, 'fehlgeschlagen', verteile('fehlgeschlagen', (p) => beiEnde(p, false)));
+    eventRouter.register(NS, 'gestartet', verteile('gestartet', beiGestartet));
+    eventRouter.register(NS, 'konsole', verteile('konsole', beiKonsole));
+    eventRouter.register(NS, 'bereitschaft', verteile('bereitschaft', beiBereitschaft));
+    eventRouter.register(NS, 'ports', verteile('ports', beiPorts));
+    eventRouter.register(NS, 'beendet', verteile('beendet', beiBeendet));
+    eventRouter.register(NS, 'pruefung', beiPruefung);
     angemeldet = true;
 }
 
 module.exports = {
-    anmelden, merke, vergiss, merkeLauf, vergissLauf,
-    beiAusgabe, beiEnde, beiStatus, beiGestartet, beiKonsole, beiBereitschaft, beiPorts, beiBeendet,
+    anmelden, merke, vergiss, merkeLauf, vergissLauf, merkePruefung, vergissPruefung, verteile,
+    beiAusgabe, beiEnde, beiStatus, beiGestartet, beiKonsole, beiBereitschaft, beiPorts, beiBeendet, beiPruefung,
     _laufend: laufend, _puffer: puffer, _laeufe: laeufe, _konsolenPuffer: konsolenPuffer,
+    _pruefungen: pruefungen, _pruefPuffer: pruefPuffer,
 };

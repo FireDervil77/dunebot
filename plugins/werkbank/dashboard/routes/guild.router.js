@@ -19,6 +19,10 @@
  *   POST /:kennung/bereitschaftszeile   Konsolenzeile als ready_when.log_line
  *   POST /:kennung/dateien              was das laufende Spiel angelegt/geändert hat
  *
+ * Stufe 3 (Prüfdurchlauf):
+ *   POST /:kennung/pruefen              ganzes Rezept auf leerem Volume, Start, Stopp
+ *   POST /:kennung/pruefung/abbrechen   hängenden Durchlauf von Hand rot setzen
+ *
  * @module werkbank/routes/guild
  */
 
@@ -210,7 +214,8 @@ router.get('/:kennung', requirePermission('WERKBANK.VIEW'), async (req, res) => 
         if (!sitzung || sitzung.status !== 'offen') {
             return res.redirect(`/guild/${guildId}/plugins/werkbank`);
         }
-        const [liste, laeufe] = await Promise.all([Sitzungen.schritte(sitzung.id), Sitzungen.laeufe(sitzung.id)]);
+        const [liste, laeufe, pruefungen] = await Promise.all([
+            Sitzungen.schritte(sitzung.id), Sitzungen.laeufe(sitzung.id), Sitzungen.pruefungen(sitzung.id)]);
         const maschine = (await Sitzungen.maschinen(guildId)).find(m => m.id === sitzung.rootserver_id) || null;
         const entwurf = Sitzungen.entwurfAlsPaket(sitzung, liste);
         return await renderView(res, 'guild/werkbank-sitzung', {
@@ -218,6 +223,9 @@ router.get('/:kennung', requirePermission('WERKBANK.VIEW'), async (req, res) => 
             schritttypen: Sitzungen.SCHRITTTYPEN,
             entwurf,
             ungenutztePorts: Sitzungen.ungenutztePorts(entwurf),
+            pruefungen,
+            entwurfHash: Sitzungen.fingerabdruck(entwurf),
+            durchlaufMaengel: Sitzungen.durchlaufMaengel(entwurf),
             startFormular: startAlsFormular(sitzung.entwurf?.start),
             werkbankTeil: Sitzungen.werkbankTeil(sitzung),
             laeufe,
@@ -342,6 +350,25 @@ router.post('/:kennung/dateien', requirePermission('WERKBANK.VIEW'), async (req,
         } });
     } catch (error) {
         return fehler(res, error, 'Dateien nicht abgefragt', 400);
+    }
+});
+
+router.post('/:kennung/pruefen', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        const sitzung = await offeneSitzung(req, res);
+        const ergebnis = await Sitzungen.pruefen(sitzung, await Sitzungen.schritte(sitzung.id));
+        return res.json({ success: true, ...ergebnis });
+    } catch (error) {
+        return fehler(res, error, 'Prüfdurchlauf nicht gestartet', 400);
+    }
+});
+
+router.post('/:kennung/pruefung/abbrechen', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.pruefungAbbrechen(await offeneSitzung(req, res));
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Nicht abgebrochen', 400);
     }
 });
 

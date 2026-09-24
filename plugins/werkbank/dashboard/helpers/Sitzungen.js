@@ -323,8 +323,11 @@ async function entwurfSchreiben(sitzung, aendern) {
     return e;
 }
 
-/** Läuft ein Schritt oder ein Probestart? Dann geht weder das eine noch das andere. */
+/** Läuft ein Schritt, ein Probestart oder ein Durchlauf? Dann geht nichts davon. */
 async function pruefeFrei(sitzung) {
+    if (await laufendePruefung(sitzung.kennung)) {
+        throw new Error('Der Prüfdurchlauf läuft — erst nach seinem Urteil.');
+    }
     const [schritt] = await db().query(
         "SELECT id FROM werkbank_schritte WHERE sitzung_id = ? AND status = 'laeuft' LIMIT 1", [sitzung.id]);
     if (schritt) throw new Error('In dieser Sitzung läuft schon ein Schritt — erst nach seinem Ende.');
@@ -467,6 +470,110 @@ async function bereitschaftszeile(sitzung, zeile) {
     });
 }
 
+// ── Stufe 3: Prüfdurchlauf ───────────────────────────────────────────────────
+
+/** Der Suffix des Daemons (werkbank_pruefung.go, PruefSuffix). */
+const PRUEF_SUFFIX = '-pruefung';
+
+/** JSON mit sortierten Schlüsseln — derselbe Entwurf ergibt denselben Fingerabdruck. */
+function stabil(wert) {
+    if (Array.isArray(wert)) return '[' + wert.map(stabil).join(',') + ']';
+    if (wert && typeof wert === 'object') {
+        return '{' + Object.keys(wert).sort().filter(k => wert[k] !== undefined)
+            .map(k => JSON.stringify(k) + ':' + stabil(wert[k])).join(',') + '}';
+    }
+    return JSON.stringify(wert);
+}
+
+function fingerabdruck(paket) {
+    return crypto.createHash('sha256').update(stabil(paket)).digest('hex');
+}
+
+async function laufendePruefung(kennung) {
+    const [z] = await db().query(`
+        SELECT p.id AS pruefId, s.guild_id AS guildId
+          FROM werkbank_pruefungen p JOIN werkbank_sitzungen s ON s.id = p.sitzung_id
+         WHERE s.kennung = ? AND p.status = 'laeuft'
+         ORDER BY p.id DESC LIMIT 1`, [kennung]);
+    return z || null;
+}
+
+async function pruefungen(sitzungId, anzahl = 5) {
+    const zeilen = await db().query(
+        'SELECT * FROM werkbank_pruefungen WHERE sitzung_id = ? ORDER BY id DESC LIMIT ?', [sitzungId, anzahl]);
+    return zeilen.map(z => ({ ...z, ergebnis: json(z.ergebnis, null), entwurf: json(z.entwurf, null) }));
+}
+
+/**
+ * Was vor einem Durchlauf sicher scheitern würde — hier gesagt statt nach
+ * einer halben Stunde SteamCMD. Dieselben Regeln wie das Urteil im Daemon.
+ */
+function durchlaufMaengel(paket) {
+    const m = [];
+    if (!paket.install?.steps?.length) m.push('Der Entwurf hat keinen Schritt.');
+    if (!paket.start?.program) m.push('Der Startteil fehlt.');
+    if (!paket.start?.ready_when?.port) {
+        m.push('„Bereit, wenn Port" fehlt — die Zeile allein prüft fb-init nicht, grün gibt es nur über einen Port.');
+    }
+    const seq = paket.start?.stop?.sequence || [];
+    if (seq.length < 2) m.push('Die Stoppfolge hat nur sigkill — grün verlangt, dass das Spiel VORHER endet (etwa „command:/quit 30 beendet").');
+    for (const z of ungenutztePorts(paket)) m.push(`Auf den Port „${z}" verweist nichts — das Spiel erführe seine Nummer nicht.`);
+    return m;
+}
+
+async function pruefen(sitzung, liste) {
+    await pruefeFrei(sitzung);
+    const paket = entwurfAlsPaket(sitzung, liste);
+    const maengel = durchlaufMaengel(paket);
+    if (maengel.length) throw new Error(maengel.join(' '));
+    const w = werkbankTeil(sitzung);
+    // Ohne Nummer für den Bereitschaftsport entstünde kein Auftrag (Job.Validate).
+    if (!w.portnummern[paket.start.ready_when.port]) {
+        throw new Error(`Der Port „${paket.start.ready_when.port}" hat in dieser Sitzung keine Nummer — erst beobachten und übernehmen.`);
+    }
+    const daemon = await daemonFuer(sitzung);
+
+    const r = await db().query(
+        "INSERT INTO werkbank_pruefungen (sitzung_id, status, entwurf, entwurf_hash) VALUES (?, 'laeuft', ?, ?)",
+        [sitzung.id, JSON.stringify(paket), fingerabdruck(paket)]);
+    const pruefId = r.insertId;
+    require('./Ereignisse').merkePruefung(sitzung.kennung, { pruefId, guildId: sitzung.guild_id });
+
+    const antwort = await daemon.senden('werkbank.pruefen', {
+        guild_id: sitzung.guild_id, image: sitzung.image,
+        start: paket.start, env: paket.env || {}, ports: paket.ports,
+        portnummern: w.portnummern, settings: {}, install: paket.install,
+        memory_mb: w.memory_mb, cpu_prozent: w.cpu_prozent,
+    });
+    if (!antwort?.success) {
+        const grund = antwort?.error || 'Der Daemon hat nicht geantwortet';
+        await pruefungBeenden(pruefId, { gruen: false, gruende: [grund], installation: 'nicht begonnen' });
+        require('./Ereignisse').vergissPruefung(sitzung.kennung);
+        throw new Error(grund);
+    }
+    return { pruefId };
+}
+
+/** Hängt fest (Daemon weg, Dashboard neu gestartet)? Von Hand rot setzen. */
+async function pruefungAbbrechen(sitzung) {
+    const p = await laufendePruefung(sitzung.kennung);
+    if (!p) throw new Error('Es läuft kein Prüfdurchlauf.');
+    await pruefungBeenden(p.pruefId, { gruen: false, gruende: ['von Hand abgebrochen — das Urteil des Daemons kam nicht'] });
+    require('./Ereignisse').vergissPruefung(sitzung.kennung);
+}
+
+async function pruefProtokoll(pruefId, text) {
+    await db().query(
+        `UPDATE werkbank_pruefungen SET protokoll = RIGHT(CONCAT(COALESCE(protokoll, ''), ?), ?) WHERE id = ?`,
+        [text, MAX_AUSGABE, pruefId]);
+}
+
+async function pruefungBeenden(pruefId, ergebnis) {
+    await db().query(
+        `UPDATE werkbank_pruefungen SET status = ?, ergebnis = ?, beendet_am = NOW() WHERE id = ? AND status = 'laeuft'`,
+        [ergebnis?.gruen ? 'gruen' : 'rot', JSON.stringify(ergebnis || {}), pruefId]);
+}
+
 // ── Ereignisse eines Laufs (aufgerufen aus Ereignisse.js) ────────────────────
 
 async function laufSetzen(laufId, felder) {
@@ -538,6 +645,8 @@ module.exports = {
     waehlbareImages, maschinen, liste, laden, schritte, anlegen,
     schrittAusfuehren, ausgabeAnhaengen, beenden, laufenderSchritt,
     herausnehmen, verwerfen, entwurfAlsPaket,
+    PRUEF_SUFFIX, fingerabdruck, laufendePruefung, pruefungen, durchlaufMaengel, pruefen,
+    pruefungAbbrechen, pruefProtokoll, pruefungBeenden,
     werkbankTeil, ungenutztePorts, startSpeichern, starten, stoppen, eingabe, laeufe, laufenderLauf,
     portUebernehmen, portEntfernen, bereitschaftszeile,
     laufSetzen, konsoleAnhaengen, laufBeenden, dateienJetzt, gruppiere,
