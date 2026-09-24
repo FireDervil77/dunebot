@@ -427,7 +427,10 @@ console.log('\nModpacks: was hereinkommt, ist fremder Text');
         const mcPaket = pakete.find(x => x.name === 'minecraft.json');
         const varianten = mcPaket?.inhalt?.content?.variants || {};
         const modLader = Object.entries(varianten)
-            .filter(([, v]) => v.supported && v.path === 'mods')
+            // Seit Paket 1.4.2 heisst der Pfad `game/mods` (ab der Wurzel des
+            // Volumes, siehe check-inhaltspfade.js) — gemeint ist der Ordner
+            // `mods` am Ende, nicht der ganze Pfad.
+            .filter(([, v]) => v.supported && path.posix.basename(v.path || '') === 'mods')
             .map(([k]) => k).sort();
 
         pruefe(JSON.stringify(unsere) === JSON.stringify(modLader),

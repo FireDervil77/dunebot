@@ -3,7 +3,7 @@
   "identity": {
     "slug": "minecraft",
     "name": "Minecraft",
-    "version": "1.4.1",
+    "version": "1.4.2",
     "author": "firenetworks",
     "category": "sandbox",
     "description": {
@@ -747,7 +747,7 @@
         "source_ids": {
           "modrinth": "paper"
         },
-        "path": "plugins"
+        "path": "game/plugins"
       },
       "fabric": {
         "supported": true,
@@ -758,7 +758,7 @@
         "source_ids": {
           "modrinth": "fabric"
         },
-        "path": "mods"
+        "path": "game/mods"
       },
       "neoforge": {
         "supported": true,
@@ -769,7 +769,7 @@
         "source_ids": {
           "modrinth": "neoforge"
         },
-        "path": "mods"
+        "path": "game/mods"
       },
       "forge": {
         "supported": true,
@@ -780,7 +780,7 @@
         "source_ids": {
           "modrinth": "forge"
         },
-        "path": "mods"
+        "path": "game/mods"
       }
     }
   },
@@ -835,7 +835,8 @@
       "GEMESSEN und behoben (1.2.1, 2026-09-22): Die vier Merkzettel lagen in `game/` — dem Ordner, den der Vertrag ausdruecklich als ERSETZBAR bezeichnet. Sie gehoeren nach `.fb` (DirFB: „unsere Ablage: Rezeptstand, Pruefsummen, Marker; uebersteht ein Zuruecksetzen\"), und der Pfad stand die ganze Zeit als `FB_STATE_DIR` im Vertrag — von KEINEM Paket benutzt. Das Auspacken des Modpacks geht jetzt nach `$XDG_CACHE_HOME` statt neben die Spieldateien. Nachgestellt mit der echten Ordnerstruktur: `game/` enthaelt danach nur Spieldateien, `.fb/` die vier Zettel, `cache/` ist leer. Altlasten aus frueheren Installationen raeumt das Skript beim naechsten Lauf weg. Waechter: `scripts/check-ablageordnung.js`.",
       "GEMESSEN und behoben (1.2.2, 2026-09-22): Modpack-Archive koennen fuer ihre Eintraege den Modus 000 speichern — „Horror +\" tut es fuer alle 78. `unzip` uebertraegt das treu, und die Installation brach mit „jq: Permission denied\" und Code 2 ab. Nach dem Auspacken wird jetzt `chmod -R u+rwX` gesetzt. Das rettet nicht nur den Index: Ohne die Zeile laegen Konfigurationsdateien mit Modus 000 im Serververzeichnis, und DAS waere erst beim Start aufgefallen — mit einer Meldung ueber eine angeblich fehlende Einstellung.",
       "GEMESSEN und behoben (1.2.3, 2026-09-22): `ready_when` nannte nur die Logzeile. Die Bereitschaftskarte zeigte den Port deshalb blass mit „Kein Port im Paket genannt\" — richtig, aber unnoetig: Minecraft LAUSCHT auf dem Spielport, und der Daemon prueft das (`fb-init/ready.go`: „2 Port lauscht — sagt: es nimmt Verbindungen an\"). Jetzt steht `port: \"game\"` da, und die Stufe wird echt gemessen statt weggelassen. Die Abfrage bleibt blass, und das ist richtig: Minecraft antwortet auf Server List Ping, und einen SLP-Treiber gibt es im Daemon nicht — das steht weiter oben als eigener offener Punkt.",
-      "GEMESSEN am 2026-09-24 im Abbild fb/java:2026.09 (Java 8, 17, 21, 25 nebeneinander, gewaehlt ueber .fb/java), jeweils installiert UND gestartet bis „Done (\": forge 1.12.2 → Java 8 (11,9 s), forge 1.16.5 → 8 (28,5 s), forge 1.20.1 → 17 (38,1 s), vanilla 26.3 → 25 (5,0 s), vanilla 1.17.1 → 17 (verlangt 16, 29,2 s), paper 1.16.5 → 8 (9,5 s), fabric 1.20.1 → 17 (36,9 s), neoforge 1.21.1 → 21 (5,4 s). Dabei gefunden: Java 8 kennt `java @datei` nicht („Could not find or load main class @forge_args.txt\") — der Starter im Abbild loest die Argumentdatei fuer Java 8 selbst auf. Waechter: scripts/check-java-laufzeiten.js."
+      "GEMESSEN am 2026-09-24 im Abbild fb/java:2026.09 (Java 8, 17, 21, 25 nebeneinander, gewaehlt ueber .fb/java), jeweils installiert UND gestartet bis „Done (\": forge 1.12.2 → Java 8 (11,9 s), forge 1.16.5 → 8 (28,5 s), forge 1.20.1 → 17 (38,1 s), vanilla 26.3 → 25 (5,0 s), vanilla 1.17.1 → 17 (verlangt 16, 29,2 s), paper 1.16.5 → 8 (9,5 s), fabric 1.20.1 → 17 (36,9 s), neoforge 1.21.1 → 21 (5,4 s). Dabei gefunden: Java 8 kennt `java @datei` nicht („Could not find or load main class @forge_args.txt\") — der Starter im Abbild loest die Argumentdatei fuer Java 8 selbst auf. Waechter: scripts/check-java-laufzeiten.js.",
+      "GEMESSEN und behoben (1.4.2, 2026-09-24): Mods und Plugins landeten NEBEN dem Spiel. Die Inhaltspfade gelten ab der Wurzel des Volumes (Valheim nennt deshalb `game/BepInEx/plugins`), dieses Paket nannte nur `mods` und `plugins` — der Server laeuft aber in `game/`. Auf Server 202 lagen 146 Mods des Modpacks Cave Horror in `/home/container/mods`, `game/mods` war leer, und Forge 1.20.1 startete sauber bis „Done (20.540s)\" — ohne eine einzige Mod und ohne Fehlerzeile. Jetzt `game/mods` und `game/plugins`; der Modpack-Weg im Daemon schreibt seit derselben Fassung nach `game/` (modpackWurzel). Waechter: check-inhaltspfade.js."
     ]
   }
 }
