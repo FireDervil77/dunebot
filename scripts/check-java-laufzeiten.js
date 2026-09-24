@@ -58,10 +58,16 @@ const MOJANG = [
 // ── Gemessen am 2026-09-23/24: wo Forge WIRKLICH laeuft ─────────────────────
 // Die Obergrenze, die Mojangs Zahl nicht nennt. Wer die Wahl auf „das Neueste,
 // das reicht" umstellt, faellt hier auf.
+//
+// 1.20.1 ist BUILD-ABHAENGIG und steht deshalb ohne `stirbt`: Build 47.4.0
+// starb am 2026-09-23 auf 21 und 25 — Build 47.4.23 lief auf Server 202 dagegen
+// 14 Stunden auf Java 25.0.4 (ModLauncher-Zeile im Log, 2026-09-24). Getragen
+// hat 17 beide. Die Wahl nimmt 17, weil Mojang 17 nennt, nicht weil 25 sicher
+// scheitert.
 const FORGE = [
     { ausgabe: '1.12.2', verlangt: 8,  laeuft: [8],  stirbt: [17, 25] },
     { ausgabe: '1.16.5', verlangt: 8,  laeuft: [8],  stirbt: [17, 25] },
-    { ausgabe: '1.20.1', verlangt: 17, laeuft: [17], stirbt: [21, 25] },
+    { ausgabe: '1.20.1', verlangt: 17, laeuft: [17], stirbt: [] },
 ];
 
 // ── Das Image ───────────────────────────────────────────────────────────────
