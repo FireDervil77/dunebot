@@ -1,0 +1,22 @@
+{
+  "plugin": "werkbank",
+  "version": "1.0.0",
+  "permissions": [
+    {
+      "key": "WERKBANK.VIEW",
+      "name": "Werkbank anzeigen",
+      "description": "Berechtigung, die Werkbank und ihre Sitzungen zu sehen",
+      "category": "werkbank",
+      "is_dangerous": 0,
+      "requires": null
+    },
+    {
+      "key": "WERKBANK.BAUEN",
+      "name": "In der Werkbank bauen",
+      "description": "Sitzungen anlegen und verwerfen, Schritte ausführen — die Schritte laufen als Container auf einem Rootserver, ein script-Schritt führt beliebige Befehle aus",
+      "category": "werkbank",
+      "is_dangerous": 1,
+      "requires": "WERKBANK.VIEW"
+    }
+  ]
+}

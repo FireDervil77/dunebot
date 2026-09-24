@@ -1,0 +1,128 @@
+<!--
+    Werkbank: Sitzungen (Stufe 1, 2026-09-24)
+
+    Eine Sitzung ist ein eigenes Volume auf einer Maschine und ein
+    Paket-Entwurf. Angelegt wird mit Name, Basis-Image und Maschine; das
+    Volume entsteht beim ersten Schritt.
+
+    Die Images kommen aus den eingelieferten Paketen, mit ihrem Digest —
+    keine eigene Liste, die beim naechsten Image veraltet.
+-->
+<%
+  const basis = `/guild/${guildId}/plugins/werkbank`;
+  const bildName = (i) => i.ref.replace(/^.*\//, '') + (i.tag ? ':' + i.tag : '');
+  const online = maschinen.filter(m => m.online);
+%>
+
+<%- include('shared/seitenkopf', {
+    plugin:       'werkbank',
+    vortitel:     tr('werkbank:TITLE'),
+    titel:        'Sitzungen',
+    beschreibung: 'Spielpakete bauen — jeder Schritt läuft sofort, und du siehst, was er tut',
+    icon:         'fa-solid fa-screwdriver-wrench',
+    guildId
+}) %>
+
+<div class="row row-cards" id="werkbankUebersicht" data-werkbank-basis="<%= basis %>">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">Offene Sitzungen</h3></div>
+      <% if (!sitzungen.length) { %>
+        <div class="card-body">
+          <%- include('shared/leerzustand', {
+              icon:  'fa-solid fa-screwdriver-wrench',
+              titel: 'Noch keine Sitzung',
+              text:  'Eine Sitzung ist ein leeres Volume auf einer Maschine. Du fügst Schritte hinzu, jeder läuft sofort — was gelingt, wird Teil des Pakets.'
+          }) %>
+        </div>
+      <% } else { %>
+        <div class="table-responsive">
+          <table class="table table-vcenter card-table">
+            <thead><tr><th>Name</th><th>Schritte im Entwurf</th><th>Zuletzt</th><th></th></tr></thead>
+            <tbody>
+              <% sitzungen.forEach(function (s) { %>
+                <tr>
+                  <td><a href="<%= basis %>/<%= s.kennung %>"><%= s.name %></a>
+                    <div class="text-secondary small font-monospace"><%= s.kennung %></div></td>
+                  <td><%= s.schritte_ok %>
+                    <% if (s.laeuft > 0) { %><span class="badge bg-blue-lt ms-2">läuft</span><% } %></td>
+                  <td class="text-secondary"><%= new Date(s.updated_at).toLocaleString('de-DE') %></td>
+                  <td class="text-end"><a class="btn btn-sm" href="<%= basis %>/<%= s.kennung %>">Öffnen</a></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">Neue Sitzung</h3></div>
+      <div class="card-body">
+        <% if (!images.length) { %>
+          <p class="text-secondary">Es ist kein Paket eingeliefert, dessen Image eine Sitzung tragen könnte.</p>
+        <% } else if (!online.length) { %>
+          <p class="text-secondary">Keine Maschine dieser Guild ist gerade erreichbar.</p>
+        <% } else { %>
+          <form id="formNeu">
+            <div class="mb-3">
+              <label class="form-label" for="neuName">Name</label>
+              <input class="form-control" id="neuName" name="name" maxlength="100" required placeholder="z. B. Terraria">
+              <div class="form-hint">Meist das Spiel, das entstehen soll.</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="neuImage">Basis-Image</label>
+              <select class="form-select" id="neuImage" name="image">
+                <% images.forEach(function (i) { %>
+                  <option value="<%= i.ref %>@<%= i.digest %>"><%= bildName(i) %></option>
+                <% }) %>
+              </select>
+              <div class="form-hint">Welche Laufzeit das Spiel braucht: base (nativ), java, dotnet, steamcmd, proton.</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="neuMaschine">Maschine</label>
+              <select class="form-select" id="neuMaschine" name="rootserver_id">
+                <% online.forEach(function (m) { %>
+                  <option value="<%= m.id %>"><%= m.name %></option>
+                <% }) %>
+              </select>
+            </div>
+            <button class="btn btn-primary w-100" type="submit">
+              <i class="fa-solid fa-plus me-1"></i>Sitzung anlegen
+            </button>
+          </form>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var wurzel = document.getElementById('werkbankUebersicht');
+  var form = document.getElementById('formNeu');
+  if (!wurzel || !form) return;
+  var basis = wurzel.dataset.werkbankBasis;
+  form.addEventListener('submit', async function (ev) {
+    ev.preventDefault();
+    var knopf = form.querySelector('button[type=submit]');
+    knopf.disabled = true;
+    try {
+      var antwort = await fetch(basis + '/sitzungen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(Object.fromEntries(new FormData(form)))
+      });
+      var daten = {};
+      try { daten = await antwort.json(); } catch (e) { /* kein JSON */ }
+      if (!antwort.ok || !daten.success) throw new Error(daten.message || ('HTTP ' + antwort.status));
+      window.location.href = basis + '/' + daten.kennung;
+    } catch (fehler) {
+      knopf.disabled = false;
+      if (window.showToast) window.showToast('error', 'Sitzung nicht angelegt: ' + fehler.message);
+    }
+  });
+})();
+</script>

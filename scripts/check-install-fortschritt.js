@@ -60,7 +60,12 @@ const roh = (datei) => fs.existsSync(datei) ? fs.readFileSync(datei, 'utf8') : n
         'und schickt es nur bei Änderung',
         'SteamCMD schreibt die Prozente mehrmals je Sekunde — jede einzelne wäre dieselbe '
       + 'Zahl in hundert Ereignissen.');
-    pruefe(/"phase":\s*"installing_game"/.test(paket) && /"steps":/.test(paket),
+    // Seit 2026-09-24 teilen sich Installation und Werkbank EINEN Melder
+    // (melderNach); die Phase kommt als Argument. Geprueft wird beides: dass die
+    // Installation `installing_game` uebergibt, und dass der Melder `phase` und
+    // `steps` mitschickt.
+    pruefe(/melderNach\([^)]*protocol\.NSInstall[^)]*"installing_game"\)/.test(paket)
+            && /"phase":\s*phase/.test(paket) && /"steps":/.test(paket),
         'Phasen und Schrittzahl gehen mit');
 
     // ── Dashboard: annehmen und wegschreiben ─────────────────────────────────

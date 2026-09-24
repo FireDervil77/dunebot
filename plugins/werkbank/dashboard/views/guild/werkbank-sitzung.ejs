@@ -1,0 +1,328 @@
+<!--
+    Werkbank: eine Sitzung (Stufe 1, 2026-09-24)
+
+    Links die ausgefuehrten Schritte mit Status und Ausgabe, rechts der
+    naechste Schritt und der Entwurf, wie er gerade steht.
+
+    Ein Schritt laeuft SOFORT im Volume der Sitzung. Seine Ausgabe kommt live
+    ueber SSE (Namensraum werkbank, gefiltert auf diese Sitzung). Ist er fertig,
+    laedt die Seite neu — dann stehen Status und gespeicherte Ausgabe da.
+
+    „Aus dem Entwurf nehmen" nimmt einen Schritt aus dem Rezept. Was er im
+    Volume angelegt hat, bleibt dort; das steht beim Knopf dabei.
+-->
+<%
+  const basis = `/guild/${guildId}/plugins/werkbank`;
+  const hier = `${basis}/${sitzung.kennung}`;
+  const bildName = (sitzung.image.ref || '').replace(/^.*\//, '') + (sitzung.image.tag ? ':' + sitzung.image.tag : '');
+  const laeuft = schritte.some(s => s.status === 'laeuft');
+
+  const statusMarke = {
+    laeuft:         '<span class="badge bg-blue-lt">läuft</span>',
+    ok:             '<span class="badge bg-green-lt">im Entwurf</span>',
+    fehler:         '<span class="badge bg-red-lt">gescheitert</span>',
+    herausgenommen: '<span class="badge bg-secondary-lt">herausgenommen</span>'
+  };
+
+  // Eine Zeile, die sagt, was der Schritt tut — ohne ihn aufzuklappen.
+  function kurz(s) {
+    switch (s.type) {
+      case 'script':   return (s.script || '').split('\n').filter(z => z.trim() && !z.trim().startsWith('#'))[0] || '(leeres Skript)';
+      case 'mkdir':    return s.path;
+      case 'download': return s.url + ' → ' + s.target;
+      case 'extract':  return s.archive + (s.target ? ' → ' + s.target : '') + (s.strip_components ? ' (strip ' + s.strip_components + ')' : '');
+      case 'template': return s.file;
+      case 'steamcmd': return 'App ' + s.app + (s.branch ? ' · ' + s.branch : '');
+      default:         return '';
+    }
+  }
+%>
+
+<%- include('shared/seitenkopf', {
+    plugin:       'werkbank',
+    vortitel:     tr('werkbank:TITLE'),
+    titel:        sitzung.name,
+    beschreibung: bildName + ' · ' + (maschine ? maschine.name : 'Maschine ' + sitzung.rootserver_id) + (maschine && !maschine.online ? ' (nicht erreichbar)' : ''),
+    icon:         'fa-solid fa-screwdriver-wrench',
+    guildId,
+    aktion:       '<button class="btn btn-outline-danger" id="knopfVerwerfen"' + (laeuft ? ' disabled' : '') + '><i class="fa-solid fa-trash me-1"></i>Sitzung verwerfen</button>'
+}) %>
+
+<div class="row row-cards" id="werkbankSitzung"
+     data-werkbank-hier="<%= hier %>" data-werkbank-basis="<%= basis %>"
+     data-werkbank-sitzung="<%= sitzung.kennung %>" data-werkbank-laeuft="<%= laeuft ? '1' : '0' %>">
+
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">Schritte</h3></div>
+      <% if (!schritte.length) { %>
+        <div class="card-body">
+          <%- include('shared/leerzustand', {
+              icon:  'fa-solid fa-list-check',
+              titel: 'Noch kein Schritt',
+              text:  'Rechts fügst du den ersten hinzu. Meist ist das ein download der Serverdateien oder ein steamcmd-Schritt.'
+          }) %>
+        </div>
+      <% } else { %>
+        <div class="list-group list-group-flush">
+          <% schritte.forEach(function (x) { %>
+            <div class="list-group-item" data-schritt="<%= x.id %>">
+              <div class="d-flex align-items-center gap-2">
+                <span class="text-secondary" style="min-width:1.5rem">#<%= x.nr %></span>
+                <span class="badge bg-azure-lt font-monospace"><%= x.schritt.type %></span>
+                <span class="text-truncate font-monospace small" style="flex:1 1 auto" title="<%= kurz(x.schritt) %>"><%= kurz(x.schritt) %></span>
+                <%- statusMarke[x.status] || '' %>
+              </div>
+              <% if (x.fehler) { %>
+                <div class="text-danger small mt-2" style="white-space:pre-wrap"><%= x.fehler %></div>
+              <% } %>
+              <% if (x.ausgabe || x.status === 'laeuft') { %>
+                <details class="mt-2" <%= x.status === 'laeuft' ? 'open' : '' %>>
+                  <summary class="text-secondary small">Ausgabe</summary>
+                  <pre class="mt-2 mb-0 p-2 small" style="max-height:24rem;overflow:auto;background:var(--tblr-bg-surface-secondary)" <%= x.status === 'laeuft' ? 'id=liveAusgabe' : '' %>><%= x.ausgabe || '' %></pre>
+                </details>
+              <% } %>
+              <% if (x.status === 'ok' || x.status === 'fehler') { %>
+                <div class="mt-2">
+                  <button class="btn btn-sm btn-ghost-secondary" data-herausnehmen="<%= x.id %>"
+                          title="Nimmt den Schritt aus dem Rezept. Was er im Volume angelegt hat, bleibt dort.">
+                    <i class="fa-solid fa-xmark me-1"></i>Aus dem Entwurf nehmen
+                  </button>
+                </div>
+              <% } %>
+            </div>
+          <% }) %>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">Nächster Schritt</h3></div>
+      <div class="card-body">
+        <% if (laeuft) { %>
+          <p class="text-secondary mb-0">Ein Schritt läuft — der nächste kommt, wenn er fertig ist.</p>
+        <% } else { %>
+        <form id="formSchritt">
+          <div class="mb-3">
+            <label class="form-label" for="schrittTyp">Typ</label>
+            <select class="form-select" id="schrittTyp" name="type">
+              <% schritttypen.forEach(function (t) { %><option value="<%= t %>"><%= t %></option><% }) %>
+            </select>
+          </div>
+
+          <fieldset data-typ="script">
+            <div class="mb-3">
+              <label class="form-label" for="fScript">Skript (bash, läuft in game/)</label>
+              <textarea class="form-control font-monospace" id="fScript" name="script" rows="8" placeholder="set -euo pipefail&#10;ls -la"></textarea>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="fReason">Warum ein Skript?</label>
+              <input class="form-control" id="fReason" name="reason" placeholder="Kommt ins Paket — ohne Begründung gibt es einen Befund">
+            </div>
+          </fieldset>
+
+          <fieldset data-typ="mkdir" hidden>
+            <div class="mb-3">
+              <label class="form-label" for="fPath">Ordner in game/</label>
+              <input class="form-control font-monospace" id="fPath" name="path" placeholder="mods">
+            </div>
+          </fieldset>
+
+          <fieldset data-typ="download" hidden>
+            <div class="mb-3">
+              <label class="form-label" for="fUrl">Adresse (nur https)</label>
+              <input class="form-control font-monospace" id="fUrl" name="url" placeholder="https://…">
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="fTarget">Zieldatei in game/</label>
+              <input class="form-control font-monospace" id="fTarget" name="target" placeholder="server.zip">
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="fChecksum">Prüfsumme</label>
+              <input class="form-control font-monospace" id="fChecksum" name="checksum" placeholder="sha256:… oder sha1:…">
+              <div class="form-hint">Pflicht. Stimmt sie nicht, bricht der Schritt ab, und die Datei bleibt nicht liegen.</div>
+            </div>
+          </fieldset>
+
+          <fieldset data-typ="extract" hidden>
+            <div class="mb-3">
+              <label class="form-label" for="fArchive">Archiv in game/</label>
+              <input class="form-control font-monospace" id="fArchive" name="archive" placeholder="server.tar.xz">
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="fExTarget">Zielordner in game/ (leer = game/)</label>
+              <input class="form-control font-monospace" id="fExTarget" name="target">
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="fStrip">Oberste Ordnerebenen weglassen</label>
+              <input class="form-control" id="fStrip" name="strip_components" type="number" min="0" value="0">
+            </div>
+            <label class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="delete_archive" checked>
+              <span class="form-check-label">Archiv danach löschen</span>
+            </label>
+          </fieldset>
+
+          <fieldset data-typ="template" hidden>
+            <div class="mb-3">
+              <label class="form-label" for="fFile">Datei in game/</label>
+              <input class="form-control font-monospace" id="fFile" name="file" placeholder="server.cfg">
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="fContent">Inhalt</label>
+              <textarea class="form-control font-monospace" id="fContent" name="content" rows="8"></textarea>
+              <div class="form-hint">Verweise wie <code>{{setting:name}}</code> und <code>{{port:game}}</code> kommen erst mit Stufe 2 an — bis dahin hat die Sitzung keine Werte dafür.</div>
+            </div>
+            <label class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="only_if_missing" checked>
+              <span class="form-check-label">Nur anlegen, wenn die Datei fehlt</span>
+            </label>
+          </fieldset>
+
+          <fieldset data-typ="steamcmd" hidden>
+            <div class="mb-3">
+              <label class="form-label" for="fApp">Steam-App-ID</label>
+              <input class="form-control" id="fApp" name="app" type="number" min="1">
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="fBranch">Zweig (leer = public)</label>
+              <input class="form-control font-monospace" id="fBranch" name="branch">
+            </div>
+            <label class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="validate" checked>
+              <span class="form-check-label">Nach dem Laden prüfen (validate)</span>
+            </label>
+          </fieldset>
+
+          <div class="mb-3 mt-3">
+            <label class="form-label" for="fBeschreibung">Beschreibung (freiwillig)</label>
+            <input class="form-control" id="fBeschreibung" name="beschreibung" placeholder="Was dieser Schritt tut">
+          </div>
+          <button class="btn btn-primary w-100" type="submit">
+            <i class="fa-solid fa-play me-1"></i>Ausführen
+          </button>
+        </form>
+        <% } %>
+      </div>
+    </div>
+
+    <div class="card mt-3">
+      <div class="card-header"><h3 class="card-title">Entwurf</h3></div>
+      <div class="card-body">
+        <p class="text-secondary small">So sähe das Paket gerade aus — nur die Schritte, die „im Entwurf" stehen. Start, Ports und Einstellungen kommen mit Stufe 2.</p>
+        <pre class="small mb-0 p-2" style="max-height:24rem;overflow:auto;background:var(--tblr-bg-surface-secondary)"><%= JSON.stringify(entwurf, null, 2) %></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var wurzel = document.getElementById('werkbankSitzung');
+  if (!wurzel) return;
+  var hier = wurzel.dataset.werkbankHier;
+  var basis = wurzel.dataset.werkbankBasis;
+  var kennung = wurzel.dataset.werkbankSitzung;
+
+  function melde(art, text) { if (window.showToast) window.showToast(art, text); }
+
+  async function schicke(pfad, nutzlast) {
+    var antwort = await fetch(pfad, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(nutzlast || {})
+    });
+    var daten = {};
+    try { daten = await antwort.json(); } catch (e) { /* kein JSON */ }
+    if (!antwort.ok || !daten.success) throw new Error(daten.message || ('HTTP ' + antwort.status));
+    return daten;
+  }
+
+  // ── Felder je Typ ──────────────────────────────────────────────────────
+  var typ = document.getElementById('schrittTyp');
+  function zeigeTyp() {
+    document.querySelectorAll('#formSchritt fieldset[data-typ]').forEach(function (f) {
+      f.hidden = f.dataset.typ !== typ.value;
+    });
+  }
+  if (typ) { typ.addEventListener('change', zeigeTyp); zeigeTyp(); }
+
+  // ── Schritt ausführen ─────────────────────────────────────────────────
+  var form = document.getElementById('formSchritt');
+  if (form) {
+    form.addEventListener('submit', async function (ev) {
+      ev.preventDefault();
+      var knopf = form.querySelector('button[type=submit]');
+      knopf.disabled = true;
+      // Nur die Felder des gewählten Typs — die versteckten gehören nicht dazu.
+      var nutzlast = { type: typ.value, beschreibung: form.beschreibung.value };
+      var feld = form.querySelector('fieldset[data-typ="' + typ.value + '"]');
+      feld.querySelectorAll('input, textarea, select').forEach(function (e) {
+        nutzlast[e.name] = e.type === 'checkbox' ? e.checked : e.value;
+      });
+      try {
+        var daten = await schicke(hier + '/schritte', nutzlast);
+        if (daten.angenommen) { window.location.reload(); return; }
+        melde('error', 'Der Daemon hat den Schritt abgewiesen: ' + (daten.fehler || ''));
+        window.location.reload();
+      } catch (fehler) {
+        knopf.disabled = false;
+        melde('error', 'Schritt nicht ausgeführt: ' + fehler.message);
+      }
+    });
+  }
+
+  // ── Aus dem Entwurf nehmen ────────────────────────────────────────────
+  document.querySelectorAll('[data-herausnehmen]').forEach(function (k) {
+    k.addEventListener('click', async function () {
+      k.disabled = true;
+      try {
+        await schicke(hier + '/schritte/' + k.dataset.herausnehmen + '/herausnehmen');
+        window.location.reload();
+      } catch (fehler) {
+        k.disabled = false;
+        melde('error', fehler.message);
+      }
+    });
+  });
+
+  // ── Verwerfen ─────────────────────────────────────────────────────────
+  var verwerfen = document.getElementById('knopfVerwerfen');
+  if (verwerfen) {
+    verwerfen.addEventListener('click', async function () {
+      if (!confirm('Sitzung verwerfen? Das Volume auf der Maschine wird gelöscht, der Entwurf ist weg.')) return;
+      verwerfen.disabled = true;
+      try {
+        await schicke(hier + '/verwerfen');
+        window.location.href = basis;
+      } catch (fehler) {
+        verwerfen.disabled = false;
+        melde('error', 'Nicht verworfen: ' + fehler.message);
+      }
+    });
+  }
+
+  // ── Live-Ausgabe ──────────────────────────────────────────────────────
+  if (wurzel.dataset.werkbankLaeuft === '1') {
+    var live = document.getElementById('liveAusgabe');
+    var strom = new EventSource(basis + '/events?sitzung=' + encodeURIComponent(kennung));
+    strom.addEventListener('werkbank', function (e) {
+      var d = {};
+      try { d = JSON.parse(e.data); } catch (x) { return; }
+      if (d.sitzung_id !== kennung) return;
+      if (d.action === 'output' && live) {
+        var unten = live.scrollTop + live.clientHeight >= live.scrollHeight - 4;
+        live.textContent += (d.finding ? '⚑ ' : '') + d.line + '\n';
+        if (unten) live.scrollTop = live.scrollHeight;
+      } else if (d.action === 'status' && live && d.message) {
+        live.textContent += '── ' + d.message + '\n';
+      } else if (d.action === 'fertig' || d.action === 'fehlgeschlagen') {
+        strom.close();
+        window.location.reload();
+      }
+    });
+  }
+})();
+</script>

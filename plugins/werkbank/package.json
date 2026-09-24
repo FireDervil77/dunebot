@@ -1,0 +1,14 @@
+{
+    "name": "werkbank",
+    "displayName": "Werkbank",
+    "description": "Spielpakete bauen: Schritte ausprobieren, starten, prüfen, veröffentlichen",
+    "version": "1.0.0",
+    "author": "FireBot Team",
+    "license": "none",
+    "type": "commonjs",
+    "peerDependencies": {
+        "express": "^5.1.0",
+        "dunebot-core": "*",
+        "dunebot-sdk": "*"
+    }
+}
