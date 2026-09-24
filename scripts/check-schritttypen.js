@@ -38,7 +38,6 @@ const { ohneKommentare } = require('./lib/quelltext');
 const DAEMON = '/home/firedervil/firebot_daemon';
 
 const AUSSTEHEND = {
-    extract:  'W-12 Schritt 3 — setzt auf download auf; Testfall Factorio 2.0.77 (.tar.xz)',
     template: 'W-12 Schritt 4 — dieselbe Platzhalterregel wie start.args und config[]',
 };
 
