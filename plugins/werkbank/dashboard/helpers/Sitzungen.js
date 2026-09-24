@@ -279,6 +279,32 @@ function entwurfAlsPaket(sitzung, liste) {
 
 // ── Stufe 2: Probestart ──────────────────────────────────────────────────────
 
+/**
+ * Übernommene Ports, auf die nichts verweist.
+ *
+ * Ins Paket kommt nur der Zweck; ein echter Server bekommt seine Nummer aus
+ * dem Pool. Erfährt das Spiel sie nirgends — kein `{{port:zweck}}` in
+ * Argumenten, Umgebung oder Schritten, keine `variable` am Port —, lauscht es
+ * auf seinem eigenen Standard, und auf jedem Server mit anderer Nummer kommt
+ * niemand herein. In der Werkbank fällt das nicht auf, wenn die beobachtete
+ * Nummer der Standard des Spiels ist (Factorio: 34197, 2026-09-24).
+ */
+function ungenutztePorts(paket) {
+    // Alles außer den Ports selbst und den Beschreibungen: Verweise stehen in
+    // start, env, install, aber auch im `config`-Abschnitt (Minecraft schreibt
+    // Spiel- und RCON-Port so nach server.properties).
+    const { ports, identity, status, ...rest } = paket;
+    const text = JSON.stringify(rest);
+    return (ports || [])
+        // `assign: game+1` leitet das Spiel selbst ab (Valheims Query) — dem
+        // muss niemand etwas sagen.
+        .filter(p => (p.assign || 'pool') === 'pool')
+        .filter(p => !p.variable && !text.includes(`{{port:${p.purpose}}}`)
+            // `form` + `from: port:x` ist die zweite Schreibweise (Handpakete).
+            && !text.includes(`"from":"port:${p.purpose}"`))
+        .map(p => p.purpose);
+}
+
 /** Was nur der Sitzung gehört: Portnummern und die zuletzt gewählten Werte. */
 function werkbankTeil(sitzung) {
     const w = sitzung.entwurf?.werkbank || {};
@@ -467,7 +493,7 @@ module.exports = {
     waehlbareImages, maschinen, liste, laden, schritte, anlegen,
     schrittAusfuehren, ausgabeAnhaengen, beenden, laufenderSchritt,
     herausnehmen, verwerfen, entwurfAlsPaket,
-    werkbankTeil, startSpeichern, starten, stoppen, eingabe, laeufe, laufenderLauf,
+    werkbankTeil, ungenutztePorts, startSpeichern, starten, stoppen, eingabe, laeufe, laufenderLauf,
     portUebernehmen, portEntfernen, bereitschaftszeile,
     laufSetzen, konsoleAnhaengen, laufBeenden,
 };

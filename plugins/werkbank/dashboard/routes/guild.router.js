@@ -211,10 +211,12 @@ router.get('/:kennung', requirePermission('WERKBANK.VIEW'), async (req, res) => 
         }
         const [liste, laeufe] = await Promise.all([Sitzungen.schritte(sitzung.id), Sitzungen.laeufe(sitzung.id)]);
         const maschine = (await Sitzungen.maschinen(guildId)).find(m => m.id === sitzung.rootserver_id) || null;
+        const entwurf = Sitzungen.entwurfAlsPaket(sitzung, liste);
         return await renderView(res, 'guild/werkbank-sitzung', {
             guildId, sitzung, schritte: liste, maschine,
             schritttypen: Sitzungen.SCHRITTTYPEN,
-            entwurf: Sitzungen.entwurfAlsPaket(sitzung, liste),
+            entwurf,
+            ungenutztePorts: Sitzungen.ungenutztePorts(entwurf),
             startFormular: startAlsFormular(sitzung.entwurf?.start),
             werkbankTeil: Sitzungen.werkbankTeil(sitzung),
             laeufe,

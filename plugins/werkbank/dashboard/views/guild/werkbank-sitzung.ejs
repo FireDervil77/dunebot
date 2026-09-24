@@ -354,10 +354,22 @@
             <div class="row g-3 mt-2">
               <div class="col-md-6">
                 <div class="text-secondary small mb-1">Beobachtet (lauscht im Container)</div>
-                <div id="laufPorts">
+                <%# Schon übernommene Ports (gleiche Nummer und Protokoll) nicht noch einmal anbieten. %>
+                <% const uebernommen = {};
+                   entwurfPorts.forEach(function (p) {
+                     const n = werkbankTeil.portnummern[p.purpose];
+                     if (n) (p.protocol === 'both' ? ['tcp', 'udp'] : [p.protocol]).forEach(function (pr) { uebernommen[n + '/' + pr] = p.purpose; });
+                   }); %>
+                <div id="laufPorts" data-uebernommen="<%= JSON.stringify(uebernommen) %>">
                   <% const beobachtet = (lauf && lauf.ports) || []; %>
                   <% if (!beobachtet.length) { %><span class="text-secondary small">Noch keiner. Öffnet das Spiel einen Port, erscheint er hier mit Nummer — dann Zweck eintragen (game, query, rcon …) und übernehmen.</span><% } %>
                   <% beobachtet.forEach(function (p) { %>
+                    <% if (uebernommen[p.port + '/' + p.protocol]) { %>
+                      <div class="d-flex gap-2 mb-1 align-items-center">
+                        <span class="badge bg-green-lt font-monospace"><%= p.port %>/<%= p.protocol %></span>
+                        <span class="text-secondary small">im Entwurf als <span class="font-monospace"><%= uebernommen[p.port + '/' + p.protocol] %></span></span>
+                      </div>
+                      <% return; } %>
                     <form class="d-flex gap-1 mb-1" data-port-uebernehmen data-port="<%= p.port %>" data-protocol="<%= p.protocol %>">
                       <span class="badge bg-azure-lt font-monospace align-self-center"><%= p.port %>/<%= p.protocol %></span>
                       <input class="form-control form-control-sm font-monospace" name="zweck" placeholder="Zweck (game)" style="max-width:9rem">
@@ -369,6 +381,14 @@
               <div class="col-md-6">
                 <div class="text-secondary small mb-1">Im Entwurf</div>
                 <% if (!entwurfPorts.length) { %><span class="text-secondary small">Noch kein Port. Nummern trägst du nicht ein — die Werkbank beobachtet sie.</span><% } %>
+                <% if (ungenutztePorts.length) { %>
+                  <div class="alert alert-warning py-2 small mb-2">
+                    Auf <strong class="font-monospace"><%= ungenutztePorts.join(', ') %></strong> verweist nichts.
+                    Ein echter Server bekommt seine Nummer aus dem Pool — erfährt das Spiel sie nicht, lauscht es auf seinem Standard,
+                    und niemand kommt herein. Meist fehlt ein Argument wie <code>--port</code> gefolgt von
+                    <code>{{port:<%= ungenutztePorts[0] %>}}</code>.
+                  </div>
+                <% } %>
                 <% entwurfPorts.forEach(function (p) { %>
                   <div class="d-flex align-items-center gap-2 mb-1">
                     <span class="font-monospace small"><%= p.purpose %></span>
@@ -543,10 +563,26 @@
     } catch (fehler) { melde('error', fehler.message); }
   });
 
+  var uebernommen = {};
+  try { uebernommen = JSON.parse(portsKasten.dataset.uebernommen || '{}'); } catch (e) { /* leer */ }
   function zeichnePorts(ports) {
     portsKasten.innerHTML = '';
     if (!ports.length) { portsKasten.innerHTML = '<span class="text-secondary small">Gerade lauscht nichts.</span>'; return; }
     ports.forEach(function (p) {
+      var zweck = uebernommen[p.port + '/' + p.protocol];
+      if (zweck) {
+        var zeile = document.createElement('div');
+        zeile.className = 'd-flex gap-2 mb-1 align-items-center';
+        var marke = document.createElement('span');
+        marke.className = 'badge bg-green-lt font-monospace';
+        marke.textContent = p.port + '/' + p.protocol;
+        var hinweis = document.createElement('span');
+        hinweis.className = 'text-secondary small';
+        hinweis.textContent = 'im Entwurf als ' + zweck;
+        zeile.append(marke, hinweis);
+        portsKasten.appendChild(zeile);
+        return;
+      }
       var f = document.createElement('form');
       f.className = 'd-flex gap-1 mb-1';
       f.setAttribute('data-port-uebernehmen', '');

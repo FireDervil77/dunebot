@@ -380,6 +380,24 @@ async function pruefe(name, fn) {
         assert.strictEqual(paket.start.program, './bin/x64/factorio');
     });
 
+    await pruefe('ein übernommener Port, auf den nichts verweist, wird gemeldet', async () => {
+        const paket = (args, extra = {}) => ({ ports: [{ purpose: 'game', protocol: 'udp', assign: 'pool', ...extra }],
+            start: { program: 'x', args }, install: { steps: [] } });
+        // Der Fall vom 2026-09-24: Factorio ohne --port lief nur, weil 34197 sein Standard ist.
+        assert.deepStrictEqual(Sitzungen.ungenutztePorts(paket([{ key: 'arg1', parts: [{ text: '--start-server' }] }])), ['game']);
+        assert.deepStrictEqual(Sitzungen.ungenutztePorts(paket([{ key: 'arg1', parts: [{ text: '{{port:game}}' }] }])), []);
+        assert.deepStrictEqual(Sitzungen.ungenutztePorts(paket([{ key: 'port', form: ['--port', '{{value}}'], from: 'port:game' }])), [], 'form/from zählt');
+        assert.deepStrictEqual(Sitzungen.ungenutztePorts(paket([], { variable: 'SERVER_PORT' })), [], 'variable zählt');
+        const f = require('../packages/fbpkg/beispiele/factorio.json');
+        // Alle Beispielpakete: keins darf gemeldet werden. Beim ersten Wurf fielen
+        // Minecraft (Ports über `config`) und Valheim (query = game+1) durch.
+        const ordner = path.join(__dirname, '../packages/fbpkg/beispiele');
+        for (const d of fs.readdirSync(ordner).filter(x => x.endsWith('.json'))) {
+            const u = Sitzungen.ungenutztePorts(JSON.parse(fs.readFileSync(path.join(ordner, d), 'utf8')));
+            assert.deepStrictEqual(u, [], `${d}: ${u} gemeldet — ein Paket, das läuft, ist kein Befund`);
+        }
+    });
+
     console.log(`\n${bestanden} Prüfung(en) bestanden.\n`);
     process.exit(process.exitCode || 0);
 })();
