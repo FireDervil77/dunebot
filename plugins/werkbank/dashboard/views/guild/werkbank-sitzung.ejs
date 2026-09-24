@@ -356,7 +356,7 @@
                 <div class="text-secondary small mb-1">Beobachtet (lauscht im Container)</div>
                 <div id="laufPorts">
                   <% const beobachtet = (lauf && lauf.ports) || []; %>
-                  <% if (!beobachtet.length) { %><span class="text-secondary small">—</span><% } %>
+                  <% if (!beobachtet.length) { %><span class="text-secondary small">Noch keiner. Öffnet das Spiel einen Port, erscheint er hier mit Nummer — dann Zweck eintragen (game, query, rcon …) und übernehmen.</span><% } %>
                   <% beobachtet.forEach(function (p) { %>
                     <form class="d-flex gap-1 mb-1" data-port-uebernehmen data-port="<%= p.port %>" data-protocol="<%= p.protocol %>">
                       <span class="badge bg-azure-lt font-monospace align-self-center"><%= p.port %>/<%= p.protocol %></span>
@@ -368,7 +368,7 @@
               </div>
               <div class="col-md-6">
                 <div class="text-secondary small mb-1">Im Entwurf</div>
-                <% if (!entwurfPorts.length) { %><span class="text-secondary small">noch kein Port</span><% } %>
+                <% if (!entwurfPorts.length) { %><span class="text-secondary small">Noch kein Port. Nummern trägst du nicht ein — die Werkbank beobachtet sie.</span><% } %>
                 <% entwurfPorts.forEach(function (p) { %>
                   <div class="d-flex align-items-center gap-2 mb-1">
                     <span class="font-monospace small"><%= p.purpose %></span>
@@ -545,7 +545,7 @@
 
   function zeichnePorts(ports) {
     portsKasten.innerHTML = '';
-    if (!ports.length) { portsKasten.innerHTML = '<span class="text-secondary small">—</span>'; return; }
+    if (!ports.length) { portsKasten.innerHTML = '<span class="text-secondary small">Gerade lauscht nichts.</span>'; return; }
     ports.forEach(function (p) {
       var f = document.createElement('form');
       f.className = 'd-flex gap-1 mb-1';
