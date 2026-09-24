@@ -9,6 +9,15 @@
  *   POST /:kennung/schritte/:id/herausnehmen
  *   POST /:kennung/verwerfen            Volume löschen, Sitzung schließen
  *
+ * Stufe 2 (Probestart):
+ *   POST /:kennung/start                Startteil + RAM/CPU speichern
+ *   POST /:kennung/starten              speichern (wenn mitgeschickt) und starten
+ *   POST /:kennung/stoppen              Stoppfolge des Entwurfs fahren
+ *   POST /:kennung/eingabe              eine Zeile in die Konsole des Spiels
+ *   POST /:kennung/ports                beobachteten Port übernehmen
+ *   POST /:kennung/ports/:zweck/entfernen
+ *   POST /:kennung/bereitschaftszeile   Konsolenzeile als ready_when.log_line
+ *
  * @module werkbank/routes/guild
  */
 
@@ -71,6 +80,78 @@ function schrittAusFormular(b) {
     return s;
 }
 
+const RE_STOPP = /^(save|sigint|sigterm|sigkill|command:.+|rcon:.+)$/;
+const SIGNALE = ['sigint', 'sigterm', 'sigkill'];
+
+/**
+ * Den Startteil aus dem Formular bauen — in der Form des Schemas.
+ *
+ *   Argumente   eine Zeile = EIN argv-Eintrag (`parts`), Verweise wie
+ *               {{port:game}} bleiben darin stehen und werden erst beim Start
+ *               eingesetzt. Keine Shell: Leerzeichen trennen nichts.
+ *   Stoppfolge  eine Zeile = `schritt [frist] [beendet|weiter]`. Signale
+ *               beenden immer; bei command:/rcon: sagt man es dazu, sonst
+ *               meldet der Auftragsbau die fehlende Angabe als Lücke.
+ */
+function startAusFormular(b) {
+    // Zahlen zählen mit — die Nutzlast kommt als JSON, nicht nur aus Textfeldern.
+    const text = (k) => (typeof b[k] === 'string' ? b[k] : typeof b[k] === 'number' ? String(b[k]) : '');
+    const zeilen = (k) => text(k).split(/\r?\n/).map(z => z.trim()).filter(Boolean);
+    const start = { program: text('program').trim() };
+    if (text('workdir').trim()) start.workdir = text('workdir').trim();
+
+    const args = zeilen('args');
+    if (args.length) start.args = args.map((z, i) => ({ key: `arg${i + 1}`, parts: [{ text: z }] }));
+
+    const folge = zeilen('stop').map((z) => {
+        const m = z.match(/^(.+?)(?:\s+(\d+))?(?:\s+(beendet|weiter))?$/);
+        const step = m[1].trim();
+        if (!RE_STOPP.test(step)) {
+            throw new Error(`Stoppfolge: „${step}" — erlaubt sind sigint, sigterm, sigkill, command:…, rcon:…`);
+        }
+        const eintrag = { step };
+        if (m[2]) eintrag.timeout_sec = Number(m[2]);
+        if (m[3]) eintrag.terminates = m[3] === 'beendet';
+        else if (SIGNALE.includes(step)) eintrag.terminates = true;
+        return eintrag;
+    });
+    if (folge.length) start.stop = { sequence: folge };
+
+    const bereit = {};
+    if (text('ready_port').trim()) bereit.port = text('ready_port').trim();
+    if (text('log_line').trim()) bereit.log_line = text('log_line').trim();
+    const frist = Number(text('timeout_sec'));
+    if (Number.isInteger(frist) && frist > 0) bereit.timeout_sec = frist;
+    if (Object.keys(bereit).length) start.ready_when = bereit;
+    return start;
+}
+
+/** Die Gegenrichtung für die Vorbelegung des Formulars. */
+function startAlsFormular(start) {
+    const s = start || {};
+    const argZeile = (a) => (a.parts ? a.parts.map(t => t.text).join('') : [].concat(a.form || []).join(' '));
+    const stoppZeile = (e) => {
+        const x = typeof e === 'string' ? { step: e } : e;
+        return [x.step, x.timeout_sec || '', SIGNALE.includes(x.step) || x.terminates === undefined ? '' : (x.terminates ? 'beendet' : 'weiter')]
+            .filter(v => v !== '').join(' ');
+    };
+    const log = s.ready_when?.log_line;
+    return {
+        program: s.program || '', workdir: s.workdir || '',
+        args: (s.args || []).map(argZeile).join('\n'),
+        stop: (s.stop?.sequence || []).map(stoppZeile).join('\n'),
+        ready_port: s.ready_when?.port || '',
+        log_line: Array.isArray(log) ? log[0] : (log || ''),
+        timeout_sec: s.ready_when?.timeout_sec || '',
+    };
+}
+
+async function offeneSitzung(req, res) {
+    const sitzung = await Sitzungen.laden(res.locals.guildId, req.params.kennung);
+    if (!sitzung || sitzung.status !== 'offen') throw new Error('Sitzung nicht gefunden');
+    return sitzung;
+}
+
 // ── Übersicht ────────────────────────────────────────────────────────────────
 router.get('/', requirePermission('WERKBANK.VIEW'), async (req, res) => {
     const guildId = res.locals.guildId;
@@ -120,12 +201,18 @@ router.get('/:kennung', requirePermission('WERKBANK.VIEW'), async (req, res) => 
         if (!sitzung || sitzung.status !== 'offen') {
             return res.redirect(`/guild/${guildId}/plugins/werkbank`);
         }
-        const liste = await Sitzungen.schritte(sitzung.id);
+        const [liste, laeufe] = await Promise.all([Sitzungen.schritte(sitzung.id), Sitzungen.laeufe(sitzung.id)]);
         const maschine = (await Sitzungen.maschinen(guildId)).find(m => m.id === sitzung.rootserver_id) || null;
         return await renderView(res, 'guild/werkbank-sitzung', {
             guildId, sitzung, schritte: liste, maschine,
             schritttypen: Sitzungen.SCHRITTTYPEN,
             entwurf: Sitzungen.entwurfAlsPaket(sitzung, liste),
+            startFormular: startAlsFormular(sitzung.entwurf?.start),
+            werkbankTeil: Sitzungen.werkbankTeil(sitzung),
+            laeufe,
+            // Die Adresse trägt die Kennung und trifft keinen Menüpunkt — ohne
+            // Angabe klappte die Seitenleiste zu (check-navigation-treffer).
+            activeMenu: `/guild/${guildId}/plugins/werkbank`,
         });
     } catch (error) {
         return renderFehler(res, error, 'Die Sitzung konnte nicht geladen werden');
@@ -165,5 +252,85 @@ router.post('/:kennung/verwerfen', requirePermission('WERKBANK.BAUEN'), async (r
     }
 });
 
+// ── Probestart (Stufe 2) ─────────────────────────────────────────────────────
+router.post('/:kennung/start', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        const sitzung = await offeneSitzung(req, res);
+        await Sitzungen.startSpeichern(sitzung, {
+            start: startAusFormular(req.body || {}),
+            memory_mb: req.body?.memory_mb, cpu_prozent: req.body?.cpu_prozent,
+        });
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Startteil nicht gespeichert', 400);
+    }
+});
+
+router.post('/:kennung/starten', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        const sitzung = await offeneSitzung(req, res);
+        // Mit Formular: erst speichern — gestartet wird, was auf dem Bildschirm steht.
+        if (req.body?.program !== undefined) {
+            await Sitzungen.startSpeichern(sitzung, {
+                start: startAusFormular(req.body),
+                memory_mb: req.body.memory_mb, cpu_prozent: req.body.cpu_prozent,
+            });
+        }
+        const ergebnis = await Sitzungen.starten(sitzung, await Sitzungen.schritte(sitzung.id));
+        return res.json({ success: true, ...ergebnis });
+    } catch (error) {
+        return fehler(res, error, 'Nicht gestartet', 400);
+    }
+});
+
+router.post('/:kennung/stoppen', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.stoppen(await offeneSitzung(req, res));
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Nicht gestoppt', 400);
+    }
+});
+
+router.post('/:kennung/eingabe', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.eingabe(await offeneSitzung(req, res), req.body?.zeile);
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Eingabe nicht zugestellt', 400);
+    }
+});
+
+router.post('/:kennung/ports', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.portUebernehmen(await offeneSitzung(req, res), {
+            zweck: req.body?.zweck, protocol: req.body?.protocol, port: req.body?.port,
+        });
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Port nicht übernommen', 400);
+    }
+});
+
+router.post('/:kennung/ports/:zweck/entfernen', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.portEntfernen(await offeneSitzung(req, res), String(req.params.zweck));
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Port nicht entfernt', 400);
+    }
+});
+
+router.post('/:kennung/bereitschaftszeile', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.bereitschaftszeile(await offeneSitzung(req, res), req.body?.zeile);
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Zeile nicht übernommen', 400);
+    }
+});
+
 module.exports = router;
 module.exports.schrittAusFormular = schrittAusFormular;
+module.exports.startAusFormular = startAusFormular;
+module.exports.startAlsFormular = startAlsFormular;

@@ -10,12 +10,26 @@
 
     „Aus dem Entwurf nehmen" nimmt einen Schritt aus dem Rezept. Was er im
     Volume angelegt hat, bleibt dort; das steht beim Knopf dabei.
+
+    Stufe 2: Probestart (Karte unten). Das Spiel laeuft im Volume der Sitzung,
+    ohne freigegebene Ports; beobachtet wird von innen. Was beobachtet wurde
+    (Ports, Konsolenzeilen), kommt erst per Knopf in den Entwurf.
 -->
 <%
   const basis = `/guild/${guildId}/plugins/werkbank`;
   const hier = `${basis}/${sitzung.kennung}`;
   const bildName = (sitzung.image.ref || '').replace(/^.*\//, '') + (sitzung.image.tag ? ':' + sitzung.image.tag : '');
   const laeuft = schritte.some(s => s.status === 'laeuft');
+  const lauf = laeufe[0] || null;
+  const spielLaeuft = Boolean(lauf && lauf.status !== 'beendet');
+  const beschaeftigt = laeuft || spielLaeuft;
+  const entwurfPorts = sitzung.entwurf.ports || [];
+  const laufStatus = {
+    startet: '<span class="badge bg-blue-lt">startet</span>',
+    laeuft:  '<span class="badge bg-green-lt">läuft</span>',
+    stoppt:  '<span class="badge bg-orange-lt">stoppt</span>',
+    beendet: '<span class="badge bg-secondary-lt">beendet</span>'
+  };
 
   const statusMarke = {
     laeuft:         '<span class="badge bg-blue-lt">läuft</span>',
@@ -45,12 +59,13 @@
     beschreibung: bildName + ' · ' + (maschine ? maschine.name : 'Maschine ' + sitzung.rootserver_id) + (maschine && !maschine.online ? ' (nicht erreichbar)' : ''),
     icon:         'fa-solid fa-screwdriver-wrench',
     guildId,
-    aktion:       '<button class="btn btn-outline-danger" id="knopfVerwerfen"' + (laeuft ? ' disabled' : '') + '><i class="fa-solid fa-trash me-1"></i>Sitzung verwerfen</button>'
+    aktion:       '<button class="btn btn-outline-danger" id="knopfVerwerfen"' + (beschaeftigt ? ' disabled' : '') + '><i class="fa-solid fa-trash me-1"></i>Sitzung verwerfen</button>'
 }) %>
 
 <div class="row row-cards" id="werkbankSitzung"
      data-werkbank-hier="<%= hier %>" data-werkbank-basis="<%= basis %>"
-     data-werkbank-sitzung="<%= sitzung.kennung %>" data-werkbank-laeuft="<%= laeuft ? '1' : '0' %>">
+     data-werkbank-sitzung="<%= sitzung.kennung %>" data-werkbank-laeuft="<%= laeuft ? '1' : '0' %>"
+     data-werkbank-spiel="<%= spielLaeuft ? '1' : '0' %>">
 
   <div class="col-lg-7">
     <div class="card">
@@ -103,6 +118,8 @@
       <div class="card-body">
         <% if (laeuft) { %>
           <p class="text-secondary mb-0">Ein Schritt läuft — der nächste kommt, wenn er fertig ist.</p>
+        <% } else if (spielLaeuft) { %>
+          <p class="text-secondary mb-0">Das Spiel läuft (Probestart unten) — Schritte gehen erst wieder, wenn es gestoppt ist.</p>
         <% } else { %>
         <form id="formSchritt">
           <div class="mb-3">
@@ -157,7 +174,8 @@
             </div>
             <div class="mb-3">
               <label class="form-label" for="fStrip">Oberste Ordnerebenen weglassen</label>
-              <input class="form-control" id="fStrip" name="strip_components" type="number" min="0" value="0">
+              <input class="form-control" id="fStrip" name="strip_components" type="number" min="0" placeholder="0">
+              <div class="form-hint">Liegt im Archiv alles in einem Ordner (etwa <code>factorio/</code>), ist es meist 1.</div>
             </div>
             <label class="form-check form-switch">
               <input class="form-check-input" type="checkbox" name="delete_archive" checked>
@@ -173,7 +191,7 @@
             <div class="mb-3">
               <label class="form-label" for="fContent">Inhalt</label>
               <textarea class="form-control font-monospace" id="fContent" name="content" rows="8"></textarea>
-              <div class="form-hint">Verweise wie <code>{{setting:name}}</code> und <code>{{port:game}}</code> kommen erst mit Stufe 2 an — bis dahin hat die Sitzung keine Werte dafür.</div>
+              <div class="form-hint"><code>{{port:zweck}}</code> bekommt die Nummer, die beim Probestart übernommen wurde. <code>{{setting:name}}</code> hat die Sitzung noch nicht.</div>
             </div>
             <label class="form-check form-switch">
               <input class="form-check-input" type="checkbox" name="only_if_missing" checked>
@@ -211,8 +229,148 @@
     <div class="card mt-3">
       <div class="card-header"><h3 class="card-title">Entwurf</h3></div>
       <div class="card-body">
-        <p class="text-secondary small">So sähe das Paket gerade aus — nur die Schritte, die „im Entwurf" stehen. Start, Ports und Einstellungen kommen mit Stufe 2.</p>
+        <p class="text-secondary small">So sähe das Paket gerade aus: die Schritte „im Entwurf", Startteil und übernommene Ports. Einstellungen kommen später.</p>
         <pre class="small mb-0 p-2" style="max-height:24rem;overflow:auto;background:var(--tblr-bg-surface-secondary);color:var(--tblr-body-color)"><%= JSON.stringify(entwurf, null, 2) %></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Probestart (Stufe 2) ─────────────────────────────────────────── -->
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Probestart</h3>
+        <div class="card-actions" id="laufStatus"><%- lauf ? (laufStatus[lauf.status] || '') : '<span class="text-secondary small">noch nie gestartet</span>' %></div>
+      </div>
+      <div class="card-body">
+        <div class="row g-4">
+          <div class="col-lg-5">
+            <form id="formStart">
+              <div class="mb-3">
+                <label class="form-label" for="sProgram">Programm (relativ zu game/)</label>
+                <input class="form-control font-monospace" id="sProgram" name="program" value="<%= startFormular.program %>" placeholder="./bin/x64/factorio">
+              </div>
+              <div class="mb-3">
+                <label class="form-label" for="sArgs">Argumente — eins pro Zeile</label>
+                <textarea class="form-control font-monospace" id="sArgs" name="args" rows="5" placeholder="--start-server&#10;saves/welt.zip&#10;--port&#10;{{port:game}}"><%= startFormular.args %></textarea>
+                <div class="form-hint">Eine Zeile ist genau ein Argument, Leerzeichen trennen nichts. <code>{{port:zweck}}</code> wird beim Start eingesetzt.</div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label" for="sWorkdir">Arbeitsordner (leer = game/)</label>
+                <input class="form-control font-monospace" id="sWorkdir" name="workdir" value="<%= startFormular.workdir %>">
+              </div>
+              <div class="mb-3">
+                <label class="form-label" for="sStop">Stoppfolge — ein Schritt pro Zeile</label>
+                <textarea class="form-control font-monospace" id="sStop" name="stop" rows="3" placeholder="command:/quit 30 beendet&#10;sigint 30&#10;sigkill 10"><%= startFormular.stop %></textarea>
+                <div class="form-hint"><code>schritt [frist] [beendet|weiter]</code> — sigint, sigterm, sigkill, command:…, rcon:…. Leer lassen heißt: Docker beendet hart.</div>
+              </div>
+              <div class="row g-2 mb-3">
+                <div class="col-sm-4">
+                  <label class="form-label" for="sReadyPort">Bereit, wenn Port</label>
+                  <select class="form-select" id="sReadyPort" name="ready_port">
+                    <option value="">—</option>
+                    <% entwurfPorts.forEach(function (p) { %><option value="<%= p.purpose %>" <%= startFormular.ready_port === p.purpose ? 'selected' : '' %>><%= p.purpose %></option><% }) %>
+                  </select>
+                </div>
+                <div class="col-sm-5">
+                  <label class="form-label" for="sLogLine">… oder Zeile</label>
+                  <input class="form-control font-monospace" id="sLogLine" name="log_line" value="<%= startFormular.log_line %>" placeholder="Klick auf eine Konsolenzeile">
+                </div>
+                <div class="col-sm-3">
+                  <label class="form-label" for="sTimeout">Frist (s)</label>
+                  <input class="form-control" id="sTimeout" name="timeout_sec" type="number" min="1" value="<%= startFormular.timeout_sec %>" placeholder="300">
+                </div>
+              </div>
+              <div class="row g-2 mb-3">
+                <div class="col-6">
+                  <label class="form-label" for="sMem">Arbeitsspeicher (MB)</label>
+                  <input class="form-control" id="sMem" name="memory_mb" type="number" min="128" value="<%= werkbankTeil.memory_mb %>">
+                </div>
+                <div class="col-6">
+                  <label class="form-label" for="sCpu">CPU (%, 100 = ein Kern)</label>
+                  <input class="form-control" id="sCpu" name="cpu_prozent" type="number" min="10" value="<%= werkbankTeil.cpu_prozent %>">
+                </div>
+                <div class="col-12 form-hint">Nur für den Probestart — wird nicht auf der Maschine gebucht.</div>
+              </div>
+              <div class="d-flex gap-2">
+                <button class="btn btn-outline-secondary" type="button" id="knopfStartSpeichern" <%= spielLaeuft ? 'disabled' : '' %>>
+                  <i class="fa-solid fa-floppy-disk me-1"></i>Speichern
+                </button>
+                <% if (spielLaeuft) { %>
+                  <button class="btn btn-danger flex-fill" type="button" id="knopfStoppen" <%= lauf.status === 'stoppt' ? 'disabled' : '' %>>
+                    <i class="fa-solid fa-stop me-1"></i><%= lauf.status === 'stoppt' ? 'Stoppt …' : 'Stoppen' %>
+                  </button>
+                <% } else { %>
+                  <button class="btn btn-success flex-fill" type="submit" <%= laeuft ? 'disabled' : '' %>>
+                    <i class="fa-solid fa-play me-1"></i>Speichern und starten
+                  </button>
+                <% } %>
+              </div>
+            </form>
+          </div>
+
+          <div class="col-lg-7">
+            <div class="mb-2 small" id="laufBereitschaft">
+              <% if (lauf && lauf.bereitschaft) { %>
+                <span class="text-secondary">Bereitschaft:</span>
+                <span class="font-monospace"><%= lauf.bereitschaft.type %><%= lauf.bereitschaft.stage ? ' · ' + lauf.bereitschaft.stage : '' %></span>
+                <% if (lauf.bereitschaft.hinweis) { %><span class="text-secondary"> — <%= lauf.bereitschaft.hinweis %></span><% } %>
+              <% } %>
+            </div>
+            <% if (lauf && lauf.status === 'beendet') { %>
+              <div class="mb-2 small <%= lauf.exit_code === 0 || lauf.gestoppt ? 'text-secondary' : 'text-danger' %>">
+                Beendet<%= lauf.exit_code !== null ? ' mit Code ' + lauf.exit_code : '' %><%= lauf.gestoppt ? ' (gestoppt)' : '' %><%= lauf.fehler ? ' — ' + lauf.fehler : '' %>
+              </div>
+            <% } %>
+            <div id="laufLuecken">
+              <% if (lauf && lauf.luecken && lauf.luecken.length) { %>
+                <details class="mb-2 small">
+                  <summary class="text-warning">Der Auftragsbau vermisste <%= lauf.luecken.length %> Angabe(n)</summary>
+                  <ul class="mb-0 mt-1"><% lauf.luecken.forEach(function (l) { %><li><%= l %></li><% }) %></ul>
+                </details>
+              <% } %>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="text-secondary small">Konsole — Klick auf eine Zeile übernimmt sie als Bereitschaftszeile</span>
+            </div>
+            <div id="laufKonsole" class="mt-1 p-2 small font-monospace"
+                 style="height:22rem;overflow:auto;white-space:pre-wrap;background:var(--tblr-bg-surface-secondary);color:var(--tblr-body-color);cursor:pointer"><%
+              ((lauf && lauf.konsole) || '').split('\n').filter(Boolean).forEach(function (z) { %><div><%= z %></div><% }) %></div>
+            <form id="formEingabe" class="input-group mt-2">
+              <input class="form-control font-monospace" name="zeile" placeholder="Befehl an das Spiel (Standardeingabe)" <%= spielLaeuft ? '' : 'disabled' %>>
+              <button class="btn btn-outline-secondary" type="submit" <%= spielLaeuft ? '' : 'disabled' %>>Senden</button>
+            </form>
+
+            <div class="row g-3 mt-2">
+              <div class="col-md-6">
+                <div class="text-secondary small mb-1">Beobachtet (lauscht im Container)</div>
+                <div id="laufPorts">
+                  <% const beobachtet = (lauf && lauf.ports) || []; %>
+                  <% if (!beobachtet.length) { %><span class="text-secondary small">—</span><% } %>
+                  <% beobachtet.forEach(function (p) { %>
+                    <form class="d-flex gap-1 mb-1" data-port-uebernehmen data-port="<%= p.port %>" data-protocol="<%= p.protocol %>">
+                      <span class="badge bg-azure-lt font-monospace align-self-center"><%= p.port %>/<%= p.protocol %></span>
+                      <input class="form-control form-control-sm font-monospace" name="zweck" placeholder="Zweck (game)" style="max-width:9rem">
+                      <button class="btn btn-sm btn-outline-primary" type="submit">Übernehmen</button>
+                    </form>
+                  <% }) %>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="text-secondary small mb-1">Im Entwurf</div>
+                <% if (!entwurfPorts.length) { %><span class="text-secondary small">noch kein Port</span><% } %>
+                <% entwurfPorts.forEach(function (p) { %>
+                  <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="font-monospace small"><%= p.purpose %></span>
+                    <span class="badge bg-green-lt font-monospace"><%= werkbankTeil.portnummern[p.purpose] || '?' %>/<%= p.protocol %></span>
+                    <button class="btn btn-sm btn-ghost-secondary ms-auto" data-port-entfernen="<%= p.purpose %>" <%= spielLaeuft ? 'disabled' : '' %>>entfernen</button>
+                  </div>
+                <% }) %>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -304,15 +462,124 @@
     });
   }
 
+  // ── Probestart ────────────────────────────────────────────────────────
+  var formStart = document.getElementById('formStart');
+  function startNutzlast() {
+    var n = {};
+    formStart.querySelectorAll('input, textarea, select').forEach(function (e) { n[e.name] = e.value; });
+    return n;
+  }
+  if (formStart) {
+    document.getElementById('knopfStartSpeichern').addEventListener('click', async function () {
+      try { await schicke(hier + '/start', startNutzlast()); window.location.reload(); }
+      catch (fehler) { melde('error', fehler.message); }
+    });
+    formStart.addEventListener('submit', async function (ev) {
+      ev.preventDefault();
+      var knopf = formStart.querySelector('button[type=submit]');
+      knopf.disabled = true;
+      try { await schicke(hier + '/starten', startNutzlast()); window.location.reload(); }
+      catch (fehler) { knopf.disabled = false; melde('error', fehler.message); }
+    });
+  }
+  var knopfStoppen = document.getElementById('knopfStoppen');
+  if (knopfStoppen) {
+    knopfStoppen.addEventListener('click', async function () {
+      knopfStoppen.disabled = true;
+      try { await schicke(hier + '/stoppen'); knopfStoppen.textContent = 'Stoppt …'; }
+      catch (fehler) { knopfStoppen.disabled = false; melde('error', fehler.message); }
+    });
+  }
+  var formEingabe = document.getElementById('formEingabe');
+  formEingabe.addEventListener('submit', async function (ev) {
+    ev.preventDefault();
+    var feld = formEingabe.zeile;
+    try { await schicke(hier + '/eingabe', { zeile: feld.value }); feld.value = ''; }
+    catch (fehler) { melde('error', fehler.message); }
+  });
+
+  // Ports übernehmen / entfernen — Formulare entstehen auch per SSE neu,
+  // deshalb am Container horchen.
+  var portsKasten = document.getElementById('laufPorts');
+  portsKasten.addEventListener('submit', async function (ev) {
+    var f = ev.target.closest('[data-port-uebernehmen]');
+    if (!f) return;
+    ev.preventDefault();
+    try {
+      await schicke(hier + '/ports', { zweck: f.zweck.value, port: Number(f.dataset.port), protocol: f.dataset.protocol });
+      if (wurzel.dataset.werkbankSpiel === '1') melde('success', 'Übernommen — die Nummer gilt ab dem nächsten Start.');
+      else window.location.reload();
+    } catch (fehler) { melde('error', fehler.message); }
+  });
+  document.querySelectorAll('[data-port-entfernen]').forEach(function (k) {
+    k.addEventListener('click', async function () {
+      try { await schicke(hier + '/ports/' + encodeURIComponent(k.dataset.portEntfernen) + '/entfernen'); window.location.reload(); }
+      catch (fehler) { melde('error', fehler.message); }
+    });
+  });
+
+  // Konsolenzeile → Bereitschaftszeile
+  var konsole = document.getElementById('laufKonsole');
+  konsole.scrollTop = konsole.scrollHeight;
+  konsole.addEventListener('click', async function (ev) {
+    var zeile = ev.target.closest('#laufKonsole > div');
+    if (!zeile || window.getSelection().toString()) return;
+    // Zeitstempel vorn (Factorio: "   2.150 ") ändern sich bei jedem Start — weg damit.
+    var text = zeile.textContent.replace(/^\s*\d+\.\d+\s+/, '').trim();
+    if (!confirm('Als Bereitschaftszeile übernehmen?\n\n' + text)) return;
+    try {
+      await schicke(hier + '/bereitschaftszeile', { zeile: text });
+      document.getElementById('sLogLine').value = text;
+      melde('success', 'Bereitschaftszeile übernommen.');
+    } catch (fehler) { melde('error', fehler.message); }
+  });
+
+  function zeichnePorts(ports) {
+    portsKasten.innerHTML = '';
+    if (!ports.length) { portsKasten.innerHTML = '<span class="text-secondary small">—</span>'; return; }
+    ports.forEach(function (p) {
+      var f = document.createElement('form');
+      f.className = 'd-flex gap-1 mb-1';
+      f.setAttribute('data-port-uebernehmen', '');
+      f.dataset.port = p.port; f.dataset.protocol = p.protocol;
+      var b = document.createElement('span');
+      b.className = 'badge bg-azure-lt font-monospace align-self-center';
+      b.textContent = p.port + '/' + p.protocol;
+      var i = document.createElement('input');
+      i.className = 'form-control form-control-sm font-monospace'; i.name = 'zweck';
+      i.placeholder = 'Zweck (game)'; i.style.maxWidth = '9rem';
+      var k = document.createElement('button');
+      k.className = 'btn btn-sm btn-outline-primary'; k.type = 'submit'; k.textContent = 'Übernehmen';
+      f.append(b, i, k);
+      portsKasten.appendChild(f);
+    });
+  }
+
   // ── Live-Ausgabe ──────────────────────────────────────────────────────
-  if (wurzel.dataset.werkbankLaeuft === '1') {
+  if (wurzel.dataset.werkbankLaeuft === '1' || wurzel.dataset.werkbankSpiel === '1') {
     var live = document.getElementById('liveAusgabe');
     var strom = new EventSource(basis + '/events?sitzung=' + encodeURIComponent(kennung));
     strom.addEventListener('werkbank', function (e) {
       var d = {};
       try { d = JSON.parse(e.data); } catch (x) { return; }
       if (d.sitzung_id !== kennung) return;
-      if (d.action === 'output' && live) {
+      if (d.action === 'konsole') {
+        var unten = konsole.scrollTop + konsole.clientHeight >= konsole.scrollHeight - 4;
+        var z = document.createElement('div');
+        z.textContent = d.line;
+        konsole.appendChild(z);
+        if (unten) konsole.scrollTop = konsole.scrollHeight;
+      } else if (d.action === 'ports') {
+        zeichnePorts(d.ports || []);
+      } else if (d.action === 'bereitschaft') {
+        var kasten = document.getElementById('laufBereitschaft');
+        kasten.textContent = 'Bereitschaft: ' + (d.type || '') + (d.stage ? ' · ' + d.stage : '') + (d.hinweis ? ' — ' + d.hinweis : '');
+      } else if (d.action === 'gestartet') {
+        document.getElementById('laufStatus').innerHTML = '<span class="badge bg-green-lt">läuft</span>';
+      } else if (d.action === 'beendet') {
+        strom.close();
+        window.location.reload();
+      } else if (d.action === 'output' && live) {
         var unten = live.scrollTop + live.clientHeight >= live.scrollHeight - 4;
         live.textContent += (d.finding ? '⚑ ' : '') + d.line + '\n';
         if (unten) live.scrollTop = live.scrollHeight;

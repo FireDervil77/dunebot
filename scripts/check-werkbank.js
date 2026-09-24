@@ -6,8 +6,10 @@
  *
  * Die Werkbank spricht mit dem Daemon über Namen, die auf zwei Seiten stehen:
  *
- *   Befehle     werkbank.schritt · werkbank.verwerfen     (internal/websocket/client.go)
- *   Ereignisse  werkbank.status|output|fertig|fehlgeschlagen  (pkg/protocol/messages.go)
+ *   Befehle     werkbank.schritt · verwerfen · starten · stoppen · eingabe
+ *               (internal/websocket/client.go)
+ *   Ereignisse  werkbank.status|output|fertig|fehlgeschlagen, und seit Stufe 2
+ *               gestartet|konsole|bereitschaft|ports|beendet  (pkg/protocol/messages.go)
  *   Kennung     reSitzung im Daemon  ↔  RE_KENNUNG im Plugin
  *
  * Ein Tippfehler auf einer Seite fällt nirgends auf: Der Schritt läuft, die
@@ -34,6 +36,9 @@ ServiceManager.register('Logger', { debug: still, info: still, warn: still, erro
 const db = {
     schritte: [],            // {id, sitzung_id, nr, schritt, status, ausgabe, fehler, bytes}
     updates: [],             // geschriebene Ausgabe-Stücke
+    laeufe: [],              // {id, sitzung_id, status, konsole, ports, ...}
+    konsole: [],             // geschriebene Konsolen-Stücke
+    entwurf: null,           // zuletzt geschriebener Entwurf
     sitzung: { id: 7, kennung: 'wbprobe', guild_id: 'g1', rootserver_id: 54, image: { ref: 'r/fb/base', tag: '2026.09', digest: 'sha256:x' } },
     async query(sql, p) {
         const t = String(sql).replace(/\s+/g, ' ').trim();
@@ -68,6 +73,45 @@ const db = {
             const s = this.schritte.find(x => x.status === 'laeuft' && x.sitzung_id === this.sitzung.id);
             return s ? [{ schrittId: s.id, guildId: 'g1' }] : [];
         }
+        // ── Stufe 2 ──
+        if (/^SELECT l\.id AS laufId, s\.guild_id AS guildId, l\.status FROM werkbank_laeufe l JOIN werkbank_sitzungen s ON s\.id = l\.sitzung_id WHERE s\.kennung = \? AND l\.status <> 'beendet' ORDER BY l\.id DESC LIMIT 1$/.test(t)) {
+            if (p[0] !== this.sitzung.kennung) return [];
+            const l = [...this.laeufe].reverse().find(x => x.status !== 'beendet' && x.sitzung_id === this.sitzung.id);
+            return l ? [{ laufId: l.id, guildId: 'g1', status: l.status }] : [];
+        }
+        if (/^INSERT INTO werkbank_laeufe \(sitzung_id, status, memory_mb, cpu_prozent, start\) VALUES \(\?, 'startet', \?, \?, \?\)$/.test(t)) {
+            const id = this.laeufe.length + 500;
+            this.laeufe.push({ id, sitzung_id: p[0], status: 'startet', memory_mb: p[1], cpu_prozent: p[2], start: p[3], konsole: '' });
+            return { insertId: id };
+        }
+        if (/^UPDATE werkbank_laeufe SET status = 'beendet', exit_code = \?, gestoppt = \?, fehler = \?, beendet_am = NOW\(\) WHERE id = \? AND status <> 'beendet'$/.test(t)) {
+            const l = this.laeufe.find(x => x.id === p[3] && x.status !== 'beendet');
+            if (l) Object.assign(l, { status: 'beendet', exit_code: p[0], gestoppt: p[1], fehler: p[2] });
+            return { affectedRows: l ? 1 : 0 };
+        }
+        if (/^UPDATE werkbank_laeufe SET status = 'stoppt' WHERE id = \? AND status <> 'beendet'$/.test(t)) {
+            const l = this.laeufe.find(x => x.id === p[0] && x.status !== 'beendet');
+            if (l) l.status = 'stoppt';
+            return { affectedRows: l ? 1 : 0 };
+        }
+        if (/^UPDATE werkbank_laeufe SET konsole = RIGHT\(CONCAT\(COALESCE\(konsole, ''\), \?\), \?\) WHERE id = \?$/.test(t)) {
+            const l = this.laeufe.find(x => x.id === p[2]);
+            // Mit dem Stand des Laufs in dem Moment — die Reihenfolge ist die Aussage.
+            this.konsole.push({ text: p[0], status: l && l.status });
+            if (l) l.konsole = (l.konsole + p[0]).slice(-p[1]);
+            return { affectedRows: 1 };
+        }
+        const setzen = t.match(/^UPDATE werkbank_laeufe SET ((?:(?:status|luecken|bereitschaft|ports) = \?(?:, )?)+) WHERE id = \?$/);
+        if (setzen) {
+            const spalten = setzen[1].split(', ').map(x => x.replace(' = ?', ''));
+            const l = this.laeufe.find(x => x.id === p[spalten.length]);
+            spalten.forEach((k, i) => { if (l) l[k] = p[i]; });
+            return { affectedRows: l ? 1 : 0 };
+        }
+        if (/^UPDATE werkbank_sitzungen SET entwurf = \? WHERE id = \?$/.test(t)) {
+            this.entwurf = JSON.parse(p[0]);
+            return { affectedRows: 1 };
+        }
         throw new Error('Unerwartete Abfrage: ' + t.slice(0, 100));
     },
 };
@@ -84,13 +128,15 @@ ServiceManager.register('sseManager', sse);
 const HELFER = path.join(__dirname, '../plugins/werkbank/dashboard/helpers');
 const Sitzungen = require(path.join(HELFER, 'Sitzungen.js'));
 const Ereignisse = require(path.join(HELFER, 'Ereignisse.js'));
-const { schrittAusFormular } = require('../plugins/werkbank/dashboard/routes/guild.router.js');
+const { schrittAusFormular, startAusFormular, startAlsFormular } = require('../plugins/werkbank/dashboard/routes/guild.router.js');
 
 let bestanden = 0;
 async function pruefe(name, fn) {
     db.schritte = []; db.updates = []; daemon.befehle = []; daemon.online = true;
+    db.laeufe = []; db.konsole = []; db.entwurf = null;
     daemon.antwort = { success: true }; sse.gesendet = [];
     Ereignisse._laufend.clear(); Ereignisse._puffer.clear();
+    Ereignisse._laeufe.clear(); Ereignisse._konsolenPuffer.clear();
     try { await fn(); console.log(`  ✓ ${name}`); bestanden++; }
     catch (e) { console.error(`  ✗ ${name}\n    ${e.message}`); process.exitCode = 1; }
 }
@@ -108,15 +154,19 @@ async function pruefe(name, fn) {
     await pruefe('die Befehle, die das Plugin schickt, kennt der Daemon', async () => {
         const client = ohneKommentare(fs.readFileSync(path.join(DAEMON, 'internal/websocket/client.go'), 'utf8'));
         const plugin = ohneKommentare(fs.readFileSync(path.join(HELFER, 'Sitzungen.js'), 'utf8'));
-        const geschickt = [...plugin.matchAll(/sendCommand\([^,]+,\s*'(werkbank\.[a-z]+)'/g)].map(x => x[1]);
-        assert.ok(geschickt.length >= 2, `zu wenige Befehle gefunden: ${geschickt}`);
+        // Zwei Schreibweisen: direkt, und über daemonFuer(...).senden('werkbank.x', …).
+        const geschickt = [...plugin.matchAll(/(?:sendCommand\([^,]+,|senden\()\s*'(werkbank\.[a-z]+)'/g)].map(x => x[1]);
+        for (const b of ['werkbank.schritt', 'werkbank.verwerfen', 'werkbank.starten', 'werkbank.stoppen', 'werkbank.eingabe']) {
+            assert.ok(geschickt.includes(b), `${b} wird nicht (mehr) geschickt — die Suche sieht ${geschickt}`);
+        }
         for (const b of geschickt) assert.ok(client.includes(`case "${b}":`), `${b} fehlt im Daemon`);
     });
 
     await pruefe('die Ereignisse, die der Daemon schickt, fängt das Plugin', async () => {
         const proto = ohneKommentare(fs.readFileSync(path.join(DAEMON, 'pkg/protocol/messages.go'), 'utf8'));
         assert.match(proto, /NSWerkbank\s+Namespace\s*=\s*"werkbank"/);
-        const aktionen = ['WerkbankStatus', 'WerkbankAusgabe', 'WerkbankFertig', 'WerkbankFehlgeschlagen']
+        const aktionen = ['WerkbankStatus', 'WerkbankAusgabe', 'WerkbankFertig', 'WerkbankFehlgeschlagen',
+            'WerkbankGestartet', 'WerkbankKonsole', 'WerkbankBereitschaft', 'WerkbankPorts', 'WerkbankBeendet']
             .map(k => (proto.match(new RegExp(k + '\\s*=\\s*"([a-z]+)"')) || [])[1]);
         const plugin = ohneKommentare(fs.readFileSync(path.join(HELFER, 'Ereignisse.js'), 'utf8'));
         for (const a of aktionen) {
@@ -213,6 +263,103 @@ async function pruefe(name, fn) {
         assert.deepStrictEqual(e.install.steps.map(s => s.type), ['download', 'template']);
         assert.strictEqual(e.identity.name, 'Terraria');
         assert.deepStrictEqual(e.image, db.sitzung.image);
+    });
+
+    console.log('\nProbestart (Stufe 2)');
+
+    const sitzungMitStart = () => ({ ...db.sitzung, entwurf: {
+        identity: { name: 'Factorio' },
+        ports: [{ purpose: 'game', protocol: 'udp', assign: 'pool' }],
+        start: { program: './bin/x64/factorio', args: [{ key: 'arg1', parts: [{ text: '{{port:game}}' }] }] },
+        werkbank: { portnummern: { game: 34197 }, memory_mb: 2048, cpu_prozent: 150 },
+    } });
+
+    await pruefe('Formular → Startteil: eine Zeile ein Argument, Stoppfolge mit Frist, gültig nach Schema', async () => {
+        const start = startAusFormular({ program: './bin/x64/factorio', args: '--start-server\nsaves/welt.zip\n{{port:game}}',
+            stop: 'command:/quit 30 beendet\nrcon:/save 60 weiter\nsigkill 5', ready_port: 'game', log_line: 'Hosting game', timeout_sec: '120' });
+        assert.deepStrictEqual(start.args[2], { key: 'arg3', parts: [{ text: '{{port:game}}' }] });
+        assert.deepStrictEqual(start.stop.sequence, [
+            { step: 'command:/quit', timeout_sec: 30, terminates: true },
+            { step: 'rcon:/save', timeout_sec: 60, terminates: false },
+            { step: 'sigkill', timeout_sec: 5, terminates: true },
+        ]);
+        const Ajv = require('ajv');
+        const schema = require('../packages/fbpkg/schema/fbpkg-v1.schema.json');
+        const pruefer = new Ajv({ allErrors: true, jsonPointers: true }).compile({ ...schema.properties.start, definitions: schema.definitions });
+        assert.ok(pruefer(start), JSON.stringify(pruefer.errors));
+        assert.deepStrictEqual(startAusFormular(startAlsFormular(start)), start, 'hin und zurück verlustfrei');
+        assert.throws(() => startAusFormular({ program: 'x', stop: 'rm -rf /' }), /Stoppfolge/);
+    });
+
+    await pruefe('Starten schickt Startteil, Portnummern und RAM/CPU — und legt einen Lauf an', async () => {
+        const s = sitzungMitStart();
+        const r = await Sitzungen.starten(s, [{ status: 'ok', schritt: { type: 'download' } }, { status: 'fehler', schritt: { type: 'x' } }]);
+        const b = daemon.befehle[0];
+        assert.strictEqual(b.befehl, 'werkbank.starten');
+        assert.strictEqual(b.nutzlast.sitzung_id, 'wbprobe');
+        assert.deepStrictEqual(b.nutzlast.portnummern, { game: 34197 });
+        assert.strictEqual(b.nutzlast.memory_mb, 2048);
+        assert.strictEqual(b.nutzlast.cpu_prozent, 150);
+        assert.deepStrictEqual(b.nutzlast.install.steps.map(x => x.type), ['download'], 'nur Schritte im Entwurf');
+        assert.strictEqual(db.laeufe[0].id, r.laufId);
+        assert.strictEqual(db.laeufe[0].status, 'startet');
+    });
+
+    await pruefe('weist der Daemon den Start ab, ist der Lauf beendet mit Grund', async () => {
+        daemon.antwort = { success: false, error: 'Arbeitsspeicher 40 MB: erlaubt sind 128 bis 262144 MB' };
+        await assert.rejects(Sitzungen.starten(sitzungMitStart(), []), /Arbeitsspeicher/);
+        assert.strictEqual(db.laeufe[0].status, 'beendet');
+        assert.match(db.laeufe[0].fehler, /Arbeitsspeicher/);
+    });
+
+    await pruefe('während das Spiel läuft: kein Schritt, kein zweiter Start, kein Verwerfen', async () => {
+        await Sitzungen.starten(sitzungMitStart(), []);
+        daemon.befehle = [];
+        await assert.rejects(Sitzungen.schrittAusfuehren({ sitzung: db.sitzung, schritt: { type: 'mkdir', path: 'x' } }), /läuft/);
+        await assert.rejects(Sitzungen.starten(sitzungMitStart(), []), /läuft/);
+        await assert.rejects(Sitzungen.verwerfen(db.sitzung), /läuft/);
+        assert.strictEqual(daemon.befehle.length, 0);
+    });
+
+    await pruefe('Konsole gebündelt, Ports gespeichert, beim Ende erst die Konsole, dann der Status', async () => {
+        await Sitzungen.starten(sitzungMitStart(), []);
+        const lauf = db.laeufe[0];
+        await Ereignisse.beiGestartet({ sitzung_id: 'wbprobe', luecken: ['start.stop: fehlt'] });
+        assert.strictEqual(lauf.status, 'laeuft');
+        for (let i = 1; i <= 3; i++) await Ereignisse.beiKonsole({ sitzung_id: 'wbprobe', line: 'K' + i });
+        assert.strictEqual(sse.gesendet.filter(x => x.daten.action === 'konsole').length, 3);
+        assert.strictEqual(db.konsole.length, 0, 'noch gebündelt');
+        await Ereignisse.beiPorts({ sitzung_id: 'wbprobe', ports: [{ protocol: 'udp', port: 34197 }] });
+        assert.deepStrictEqual(JSON.parse(lauf.ports), [{ protocol: 'udp', port: 34197 }]);
+        await Ereignisse.beiBereitschaft({ sitzung_id: 'wbprobe', server_id: 'werkbank-wbprobe', type: 'ready', stage: 'port' });
+        assert.ok(!('server_id' in JSON.parse(lauf.bereitschaft)), 'server_id des Daemons gehört nicht in die Anzeige');
+        await Ereignisse.beiBeendet({ sitzung_id: 'wbprobe', exit_code: 0, gestoppt: true });
+        assert.strictEqual(lauf.konsole, 'K1\nK2\nK3\n');
+        assert.notStrictEqual(db.konsole[0].status, 'beendet', 'die Konsole muss VOR dem Status „beendet" geschrieben sein');
+        assert.strictEqual(lauf.status, 'beendet');
+        assert.strictEqual(lauf.exit_code, 0);
+        assert.ok(sse.gesendet.some(x => x.daten.action === 'beendet'));
+    });
+
+    await pruefe('Ereignisse einer fremden Sitzung fassen keinen Lauf an', async () => {
+        await Sitzungen.starten(sitzungMitStart(), []);
+        await Ereignisse.beiKonsole({ sitzung_id: 'wbfremd', line: 'nicht meins' });
+        await Ereignisse.beiBeendet({ sitzung_id: 'wbfremd', exit_code: 1 });
+        assert.strictEqual(db.laeufe[0].status, 'startet');
+        assert.strictEqual(sse.gesendet.length, 0);
+    });
+
+    await pruefe('Port übernehmen: Zweck ins Paket, Nummer zur Sitzung', async () => {
+        const s = sitzungMitStart();
+        await assert.rejects(Sitzungen.portUebernehmen(s, { zweck: 'Game Port', protocol: 'udp', port: 1 }), /Zweck/);
+        await assert.rejects(Sitzungen.portUebernehmen(s, { zweck: 'rcon', protocol: 'udp', port: 70000 }), /Portnummer/);
+        await Sitzungen.portUebernehmen(s, { zweck: 'rcon', protocol: 'tcp', port: 27015 });
+        assert.deepStrictEqual(db.entwurf.ports.map(p => p.purpose), ['game', 'rcon']);
+        assert.strictEqual(db.entwurf.werkbank.portnummern.rcon, 27015);
+        const paket = Sitzungen.entwurfAlsPaket(s, []);
+        assert.ok(!('werkbank' in paket), 'Sitzungsteil gehört nicht ins Paket');
+        assert.ok(!JSON.stringify(paket).includes('27015'), 'I2: keine Portnummer im Paket');
+        assert.strictEqual(paket.start.program, './bin/x64/factorio');
     });
 
     console.log(`\n${bestanden} Prüfung(en) bestanden.\n`);
