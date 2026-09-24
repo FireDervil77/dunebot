@@ -79,7 +79,7 @@
               <% if (x.ausgabe || x.status === 'laeuft') { %>
                 <details class="mt-2" <%= x.status === 'laeuft' ? 'open' : '' %>>
                   <summary class="text-secondary small">Ausgabe</summary>
-                  <pre class="mt-2 mb-0 p-2 small" style="max-height:24rem;overflow:auto;background:var(--tblr-bg-surface-secondary)" <%= x.status === 'laeuft' ? 'id=liveAusgabe' : '' %>><%= x.ausgabe || '' %></pre>
+                  <pre class="mt-2 mb-0 p-2 small" style="max-height:24rem;overflow:auto;background:var(--tblr-bg-surface-secondary);color:var(--tblr-body-color)" <%= x.status === 'laeuft' ? 'id=liveAusgabe' : '' %>><%= x.ausgabe || '' %></pre>
                 </details>
               <% } %>
               <% if (x.status === 'ok' || x.status === 'fehler') { %>
@@ -212,7 +212,7 @@
       <div class="card-header"><h3 class="card-title">Entwurf</h3></div>
       <div class="card-body">
         <p class="text-secondary small">So sähe das Paket gerade aus — nur die Schritte, die „im Entwurf" stehen. Start, Ports und Einstellungen kommen mit Stufe 2.</p>
-        <pre class="small mb-0 p-2" style="max-height:24rem;overflow:auto;background:var(--tblr-bg-surface-secondary)"><%= JSON.stringify(entwurf, null, 2) %></pre>
+        <pre class="small mb-0 p-2" style="max-height:24rem;overflow:auto;background:var(--tblr-bg-surface-secondary);color:var(--tblr-body-color)"><%= JSON.stringify(entwurf, null, 2) %></pre>
       </div>
     </div>
   </div>
