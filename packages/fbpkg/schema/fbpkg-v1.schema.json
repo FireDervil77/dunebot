@@ -125,7 +125,6 @@
             "extract",
             "mkdir",
             "template",
-            "chown",
             "script"
           ]
         },
@@ -309,35 +308,6 @@
                 ]
               }
             ]
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "type": {
-                "const": "chown"
-              }
-            }
-          },
-          "then": {
-            "required": [
-              "path"
-            ],
-            "properties": {
-              "type": {},
-              "description": {},
-              "path": {
-                "type": "string"
-              },
-              "user": {
-                "enum": [
-                  "container",
-                  "root"
-                ],
-                "default": "container"
-              }
-            },
-            "additionalProperties": false
           }
         },
         {

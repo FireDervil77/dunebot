@@ -4,7 +4,10 @@
  *
  * ── Warum es diesen Waechter gibt (Werkbank W-12, 2026-09-24) ───────────────
  *
- * Das Schema kennt seit jeher sieben Schritttypen, der Daemon fuehrte zwei aus.
+ * Das Schema kannte sieben Schritttypen, der Daemon fuehrte zwei aus. (`chown`
+ * ist am 2026-09-24 aus dem Schema gegangen: Schritte laufen als
+ * Container-Benutzer, der Typ hatte keine Aufgabe — Betreiber: „chown aus dem
+ * schritt entfernen.")
  * Aufgefallen ist das nicht als Fehler, sondern als Messung am 2026-09-23 — ein
  * Paket mit `download` waere mit „dieser Schritttyp wird noch nicht ausgefuehrt"
  * abgewiesen worden. Ehrlich, aber niemand hat die Luecke gezaehlt.
@@ -38,7 +41,6 @@ const AUSSTEHEND = {
     download: 'W-12 Schritt 2 — offen ist zuerst die Vertrauensfrage (Pruefsumme statt Herkunftsliste)',
     extract:  'W-12 Schritt 3 — setzt auf download auf',
     template: 'W-12 Schritt 4 — dieselbe Platzhalterregel wie start.args und config[]',
-    chown:    'W-12 — ohne Aufgabe: Schritte laufen als Container-Benutzer (A+B), Entscheidung offen',
 };
 
 let fehler = 0;
