@@ -24,6 +24,12 @@
   const spielLaeuft = Boolean(lauf && lauf.status !== 'beendet');
   const beschaeftigt = laeuft || spielLaeuft;
   const entwurfPorts = sitzung.entwurf.ports || [];
+  function groesse(n) {
+    n = Number(n) || 0;
+    if (n < 1024) return n + ' B';
+    if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+    return (n / 1048576).toFixed(1) + ' MB';
+  }
   const laufStatus = {
     startet: '<span class="badge bg-blue-lt">startet</span>',
     laeuft:  '<span class="badge bg-green-lt">läuft</span>',
@@ -398,6 +404,42 @@
                 <% }) %>
               </div>
             </div>
+
+            <!-- Dateien: game/ und data/ vor dem Start gegen jetzt bzw. nach dem Ende -->
+            <div class="mt-3">
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="text-secondary small">Dateien seit dem Start (game/, data/)</span>
+                <% if (spielLaeuft) { %>
+                  <button class="btn btn-sm btn-outline-secondary ms-auto" type="button" id="knopfDateien">
+                    <i class="fa-solid fa-magnifying-glass me-1"></i>Jetzt nachsehen
+                  </button>
+                <% } %>
+              </div>
+              <div id="laufDateien" class="small">
+                <% const d = lauf && lauf.dateien; %>
+                <% if (!d) { %>
+                  <span class="text-secondary"><%= spielLaeuft ? 'Während des Laufs auf Knopfdruck, nach dem Ende von selbst.' : (lauf ? 'Dieser Lauf hat keinen Vergleich (Daemon vor 1.0.93).' : '—') %></span>
+                <% } else { %>
+                  <% [['neu', 'bg-green-lt', 'neu'], ['geaendert', 'bg-yellow-lt', 'geändert'], ['weg', 'bg-red-lt', 'weg']].forEach(function (art) {
+                       const gruppen = gruppiere(d[art[0]]);
+                       const anzahl = d['anzahl_' + art[0]] || 0;
+                       if (!anzahl) return; %>
+                    <div class="mb-1"><span class="badge <%= art[1] %>"><%= art[2] %> · <%= anzahl %></span><% if (anzahl > (d[art[0]] || []).length) { %> <span class="text-secondary">(die ersten <%= d[art[0]].length %>)</span><% } %></div>
+                    <ul class="list-unstyled mb-2 ms-2 font-monospace">
+                      <% gruppen.forEach(function (g) { %>
+                        <% if (g.ordner) { %>
+                          <li class="text-secondary"><%= g.ordner %> — <%= g.anzahl %> Dateien, <%= groesse(g.groesse) %></li>
+                        <% } else { %>
+                          <li><%= g.pfad %> <span class="text-secondary">(<%= g.vorher !== undefined && g.vorher !== g.groesse ? groesse(g.vorher) + ' → ' : '' %><%= groesse(g.groesse) %>)</span></li>
+                        <% } %>
+                      <% }) %>
+                    </ul>
+                  <% }) %>
+                  <% if (!d.anzahl_neu && !d.anzahl_geaendert && !d.anzahl_weg) { %><span class="text-secondary">Nichts angelegt, nichts geändert.</span><% } %>
+                  <% if (d.unvollstaendig) { %><div class="text-warning">Unvollständig — zu viele Dateien für einen Vergleich.</div><% } %>
+                <% } %>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -561,6 +603,53 @@
       catch (fehler) { melde('error', fehler.message); }
     });
   });
+
+  // Dateien: während des Laufs auf Knopfdruck beim Daemon nachsehen.
+  var knopfDateien = document.getElementById('knopfDateien');
+  function groesse(n) {
+    n = Number(n) || 0;
+    if (n < 1024) return n + ' B';
+    if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+    return (n / 1048576).toFixed(1) + ' MB';
+  }
+  if (knopfDateien) {
+    knopfDateien.addEventListener('click', async function () {
+      knopfDateien.disabled = true;
+      try {
+        var daten = await schicke(hier + '/dateien');
+        var kasten = document.getElementById('laufDateien');
+        kasten.innerHTML = '';
+        var d = daten.dateien || {};
+        var leer = true;
+        [['neu', 'bg-green-lt', 'neu'], ['geaendert', 'bg-yellow-lt', 'geändert'], ['weg', 'bg-red-lt', 'weg']].forEach(function (art) {
+          var anzahl = d['anzahl_' + art[0]] || 0;
+          if (!anzahl) return;
+          leer = false;
+          var kopf = document.createElement('div');
+          kopf.className = 'mb-1';
+          var marke = document.createElement('span');
+          marke.className = 'badge ' + art[1];
+          marke.textContent = art[2] + ' · ' + anzahl;
+          kopf.appendChild(marke);
+          var ul = document.createElement('ul');
+          ul.className = 'list-unstyled mb-2 ms-2 font-monospace';
+          (daten.gruppen[art[0]] || []).forEach(function (g) {
+            var li = document.createElement('li');
+            if (g.ordner) {
+              li.className = 'text-secondary';
+              li.textContent = g.ordner + ' — ' + g.anzahl + ' Dateien, ' + groesse(g.groesse);
+            } else {
+              li.textContent = g.pfad + ' (' + (g.vorher !== undefined && g.vorher !== g.groesse ? groesse(g.vorher) + ' → ' : '') + groesse(g.groesse) + ')';
+            }
+            ul.appendChild(li);
+          });
+          kasten.append(kopf, ul);
+        });
+        if (leer) kasten.textContent = 'Nichts angelegt, nichts geändert.';
+      } catch (fehler) { melde('error', fehler.message); }
+      knopfDateien.disabled = false;
+    });
+  }
 
   // Konsolenzeile → Bereitschaftszeile
   var konsole = document.getElementById('laufKonsole');

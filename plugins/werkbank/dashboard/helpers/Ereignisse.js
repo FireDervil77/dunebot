@@ -188,7 +188,10 @@ const beiBeendet = zumLauf('beendet', async (p, lauf, kennung) => {
     await schreibeKonsole(lauf.laufId);
     const code = Number.isFinite(Number(p.exit_code)) ? Number(p.exit_code) : null;
     const text = [p.error, p.hinweis].filter(Boolean).join(' — ') || null;
-    await Sitzungen.laufBeenden(lauf.laufId, { exit_code: code, gestoppt: p.gestoppt ? 1 : 0, fehler: text });
+    await Sitzungen.laufBeenden(lauf.laufId, {
+        exit_code: code, gestoppt: p.gestoppt ? 1 : 0, fehler: text,
+        dateien: p.dateien && typeof p.dateien === 'object' ? p.dateien : null,
+    });
     vergissLauf(kennung);
     sende(lauf.guildId, { action: 'beendet', sitzung_id: kennung, exit_code: code, gestoppt: Boolean(p.gestoppt), error: text });
     ServiceManager.get('Logger').info(`[Werkbank] Sitzung ${kennung}: Probestart ${lauf.laufId} beendet (Code ${code})`);

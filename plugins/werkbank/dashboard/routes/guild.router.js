@@ -17,6 +17,7 @@
  *   POST /:kennung/ports                beobachteten Port übernehmen
  *   POST /:kennung/ports/:zweck/entfernen
  *   POST /:kennung/bereitschaftszeile   Konsolenzeile als ready_when.log_line
+ *   POST /:kennung/dateien              was das laufende Spiel angelegt/geändert hat
  *
  * @module werkbank/routes/guild
  */
@@ -220,6 +221,7 @@ router.get('/:kennung', requirePermission('WERKBANK.VIEW'), async (req, res) => 
             startFormular: startAlsFormular(sitzung.entwurf?.start),
             werkbankTeil: Sitzungen.werkbankTeil(sitzung),
             laeufe,
+            gruppiere: Sitzungen.gruppiere,
             // Die Adresse trägt die Kennung und trifft keinen Menüpunkt — ohne
             // Angabe klappte die Seitenleiste zu (check-navigation-treffer).
             activeMenu: `/guild/${guildId}/plugins/werkbank`,
@@ -328,6 +330,18 @@ router.post('/:kennung/ports/:zweck/entfernen', requirePermission('WERKBANK.BAUE
         return res.json({ success: true });
     } catch (error) {
         return fehler(res, error, 'Port nicht entfernt', 400);
+    }
+});
+
+router.post('/:kennung/dateien', requirePermission('WERKBANK.VIEW'), async (req, res) => {
+    try {
+        const dateien = await Sitzungen.dateienJetzt(await offeneSitzung(req, res));
+        return res.json({ success: true, dateien, gruppen: dateien && {
+            neu: Sitzungen.gruppiere(dateien.neu), geaendert: Sitzungen.gruppiere(dateien.geaendert),
+            weg: Sitzungen.gruppiere(dateien.weg),
+        } });
+    } catch (error) {
+        return fehler(res, error, 'Dateien nicht abgefragt', 400);
     }
 });
 

@@ -370,6 +370,7 @@ async function laeufe(sitzungId, anzahl = 5) {
     return zeilen.map(z => ({
         ...z, start: json(z.start, {}), ports: json(z.ports, []),
         bereitschaft: json(z.bereitschaft, null), luecken: json(z.luecken, []),
+        dateien: json(z.dateien, null),
     }));
 }
 
@@ -482,10 +483,54 @@ async function konsoleAnhaengen(laufId, text) {
         [text, MAX_AUSGABE, laufId]);
 }
 
-async function laufBeenden(laufId, { exit_code = null, gestoppt = null, fehler = null }) {
+async function laufBeenden(laufId, { exit_code = null, gestoppt = null, fehler = null, dateien = null }) {
     await db().query(
-        `UPDATE werkbank_laeufe SET status = 'beendet', exit_code = ?, gestoppt = ?, fehler = ?, beendet_am = NOW()
-          WHERE id = ? AND status <> 'beendet'`, [exit_code, gestoppt, fehler, laufId]);
+        `UPDATE werkbank_laeufe SET status = 'beendet', exit_code = ?, gestoppt = ?, fehler = ?, dateien = ?, beendet_am = NOW()
+          WHERE id = ? AND status <> 'beendet'`,
+        [exit_code, gestoppt, fehler, dateien ? JSON.stringify(dateien) : null, laufId]);
+}
+
+/** Was das laufende Spiel bisher angelegt und geändert hat — beim Daemon nachgefragt. */
+async function dateienJetzt(sitzung) {
+    if (!(await laufenderLauf(sitzung.kennung))) throw new Error('Es läuft kein Probestart.');
+    const daemon = await daemonFuer(sitzung);
+    const antwort = await daemon.senden('werkbank.dateien', {});
+    if (!antwort?.success) throw new Error(antwort?.error || 'Der Daemon hat nicht geantwortet');
+    return antwort.data?.dateien || null;
+}
+
+/**
+ * Viele Dateien im selben Ordner zu einer Zeile zusammenfassen.
+ *
+ * Gemessen an Factorio: 52 von 53 neuen Dateien während des Laufs lagen unter
+ * temp/currently-playing/, 49 davon Übersetzungen. Einzeln aufgelistet
+ * verdecken sie die eine Datei, um die es geht. Ab `ab` Einträgen in einem
+ * Ordner (samt Unterordnern) steht der Ordner mit Anzahl und Summe da.
+ */
+function gruppiere(liste, ab = 6) {
+    const eintraege = (liste || []).map(d => ({ ...d, teile: d.pfad.split('/') }));
+    const aus = [];
+    const erledigt = new Set();
+    // Tiefste Ordner zuerst prüfen wäre zu fein — gesucht wird der OBERSTE
+    // Ordner, unter dem sich viele sammeln, aber nicht game/ oder data/ selbst.
+    for (const d of eintraege) {
+        if (erledigt.has(d.pfad)) continue;
+        let gruppe = null;
+        for (let tiefe = 2; tiefe < d.teile.length; tiefe++) {
+            const ordner = d.teile.slice(0, tiefe).join('/') + '/';
+            const drin = eintraege.filter(x => !erledigt.has(x.pfad) && x.pfad.startsWith(ordner));
+            if (drin.length >= ab) { gruppe = { ordner, drin }; break; }
+        }
+        if (gruppe) {
+            gruppe.drin.forEach(x => erledigt.add(x.pfad));
+            aus.push({ ordner: gruppe.ordner, anzahl: gruppe.drin.length,
+                groesse: gruppe.drin.reduce((n, x) => n + (Number(x.groesse) || 0), 0) });
+        } else {
+            erledigt.add(d.pfad);
+            aus.push({ pfad: d.pfad, groesse: d.groesse, vorher: d.vorher });
+        }
+    }
+    return aus;
 }
 
 module.exports = {
@@ -495,5 +540,5 @@ module.exports = {
     herausnehmen, verwerfen, entwurfAlsPaket,
     werkbankTeil, ungenutztePorts, startSpeichern, starten, stoppen, eingabe, laeufe, laufenderLauf,
     portUebernehmen, portEntfernen, bereitschaftszeile,
-    laufSetzen, konsoleAnhaengen, laufBeenden,
+    laufSetzen, konsoleAnhaengen, laufBeenden, dateienJetzt, gruppiere,
 };

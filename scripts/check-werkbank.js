@@ -84,9 +84,9 @@ const db = {
             this.laeufe.push({ id, sitzung_id: p[0], status: 'startet', memory_mb: p[1], cpu_prozent: p[2], start: p[3], konsole: '' });
             return { insertId: id };
         }
-        if (/^UPDATE werkbank_laeufe SET status = 'beendet', exit_code = \?, gestoppt = \?, fehler = \?, beendet_am = NOW\(\) WHERE id = \? AND status <> 'beendet'$/.test(t)) {
-            const l = this.laeufe.find(x => x.id === p[3] && x.status !== 'beendet');
-            if (l) Object.assign(l, { status: 'beendet', exit_code: p[0], gestoppt: p[1], fehler: p[2] });
+        if (/^UPDATE werkbank_laeufe SET status = 'beendet', exit_code = \?, gestoppt = \?, fehler = \?, dateien = \?, beendet_am = NOW\(\) WHERE id = \? AND status <> 'beendet'$/.test(t)) {
+            const l = this.laeufe.find(x => x.id === p[4] && x.status !== 'beendet');
+            if (l) Object.assign(l, { status: 'beendet', exit_code: p[0], gestoppt: p[1], fehler: p[2], dateien: p[3] });
             return { affectedRows: l ? 1 : 0 };
         }
         if (/^UPDATE werkbank_laeufe SET status = 'stoppt' WHERE id = \? AND status <> 'beendet'$/.test(t)) {
@@ -156,7 +156,7 @@ async function pruefe(name, fn) {
         const plugin = ohneKommentare(fs.readFileSync(path.join(HELFER, 'Sitzungen.js'), 'utf8'));
         // Zwei Schreibweisen: direkt, und über daemonFuer(...).senden('werkbank.x', …).
         const geschickt = [...plugin.matchAll(/(?:sendCommand\([^,]+,|senden\()\s*'(werkbank\.[a-z]+)'/g)].map(x => x[1]);
-        for (const b of ['werkbank.schritt', 'werkbank.verwerfen', 'werkbank.starten', 'werkbank.stoppen', 'werkbank.eingabe']) {
+        for (const b of ['werkbank.schritt', 'werkbank.verwerfen', 'werkbank.starten', 'werkbank.stoppen', 'werkbank.eingabe', 'werkbank.dateien']) {
             assert.ok(geschickt.includes(b), `${b} wird nicht (mehr) geschickt — die Suche sieht ${geschickt}`);
         }
         for (const b of geschickt) assert.ok(client.includes(`case "${b}":`), `${b} fehlt im Daemon`);
@@ -351,7 +351,10 @@ async function pruefe(name, fn) {
         assert.deepStrictEqual(JSON.parse(lauf.ports), [{ protocol: 'udp', port: 34197 }]);
         await Ereignisse.beiBereitschaft({ sitzung_id: 'wbprobe', server_id: 'werkbank-wbprobe', type: 'ready', stage: 'port' });
         assert.ok(!('server_id' in JSON.parse(lauf.bereitschaft)), 'server_id des Daemons gehört nicht in die Anzeige');
-        await Ereignisse.beiBeendet({ sitzung_id: 'wbprobe', exit_code: 0, gestoppt: true });
+        const dateien = { neu: [{ pfad: 'game/config/config.ini', groesse: 5 }], geaendert: [], weg: [],
+            anzahl_neu: 1, anzahl_geaendert: 0, anzahl_weg: 0 };
+        await Ereignisse.beiBeendet({ sitzung_id: 'wbprobe', exit_code: 0, gestoppt: true, dateien });
+        assert.deepStrictEqual(JSON.parse(lauf.dateien), dateien, 'der Dateivergleich gehört zum Lauf');
         assert.strictEqual(lauf.konsole, 'K1\nK2\nK3\n');
         assert.notStrictEqual(db.konsole[0].status, 'beendet', 'die Konsole muss VOR dem Status „beendet" geschrieben sein');
         assert.strictEqual(lauf.status, 'beendet');
@@ -378,6 +381,20 @@ async function pruefe(name, fn) {
         assert.ok(!('werkbank' in paket), 'Sitzungsteil gehört nicht ins Paket');
         assert.ok(!JSON.stringify(paket).includes('27015'), 'I2: keine Portnummer im Paket');
         assert.strictEqual(paket.start.program, './bin/x64/factorio');
+    });
+
+    await pruefe('Dateien: viele im selben Ordner werden eine Zeile, Einzelne bleiben', async () => {
+        // Gemessen an Factorio: 52 von 53 neuen Dateien lagen unter temp/.
+        const l = [{ pfad: 'game/.lock', groesse: 0 }, { pfad: 'game/factorio-previous.log', groesse: 2662 }];
+        for (const x of ['af', 'ar', 'be', 'bg', 'ca', 'cs', 'da']) l.push({ pfad: `game/temp/currently-playing/locale/${x}/freeplay.cfg`, groesse: 100 });
+        const g = Sitzungen.gruppiere(l);
+        assert.deepStrictEqual(g.map(x => x.pfad || x.ordner), ['game/.lock', 'game/factorio-previous.log', 'game/temp/']);
+        assert.strictEqual(g[2].anzahl, 7);
+        assert.strictEqual(g[2].groesse, 700);
+        // Fünf in einem Ordner bleiben einzeln — erst ab sechs lohnt die Zeile.
+        const wenige = ['a', 'b', 'c', 'd', 'e'].map(x => ({ pfad: `game/config/${x}.ini`, groesse: 1 }));
+        assert.strictEqual(Sitzungen.gruppiere(wenige).length, 5);
+        assert.deepStrictEqual(Sitzungen.gruppiere(undefined), []);
     });
 
     await pruefe('ein übernommener Port, auf den nichts verweist, wird gemeldet', async () => {
