@@ -72,4 +72,20 @@ function ohneKommentareEjs(inhalt) {
     return ohneKommentare(String(inhalt).replace(/<%#[\s\S]*?%>/g, ' '));
 }
 
-module.exports = { ohneKommentare, ohneKommentareEjs };
+/**
+ * Dasselbe fuer Shell-Skripte und Dockerfiles (2026-09-24).
+ *
+ * Entfernt nur GANZE Kommentarzeilen (erstes Zeichen ausser Leerraum ist `#`).
+ * Ein angehaengter Kommentar bleibt stehen: `#` ist in Shell auch Teil von
+ * Code (`$#`, `${x#y}`, `'#'`), und eine Regel, die das unterscheidet, waere
+ * ein Parser. Die Zeilen bleiben als Leerzeilen erhalten, damit Zeilennummern
+ * stimmen.
+ *
+ * @param {string} inhalt Roher Dateiinhalt (sh/bash/Dockerfile)
+ * @returns {string}
+ */
+function ohneKommentareShell(inhalt) {
+    return String(inhalt).split('\n').map(z => (/^\s*#/.test(z) ? '' : z)).join('\n');
+}
+
+module.exports = { ohneKommentare, ohneKommentareEjs, ohneKommentareShell };
