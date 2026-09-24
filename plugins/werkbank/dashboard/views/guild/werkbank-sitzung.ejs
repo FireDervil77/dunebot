@@ -468,8 +468,8 @@
           mit deiner Stoppfolge anhalten. Grün heißt: alles lief, bereit über den Port, und das Spiel endete, bevor sigkill nötig war.
           Das Prüf-Volume wird danach gelöscht.
         </p>
-        <% if (pruefung && !pruefLaeuft && pruefung.entwurf_hash !== entwurfHash) { %>
-          <div class="alert alert-warning py-2 small">Der Entwurf hat sich seit diesem Durchlauf geändert — das Urteil gilt für den alten Stand.</div>
+        <% if (pruefung && !pruefLaeuft && pruefHash !== entwurfHash) { %>
+          <div class="alert alert-warning py-2 small">Der technische Teil (Image, Ports, Schritte, Start) hat sich seit diesem Durchlauf geändert — das Urteil gilt für den alten Stand. Name, Beschreibung und Bild zählen nicht mit.</div>
         <% } %>
         <% if (durchlaufMaengel.length && !pruefLaeuft) { %>
           <div class="alert alert-info py-2 small mb-2">
@@ -507,7 +507,91 @@
       </div>
     </div>
   </div>
+
+  <!-- ── Veröffentlichen (Stufe 4) ──────────────────────────────────────── -->
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Angaben &amp; Veröffentlichen</h3>
+        <div class="card-actions">
+          <% if (veroeffentlichung.darf) { %><span class="badge bg-green-lt">bereit für test</span>
+          <% } else { %><span class="badge bg-secondary-lt">noch nicht</span><% } %>
+        </div>
+      </div>
+      <div class="card-body">
+        <form id="formAngaben" class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label" for="aSlug">Slug</label>
+            <input class="form-control font-monospace" id="aSlug" name="slug" value="<%= angaben.slug %>" placeholder="factorio">
+            <div class="form-hint">Gibt es ihn schon, wird es eine neue Fassung dieses Pakets<%= veroeffentlichung.neueste ? ' (bisher bis ' + veroeffentlichung.neueste + ')' : '' %>.</div>
+          </div>
+          <div class="col-md-5">
+            <label class="form-label" for="aName">Name</label>
+            <input class="form-control" id="aName" name="name" value="<%= angaben.name %>">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" for="aVersion">Fassung</label>
+            <input class="form-control font-monospace" id="aVersion" name="version" value="<%= angaben.version %>" placeholder="1.0.0">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="aDe">Beschreibung (deutsch)</label>
+            <textarea class="form-control" id="aDe" name="beschreibung_de" rows="2"><%= angaben.beschreibung_de %></textarea>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="aEn">Beschreibung (englisch)</label>
+            <textarea class="form-control" id="aEn" name="beschreibung_en" rows="2"><%= angaben.beschreibung_en %></textarea>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="aKat">Kategorie</label>
+            <select class="form-select" id="aKat" name="kategorie">
+              <% kategorien.forEach(function (k) { %><option value="<%= k %>" <%= angaben.kategorie === k ? 'selected' : '' %>><%= k %></option><% }) %>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="aIcon">Symbol</label>
+            <div class="d-flex align-items-center gap-2">
+              <div data-medienwahl-vorschau="aIcon" style="width:48px;height:48px;border:1px dashed var(--tblr-border-color);border-radius:6px;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0"></div>
+              <div class="input-group">
+                <input class="form-control" id="aIcon" name="icon_url" value="<%= angaben.icon_url %>" placeholder="aus den Medien oder https://…">
+                <button class="btn btn-outline-secondary" type="button" data-medienwahl="aIcon" title="Aus den Medien wählen"><i class="fa-solid fa-photo-film"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="aBanner">Banner</label>
+            <div class="input-group">
+              <input class="form-control" id="aBanner" name="banner_url" value="<%= angaben.banner_url %>" placeholder="aus den Medien oder https://…">
+              <button class="btn btn-outline-secondary" type="button" data-medienwahl="aBanner" title="Aus den Medien wählen"><i class="fa-solid fa-photo-film"></i></button>
+            </div>
+            <div data-medienwahl-vorschau="aBanner" class="mt-2" style="height:64px;border:1px dashed var(--tblr-border-color);border-radius:6px;display:flex;align-items:center;justify-content:center;overflow:hidden"></div>
+          </div>
+          <div class="col-12 d-flex flex-wrap gap-2 align-items-center">
+            <button class="btn btn-outline-secondary" type="submit"><i class="fa-solid fa-floppy-disk me-1"></i>Angaben speichern</button>
+            <button class="btn btn-success" type="button" id="knopfVeroeffentlichen" <%= veroeffentlichung.darf ? '' : 'disabled' %>>
+              <i class="fa-solid fa-cloud-arrow-up me-1"></i>In test veröffentlichen
+            </button>
+            <span class="text-secondary small">Angaben und Bild ändern nichts am Prüfurteil.</span>
+          </div>
+        </form>
+        <% if (!veroeffentlichung.darf) { %>
+          <ul class="text-secondary small mt-3 mb-0"><% veroeffentlichung.gruende.forEach(function (g) { %><li><%= g %></li><% }) %></ul>
+        <% } %>
+        <% if (veroeffentlicht.length) { %>
+          <div class="mt-3 small">
+            <div class="text-secondary mb-1">Aus dieser Sitzung veröffentlicht:</div>
+            <ul class="mb-0">
+              <% veroeffentlicht.slice().reverse().forEach(function (v) { %>
+                <li><span class="font-monospace"><%= v.slug %> <%= v.version %></span> · Kanal test · <%= new Date(v.am).toLocaleString('de-DE') %> · Durchlauf #<%= v.pruef_id %></li>
+              <% }) %>
+            </ul>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
 </div>
+
+<%- include('shared/medienwahl', { guildId }) %>
 
 <script>
 (function () {
@@ -765,6 +849,28 @@
       portsKasten.appendChild(f);
     });
   }
+
+  // ── Angaben & Veröffentlichen ─────────────────────────────────────────
+  var formAngaben = document.getElementById('formAngaben');
+  formAngaben.addEventListener('submit', async function (ev) {
+    ev.preventDefault();
+    try {
+      await schicke(hier + '/angaben', Object.fromEntries(new FormData(formAngaben)));
+      window.location.reload();
+    } catch (fehler) { melde('error', fehler.message); }
+  });
+  var knopfVeroeffentlichen = document.getElementById('knopfVeroeffentlichen');
+  knopfVeroeffentlichen.addEventListener('click', async function () {
+    if (!confirm('In den Kanal test einliefern? Die Fassung ist danach unveränderlich — Änderungen brauchen eine höhere Nummer.')) return;
+    knopfVeroeffentlichen.disabled = true;
+    try {
+      // Erst die Angaben, wie sie gerade im Formular stehen — veröffentlicht wird, was man sieht.
+      await schicke(hier + '/angaben', Object.fromEntries(new FormData(formAngaben)));
+      var d = await schicke(hier + '/veroeffentlichen');
+      melde('success', d.slug + ' ' + d.version + ' ist im Kanal test.');
+      setTimeout(function () { window.location.reload(); }, 800);
+    } catch (fehler) { knopfVeroeffentlichen.disabled = false; melde('error', fehler.message); }
+  });
 
   // ── Prüfdurchlauf ─────────────────────────────────────────────────────
   var knopfPruefen = document.getElementById('knopfPruefen');

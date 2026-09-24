@@ -57,7 +57,14 @@ const skip = (was, warum) => { uebersprungen++; console.log(`  ⏭  ${was} — $
     // ════════════════════════════════════════════════════════════════════════
     console.log('Der Einlieferer legt den Anker an');
     // ════════════════════════════════════════════════════════════════════════
-    const lief = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'scripts/liefere-pakete.js'), 'utf8'));
+    // Seit 2026-09-24 steht der Kern in packages/fbpkg/lib/einlieferung.js —
+    // Kommandozeile und Werkbank rufen ihn beide. Gelesen wird also das Modul,
+    // und geprüft, dass das Skript es wirklich benutzt (sonst prüfte dieser
+    // Wächter einen Kern, den niemand ruft).
+    const skript = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'scripts/liefere-pakete.js'), 'utf8'));
+    pruefe(/require\('\.\.\/packages\/fbpkg\/lib\/einlieferung'\)/.test(skript) && /einlieferung\.liefereEin\(/.test(skript),
+        'das Skript liefert über den gemeinsamen Kern ein');
+    const lief = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'packages/fbpkg/lib/einlieferung.js'), 'utf8'));
     pruefe(/async function sichereAnker\(/.test(lief),
         'es gibt einen Schritt, der den Ankersatz sicherstellt');
     pruefe(/INSERT INTO addon_marketplace/.test(lief),

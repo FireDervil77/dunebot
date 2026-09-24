@@ -17,6 +17,14 @@
       "category": "werkbank",
       "is_dangerous": 1,
       "requires": "WERKBANK.VIEW"
+    },
+    {
+      "key": "WERKBANK.VEROEFFENTLICHEN",
+      "name": "Aus der Werkbank veröffentlichen",
+      "description": "Ein grün geprüftes Paket in den Kanal test einliefern — es wird damit für neue Server wählbar, und Symbol/Banner gehen an den Marktplatz-Eintrag",
+      "category": "werkbank",
+      "is_dangerous": 1,
+      "requires": "WERKBANK.BAUEN"
     }
   ]
 }

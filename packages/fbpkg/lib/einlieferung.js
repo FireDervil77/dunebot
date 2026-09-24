@@ -88,7 +88,9 @@ function fuerDbService(dbService) {
  */
 function grundZeilen(text) {
     const zeilen = text.split('\n');
-    const treffer = zeilen.filter(z => /Schema:|✘|Fehler|fehlt|ungültig|ungueltig/i.test(z));
+    // `Befund:` seit 2026-09-24 — die Regel zum Notausgang meldet sich so, und
+    // ohne das Wort stand bei der Werkbank nur „✘ datei" ohne Grund da.
+    const treffer = zeilen.filter(z => /Schema:|Befund:|✘|Fehler|fehlt|ungültig|ungueltig/i.test(z));
     return treffer.length ? treffer.slice(0, 8) : zeilen.slice(0, 8);
 }
 

@@ -1,0 +1,150 @@
+<%
+/**
+ * Ein Bild aus der Medienablage der Guild wählen — der gemeinsame Baustein.
+ *
+ * Entstanden am 2026-09-24 für die Werkbank (Symbol und Banner eines Pakets).
+ * Vorher gab es die Auswahl genau einmal: fest im Addon-Editor verbaut
+ * (gameserver-addon-editor.ejs, rund 150 Zeilen Inline-Skript). Dieselbe
+ * Schnittstelle wie dort — GET /guild/ID/media/api/list, Recht
+ * CORE.MEDIA.VIEW —, aber als Baustein, den jede Seite einbinden kann. Der
+ * Addon-Editor ist noch NICHT umgestellt; zwei Wege sind einer zu viel, das
+ * steht als offener Punkt in docs/Baustellen.md.
+ *
+ * ## Aufruf
+ *
+ * Einmal je Seite, irgendwo im Inhalt:
+ *
+ *     include('shared/medienwahl', { guildId })
+ *
+ * Dann an beliebig vielen Stellen:
+ *
+ *     input id=fIcon                       ← das Feld, das die Adresse trägt
+ *     button data-medienwahl=fIcon         ← öffnet die Auswahl für dieses Feld
+ *     div data-medienwahl-vorschau=fIcon   ← zeigt das Bild (optional)
+ *
+ * Getippte Adressen gehen auch; die Vorschau folgt dem Feld.
+ *
+ * **Keine EJS-Zeichen im Kommentar** — siehe seitenkopf.ejs.
+ */
+%>
+<div class="modal modal-blur fade" id="medienwahlFenster" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Bild aus den Medien wählen</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+      </div>
+      <div class="modal-body">
+        <input type="search" class="form-control mb-3" id="medienwahlSuche" placeholder="Suchen …">
+        <div id="medienwahlRaster" class="row g-2"></div>
+        <div id="medienwahlSeiten" class="d-flex justify-content-center align-items-center gap-2 mt-3"></div>
+      </div>
+      <div class="modal-footer">
+        <span class="text-secondary small me-auto">Neue Bilder lädst du im <a href="/guild/<%= guildId %>/media" target="_blank" rel="noopener">Media-Manager</a> hoch.</span>
+        <button type="button" class="btn" data-bs-dismiss="modal">Abbrechen</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  var GUILD = '<%= guildId %>';
+  var ziel = null, seite = 1, suche = '', zeitgeber = null;
+
+  function vorschau(feldId) {
+    var feld = document.getElementById(feldId);
+    document.querySelectorAll('[data-medienwahl-vorschau="' + feldId + '"]').forEach(function (v) {
+      v.innerHTML = '';
+      var url = feld ? feld.value.trim() : '';
+      if (!url) {
+        var i = document.createElement('i');
+        i.className = 'fa-solid fa-image text-secondary';
+        v.appendChild(i);
+        return;
+      }
+      var img = document.createElement('img');
+      img.src = url;
+      img.alt = '';
+      img.style.cssText = 'max-width:100%;max-height:100%;object-fit:cover';
+      v.appendChild(img);
+    });
+  }
+
+  async function lade() {
+    var raster = document.getElementById('medienwahlRaster');
+    var seiten = document.getElementById('medienwahlSeiten');
+    raster.textContent = 'Lädt …';
+    seiten.innerHTML = '';
+    var p = new URLSearchParams({ page: seite, limit: 24 });
+    if (suche) p.set('search', suche);
+    try {
+      var antwort = await fetch('/guild/' + GUILD + '/media/api/list?' + p);
+      var d = await antwort.json();
+      if (!antwort.ok || !d.success) throw new Error(d.message || ('HTTP ' + antwort.status));
+      var bilder = (d.data || []).filter(function (m) { return !m.mime_type || String(m.mime_type).indexOf('image/') === 0; });
+      raster.innerHTML = '';
+      if (!bilder.length) { raster.textContent = 'Keine Bilder gefunden.'; return; }
+      bilder.forEach(function (m) {
+        var spalte = document.createElement('div');
+        spalte.className = 'col-4 col-md-3';
+        var knopf = document.createElement('button');
+        knopf.type = 'button';
+        knopf.className = 'btn p-1 w-100';
+        knopf.title = m.title || m.filename || '';
+        var img = document.createElement('img');
+        img.src = m.url; img.loading = 'lazy'; img.alt = '';
+        img.style.cssText = 'width:100%;height:5.5rem;object-fit:cover;border-radius:4px';
+        var name = document.createElement('div');
+        name.className = 'small text-truncate text-secondary';
+        name.textContent = m.filename || '';
+        knopf.append(img, name);
+        knopf.addEventListener('click', function () {
+          var feld = document.getElementById(ziel);
+          if (feld) {
+            feld.value = m.url;
+            feld.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+          fenster('medienwahlFenster') && fenster('medienwahlFenster').hide();
+        });
+        spalte.appendChild(knopf);
+        raster.appendChild(spalte);
+      });
+      var pg = d.pagination || {};
+      if (pg.pages > 1) {
+        var zurueck = document.createElement('button');
+        zurueck.type = 'button'; zurueck.className = 'btn btn-sm'; zurueck.textContent = '‹';
+        zurueck.disabled = pg.page <= 1;
+        zurueck.addEventListener('click', function () { seite--; lade(); });
+        var stand = document.createElement('span');
+        stand.className = 'text-secondary small'; stand.textContent = pg.page + ' / ' + pg.pages;
+        var weiter = document.createElement('button');
+        weiter.type = 'button'; weiter.className = 'btn btn-sm'; weiter.textContent = '›';
+        weiter.disabled = pg.page >= pg.pages;
+        weiter.addEventListener('click', function () { seite++; lade(); });
+        seiten.append(zurueck, stand, weiter);
+      }
+    } catch (fehler) {
+      raster.textContent = 'Medien nicht ladbar: ' + fehler.message;
+    }
+  }
+
+  document.addEventListener('click', function (ev) {
+    var k = ev.target.closest('[data-medienwahl]');
+    if (!k) return;
+    ev.preventDefault();
+    ziel = k.getAttribute('data-medienwahl');
+    seite = 1; suche = '';
+    document.getElementById('medienwahlSuche').value = '';
+    lade();
+    fenster('medienwahlFenster') && fenster('medienwahlFenster').show();
+  });
+  document.getElementById('medienwahlSuche').addEventListener('input', function (ev) {
+    clearTimeout(zeitgeber);
+    zeitgeber = setTimeout(function () { suche = ev.target.value.trim(); seite = 1; lade(); }, 300);
+  });
+  document.addEventListener('input', function (ev) {
+    if (ev.target && ev.target.id && document.querySelector('[data-medienwahl-vorschau="' + ev.target.id + '"]')) vorschau(ev.target.id);
+  });
+  document.querySelectorAll('[data-medienwahl-vorschau]').forEach(function (v) { vorschau(v.getAttribute('data-medienwahl-vorschau')); });
+})();
+</script>

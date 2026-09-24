@@ -23,6 +23,10 @@
  *   POST /:kennung/pruefen              ganzes Rezept auf leerem Volume, Start, Stopp
  *   POST /:kennung/pruefung/abbrechen   hängenden Durchlauf von Hand rot setzen
  *
+ * Stufe 4 (Veröffentlichen):
+ *   POST /:kennung/angaben              Slug, Name, Fassung, Beschreibung, Kategorie, Symbol, Banner
+ *   POST /:kennung/veroeffentlichen     grün geprüften Entwurf in den Kanal test einliefern
+ *
  * @module werkbank/routes/guild
  */
 
@@ -183,6 +187,7 @@ router.post('/sitzungen', requirePermission('WERKBANK.BAUEN'), async (req, res) 
         const kennung = await Sitzungen.anlegen({
             guildId: res.locals.guildId, userId: nutzerId(req, res),
             name: req.body?.name, rootserverId: req.body?.rootserver_id, image: req.body?.image,
+            iconUrl: req.body?.icon_url,
         });
         return res.json({ success: true, kennung });
     } catch (error) {
@@ -225,6 +230,14 @@ router.get('/:kennung', requirePermission('WERKBANK.VIEW'), async (req, res) => 
             ungenutztePorts: Sitzungen.ungenutztePorts(entwurf),
             pruefungen,
             entwurfHash: Sitzungen.fingerabdruck(entwurf),
+            // Aus dem gespeicherten Entwurf NACHGERECHNET, nicht die Spalte: Der
+            // Fingerabdruck deckt seit Stufe 4 nur den technischen Teil ab, und
+            // ältere Durchläufe hätten sonst alle als „geändert" gegolten.
+            pruefHash: pruefungen[0]?.entwurf ? Sitzungen.fingerabdruck(pruefungen[0].entwurf) : null,
+            angaben: Sitzungen.angaben(sitzung),
+            kategorien: [...require('../../../../packages/fbpkg/lib/einlieferung').KATEGORIEN],
+            veroeffentlichung: await Sitzungen.veroeffentlichungsStand(sitzung, liste, pruefungen),
+            veroeffentlicht: sitzung.entwurf?.werkbank?.veroeffentlicht || [],
             durchlaufMaengel: Sitzungen.durchlaufMaengel(entwurf),
             startFormular: startAlsFormular(sitzung.entwurf?.start),
             werkbankTeil: Sitzungen.werkbankTeil(sitzung),
@@ -369,6 +382,28 @@ router.post('/:kennung/pruefung/abbrechen', requirePermission('WERKBANK.BAUEN'),
         return res.json({ success: true });
     } catch (error) {
         return fehler(res, error, 'Nicht abgebrochen', 400);
+    }
+});
+
+router.post('/:kennung/angaben', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.angabenSpeichern(await offeneSitzung(req, res), req.body || {});
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Angaben nicht gespeichert', 400);
+    }
+});
+
+router.post('/:kennung/veroeffentlichen', requirePermission('WERKBANK.VEROEFFENTLICHEN'), async (req, res) => {
+    try {
+        const sitzung = await offeneSitzung(req, res);
+        const [liste, pruefungen] = await Promise.all([Sitzungen.schritte(sitzung.id), Sitzungen.pruefungen(sitzung.id)]);
+        const autor = res.locals.user?.username || res.locals.user?.global_name || null;
+        const ergebnis = await Sitzungen.veroeffentlichen(sitzung, liste, pruefungen, { autor });
+        ServiceManager.get('Logger').info(`[Werkbank] Sitzung ${sitzung.kennung}: ${ergebnis.slug} ${ergebnis.version} in test eingeliefert (Paket ${ergebnis.paketId})`);
+        return res.json({ success: true, ...ergebnis });
+    } catch (error) {
+        return fehler(res, error, 'Nicht veröffentlicht', 400);
     }
 });
 

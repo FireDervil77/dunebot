@@ -89,6 +89,17 @@
                 <% }) %>
               </select>
             </div>
+            <div class="mb-3">
+              <label class="form-label" for="neuIcon">Symbol (freiwillig)</label>
+              <div class="d-flex align-items-center gap-2">
+                <div data-medienwahl-vorschau="neuIcon" style="width:48px;height:48px;border:1px dashed var(--tblr-border-color);border-radius:6px;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0"></div>
+                <div class="input-group">
+                  <input class="form-control" id="neuIcon" name="icon_url" placeholder="aus den Medien oder https://…">
+                  <button class="btn btn-outline-secondary" type="button" data-medienwahl="neuIcon" title="Aus den Medien wählen"><i class="fa-solid fa-photo-film"></i></button>
+                </div>
+              </div>
+              <div class="form-hint">Kommt beim Veröffentlichen an den Marktplatz-Eintrag — ändern geht jederzeit in der Sitzung.</div>
+            </div>
             <button class="btn btn-primary w-100" type="submit">
               <i class="fa-solid fa-plus me-1"></i>Sitzung anlegen
             </button>
@@ -98,6 +109,8 @@
     </div>
   </div>
 </div>
+
+<%- include('shared/medienwahl', { guildId }) %>
 
 <script>
 (function () {

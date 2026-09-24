@@ -41,6 +41,7 @@ const db = {
     entwurf: null,           // zuletzt geschriebener Entwurf
     pruefungen: [],          // {id, sitzung_id, status, entwurf, entwurf_hash, ergebnis, protokoll}
     pruefSchreiben: [],      // Protokoll-Stücke mit dem Status der Prüfung in dem Moment
+    fassungen: {},           // slug → [version] in package_versions
     sitzung: { id: 7, kennung: 'wbprobe', guild_id: 'g1', rootserver_id: 54, image: { ref: 'r/fb/base', tag: '2026.09', digest: 'sha256:x' } },
     async query(sql, p) {
         const t = String(sql).replace(/\s+/g, ' ').trim();
@@ -132,6 +133,10 @@ const db = {
             if (x) Object.assign(x, { status: p[0], ergebnis: p[1] });
             return { affectedRows: x ? 1 : 0 };
         }
+        // ── Stufe 4 ──
+        if (/^SELECT pv\.version FROM package_versions pv JOIN packages p ON p\.id = pv\.package_id WHERE p\.slug = \?$/.test(t)) {
+            return (this.fassungen[p[0]] || []).map(version => ({ version }));
+        }
         if (/^UPDATE werkbank_sitzungen SET entwurf = \? WHERE id = \?$/.test(t)) {
             this.entwurf = JSON.parse(p[0]);
             return { affectedRows: 1 };
@@ -157,7 +162,7 @@ const { schrittAusFormular, startAusFormular, startAlsFormular } = require('../p
 let bestanden = 0;
 async function pruefe(name, fn) {
     db.schritte = []; db.updates = []; daemon.befehle = []; daemon.online = true;
-    db.laeufe = []; db.konsole = []; db.entwurf = null; db.pruefungen = []; db.pruefSchreiben = [];
+    db.laeufe = []; db.konsole = []; db.entwurf = null; db.pruefungen = []; db.pruefSchreiben = []; db.fassungen = {};
     daemon.antwort = { success: true }; sse.gesendet = [];
     Ereignisse._laufend.clear(); Ereignisse._puffer.clear();
     Ereignisse._laeufe.clear(); Ereignisse._konsolenPuffer.clear();
@@ -520,6 +525,80 @@ async function pruefe(name, fn) {
         const b = { ports: [{ protocol: 'udp', purpose: 'game' }], start: { args: [1, 2], program: 'x' } };
         assert.strictEqual(Sitzungen.fingerabdruck(a), Sitzungen.fingerabdruck(b));
         assert.notStrictEqual(Sitzungen.fingerabdruck(a), Sitzungen.fingerabdruck({ ...a, start: { program: 'x', args: [2, 1] } }));
+    });
+
+    console.log('\nVeröffentlichen (Stufe 4)');
+
+    const gruenGeprueft = (s, liste) => ({ id: 3, status: 'gruen', beendet_am: new Date('2026-09-24T21:00:00Z'),
+        entwurf: Sitzungen.entwurfAlsPaket(s, liste) });
+    const mitAngaben = () => {
+        const s = pruefbar();
+        s.entwurf.identity = { name: 'Factorio', slug: 'factorio', version: '1.1.0', category: 'strategy', description: { de: 'Fabriken' } };
+        return s;
+    };
+
+    await pruefe('Name, Beschreibung und Bild ändern den Fingerabdruck nicht — Schritte schon', async () => {
+        const a = mitAngaben();
+        const vorher = Sitzungen.fingerabdruck(Sitzungen.entwurfAlsPaket(a, liste));
+        a.entwurf.identity.description = { de: 'ganz anders' };
+        a.entwurf.werkbank.praesentation = { icon_url: '/uploads/media/g/x.png' };
+        assert.strictEqual(Sitzungen.fingerabdruck(Sitzungen.entwurfAlsPaket(a, liste)), vorher);
+        const andere = [...liste, { status: 'ok', schritt: { type: 'mkdir', path: 'mods' } }];
+        assert.notStrictEqual(Sitzungen.fingerabdruck(Sitzungen.entwurfAlsPaket(a, andere)), vorher);
+    });
+
+    await pruefe('veröffentlichen verlangt: letzter Durchlauf grün, technisch unverändert, Slug, höhere Fassung', async () => {
+        const s = mitAngaben();
+        let st = await Sitzungen.veroeffentlichungsStand(s, liste, []);
+        assert.match(st.gruende.join(' '), /kein Prüfdurchlauf/);
+        st = await Sitzungen.veroeffentlichungsStand(s, liste, [{ status: 'rot', entwurf: {} }]);
+        assert.match(st.gruende.join(' '), /rot/);
+        const g = gruenGeprueft(s, liste);
+        st = await Sitzungen.veroeffentlichungsStand(s, [...liste, { status: 'ok', schritt: { type: 'mkdir', path: 'x' } }], [g]);
+        assert.match(st.gruende.join(' '), /technische Teil geändert/);
+        db.fassungen.factorio = ['1.0.0', '1.2.0'];
+        st = await Sitzungen.veroeffentlichungsStand(s, liste, [g]);
+        assert.match(st.gruende.join(' '), /bis 1\.2\.0/);
+        assert.strictEqual(st.neueste, '1.2.0', '1.2.0 > 1.0.0 — nicht lexikalisch, sondern als Zahlen');
+        db.fassungen.factorio = ['1.0.0', '1.0.10'];
+        st = await Sitzungen.veroeffentlichungsStand(s, liste, [g]);
+        assert.strictEqual(st.darf, true, st.gruende.join(' '));
+    });
+
+    await pruefe('das gebaute Paket besteht check-pakete — dasselbe Tor wie die Kommandozeile', async () => {
+        // Echte Bestandteile: Image und Schritte aus dem Factorio-Paket — mit
+        // Attrappen-Werten (Digest „x", Download ohne Adresse) lehnt das Tor
+        // zu Recht ab, und genau das soll es auch.
+        const f = require('../packages/fbpkg/beispiele/factorio.json');
+        const s = mitAngaben();
+        s.image = f.image;
+        const echt = f.install.steps.map(schritt => ({ status: 'ok', schritt }));
+        const paket = Sitzungen.veroeffentlichungsPaket(s, echt, gruenGeprueft(s, echt), 'firedervil');
+        assert.strictEqual(paket.identity.origin.type, 'installer');
+        assert.ok(!paket.werkbank && !JSON.stringify(paket).includes('34197'), 'Sitzungsteil und Portnummern bleiben draußen');
+        const einl = require('../packages/fbpkg/lib/einlieferung');
+        const os = require('os');
+        const d = fs.mkdtempSync(path.join(os.tmpdir(), 'wb-check-'));
+        try {
+            const datei = path.join(d, 'factorio.json');
+            fs.writeFileSync(datei, JSON.stringify(paket));
+            const tor = einl.bestehtPruefung(datei);
+            assert.ok(tor.ok, einl.grundZeilen(tor.text || '').join(' | '));
+        } finally { fs.rmSync(d, { recursive: true, force: true }); }
+    });
+
+    await pruefe('Angaben: Slug, Fassung, Kategorie und Bildadressen werden geprüft', async () => {
+        const s = mitAngaben();
+        await assert.rejects(Sitzungen.angabenSpeichern(s, { name: 'x', slug: 'Mit Leerzeichen' }), /Slug/);
+        await assert.rejects(Sitzungen.angabenSpeichern(s, { name: 'x', version: '1.0' }), /Fassung/);
+        await assert.rejects(Sitzungen.angabenSpeichern(s, { name: 'x', kategorie: 'erfunden' }), /Kategorie/);
+        await assert.rejects(Sitzungen.angabenSpeichern(s, { name: 'x', icon_url: 'javascript:alert(1)' }), /Symbol/);
+        await assert.rejects(Sitzungen.angabenSpeichern(s, { name: 'x', banner_url: 'http://unsicher/x.png' }), /Banner/);
+        await Sitzungen.angabenSpeichern(s, { name: 'Factorio', slug: 'factorio', version: '1.2.0', kategorie: 'strategy',
+            beschreibung_de: 'Fabriken', icon_url: '/uploads/media/g/1.png', banner_url: 'https://cdn.example/b.jpg' });
+        assert.deepStrictEqual(db.entwurf.werkbank.praesentation, { icon_url: '/uploads/media/g/1.png', banner_url: 'https://cdn.example/b.jpg' });
+        assert.strictEqual(db.entwurf.identity.version, '1.2.0');
+        assert.deepStrictEqual(db.entwurf.werkbank.portnummern, { game: 34197 }, 'der Sitzungsteil bleibt erhalten');
     });
 
     console.log(`\n${bestanden} Prüfung(en) bestanden.\n`);

@@ -150,7 +150,7 @@ async function schritte(sitzungId) {
  * Eine Sitzung anlegen. Das Volume entsteht beim Daemon mit dem ersten
  * Schritt — vorher gibt es nichts, was es tragen müsste.
  */
-async function anlegen({ guildId, userId, name, rootserverId, image }) {
+async function anlegen({ guildId, userId, name, rootserverId, image, iconUrl }) {
     const name2 = String(name || '').trim().slice(0, 100);
     if (!name2) throw new Error('Die Sitzung braucht einen Namen — meist das Spiel, das entstehen soll.');
     const erlaubt = await waehlbareImages();
@@ -160,11 +160,16 @@ async function anlegen({ guildId, userId, name, rootserverId, image }) {
     if (!maschine) throw new Error('Diese Maschine gehört nicht zu dieser Guild.');
 
     const kennung = neueKennung();
+    // Das Bild „von vornherein" (Betreiber, 2026-09-24) — es gehört der Sitzung,
+    // ins Paket kommt es nicht; beim Veröffentlichen geht es an den Anker.
+    const icon = pruefeBildAdresse(iconUrl, 'Symbol');
+    const entwurf = { identity: { name: name2 } };
+    if (icon) entwurf.werkbank = { praesentation: { icon_url: icon } };
     await db().query(
         `INSERT INTO werkbank_sitzungen (kennung, guild_id, angelegt_von, name, rootserver_id, image, entwurf)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [kennung, guildId, userId || null, name2, maschine.id, JSON.stringify(img),
-         JSON.stringify({ identity: { name: name2 } })]);
+         JSON.stringify(entwurf)]);
     return kennung;
 }
 
@@ -485,8 +490,21 @@ function stabil(wert) {
     return JSON.stringify(wert);
 }
 
+/**
+ * Der technische Teil eines Pakets — das, was ein Durchlauf prüft.
+ *
+ * Name, Beschreibung, Fassung und Bild gehören NICHT dazu: Sie ändern nichts
+ * daran, ob das Spiel installiert und startet, und wer nach einem grünen
+ * Durchlauf die Beschreibung verbessert, soll nicht neu prüfen müssen
+ * (Stufe 4, 2026-09-24).
+ */
+function technisch(paket) {
+    const p = paket || {};
+    return { image: p.image || null, ports: p.ports || [], install: p.install || {}, start: p.start || null, env: p.env || {} };
+}
+
 function fingerabdruck(paket) {
-    return crypto.createHash('sha256').update(stabil(paket)).digest('hex');
+    return crypto.createHash('sha256').update(stabil(technisch(paket))).digest('hex');
 }
 
 async function laufendePruefung(kennung) {
@@ -574,6 +592,169 @@ async function pruefungBeenden(pruefId, ergebnis) {
         [ergebnis?.gruen ? 'gruen' : 'rot', JSON.stringify(ergebnis || {}), pruefId]);
 }
 
+// ── Stufe 4: Angaben, Präsentation, Veröffentlichen ──────────────────────────
+
+const einlieferung = require('../../../../packages/fbpkg/lib/einlieferung');
+
+const RE_SLUG = /^[a-z0-9][a-z0-9-]*$/;       // Schema: identity.slug
+const RE_FASSUNG = /^[0-9]+\.[0-9]+\.[0-9]+$/; // Schema: identity.version
+
+/**
+ * Eine Bildadresse annehmen — aus der Medienablage (/uploads/…) oder https.
+ * Alles andere (javascript:, data:, http:) landete sonst in einem img-src
+ * auf jeder Seite, die das Spiel zeigt.
+ */
+function pruefeBildAdresse(wert, was) {
+    const url = String(wert || '').trim();
+    if (!url) return null;
+    if (url.length > 500 || !(/^\/uploads\/[^\s"'<>]+$/.test(url) || /^https:\/\/[^\s"'<>]+$/.test(url))) {
+        throw new Error(`${was}: nur ein Bild aus den Medien (/uploads/…) oder eine https-Adresse.`);
+    }
+    return url;
+}
+
+/** Die Angaben, wie sie im Formular stehen — mit Vorbelegung. */
+function angaben(sitzung) {
+    const id = sitzung.entwurf?.identity || {};
+    const p = sitzung.entwurf?.werkbank?.praesentation || {};
+    const b = id.description || {};
+    return {
+        slug: id.slug || '', name: id.name || sitzung.name || '', version: id.version || '1.0.0',
+        beschreibung_de: typeof b === 'object' ? (b.de || '') : String(b || ''),
+        beschreibung_en: typeof b === 'object' ? (b.en || '') : '',
+        kategorie: id.category || 'other',
+        icon_url: p.icon_url || '', banner_url: p.banner_url || '',
+    };
+}
+
+async function angabenSpeichern(sitzung, f) {
+    const slug = String(f.slug || '').trim().toLowerCase();
+    if (slug && !RE_SLUG.test(slug)) throw new Error('Slug: Kleinbuchstaben, Ziffern und -, beginnend mit Buchstabe oder Ziffer.');
+    const name = String(f.name || '').trim().slice(0, 100);
+    if (!name) throw new Error('Name fehlt.');
+    const version = String(f.version || '').trim();
+    if (version && !RE_FASSUNG.test(version)) throw new Error('Fassung: drei Zahlen, etwa 1.0.0.');
+    const kategorie = String(f.kategorie || 'other');
+    if (!einlieferung.KATEGORIEN.has(kategorie)) throw new Error('Unbekannte Kategorie.');
+    const icon = pruefeBildAdresse(f.icon_url, 'Symbol');
+    const banner = pruefeBildAdresse(f.banner_url, 'Banner');
+    const de = String(f.beschreibung_de || '').trim().slice(0, 2000);
+    const en = String(f.beschreibung_en || '').trim().slice(0, 2000);
+    return entwurfSchreiben(sitzung, (e) => {
+        const id = { ...(e.identity || {}), name, category: kategorie };
+        if (slug) id.slug = slug; else delete id.slug;
+        if (version) id.version = version; else delete id.version;
+        if (de || en) id.description = { ...(de ? { de } : {}), ...(en ? { en } : {}) }; else delete id.description;
+        e.identity = id;
+        e.werkbank = { ...(e.werkbank || {}), praesentation: { icon_url: icon, banner_url: banner } };
+    });
+}
+
+function fassungGroesser(a, b) {
+    const x = a.split('.').map(Number), y = b.split('.').map(Number);
+    for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] > y[i];
+    return false;
+}
+
+/**
+ * Darf veröffentlicht werden? Gründe statt Ja/Nein — die Seite zeigt sie.
+ *
+ * Verlangt (abgestimmt 2026-09-24): der LETZTE Durchlauf grün, und am
+ * technischen Teil hat sich seither nichts geändert; Slug und Fassung
+ * gesetzt; gibt es den Slug schon, eine HÖHERE Fassung (Fassungen sind
+ * unveränderlich, siehe einlieferung.js).
+ */
+async function veroeffentlichungsStand(sitzung, liste, pruefListe) {
+    const gruende = [];
+    const paket = entwurfAlsPaket(sitzung, liste);
+    const letzte = pruefListe[0] || null;
+    if (!letzte) gruende.push('Noch kein Prüfdurchlauf.');
+    else if (letzte.status === 'laeuft') gruende.push('Der Prüfdurchlauf läuft noch.');
+    else if (letzte.status !== 'gruen') gruende.push('Der letzte Prüfdurchlauf war rot.');
+    else if (fingerabdruck(letzte.entwurf) !== fingerabdruck(paket)) {
+        gruende.push('Seit dem grünen Durchlauf hat sich der technische Teil geändert — neu prüfen.');
+    }
+    const id = paket.identity || {};
+    if (!id.slug) gruende.push('Slug fehlt.');
+    if (!id.version) gruende.push('Fassung fehlt.');
+    let neueste = null;
+    if (id.slug) {
+        const zeilen = await db().query(
+            `SELECT pv.version FROM package_versions pv JOIN packages p ON p.id = pv.package_id WHERE p.slug = ?`, [id.slug]);
+        for (const z of zeilen) if (!neueste || fassungGroesser(z.version, neueste)) neueste = z.version;
+        if (neueste && id.version && !fassungGroesser(id.version, neueste)) {
+            gruende.push(`„${id.slug}" gibt es schon bis ${neueste} — die Fassung muss höher sein.`);
+        }
+    }
+    return { darf: gruende.length === 0, gruende, neueste, pruefung: letzte };
+}
+
+/** Das Paket, wie es eingeliefert wird. */
+function veroeffentlichungsPaket(sitzung, liste, pruefung, autor) {
+    const e = entwurfAlsPaket(sitzung, liste);
+    const heute = new Date().toISOString().slice(0, 10);
+    const am = pruefung.beendet_am ? new Date(pruefung.beendet_am).toISOString().slice(0, 16).replace('T', ' ') : heute;
+    const identity = {
+        slug: e.identity.slug, name: e.identity.name || e.identity.slug, version: e.identity.version,
+        ...(autor ? { author: String(autor) } : {}),
+        ...(e.identity.description ? { description: e.identity.description } : {}),
+        category: e.identity.category || 'other',
+        origin: { type: 'installer', source: `werkbank:${sitzung.kennung}`, imported_at: heute },
+    };
+    return {
+        format: 'FBPKG_v1', identity,
+        // Der technische Teil aus dem GEPRÜFTEN Entwurf — gleich per Fingerabdruck,
+        // aber so steht außer Frage, was eingeliefert wird.
+        ...technisch(pruefung.entwurf),
+        status: {
+            complete: false,
+            open: [
+                `Aus der Werkbank (Sitzung ${sitzung.kennung}). Prüfdurchlauf #${pruefung.id} grün am ${am} UTC: `
+                    + `ganzes Rezept auf leerem Volume, bereit über den Port, Stoppfolge endete vor sigkill.`,
+                'Keine Einstellungen: Die Werkbank kennt sie noch nicht — der Server ist startbar, aber nicht einstellbar.',
+                // Der Notausgang gehört genannt (check-pakete, BEFUND) — samt dem
+                // Grund, den die Werkbank beim Anlegen des Schritts erfragt.
+                ...(pruefung.entwurf?.install?.steps || []).map((x, i) => (x.type === 'script'
+                    ? `Notausgang: install-Schritt ${i + 1} ist ein script — ${(x.reason && (x.reason.de || x.reason.en)) || 'ohne Begründung'}`
+                    : null)).filter(Boolean),
+            ],
+        },
+    };
+}
+
+async function veroeffentlichen(sitzung, liste, pruefListe, { autor } = {}) {
+    const stand = await veroeffentlichungsStand(sitzung, liste, pruefListe);
+    if (!stand.darf) throw new Error(stand.gruende.join(' '));
+    const paket = veroeffentlichungsPaket(sitzung, liste, stand.pruefung, autor);
+    // Dasselbe Tor wie die Kommandozeile: check-pakete.js über eine Datei.
+    const fs = require('fs'), os = require('os'), path = require('path');
+    const ordner = fs.mkdtempSync(path.join(os.tmpdir(), 'werkbank-'));
+    const datei = path.join(ordner, `${paket.identity.slug}.json`);
+    try {
+        fs.writeFileSync(datei, JSON.stringify(paket, null, 2));
+        const tor = einlieferung.bestehtPruefung(datei);
+        if (!tor.ok) throw new Error('Die Paketprüfung lehnt ab: ' + einlieferung.grundZeilen(tor.text).join(' · '));
+    } finally {
+        fs.rmSync(ordner, { recursive: true, force: true });
+    }
+    const zeilen = [];
+    const r = await einlieferung.liefereEin(einlieferung.fuerDbService(db()), paket, {
+        wirklich: true, etikett: paket.identity.slug,
+        testBestanden: stand.pruefung.beendet_am ? new Date(stand.pruefung.beendet_am) : new Date(),
+        praesentation: sitzung.entwurf?.werkbank?.praesentation || null,
+        log: (z) => zeilen.push(z),
+    });
+    if (r.art !== 'neu') throw new Error(r.grund || zeilen.join(' ') || 'nicht eingeliefert');
+    await entwurfSchreiben(sitzung, (e) => {
+        e.werkbank = { ...(e.werkbank || {}) };
+        e.werkbank.veroeffentlicht = [...(e.werkbank.veroeffentlicht || []), {
+            slug: paket.identity.slug, version: paket.identity.version, am: new Date().toISOString(),
+            pruef_id: stand.pruefung.id, paket_id: r.paketId,
+        }];
+    });
+    return { slug: paket.identity.slug, version: paket.identity.version, paketId: r.paketId, meldungen: zeilen };
+}
+
 // ── Ereignisse eines Laufs (aufgerufen aus Ereignisse.js) ────────────────────
 
 async function laufSetzen(laufId, felder) {
@@ -645,7 +826,8 @@ module.exports = {
     waehlbareImages, maschinen, liste, laden, schritte, anlegen,
     schrittAusfuehren, ausgabeAnhaengen, beenden, laufenderSchritt,
     herausnehmen, verwerfen, entwurfAlsPaket,
-    PRUEF_SUFFIX, fingerabdruck, laufendePruefung, pruefungen, durchlaufMaengel, pruefen,
+    PRUEF_SUFFIX, fingerabdruck, technisch,
+    pruefeBildAdresse, angaben, angabenSpeichern, veroeffentlichungsStand, veroeffentlichungsPaket, veroeffentlichen, laufendePruefung, pruefungen, durchlaufMaengel, pruefen,
     pruefungAbbrechen, pruefProtokoll, pruefungBeenden,
     werkbankTeil, ungenutztePorts, startSpeichern, starten, stoppen, eingabe, laeufe, laufenderLauf,
     portUebernehmen, portEntfernen, bereitschaftszeile,
