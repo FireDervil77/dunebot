@@ -38,7 +38,7 @@ const { ohneKommentare } = require('./lib/quelltext');
 const DAEMON = '/home/firedervil/firebot_daemon';
 
 const AUSSTEHEND = {
-    template: 'W-12 Schritt 4 — dieselbe Platzhalterregel wie start.args und config[]',
+    // Leer seit dem 2026-09-24: alle Typen des Schemas sind gebaut (W-12).
 };
 
 let fehler = 0;

@@ -285,19 +285,21 @@
               "type": {},
               "description": {},
               "file": {
-                "type": "string"
+                "type": "string",
+                "description": "Zieldatei in game/."
               },
               "from": {
                 "type": "string",
-                "description": "Vorlage im Paket."
+                "description": "Vorlage im Paket. NOCH OHNE TRÄGER (2026-09-24): Ein Paket ist eine JSON-Datei ohne Begleitdateien; der Daemon weist `from` ab. Bis dahin `content`."
               },
               "content": {
                 "type": "string",
-                "description": "Alternativ: Inhalt direkt."
+                "description": "Der Inhalt direkt, mit {{setting:…}} und {{port:…}} — dieselbe Regel wie `env` eines script-Schritts. Höchstens 64 KiB; Größeres gehört geladen (download)."
               },
               "only_if_missing": {
                 "type": "boolean",
-                "default": true
+                "default": true,
+                "description": "Vorgabe true: Eine Datei, die schon da ist, bleibt — eine Neuinstallation setzt nichts zurück, was der Betreiber geändert hat. Was bei JEDEM Start gelten muss, gehört in config[]."
               }
             },
             "additionalProperties": false,
