@@ -13,6 +13,9 @@
  *   Stoppen   `queued` → der Status bleibt `stopping`, der Browser erfährt es sofort
  *   Löschen   läuft er? → stoppen → auf die Meldung warten → erst dann deinstallieren
  *             kommt er nicht herunter → es wird NICHTS gelöscht
+ *   Neu-      dasselbe vor `gameserver.install` (seit 2026-09-24, Baustelle 155:
+ *   install.  #202 lief waehrend der Neuinstallation weiter und stand danach
+ *             im Panel auf `offline`)
  *
  * Die Attrappen WERFEN bei unerwarteten Abfragen und Befehlen.
  *
@@ -49,6 +52,10 @@ const db = {
             return this.server ? [{ status: this.server.status, error_message: this.server.error_message || null }] : [];
         }
         if (/^UPDATE port_allocations SET server_id = NULL/.test(t)) return { affectedRows: 1 };
+        if (/^UPDATE gameservers SET status = \?, error_message = NULL WHERE id = \?$/.test(t)) {
+            this.server.status = params[0]; this.geschrieben.push(params[0]);
+            return { affectedRows: 1 };
+        }
         if (/^DELETE FROM gameservers WHERE id = \?$/.test(t)) { this.geloescht = true; return { affectedRows: 1 }; }
         throw new Error('Unerwartete Abfrage: ' + t.slice(0, 90));
     },
@@ -63,6 +70,7 @@ const daemon = {
         this.befehle.push(befehl);
         if (befehl === 'gameserver.stop') return this.stoppAntwort;
         if (befehl === 'gameserver.uninstall') return { success: true, deleted_files: 3 };
+        if (befehl === 'gameserver.install') return { success: true, task_id: 't-2' };
         throw new Error('Unerwarteter Befehl: ' + befehl);
     },
     async syncSftpUsers() { return true; },
@@ -79,7 +87,12 @@ const ServerStopp = require(path.join(HELFER, 'ServerStopp.js'));
 
 const LAUFEND = () => ({ id: 42, name: 'Bude', status: 'online', guild_id: 'g1',
     last_status_update: new Date().toISOString(), daemon_id: 'd1', rootserver_id: 55,
-    install_path: '42-valheim', addon_slug: 'valheim' });
+    install_path: '42-valheim', addon_slug: 'valheim',
+    // Das echte Paket: Die Neuinstallation baut ihren Auftrag mit
+    // baueInstallNutzlast, und der weist einen Server ohne Paket ab — dann
+    // prüfte die Neuinstallation nur ihren eigenen Abbruch.
+    paket_json: require('fs').readFileSync(path.join(__dirname, '../packages/fbpkg/beispiele/valheim.json'), 'utf8'),
+    paket_werte: '{}', ports: '{}' });
 
 let bestanden = 0;
 async function pruefe(name, fn) {
@@ -231,6 +244,53 @@ async function pruefe(name, fn) {
             assert.strictEqual(r.status, 200, JSON.stringify(r.antwort));
             assert.deepStrictEqual(daemon.befehle, ['gameserver.uninstall']);
             assert.strictEqual(gewartet, false);
+        } finally { ServerStopp.warteBisGestoppt = echtesWarten; }
+    });
+
+    console.log('\nNeuinstallation (Baustelle 155)');
+
+    await pruefe('Neuinstallation eines laufenden Servers: stoppen → warten → erst dann installieren', async () => {
+        const ablauf = [];
+        ServerStopp.warteBisGestoppt = async () => { ablauf.push('gewartet'); db.server.status = 'offline'; return { ok: true }; };
+        const vorher = daemon.sendCommand.bind(daemon);
+        daemon.sendCommand = async (d, b, n) => { ablauf.push(b); return vorher(d, b, n); };
+        try {
+            const r = await rufe('post', '/:serverId/reinstall');
+            assert.strictEqual(r.status, 200, JSON.stringify(r.antwort));
+            assert.deepStrictEqual(ablauf, ['gameserver.stop', 'gewartet', 'gameserver.install'],
+                'installiert wird erst, wenn der Server unten ist');
+            assert.strictEqual(r.antwort.gestoppt, true);
+            assert.match(r.antwort.message, /wurde gestoppt/, 'der Betreiber erfährt, dass gestoppt wurde');
+            assert.strictEqual(db.server.status, 'installing');
+        } finally {
+            ServerStopp.warteBisGestoppt = echtesWarten;
+            daemon.sendCommand = vorher;
+        }
+    });
+
+    await pruefe('Kommt er nicht herunter, wird NICHTS neu installiert', async () => {
+        ServerStopp.warteBisGestoppt = async () => ({ ok: false, zeitueberschreitung: true,
+            grund: 'Der Server steht nach 150 Sekunden noch auf „stopping"' });
+        try {
+            const r = await rufe('post', '/:serverId/reinstall');
+            assert.strictEqual(r.status, 504);
+            assert.match(r.antwort.message, /nichts neu installiert/);
+            assert.ok(!daemon.befehle.includes('gameserver.install'), 'kein Installationsauftrag');
+            assert.ok(!db.geschrieben.includes('installing'), 'der Status wird nicht auf installing gesetzt');
+        } finally { ServerStopp.warteBisGestoppt = echtesWarten; }
+    });
+
+    await pruefe('Ein gestoppter Server wird neu installiert wie bisher — ohne Stopp, ohne Warten', async () => {
+        db.server.status = 'offline';
+        let gewartet = false;
+        ServerStopp.warteBisGestoppt = async () => { gewartet = true; return { ok: true }; };
+        try {
+            const r = await rufe('post', '/:serverId/reinstall');
+            assert.strictEqual(r.status, 200, JSON.stringify(r.antwort));
+            assert.deepStrictEqual(daemon.befehle, ['gameserver.install']);
+            assert.strictEqual(gewartet, false);
+            assert.strictEqual(r.antwort.gestoppt, false);
+            assert.doesNotMatch(r.antwort.message, /wurde gestoppt/);
         } finally { ServerStopp.warteBisGestoppt = echtesWarten; }
     });
 

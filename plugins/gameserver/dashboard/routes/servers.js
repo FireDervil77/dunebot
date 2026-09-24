@@ -2478,33 +2478,15 @@ router.delete('/:serverId', requirePermission('GAMESERVER.DELETE'), async (req, 
         // Deinstallieren stoppt er selbst NICHTS — er löscht Volume und
         // Verzeichnis, auch unter einem noch laufenden Container. Deshalb gilt:
         // Kommt der Server nicht sicher herunter, wird nichts gelöscht.
-        if (['online', 'starting', 'stopping'].includes(server.status)) {
-            // Ein laufender Stopp wird nicht doppelt ausgelöst — außer er hängt
-            // länger, als ein Übergang darf (dasselbe Ventil wie beim Stoppen).
-            const { uebergangVerfallen } = require('../helpers/ServerState');
-            const schonImStopp = server.status === 'stopping'
-                && !uebergangVerfallen(server.last_status_update);
-
-            if (!schonImStopp) {
-                Logger.info(`[Gameserver] Server ${serverId} läuft noch (${server.status}) — wird vor dem Löschen gestoppt`);
-                const stopp = await ServerStopp.stoppe({ server, guildId });
-                if (!stopp.ok) {
-                    return res.status(stopp.status || 500).json({
-                        success: false,
-                        message: `Der Server läuft und ließ sich nicht stoppen: ${stopp.grund}. Es wurde nichts gelöscht.`
-                    });
-                }
-            }
-
-            const warten = await ServerStopp.warteBisGestoppt(serverId);
-            if (!warten.ok) {
-                Logger.warn(`[Gameserver] Löschen von Server ${serverId} abgebrochen: ${warten.grund}`);
-                return res.status(warten.zeitueberschreitung ? 504 : 409).json({
-                    success: false,
-                    message: `${warten.grund}. Es wurde nichts gelöscht — der Server bleibt, bis er sicher unten ist.`
-                });
-            }
-            Logger.info(`[Gameserver] Server ${serverId} ist unten — Löschen geht weiter`);
+        // Der Ablauf selbst steht seit 2026-09-24 in ServerStopp.stoppeFallsLaeuft
+        // — die Neuinstallation braucht denselben (Baustelle 155).
+        const stopp = await ServerStopp.stoppeFallsLaeuft({ server, guildId });
+        if (!stopp.ok) {
+            Logger.warn(`[Gameserver] Löschen von Server ${serverId} abgebrochen: ${stopp.grund}`);
+            return res.status(stopp.status).json({
+                success: false,
+                message: `${stopp.grund}. Es wurde nichts gelöscht — der Server bleibt, bis er sicher unten ist.`
+            });
         }
 
         // ════════════════════════════════════════════════════════════
@@ -3378,6 +3360,21 @@ router.post('/:serverId/reinstall', requirePermission('GAMESERVER.CREATE'), asyn
             });
         }
 
+        // ── Läuft er? Dann erst sauber stoppen (Baustelle 155) ──────────────
+        //
+        // Wie beim Löschen: Der Daemon installiert in das Volume, ohne auf den
+        // Container zu sehen. Am 2026-09-24 lief #202 dabei weiter und stand
+        // danach im Panel auf `offline`. Kommt der Server nicht sicher herunter,
+        // wird nichts installiert.
+        const stopp = await ServerStopp.stoppeFallsLaeuft({ server, guildId });
+        if (!stopp.ok) {
+            Logger.warn(`[Gameserver] Neuinstallation von Server ${serverId} abgebrochen: ${stopp.grund}`);
+            return res.status(stopp.status).json({
+                success: false,
+                message: `${stopp.grund}. Es wurde nichts neu installiert.`
+            });
+        }
+
         // Status auf 'installing' setzen
         await dbService.query(
             'UPDATE gameservers SET status = ?, error_message = NULL WHERE id = ?',
@@ -3393,7 +3390,9 @@ router.post('/:serverId/reinstall', requirePermission('GAMESERVER.CREATE'), asyn
 
             res.json({
                 success: true,
-                message: `Neuinstallation von "${server.name}" wurde gestartet. Du erhältst eine Benachrichtigung wenn sie abgeschlossen ist.`,
+                message: (stopp.gestoppt ? `"${server.name}" wurde gestoppt. ` : '')
+                    + `Neuinstallation von "${server.name}" wurde gestartet. Du erhältst eine Benachrichtigung, wenn sie abgeschlossen ist.`,
+                gestoppt: stopp.gestoppt,
                 task_id: response.task_id
             });
         } else {

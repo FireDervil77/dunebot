@@ -262,7 +262,7 @@ async function reinstallServer(serverId, serverName) {
     console.log(`[ServerAction] Reinstall Server ${serverId} (${serverName})`);
 
     // Bestätigung
-    if (!confirm(`🔧 Möchtest du den Server "${serverName}" neu installieren?\n\nDies wird:\n- Die bestehende Installation ersetzen\n- Alle Spiel-Dateien neu herunterladen\n- Config-Dateien bleiben erhalten\n\nDauer: 5-15 Minuten (je nach Spiel)`)) {
+    if (!confirm(`🔧 Möchtest du den Server "${serverName}" neu installieren?\n\nDies wird:\n- Die bestehende Installation ersetzen\n- Alle Spiel-Dateien neu herunterladen\n- Config-Dateien bleiben erhalten\n\nLäuft er noch, wird er vorher sauber gestoppt — das kann bis zu zweieinhalb Minuten dauern.\n\nDauer: 5-15 Minuten (je nach Spiel)`)) {
         console.log('[ServerAction] Reinstall abgebrochen durch Benutzer');
         return;
     }
@@ -282,7 +282,7 @@ async function reinstallServer(serverId, serverName) {
 
     // Loading-Toast
     if (window.showToast) {
-        window.showToast('info', `Installation von "${serverName}" wird gestartet...`);
+        window.showToast('info', `Neuinstallation von "${serverName}" … läuft er noch, wird er zuerst gestoppt.`);
     }
 
     try {
@@ -306,7 +306,8 @@ async function reinstallServer(serverId, serverName) {
             console.log(`[ServerAction] ✅ Reinstall gestartet:`, result);
             
             if (window.showToast) {
-                window.showToast('success', `Installation läuft! Du erhältst eine Benachrichtigung wenn sie abgeschlossen ist.`);
+                // Die Route sagt selbst, ob vorher gestoppt wurde (Baustelle 155).
+                window.showToast('success', result.message || 'Installation läuft! Du erhältst eine Benachrichtigung, wenn sie abgeschlossen ist.');
             }
             
             // Status-Update erfolgt automatisch via SSE (installing → offline/error)

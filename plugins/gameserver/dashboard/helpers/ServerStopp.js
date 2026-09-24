@@ -175,4 +175,61 @@ async function warteBisGestoppt(serverId, { fristMs = STOPP_FRIST_MS, taktMs = T
     }
 }
 
-module.exports = { stoppe, warteBisGestoppt, STOPP_FRIST_MS };
+/**
+ * Läuft der Server? Dann stoppen und warten, bis er wirklich unten ist.
+ *
+ * Für alles, was Dateien unter dem Server anfasst — Löschen und
+ * Neuinstallieren. Beide lassen den Container selbst stehen: Der Daemon löscht
+ * beim Deinstallieren nur Volume und Verzeichnis, und beim Installieren prüft er
+ * nicht, ob der Container läuft.
+ *
+ * ── Warum das nicht mehr nur beim Löschen steht (2026-09-24, Baustelle 155) ──
+ *
+ * Bis dahin stand dieser Ablauf allein in der Löschroute. Die Neuinstallation
+ * schickte ihren Auftrag, ohne hinzusehen: #202 stand auf `online`, der
+ * Container lief seit dem Vorabend, und die Installation tauschte Forge unter
+ * dem laufenden Prozess aus. Danach setzte das Dashboard `offline` — der Server
+ * lief weiter, nur das Panel sah ihn nicht mehr. Betreiber: *„wie beim
+ * entfernen … wird vor dem reinstall sauber gestoppt. das dashboard meldet das
+ * und dann startet der reinstall."*
+ *
+ * @param {{server: object, guildId: string}} auftrag
+ *        `server` braucht id, status, last_status_update, daemon_id
+ * @returns {Promise<{ok: boolean, gestoppt?: boolean, status?: number, grund?: string}>}
+ *          `gestoppt` sagt, ob tatsächlich gestoppt wurde; `status` ist der
+ *          HTTP-Status für die Route, wenn nicht.
+ */
+async function stoppeFallsLaeuft({ server, guildId }) {
+    if (!['online', 'starting', 'stopping'].includes(server.status)) {
+        return { ok: true, gestoppt: false };
+    }
+    const Logger = ServiceManager.get('Logger');
+
+    // Ein laufender Stopp wird nicht doppelt ausgelöst — außer er hängt
+    // länger, als ein Übergang darf (dasselbe Ventil wie beim Stoppen).
+    const { uebergangVerfallen } = require('./ServerState');
+    const schonImStopp = server.status === 'stopping'
+        && !uebergangVerfallen(server.last_status_update);
+
+    if (!schonImStopp) {
+        Logger.info(`[Gameserver] Server ${server.id} läuft noch (${server.status}) — wird zuerst gestoppt`);
+        const stopp = await module.exports.stoppe({ server, guildId });
+        if (!stopp.ok) {
+            return { ok: false, status: stopp.status || 500,
+                grund: `Der Server läuft und ließ sich nicht stoppen: ${stopp.grund}` };
+        }
+    }
+
+    // Über den Export, nicht direkt: `check-server-stopp.js` ersetzt das Warten,
+    // um die REIHENFOLGE in den Routen zu prüfen statt der Uhr. Ein direkter
+    // Aufruf ginge an diesem Ersatz vorbei, und die Prüfung liefe in die echte
+    // Frist von 150 s (am 2026-09-24 genau so hängen geblieben).
+    const warten = await module.exports.warteBisGestoppt(server.id);
+    if (!warten.ok) {
+        return { ok: false, status: warten.zeitueberschreitung ? 504 : 409, grund: warten.grund };
+    }
+    Logger.info(`[Gameserver] Server ${server.id} ist unten`);
+    return { ok: true, gestoppt: true };
+}
+
+module.exports = { stoppe, warteBisGestoppt, stoppeFallsLaeuft, STOPP_FRIST_MS };
