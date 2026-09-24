@@ -1,0 +1,347 @@
+{
+  "format": "FBPKG_v1",
+  "identity": {
+    "slug": "factorio",
+    "name": "Factorio",
+    "version": "1.0.0",
+    "author": "firenetworks",
+    "category": "strategy",
+    "description": {
+      "de": "Fabriken bauen und automatisieren — der offizielle Linux-Server (headless) von Wube Software.",
+      "en": "Build and automate factories — Wube Software's official headless Linux server."
+    },
+    "origin": {
+      "type": "manual",
+      "source": "https://factorio.com/download/sha256sums/",
+      "imported_at": "2026-09-24"
+    }
+  },
+  "image": {
+    "ref": "registry.firenetworks.de/fb/base",
+    "tag": "2026.09",
+    "digest": "sha256:6bc667b35c4888293c35d95317cf8c8a3a925124cceb2c5277d0a58d326f86b0",
+    "pinned_at": "2026-09-24",
+    "platform": "linux",
+    "arch": [
+      "amd64"
+    ]
+  },
+  "requirements": {
+    "os_packages": []
+  },
+  "ports": [
+    {
+      "purpose": "game",
+      "protocol": "udp",
+      "assign": "pool",
+      "required": true,
+      "description": {
+        "de": "Spielport (UDP). Factorio bekommt ihn als --port.",
+        "en": "Game port (UDP), passed as --port."
+      }
+    },
+    {
+      "purpose": "rcon",
+      "protocol": "tcp",
+      "assign": "pool",
+      "required": true,
+      "description": {
+        "de": "Fernsteuerung (Source-RCON). Ohne sie kein Speichern vor dem Stopp über den Daemon.",
+        "en": "Remote console (Source RCON)."
+      }
+    }
+  ],
+  "install": {
+    "steps": [
+      {
+        "type": "download",
+        "description": {
+          "de": "Linux-Server 2.0.77 von factorio.com",
+          "en": "Headless server 2.0.77 from factorio.com"
+        },
+        "url": "https://factorio.com/get-download/2.0.77/headless/linux64",
+        "target": "factorio.tar.xz",
+        "checksum": "sha256:c4efc11529f74d37c96933e291e0db73fd9f5aa4738913d9301b24680b3e947f"
+      },
+      {
+        "type": "extract",
+        "description": {
+          "de": "Auspacken (der Ordner factorio/ fällt weg)",
+          "en": "Unpack (drops the factorio/ folder)"
+        },
+        "archive": "factorio.tar.xz",
+        "strip_components": 1
+      },
+      {
+        "type": "template",
+        "description": {
+          "de": "Servereinstellungen anlegen (nur wenn noch keine da sind). Ohne Platzhalter: Name, Kennwort und Spielerzahl setzt `apply` bei JEDEM Start über den JSON-Parser — der maskiert, eine Vorlage nicht. Ein Name mit Anführungszeichen ergäbe hier sonst kaputtes JSON.",
+          "en": "Create server settings (only if missing). No placeholders: `apply` sets the values on every start through the JSON parser, which escapes them."
+        },
+        "file": "server-settings.json",
+        "content": "{\n  \"name\": \"Mein Factorio-Server\",\n  \"description\": \"\",\n  \"tags\": [],\n  \"max_players\": 0,\n  \"visibility\": {\n    \"public\": false,\n    \"lan\": false\n  },\n  \"username\": \"\",\n  \"password\": \"\",\n  \"token\": \"\",\n  \"game_password\": \"\",\n  \"require_user_verification\": true,\n  \"max_upload_in_kilobytes_per_second\": 0,\n  \"max_upload_slots\": 5,\n  \"minimum_latency_in_ticks\": 0,\n  \"max_heartbeats_per_second\": 60,\n  \"ignore_player_limit_for_returning_players\": false,\n  \"allow_commands\": \"admins-only\",\n  \"autosave_interval\": 10,\n  \"autosave_slots\": 5,\n  \"afk_autokick_interval\": 0,\n  \"auto_pause\": true,\n  \"auto_pause_when_players_connect\": false,\n  \"only_admins_can_pause_the_game\": true,\n  \"autosave_only_on_server\": true,\n  \"non_blocking_saving\": false,\n  \"minimum_segment_size\": 25,\n  \"minimum_segment_size_peer_count\": 20,\n  \"maximum_segment_size\": 100,\n  \"maximum_segment_size_peer_count\": 10\n}\n"
+      },
+      {
+        "type": "script",
+        "description": {
+          "de": "Eine Welt anlegen, falls noch keine da ist",
+          "en": "Create a world if none exists"
+        },
+        "script": "set -euo pipefail\n# Factorio startet nur mit einer vorhandenen Welt (--start-server <datei>);\n# --start-server-load-latest bricht ohne Spielstand ab. Eine Welt anlegen kann\n# nur das Programm selbst — deshalb dieser eine Notausgang. Gemessen am\n# 2026-09-24: 3 Sekunden, 870 KB.\nif [ -f saves/welt.zip ]; then\n    echo \"==> saves/welt.zip liegt schon da — bleibt\"\nelse\n    ./bin/x64/factorio --create saves/welt.zip\nfi\n",
+        "reason": {
+          "de": "Eine Welt legt nur das Programm selbst an; kein deklarativer Schritt kann das.",
+          "en": "Only the game binary can create a world; no declarative step can."
+        }
+      }
+    ]
+  },
+  "start": {
+    "program": "./bin/x64/factorio",
+    "workdir": ".",
+    "args": [
+      {
+        "key": "start_server",
+        "form": [
+          "--start-server",
+          "saves/welt.zip"
+        ],
+        "from": "fixed"
+      },
+      {
+        "key": "port",
+        "form": [
+          "--port",
+          "{{value}}"
+        ],
+        "from": "port:game"
+      },
+      {
+        "key": "rcon_port",
+        "form": [
+          "--rcon-port",
+          "{{value}}"
+        ],
+        "from": "port:rcon"
+      },
+      {
+        "key": "rcon_password",
+        "form": [
+          "--rcon-password",
+          "{{value}}"
+        ],
+        "from": "setting:rcon_password"
+      },
+      {
+        "key": "server_settings",
+        "form": [
+          "--server-settings",
+          "server-settings.json"
+        ],
+        "from": "fixed"
+      }
+    ],
+    "ready_when": {
+      "port": "game",
+      "log_line": "to(InGame)",
+      "timeout_sec": 300
+    },
+    "stop": {
+      "sequence": [
+        {
+          "step": "rcon:/server-save",
+          "timeout_sec": 60,
+          "terminates": false
+        },
+        {
+          "step": "sigint",
+          "timeout_sec": 60,
+          "terminates": true
+        },
+        {
+          "step": "sigkill",
+          "timeout_sec": 10,
+          "terminates": true
+        }
+      ]
+    }
+  },
+  "env": {
+    "RCON_PASSWORD": "{{setting:rcon_password}}"
+  },
+  "settings": [
+    {
+      "key": "name",
+      "group": "identity",
+      "name": {
+        "de": "Servername",
+        "en": "Server name"
+      },
+      "description": {
+        "de": "So heißt der Server im Spiel.",
+        "en": "How the server is named in game."
+      },
+      "type": "text",
+      "default": "Mein Factorio-Server",
+      "apply": [
+        {
+          "target": "file",
+          "file": "server-settings.json",
+          "parser": "json",
+          "path": "name"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "player"
+    },
+    {
+      "key": "description",
+      "group": "identity",
+      "name": {
+        "de": "Beschreibung",
+        "en": "Description"
+      },
+      "description": {
+        "de": "Ein Satz über den Server.",
+        "en": "One line about the server."
+      },
+      "type": "text",
+      "default": "",
+      "apply": [
+        {
+          "target": "file",
+          "file": "server-settings.json",
+          "parser": "json",
+          "path": "description"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "player"
+    },
+    {
+      "key": "game_password",
+      "group": "access",
+      "name": {
+        "de": "Beitrittskennwort",
+        "en": "Join password"
+      },
+      "description": {
+        "de": "Leer heißt: jeder, der die Adresse kennt, kommt herein.",
+        "en": "Empty means anyone with the address can join."
+      },
+      "type": "password",
+      "default": "",
+      "apply": [
+        {
+          "target": "file",
+          "file": "server-settings.json",
+          "parser": "json",
+          "path": "game_password"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "player"
+    },
+    {
+      "key": "max_players",
+      "group": "access",
+      "name": {
+        "de": "Spieler höchstens",
+        "en": "Max players"
+      },
+      "description": {
+        "de": "0 heißt: keine Grenze.",
+        "en": "0 means no limit."
+      },
+      "type": "number",
+      "default": 0,
+      "apply": [
+        {
+          "target": "file",
+          "file": "server-settings.json",
+          "parser": "json",
+          "path": "max_players"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "player"
+    },
+    {
+      "key": "rcon_password",
+      "group": "start",
+      "name": {
+        "de": "Kennwort der Fernsteuerung",
+        "en": "Remote console password"
+      },
+      "description": {
+        "de": "Nur der Daemon benutzt es — für das Speichern vor dem Stopp. Es geht nie an Spieler.",
+        "en": "Only the daemon uses it, to save before stopping. Players never see it."
+      },
+      "type": "password",
+      "default": null,
+      "apply": [
+        {
+          "target": "env",
+          "variable": "RCON_PASSWORD"
+        }
+      ],
+      "takes_effect": "restart",
+      "risk": "none",
+      "role": "owner"
+    }
+  ],
+  "commands": {
+    "players.list": {
+      "via": "rcon",
+      "command": "/players"
+    },
+    "players.kick": {
+      "via": "rcon",
+      "command": "/kick {{player_id}} {{reason}}"
+    },
+    "players.ban": {
+      "via": "rcon",
+      "command": "/ban {{player_id}} {{reason}}"
+    },
+    "world.save": {
+      "via": "rcon",
+      "command": "/server-save"
+    },
+    "broadcast": {
+      "via": "rcon",
+      "command": "{{message}}"
+    }
+  },
+  "management": {
+    "rcon": {
+      "protocol": "source",
+      "port": "rcon",
+      "password_variable": "RCON_PASSWORD"
+    },
+    "saves": [
+      "saves"
+    ]
+  },
+  "files": {
+    "denylist": [
+      "bin"
+    ]
+  },
+  "status": {
+    "complete": false,
+    "open": [
+      "GEMESSEN am 2026-09-24, NICHT ueber das Panel, aber ueber den Produktionscode: Installation mit rezept.Fuehre und dem echten Laeufer (RunSchrittContainer) als Benutzer firebot, 26 s — download 55 MB mit sha256 von factorio.com (falsche Summe bricht ab und hinterlaesst nichts), extract strip 1 (3581 Dateien, Archiv danach weg), template server-settings.json, script --create saves/welt.zip. Start mit fb-startprobe (derselbe Auftragsbau wie der Daemon) als 998:998: apply schrieb `Fires \"Fabrik\"` korrekt maskiert in server-settings.json, fb-init [ready] nach 'to(InGame)' (2,2 s), RCON (srcds) ueber den Auftrag: '/players' -> 'Players (0):', Text ohne / -> '[CHAT] <server>: …'. Stopp nach Paket: rcon:/server-save -> 'Saving the map', dann SIGINT -> Factorio speichert erneut und endet mit 0.",
+      "DIE FASSUNG IST FEST: 2.0.77. Die Pruefsumme passt auf genau eine Datei, deshalb kann `download` keine Einstellung `version` lesen. Ein Update ist eine neue Paketfassung mit neuer Adresse und neuer Summe (factorio.com/download/sha256sums/). Das ist der Preis der Pruefsumme — und ein Grund, warum die Werkbank diesen Schritt spaeter automatisieren sollte.",
+      "install benutzt EINEN script-Schritt, fuer das Anlegen der Welt: Das kann nur das Programm selbst (`--create`), und `--start-server-load-latest` bricht ohne Spielstand ab. Alles andere ist deklarativ (download, extract, template).",
+      "visibility.public steht auf false: Oeffentlich gelistet will Factorio Zugangsdaten von factorio.com (gemessen: 'Missing token' bei public=true ohne Konto). Eine Einstellung dafuer kaeme mit einer Moeglichkeit, Konto und Token sicher abzulegen.",
+      "Die Welt heisst fest saves/welt.zip. Mehrere Welten und Karteneinstellungen (map-gen-settings) sind nicht gebaut.",
+      "content: keine Mods. Factorios Mod-Portal verlangt zum Herunterladen ein Konto samt Token — gleiche Frage wie visibility.public.",
+      "rcon_password steht als Startparameter in der Prozessliste des Containers (Factorio kennt keinen anderen Weg). Er ist nur im Container sichtbar, nicht fuer Spieler.",
+      "commands.players.list hat keinen Parser: Die Antwort 'Players (N):' mit Namen darunter ist gemessen nur mit 0 Spielern.",
+      "fb-startprobe startet ohne --user, also als 1000 aus dem Image; der Daemon startet als Container-Benutzer aus der Konfiguration (firebot, 998). Nach einer Installation als 998 scheiterte der erste Probestart deshalb an 'Permission denied' in temp/ — ein Unterschied des Werkzeugs, nicht des Pakets. Gemessen am 2026-09-24."
+    ]
+  }
+}
