@@ -81,8 +81,36 @@
         },
         "description": {
           "$ref": "#/definitions/text"
+        },
+        "needed_by": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[^/.][^\\\\]*$",
+          "description": "Der Port wird nur gebraucht, wenn eine Datei auf dieses Muster passt — Pfad ab der Wurzel des Volumes, * im letzten Teil (game/mods/voicechat-*.jar). Geprüft wird vor jedem Start: passt eine Datei, wird der Port nachgebucht, passt keine, wird er freigegeben. Für Ports, die erst ein Mod mitbringt (Sprachchat, Webkarte). Nur mit assign: pool und required: false (Baustelle 156, 2026-09-24)."
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "needed_by"
+            ]
+          },
+          "then": {
+            "properties": {
+              "assign": {
+                "const": "pool"
+              },
+              "required": {
+                "const": false
+              }
+            },
+            "required": [
+              "required"
+            ]
+          }
+        }
+      ]
     },
     "installStep": {
       "type": "object",

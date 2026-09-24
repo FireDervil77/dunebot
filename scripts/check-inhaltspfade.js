@@ -75,6 +75,16 @@ for (const datei of fs.readdirSync(ordner).filter(d => d.endsWith('.json')).sort
             imSpielordner(pfad) ? '' : `liegt neben dem Spiel — richtig waere "${dirGame}/${pfad}"`);
     }
 }
+// `ports[].needed_by` (Baustelle 156) ist ein Dateimuster ab derselben Wurzel —
+// ein Muster neben dem Spiel traefe nie, und der Port bliebe fuer immer aus.
+for (const datei of fs.readdirSync(ordner).filter(d => d.endsWith('.json')).sort()) {
+    const paket = JSON.parse(fs.readFileSync(path.join(ordner, datei), 'utf8'));
+    for (const port of (paket.ports || []).filter(p => p.needed_by)) {
+        gezaehlt++;
+        pruefe(imSpielordner(port.needed_by), `${datei}  ports[${port.purpose}].needed_by = "${port.needed_by}"`,
+            imSpielordner(port.needed_by) ? '' : `liegt neben dem Spiel — richtig waere "${dirGame}/${port.needed_by}"`);
+    }
+}
 pruefe(gezaehlt > 0, `mindestens ein Inhaltspfad wurde geprueft (${gezaehlt})`,
     'Sonst waere dieser Waechter gruen, weil er nichts findet');
 

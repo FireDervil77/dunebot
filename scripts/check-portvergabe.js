@@ -159,7 +159,18 @@ console.log('\n▸ Jeder Portzweck des Pakets bekommt eine Nummer');
             fehlgeschlagen || '');
         if (!ports) continue;
 
-        for (const zweck of zwecke) {
+        // Ports mit `needed_by` (Baustelle 156, 2026-09-24) bucht NICHT das
+        // Anlegen, sondern der Start, sobald ihre Datei da ist — geprueft in
+        // check-zusatzports.js. Hier gilt fuer sie das GEGENTEIL: Bekaemen sie
+        // beim Anlegen eine Nummer, haette jeder Minecraft-Server einen
+        // Sprachchat-Port, auch ohne Sprachchat-Mod.
+        for (const p of (paket.ports || []).filter(x => x.needed_by)) {
+            pruefe(!ports[p.purpose], `${datei}: „${p.purpose}" (needed_by) wird beim Anlegen NICHT gebucht`,
+                ports[p.purpose] ? `gebucht als ${JSON.stringify(ports[p.purpose])}` : '');
+        }
+        const nachBedarf = new Set((paket.ports || []).filter(x => x.needed_by).map(x => x.purpose));
+
+        for (const zweck of zwecke.filter(z => !nachBedarf.has(z))) {
             const da = Boolean(ports[zweck] && ports[zweck].internal);
             pruefe(da, `${datei}: „${zweck}" bekommt eine Nummer`,
                 da ? '' : 'Das Paket nennt den Zweck, die Vergabe bucht ihn nicht — der Daemon meldet '

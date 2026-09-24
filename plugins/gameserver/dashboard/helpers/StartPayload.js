@@ -263,6 +263,23 @@ async function buildStartPayload(server, guildId, Logger = null) {
         };
     }
 
+    // ── Ports, die erst ein Mod mitbringt (Baustelle 156) ────────────────────
+    //
+    // Vor dem Lesen der Ports: Liegt eine Datei, die einen `needed_by`-Port
+    // verlangt, wird er hier gebucht — liegt keine mehr, freigegeben. Hier und
+    // nicht in einer Route, damit JEDER Startweg es hat (Panel, Neustart, Cron,
+    // Discord). Ein Fehler startet den Server trotzdem, mit den Ports, die er
+    // hatte — aber laut.
+    let zusatz = null;
+    try {
+        zusatz = await require('./Zusatzports').gleicheAb({ server, paket });
+        if (zusatz.geaendert) server.ports = JSON.stringify(zusatz.ports);
+        for (const h of zusatz.hinweise) Logger?.warn?.(`[StartPayload] Server ${serverId}: ${h}`);
+    } catch (fehler) {
+        Logger?.error?.(`[StartPayload] Server ${serverId}: Zusatzports nicht abgeglichen — `
+            + `der Server startet mit den Ports, die er hatte: ${fehler.message}`);
+    }
+
     const ports = parseJson(server.ports, {}) || {};
     const ohnePort = fehlendePorts(paket, ports);
     if (ohnePort.length) {
@@ -311,7 +328,7 @@ async function buildStartPayload(server, guildId, Logger = null) {
         + `${Object.keys(settings).length} von ${(paket.settings || []).length} Werten, `
         + `Auto-Update ${payload.auto_update ? 'an' : 'aus'}.`);
 
-    return { payload, error: null, dockerImage: image };
+    return { payload, error: null, dockerImage: image, zusatzports: zusatz };
 }
 
 /**

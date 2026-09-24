@@ -3,7 +3,7 @@
   "identity": {
     "slug": "minecraft",
     "name": "Minecraft",
-    "version": "1.4.2",
+    "version": "1.5.0",
     "author": "firenetworks",
     "category": "sandbox",
     "description": {
@@ -45,6 +45,17 @@
       "description": {
         "de": "Fernsteuerung. Ohne sie gäbe es keinen sauberen Stopp — das Spiel speichert dann nur, was der Absturzschutz rettet.",
         "en": "Remote console. Without it there is no clean shutdown."
+      }
+    },
+    {
+      "purpose": "voice",
+      "protocol": "udp",
+      "assign": "pool",
+      "required": false,
+      "needed_by": "game/mods/voicechat-*.jar",
+      "description": {
+        "de": "Sprachchat der Mod Simple Voice Chat. Nur gebucht, solange die Mod in game/mods liegt — geprüft vor jedem Start. Die Nummer schreibt der config-Abschnitt in config/voicechat/voicechat-server.properties; den Spielport mitzubenutzen (port=-1) rät die Mod selbst ab: „may crash the server“ (gemessen an #202, 2026-09-24).",
+        "en": "Voice chat of the Simple Voice Chat mod. Booked only while the mod is in game/mods, checked before every start."
       }
     }
   ],
@@ -149,6 +160,13 @@
         "enable-rcon": "true",
         "rcon.port": "{{port:rcon}}",
         "rcon.password": "{{setting:rcon_password}}"
+      }
+    },
+    {
+      "file": "config/voicechat/voicechat-server.properties",
+      "parser": "properties",
+      "set": {
+        "port": "{{port:voice}}"
       }
     }
   ],
@@ -836,7 +854,8 @@
       "GEMESSEN und behoben (1.2.2, 2026-09-22): Modpack-Archive koennen fuer ihre Eintraege den Modus 000 speichern — „Horror +\" tut es fuer alle 78. `unzip` uebertraegt das treu, und die Installation brach mit „jq: Permission denied\" und Code 2 ab. Nach dem Auspacken wird jetzt `chmod -R u+rwX` gesetzt. Das rettet nicht nur den Index: Ohne die Zeile laegen Konfigurationsdateien mit Modus 000 im Serververzeichnis, und DAS waere erst beim Start aufgefallen — mit einer Meldung ueber eine angeblich fehlende Einstellung.",
       "GEMESSEN und behoben (1.2.3, 2026-09-22): `ready_when` nannte nur die Logzeile. Die Bereitschaftskarte zeigte den Port deshalb blass mit „Kein Port im Paket genannt\" — richtig, aber unnoetig: Minecraft LAUSCHT auf dem Spielport, und der Daemon prueft das (`fb-init/ready.go`: „2 Port lauscht — sagt: es nimmt Verbindungen an\"). Jetzt steht `port: \"game\"` da, und die Stufe wird echt gemessen statt weggelassen. Die Abfrage bleibt blass, und das ist richtig: Minecraft antwortet auf Server List Ping, und einen SLP-Treiber gibt es im Daemon nicht — das steht weiter oben als eigener offener Punkt.",
       "GEMESSEN am 2026-09-24 im Abbild fb/java:2026.09 (Java 8, 17, 21, 25 nebeneinander, gewaehlt ueber .fb/java), jeweils installiert UND gestartet bis „Done (\": forge 1.12.2 → Java 8 (11,9 s), forge 1.16.5 → 8 (28,5 s), forge 1.20.1 → 17 (38,1 s), vanilla 26.3 → 25 (5,0 s), vanilla 1.17.1 → 17 (verlangt 16, 29,2 s), paper 1.16.5 → 8 (9,5 s), fabric 1.20.1 → 17 (36,9 s), neoforge 1.21.1 → 21 (5,4 s). Dabei gefunden: Java 8 kennt `java @datei` nicht („Could not find or load main class @forge_args.txt\") — der Starter im Abbild loest die Argumentdatei fuer Java 8 selbst auf. Waechter: scripts/check-java-laufzeiten.js.",
-      "GEMESSEN und behoben (1.4.2, 2026-09-24): Mods und Plugins landeten NEBEN dem Spiel. Die Inhaltspfade gelten ab der Wurzel des Volumes (Valheim nennt deshalb `game/BepInEx/plugins`), dieses Paket nannte nur `mods` und `plugins` — der Server laeuft aber in `game/`. Auf Server 202 lagen 146 Mods des Modpacks Cave Horror in `/home/container/mods`, `game/mods` war leer, und Forge 1.20.1 startete sauber bis „Done (20.540s)\" — ohne eine einzige Mod und ohne Fehlerzeile. Jetzt `game/mods` und `game/plugins`; der Modpack-Weg im Daemon schreibt seit derselben Fassung nach `game/` (modpackWurzel). Waechter: check-inhaltspfade.js."
+      "GEMESSEN und behoben (1.4.2, 2026-09-24): Mods und Plugins landeten NEBEN dem Spiel. Die Inhaltspfade gelten ab der Wurzel des Volumes (Valheim nennt deshalb `game/BepInEx/plugins`), dieses Paket nannte nur `mods` und `plugins` — der Server laeuft aber in `game/`. Auf Server 202 lagen 146 Mods des Modpacks Cave Horror in `/home/container/mods`, `game/mods` war leer, und Forge 1.20.1 startete sauber bis „Done (20.540s)\" — ohne eine einzige Mod und ohne Fehlerzeile. Jetzt `game/mods` und `game/plugins`; der Modpack-Weg im Daemon schreibt seit derselben Fassung nach `game/` (modpackWurzel). Waechter: check-inhaltspfade.js.",
+      "GEBAUT mit 1.5.0 (2026-09-24, Baustelle 156): Port `voice` fuer Simple Voice Chat, gebucht erst, wenn `game/mods/voicechat-*.jar` da ist (ports[].needed_by, Abgleich vor jedem Start in helpers/Zusatzports.js). Gemessen an #202: Die Mod legt `game/config/voicechat/voicechat-server.properties` mit `port=24454` an; der Container gab den Port nicht frei. NICHT gemessen: (1) ob die Mod beim ALLERERSTEN Start eine von fb-cfg angelegte Datei mit nur `port=` behaelt und die uebrigen Werte ergaenzt; (2) Paper — dort ist Simple Voice Chat ein Plugin (`game/plugins/voicechat-bukkit-*.jar`, Konfiguration unter `plugins/voicechat/`), und `needed_by` kennt nur EIN Muster."
     ]
   }
 }

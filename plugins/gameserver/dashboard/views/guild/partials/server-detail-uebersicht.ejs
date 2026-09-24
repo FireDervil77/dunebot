@@ -429,6 +429,11 @@
           <% if (p.regel) { %>
             <div class="fb-muted fb-mono" style="font-size:12px;margin:-4px 0 4px">assign: <%= p.regel %></div>
           <% } %>
+          <% if (p.bedarf) { %>
+            <div class="fb-muted" style="font-size:12px;margin:-4px 0 4px">
+              <% if (p.nummer !== null) { %>vergeben, weil <span class="fb-mono"><%= p.bedarf %></span> vorhanden ist<% } else { %>wird beim Start vergeben, sobald <span class="fb-mono"><%= p.bedarf %></span> vorhanden ist<% } %>
+            </div>
+          <% } %>
         <% }); %>
       </div>
     </div>

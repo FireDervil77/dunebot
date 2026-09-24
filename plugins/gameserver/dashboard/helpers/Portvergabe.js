@@ -57,7 +57,11 @@ function lesePortzwecke(paket) {
     // beides gibt es: `query` MUSS neben dem Spielport liegen (das Spiel
     // rechnet es sich aus), `rcon` darf irgendwo liegen (es steht in einer
     // Datei). Deshalb zwei Listen statt einer.
-    const ausPool = ports.filter(p => p.assign === 'pool');
+    // Ports mit `needed_by` bucht NICHT das Anlegen, sondern der Start — und
+    // nur, wenn die Datei da ist, die sie verlangt (Zusatzports.js,
+    // Baustelle 156). Hier mitgezaehlt, bekaeme jeder Minecraft-Server einen
+    // Sprachchat-Port, auch ohne Sprachchat-Mod.
+    const ausPool = ports.filter(p => p.assign === 'pool' && !p.needed_by);
     const basis = ausPool[0] || null;
     const weiterePool = ausPool.slice(1).map(p => ({
         zweck: p.purpose,

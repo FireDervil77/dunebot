@@ -830,7 +830,7 @@ function bauePorts(server, paket) {
     const uebergang = ladeUebergang(paket?.identity?.slug || '');
     const zweckKey = (zweck) => uebergang?.portzwecke?.[zweck] || zweck;
 
-    const ZWECK = { game: 'Spiel', query: 'Abfrage', rcon: 'RCON' };
+    const ZWECK = { game: 'Spiel', query: 'Abfrage', rcon: 'RCON', voice: 'Sprachchat' };
     const liste = [];
 
     for (const p of (paket?.ports || [])) {
@@ -844,6 +844,9 @@ function bauePorts(server, paket) {
             regel:    p.assign || null,
             variable: p.variable || null,
             pflicht:  p.required !== false,
+            // Nur bei Bedarf gebucht (Baustelle 156): Die Ansicht sagt, wovon
+            // es abhaengt — sonst steht dort ein „—" ohne Erklaerung.
+            bedarf:   p.needed_by || null,
         });
     }
 
