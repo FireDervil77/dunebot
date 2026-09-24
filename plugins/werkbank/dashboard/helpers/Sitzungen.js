@@ -35,6 +35,25 @@ const RE_ZWECK = /^[a-z][a-z0-9_]*$/;
 /** Die Grenzen des Daemons (werkbank_start.go) — hier nur, um früh zu sagen, was er abweist. */
 const GRENZEN = { memory_mb: [128, 262144], cpu_prozent: [10, 12800] };
 
+/**
+ * Platzhalter-Bereitschaft für einen Erkundungsstart.
+ *
+ * Der Auftrag (Job.Validate, in Daemon UND fb-init) verlangt Port oder
+ * Logzeile. Ein erster Probestart kennt beides noch nicht — er ist ja dazu da,
+ * sie zu finden. Diese Zeile geht NUR in diesen einen Start, nie in den
+ * Entwurf: Ohne Port meldet fb-init dann ehrlich nur „Prozess läuft", und der
+ * Prüfdurchlauf (Stufe 3) weist den Entwurf weiter ab, bis er eine echte
+ * Bedingung hat. Gemessen am 2026-09-24: ohne sie „Beendet mit Code -1".
+ */
+const ERKUNDUNG = '[Werkbank] Erkundungsstart ohne Bereitschaftsbedingung';
+
+/** Hat der Startteil eine Bereitschaftsbedingung, die der Auftrag annimmt? */
+function hatBereitschaft(start) {
+    const r = start?.ready_when || {};
+    const zeile = Array.isArray(r.log_line) ? r.log_line.length : Boolean(r.log_line);
+    return Boolean(r.port || zeile || r.query);
+}
+
 /** Vorbelegung eines ersten Starts. Frei änderbar (Betreiber, 2026-09-24). */
 const VORGABE = { memory_mb: 4096, cpu_prozent: 200 };
 
@@ -345,7 +364,8 @@ async function starten(sitzung, liste) {
     const antwort = await daemon.senden('werkbank.starten', {
         guild_id: sitzung.guild_id,
         image: sitzung.image,
-        start,
+        start: hatBereitschaft(start) ? start
+            : { ...start, ready_when: { ...(start.ready_when || {}), log_line: ERKUNDUNG } },
         env: sitzung.entwurf?.env || {},
         ports: sitzung.entwurf?.ports || [],
         portnummern: w.portnummern,
@@ -443,7 +463,7 @@ async function laufBeenden(laufId, { exit_code = null, gestoppt = null, fehler =
 }
 
 module.exports = {
-    RE_KENNUNG, RE_ZWECK, SCHRITTTYPEN, MAX_AUSGABE, GRENZEN, VORGABE,
+    RE_KENNUNG, RE_ZWECK, SCHRITTTYPEN, MAX_AUSGABE, GRENZEN, VORGABE, ERKUNDUNG, hatBereitschaft,
     waehlbareImages, maschinen, liste, laden, schritte, anlegen,
     schrittAusfuehren, ausgabeAnhaengen, beenden, laufenderSchritt,
     herausnehmen, verwerfen, entwurfAlsPaket,

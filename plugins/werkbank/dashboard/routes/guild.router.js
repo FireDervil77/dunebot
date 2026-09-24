@@ -115,7 +115,14 @@ function startAusFormular(b) {
         else if (SIGNALE.includes(step)) eintrag.terminates = true;
         return eintrag;
     });
-    if (folge.length) start.stop = { sequence: folge };
+    // Dieselbe Regel wie Job.Validate im Daemon und in fb-init: Ohne sigkill am
+    // Ende wird der Auftrag gar nicht erst abgelegt. Hier gesagt, wo sie getippt
+    // wird — nicht erst als „Beendet mit Code -1".
+    if (!folge.length) throw new Error('Stoppfolge fehlt — mindestens „sigkill 10".');
+    if (folge[folge.length - 1].step !== 'sigkill') {
+        throw new Error('Die Stoppfolge muss mit sigkill enden (letztes Mittel), etwa „sigkill 10" als letzte Zeile.');
+    }
+    start.stop = { sequence: folge };
 
     const bereit = {};
     if (text('ready_port').trim()) bereit.port = text('ready_port').trim();
@@ -139,7 +146,8 @@ function startAlsFormular(start) {
     return {
         program: s.program || '', workdir: s.workdir || '',
         args: (s.args || []).map(argZeile).join('\n'),
-        stop: (s.stop?.sequence || []).map(stoppZeile).join('\n'),
+        // Leer: die übliche Folge vorschlagen — sichtbar im Feld, nicht still ergänzt.
+        stop: (s.stop?.sequence || []).map(stoppZeile).join('\n') || 'sigint 30\nsigkill 10',
         ready_port: s.ready_when?.port || '',
         log_line: Array.isArray(log) ? log[0] : (log || ''),
         timeout_sec: s.ready_when?.timeout_sec || '',

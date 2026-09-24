@@ -262,8 +262,15 @@
               <div class="mb-3">
                 <label class="form-label" for="sStop">Stoppfolge — ein Schritt pro Zeile</label>
                 <textarea class="form-control font-monospace" id="sStop" name="stop" rows="3" placeholder="command:/quit 30 beendet&#10;sigint 30&#10;sigkill 10"><%= startFormular.stop %></textarea>
-                <div class="form-hint"><code>schritt [frist] [beendet|weiter]</code> — sigint, sigterm, sigkill, command:…, rcon:…. Leer lassen heißt: Docker beendet hart.</div>
+                <div class="form-hint"><code>schritt [frist] [beendet|weiter]</code> — sigint, sigterm, sigkill, command:…, rcon:…. Die letzte Zeile muss <code>sigkill</code> sein.</div>
               </div>
+              <% if (!startFormular.ready_port && !startFormular.log_line) { %>
+                <div class="alert alert-info py-2 small mb-2">
+                  Noch keine Bereitschaft — dann ist es ein <strong>Erkundungsstart</strong>: Das Spiel läuft,
+                  du siehst Konsole und Ports, übernimmst beides, und ab dem nächsten Start zählt es.
+                  Ins Paket kommt die Erkundung nicht.
+                </div>
+              <% } %>
               <div class="row g-2 mb-3">
                 <div class="col-sm-4">
                   <label class="form-label" for="sReadyPort">Bereit, wenn Port</label>
@@ -314,7 +321,9 @@
               <% if (lauf && lauf.bereitschaft) { %>
                 <span class="text-secondary">Bereitschaft:</span>
                 <span class="font-monospace"><%= lauf.bereitschaft.type %><%= lauf.bereitschaft.stage ? ' · ' + lauf.bereitschaft.stage : '' %></span>
-                <% if (lauf.bereitschaft.hinweis) { %><span class="text-secondary"> — <%= lauf.bereitschaft.hinweis %></span><% } %>
+                <%# fb-init erklärt sich in `hinweis` (Fehler/Fortschritt) oder in `note` (Stufe erreicht). %>
+                <% const erklaerung = lauf.bereitschaft.hinweis || lauf.bereitschaft.note; %>
+                <% if (erklaerung) { %><span class="text-secondary"> — <%= erklaerung %></span><% } %>
               <% } %>
             </div>
             <% if (lauf && lauf.status === 'beendet') { %>
@@ -573,7 +582,7 @@
         zeichnePorts(d.ports || []);
       } else if (d.action === 'bereitschaft') {
         var kasten = document.getElementById('laufBereitschaft');
-        kasten.textContent = 'Bereitschaft: ' + (d.type || '') + (d.stage ? ' · ' + d.stage : '') + (d.hinweis ? ' — ' + d.hinweis : '');
+        kasten.textContent = 'Bereitschaft: ' + (d.type || '') + (d.stage ? ' · ' + d.stage : '') + ((d.hinweis || d.note) ? ' — ' + (d.hinweis || d.note) : '');
       } else if (d.action === 'gestartet') {
         document.getElementById('laufStatus').innerHTML = '<span class="badge bg-green-lt">läuft</span>';
       } else if (d.action === 'beendet') {

@@ -289,6 +289,11 @@ async function pruefe(name, fn) {
         assert.ok(pruefer(start), JSON.stringify(pruefer.errors));
         assert.deepStrictEqual(startAusFormular(startAlsFormular(start)), start, 'hin und zurück verlustfrei');
         assert.throws(() => startAusFormular({ program: 'x', stop: 'rm -rf /' }), /Stoppfolge/);
+        // Job.Validate (Daemon + fb-init) verlangt sigkill am Ende — gemessen
+        // am 2026-09-24 als „Beendet mit Code -1", weil das Formular es nicht sagte.
+        assert.throws(() => startAusFormular({ program: 'x', stop: 'command:/quit 30 beendet' }), /sigkill/);
+        assert.throws(() => startAusFormular({ program: 'x', stop: '' }), /Stoppfolge fehlt/);
+        assert.match(startAlsFormular(undefined).stop, /sigkill 10$/, 'leer: Vorschlag im Feld');
     });
 
     await pruefe('Starten schickt Startteil, Portnummern und RAM/CPU — und legt einen Lauf an', async () => {
@@ -303,6 +308,19 @@ async function pruefe(name, fn) {
         assert.deepStrictEqual(b.nutzlast.install.steps.map(x => x.type), ['download'], 'nur Schritte im Entwurf');
         assert.strictEqual(db.laeufe[0].id, r.laufId);
         assert.strictEqual(db.laeufe[0].status, 'startet');
+    });
+
+    await pruefe('ohne Bereitschaft: Erkundungsstart — Platzhalter nur im Start, nie im Entwurf', async () => {
+        const s = sitzungMitStart();
+        await Sitzungen.starten(s, []);
+        const gesendet = daemon.befehle[0].nutzlast.start;
+        assert.strictEqual(gesendet.ready_when.log_line, Sitzungen.ERKUNDUNG, 'Job.Validate braucht eine Bedingung');
+        assert.ok(!s.entwurf.start.ready_when, 'der Entwurf bleibt ohne — Stufe 3 soll ihn weiter abweisen');
+        assert.strictEqual(db.entwurf, null, 'nichts in den Entwurf geschrieben');
+        daemon.befehle = []; db.laeufe = []; Ereignisse._laeufe.clear();
+        s.entwurf.start.ready_when = { port: 'game' };
+        await Sitzungen.starten(s, []);
+        assert.deepStrictEqual(daemon.befehle[0].nutzlast.start.ready_when, { port: 'game' }, 'mit Bedingung: unverändert');
     });
 
     await pruefe('weist der Daemon den Start ab, ist der Lauf beendet mit Grund', async () => {
