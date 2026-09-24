@@ -189,21 +189,26 @@
           "then": {
             "required": [
               "url",
-              "target"
+              "target",
+              "checksum"
             ],
             "properties": {
               "type": {},
               "description": {},
               "url": {
                 "type": "string",
-                "format": "uri"
+                "format": "uri",
+                "pattern": "^https://",
+                "description": "Nur https. Jede Adresse ist erlaubt — die Zusicherung ist die Prüfsumme, nicht eine Herkunftsliste (die gilt für Mods, nicht für die Dateien eines Herstellers). Ohne Verweise: Eine Prüfsumme passt nur auf genau eine Datei."
               },
               "target": {
-                "type": "string"
+                "type": "string",
+                "description": "Zieldatei in game/ (wie mkdir.path). Liegt dort schon eine, wird sie ersetzt."
               },
               "checksum": {
                 "type": "string",
-                "description": "sha256:… — Pflicht, sobald die Quelle nicht wir selbst sind."
+                "pattern": "^(sha256:[0-9a-f]{64}|sha1:[0-9a-f]{40})$",
+                "description": "Pflicht (Betreiber, 2026-09-24). sha256, oder sha1, wo der Hersteller nur sha1 nennt (Mojang). Stimmt sie nicht, bricht die Installation ab, und die Datei bleibt nicht liegen."
               }
             },
             "additionalProperties": false
