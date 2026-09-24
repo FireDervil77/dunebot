@@ -253,7 +253,7 @@
               <div class="mb-3">
                 <label class="form-label" for="sArgs">Argumente — eins pro Zeile</label>
                 <textarea class="form-control font-monospace" id="sArgs" name="args" rows="5" placeholder="--start-server&#10;saves/welt.zip&#10;--port&#10;{{port:game}}"><%= startFormular.args %></textarea>
-                <div class="form-hint">Eine Zeile ist genau ein Argument, Leerzeichen trennen nichts. <code>{{port:zweck}}</code> wird beim Start eingesetzt.</div>
+                <div class="form-hint">Eine Zeile ist genau ein Argument, Leerzeichen trennen nichts — <code>--port</code> und <code>{{port:game}}</code> sind zwei Zeilen. Ein Schalter mit Wert steht direkt vor seinem Wert.</div>
               </div>
               <div class="mb-3">
                 <label class="form-label" for="sWorkdir">Arbeitsordner (leer = game/)</label>
@@ -494,6 +494,21 @@
   // ── Probestart ────────────────────────────────────────────────────────
   var formStart = document.getElementById('formStart');
   function startNutzlast() {
+    // Eine Zeile ist EIN Argument (keine Shell). „--port {{port:game}}" in einer
+    // Zeile wird zu einem Argument mit Leerzeichen — gemessen am 2026-09-24:
+    // Factorio las "--port 34197" als Dateinamen. Wer so schreibt, meint fast
+    // immer zwei Argumente; gefragt wird trotzdem, denn ein Servername mit
+    // Leerzeichen ist genau ein Argument.
+    var feld = formStart.args;
+    var zeilen = feld.value.split(/\r?\n/);
+    var verdaechtig = zeilen.filter(function (z) { return /^\s*-{1,2}[^\s=]+\s+\S/.test(z); });
+    if (verdaechtig.length && confirm('Eine Zeile ist genau ein Argument. Diese Zeile(n) enthalten Schalter und Wert zusammen:\n\n  '
+        + verdaechtig.join('\n  ') + '\n\nAufteilen in Schalter und Wert (je eine Zeile)?\nOK = aufteilen, Abbrechen = so lassen')) {
+      feld.value = zeilen.map(function (z) {
+        var m = z.match(/^\s*(-{1,2}[^\s=]+)\s+(.+?)\s*$/);
+        return m ? m[1] + '\n' + m[2] : z;
+      }).join('\n');
+    }
     var n = {};
     formStart.querySelectorAll('input, textarea, select').forEach(function (e) { n[e.name] = e.value; });
     return n;
