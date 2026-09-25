@@ -345,12 +345,13 @@
                   grün  = gemessen erreicht
                   gelb  = die Stufe, auf die gerade gewartet wird
                   grau  = verlangt, aber noch nicht dran
-                  blass = das Paket verlangt sie gar nicht
+                  blass = das Paket verlangt sie gar nicht — oder fb-init
+                          konnte sie nicht prüfen (B160): keine Messung
                 Gelb gibt es nur, WENN gemessen wird. Ohne Meldung ist alles
                 grau — eine wartende Stufe zu zeigen, wo niemand misst, wäre
                 dieselbe Behauptung wie ein grüner Haken. %>
             <% const farbe = st.erreicht ? 'var(--fb-success)'
-                 : (!st.verlangt ? '#f1f3f5'
+                 : (!st.verlangt || st.ungeprueft ? '#f1f3f5'
                  : (u.bereitschaft.gemessen && st.wartet ? 'var(--fb-warning)' : 'var(--fb-border)')); %>
             <span class="fb-punkt" style="margin-top:6px;background:<%= farbe %>"
                   data-fb-live="stufe-punkt" data-fb-server="<%= server.id %>"
@@ -358,7 +359,7 @@
                   data-fb-verlangt="<%= st.verlangt ? 'ja' : 'nein' %>"></span>
             <div>
               <div style="font-weight:500;<%= st.verlangt ? '' : 'color:var(--fb-text-muted)' %>">
-                <%= st.name %><% if (st.erreicht) { %> ✓<% } %>
+                <%= st.name %><% if (st.erreicht) { %> ✓<% } %><% if (st.ungeprueft) { %> — nicht geprüft<% } %>
               </div>
               <div class="fb-muted" style="font-size:13px"><%= st.erklaerung %></div>
             </div>

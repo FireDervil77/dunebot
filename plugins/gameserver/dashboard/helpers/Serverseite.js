@@ -962,10 +962,27 @@ function baueBereitschaft(paket, server = {}) {
         stufen[i].erreicht = zaehlt && wieWeit >= 0 && i <= wieWeit;
     }
 
+    // ── Das letzte Wort hat fb-init (Baustelle 160, 2026-09-25) ──────────────
+    //
+    // Kann fb-init eine verlangte Stufe nicht pruefen — die Abfrage, wenn
+    // fb-probe das Protokoll nicht spricht —, meldet es `ready` bei der Stufe
+    // darunter und sagt, warum. Bis heute wartete das Panel dann ewig auf die
+    // Abfrage und sperrte „Neu starten" (Astro Colony 203). Jetzt gilt die
+    // Meldung, und die Stufe heisst ehrlich „nicht geprueft" — nicht erreicht,
+    // nicht wartend. `bereitschaft_bereit` NULL (alter Daemon): Leiter wie bisher.
+    const fbInitBereit = zaehlt && Number(server.bereitschaft_bereit) === 1;
+    for (const st of stufen) {
+        st.ungeprueft = fbInitBereit && st.verlangt && !st.erreicht;
+        if (st.ungeprueft) {
+            st.erklaerung = 'Nicht geprüft — ' + (server.bereitschaft_grund
+                || 'fb-init konnte diese Stufe nicht prüfen und hat den Server trotzdem bereit gemeldet.');
+        }
+    }
+
     // Auf welche Stufe wartet der Server gerade? Die erste verlangte, die noch
     // nicht erreicht ist. Ohne Messung wartet er auf nichts — dann steht diese
     // Angabe auf false, und die Ansicht faerbt nichts gelb.
-    const wartend = stufen.findIndex(st => st.verlangt && !st.erreicht);
+    const wartend = stufen.findIndex(st => st.verlangt && !st.erreicht && !st.ungeprueft);
     for (let i = 0; i < stufen.length; i++) {
         stufen[i].wartet = zaehlt && i === wartend;
     }
@@ -981,7 +998,9 @@ function baueBereitschaft(paket, server = {}) {
         // vom vorigen Lauf ebenso wenig.
         veraltet: Boolean(gemeldet) && (!laeuft || !ausDiesemLauf),
         bereit: zaehlt && wieWeit >= 0
-            && stufen.every((st, i) => !st.verlangt || i <= wieWeit),
+            && stufen.every((st, i) => !st.verlangt || i <= wieWeit || st.ungeprueft),
+        // Die Namen der Stufen, die fb-init nicht pruefen konnte — fuer den Text.
+        ungeprueft: stufen.filter(st => st.ungeprueft).map(st => st.name),
     };
 }
 
@@ -1177,6 +1196,8 @@ function baueBereitschaftAuskunft(paket, s) {
         grund:   leiter?.grund || null,
         text:
             !leiter                 ? 'nicht messbar'
+          : leiter.bereit && leiter.ungeprueft.length
+                                    ? 'bereit · ' + leiter.ungeprueft.join(', ') + ' nicht geprüft'
           : leiter.bereit           ? 'bereit'
           : !laeuft                 ? (s.status === 'offline' ? 'aus' : zustand.text)
           : leiter.veraltet         ? 'seit dem Start nichts gemeldet'
@@ -1190,6 +1211,7 @@ function baueBereitschaftAuskunft(paket, s) {
             name:     st.name,
             erfuellt: st.erreicht,
             wartet:   st.wartet,
+            ungeprueft: st.ungeprueft,
             verlangt: st.verlangt,
             titel:    st.erklaerung,
         })),

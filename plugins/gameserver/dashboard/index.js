@@ -819,15 +819,20 @@ class GameserverPlugin extends DashboardPlugin {
         const Logger = ServiceManager.get('Logger');
         const dbService = ServiceManager.get('dbService');
 
-        const { server_id, stage, hinweis } = payload || {};
+        const { server_id, stage, hinweis, art } = payload || {};
         if (!server_id) return;
+
+        // Hat fb-init „bereit" gesagt? Nur `ready` zaehlt (Baustelle 160). Ohne
+        // `art` (Daemon vor 1.0.96) bleibt es unbekannt, und die Leiter gilt.
+        const bereit = art === 'ready' ? 1 : (art ? 0 : null);
 
         try {
             await dbService.query(
                 `UPDATE gameservers
-                    SET bereitschaft_stufe = ?, bereitschaft_grund = ?, bereitschaft_am = NOW()
+                    SET bereitschaft_stufe = ?, bereitschaft_grund = ?, bereitschaft_am = NOW(),
+                        bereitschaft_bereit = ?
                   WHERE id = ?`,
-                [stage || null, hinweis ? String(hinweis).slice(0, 500) : null, server_id]
+                [stage || null, hinweis ? String(hinweis).slice(0, 500) : null, bereit, server_id]
             );
 
             const [server] = await dbService.query(

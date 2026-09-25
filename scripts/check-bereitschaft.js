@@ -126,6 +126,38 @@ const pruefe = (ok, was, zusatz = '') => {
             + `balken=[${x.stufen.map(st => st.erfuellt ? '✓' : st.wartet ? '~' : '·').join('')}]`);
     }
 
+    // ── Das letzte Wort hat fb-init (Baustelle 160, 2026-09-25) ──────────────
+    //
+    // Astro Colony 203: fb-init meldete `ready` bei Stufe port, weil fb-probe
+    // die Abfrage nicht sprechen konnte — das Panel wartete ewig auf „Abfrage"
+    // und sperrte „Neu starten". Geprüft mit einem Paket, das die Abfrage
+    // VERLANGT; sonst gäbe es nichts Ungeprüftes.
+    console.log('\n▸ fb-init hat das letzte Wort (Baustelle 160)');
+    const mitAbfrage = { ...paket, start: { ...paket.start,
+        ready_when: { port: 'query', query: true } } };
+    const grund160 = 'Stufe 3 nicht geprüft — das Protokoll spricht fb-probe nicht.';
+    const b160 = (bereit) => Serverseite.baueBereitschaft(mitAbfrage,
+        { status: 'online', bereitschaft_stufe: 'port', bereitschaft_grund: grund160,
+          bereitschaft_bereit: bereit });
+    const ja = b160(1);
+    pruefe(ja.bereit && ja.ungeprueft.includes('Abfrage') && !ja.stufen.some(st => st.wartet),
+        'ready bei Stufe port → bereit, Abfrage „nicht geprüft", nichts wartet',
+        `bereit=${ja.bereit} ungeprueft=${ja.ungeprueft}`);
+    pruefe(ja.stufen.find(st => st.schluessel === 'query').erklaerung.includes(grund160),
+        'die Begründung von fb-init steht an der Stufe');
+    pruefe(!b160(0).bereit, 'eine andere Meldung als ready macht nicht bereit');
+    pruefe(!b160(null).bereit && b160(null).stufen.some(st => st.wartet),
+        'alter Daemon ohne Meldungsart: die Leiter gilt wie bisher');
+    const liste160 = Serverseite.baueServerListe([zeile({ status: 'online', bereitschaft_stufe: 'port',
+        bereitschaft_bereit: 1, bereitschaft_grund: grund160 })], { [addonId]: mitAbfrage }).liste[0];
+    pruefe(liste160.bereit && /nicht geprüft/.test(liste160.bereitschaftText),
+        'die Liste sagt „nicht geprüft" dazu', `text="${liste160.bereitschaftText}"`);
+    const { pillenZustand } = require('../plugins/gameserver/dashboard/assets/js/gameserver-live.js');
+    const pille = pillenZustand({ status: 'online', bereit: true, messbar: true,
+        text: liste160.bereitschaftText, grund: grund160 });
+    pruefe(/nicht geprüft/.test(pille.text) && pille.titel === grund160,
+        'die Pille sagt es sichtbar, der Tooltip nennt den Grund', `text="${pille.text}"`);
+
     // ── Die Meldung des VORIGEN Laufs zählt nicht ────────────────────────────
     console.log('\n▸ Eine Meldung von vor dem letzten Start zählt nicht');
     const vorher = new Date(Date.now() - 3600e3);
@@ -173,8 +205,8 @@ const pruefe = (ok, was, zusatz = '') => {
         const a = ohneKommentare.indexOf(von);
         const b = a >= 0 ? ohneKommentare.indexOf(bis, a) : -1;
         const block = a >= 0 ? ohneKommentare.slice(a, b > a ? b : undefined) : '';
-        pruefe(a >= 0 && /bereitschaft_stufe/.test(block),
-            name + ' wählt bereitschaft_stufe aus',
+        pruefe(a >= 0 && /bereitschaft_stufe/.test(block) && /bereitschaft_bereit/.test(block),
+            name + ' wählt bereitschaft_stufe und bereitschaft_bereit aus',
             a < 0 ? 'Block nicht gefunden — Anker anpassen' : '');
     }
 

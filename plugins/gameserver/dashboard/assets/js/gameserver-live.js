@@ -92,10 +92,14 @@
         }
 
         if (z.bereit === true) {
+            // fb-init hat bereit gemeldet, konnte aber nicht alles pruefen
+            // (B160). Das steht sichtbar in der Pille, nicht nur im Tooltip.
+            const offen = typeof z.text === 'string' && z.text.startsWith('bereit · ');
             return {
-                sichtbar: true, text: 'Spieler können rein',
+                sichtbar: true,
+                text: offen ? 'Spieler können rein · ' + z.text.slice('bereit · '.length) : 'Spieler können rein',
                 klasse: 'fb-pille fb-pille-gut',
-                titel: 'Alle verlangten Stufen sind erreicht.', wartet: false,
+                titel: offen ? (z.grund || z.text) : 'Alle verlangten Stufen sind erreicht.', wartet: false,
             };
         }
 
@@ -513,11 +517,14 @@
                         const verlangt   = el.dataset.fbVerlangt !== 'nein';
                         const laeuft = z.status === 'online' || z.status === 'starting';
 
-                        let erreicht, wartet;
+                        let erreicht, wartet, ungeprueft = false;
                         const geliefert = (z.stufen || []).find(st => st.schluessel === meineStufe);
                         if (geliefert) {
                             erreicht = geliefert.erfuellt;
                             wartet   = geliefert.wartet;
+                            // fb-init konnte sie nicht pruefen (B160) — blass
+                            // wie „nicht verlangt": dazu gibt es keine Messung.
+                            ungeprueft = Boolean(geliefert.ungeprueft);
                         } else {
                             const meine   = LEITER.indexOf(meineStufe);
                             const wieWeit = LEITER.indexOf(z.stufe);
@@ -526,7 +533,7 @@
                         }
 
                         let farbe;
-                        if (!verlangt)   farbe = '#f1f3f5';
+                        if (!verlangt || ungeprueft) farbe = '#f1f3f5';
                         else if (erreicht) farbe = 'var(--fb-success)';
                         else if (wartet)   farbe = 'var(--fb-warning)';
                         else               farbe = 'var(--fb-border)';
