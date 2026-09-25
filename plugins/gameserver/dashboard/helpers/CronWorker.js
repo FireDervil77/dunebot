@@ -439,6 +439,7 @@ class CronWorker {
 
         const [server] = await dbService.query(`
             SELECT gs.id, gs.guild_id, gs.ports, gs.env_variables, gs.bind_ip,
+                   gs.addon_marketplace_id, gs.paket_werte,
                    am.game_data,
                    r.host AS rootserver_ip
             FROM gameservers gs
@@ -458,7 +459,17 @@ class CronWorker {
         const envVars  = parse(server.env_variables, {});
         const gameData = parse(server.game_data, {});
 
-        const rcon = StatusService.resolveRcon({ gameData, ports, envVars });
+        // Das PAKET geht mit (2026-09-25): Bis dahin kannte dieser Weg nur das
+        // Egg (`game_data.config.rcon`). Ein Paket-Server — Minecraft, Factorio —
+        // hat dort `{}`, und jeder geplante RCON-Befehl scheiterte mit „keine
+        // RCON-Konfiguration“. Gleiche Auflösung wie die Fernsteuerungs-Route.
+        const { ladePaketFuerAddon } = require('./StartPayload');
+        const eintrag = await ladePaketFuerAddon(dbService, server.addon_marketplace_id);
+        const paket = parse(eintrag?.paket_json, null);
+        const rcon = StatusService.resolveRcon({
+            gameData, ports, envVars,
+            paket, paketWerte: parse(server.paket_werte, {}) || {},
+        });
         if (!rcon.available) {
             throw new Error(rcon.reason || 'RCON ist für diesen Server nicht verfügbar');
         }
@@ -468,7 +479,9 @@ class CronWorker {
             server_id:     String(server.id),
             rcon_host:     server.bind_ip || server.rootserver_ip || '127.0.0.1',
             rcon_port:     rcon.port,
-            rcon_password: envVars[gameData.config.rcon.password_var] || '',
+            // Beim Paket steht das Kennwort schon aufgelöst in `rcon.password`;
+            // der Egg-Weg nennt nur den Variablennamen.
+            rcon_password: rcon.password || envVars[gameData.config?.rcon?.password_var] || '',
             rcon_protocol: rcon.protocol || 'srcds',
             rcon_command:  job.command,
         }, 30000);

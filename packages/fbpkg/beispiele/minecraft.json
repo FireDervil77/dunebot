@@ -3,7 +3,7 @@
   "identity": {
     "slug": "minecraft",
     "name": "Minecraft",
-    "version": "1.5.3",
+    "version": "1.5.4",
     "author": "firenetworks",
     "category": "sandbox",
     "description": {
@@ -803,6 +803,10 @@
     }
   },
   "management": {
+    "query": {
+      "protocol": "minecraft",
+      "port": "game"
+    },
     "rcon": {
       "protocol": "source",
       "port": "rcon",
@@ -828,6 +832,7 @@
   "status": {
     "complete": false,
     "open": [
+      "SPIELERANZEIGE AUS DEM PAKET (1.5.4, 2026-09-25): management.query neu (GameDig \"minecraft\" = Server-List-Ping auf dem Spielport, braucht kein enable-query). Bis dahin las die Live-Anzeige des Dashboards nur das Egg — Minecraft-Server zeigten nie Spieler. ready_when fragt weiter per Logzeile; die Abfrage dient nur der Anzeige.",
       "NEOFORGE-FASSUNG PER WOERTLICHEM PRAEFIX (1.5.3, 2026-09-25): Die Suche nahm `grep \"^21.1.\"` — der Punkt ist dort ein Platzhalter, und Minecraft 1.21.1 bekam NeoForge 21.11.45 (fuer 1.21.11). Server 204 startete nicht: FML 10 statt 4, Mods des Modpacks fanden `cpw.mods.jarhandling.SecureJar` nicht. Jetzt `beginnt_mit` (Shell-case, buchstabengetreu) an allen vier Stellen, NeoForge wie Forge. Gegen die echten Maven-Listen nachgestellt: 1.21.1 → 21.1.251 statt 21.11.45; 1.21, 1.21.11, 1.20.4, Forge 1.12.2/1.20.1 unveraendert. Betroffen waren Server mit 1.21.1 oder anderen Fassungen, deren Nummer der Anfang einer laengeren ist — sie brauchen eine Neuinstallation.",
       "IMAGE NEU ANGEHEFTET (1.5.2, 2026-09-25 nachmittags): Images vom zweiten Bau, jetzt mit fb-probe-Kennung a2s (B160).",
       "IMAGE NEU ANGEHEFTET (1.5.1, 2026-09-25): java:2026.09 → java:2026.09, Digest der Images vom 2026-09-25 09:28–09:33. Darin fb-init mit Portpflicht/Zeilenwache (B158) und der Abfrage-Kennung a2s (B160). Der Daemon nimmt den Digest vor dem Tag — ohne Neu-Anheften liefen die Server weiter mit dem alten fb-init, obwohl die Images laengst gebaut waren.",

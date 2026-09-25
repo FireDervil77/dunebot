@@ -250,4 +250,34 @@ function resolveStatusConfig(gameData = {}) {
     return { query, rcon, merge, display };
 }
 
-module.exports = { resolveStatusConfig, BUILTIN, BUILTIN_RCON, DEFAULT_DISPLAY };
+/**
+ * Die Status-Angaben eines SPIELPAKETS — in der Form, die resolveStatusConfig liest.
+ *
+ * Bis zum 2026-09-25 las der ganze Status-Weg (Spielerzahl, Map, Ping) nur
+ * `game_data.query` — das Egg. `management.query` stand in jedem Paket, das
+ * Dashboard las es nirgends. Folge: Minecraft ohne Spieleranzeige, Valheim und
+ * Astro Colony zeigten sie nur, weil ihr Marktplatz-Eintrag das Egg noch trug.
+ * Beim Umstieg auf Pakete war die Anzeige einfach nicht mitgekommen.
+ *
+ * Übersetzt wird hier, damit alles dahinter (Regeln, Anzeige, Abfrage) gleich
+ * bleibt: `protocol` ist die GameDig-Kennung, `port` der ZWECK des Ports — genau
+ * das, was `port_var` in `ports` nachschlägt.
+ *
+ * `a2s` ist unsere Kennung für „spricht Source Query, steht aber nicht in
+ * GameDigs Katalog“ (Baustelle 160). GameDig kennt dafür `protocol-valve`.
+ *
+ * @param {object|null} paket - FBPKG_v1
+ * @returns {object} game_data-förmig; `{}` heißt „das Paket nennt keine Abfrage“
+ */
+function statusDatenAusPaket(paket) {
+    const q = paket?.management?.query;
+    if (!q?.protocol || !q?.port) return {};
+    return {
+        query: {
+            gamedig_type: q.protocol === 'a2s' ? 'protocol-valve' : q.protocol,
+            port_var:     q.port,
+        },
+    };
+}
+
+module.exports = { resolveStatusConfig, statusDatenAusPaket, BUILTIN, BUILTIN_RCON, DEFAULT_DISPLAY };

@@ -20,7 +20,8 @@
 
 const { ServiceManager } = require('dunebot-core');
 const QueryService = require('./QueryService');
-const { resolveStatusConfig } = require('./StatusSchema');
+const { resolveStatusConfig, statusDatenAusPaket } = require('./StatusSchema');
+const { ladePaketFuerAddon } = require('./StartPayload');
 
 /** ENV-Variablen, die als Slot-Anzahl in Frage kommen (Reihenfolge = Priorität) */
 const MAX_PLAYER_VARS = ['MAX_PLAYERS', 'MAXPLAYERS', 'SERVER_MAXPLAYERS', 'SLOTS'];
@@ -338,15 +339,61 @@ class StatusService {
         return !!statusCfg?.query?.gamedig_type || !!statusCfg?.rcon?.command;
     }
 
+    /**
+     * Woher die Status-Angaben kommen: aus dem PAKET, sonst aus dem Egg.
+     *
+     * Hier und nicht beim Aufrufer: Drei Stellen rufen `refresh` (Poller,
+     * Detailseite, Discord-Panel), und alle laden ihre Zeile mit
+     * `COALESCE(am.game_data, gs.frozen_game_data)` — dem Egg. Bis zum
+     * 2026-09-25 war das die einzige Quelle; ein Paket-Server bekam `{}` und
+     * damit „keine Live-Quelle“ (siehe statusDatenAusPaket).
+     *
+     * Das Egg bleibt nur für Server OHNE Paket. Hat der Server ein Paket, gilt
+     * es allein — auch wenn der Marktplatz-Eintrag noch ein Egg trägt.
+     *
+     * @private
+     * @returns {Promise<{gameData: object, paket: object|null, werte: object}>}
+     */
+    static async _statusQuelle(server) {
+        const dbService = ServiceManager.get('dbService');
+        const [zeile] = await dbService.query(
+            'SELECT addon_marketplace_id, paket_werte FROM gameservers WHERE id = ?', [server.id]);
+        const eintrag = zeile?.addon_marketplace_id
+            ? await ladePaketFuerAddon(dbService, zeile.addon_marketplace_id)
+            : null;
+        const paket = StatusService._parseJson(eintrag?.paket_json, null);
+        if (!paket) {
+            return { gameData: StatusService._parseJson(server.game_data, {}), paket: null, werte: {} };
+        }
+        return {
+            gameData: statusDatenAusPaket(paket),
+            paket,
+            werte: StatusService._parseJson(zeile.paket_werte, {}) || {},
+        };
+    }
+
+    /**
+     * Slot-Zahl eines Paket-Servers, solange die Abfrage keine liefert (offline).
+     * `max_players` ist der Schlüssel, den die Pakete dafür benutzen.
+     * @private
+     */
+    static _maxSpielerAusWerten(werte) {
+        const n = parseInt(werte?.max_players, 10);
+        return Number.isFinite(n) && n > 0 ? n : null;
+    }
+
     /** @private */
     static async _refreshNow(server) {
         const Logger = ServiceManager.get('Logger');
 
         const ports    = StatusService._parseJson(server.ports, {});
-        const gameData = StatusService._parseJson(server.game_data, {});
         const envVars  = StatusService._parseJson(server.env_variables, {});
+        const quelle   = await StatusService._statusQuelle(server);
+        const gameData = quelle.gameData;
 
-        const maxFromVars = StatusService.resolveMaxPlayers(envVars, gameData);
+        const maxFromVars = quelle.paket
+            ? StatusService._maxSpielerAusWerten(quelle.werte)
+            : StatusService.resolveMaxPlayers(envVars, gameData);
 
         // Offline-Server werden nicht abgefragt – das spart Timeouts im Poller
         if (server.status !== 'online') {
