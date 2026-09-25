@@ -580,8 +580,10 @@ function baueMesswerte(server) {
         // Bei einem Absturz ist der Grund die wichtigere Auskunft als „es wird
         // nichts gemessen" (Baustelle 163) — der Daemon schickt die Zeile aus
         // dem Log, die ihn erklärt.
+        // „Fehler" und nicht „Abgestürzt": Auch eine gescheiterte Installation
+        // landet hier, und der Grund sagt selbst, welches von beiden.
         grund: server.status === 'error'
-                ? 'Abgestürzt — ' + (server.error_message || 'der Daemon hat keinen Grund gemeldet.')
+                ? 'Fehler — ' + (server.error_message || 'der Daemon hat keinen Grund gemeldet.')
             : !laeuft ? 'Der Server läuft nicht — es wird nichts gemessen.'
             : (alterSekunden === null ? 'Noch keine Messung angekommen.'
             : (!frisch ? `Letzte Meldung vor ${alterSekunden} s — die Maschine meldet sich nicht.` : null)),

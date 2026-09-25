@@ -1305,6 +1305,9 @@ class IPMServer {
         await this.dbService.query(
             `UPDATE gameservers 
              SET status = 'error', 
+                 -- Der Grund gehoert dorthin, wo die Seite ihn zu \`error\` liest
+                 -- (2026-09-25: #204 stand auf „Fehler" ohne ein Wort).
+                 error_message = ?,
                  install_phase = NULL,
                  -- Der Fortschritt bleibt stehen: Er sagt, WIE WEIT es kam, und
                  -- das ist bei einem Fehlschlag die nuetzlichste Zahl (bricht es
@@ -1313,7 +1316,7 @@ class IPMServer {
                  last_status_update = NOW(),
                  updated_at = NOW() 
              WHERE id = ?`,
-            [server_id]
+            [error ? 'Installation fehlgeschlagen: ' + String(error).slice(0, 480) : null, server_id]
         );
     }
 
