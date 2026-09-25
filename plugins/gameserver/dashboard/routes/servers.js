@@ -138,6 +138,7 @@ router.get('/', requirePermission('GAMESERVER.VIEW'), async (req, res) => {
                 gs.id,
                 gs.name,
                 gs.status,
+                gs.error_message,
                 gs.current_players,
                 gs.max_players,
                 gs.addon_marketplace_id,
@@ -1431,7 +1432,7 @@ router.get('/status', requirePermission('GAMESERVER.VIEW'), async (req, res) => 
         // fertige Auskunft aus `baueBereitschaftAuskunft()` — dieselbe Funktion,
         // aus der auch die Liste und die Serverseite zeichnen.
         const servers = await dbService.query(
-            `SELECT id, status, current_players, max_players,
+            `SELECT id, status, error_message, current_players, max_players,
                     addon_marketplace_id,
                     bereitschaft_stufe, bereitschaft_grund, bereitschaft_am, bereitschaft_bereit,
                     last_started_at,
@@ -1871,6 +1872,7 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
                 gs.guild_id,
                 gs.name,
                 gs.status,
+                gs.error_message,
                 gs.current_players,
                 gs.max_players,
                 gs.ports,

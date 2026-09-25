@@ -577,7 +577,12 @@ function baueMesswerte(server) {
         // nicht die Last, sondern WIE WEIT (Baustelle 44).
         installation: baueInstallation(server),
         // Ein Satz, der erklärt, warum keine Zahlen dastehen — oder null.
-        grund: !laeuft ? 'Der Server läuft nicht — es wird nichts gemessen.'
+        // Bei einem Absturz ist der Grund die wichtigere Auskunft als „es wird
+        // nichts gemessen" (Baustelle 163) — der Daemon schickt die Zeile aus
+        // dem Log, die ihn erklärt.
+        grund: server.status === 'error'
+                ? 'Abgestürzt — ' + (server.error_message || 'der Daemon hat keinen Grund gemeldet.')
+            : !laeuft ? 'Der Server läuft nicht — es wird nichts gemessen.'
             : (alterSekunden === null ? 'Noch keine Messung angekommen.'
             : (!frisch ? `Letzte Meldung vor ${alterSekunden} s — die Maschine meldet sich nicht.` : null)),
         cpu:  null,

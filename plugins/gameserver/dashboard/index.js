@@ -1054,12 +1054,16 @@ class GameserverPlugin extends DashboardPlugin {
             await dbService.query(
                 `UPDATE gameservers 
                  SET status = 'error', 
+                     error_message = ?,
                      crash_count = crash_count + 1,
                      last_crash_at = NOW(),
                      last_crash_reason = ?,
                      updated_at = NOW() 
                  WHERE id = ?`,
-                [error, server_id]
+                // Auch nach `error_message`: Das ist die Spalte, die die Seite
+                // zu `error` liest (Baustelle 163). Vorher stand der Grund nur
+                // in `last_crash_reason`, und „Fehler" kam ohne Grund an.
+                [error, error, server_id]
             );
             
             // 2. Crash-Log speichern

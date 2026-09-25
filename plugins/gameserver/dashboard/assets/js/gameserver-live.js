@@ -225,6 +225,13 @@
                 this.uebernimm(d.server_id, { status: d.status });
                 this.holeBald();
             });
+            // Ein Absturz kommt als eigenes Ereignis, nicht als status_changed
+            // (Daemon: watchContainerExit). Ohne diesen Zuhoerer stand eine
+            // offene Seite bis zum naechsten anderen Ereignis auf „Laeuft".
+            sse.on('crashed', (d) => {
+                this.uebernimm(d.server_id, { status: 'error' });
+                this.holeBald();
+            });
             sse.on('readiness', (d) => {
                 this.uebernimm(d.server_id, { stufe: d.stufe, grund: d.grund });
                 this.holeBald();
