@@ -76,7 +76,7 @@
               <label class="form-label" for="neuImage">Basis-Image</label>
               <select class="form-select" id="neuImage" name="image">
                 <% images.forEach(function (i) { %>
-                  <option value="<%= i.ref %>@<%= i.digest %>"><%= bildName(i) %></option>
+                  <option value="<%= i.ref %>:<%= i.tag %>"><%= bildName(i) %></option>
                 <% }) %>
               </select>
               <div class="form-hint">Welche Laufzeit das Spiel braucht: base (nativ), java, dotnet, steamcmd, proton.</div>

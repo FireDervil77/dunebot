@@ -228,7 +228,8 @@ async function pruefe(name, fn) {
         assert.strictEqual(b.befehl, 'werkbank.schritt');
         assert.strictEqual(b.nutzlast.sitzung_id, 'wbprobe');
         assert.ok(!('server_id' in b.nutzlast), 'eine server_id liesse das Dashboard einen Server suchen');
-        assert.deepStrictEqual(b.nutzlast.image, db.sitzung.image);
+        // Image und Tag, kein Digest: Den legt der Daemon je Lauf fest (B166).
+        assert.deepStrictEqual(b.nutzlast.image, { ref: 'r/fb/base', tag: '2026.09' });
         assert.strictEqual(db.schritte[0].status, 'laeuft');
     });
 
@@ -293,7 +294,7 @@ async function pruefe(name, fn) {
         ]);
         assert.deepStrictEqual(e.install.steps.map(s => s.type), ['download', 'template']);
         assert.strictEqual(e.identity.name, 'Terraria');
-        assert.deepStrictEqual(e.image, db.sitzung.image);
+        assert.deepStrictEqual(e.image, { ref: 'r/fb/base', tag: '2026.09' }, 'der Entwurf trägt keinen Digest (B166)');
     });
 
     console.log('\nProbestart (Stufe 2)');
@@ -554,7 +555,11 @@ async function pruefe(name, fn) {
 
     console.log('\nVeröffentlichen (Stufe 4)');
 
-    const gruenGeprueft = (s, liste) => ({ id: 3, status: 'gruen', beendet_am: new Date('2026-09-24T21:00:00Z'),
+    // Der Digest, den der Daemon für DIESEN Durchlauf gemeldet hat (B166).
+    const LAUF_DIGEST = 'sha256:' + 'ab'.repeat(32);
+    const gruenGeprueft = (s, liste, digest = LAUF_DIGEST) => ({ id: 3, status: 'gruen',
+        beendet_am: new Date('2026-09-24T21:00:00Z'),
+        ergebnis: { gruen: true, gruende: [], ...(digest ? { image_digest: digest } : {}) },
         entwurf: Sitzungen.entwurfAlsPaket(s, liste) });
     const mitAngaben = () => {
         const s = pruefbar();
@@ -581,6 +586,9 @@ async function pruefe(name, fn) {
         const g = gruenGeprueft(s, liste);
         st = await Sitzungen.veroeffentlichungsStand(s, [...liste, { status: 'ok', schritt: { type: 'mkdir', path: 'x' } }], [g]);
         assert.match(st.gruende.join(' '), /technische Teil geändert/);
+        // Grün, aber ohne aufgezeichneten Digest: nichts, was sich anheften ließe.
+        st = await Sitzungen.veroeffentlichungsStand(s, liste, [gruenGeprueft(s, liste, null)]);
+        assert.match(st.gruende.join(' '), /nennt sein Image nicht/);
         db.fassungen.factorio = ['1.0.0', '1.2.0'];
         st = await Sitzungen.veroeffentlichungsStand(s, liste, [g]);
         assert.match(st.gruende.join(' '), /bis 1\.2\.0/);
@@ -600,6 +608,11 @@ async function pruefe(name, fn) {
         const echt = f.install.steps.map(schritt => ({ status: 'ok', schritt }));
         const paket = Sitzungen.veroeffentlichungsPaket(s, echt, gruenGeprueft(s, echt), 'firedervil');
         assert.strictEqual(paket.identity.origin.type, 'installer');
+        // Angeheftet ist der Digest des grünen Durchlaufs, nicht der der Sitzung
+        // oder der, der gerade hinter dem Tag steht (B166).
+        assert.strictEqual(paket.image.digest, LAUF_DIGEST);
+        assert.strictEqual(paket.image.tag, f.image.tag);
+        assert.match(paket.image.pinned_at, /^\d{4}-\d{2}-\d{2}$/);
         assert.ok(!paket.werkbank && !JSON.stringify(paket).includes('34197'), 'Sitzungsteil und Portnummern bleiben draußen');
         const einl = require('../packages/fbpkg/lib/einlieferung');
         const os = require('os');

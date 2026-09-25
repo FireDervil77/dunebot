@@ -104,12 +104,26 @@ function neueKennung() {
 }
 
 /**
+ * Das Image einer Sitzung, wie es an den Daemon geht: Image und Tag, KEIN Digest.
+ *
+ * Baustelle 166 (2026-09-25): Eine Sitzung soll bei jedem Lauf den aktuellen
+ * Stand nehmen — der Daemon löst den Tag auf und meldet, welcher Digest es war.
+ * Angeheftet wird erst beim Veröffentlichen, und zwar der Digest des grünen
+ * Durchlaufs. Ältere Sitzungen haben den Digest noch gespeichert; er wird hier
+ * weggelassen, damit auch sie nachziehen.
+ */
+function sitzungsImage(sitzung) {
+    const i = sitzung?.image || {};
+    return { ref: i.ref, ...(i.tag ? { tag: i.tag } : {}), ...(i.platform ? { platform: i.platform } : {}) };
+}
+
+/**
  * Die Images, aus denen eine Sitzung wählen kann.
  *
- * Genommen wird, was die eingelieferten Pakete tatsächlich benutzen — mit dem
- * Digest, auf den sie angeheftet sind. Keine eigene Liste: Ein Image, das kein
- * geprüftes Paket trägt, ist für die Werkbank keine Grundlage, und eine zweite
- * Liste wäre beim nächsten Image veraltet.
+ * Genommen wird, was die eingelieferten Pakete tatsächlich benutzen — als Image
+ * und Tag (der Digest ist Sache des Laufs, siehe sitzungsImage). Keine eigene
+ * Liste: Ein Image, das kein geprüftes Paket trägt, ist für die Werkbank keine
+ * Grundlage, und eine zweite Liste wäre beim nächsten Image veraltet.
  */
 async function waehlbareImages() {
     const zeilen = await db().query(`
@@ -120,11 +134,9 @@ async function waehlbareImages() {
     const gesehen = new Map();
     for (const z of zeilen) {
         const img = json(z.fbpkg, {})?.image;
-        if (!img?.ref || !img?.digest) continue;
-        const schluessel = `${img.ref}@${img.digest}`;
-        if (!gesehen.has(schluessel)) {
-            gesehen.set(schluessel, { ref: img.ref, tag: img.tag || null, digest: img.digest });
-        }
+        if (!img?.ref || !img?.tag) continue;
+        const schluessel = `${img.ref}:${img.tag}`;
+        if (!gesehen.has(schluessel)) gesehen.set(schluessel, { ref: img.ref, tag: img.tag });
     }
     return [...gesehen.values()].sort((a, b) => (a.ref + a.tag).localeCompare(b.ref + b.tag));
 }
@@ -174,7 +186,7 @@ async function anlegen({ guildId, userId, name, rootserverId, image, iconUrl }) 
     const name2 = String(name || '').trim().slice(0, 100);
     if (!name2) throw new Error('Die Sitzung braucht einen Namen — meist das Spiel, das entstehen soll.');
     const erlaubt = await waehlbareImages();
-    const img = erlaubt.find(i => `${i.ref}@${i.digest}` === image);
+    const img = erlaubt.find(i => `${i.ref}:${i.tag}` === image);
     if (!img) throw new Error('Dieses Image ist nicht wählbar.');
     const maschine = (await maschinen(guildId)).find(m => String(m.id) === String(rootserverId));
     if (!maschine) throw new Error('Diese Maschine gehört nicht zu dieser Guild.');
@@ -219,7 +231,7 @@ async function schrittAusfuehren({ sitzung, schritt }) {
 
     const antwort = await daemon.senden('werkbank.schritt', {
         guild_id: sitzung.guild_id,
-        image: sitzung.image,
+        image: sitzungsImage(sitzung),
         schritt,
         settings: {},
         // Seit Stufe 2 hat die Sitzung Portnummern — ein template-Schritt mit
@@ -293,7 +305,7 @@ function entwurfAlsPaket(sitzung, liste) {
     const paket = {
         format: 'FBPKG_v1',
         identity: { slug: '', version: '0.1.0', ...(e.identity || {}) },
-        image: sitzung.image,
+        image: sitzungsImage(sitzung),
         ports: e.ports || [],
         install: { steps: liste.filter(s => s.status === 'ok').map(s => s.schritt) },
     };
@@ -418,7 +430,7 @@ async function starten(sitzung, liste) {
 
     const antwort = await daemon.senden('werkbank.starten', {
         guild_id: sitzung.guild_id,
-        image: sitzung.image,
+        image: sitzungsImage(sitzung),
         start: hatBereitschaft(start) ? start : alsErkundung(start),
         env: sitzung.entwurf?.env || {},
         ports: sitzung.entwurf?.ports || [],
@@ -578,7 +590,7 @@ async function pruefen(sitzung, liste) {
     require('./Ereignisse').merkePruefung(sitzung.kennung, { pruefId, guildId: sitzung.guild_id });
 
     const antwort = await daemon.senden('werkbank.pruefen', {
-        guild_id: sitzung.guild_id, image: sitzung.image,
+        guild_id: sitzung.guild_id, image: sitzungsImage(sitzung),
         start: paket.start, env: paket.env || {}, ports: paket.ports,
         portnummern: w.portnummern, settings: {}, install: paket.install,
         memory_mb: w.memory_mb, cpu_prozent: w.cpu_prozent,
@@ -694,6 +706,11 @@ async function veroeffentlichungsStand(sitzung, liste, pruefListe) {
     else if (fingerabdruck(letzte.entwurf) !== fingerabdruck(paket)) {
         gruende.push('Seit dem grünen Durchlauf hat sich der technische Teil geändert — neu prüfen.');
     }
+    // Angeheftet wird der Digest DIESES Durchlaufs — ohne Aufzeichnung gibt es
+    // nichts anzuheften (Durchläufe vor Baustelle 166).
+    else if (!letzte.ergebnis?.image_digest) {
+        gruende.push('Der grüne Durchlauf nennt sein Image nicht (älter als die Digest-Aufzeichnung) — neu prüfen.');
+    }
     const id = paket.identity || {};
     if (!id.slug) gruende.push('Slug fehlt.');
     if (!id.version) gruende.push('Fassung fehlt.');
@@ -726,6 +743,14 @@ function veroeffentlichungsPaket(sitzung, liste, pruefung, autor) {
         // Der technische Teil aus dem GEPRÜFTEN Entwurf — gleich per Fingerabdruck,
         // aber so steht außer Frage, was eingeliefert wird.
         ...technisch(pruefung.entwurf),
+        // Angeheftet wird der Digest, auf dem der grüne Durchlauf WIRKLICH lief
+        // (der Daemon meldet ihn) — nicht der, der beim Veröffentlichen gerade
+        // hinter dem Tag steht (Baustelle 166).
+        image: {
+            ...(pruefung.entwurf?.image || {}),
+            digest: pruefung.ergebnis?.image_digest,
+            pinned_at: heute,
+        },
         status: {
             complete: false,
             open: [
@@ -842,6 +867,7 @@ function gruppiere(liste, ab = 6) {
 }
 
 module.exports = {
+    sitzungsImage,
     RE_KENNUNG, RE_ZWECK, SCHRITTTYPEN, MAX_AUSGABE, GRENZEN, VORGABE, ERKUNDUNG, hatBereitschaft,
     waehlbareImages, maschinen, liste, laden, schritte, anlegen,
     schrittAusfuehren, ausgabeAnhaengen, beenden, laufenderSchritt,
