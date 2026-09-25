@@ -906,9 +906,17 @@ function baueBereitschaft(paket, server = {}) {
     if (!r) return null;
 
     // Die Leiter, wie das Paket sie verlangt.
+    //
+    // `log_line` steht nur bei der Ausnahme ohne Port auf der Leiter (Baustelle
+    // 158, 2026-09-25) — dort ist die Zeile die Bedingung, und fb-init prueft
+    // sie. Neben einem Port prueft sie niemand; ein grauer Punkt dafuer saehe
+    // aus wie eine Messung, die es nicht gibt.
+    const ohnePort = Boolean(r.without_port);
     const stufen = [
         { schluessel: 'process', name: 'Prozess', verlangt: true,
           erklaerung: 'Das Programm läuft — PID 1 ist fb-init, exec ohne Shell.' },
+        ...(ohnePort ? [{ schluessel: 'log_line', name: 'Logzeile', verlangt: true,
+          erklaerung: 'Das Spiel hat seine Bereitschaftszeile geschrieben. Ohne Port, weil: ' + r.without_port }] : []),
         { schluessel: 'port', name: 'Port', verlangt: Boolean(r.port),
           erklaerung: r.port ? 'Der Port „' + r.port + '" lauscht.' : 'Kein Port im Paket genannt.' },
         { schluessel: 'query', name: 'Abfrage', verlangt: r.query === true,

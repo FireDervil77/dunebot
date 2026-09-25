@@ -924,21 +924,39 @@
         "ready_when": {
           "type": "object",
           "additionalProperties": false,
+          "description": "Portpflicht mit ausdrücklicher Ausnahme (Baustelle 158, 2026-09-25): Bereitschaft wird am Port gemessen. Nur ein Spiel ohne jeden prüfbaren Port nennt stattdessen without_port (Begründung) und log_line — dann wartet fb-init wirklich auf die Zeile.",
+          "allOf": [
+            {
+              "if": { "not": { "required": ["port"] } },
+              "then": { "required": ["without_port", "log_line"] }
+            },
+            {
+              "if": { "required": ["without_port"] },
+              "then": { "not": { "required": ["port"] } }
+            }
+          ],
           "properties": {
             "port": {
               "type": "string",
               "description": "Zweck des Ports, der lauschen muss — nicht die Nummer."
             },
+            "without_port": {
+              "type": "string",
+              "pattern": "\\S",
+              "description": "Ausnahme von der Portpflicht; der Wert ist die Begründung (z. B. „P2P, öffnet keinen Port“). Nur ohne port, und nur mit log_line. Ändert das Spiel seine Meldung, wird der Server nicht mehr bereit — fb-init sagt das nach der Frist."
+            },
             "log_line": {
               "description": "Zeile im Ausgabestrom, die den fertigen Start anzeigt. Als Liste: die erste, die auftaucht, genügt — Spiele melden sich je nach Fassung unterschiedlich (Portal Knights: \"Listening on\" / \"ReadyToServe\" / \"has started\") (E-23).",
               "oneOf": [
                 {
-                  "type": "string"
+                  "type": "string",
+                  "pattern": "\\S"
                 },
                 {
                   "type": "array",
                   "items": {
-                    "type": "string"
+                    "type": "string",
+                    "pattern": "\\S"
                   },
                   "minItems": 1
                 }

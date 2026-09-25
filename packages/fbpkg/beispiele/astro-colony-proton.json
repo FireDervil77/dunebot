@@ -7,7 +7,7 @@
       "de": "Vorlage fuer Windows-Spiele unter Proton. Astro Colony selbst laeuft nativ unter Linux - dafuer ist das Paket \"Astro Colony\" das richtige. Dieses hier entstand als Vergleichsimage waehrend einer Fehlersuche und bleibt als Muster stehen, wie ein reines Windows-Spiel lauffaehig wird. Baue Kolonien im All, automatisiere die Produktion mit Förderbändern und versorge deine Astronauten. Für 1–10 Spieler.",
       "en": "Template for Windows-only games running under Proton. Astro Colony itself runs natively on Linux - use the \"Astro Colony\" package for that. This one started as a comparison image during debugging and remains as a blueprint. Explore an endless universe and build the most efficient constellation of colonies. Automate production with conveyor systems and take care of your astronauts. For 1-10 players."
     },
-    "version": "1.0.12",
+    "version": "1.0.13",
     "author": "firenetworks",
     "category": "sandbox",
     "origin": {
@@ -125,6 +125,8 @@
       }
     ],
     "ready_when": {
+      "port": "query",
+      "query": true,
       "log_line": "server create success",
       "timeout_sec": 300
     },
@@ -691,7 +693,7 @@
       "KONFIGURATIONSPFAD — am 2026-09-02 GEMESSEN, die Herleitung stimmte: Das Spiellog sagt woertlich `LogInit: Active device profile: WindowsServer`, und das Spiel legt unter Saved/Config/ genau die Verzeichnisse CrashReportClient und WindowsServer an. Unsere ServerSettings.ini liegt damit am richtigen Ort. Der Vorbehalt der Vorfassung (\"hergeleitet, nicht gemessen\" — beim Linux-Paket ist es LinuxServer/) ist damit erledigt; er stand hier, weil ein falscher Ort NICHTS meldet und der Server dann mit Vorgaben und OHNE Kennwort liefe.",
       "STEAMCLIENT: Der Daemon legt nach jedem steamcmd-Schritt steamclient.so nach data/.steam/sdk{32,64} (Baustelle 90). Fuer einen WINDOWS-Build ist das wirkungslos — der braeuchte steamclient64.dll. Der Schritt schadet nicht, er kostet 30 MB. OB und WOHER dieser Build seine DLL bekommt, ist ungeklaert; moeglicherweise bringt die App sie mit. Faellt der Server auf das Null-Subsystem zurueck (Log: \"Creating online subsystem instance for: NULL\"), ist genau das die Ursache. Ein Ueberspringen des SDK-Schritts bei platform=windows waere die Folgearbeit im Daemon — bewusst NICHT vorab gebaut, weil ungemessen.",
       "START UEBER `proton run`: program ist /opt/fb/proton/proton, die ersten beiden Argumente sind `run` und der Pfad zur .exe. STEAM_COMPAT_DATA_PATH und STEAM_COMPAT_CLIENT_INSTALL_PATH setzt das Image selbst (siehe images/proton/Dockerfile) und zeigen nach data/ — das Windows-Praefix landet damit im bleibenden Bereich und in der Sicherung. Ungeprueft am laufenden Server.",
-      "start.ready_when: \"server create success\" ist aus dem LINUX-Lauf belegt. Ob der Windows-Build dieselbe Zeile schreibt, ist offen. Kommt sie nicht, bleibt der Server in \"startet\" haengen, bis die 300 s ablaufen — laestig, aber sichtbar.",
+      "BEREITSCHAFT UEBER DEN ABFRAGEPORT (1.0.13, 2026-09-25, Baustelle 158): ready_when nennt jetzt port=query und query=true. Bis dahin stand hier nur die Logzeile — und die hat fb-init nie geprueft; der Server war sofort \"bereit\". Der Abfrageport ist seit 2026-08-30 von aussen belegt (A2S antwortet), also braucht dieses Paket KEINE Ausnahme von der Portpflicht. Die Zeile bleibt als Zusatz stehen, geprueft wird sie mit Port nicht. Frueherer Eintrag: start.ready_when: \"server create success\" ist aus dem LINUX-Lauf belegt. Ob der Windows-Build dieselbe Zeile schreibt, ist offen. Kommt sie nicht, bleibt der Server in \"startet\" haengen, bis die 300 s ablaufen — laestig, aber sichtbar.",
       "management.persist zeigt auf denselben Pfad wie beim Linux-Paket (game/AstroColony/Saved/SaveGames → data/saves). Ein Unreal-Spiel schreibt unter <Spiel>/Saved/, unabhaengig von der Plattform. Ungeprueft fuer diesen Build.",
       "commands: Keine Befehle deklariert — wie beim Linux-Paket. Astro Colony hat nach heutigem Stand keine Fernsteuerung; nicht nachgewiesen, nur nicht gefunden.",
       "requirements: RAM und Plattenbedarf nicht gemessen. Unter Proton ist mit mehr zu rechnen als beim nativen Build — geraten wird trotzdem nichts."

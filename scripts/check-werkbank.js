@@ -324,6 +324,20 @@ async function pruefe(name, fn) {
         // am 2026-09-24 als „Beendet mit Code -1", weil das Formular es nicht sagte.
         assert.throws(() => startAusFormular({ program: 'x', stop: 'command:/quit 30 beendet' }), /sigkill/);
         assert.throws(() => startAusFormular({ program: 'x', stop: '' }), /Stoppfolge fehlt/);
+        // Die Ausnahme von der Portpflicht — dieselben Regeln wie Job.Validate.
+        const ausnahme = startAusFormular({ program: 'x', stop: 'sigkill 10', log_line: 'server create success', without_port: 'P2P' });
+        assert.deepStrictEqual(ausnahme.ready_when, { log_line: 'server create success', without_port: 'P2P' });
+        assert.ok(pruefer(ausnahme), JSON.stringify(pruefer.errors));
+        assert.strictEqual(startAlsFormular(ausnahme).without_port, 'P2P', 'zurück ins Formular');
+        assert.throws(() => startAusFormular({ program: 'x', stop: 'sigkill 10', ready_port: 'game', log_line: 'a', without_port: 'P2P' }), /nur ohne/);
+        assert.throws(() => startAusFormular({ program: 'x', stop: 'sigkill 10', without_port: 'P2P' }), /Zeile/);
+        // Das Schema lehnt ab, was Job.Validate ablehnen würde.
+        const mit = (r) => pruefer({ ...ausnahme, ready_when: r });
+        assert.ok(!mit({ log_line: 'x' }), 'Zeile ohne Port und ohne Ausnahme');
+        assert.ok(!mit({ without_port: 'P2P' }), 'Ausnahme ohne Zeile');
+        assert.ok(!mit({ port: 'game', without_port: 'P2P', log_line: 'x' }), 'Ausnahme neben Port');
+        assert.ok(!mit({ without_port: 'P2P', log_line: ' ' }), 'leere Zeile');
+        assert.ok(mit({ port: 'game' }), 'Port allein');
         assert.match(startAlsFormular(undefined).stop, /sigkill 10$/, 'leer: Vorschlag im Feld');
     });
 
@@ -345,9 +359,16 @@ async function pruefe(name, fn) {
         const s = sitzungMitStart();
         await Sitzungen.starten(s, []);
         const gesendet = daemon.befehle[0].nutzlast.start;
-        assert.strictEqual(gesendet.ready_when.log_line, Sitzungen.ERKUNDUNG, 'Job.Validate braucht eine Bedingung');
+        // Portpflicht (Baustelle 158): ohne Port nur als begründete Ausnahme.
+        assert.strictEqual(gesendet.ready_when.without_port, Sitzungen.ERKUNDUNG, 'Job.Validate braucht Port oder Ausnahme');
+        assert.strictEqual(gesendet.ready_when.log_line, Sitzungen.ERKUNDUNG, 'die Ausnahme braucht eine Zeile');
         assert.ok(!s.entwurf.start.ready_when, 'der Entwurf bleibt ohne — Stufe 3 soll ihn weiter abweisen');
         assert.strictEqual(db.entwurf, null, 'nichts in den Entwurf geschrieben');
+        daemon.befehle = []; db.laeufe = []; Ereignisse._laeufe.clear();
+        s.entwurf.start.ready_when = { log_line: 'Hosting game' };
+        await Sitzungen.starten(s, []);
+        assert.deepStrictEqual(daemon.befehle[0].nutzlast.start.ready_when,
+            { log_line: 'Hosting game', without_port: Sitzungen.ERKUNDUNG }, 'eine getippte Zeile wird in der Erkundung wirklich geprüft');
         daemon.befehle = []; db.laeufe = []; Ereignisse._laeufe.clear();
         s.entwurf.start.ready_when = { port: 'game' };
         await Sitzungen.starten(s, []);
@@ -480,6 +501,10 @@ async function pruefe(name, fn) {
     await pruefe('was sicher rot würde, wird vorher gesagt — nichts geht an den Daemon', async () => {
         const ohnePort = pruefbar(); ohnePort.entwurf.start.ready_when = { log_line: 'Hosting game' };
         await assert.rejects(Sitzungen.pruefen(ohnePort, liste), /Bereit, wenn Port/);
+        // Die begründete Ausnahme ist kein Mangel (Baustelle 158).
+        assert.ok(!Sitzungen.durchlaufMaengel({ ...Sitzungen.entwurfAlsPaket(pruefbar(), liste),
+            start: { ...pruefbar().entwurf.start, ready_when: { log_line: 'Hosting game', without_port: 'P2P' } } })
+            .some(x => /Bereit, wenn Port/.test(x)), 'Ausnahme mit Zeile gilt');
         const nurKill = pruefbar(); nurKill.entwurf.start.stop = { sequence: [{ step: 'sigkill' }] };
         await assert.rejects(Sitzungen.pruefen(nurKill, liste), /sigkill/);
         const ungenutzt = pruefbar(); ungenutzt.entwurf.start.args = [];

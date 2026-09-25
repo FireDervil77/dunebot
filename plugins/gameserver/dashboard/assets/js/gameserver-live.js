@@ -44,7 +44,9 @@
     };
 
     /** Die Leiter in der Reihenfolge, in der fb-init sie meldet. */
-    const LEITER = ['process', 'port', 'query'];
+    // `log_line` gibt es nur bei der Ausnahme ohne Port (Baustelle 158); dann
+    // fehlen port und query, und die Reihenfolge bleibt richtig.
+    const LEITER = ['process', 'log_line', 'port', 'query'];
 
     /**
      * Wie steht die Bereitschaftspille? — eine reine Rechnung.

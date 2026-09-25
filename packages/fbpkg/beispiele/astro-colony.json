@@ -7,7 +7,7 @@
       "de": "Baue Kolonien im All, automatisiere die Produktion mit Förderbändern und versorge deine Astronauten. Für 1–10 Spieler.",
       "en": "Explore an endless universe and build the most efficient constellation of colonies. Automate production with conveyor systems and take care of your astronauts. For 1-10 players."
     },
-    "version": "1.0.13",
+    "version": "1.0.14",
     "author": "firenetworks",
     "category": "sandbox",
     "origin": {
@@ -115,6 +115,8 @@
       }
     ],
     "ready_when": {
+      "port": "query",
+      "query": true,
       "log_line": "server create success",
       "timeout_sec": 300
     },
@@ -682,7 +684,7 @@
       "commands: Keine Befehle deklariert. Astro Colony hat nach heutigem Stand keine Fernsteuerung — nicht nachgewiesen, nur nicht gefunden.",
       "requirements: RAM und Plattenbedarf nicht gemessen, deshalb nicht angegeben.",
       "management.query: Auf `source` gesetzt, weil der Server auf A2S antwortet (gemessen). Ob Spielerzahl und Name darin brauchbar stehen, ist NICHT geprueft — die Antwort war eine Challenge von 9 Bytes.",
-      "start.ready_when: \"server create success\" ist im Log belegt. Ob 300 s reichen, wenn eine grosse Welt geladen wird, ist ungeprueft."
+      "BEREITSCHAFT UEBER DEN ABFRAGEPORT (1.0.14, 2026-09-25, Baustelle 158): ready_when nennt jetzt port=query und query=true. Bis dahin stand hier nur die Logzeile — und die hat fb-init nie geprueft; der Server war sofort \"bereit\". Der Abfrageport ist seit 2026-08-30 von aussen belegt (A2S antwortet), also braucht dieses Paket KEINE Ausnahme von der Portpflicht. Die Zeile bleibt als Zusatz stehen, geprueft wird sie mit Port nicht. Frueherer Eintrag: start.ready_when: \"server create success\" ist im Log belegt. Ob 300 s reichen, wenn eine grosse Welt geladen wird, ist ungeprueft."
     ]
   }
 }

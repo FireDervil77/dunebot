@@ -38,20 +38,40 @@ const GRENZEN = { memory_mb: [128, 262144], cpu_prozent: [10, 12800] };
 /**
  * Platzhalter-Bereitschaft für einen Erkundungsstart.
  *
- * Der Auftrag (Job.Validate, in Daemon UND fb-init) verlangt Port oder
- * Logzeile. Ein erster Probestart kennt beides noch nicht — er ist ja dazu da,
- * sie zu finden. Diese Zeile geht NUR in diesen einen Start, nie in den
- * Entwurf: Ohne Port meldet fb-init dann ehrlich nur „Prozess läuft", und der
- * Prüfdurchlauf (Stufe 3) weist den Entwurf weiter ab, bis er eine echte
- * Bedingung hat. Gemessen am 2026-09-24: ohne sie „Beendet mit Code -1".
+ * Der Auftrag (Job.Validate, in Daemon UND fb-init) verlangt einen Port —
+ * oder die begründete Ausnahme `without_port` samt Logzeile (Baustelle 158,
+ * 2026-09-25). Ein erster Probestart kennt den Port noch nicht; er ist ja dazu
+ * da, ihn zu finden. Er läuft deshalb als Ausnahme mit dieser Begründung. Das
+ * geht NUR in diesen einen Start, nie in den Entwurf, und der Prüfdurchlauf
+ * (Stufe 3) weist den Entwurf weiter ab, bis er eine echte Bedingung hat.
+ *
+ * Seit fb-init die Zeile wirklich prüft, meldet ein Erkundungsstart nicht mehr
+ * sofort „process": Steht im Formular schon eine Zeile, wird genau sie
+ * geprüft — die Erkundung zeigt dann, ob sie trägt. Sonst wartet er auf
+ * ERKUNDUNG, die nie kommt, und fb-init sagt nach der Frist, dass sie ausblieb.
+ * Gemessen am 2026-09-24: ganz ohne Bedingung „Beendet mit Code -1".
  */
 const ERKUNDUNG = '[Werkbank] Erkundungsstart ohne Bereitschaftsbedingung';
 
 /** Hat der Startteil eine Bereitschaftsbedingung, die der Auftrag annimmt? */
 function hatBereitschaft(start) {
     const r = start?.ready_when || {};
-    const zeile = Array.isArray(r.log_line) ? r.log_line.length : Boolean(r.log_line);
-    return Boolean(r.port || zeile || r.query);
+    const zeile = Array.isArray(r.log_line) ? r.log_line.length : Boolean(String(r.log_line || '').trim());
+    return Boolean(r.port || (String(r.without_port || '').trim() && zeile));
+}
+
+/** Der Startteil eines Erkundungsstarts — nur für diesen einen Start. */
+function alsErkundung(start) {
+    const r = start.ready_when || {};
+    const zeile = Array.isArray(r.log_line) ? r.log_line.length : Boolean(String(r.log_line || '').trim());
+    return {
+        ...start,
+        ready_when: {
+            ...r,
+            without_port: ERKUNDUNG,
+            log_line: zeile ? r.log_line : ERKUNDUNG,
+        },
+    };
 }
 
 /** Vorbelegung eines ersten Starts. Frei änderbar (Betreiber, 2026-09-24). */
@@ -399,8 +419,7 @@ async function starten(sitzung, liste) {
     const antwort = await daemon.senden('werkbank.starten', {
         guild_id: sitzung.guild_id,
         image: sitzung.image,
-        start: hatBereitschaft(start) ? start
-            : { ...start, ready_when: { ...(start.ready_when || {}), log_line: ERKUNDUNG } },
+        start: hatBereitschaft(start) ? start : alsErkundung(start),
         env: sitzung.entwurf?.env || {},
         ports: sitzung.entwurf?.ports || [],
         portnummern: w.portnummern,
@@ -530,8 +549,9 @@ function durchlaufMaengel(paket) {
     const m = [];
     if (!paket.install?.steps?.length) m.push('Der Entwurf hat keinen Schritt.');
     if (!paket.start?.program) m.push('Der Startteil fehlt.');
-    if (!paket.start?.ready_when?.port) {
-        m.push('„Bereit, wenn Port" fehlt — die Zeile allein prüft fb-init nicht, grün gibt es nur über einen Port.');
+    const bereit = paket.start?.ready_when || {};
+    if (!bereit.port && !String(bereit.without_port || '').trim()) {
+        m.push('„Bereit, wenn Port" fehlt — grün gibt es über einen Port, oder für ein Spiel ohne prüfbaren Port über die begründete Ausnahme samt Zeile.');
     }
     const seq = paket.start?.stop?.sequence || [];
     if (seq.length < 2) m.push('Die Stoppfolge hat nur sigkill — grün verlangt, dass das Spiel VORHER endet (etwa „command:/quit 30 beendet").');
@@ -546,7 +566,7 @@ async function pruefen(sitzung, liste) {
     if (maengel.length) throw new Error(maengel.join(' '));
     const w = werkbankTeil(sitzung);
     // Ohne Nummer für den Bereitschaftsport entstünde kein Auftrag (Job.Validate).
-    if (!w.portnummern[paket.start.ready_when.port]) {
+    if (paket.start.ready_when.port && !w.portnummern[paket.start.ready_when.port]) {
         throw new Error(`Der Port „${paket.start.ready_when.port}" hat in dieser Sitzung keine Nummer — erst beobachten und übernehmen.`);
     }
     const daemon = await daemonFuer(sitzung);

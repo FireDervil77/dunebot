@@ -136,6 +136,13 @@ function startAusFormular(b) {
     const bereit = {};
     if (text('ready_port').trim()) bereit.port = text('ready_port').trim();
     if (text('log_line').trim()) bereit.log_line = text('log_line').trim();
+    // Die Ausnahme von der Portpflicht (Baustelle 158) — dieselben Regeln wie
+    // Job.Validate, hier gesagt, wo sie getippt werden.
+    if (text('without_port').trim()) {
+        if (bereit.port) throw new Error('„Ohne Port, weil …" gilt nur ohne „Bereit, wenn Port" — eins von beiden leeren.');
+        if (!bereit.log_line) throw new Error('Ohne Port ist die Zeile die Bedingung — bitte eine Zeile angeben.');
+        bereit.without_port = text('without_port').trim().slice(0, 300);
+    }
     const frist = Number(text('timeout_sec'));
     if (Number.isInteger(frist) && frist > 0) bereit.timeout_sec = frist;
     if (Object.keys(bereit).length) start.ready_when = bereit;
@@ -158,6 +165,7 @@ function startAlsFormular(start) {
         // Leer: die übliche Folge vorschlagen — sichtbar im Feld, nicht still ergänzt.
         stop: (s.stop?.sequence || []).map(stoppZeile).join('\n') || 'sigint 30\nsigkill 10',
         ready_port: s.ready_when?.port || '',
+        without_port: s.ready_when?.without_port || '',
         log_line: Array.isArray(log) ? log[0] : (log || ''),
         timeout_sec: s.ready_when?.timeout_sec || '',
     };

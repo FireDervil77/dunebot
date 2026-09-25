@@ -274,7 +274,7 @@
                 <textarea class="form-control font-monospace" id="sStop" name="stop" rows="3" placeholder="command:/quit 30 beendet&#10;sigint 30&#10;sigkill 10"><%= startFormular.stop %></textarea>
                 <div class="form-hint"><code>schritt [frist] [beendet|weiter]</code> — sigint, sigterm, sigkill, command:…, rcon:…. Die letzte Zeile muss <code>sigkill</code> sein.</div>
               </div>
-              <% if (!startFormular.ready_port && !startFormular.log_line) { %>
+              <% if (!startFormular.ready_port && !(startFormular.without_port && startFormular.log_line)) { %>
                 <div class="alert alert-info py-2 small mb-2">
                   Noch keine Bereitschaft — dann ist es ein <strong>Erkundungsstart</strong>: Das Spiel läuft,
                   du siehst Konsole und Ports, übernimmst beides, und ab dem nächsten Start zählt es.
@@ -290,13 +290,18 @@
                   </select>
                 </div>
                 <div class="col-sm-5">
-                  <label class="form-label" for="sLogLine" title="fb-init prüft die Zeile noch nicht (Baustelle 158) — bereit wird ein Start nur über den Port.">Zeile (Zusatz, ungeprüft)</label>
+                  <label class="form-label" for="sLogLine" title="Mit Port ist die Zeile ein Zusatz und wird nicht geprüft. Ohne Port (Ausnahme unten) ist sie die Bedingung, und fb-init wartet auf sie.">Zeile</label>
                   <input class="form-control font-monospace" id="sLogLine" name="log_line" value="<%= startFormular.log_line %>" placeholder="Klick auf eine Konsolenzeile">
                 </div>
                 <div class="col-sm-3">
                   <label class="form-label" for="sTimeout">Frist (s)</label>
                   <input class="form-control" id="sTimeout" name="timeout_sec" type="number" min="1" value="<%= startFormular.timeout_sec %>" placeholder="300">
                 </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label" for="sOhnePort">Ohne Port, weil …</label>
+                <input class="form-control" id="sOhnePort" name="without_port" maxlength="300" value="<%= startFormular.without_port %>" placeholder="leer lassen — nur für Spiele, die keinen prüfbaren Port öffnen">
+                <div class="form-hint">Die Ausnahme von der Portpflicht. Dann ist die Zeile die Bedingung: Ändert das Spiel seine Meldung, wird der Server nicht mehr bereit. Hat das Spiel einen Abfrageport, nimm lieber den.</div>
               </div>
               <div class="row g-2 mb-3">
                 <div class="col-6">
