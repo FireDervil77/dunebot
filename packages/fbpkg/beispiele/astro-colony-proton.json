@@ -7,7 +7,7 @@
       "de": "Vorlage fuer Windows-Spiele unter Proton. Astro Colony selbst laeuft nativ unter Linux - dafuer ist das Paket \"Astro Colony\" das richtige. Dieses hier entstand als Vergleichsimage waehrend einer Fehlersuche und bleibt als Muster stehen, wie ein reines Windows-Spiel lauffaehig wird. Baue Kolonien im All, automatisiere die Produktion mit Förderbändern und versorge deine Astronauten. Für 1–10 Spieler.",
       "en": "Template for Windows-only games running under Proton. Astro Colony itself runs natively on Linux - use the \"Astro Colony\" package for that. This one started as a comparison image during debugging and remains as a blueprint. Explore an endless universe and build the most efficient constellation of colonies. Automate production with conveyor systems and take care of your astronauts. For 1-10 players."
     },
-    "version": "1.0.15",
+    "version": "1.0.16",
     "author": "firenetworks",
     "category": "sandbox",
     "origin": {
@@ -19,7 +19,7 @@
   "image": {
     "ref": "registry.firenetworks.de/fb/proton",
     "tag": "2026.09-GE-Proton10-32",
-    "digest": "sha256:e7ce555e9a32c4a68a4e7f53d5252b2f4160db332bed4731442aa4caf0364308",
+    "digest": "sha256:7ad87ec44075e0e808af1d8822c2b3d20b293887a9a71fd2dda5dd9e000d6867",
     "pinned_at": "2026-09-25",
     "platform": "linux",
     "arch": [
@@ -681,6 +681,7 @@
   "status": {
     "complete": false,
     "open": [
+      "IMAGE NEU ANGEHEFTET (1.0.16, 2026-09-25 nachmittags): Images vom zweiten Bau, jetzt mit fb-probe-Kennung a2s (B160).",
       "IMAGE NEU ANGEHEFTET (1.0.15, 2026-09-25): proton:2026.09-GE-Proton10-32 → proton:2026.09-GE-Proton10-32, Digest der Images vom 2026-09-25 09:28–09:33. Darin fb-init mit Portpflicht/Zeilenwache (B158) und der Abfrage-Kennung a2s (B160). Der Daemon nimmt den Digest vor dem Tag — ohne Neu-Anheften liefen die Server weiter mit dem alten fb-init, obwohl die Images laengst gebaut waren.",
       "ABFRAGE WIEDER VERLANGT, JETZT PRUEFBAR (1.0.15, 2026-09-25, Baustelle 160): management.query.protocol ist \"a2s\" statt \"source\" — unsere eigene Kennung fuer Source Query ohne GameDig-Eintrag; fb-probe fragt damit wirklich (auch die Challenge). Braucht fb-init mit dieser Kennung (Images ab 2026-09-25 nachmittags). Mit aelterem fb-init meldet es \"Abfrage nicht geprueft\", und das Panel zeigt den Server trotzdem als bereit (fb-init hat das letzte Wort).",
       "EINSTELLUNGEN WIRKEN JETZT BEI JEDEM NEUSTART (1.0.9, 2026-09-02). Vorher wirkten sie NUR bei der Installation, und das war kein Entwurf, sondern ein fehlendes Kabel: `pkgspec.Paket` kannte den settings-Abschnitt gar nicht, `job.Config` wurde von niemandem gefuellt — waehrend `fb-cfg` im Container seit Monaten fertig ist und im Abnahmetest je Schluessel patcht und berichtet. Gebaut, aber nie verdrahtet. Fuer jemanden, der abends spielt, war jede Einstellung damit unbenutzbar: Umstellen im Panel aenderte nichts, und nichts sagte es ihm. Jede der 11 INI-Einstellungen hat jetzt zusaetzlich ein Ziel mit target=file — das env-Ziel bleibt daneben stehen, damit das Installationsskript die Datei weiterhin anlegt. ⚠ BRAUCHT DEN DAEMON VOM 2026-09-02: Ein aelterer liest den settings-Abschnitt nicht, und dann ist alles wie vorher (nicht kaputt, nur wirkungslos). ⚠ Dabei kam ein zweiter Blindgaenger heraus: `splitIniKey` trennte am ERSTEN Punkt, und Unreals Abschnittsnamen enthalten selbst einen ('/Script/ACFeature.EHServerSubsystem'). Der Wert waere in einem neu angelegten Abschnitt '/Script/ACFeature' gelandet, den das Spiel nie liest — samt Erfolgsmeldung. Der Fehler lag seit jeher da und konnte nicht auffallen, weil nie jemand in eine INI schrieb. Jetzt am letzten Punkt, mit Test.",
