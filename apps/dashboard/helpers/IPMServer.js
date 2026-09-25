@@ -537,9 +537,7 @@ class IPMServer {
                             guild_id: daemon.guild_id,
                             display_name: daemon.name,
                             version: version || daemon.daemon_version,
-                            hardware: hardware || null,
-                            updateAvailable: this._istDaemonUpdateVerfuegbar(version || daemon.daemon_version),
-                            latestVersion: this._getLatestDaemonVersion()
+                            hardware: hardware || null
                         }
                     };
                     
@@ -649,9 +647,7 @@ class IPMServer {
                     guild_id: rootserverByToken.guild_id,
                     display_name: rootserverByToken.name,
                     version,
-                    hardware: hardware || null,
-                    updateAvailable: this._istDaemonUpdateVerfuegbar(version),
-                    latestVersion: this._getLatestDaemonVersion()
+                    hardware: hardware || null
                 }
             };
 
@@ -784,11 +780,9 @@ class IPMServer {
             }
         }
 
-        // Update-Info in Connection-Metadata speichern
-        if (payload.updateInfo) {
-            conn.metadata.updateInfo = payload.updateInfo;
-            this.Logger.debug(`[IPMServer] Update-Info: ${payload.updateInfo.currentVersion} → ${payload.updateInfo.latestVersion} (Available: ${payload.updateInfo.available})`);
-        }
+        // Kein `updateInfo` mehr aus dem Herzschlag: Der Daemon schickt es nicht
+        // mehr (websocket/client.go, GitHub-Check entfernt), und gelesen hat es
+        // nie jemand. Den Update-Stand rechnet daemonUpdateStand().
 
         // Herzschlag im Modell verbuchen. Das setzt zusaetzlich
         // `daemon_status = 'online'` und `missed_heartbeats = 0` — ein Daemon,
@@ -1609,6 +1603,30 @@ class IPMServer {
      */
     isDaemonOnline(daemonId) {
         return this.connections.has(daemonId);
+    }
+
+    /**
+     * Update-Stand eines Daemons — bei JEDER Abfrage frisch gerechnet.
+     *
+     * Bis 2026-09-25 stand er als `metadata.updateAvailable/latestVersion` an
+     * der Verbindung, einmal beim Verbinden berechnet. Wer danach einen neuen
+     * Daemon baute (`version.json` neu), sah im Panel kein Update, bis sich der
+     * Daemon neu verband oder das Dashboard neu startete. Die Version des
+     * Daemons ändert sich nur mit einer neuen Verbindung, die bereitgestellte
+     * jederzeit — deshalb wird hier verglichen, nicht beim Verbinden.
+     *
+     * @param {string} daemonId
+     * @returns {{online: boolean, version: string|null, latestVersion: string|null, updateAvailable: boolean}}
+     */
+    daemonUpdateStand(daemonId) {
+        const conn = this.connections.get(daemonId);
+        const version = conn?.metadata?.version || null;
+        return {
+            online: Boolean(conn),
+            version,
+            latestVersion: this._getLatestDaemonVersion(),
+            updateAvailable: Boolean(conn) && this._istDaemonUpdateVerfuegbar(version),
+        };
     }
 
     /**

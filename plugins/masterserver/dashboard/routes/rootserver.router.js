@@ -51,12 +51,17 @@ router.get('/', requirePermission('MASTERSERVER.ROOTSERVER.VIEW'), async (req, r
         const daemonHardware = daemonOnline ? ipmServer.getDaemonHardware(primaryDaemonId) : null;
 
         // Online-Status für jeden RootServer prüfen
-        const rootserversWithStatus = rootservers.map(rs => ({
-            ...rs,
-            isOnline: ipmServer.isDaemonOnline(rs.daemon_id),
-            updateAvailable: ipmServer.connections.get(rs.daemon_id)?.metadata?.updateAvailable || false,
-            latestVersion:   ipmServer.connections.get(rs.daemon_id)?.metadata?.latestVersion   || null
-        }));
+        // Update-Stand frisch je Abruf (daemonUpdateStand) — ein neu gebauter
+        // Daemon erscheint ohne Neustart von Dashboard oder Daemon.
+        const rootserversWithStatus = rootservers.map(rs => {
+            const stand = ipmServer.daemonUpdateStand(rs.daemon_id);
+            return {
+                ...rs,
+                isOnline: stand.online,
+                updateAvailable: stand.updateAvailable,
+                latestVersion:   stand.latestVersion,
+            };
+        });
 
         // Status-Zusammenfassung berechnen
         const serverStats = {

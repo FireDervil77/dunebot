@@ -126,8 +126,8 @@ router.get('/daemon/update-info', requirePermission('MASTERSERVER.VIEW'), async 
             });
         }
 
-        const connection = ipmServer.connections.get(daemon.daemon_id);
-        if (!connection) {
+        const stand = ipmServer.daemonUpdateStand(daemon.daemon_id);
+        if (!stand.online) {
             return res.json({
                 success: true,
                 updateInfo: null,
@@ -135,11 +135,10 @@ router.get('/daemon/update-info', requirePermission('MASTERSERVER.VIEW'), async 
             });
         }
 
-        const meta = connection.metadata;
-        const updateInfo = meta.updateAvailable ? {
+        const updateInfo = stand.updateAvailable ? {
             available: true,
-            currentVersion: meta.version || daemon.daemon_version,
-            latestVersion: meta.latestVersion
+            currentVersion: stand.version || daemon.daemon_version,
+            latestVersion: stand.latestVersion
         } : null;
 
         res.json({
