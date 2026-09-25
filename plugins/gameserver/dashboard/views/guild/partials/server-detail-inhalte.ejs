@@ -171,7 +171,8 @@
   }
 
   function marke(text, ton, titel) {
-    const farbe = ton === 'warn' ? 'var(--fb-warning)' : 'var(--fb-text-muted)';
+    const farbe = ton === 'warn' ? 'var(--fb-warning)'
+                : ton === 'gut'  ? 'var(--fb-success)' : 'var(--fb-text-muted)';
     return `<span class="fb-pille" style="font-size:11px;border-color:${farbe};color:${farbe}"`
       + `${titel ? ` title="${escape(titel)}"` : ''}>${escape(text)}</span>`;
   }
@@ -349,7 +350,8 @@
       const m = d.modpack;
       html += `
         <div style="margin:8px 0;padding:10px 12px;border:1px solid var(--fb-border);border-radius:6px"
-             ${m ? `data-modpack="${escape(m.name || m.kennung)}"` : ''}>
+             ${m ? `data-modpack="${escape(m.name || m.kennung)}" data-modpack-kennung="${escape(m.kennung)}"
+                    data-modpack-fassung="${escape(m.fassung || '')}"` : ''}>
           <div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap">
             <div style="flex:1 1 auto;min-width:0">
               ${m ? `
@@ -369,6 +371,10 @@
                   Mods und ihre Einstellungen in einem Stück mit.
                 </div>`}
             </div>
+            ${DARF && m ? `<button class="btn btn-white btn-sm" style="flex:0 0 auto"
+                        title="Die Dateien dieses Pakets werden entfernt und neu geholt."
+                        onclick="modpackInstallieren('${escape(m.kennung)}', '${escape(m.fassung || '')}', this)"
+                      >Neu installieren</button>` : ''}
             ${DARF ? `<button class="btn btn-white btn-sm" style="flex:0 0 auto"
                         onclick="modpackSuche()">${m ? 'Anderes Modpack' : 'Modpack wählen'}</button>` : ''}
           </div>
@@ -1035,11 +1041,32 @@
                     onclick="modpackSuchen(${d.seite + 1})">Weiter →</button>
           </div>` : '';
 
-        raum.innerHTML = kopf + d.treffer.map(t => `
-          <div style="display:flex;gap:10px;padding:8px 0;border-top:1px solid var(--fb-border);align-items:flex-start">
+        // ── Das installierte Paket wird markiert (Baustelle 164) ──────────
+        //
+        // Betreiber: „wenn das Modpack in der Suchliste bereits installiert
+        // ist … als installiert hervorheben und mit einem Reinstall-Knopf".
+        // Bis dahin stand es dort wie jedes andere, mit „Installieren" — und
+        // die Rückfrage sprach vom Ersetzen durch sich selbst.
+        const da = document.querySelector('#inhalte-wurzel [data-modpack-kennung]');
+        const hatKennung = da ? da.getAttribute('data-modpack-kennung') : null;
+        const hatFassung = da ? da.getAttribute('data-modpack-fassung') : '';
+        const knopfFuer = (t) => {
+          if (t.kennung !== hatKennung) {
+            return { text: 'Installieren', klasse: 'btn-primary', marke: '' };
+          }
+          const neuer = t.fassung && hatFassung && t.fassung !== hatFassung;
+          return neuer
+            ? { text: 'Auf ' + t.fassung + ' aktualisieren', klasse: 'btn-primary',
+                marke: marke('installiert: ' + hatFassung, 'gut') }
+            : { text: 'Neu installieren', klasse: 'btn-white', marke: marke('installiert', 'gut') };
+        };
+
+        raum.innerHTML = kopf + d.treffer.map(t => { const k = knopfFuer(t); return `
+          <div style="display:flex;gap:10px;padding:8px 0;border-top:1px solid var(--fb-border);align-items:flex-start${
+            k.marke ? ';box-shadow:inset 3px 0 0 var(--fb-success);padding-left:8px' : ''}">
             ${t.bild ? `<img src="${escape(t.bild)}" alt="" width="32" height="32" style="border-radius:4px;flex:0 0 auto">` : ''}
             <div style="flex:1 1 auto;min-width:0">
-              <div style="font-weight:600;font-size:13px">${escape(t.name)}</div>
+              <div style="font-weight:600;font-size:13px">${escape(t.name)} ${k.marke}</div>
               <div class="fb-muted" style="font-size:12px">${escape(t.beschreibung).slice(0, 160)}</div>
               <div class="fb-muted" style="font-size:11px;margin-top:2px">
                 <span class="fb-mono">${escape(t.kennung)}</span> ·
@@ -1047,10 +1074,10 @@
                 ${t.fassung ? ' · Fassung <span class="fb-mono">' + escape(t.fassung) + '</span>' : ''}
               </div>
             </div>
-            ${DARF ? `<button class="btn btn-primary btn-sm" style="flex:0 0 auto"
+            ${DARF ? `<button class="btn ${k.klasse} btn-sm" style="flex:0 0 auto"
                         onclick="modpackInstallieren('${escape(t.kennung)}', '${escape(t.fassung || '')}', this)"
-                      >Installieren</button>` : ''}
-          </div>`).join('') + blaettern;
+                      >${escape(k.text)}</button>` : ''}
+          </div>`; }).join('') + blaettern;
       })
       .catch(e => {
         raum.innerHTML = `<div style="font-size:12px;color:var(--fb-danger)">Suche fehlgeschlagen: ${escape(e.message)}</div>`;
@@ -1064,9 +1091,12 @@
     // einzige Stelle hier, an der etwas Vorhandenes verschwindet — beim ersten
     // Modpack gibt es nichts zu bestätigen.
     const altes = document.querySelector('#inhalte-wurzel [data-modpack]');
-    if (altes && !window.confirm(
-        `„${altes.getAttribute('data-modpack')}" wird samt seinen Dateien entfernt `
-        + `und durch dieses Paket ersetzt. Weiter?`)) return;
+    const dasselbe = altes && altes.getAttribute('data-modpack-kennung') === kennung;
+    if (altes && !window.confirm(dasselbe
+        ? `„${altes.getAttribute('data-modpack')}" wird neu installiert: Seine Dateien `
+          + `werden entfernt und neu geholt. Weiter?`
+        : `„${altes.getAttribute('data-modpack')}" wird samt seinen Dateien entfernt `
+          + `und durch dieses Paket ersetzt. Weiter?`)) return;
 
     knopf.disabled = true;
     const raum = document.getElementById('mp-treffer');
