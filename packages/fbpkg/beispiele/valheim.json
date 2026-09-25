@@ -3,7 +3,7 @@
   "identity": {
     "slug": "valheim",
     "name": "Valheim",
-    "version": "1.0.17",
+    "version": "1.0.18",
     "author": "firenetworks",
     "category": "survival",
     "description": {
@@ -19,8 +19,8 @@
   "image": {
     "ref": "registry.firenetworks.de/fb/steamcmd",
     "tag": "2026.09",
-    "digest": "sha256:c6d2fda4f695062d4cf9535358a1fce0bc2e87d51b568c00684f46cd02130364",
-    "pinned_at": "2026-09-06",
+    "digest": "sha256:956c34536c52bbe72a39cf6bfefe5ebb68901870a71db0ef87bcc249f1182780",
+    "pinned_at": "2026-09-25",
     "platform": "linux",
     "arch": [
       "amd64"
@@ -1211,6 +1211,7 @@
   "status": {
     "complete": false,
     "open": [
+      "IMAGE NEU ANGEHEFTET (1.0.18, 2026-09-25): steamcmd:2026.09 → steamcmd:2026.09, Digest der Images vom 2026-09-25 09:28–09:33. Darin fb-init mit Portpflicht/Zeilenwache (B158) und der Abfrage-Kennung a2s (B160). Der Daemon nimmt den Digest vor dem Tag — ohne Neu-Anheften liefen die Server weiter mit dem alten fb-init, obwohl die Images laengst gebaut waren.",
       "AUFRAEUMEN NACH DER INSTALLATION (neu in 1.0.16). Gemessen am 2026-09-20 an Server 190: game/ trug 22 Eintraege, davon mehrere, die wir nie anfassen. Entfernt werden jetzt `docker` (33 MB — Valheims eigenes Docker-Beispiel samt einer DRITTEN steamclient.so; die anderen beiden liegen in game/ und data/.steam/sdk64, alle drei mit verschiedener Pruefsumme), das Handbuch als PDF, changelog.txt und die zwei Vanilla-Startskripte — wir starten das Binary direkt ueber start.program. BEWUSST NICHT entfernt: `steamapps` (SteamCMD braucht die App-Manifeste fuers Update), `steam_appid.txt`, und die BepInEx-Beigaben (doorstop_config.ini, winhttp.dll, doorstop_libs, die beiden *_bepinex.sh) — solange der Lader nicht gemessen ohne sie laeuft, bleibt das Risiko groesser als die 9 KB. NACHTRAG 2026-09-20, und er korrigiert diesen Eintrag: Hier stand, cache/steamcmd trage 195 MB, davon siteserverui 36 MB und linux32 62 MB, \"die nie laufen\". Das mit linux32 war FALSCH — steamcmd.sh Zeile 26 setzt auf x86_64 genau STEAM_PLATFORM=linux32; das IST das laufende SteamCMD. Und siteserverui laesst sich nicht wegsparen: Am 2026-09-20 im echten Abbild gemessen stellt SteamCMD sich beim ersten Lauf selbst wieder her — auch nachdem Verzeichnis UND Paket entfernt waren, lud es die 36 MB aus dem Netz nach (149 MB -> 196 MB). Stattdessen entfernt der Daemon seit 1.0.71 die ganze Kopie NACH dem Rezept: Gebraucht wird sie nur beim Installieren und Aktualisieren, danach liegt sie bis zum naechsten Update herum. steamcmdBereitstellen legt sie neu an, wenn sie fehlt. OFFEN bleibt der groesste Posten: Der geteilte Depot-Cache greift nicht — /home/firebot/.steamcache/Steam/depotcache traegt 480 KB, nur Manifeste, keine Chunks. Ein zweiter Valheim-Server laedt die vollen 2 GB neu.",
       "WELTMODIFIKATOREN — im Netz nachgelesen am 2026-09-20, und es korrigiert zwei Annahmen von hier. (1) ADMIN-KONSOLENBEFEHLE GEHEN DOCH auf dedizierten Servern, wenn die Steam-ID in adminlist.txt steht: `setworldmodifier <name> <wert>`, `setworldpreset <name>` und `resetworldkeys` (entfernt NUR die Modifikator-Schluessel; `resetkeys` loescht dagegen ALLE globalen Schluessel inklusive Boss-Kills). Es gibt seit 0.217.22. Nur die CHEAT-Befehle (`setkey`) sind auf dedizierten Servern gesperrt. Damit hat der Betreiber einen Weg, eine verklemmte Welt OHNE Neustart aufzuraeumen — das stand hier nirgends. (2) EIN -preset RAEUMT VON SICH AUS AUF: Valheim loescht beim Anwenden eines Presets zuerst alle Modifikator-Schluessel, auch fremde, und setzt danach die des Presets. Die Zusage des Schalters „Ist er aus, fassen wir die Welt nicht an\" gilt also NICHT, wenn world_preset gesetzt ist. In den Beschreibungen steht das jetzt. Quellen: gameserverkings.com und low.ms, beide am 2026-09-20 gelesen, in den beiden Punkten uebereinstimmend.",
       "⚠ DIE MESSUNG VOM 2026-09-06/07 WAR AM ALTEN WELTFORMAT. Damals wurde „die .fwl danach ausgelesen\", und daraus stammt die ganze Bauform (setkey/resetmodifiers, der Schalter). Valheim 1.0 hat das Format gewechselt: Server 190 traegt `_main.38.fwl2` (53 Bytes: Name, Seed, vier Zahlenfelder) und `_main.38.db2` — Letztere ist ab Offset 16 GZIP-KOMPRIMIERT. Am 2026-09-20 nachgesehen: entpackt 208 982 Bytes, darin KEIN lesbarer Klartext (983 strings-Fundstellen sind Binaerrauschen). Ob und wo die Schluessel dort stehen, ist damit UNGEMESSEN — „nichts gefunden\" ist hier keine Aussage. Wer es wissen will, braucht einen Probelauf mit gesetztem Schluessel als Positivkontrolle. Lehrgeld dabei: Der erste Versuch suchte in einer alten .db und fand 5 Treffer fuer „combat\" — es war der Ortsname `CombatRuin01`. Eine Suche ohne Positivkontrolle beweist nichts.",

@@ -7,7 +7,7 @@
       "de": "Baue Kolonien im All, automatisiere die Produktion mit Förderbändern und versorge deine Astronauten. Für 1–10 Spieler.",
       "en": "Explore an endless universe and build the most efficient constellation of colonies. Automate production with conveyor systems and take care of your astronauts. For 1-10 players."
     },
-    "version": "1.0.15",
+    "version": "1.0.16",
     "author": "firenetworks",
     "category": "sandbox",
     "origin": {
@@ -18,9 +18,9 @@
   },
   "image": {
     "ref": "registry.firenetworks.de/fb/steamcmd",
-    "tag": "2026.08",
-    "digest": "sha256:f84d7ea2c2e97570cda050d939e4bd4466a63656caa66b130eb008e22c9f3733",
-    "pinned_at": "2026-08-18",
+    "tag": "2026.09",
+    "digest": "sha256:956c34536c52bbe72a39cf6bfefe5ebb68901870a71db0ef87bcc249f1182780",
+    "pinned_at": "2026-09-25",
     "platform": "linux",
     "arch": [
       "amd64"
@@ -116,6 +116,7 @@
     ],
     "ready_when": {
       "port": "query",
+      "query": true,
       "log_line": "server create success",
       "timeout_sec": 300
     },
@@ -652,7 +653,7 @@
       }
     ],
     "query": {
-      "protocol": "source",
+      "protocol": "a2s",
       "port": "query"
     }
   },
@@ -670,6 +671,8 @@
   "status": {
     "complete": false,
     "open": [
+      "IMAGE NEU ANGEHEFTET (1.0.16, 2026-09-25): steamcmd:2026.08 → steamcmd:2026.09, Digest der Images vom 2026-09-25 09:28–09:33. Darin fb-init mit Portpflicht/Zeilenwache (B158) und der Abfrage-Kennung a2s (B160). Der Daemon nimmt den Digest vor dem Tag — ohne Neu-Anheften liefen die Server weiter mit dem alten fb-init, obwohl die Images laengst gebaut waren.",
+      "ABFRAGE WIEDER VERLANGT, JETZT PRUEFBAR (1.0.16, 2026-09-25, Baustelle 160): management.query.protocol ist \"a2s\" statt \"source\" — unsere eigene Kennung fuer Source Query ohne GameDig-Eintrag; fb-probe fragt damit wirklich (auch die Challenge). Braucht fb-init mit dieser Kennung (Images ab 2026-09-25 nachmittags). Mit aelterem fb-init meldet es \"Abfrage nicht geprueft\", und das Panel zeigt den Server trotzdem als bereit (fb-init hat das letzte Wort).",
       "EINSTELLUNGEN WIRKEN JETZT BEI JEDEM NEUSTART (1.0.12, 2026-09-02). Vorher wirkten sie NUR bei der Installation, und das war kein Entwurf, sondern ein fehlendes Kabel: `pkgspec.Paket` kannte den settings-Abschnitt gar nicht, `job.Config` wurde von niemandem gefuellt — waehrend `fb-cfg` im Container seit Monaten fertig ist und im Abnahmetest je Schluessel patcht und berichtet. Gebaut, aber nie verdrahtet. Fuer jemanden, der abends spielt, war jede Einstellung damit unbenutzbar: Umstellen im Panel aenderte nichts, und nichts sagte es ihm. Jede der 11 INI-Einstellungen hat jetzt zusaetzlich ein Ziel mit target=file — das env-Ziel bleibt daneben stehen, damit das Installationsskript die Datei weiterhin anlegt. ⚠ BRAUCHT DEN DAEMON VOM 2026-09-02: Ein aelterer liest den settings-Abschnitt nicht, und dann ist alles wie vorher (nicht kaputt, nur wirkungslos). ⚠ Dabei kam ein zweiter Blindgaenger heraus: `splitIniKey` trennte am ERSTEN Punkt, und Unreals Abschnittsnamen enthalten selbst einen ('/Script/ACFeature.EHServerSubsystem'). Der Wert waere in einem neu angelegten Abschnitt '/Script/ACFeature' gelandet, den das Spiel nie liest — samt Erfolgsmeldung. Der Fehler lag seit jeher da und konnte nicht auffallen, weil nie jemand in eine INI schrieb. Jetzt am letzten Punkt, mit Test.",
       "-Port WIRD NICHT MEHR UEBERGEBEN (1.0.10, 2026-09-02), gleiche Aenderung wie im Windows-Paket 1.0.7 und aus demselben Grund: Der Pelican-Egg, aus dem dieses Paket stammt, startet mit `-log -QueryPort={{SERVER_QUERY_PORT}} -SteamServerName=\"…\"` und uebergibt KEINEN Spielport; die AMP-Vorlage ebenso. Beide laufen in Containern mit Portabbildung und oeffnen ausschliesslich den Steam-Abfrageport. Am Windows-Server gemessen: Auf dem uebergebenen Spielport lauscht kein Socket, waehrend Steam ihn als Spieladresse bewirbt. Der Verdacht ist, dass -Port aktiv schadet. ✅ BELEGT am 2026-09-02 am Linux-Server 181: 'SteamNetDriver bound to port 7777', und vier Sekunden nach 'Adding P2P connection information' steht 'Join succeeded: Firedervil' — vorher 82 s Leerlauf und Abbruch. Die Zeile, die den Mechanismus zeigt: 'NotifyAcceptedConnection ... RemoteAddr: 76561197995723590:7777'. Der Port ist eine Kennung INNERHALB von Steam, keine Netzadresse — mit -Port=25002 nannte der Server dort die 25002, waehrend der Client auf der Vorgabe 7777 ansprach. Die Sitzung entstand, und dann redeten beide an verschiedenen Tueren. Ein Socket auf dem Spielport entsteht weiterhin NICHT; es gibt keinen weiterzureichenden Spielport, genau wie es die Hoster-Vorlagen sagen. Diese Fassung ist bewusst zusammen mit der Windows-Fassung geaendert: Faellt der Beitritt hier, ist es kein Proton-Thema, und der Test ist hier billiger.",
       "⚠ DER SERVER IST NICHT BESPIELBAR (Stand 2026-08-30). Alles bis zum Handschlag steht: Installation, Steam-Anmeldung (AppId 1614550, 'Game Server API initialized 1'), Sitzung ('server create success'), Serverabfrage von aussen (Name, Karte, Spielerzahl korrekt), Eintrag in der Steam-Liste. Ein Client verbindet sich auch — und dann fliesst NICHTS:\n    Adding P2P connection information with user <SteamID>\n    Removing P2P Session … IdleTime: 81.8\nAuf ZWEI Maschinen (rs54 und rs55), mit und ohne Kennwort, identisch bis auf 34 ms Leerlaufzeit. Die Maschine ist damit ausgeschlossen. Es bleiben zwei Moeglichkeiten: der Linux-Build des Spiels bekommt den Datenweg nach dem P2P-Handschlag nicht zustande, oder unser Container-Netz laesst ihn nicht zu (beide Maschinen fahren dieselbe Bauform, das widerspricht der Messung nicht). NAECHSTER SCHRITT: dasselbe Spiel als WINDOWS-Build unter Proton (App 2662210, platform: windows, Image fb/proton, Start ueber `proton run`) im selben Container. Laeuft er, ist es der Linux-Build; haengt er genauso, ist es unser Netz. Das Egg `egg-astro-colony-wine.json` im Bestand hat den Bauplan.",

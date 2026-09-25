@@ -38,6 +38,8 @@
 const fs   = require('fs');
 const path = require('path');
 const Ajv  = require('ajv');
+// GameDigs Katalog — dieselbe Tabelle, aus der fb-probe seine A2S-Liste erzeugt.
+const GAMEDIG_KENNUNGEN = new Set(Object.keys(require('gamedig').games));
 
 const SCHEMA_PFAD    = path.join(__dirname, '../packages/fbpkg/schema/fbpkg-v1.schema.json');
 const BEISPIEL_PFAD  = path.join(__dirname, '../packages/fbpkg/beispiele');
@@ -128,6 +130,21 @@ function pruefeInvarianten(paket) {
     const bereitPort = paket.start?.ready_when?.port;
     if (bereitPort && !zwecke.has(bereitPort)) {
         verstoesse.push(`Verweis: start.ready_when.port zeigt auf "${bereitPort}", diesen Zweck gibt es nicht.`);
+    }
+
+    // ── Die Abfrage-Kennung muss jemand kennen (Baustelle 160) ──────────────
+    //
+    // Drei Pakete trugen "source" — keine GameDig-Kennung. fb-probe sagte „kann
+    // ich nicht", und bei Astro Colony wartete das Panel ewig auf die Abfrage.
+    // Erlaubt: eine Kennung aus GameDigs Katalog oder unsere eigene "a2s" für
+    // Spiele, die Source Query sprechen, aber dort fehlen.
+    const kennung = paket.management?.query?.protocol;
+    if (kennung && kennung !== 'a2s' && !GAMEDIG_KENNUNGEN.has(kennung)) {
+        verstoesse.push(`Verweis: management.query.protocol "${kennung}" ist keine GameDig-Kennung `
+            + '(und nicht "a2s" für Source Query ohne GameDig-Eintrag) — fb-probe kann damit nichts fragen.');
+    }
+    if (paket.start?.ready_when?.query === true && !paket.management?.query) {
+        verstoesse.push('Verweis: start.ready_when.query verlangt eine Abfrage, aber management.query fehlt.');
     }
 
     // ── Verweise auf die Umgebung: {{env:X}} muss auch jemand setzen ────────

@@ -3,7 +3,7 @@
   "identity": {
     "slug": "minecraft",
     "name": "Minecraft",
-    "version": "1.5.0",
+    "version": "1.5.1",
     "author": "firenetworks",
     "category": "sandbox",
     "description": {
@@ -19,8 +19,8 @@
   "image": {
     "ref": "registry.firenetworks.de/fb/java",
     "tag": "2026.09",
-    "digest": "sha256:4af5d56912d4ca0ffd677bc8887e3885a75778cf8de8f8c783595a152103ab73",
-    "pinned_at": "2026-09-24",
+    "digest": "sha256:aa8852c84705c3565cd19128d44dbb551ead34b937e1eda26da8abac7454b2a3",
+    "pinned_at": "2026-09-25",
     "platform": "linux",
     "arch": [
       "amd64"
@@ -828,6 +828,7 @@
   "status": {
     "complete": false,
     "open": [
+      "IMAGE NEU ANGEHEFTET (1.5.1, 2026-09-25): java:2026.09 → java:2026.09, Digest der Images vom 2026-09-25 09:28–09:33. Darin fb-init mit Portpflicht/Zeilenwache (B158) und der Abfrage-Kennung a2s (B160). Der Daemon nimmt den Digest vor dem Tag — ohne Neu-Anheften liefen die Server weiter mit dem alten fb-init, obwohl die Images laengst gebaut waren.",
       "GEMESSEN am 2026-09-20 an einem echten Lauf, nicht aus der Dokumentation: Ausgabe 26.3 im Abbild fb/java:2026.08-25 (Java 25.0.4). Installation 59,4 MB, sha1 gepruft, OK. Start bis 'Done (5.243s)! For help, type \"help\"'. Fernsteuerung uber fb-rcon -protocol srcds: 'list' -> 'There are 0 of a max of 8 players online:', 'save-all' -> 'Saved the game', 'say' -> leere Antwort (richtig, der Befehl gibt nichts zurueck). Stopp uber rcon:save-all + rcon:stop -> 'Stopping the server', der Container beendete sich in ~2 s SELBST mit Rueckgabewert 0, alle drei Dimensionen gespeichert. Weder sigterm noch sigkill kamen zum Einsatz.",
       "install benutzt den Notausgang `script` — hier vermerkt, wie es die Regel verlangt. Der Grund steht am Schritt selbst: Mojang hat kein SteamCMD und keine feste Adresse je Ausgabe. Erst die Versionsliste nennen die Versionsdatei, diese nennt die Serverdatei; ein `download`-Schritt kann diese Kette nicht ausdruecken, weil die URL erst zur Laufzeit feststeht. Was das Skript tut, ist eng: drei Abrufe, eine sha1-Pruefung, zwei angelegte Dateien. Es installiert nichts ueber apt und laedt nichts von Dritten.",
       "management.query: FEHLT, und zwar bewusst. Minecraft antwortet auf Server List Ping (SLP) am SPIELPORT; einen SLP-Treiber gibt es im Daemon heute nicht (bekannt: srcds, palworld_rest fuer rcon; GameDig fuer query). Ein erfundener Protokollname wuerde still nie antworten. Solange der Treiber fehlt, hat dieses Paket keine Spielerzahl-Abfrage — das ist eine Aussage, keine Luecke. Der Bedarf ist breiter als dieses Paket: alle Minecraft-Pakete haben heute gar keine Abfrage.",

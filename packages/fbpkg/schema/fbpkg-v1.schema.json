@@ -1248,7 +1248,7 @@
           "properties": {
             "protocol": {
               "type": "string",
-              "description": "GameDig-Kennung, z.B. valheim, arkse, palworld."
+              "description": "GameDig-Kennung, z.B. valheim, arkse, palworld — oder \"a2s\" für ein Spiel, das Source Query spricht, aber nicht in GameDigs Katalog steht (Baustelle 160). check-pakete prüft die Kennung gegen den Katalog."
             },
             "port": {
               "type": "string",

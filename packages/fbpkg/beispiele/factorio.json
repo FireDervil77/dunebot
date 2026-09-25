@@ -3,7 +3,7 @@
   "identity": {
     "slug": "factorio",
     "name": "Factorio",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "author": "firenetworks",
     "category": "strategy",
     "description": {
@@ -19,8 +19,8 @@
   "image": {
     "ref": "registry.firenetworks.de/fb/base",
     "tag": "2026.09",
-    "digest": "sha256:6bc667b35c4888293c35d95317cf8c8a3a925124cceb2c5277d0a58d326f86b0",
-    "pinned_at": "2026-09-24",
+    "digest": "sha256:284e42c76fb107214dabe3368126b1326f6deb8be6cd5eec5d25787073b160be",
+    "pinned_at": "2026-09-25",
     "platform": "linux",
     "arch": [
       "amd64"
@@ -333,6 +333,7 @@
   "status": {
     "complete": false,
     "open": [
+      "IMAGE NEU ANGEHEFTET (1.0.1, 2026-09-25): base:2026.09 → base:2026.09, Digest der Images vom 2026-09-25 09:28–09:33. Darin fb-init mit Portpflicht/Zeilenwache (B158) und der Abfrage-Kennung a2s (B160). Der Daemon nimmt den Digest vor dem Tag — ohne Neu-Anheften liefen die Server weiter mit dem alten fb-init, obwohl die Images laengst gebaut waren.",
       "GEMESSEN am 2026-09-24, NICHT ueber das Panel, aber ueber den Produktionscode: Installation mit rezept.Fuehre und dem echten Laeufer (RunSchrittContainer) als Benutzer firebot, 26 s — download 55 MB mit sha256 von factorio.com (falsche Summe bricht ab und hinterlaesst nichts), extract strip 1 (3581 Dateien, Archiv danach weg), template server-settings.json, script --create saves/welt.zip. Start mit fb-startprobe (derselbe Auftragsbau wie der Daemon) als 998:998: apply schrieb `Fires \"Fabrik\"` korrekt maskiert in server-settings.json, fb-init [ready] nach 'to(InGame)' (2,2 s), RCON (srcds) ueber den Auftrag: '/players' -> 'Players (0):', Text ohne / -> '[CHAT] <server>: …'. Stopp nach Paket: rcon:/server-save -> 'Saving the map', dann SIGINT -> Factorio speichert erneut und endet mit 0.",
       "DIE FASSUNG IST FEST: 2.0.77. Die Pruefsumme passt auf genau eine Datei, deshalb kann `download` keine Einstellung `version` lesen. Ein Update ist eine neue Paketfassung mit neuer Adresse und neuer Summe (factorio.com/download/sha256sums/). Das ist der Preis der Pruefsumme — und ein Grund, warum die Werkbank diesen Schritt spaeter automatisieren sollte.",
       "install benutzt EINEN script-Schritt, fuer das Anlegen der Welt: Das kann nur das Programm selbst (`--create`), und `--start-server-load-latest` bricht ohne Spielstand ab. Alles andere ist deklarativ (download, extract, template).",
