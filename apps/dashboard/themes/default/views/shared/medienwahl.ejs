@@ -4,28 +4,37 @@
  *
  * Entstanden am 2026-09-24 für die Werkbank (Symbol und Banner eines Pakets).
  * Vorher gab es die Auswahl genau einmal: fest im Addon-Editor verbaut
- * (gameserver-addon-editor.ejs, rund 150 Zeilen Inline-Skript). Dieselbe
- * Schnittstelle wie dort — GET /guild/ID/media/api/list, Recht
- * CORE.MEDIA.VIEW —, aber als Baustein, den jede Seite einbinden kann. Der
- * Addon-Editor ist noch NICHT umgestellt; zwei Wege sind einer zu viel, das
- * steht als offener Punkt in docs/Baustellen.md.
+ * (gameserver-addon-editor.ejs, rund 150 Zeilen Inline-Skript). Am 2026-09-25
+ * ist der Editor umgestellt und seine Kopie entfernt (Baustelle 159); das
+ * Hochladen direkt in der Auswahl kam dabei von dort hierher.
+ *
+ * Schnittstellen: GET /guild/ID/media/api/list (CORE.MEDIA.VIEW) und
+ * POST /guild/ID/media/api/upload (CORE.MEDIA.UPLOAD — ohne das Recht gibt es
+ * den Knopf nicht).
  *
  * ## Aufruf
  *
  * Einmal je Seite, irgendwo im Inhalt:
  *
  *     include('shared/medienwahl', { guildId })
+ *     include('shared/medienwahl', { guildId, ordner: 'icons' })   ← Ziel beim Hochladen
  *
  * Dann an beliebig vielen Stellen:
  *
  *     input id=fIcon                       ← das Feld, das die Adresse trägt
  *     button data-medienwahl=fIcon         ← öffnet die Auswahl für dieses Feld
  *     div data-medienwahl-vorschau=fIcon   ← zeigt das Bild (optional)
+ *         data-medienwahl-leer=fa-panorama ← Symbol, solange leer (optional)
  *
- * Getippte Adressen gehen auch; die Vorschau folgt dem Feld.
+ * Getippte Adressen gehen auch; die Vorschau folgt dem Feld. Wer das Feld per
+ * Skript ändert, schickt danach ein input-Ereignis (bubbles), wie die Auswahl
+ * selbst.
  *
  * **Keine EJS-Zeichen im Kommentar** — siehe seitenkopf.ejs.
  */
+const medienOrdner = (typeof ordner === 'string' && ordner) ? ordner : 'general';
+const darfHochladen = !!(locals.userPermissions && locals.userPermissions.permissions
+  && locals.userPermissions.permissions['CORE.MEDIA.UPLOAD']);
 %>
 <div class="modal modal-blur fade" id="medienwahlFenster" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -40,7 +49,11 @@
         <div id="medienwahlSeiten" class="d-flex justify-content-center align-items-center gap-2 mt-3"></div>
       </div>
       <div class="modal-footer">
-        <span class="text-secondary small me-auto">Neue Bilder lädst du im <a href="/guild/<%= guildId %>/media" target="_blank" rel="noopener">Media-Manager</a> hoch.</span>
+        <span class="text-secondary small me-auto">Alle Bilder verwaltest du im <a href="/guild/<%= guildId %>/media" target="_blank" rel="noopener">Media-Manager</a>.</span>
+        <% if (darfHochladen) { %>
+        <input type="file" id="medienwahlDatei" accept="image/*" multiple hidden>
+        <button type="button" class="btn btn-outline-primary" id="medienwahlHochladen"><i class="fa-solid fa-upload me-1"></i>Hochladen</button>
+        <% } %>
         <button type="button" class="btn" data-bs-dismiss="modal">Abbrechen</button>
       </div>
     </div>
@@ -49,6 +62,7 @@
 <script>
 (function () {
   var GUILD = '<%= guildId %>';
+  var ORDNER = <%- JSON.stringify(medienOrdner).replace(/</g, '\\u003c') %>;
   var ziel = null, seite = 1, suche = '', zeitgeber = null;
 
   function vorschau(feldId) {
@@ -58,7 +72,7 @@
       var url = feld ? feld.value.trim() : '';
       if (!url) {
         var i = document.createElement('i');
-        i.className = 'fa-solid fa-image text-secondary';
+        i.className = 'fa-solid ' + (v.getAttribute('data-medienwahl-leer') || 'fa-image') + ' text-secondary';
         v.appendChild(i);
         return;
       }
@@ -142,6 +156,36 @@
     clearTimeout(zeitgeber);
     zeitgeber = setTimeout(function () { suche = ev.target.value.trim(); seite = 1; lade(); }, 300);
   });
+  // Hochladen direkt in der Auswahl — nur da, wenn das Recht besteht.
+  var datei = document.getElementById('medienwahlDatei');
+  var hochKnopf = document.getElementById('medienwahlHochladen');
+  if (datei && hochKnopf) {
+    hochKnopf.addEventListener('click', function () { datei.click(); });
+    datei.addEventListener('change', async function () {
+      if (!datei.files || !datei.files.length) return;
+      var form = new FormData();
+      Array.prototype.forEach.call(datei.files, function (f) { form.append('files', f); });
+      form.append('folder', ORDNER);
+      var vorher = hochKnopf.innerHTML;
+      hochKnopf.disabled = true;
+      hochKnopf.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Lädt hoch …';
+      try {
+        var antwort = await fetch('/guild/' + GUILD + '/media/api/upload', { method: 'POST', body: form });
+        var d = await antwort.json();
+        if (!antwort.ok || !d.success) throw new Error(d.message || ('HTTP ' + antwort.status));
+        window.showToast && window.showToast('success', (d.data || []).length + ' Datei(en) hochgeladen');
+        seite = 1;
+        lade();
+      } catch (fehler) {
+        window.showToast && window.showToast('error', 'Hochladen fehlgeschlagen: ' + fehler.message);
+      } finally {
+        hochKnopf.disabled = false;
+        hochKnopf.innerHTML = vorher;
+        datei.value = '';
+      }
+    });
+  }
+
   document.addEventListener('input', function (ev) {
     if (ev.target && ev.target.id && document.querySelector('[data-medienwahl-vorschau="' + ev.target.id + '"]')) vorschau(ev.target.id);
   });
