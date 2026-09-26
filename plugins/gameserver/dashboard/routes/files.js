@@ -13,6 +13,7 @@ const path = require('path');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 // Grenze und Annahme liegen im Helfer — die Inhalte-Seite benutzt dieselben.
 const { nimmDatei, MAX_UPLOAD_BYTES } = require('../helpers/DateiAnnahme');
+const { gesperrt, ladeSperrliste } = require('../helpers/Sperrliste');
 
 // Helper Functions
 function isEditable(filename, size) {
@@ -50,44 +51,22 @@ function formatFileSize(bytes) {
 }
 
 /**
- * Lädt die file_denylist aus frozen_game_data eines Servers.
- * @param {object} server - DB-Zeile des Servers
- * @returns {string[]} - Array von Denylist-Patterns
+ * Sperrliste des Pakets gegen ALLE Pfade prüfen, die eine Anfrage berührt —
+ * Quelle und Ziel, jede Datei eines Stapels. Antwortet selbst mit 403 und
+ * gibt dann `true` zurück. Seit dem 2026-09-26 an jeder Route, die einen Pfad
+ * annimmt; bis dahin prüften nur Liste, Lesen, Schreiben und Löschen, und die
+ * Liste kam aus dem Egg (Egg-Rückbau C3).
  */
-function getFileDenylist(server) {
-    try {
-        const frozen = typeof server.frozen_game_data === 'string'
-            ? JSON.parse(server.frozen_game_data)
-            : server.frozen_game_data;
-        if (Array.isArray(frozen?.file_denylist)) return frozen.file_denylist;
-    } catch (_) {}
-    return [];
-}
-
-/**
- * Prüft ob ein Datei-Pfad durch die Denylist blockiert wird.
- * Unterstützt: exakte Namen, Wildcard-Patterns (*.log), Verzeichnis-Patterns (dir/)
- * @param {string} filePath - Relativer Pfad
- * @param {string[]} denylist - Denylist-Patterns
- * @returns {boolean} - true wenn blockiert
- */
-function isDenied(filePath, denylist) {
-    if (!denylist || denylist.length === 0) return false;
-    const basename = path.basename(filePath);
-    for (const pattern of denylist) {
-        // Exakter Dateiname-Match
-        if (basename === pattern) return true;
-        // Wildcard-Pattern (z.B. *.log)
-        if (pattern.includes('*')) {
-            const regex = new RegExp('^' + pattern.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$');
-            if (regex.test(basename) || regex.test(filePath)) return true;
-        }
-        // Verzeichnis-Pattern (z.B. "dir/")
-        if (pattern.endsWith('/') && (filePath.startsWith(pattern) || basename === pattern.slice(0, -1))) {
-            return true;
-        }
-    }
-    return false;
+async function sperrt(res, server, pfade) {
+    const liste = await ladeSperrliste(ServiceManager.get('dbService'), server);
+    const treffer = pfade.filter(p => gesperrt(p, liste));
+    if (treffer.length === 0) return false;
+    res.status(403).json({
+        success: false,
+        error: `Gesperrt durch das Spielpaket: ${treffer.join(', ')}`,
+        gesperrt: treffer,
+    });
+    return true;
 }
 
 // ROUTES
@@ -116,10 +95,10 @@ router.get('/servers/:serverId/files', requirePermission('GAMESERVER.FILES.VIEW'
             // Server noch nicht installiert / kein Verzeichnis vorhanden
             return res.json({ success: true, files: [], path: requestedPath });
         }
-        // Denylist aus frozen_game_data laden und Dateien filtern
-        const denylist = getFileDenylist(server);
+        // Gesperrtes zeigt die Liste gar nicht erst an
+        const sperrliste = await ladeSperrliste(ServiceManager.get('dbService'), server);
         const files = rawFiles
-            .filter(file => !isDenied(path.join(requestedPath, file.name), denylist))
+            .filter(file => !gesperrt(path.posix.join(requestedPath, file.name), sperrliste))
             .map(file => ({
                 ...file,
                 editable: !file.is_dir && isEditable(file.name, file.size),
@@ -144,11 +123,7 @@ router.get('/servers/:serverId/files/read', requirePermission('GAMESERVER.FILES.
         
         const server = await validateServerAccess(serverId, guildId);
 
-        // Denylist-Check: Datei darf nicht gelesen werden wenn blockiert
-        const denylist = getFileDenylist(server);
-        if (isDenied(filePath, denylist)) {
-            return res.status(403).json({ success: false, error: 'Zugriff auf diese Datei ist nicht erlaubt' });
-        }
+        if (await sperrt(res, server, [filePath])) return;
 
         const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.files.read', {
             server_id: serverId.toString(),
@@ -182,11 +157,7 @@ router.post('/servers/:serverId/files/write', requirePermission('GAMESERVER.FILE
         
         const server = await validateServerAccess(serverId, guildId);
 
-        // Denylist-Check: Datei darf nicht geschrieben werden wenn blockiert
-        const denylist = getFileDenylist(server);
-        if (isDenied(filePath, denylist)) {
-            return res.status(403).json({ success: false, error: 'Diese Datei darf nicht bearbeitet werden' });
-        }
+        if (await sperrt(res, server, [filePath])) return;
 
         const contentBase64 = Buffer.from(content, 'utf8').toString('base64');
 
@@ -231,11 +202,7 @@ router.delete('/servers/:serverId/files', requirePermission('GAMESERVER.FILES.MA
         
         const server = await validateServerAccess(serverId, guildId);
 
-        // Denylist-Check: Datei darf nicht gelöscht werden wenn blockiert
-        const denylist = getFileDenylist(server);
-        if (isDenied(filePath, denylist)) {
-            return res.status(403).json({ success: false, error: 'Diese Datei darf nicht gelöscht werden' });
-        }
+        if (await sperrt(res, server, [filePath])) return;
 
         const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.files.delete', {
             server_id: serverId.toString(),
@@ -267,6 +234,7 @@ router.post('/servers/:serverId/files/bulk-delete', requirePermission('GAMESERVE
         }
         
         const server = await validateServerAccess(serverId, guildId);
+        if (await sperrt(res, server, paths)) return;
         const results = await Promise.allSettled(
             paths.map(path => ipmServer.sendCommand(server.daemon_id, 'gameserver.files.delete', {
                 server_id: serverId.toString(),
@@ -294,6 +262,7 @@ router.post('/servers/:serverId/files/mkdir', requirePermission('GAMESERVER.FILE
         if (!dirPath) return res.status(400).json({ success: false, error: 'Pfad erforderlich' });
         
         const server = await validateServerAccess(serverId, guildId);
+        if (await sperrt(res, server, [dirPath])) return;
         const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.files.mkdir', {
             server_id: serverId.toString(),
             rootserver_id: server.rootserver_id.toString(),
@@ -322,6 +291,7 @@ router.delete('/servers/:serverId/files/rmdir', requirePermission('GAMESERVER.FI
         if (!dirPath) return res.status(400).json({ success: false, error: 'Pfad erforderlich' });
         
         const server = await validateServerAccess(serverId, guildId);
+        if (await sperrt(res, server, [dirPath])) return;
         const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.files.rmdir', {
             server_id: serverId.toString(),
             rootserver_id: server.rootserver_id.toString(),
@@ -352,6 +322,8 @@ router.post('/servers/:serverId/files/rename', requirePermission('GAMESERVER.FIL
         }
         
         const server = await validateServerAccess(serverId, guildId);
+        // Der neue Name landet im selben Ordner — er darf keine gesperrte Datei werden
+        if (await sperrt(res, server, [oldPath, path.posix.join(path.posix.dirname(oldPath), newName)])) return;
         const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.files.rename', {
             server_id: serverId.toString(),
             rootserver_id: server.rootserver_id.toString(),
@@ -383,6 +355,7 @@ router.post('/servers/:serverId/files/move', requirePermission('GAMESERVER.FILES
         }
         
         const server = await validateServerAccess(serverId, guildId);
+        if (await sperrt(res, server, [source_path, dest_path])) return;
         const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.files.mv', {
             server_id: serverId.toString(),
             rootserver_id: server.rootserver_id.toString(),
@@ -414,6 +387,8 @@ router.post('/servers/:serverId/files/bulk-move', requirePermission('GAMESERVER.
         }
         
         const server = await validateServerAccess(serverId, guildId);
+        const ziele = source_paths.map(source => `${dest_folder}/${path.basename(source)}`);
+        if (await sperrt(res, server, [...source_paths, ...ziele])) return;
         const results = await Promise.allSettled(
             source_paths.map(source => {
                 const filename = path.basename(source);
@@ -455,6 +430,8 @@ router.post('/servers/:serverId/files/upload', requirePermission('GAMESERVER.FIL
             ? `/${req.file.originalname}`
             : `${uploadPath}/${req.file.originalname}`;
 
+        if (await sperrt(res, server, [targetPath])) return;
+
         const contentBase64 = req.file.buffer.toString('base64');
 
         const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.files.write', {
@@ -491,6 +468,7 @@ router.get('/servers/:serverId/files/download', requirePermission('GAMESERVER.FI
         if (!filePath) return res.status(400).json({ success: false, error: 'Pfad erforderlich' });
 
         const server = await validateServerAccess(serverId, guildId);
+        if (await sperrt(res, server, [filePath])) return;
         const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.files.read', {
             server_id: serverId.toString(),
             rootserver_id: server.rootserver_id.toString(),
