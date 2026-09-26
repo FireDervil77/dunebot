@@ -8,6 +8,24 @@ const { ServiceManager } = require("dunebot-core");
  * Verwaltet globale Benachrichtigungen für das Dashboard
  * @author FireDervil
  */
+/**
+ * Kennung einer Meldung, wie sie in DISMISSED_NOTIFICATIONS steht.
+ *
+ * Zahlen für Zeilen aus `notifications`, Text für Meldungen, die ein Plugin
+ * zur Laufzeit beisteuert (Filter `guild_notices`, etwa
+ * `daemon-update-54-1.0.103`). Bis zum 2026-09-26 wurde jede Kennung mit
+ * Number() gespeichert — aus einer Textkennung wurde NaN, und das Wegklicken
+ * hielt nicht.
+ *
+ * @returns {number|string|null} null, wenn die Kennung keine ist
+ */
+function normalisiereKennung(id) {
+    const text = String(id ?? '').trim();
+    if (/^\d+$/.test(text)) return Number(text);
+    if (/^[a-z][a-z0-9.:-]{0,99}$/i.test(text)) return text;
+    return null;
+}
+
 class NotificationManager {
     constructor() {
         const Logger = ServiceManager.get('Logger');
@@ -164,7 +182,10 @@ class NotificationManager {
                     for (const row of allRows) {
                         try {
                             const parsed = JSON.parse(row.config_value);
-                            if (Array.isArray(parsed)) parsed.forEach(id => mergedIds.add(Number(id)));
+                            if (Array.isArray(parsed)) parsed.forEach(id => {
+                                const k = normalisiereKennung(id);
+                                if (k !== null) mergedIds.add(k);
+                            });
                         } catch {}
                     }
                     dismissedIds = [...mergedIds];
@@ -184,10 +205,14 @@ class NotificationManager {
                 Logger.debug('[NotificationManager] Keine dismissed IDs gefunden, erstelle neue Liste');
             }
 
-            // Füge neue ID hinzu (wenn noch nicht vorhanden) - als Number speichern!
-            const numId = Number(notificationId);
-            if (!dismissedIds.includes(numId)) {
-                dismissedIds.push(numId);
+            // Füge neue ID hinzu (wenn noch nicht vorhanden) — Zahl oder Text.
+            const kennung = normalisiereKennung(notificationId);
+            if (kennung === null) {
+                Logger.warn(`[NotificationManager] dismissNotification: unbrauchbare Kennung ${JSON.stringify(notificationId)}`);
+                return false;
+            }
+            if (!dismissedIds.includes(kennung)) {
+                dismissedIds.push(kennung);
             }
 
             // Speichere aktualisierte Liste
@@ -199,6 +224,22 @@ class NotificationManager {
             Logger.error('Fehler beim Markieren der Benachrichtigung als dismissed:', error);
             return false;
         }
+    }
+
+    /**
+     * Die Meldungen ohne die, die dieser Nutzer weggeklickt hat — für Meldungen,
+     * die nicht aus `notifications` kommen (Filter `guild_notices`).
+     *
+     * @param {string|null} userId
+     * @param {Array<{id: string|number}>} liste
+     * @returns {Promise<Array>}
+     */
+    async ohneWeggeklickte(userId, liste) {
+        if (!userId || !Array.isArray(liste) || liste.length === 0) return liste || [];
+        const dbService = ServiceManager.get('dbService');
+        const weg = await dbService.getUserConfig(userId, 'core', 'DISMISSED_NOTIFICATIONS');
+        const set = new Set((Array.isArray(weg) ? weg : []).map(String));
+        return liste.filter(n => !set.has(String(n.id)));
     }
 
     /**
@@ -236,3 +277,4 @@ class NotificationManager {
 }
 
 module.exports = NotificationManager;
+module.exports.normalisiereKennung = normalisiereKennung;

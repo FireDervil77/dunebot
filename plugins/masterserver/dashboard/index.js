@@ -42,6 +42,7 @@ class MasterserverDashboardPlugin extends DashboardPlugin {
         this._setupRoutes(); // testen ob es aktiviert wird
         this._registerHooks(); // testen ob die ausgeführt werden
         this._registerWidgets();
+        this._registerMeldungen();
 
         // Seed Standard-Quota-Profile
         try {
@@ -355,6 +356,41 @@ class MasterserverDashboardPlugin extends DashboardPlugin {
      * Haupt-Dashboard Widget registrieren
      * Zeigt RootServer-Status im Guild-Dashboard wenn das Plugin aktiv ist
      */
+    /**
+     * Meldung „Daemon-Update verfügbar" im Guild-Bereich (Filter `guild_notices`,
+     * 2026-09-26). Nur, wer das Update auslösen darf, sieht sie — dasselbe Recht
+     * wie der Update-Knopf (MASTERSERVER.DAEMON.MANAGE).
+     */
+    _registerMeldungen() {
+        const Logger = ServiceManager.get('Logger');
+        const pluginManager = ServiceManager.get('pluginManager');
+        if (!pluginManager?.hooks) {
+            Logger.warn('[Masterserver] PluginManager/Hooks nicht verfügbar – Update-Meldung nicht registriert');
+            return;
+        }
+        pluginManager.hooks.addFilter('guild_notices', async (meldungen, options = {}) => {
+            const { guildId, user } = options;
+            if (!guildId || !user?.id) return meldungen;
+            try {
+                if (!await pluginManager.isPluginEnabledForGuild('masterserver', guildId)) return meldungen;
+                const permissionManager = ServiceManager.get('permissionManager');
+                if (!await permissionManager.hasPermission(user.id, guildId, 'MASTERSERVER.DAEMON.MANAGE')) return meldungen;
+                const ipmServer = ServiceManager.get('ipmServer');
+                if (!ipmServer) return meldungen;
+                const RootServer = require('./models/RootServer');
+                const { daemonUpdateMeldungen } = require('./helpers/DaemonMeldung');
+                meldungen.push(...daemonUpdateMeldungen({
+                    guildId,
+                    rootserver: await RootServer.getByGuild(guildId),
+                    stand: (daemonId) => ipmServer.daemonUpdateStand(daemonId),
+                }));
+            } catch (err) {
+                Logger.error('[Masterserver] Update-Meldung konnte nicht gebaut werden:', err);
+            }
+            return meldungen;
+        });
+    }
+
     _registerWidgets() {
         const Logger = ServiceManager.get('Logger');
         const pluginManager = ServiceManager.get('pluginManager');

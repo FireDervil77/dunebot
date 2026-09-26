@@ -36,6 +36,8 @@ class PluginManager extends BasePluginManager {
         this.hooks.addFilter('guild_dashboard_widgets', async (widgets) => widgets);
         this.hooks.addFilter('admin_dashboard_widgets', async (widgets) => widgets);
         this.hooks.addFilter('guild_sections', async (sections) => sections);
+        // Meldungen oben im Guild-Bereich, zur Laufzeit ausgerechnet (ThemeManager.loadGlobalNotifications)
+        this.hooks.addFilter('guild_notices', async (notices) => notices);
         
         // Action-Hooks
         this.hooks.addAction('before_route_render', () => {});

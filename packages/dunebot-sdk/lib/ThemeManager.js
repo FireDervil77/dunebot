@@ -384,7 +384,32 @@ class ThemeManager {
             const userLocale = req.session?.locale || res.locals?.locale || 'de-DE';
             const user = req.session?.user?.info || req.user?.info || req.user || null;
             const notifications = await notificationManager.getNotificationsForUser(user, userLocale);
-            
+
+            // ── Meldungen der Plugins für DIESE Guild (Filter `guild_notices`) ──
+            //
+            // Seit dem 2026-09-26, zuerst für Daemon-Updates (Masterserver). Sie
+            // werden bei jedem Aufruf ausgerechnet, nicht gespeichert: Ist der
+            // Anlass erledigt, liefert das Plugin sie nicht mehr — niemand muss
+            // eine Zeile löschen. Weggeklickt wird über denselben Weg wie die
+            // übrigen Meldungen, mit Textkennung.
+            //
+            // Nur im Guild-Bereich: Auf /admin steht res.locals.guildId auch,
+            // aber nur für die Navigation.
+            const guildId = res.locals?.guildId;
+            const pluginManager = ServiceManager.get('pluginManager');
+            if (guildId && req.path?.startsWith('/guild/') && user?.id && pluginManager?.hooks) {
+                try {
+                    const beigesteuert = await pluginManager.hooks.applyFilters('guild_notices', [], {
+                        guildId, user, locale: userLocale, req,
+                    });
+                    const sichtbar = await notificationManager.ohneWeggeklickte(user.id,
+                        (Array.isArray(beigesteuert) ? beigesteuert : []).filter(n => n && n.id && n.message));
+                    notifications.unshift(...sichtbar);
+                } catch (error) {
+                    Logger.error('Fehler bei den Meldungen der Plugins (guild_notices):', error);
+                }
+            }
+
             res.locals.globalNotifications = notifications;
             return notifications;
         } catch (error) {
