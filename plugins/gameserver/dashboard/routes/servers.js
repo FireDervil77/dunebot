@@ -3305,87 +3305,10 @@ router.post('/:serverId/reinstall', requirePermission('GAMESERVER.CREATE'), asyn
     }
 });
 
-/**
- * PUT/POST /guild/:guildId/plugins/gameserver/servers/:serverId/launch-params
- * Aktualisiere Start-Parameter für einen Server
- * (POST als Fallback wenn JS den Form-Submit nicht als PUT abfängt)
- */
-router.put('/:serverId/launch-params', requirePermission('GAMESERVER.EDIT'), launchParamsHandler);
-router.post('/:serverId/launch-params', requirePermission('GAMESERVER.EDIT'), launchParamsHandler);
-
-async function launchParamsHandler(req, res) {
-    const Logger = ServiceManager.get('Logger');
-    const dbService = ServiceManager.get('dbService');
-    
-    try {
-        const guildId = res.locals.guildId;
-        const serverId = req.params.serverId;
-        const { launch_params } = req.body;
-        
-        // Validierung
-        if (!launch_params || typeof launch_params !== 'string' || launch_params.trim().length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'Start-Parameter dürfen nicht leer sein'
-            });
-        }
-        
-        // Längenprüfung (max 2048 Zeichen)
-        if (launch_params.length > 2048) {
-            return res.status(400).json({
-                success: false,
-                message: 'Start-Parameter sind zu lang (max. 2048 Zeichen)'
-            });
-        }
-        
-        Logger.info(`[Gameserver] Aktualisiere Launch-Params für Server ${serverId} (Guild: ${guildId})`);
-        
-        // Server existiert und gehört zur Guild?
-        const [server] = await dbService.query(
-            'SELECT id, name, status FROM gameservers WHERE id = ? AND guild_id = ?',
-            [serverId, guildId]
-        );
-        
-        if (!server) {
-            return res.status(404).json({
-                success: false,
-                message: 'Server nicht gefunden'
-            });
-        }
-        
-        // Update in Datenbank
-        await dbService.query(
-            'UPDATE gameservers SET launch_params = ?, updated_at = NOW() WHERE id = ?',
-            [launch_params.trim(), serverId]
-        );
-        
-        Logger.success(`[Gameserver] Launch-Params für Server "${server.name}" (ID: ${serverId}) aktualisiert`);
-        
-        // Warnung wenn Server läuft
-        let warningMessage = null;
-        if (server.status === 'online' || server.status === 'starting' || server.status === 'running') {
-            warningMessage = 'Server läuft - Änderungen werden erst nach Neustart aktiv!';
-        }
-        
-        res.json({
-            success: true,
-            message: warningMessage || 'Start-Parameter erfolgreich aktualisiert',
-            warning: !!warningMessage,
-            data: {
-                server_id: serverId,
-                launch_params: launch_params.trim(),
-                server_status: server.status
-            }
-        });
-        
-    } catch (error) {
-        Logger.error('[Gameserver] Fehler beim Aktualisieren der Launch-Params:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Serverfehler beim Speichern der Start-Parameter'
-        });
-    }
-}
+// Hier stand bis zum 2026-09-26 `PUT/POST /:serverId/launch-params`. Es
+// schrieb `gameservers.launch_params` — die Startzeile der Egg-Zeit, die der
+// Start seit dem 2026-09-10 nicht liest — und keine Vorlage rief es auf
+// (Egg-Rückbau B).
 
 // ============================================================
 // PORTS: Server-Ports aktualisieren
