@@ -78,7 +78,6 @@ router.get('/', requirePermission('GAMESERVER.ADDONS.VIEW'), async (req, res) =>
             categories: categories || [],
             filters: { category: category || 'all', search: search || '', sort: sort || 'default' },
             guildId,
-            user: req.session.user,
         });
     } catch (err) {
         Logger.error('[Gameserver/Addons] Marketplace Error:', err);
@@ -133,7 +132,6 @@ router.get('/:slug', requirePermission('GAMESERVER.ADDONS.VIEW'), async (req, re
             ratings: ratings || [],
             comments: comments || [],
             guildId,
-            user: req.session.user,
         });
     } catch (err) {
         Logger.error('[Gameserver/Addons] Detail Error:', err);

@@ -21,7 +21,6 @@ router.get('/', requirePermission('GAMESERVER.VIEW'), async (req, res) => {
     
     try {
         const guildId = res.locals.guildId; // ← Aus res.locals!
-        const { user } = req;
 
         Logger.debug(`[Gameserver] Settings aufgerufen für Guild ${guildId}`);
 
@@ -43,7 +42,6 @@ router.get('/', requirePermission('GAMESERVER.VIEW'), async (req, res) => {
             activeMenu: `/guild/${guildId}/plugins/gameserver/settings`,
             settings,
             guildId,
-            user
         });
     } catch (error) {
         Logger.error('[Gameserver] Fehler beim Laden der Settings:', error);
