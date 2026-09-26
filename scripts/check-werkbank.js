@@ -639,6 +639,169 @@ async function pruefe(name, fn) {
         assert.deepStrictEqual(db.entwurf.werkbank.portnummern, { game: 34197 }, 'der Sitzungsteil bleibt erhalten');
     });
 
+    console.log('\nEinstellungen (Baukasten B1)');
+
+    const formular = (x = {}) => ({ key: 'max_players', name_de: 'Maximale Spieler', type: 'number', default: '8',
+        role: 'player', takes_effect: 'restart', risk: 'none',
+        apply: [{ target: 'file', file: 'server-settings.json', parser: 'json', path: 'max_players' }], ...x });
+    const mitEinstellungen = () => {
+        const s = mitAngaben();
+        s.entwurf.settings = [
+            Sitzungen.einstellungAusFormular(formular()),
+            Sitzungen.einstellungAusFormular(formular({ key: 'name', name_de: 'Servername', type: 'text', default: 'Fabrik',
+                apply: [{ target: 'arg' }] })),
+            Sitzungen.einstellungAusFormular(formular({ key: 'rcon_password', name_de: 'RCON-Passwort', type: 'password', default: '',
+                role: 'expert', apply: [{ target: 'env', variable: 'RCON_PASSWORD' }] })),
+            Sitzungen.einstellungAusFormular(formular({ key: 'oeffentlich', name_de: 'Öffentlich', type: 'boolean', default: '1',
+                role: 'owner', apply: [{ target: 'file', file: 'server-settings.json', parser: 'json', path: 'visibility.public', as: 'true_false' }] })),
+        ];
+        s.entwurf.start.args.push({ key: 'arg3', parts: [{ text: '--name={{setting:name}}' }] });
+        return s;
+    };
+
+    await pruefe('Vertrag: der Daemon liest das Feld „einstellungen" bei Start und Durchlauf', async () => {
+        const go = ohneKommentare(fs.readFileSync(path.join(DAEMON, 'internal/websocket/werkbank.go'), 'utf8'));
+        assert.strictEqual((go.match(/"einstellungen":\s*&a\.Einstellungen/g) || []).length, 2);
+        const nw = ohneKommentare(fs.readFileSync(path.join(DAEMON, 'internal/gameserver/werkbank_nachweis.go'), 'utf8'));
+        assert.match(nw, /NachweisAngekommen\s*=\s*"angekommen"/, 'der Zustand, den das Dashboard als Beleg liest');
+        assert.match(nw, /json:"zustand"/);
+        assert.match(nw, /json:"wo,omitempty"/);
+    });
+
+    await pruefe('Formular → Einstellung: gültig nach Schema, Fehler dort gesagt, wo getippt wird', async () => {
+        const e = Sitzungen.einstellungAusFormular(formular({ type: 'choice', default: 'hard', choices: 'normal=Normal\nhard=Schwer' }));
+        assert.deepStrictEqual(e.choices, [{ value: 'normal', name: { de: 'Normal' } }, { value: 'hard', name: { de: 'Schwer' } }]);
+        const Ajv = require('ajv');
+        const schema = require('../packages/fbpkg/schema/fbpkg-v1.schema.json');
+        const ajv = new Ajv({ allErrors: true, strict: false });
+        ajv.addSchema(schema, 'fbpkg');
+        const pruef = ajv.compile({ $ref: 'fbpkg#/properties/settings/items' });
+        for (const x of [e, ...mitEinstellungen().entwurf.settings]) assert.ok(pruef(x), x.key + ': ' + JSON.stringify(pruef.errors));
+        assert.ok(!pruef({ ...e, erfunden: 1 }), 'die Schemaprüfung lässt Unbekanntes durch — sie prüft nichts');
+        assert.throws(() => Sitzungen.einstellungAusFormular(formular({ key: 'Max Players' })), /Schlüssel/);
+        assert.throws(() => Sitzungen.einstellungAusFormular(formular({ type: 'choice', choices: 'nur' })), /mindestens zwei/);
+        assert.throws(() => Sitzungen.einstellungAusFormular(formular({ apply: [{ target: 'file', file: 'a.json', parser: 'json' }] })), /Schlüssel darin/);
+        assert.throws(() => Sitzungen.einstellungAusFormular(formular({ apply: [{ target: 'file', file: '../x', parser: 'json', path: 'a' }] })), /ohne „\.\."/);
+        assert.throws(() => Sitzungen.einstellungAusFormular(formular({ apply: [{ target: 'env', variable: 'mit leer' }] })), /Umgebungsvariable/);
+        assert.throws(() => Sitzungen.einstellungAusFormular(formular({ apply: [] })), /Mindestens ein Ziel/);
+        assert.throws(() => Sitzungen.einstellungAusFormular(formular({ default: 'viele' })), /keine Zahl/);
+        assert.throws(() => Sitzungen.einstellungAusFormular(formular({ role: 'admin' })), /Rolle/);
+    });
+
+    await pruefe('Speichern: anlegen, umbenennen samt Probewert, doppelter Schlüssel abgewiesen', async () => {
+        const s = mitEinstellungen();
+        s.entwurf.werkbank.werte = { max_players: '4' };
+        await Sitzungen.einstellungSpeichern(s, formular({ alt: 'max_players', key: 'spieler' }));
+        assert.deepStrictEqual(db.entwurf.settings.map(x => x.key), ['spieler', 'name', 'rcon_password', 'oeffentlich']);
+        assert.deepStrictEqual(db.entwurf.werkbank.werte, { spieler: '4' }, 'der Probewert zieht mit');
+        await assert.rejects(Sitzungen.einstellungSpeichern(s, formular({ key: 'name' })), /gibt es schon/);
+    });
+
+    await pruefe('Entwurf: env-Ziel wird ins Wurzelfeld verdrahtet (B169), ein vorhandener Eintrag bleibt', async () => {
+        const s = mitEinstellungen();
+        let p = Sitzungen.entwurfAlsPaket(s, liste);
+        assert.deepStrictEqual(p.env, { RCON_PASSWORD: '{{setting:rcon_password}}' });
+        assert.strictEqual(p.settings.length, 4);
+        s.entwurf.env = { RCON_PASSWORD: 'fest' };
+        p = Sitzungen.entwurfAlsPaket(s, liste);
+        assert.deepStrictEqual(p.env, { RCON_PASSWORD: 'fest' }, 'was im Wurzelfeld steht, wird nicht überschrieben');
+        const vorher = Sitzungen.fingerabdruck(Sitzungen.entwurfAlsPaket(mitEinstellungen(), liste));
+        const t = mitEinstellungen();
+        t.entwurf.settings[0].apply[0].path = 'anders';
+        assert.notStrictEqual(Sitzungen.fingerabdruck(Sitzungen.entwurfAlsPaket(t, liste)), vorher, 'Einstellungen zählen zum technischen Teil');
+    });
+
+    await pruefe('Start und Durchlauf schicken Definitionen, Probewerte (Vorgabe, Ja/Nein als 1/0) und die Verdrahtung', async () => {
+        const s = mitEinstellungen();
+        s.entwurf.start.ready_when = { port: 'game' };
+        s.entwurf.werkbank.werte = { name: 'Probe' };
+        await Sitzungen.starten(s, []);
+        let n = daemon.befehle[0].nutzlast;
+        assert.deepStrictEqual(n.settings, { max_players: '8', name: 'Probe', rcon_password: '', oeffentlich: '1' });
+        assert.deepStrictEqual(n.einstellungen.map(x => x.key), ['max_players', 'name', 'rcon_password', 'oeffentlich']);
+        assert.deepStrictEqual(n.env, { RCON_PASSWORD: '{{setting:rcon_password}}' });
+        daemon.befehle = []; db.laeufe = []; Ereignisse._laeufe.clear();
+        await Sitzungen.pruefen(s, liste);
+        n = daemon.befehle[0].nutzlast;
+        assert.strictEqual(n.settings.name, 'Probe');
+        assert.strictEqual(n.einstellungen.length, 4);
+        assert.deepStrictEqual(n.env, { RCON_PASSWORD: '{{setting:rcon_password}}' });
+    });
+
+    const nachweis = (x) => [
+        { key: 'max_players', ziel: 'file', wo: 'server-settings.json: max_players', zustand: 'angekommen' },
+        { key: 'name', ziel: 'arg', wo: 'Startzeile', zustand: 'angekommen' },
+        { key: 'rcon_password', ziel: 'env', wo: 'RCON_PASSWORD', zustand: 'angekommen' },
+        { key: 'oeffentlich', ziel: 'file', wo: 'server-settings.json: visibility.public', zustand: 'nicht_gefunden', hinweis: 'Schlüssel fehlt' },
+        ...(x || []),
+    ];
+    const mitNachweis = (s, liste, n) => { const g = gruenGeprueft(s, liste); g.ergebnis.einstellungen = n; return g; };
+
+    await pruefe('Belegt: nur angekommene Ziele, der Rest mit Grund — und seine env-Zeile geht mit', async () => {
+        const s = mitEinstellungen();
+        let b = Sitzungen.belegteEinstellungen(Sitzungen.entwurfAlsPaket(s, liste), { einstellungen: nachweis() });
+        assert.deepStrictEqual(b.behalten.map(x => x.key), ['max_players', 'name', 'rcon_password']);
+        assert.deepStrictEqual(b.weg, [{ key: 'oeffentlich', grund: 'file server-settings.json: visibility.public: nicht_gefunden — Schlüssel fehlt' }]);
+        assert.deepStrictEqual(b.env, { RCON_PASSWORD: '{{setting:rcon_password}}' });
+        const ohneEnv = nachweis().map(x => x.key === 'rcon_password' ? { ...x, zustand: 'nicht_verdrahtet' } : x);
+        b = Sitzungen.belegteEinstellungen(Sitzungen.entwurfAlsPaket(s, liste), { einstellungen: ohneEnv });
+        assert.deepStrictEqual(b.env, {}, 'die Zeile für eine weggefallene Einstellung bleibt nicht stehen');
+        // Ein Nachweis für eine ANDERE Datei belegt dieses Ziel nicht.
+        const falscheDatei = nachweis().map(x => x.key === 'max_players' ? { ...x, wo: 'andere.json: max_players' } : x);
+        b = Sitzungen.belegteEinstellungen(Sitzungen.entwurfAlsPaket(s, liste), { einstellungen: falscheDatei });
+        assert.ok(!b.behalten.some(x => x.key === 'max_players'));
+        // Durchlauf ohne Nachweis (Daemon vor B1): nichts belegt, und das wird gesagt.
+        b = Sitzungen.belegteEinstellungen(Sitzungen.entwurfAlsPaket(s, liste), { gruen: true });
+        assert.strictEqual(b.behalten.length, 0);
+        assert.match(b.weg[0].grund, /keinen Nachweis/);
+    });
+
+    await pruefe('Veröffentlichen sperrt, wenn eine unbelegte Einstellung in der Startzeile steht', async () => {
+        const s = mitEinstellungen();
+        const n = nachweis().map(x => x.key === 'name' ? { ...x, zustand: 'nicht_verdrahtet' } : x);
+        let st = await Sitzungen.veroeffentlichungsStand(s, liste, [mitNachweis(s, liste, n)]);
+        assert.match(st.gruende.join(' '), /„name" wird in Startzeile oder Schritten benutzt/);
+        st = await Sitzungen.veroeffentlichungsStand(s, liste, [mitNachweis(s, liste, nachweis())]);
+        assert.strictEqual(st.darf, true, st.gruende.join(' '));
+    });
+
+    await pruefe('das Paket mit Einstellungen besteht check-pakete und nennt, was fehlt', async () => {
+        const f = require('../packages/fbpkg/beispiele/factorio.json');
+        const s = mitEinstellungen();
+        s.image = f.image;
+        const echt = f.install.steps.map(schritt => ({ status: 'ok', schritt }));
+        const paket = Sitzungen.veroeffentlichungsPaket(s, echt, mitNachweis(s, echt, nachweis()), 'firedervil');
+        assert.deepStrictEqual(paket.settings.map(x => x.key), ['max_players', 'name', 'rcon_password']);
+        assert.deepStrictEqual(paket.env, { RCON_PASSWORD: '{{setting:rcon_password}}' });
+        const offen = paket.status.open.join('\n');
+        assert.match(offen, /Einstellungen: 3 im Durchlauf #3 als angekommen belegt/);
+        assert.match(offen, /Nicht aufgenommen: Einstellung „oeffentlich"/);
+        assert.ok(!/Die Werkbank kennt sie noch nicht/.test(offen));
+        const einl = require('../packages/fbpkg/lib/einlieferung');
+        const os = require('os');
+        const d = fs.mkdtempSync(path.join(os.tmpdir(), 'wb-check-'));
+        try {
+            const datei = path.join(d, 'factorio.json');
+            fs.writeFileSync(datei, JSON.stringify(paket));
+            const tor = einl.bestehtPruefung(datei);
+            assert.ok(tor.ok, einl.grundZeilen(tor.text || '').join(' | '));
+        } finally { fs.rmSync(d, { recursive: true, force: true }); }
+    });
+
+    await pruefe('configured: Nachweis als Konsolenzeilen, der Bereitschaftsstand bleibt unberührt', async () => {
+        await Sitzungen.starten(sitzungMitStart(), []);
+        const lauf = db.laeufe[0];
+        await Ereignisse.beiGestartet({ sitzung_id: 'wbprobe' });
+        await Ereignisse.beiBereitschaft({ sitzung_id: 'wbprobe', type: 'started' });
+        const vorher = lauf.bereitschaft;
+        await Ereignisse.beiBereitschaft({ sitzung_id: 'wbprobe', type: 'configured', results: [], nachweis: nachweis() });
+        assert.strictEqual(lauf.bereitschaft, vorher, 'configured ist keine Bereitschaftsstufe');
+        const z = sse.gesendet.find(x => x.daten.action === 'einstellungen');
+        assert.ok(z, 'kein einstellungen-Ereignis');
+        assert.match(z.daten.zeilen.join('\n'), /✓ max_players → file server-settings\.json: max_players: angekommen/);
+        assert.match(z.daten.zeilen.join('\n'), /✗ oeffentlich .*nicht_gefunden — Schlüssel fehlt/);
+    });
+
     console.log(`\n${bestanden} Prüfung(en) bestanden.\n`);
     process.exit(process.exitCode || 0);
 })();

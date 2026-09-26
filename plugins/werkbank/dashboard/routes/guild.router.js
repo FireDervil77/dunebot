@@ -36,6 +36,8 @@ const { ServiceManager } = require('dunebot-core');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 const { renderView, renderFehler, fehler } = require('./_shared');
 const Sitzungen = require('../helpers/Sitzungen');
+// Dieselben Anzeigenamen wie die Einstellungskarte des Servers — eine Liste, nicht zwei.
+const { GRUPPE, WIRKUNG, RISIKO } = require('../../../gameserver/dashboard/helpers/Serverseite');
 
 function nutzerId(req, res) {
     return res.locals.user?.id || req.session?.user?.info?.id || null;
@@ -249,6 +251,11 @@ router.get('/:kennung', requirePermission('WERKBANK.VIEW'), async (req, res) => 
             durchlaufMaengel: Sitzungen.durchlaufMaengel(entwurf),
             startFormular: startAlsFormular(sitzung.entwurf?.start),
             werkbankTeil: Sitzungen.werkbankTeil(sitzung),
+            einstellungen: sitzung.entwurf?.settings || [],
+            probewerte: sitzung.entwurf?.werkbank?.werte || {},
+            EINSTELLUNG: Sitzungen.EINSTELLUNG,
+            anzeige: { GRUPPE, WIRKUNG, RISIKO },
+            belegt: pruefungen[0]?.ergebnis ? Sitzungen.belegteEinstellungen(pruefungen[0].entwurf, pruefungen[0].ergebnis) : null,
             laeufe,
             gruppiere: Sitzungen.gruppiere,
             // Die Adresse trägt die Kennung und trifft keinen Menüpunkt — ohne
@@ -390,6 +397,34 @@ router.post('/:kennung/pruefung/abbrechen', requirePermission('WERKBANK.BAUEN'),
         return res.json({ success: true });
     } catch (error) {
         return fehler(res, error, 'Nicht abgebrochen', 400);
+    }
+});
+
+// ── Einstellungs-Baukasten (B1) ───────────────────────────────────────────────
+router.post('/:kennung/einstellungen', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.einstellungSpeichern(await offeneSitzung(req, res), req.body || {});
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Einstellung nicht gespeichert', 400);
+    }
+});
+
+router.post('/:kennung/einstellungen/:key/entfernen', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.einstellungEntfernen(await offeneSitzung(req, res), req.params.key);
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Einstellung nicht entfernt', 400);
+    }
+});
+
+router.post('/:kennung/einstellungen/:key/probewert', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.probewertSetzen(await offeneSitzung(req, res), req.params.key, req.body?.wert);
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Probewert nicht gespeichert', 400);
     }
 });
 

@@ -310,8 +310,207 @@ function entwurfAlsPaket(sitzung, liste) {
         install: { steps: liste.filter(s => s.status === 'ok').map(s => s.schritt) },
     };
     if (e.start) paket.start = e.start;
-    if (e.env && Object.keys(e.env).length) paket.env = e.env;
+    const settings = Array.isArray(e.settings) ? e.settings : [];
+    const env = { ...(e.env || {}), ...umgebungAusEinstellungen(settings, e.env || {}) };
+    if (Object.keys(env).length) paket.env = env;
+    if (settings.length) paket.settings = settings;
     return paket;
+}
+
+// ── Einstellungs-Baukasten (B1, 2026-09-26) ─────────────────────────────────
+//
+// Eine Einstellung wird in der Sitzung von Hand beschrieben — Schlüssel, Name,
+// Typ, Vorgabe, wer sie wann sieht (`role`), wann sie greift, und wohin der
+// Wert geht (`apply`). Was heißt „wohin":
+//
+//   file   fb-init schreibt die Datei vor dem Start und meldet je Schlüssel.
+//   env    Wirksam NUR über das Wurzelfeld `env` — der Daemon setzt `apply: env`
+//          nicht selbst um (Baustelle 169). Die Werkbank schreibt die Zeile
+//          `VARIABLE: {{setting:key}}` deshalb selbst dazu; sonst erbte jedes
+//          neue Paket die Lücke der alten.
+//   arg    Wirksam nur, wenn die Startzeile `{{setting:key}}` enthält. Die
+//          schreibt der Mensch in den Startteil; der Nachweis sagt, ob sie da ist.
+//   rcon   wirkt im laufenden Spiel; im Durchlauf nicht prüfbar (B3).
+//
+// Veröffentlicht wird nur, was ein grüner Durchlauf als ANGEKOMMEN belegt
+// (Absprache 2026-09-26) — der Rest bleibt als Entwurf in der Sitzung.
+
+const EINSTELLUNG = {
+    typen:   ['text', 'number', 'boolean', 'choice', 'password'],
+    rollen:  ['player', 'owner', 'expert'],
+    wirkung: ['instant', 'restart', 'new_world', 'reinstall'],
+    risiko:  ['none', 'progress', 'world_reset'],
+    ziele:   ['file', 'env', 'arg', 'rcon'],
+    parser:  ['ini', 'json', 'yaml', 'properties', 'xml', 'text'],
+    als:     ['true_false', 'True_False', 'TRUE_FALSE', 'one_zero', 'yes_no', 'Yes_No', 'on_off', 'enabled_disabled'],
+};
+const RE_SCHLUESSEL = /^[a-z][a-z0-9_]*$/;
+const RE_VARIABLE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/** Die Verdrahtung für `apply: env` — nur, was im Wurzelfeld noch fehlt. */
+function umgebungAusEinstellungen(settings, env) {
+    const aus = {};
+    for (const s of settings) {
+        for (const z of s.apply || []) {
+            if (z.target === 'env' && z.variable && !(z.variable in env) && !(z.variable in aus)) {
+                aus[z.variable] = `{{setting:${s.key}}}`;
+            }
+        }
+    }
+    return aus;
+}
+
+/**
+ * Formular → Einstellung im Format des Pakets. Wirft mit einem Satz, der sagt,
+ * was fehlt — geprüft wird hier, wo getippt wird, nicht erst im Durchlauf.
+ */
+function einstellungAusFormular(b) {
+    const text = (k) => (typeof b[k] === 'string' ? b[k].trim() : typeof b[k] === 'number' ? String(b[k]) : '');
+    const key = text('key');
+    if (!RE_SCHLUESSEL.test(key)) throw new Error('Schlüssel: klein, mit Buchstaben anfangen, nur a–z, 0–9 und _ (etwa max_players).');
+    const name = text('name_de');
+    if (!name) throw new Error('Name fehlt — er steht so im Panel.');
+    const e = { key, name: { de: name } };
+    if (text('name_en')) e.name.en = text('name_en');
+    if (text('beschreibung_de') || text('beschreibung_en')) {
+        e.description = {};
+        if (text('beschreibung_de')) e.description.de = text('beschreibung_de');
+        if (text('beschreibung_en')) e.description.en = text('beschreibung_en');
+    }
+    if (text('group')) {
+        if (!RE_SCHLUESSEL.test(text('group'))) throw new Error('Gruppe: dieselbe Schreibweise wie der Schlüssel.');
+        e.group = text('group');
+    }
+    const aus = (feld, liste, name) => {
+        const v = text(feld);
+        if (!liste.includes(v)) throw new Error(`${name}: „${v}" gibt es nicht — erlaubt: ${liste.join(', ')}.`);
+        return v;
+    };
+    e.type = aus('type', EINSTELLUNG.typen, 'Typ');
+    e.role = aus('role', EINSTELLUNG.rollen, 'Rolle');
+    e.takes_effect = aus('takes_effect', EINSTELLUNG.wirkung, 'Wirkung');
+    const risiko = text('risk') || 'none';
+    if (!EINSTELLUNG.risiko.includes(risiko)) throw new Error(`Risiko: „${risiko}" gibt es nicht — erlaubt: ${EINSTELLUNG.risiko.join(', ')}.`);
+    e.risk = risiko;
+
+    if (e.type === 'choice') {
+        const moeglich = text('choices').split(/\r?\n/).map(z => z.trim()).filter(Boolean).map((z) => {
+            const [wert, ...rest] = z.split('=');
+            const c = { value: wert.trim() };
+            if (rest.length && rest.join('=').trim()) c.name = { de: rest.join('=').trim() };
+            return c;
+        });
+        if (moeglich.length < 2) throw new Error('Auswahl: mindestens zwei Möglichkeiten, je Zeile „wert" oder „wert=Anzeigename".');
+        e.choices = moeglich;
+    }
+    if (e.type === 'number') {
+        for (const [feld, ziel] of [['min', 'min'], ['max', 'max']]) {
+            if (text(feld) === '') continue;
+            const n = Number(text(feld));
+            if (!Number.isFinite(n)) throw new Error(`${feld}: keine Zahl.`);
+            e[ziel] = n;
+        }
+    }
+    const vorgabe = text('default');
+    if (vorgabe !== '') {
+        if (e.type === 'number' && !Number.isFinite(Number(vorgabe))) throw new Error('Vorgabe: keine Zahl.');
+        if (e.type === 'choice' && !e.choices.some(c => c.value === vorgabe)) throw new Error('Vorgabe: keine der Möglichkeiten.');
+        e.default = e.type === 'number' ? Number(vorgabe) : e.type === 'boolean' ? istWahr(vorgabe) : vorgabe;
+    } else if (e.type === 'boolean') {
+        e.default = false;
+    }
+    if (b.required === true || b.required === 'on' || b.required === '1') e.required = true;
+
+    // Ziele: je Zeile eines. Das Formular schickt sie als Liste.
+    const ziele = Array.isArray(b.apply) ? b.apply : [];
+    e.apply = ziele.map((z, i) => {
+        const t = (k) => (typeof z[k] === 'string' ? z[k].trim() : '');
+        const ziel = { target: t('target') };
+        const nr = `Ziel ${i + 1}`;
+        if (!EINSTELLUNG.ziele.includes(ziel.target)) throw new Error(`${nr}: file, env, arg oder rcon.`);
+        if (ziel.target === 'file') {
+            if (!t('file') || !t('path')) throw new Error(`${nr}: Datei und Schlüssel darin gehören beide dazu.`);
+            if (t('file').split('/').includes('..') || t('file').startsWith('/')) throw new Error(`${nr}: die Datei liegt relativ zu game/, ohne „..".`);
+            if (!EINSTELLUNG.parser.includes(t('parser'))) throw new Error(`${nr}: Format der Datei — ${EINSTELLUNG.parser.join(', ')}.`);
+            Object.assign(ziel, { file: t('file'), parser: t('parser'), path: t('path') });
+        }
+        if (ziel.target === 'env') {
+            if (!RE_VARIABLE.test(t('variable'))) throw new Error(`${nr}: Name der Umgebungsvariable, etwa SERVER_NAME.`);
+            ziel.variable = t('variable');
+        }
+        if (ziel.target === 'rcon') {
+            if (!t('command')) throw new Error(`${nr}: der Befehl, etwa „/config set name {{value}}".`);
+            ziel.command = t('command');
+        }
+        if (t('as')) {
+            if (!EINSTELLUNG.als.includes(t('as'))) throw new Error(`${nr}: Schreibweise für Ja/Nein — ${EINSTELLUNG.als.join(', ')}.`);
+            ziel.as = t('as');
+        }
+        return ziel;
+    });
+    if (!e.apply.length) throw new Error('Mindestens ein Ziel — sonst landet der Wert nirgends.');
+    return e;
+}
+
+function istWahr(v) {
+    return ['1', 'true', 'yes', 'on', 'enabled', 'ja'].includes(String(v).trim().toLowerCase());
+}
+
+/** Anlegen oder ersetzen. `alt` ist der bisherige Schlüssel, wenn umbenannt wird. */
+async function einstellungSpeichern(sitzung, formular) {
+    await pruefeFrei(sitzung);
+    const neu = einstellungAusFormular(formular);
+    const alt = typeof formular.alt === 'string' ? formular.alt.trim() : '';
+    return entwurfSchreiben(sitzung, (e) => {
+        const liste = Array.isArray(e.settings) ? e.settings : [];
+        const doppelt = liste.find(x => x.key === neu.key && x.key !== alt);
+        if (doppelt) throw new Error(`Den Schlüssel „${neu.key}" gibt es schon.`);
+        const i = liste.findIndex(x => x.key === (alt || neu.key));
+        if (i >= 0) liste[i] = neu; else liste.push(neu);
+        e.settings = liste;
+        // Der Probewert zieht beim Umbenennen mit.
+        const w = e.werkbank?.werte;
+        if (w && alt && alt !== neu.key && alt in w) { w[neu.key] = w[alt]; delete w[alt]; }
+    });
+}
+
+async function einstellungEntfernen(sitzung, key) {
+    await pruefeFrei(sitzung);
+    return entwurfSchreiben(sitzung, (e) => {
+        e.settings = (e.settings || []).filter(x => x.key !== key);
+        if (e.werkbank?.werte) delete e.werkbank.werte[key];
+    });
+}
+
+/** Der Wert, mit dem Probestart und Durchlauf laufen — leer heißt: die Vorgabe. */
+async function probewertSetzen(sitzung, key, wert) {
+    await pruefeFrei(sitzung);
+    const s = (sitzung.entwurf?.settings || []).find(x => x.key === key);
+    if (!s) throw new Error(`Keine Einstellung „${key}".`);
+    return entwurfSchreiben(sitzung, (e) => {
+        e.werkbank = e.werkbank || {};
+        e.werkbank.werte = e.werkbank.werte || {};
+        if (wert === '' || wert === null || wert === undefined) delete e.werkbank.werte[key];
+        else e.werkbank.werte[key] = String(wert).slice(0, 2000);
+    });
+}
+
+/**
+ * Die Werte für den Daemon: Probewert, sonst Vorgabe, sonst leer. Ja/Nein als
+ * 1/0 wie beim Anlegen eines Servers (paketWerteAnlegen). Anders als beim
+ * echten Start (werteFuerDaemon) gilt die Vorgabe auch bei riskanten
+ * Einstellungen: Die Werkbank läuft immer auf einem frischen Volume, es gibt
+ * keinen Weltstand, den eine Vorgabe kosten könnte.
+ */
+function probewerte(sitzung) {
+    const w = sitzung.entwurf?.werkbank?.werte || {};
+    const aus = {};
+    for (const s of sitzung.entwurf?.settings || []) {
+        let v = s.key in w ? w[s.key] : s.default;
+        if (v === undefined || v === null) v = '';
+        aus[s.key] = s.type === 'boolean' ? (istWahr(v) ? '1' : '0') : String(v);
+    }
+    return aus;
 }
 
 // ── Stufe 2: Probestart ──────────────────────────────────────────────────────
@@ -432,10 +631,11 @@ async function starten(sitzung, liste) {
         guild_id: sitzung.guild_id,
         image: sitzungsImage(sitzung),
         start: hatBereitschaft(start) ? start : alsErkundung(start),
-        env: sitzung.entwurf?.env || {},
+        env: entwurfAlsPaket(sitzung, liste).env || {},
         ports: sitzung.entwurf?.ports || [],
         portnummern: w.portnummern,
-        settings: {},
+        settings: probewerte(sitzung),
+        einstellungen: sitzung.entwurf?.settings || [],
         // Nur, damit der Daemon Proton erkennt wie beim echten Start.
         install: { steps: liste.filter(s => s.status === 'ok').map(s => s.schritt) },
         memory_mb: w.memory_mb,
@@ -531,7 +731,11 @@ function stabil(wert) {
  */
 function technisch(paket) {
     const p = paket || {};
-    return { image: p.image || null, ports: p.ports || [], install: p.install || {}, start: p.start || null, env: p.env || {} };
+    // `settings` zählt mit (B1): Wer nach einem grünen Durchlauf ein Ziel ändert,
+    // hat einen Nachweis für etwas, das es nicht mehr gibt.
+    const t = { image: p.image || null, ports: p.ports || [], install: p.install || {}, start: p.start || null, env: p.env || {} };
+    if (Array.isArray(p.settings) && p.settings.length) t.settings = p.settings;
+    return t;
 }
 
 function fingerabdruck(paket) {
@@ -592,7 +796,8 @@ async function pruefen(sitzung, liste) {
     const antwort = await daemon.senden('werkbank.pruefen', {
         guild_id: sitzung.guild_id, image: sitzungsImage(sitzung),
         start: paket.start, env: paket.env || {}, ports: paket.ports,
-        portnummern: w.portnummern, settings: {}, install: paket.install,
+        portnummern: w.portnummern, install: paket.install,
+        settings: probewerte(sitzung), einstellungen: paket.settings || [],
         memory_mb: w.memory_mb, cpu_prozent: w.cpu_prozent,
     });
     if (!antwort?.success) {
@@ -689,6 +894,56 @@ function fassungGroesser(a, b) {
 }
 
 /**
+ * Welche Einstellungen des geprüften Entwurfs belegt der Durchlauf?
+ *
+ * Behalten wird eine Einstellung mit genau den Zielen, deren Wert ANKAM
+ * (Nachweis des Daemons, werkbank_nachweis.go). Ein Ziel ohne Beleg fällt
+ * weg; eine Einstellung ohne belegtes Ziel ebenso — samt der Zeile im
+ * Wurzelfeld `env`, die die Werkbank für sie geschrieben hat.
+ *
+ * `weg` nennt je Einstellung den Grund, so wie der Daemon ihn meldete.
+ */
+function belegteEinstellungen(entwurf, ergebnis) {
+    const nachweis = Array.isArray(ergebnis?.einstellungen) ? ergebnis.einstellungen : null;
+    const belegt = (s, z) => (nachweis || []).some(n => n.key === s.key && n.ziel === z.target
+        && n.zustand === 'angekommen'
+        && (z.target !== 'file' || n.wo === `${z.file}: ${z.path}`)
+        && (z.target !== 'env' || n.wo === z.variable));
+    const behalten = [];
+    const weg = [];
+    for (const s of entwurf?.settings || []) {
+        const ziele = (s.apply || []).filter(z => belegt(s, z));
+        if (ziele.length) {
+            behalten.push({ ...s, apply: ziele });
+            continue;
+        }
+        const gruende = (nachweis || []).filter(n => n.key === s.key)
+            .map(n => `${n.ziel} ${n.wo || ''}: ${n.zustand}${n.hinweis ? ' — ' + n.hinweis : ''}`.replace(/ +:/, ':'));
+        weg.push({
+            key: s.key,
+            grund: nachweis
+                ? (gruende.join('; ') || 'im Durchlauf nicht vorgekommen')
+                : 'der Durchlauf enthält keinen Nachweis (Daemon vor dem Einstellungs-Baukasten)',
+        });
+    }
+    // Die von der Werkbank geschriebene env-Zeile geht mit ihrer Einstellung.
+    const env = { ...(entwurf?.env || {}) };
+    for (const [name, wert] of Object.entries(env)) {
+        const m = /^\{\{setting:([a-z][a-z0-9_]*)\}\}$/.exec(wert);
+        if (m && !behalten.some(s => s.key === m[1] && s.apply.some(z => z.target === 'env' && z.variable === name))) {
+            delete env[name];
+        }
+    }
+    return { behalten, weg, env };
+}
+
+/** Benutzt der Entwurf außerhalb von `env` eine Einstellung (`setting:key`)? */
+function benutztEinstellung(entwurf, key) {
+    const text = JSON.stringify({ start: entwurf?.start || {}, install: entwurf?.install || {} });
+    return text.includes(`setting:${key}}`) || text.includes(`"setting:${key}"`);
+}
+
+/**
  * Darf veröffentlicht werden? Gründe statt Ja/Nein — die Seite zeigt sie.
  *
  * Verlangt (abgestimmt 2026-09-24): der LETZTE Durchlauf grün, und am
@@ -710,6 +965,16 @@ async function veroeffentlichungsStand(sitzung, liste, pruefListe) {
     // nichts anzuheften (Durchläufe vor Baustelle 166).
     else if (!letzte.ergebnis?.image_digest) {
         gruende.push('Der grüne Durchlauf nennt sein Image nicht (älter als die Digest-Aufzeichnung) — neu prüfen.');
+    }
+    else {
+        // Eine Einstellung ohne Beleg fällt beim Veröffentlichen weg. Benutzt
+        // die Startzeile oder ein Schritt sie trotzdem, hinge dort ein Verweis
+        // ins Leere — das Paket wäre kaputt, nicht bloß kleiner.
+        for (const w of belegteEinstellungen(letzte.entwurf, letzte.ergebnis).weg) {
+            if (benutztEinstellung(letzte.entwurf, w.key)) {
+                gruende.push(`„${w.key}" wird in Startzeile oder Schritten benutzt, hat aber kein belegtes Ziel (${w.grund}).`);
+            }
+        }
     }
     const id = paket.identity || {};
     if (!id.slug) gruende.push('Slug fehlt.');
@@ -743,6 +1008,14 @@ function veroeffentlichungsPaket(sitzung, liste, pruefung, autor) {
         // Der technische Teil aus dem GEPRÜFTEN Entwurf — gleich per Fingerabdruck,
         // aber so steht außer Frage, was eingeliefert wird.
         ...technisch(pruefung.entwurf),
+        // Nur belegte Einstellungen (B1) — die übrigen bleiben in der Sitzung.
+        ...(() => {
+            const b = belegteEinstellungen(pruefung.entwurf, pruefung.ergebnis);
+            const teil = { settings: b.behalten, env: b.env };
+            if (!teil.settings.length) delete teil.settings;
+            if (!Object.keys(teil.env).length) delete teil.env;
+            return teil;
+        })(),
         // Angeheftet wird der Digest, auf dem der grüne Durchlauf WIRKLICH lief
         // (der Daemon meldet ihn) — nicht der, der beim Veröffentlichen gerade
         // hinter dem Tag steht (Baustelle 166).
@@ -756,7 +1029,20 @@ function veroeffentlichungsPaket(sitzung, liste, pruefung, autor) {
             open: [
                 `Aus der Werkbank (Sitzung ${sitzung.kennung}). Prüfdurchlauf #${pruefung.id} grün am ${am} UTC: `
                     + `ganzes Rezept auf leerem Volume, bereit über den Port, Stoppfolge endete vor sigkill.`,
-                'Keine Einstellungen: Die Werkbank kennt sie noch nicht — der Server ist startbar, aber nicht einstellbar.',
+                ...(() => {
+                    const b = belegteEinstellungen(pruefung.entwurf, pruefung.ergebnis);
+                    const zeilen = [];
+                    if (!b.behalten.length && !b.weg.length) {
+                        zeilen.push('Keine Einstellungen — der Server ist startbar, aber nicht einstellbar.');
+                    }
+                    if (b.behalten.length) {
+                        zeilen.push(`Einstellungen: ${b.behalten.length} im Durchlauf #${pruefung.id} als angekommen belegt `
+                            + '(Datei per fb-init-Meldung, Startzeile/Umgebung per Gegenwert). Ob das Spiel den Wert BEACHTET, '
+                            + 'ist damit nicht gezeigt.');
+                    }
+                    for (const w of b.weg) zeilen.push(`Nicht aufgenommen: Einstellung „${w.key}" — ${w.grund}`);
+                    return zeilen;
+                })(),
                 // Der Notausgang gehört genannt (check-pakete, BEFUND) — samt dem
                 // Grund, den die Werkbank beim Anlegen des Schritts erfragt.
                 ...(pruefung.entwurf?.install?.steps || []).map((x, i) => (x.type === 'script'
@@ -875,6 +1161,8 @@ module.exports = {
     PRUEF_SUFFIX, fingerabdruck, technisch,
     pruefeBildAdresse, angaben, angabenSpeichern, veroeffentlichungsStand, veroeffentlichungsPaket, veroeffentlichen, laufendePruefung, pruefungen, durchlaufMaengel, pruefen,
     pruefungAbbrechen, pruefProtokoll, pruefungBeenden,
+    EINSTELLUNG, einstellungAusFormular, einstellungSpeichern, einstellungEntfernen, probewertSetzen, probewerte,
+    umgebungAusEinstellungen, belegteEinstellungen,
     werkbankTeil, ungenutztePorts, startSpeichern, starten, stoppen, eingabe, laeufe, laufenderLauf,
     portUebernehmen, portEntfernen, bereitschaftszeile,
     laufSetzen, konsoleAnhaengen, laufBeenden, dateienJetzt, gruppiere,

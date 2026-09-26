@@ -186,8 +186,24 @@ const beiKonsole = zumLauf('konsole', async (p, lauf, kennung) => {
     }
 });
 
+/**
+ * Der Nachweis der Einstellungen (B1) als Zeilen — für Konsole und Protokoll.
+ * `configured` kommt auf demselben Weg wie die Bereitschaftsstufen, ist aber
+ * keine: Als Bereitschaft gespeichert, stünde kurz „configured" im Kasten.
+ */
+function nachweisZeilen(p) {
+    const n = Array.isArray(p.nachweis) ? p.nachweis : [];
+    if (!n.length) return ['── Einstellungen: fb-init hat Dateien geschrieben (keine Einstellung im Entwurf)'];
+    return ['── Einstellungen — kam der Wert an?'].concat(n.map(x =>
+        `   ${x.zustand === 'angekommen' ? '✓' : '✗'} ${x.key} → ${x.ziel}${x.wo ? ' ' + x.wo : ''}: ${x.zustand}${x.hinweis ? ' — ' + x.hinweis : ''}`));
+}
+
 const beiBereitschaft = zumLauf('bereitschaft', async (p, lauf, kennung) => {
     const { sitzung_id, server_id, ...daten } = p;
+    if (daten.type === 'configured') {
+        sende(lauf.guildId, { action: 'einstellungen', sitzung_id: kennung, zeilen: nachweisZeilen(daten) });
+        return;
+    }
     await Sitzungen.laufSetzen(lauf.laufId, { bereitschaft: daten });
     sende(lauf.guildId, { action: 'bereitschaft', sitzung_id: kennung, ...daten });
 });
@@ -235,7 +251,8 @@ function pruefZeile(action, p) {
         case 'output':       return (p.finding ? '⚑ ' : '') + String(p.line ?? '');
         case 'konsole':      return String(p.line ?? '');
         case 'gestartet':    return '── Spiel gestartet';
-        case 'bereitschaft': return `── Bereitschaft: ${p.type || ''}${p.stage ? ' · ' + p.stage : ''}${(p.hinweis || p.note) ? ' — ' + (p.hinweis || p.note) : ''}`;
+        case 'bereitschaft': if (p.type === 'configured') return nachweisZeilen(p).join('\n');
+                             return `── Bereitschaft: ${p.type || ''}${p.stage ? ' · ' + p.stage : ''}${(p.hinweis || p.note) ? ' — ' + (p.hinweis || p.note) : ''}`;
         case 'beendet':      return `── Spiel beendet (Code ${p.exit_code ?? '?'})`;
         case 'fertig':       return '── Schritt fertig';
         case 'fehlgeschlagen': return `── Schritt gescheitert: ${p.error || ''}`;

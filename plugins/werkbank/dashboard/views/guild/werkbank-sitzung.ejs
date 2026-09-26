@@ -239,7 +239,7 @@
     <div class="card mt-3">
       <div class="card-header"><h3 class="card-title">Entwurf</h3></div>
       <div class="card-body">
-        <p class="text-secondary small">So sähe das Paket gerade aus: die Schritte „im Entwurf", Startteil und übernommene Ports. Einstellungen kommen später.</p>
+        <p class="text-secondary small">So sähe das Paket gerade aus: die Schritte „im Entwurf", Startteil, übernommene Ports und Einstellungen. Veröffentlicht werden davon nur die Einstellungen, die ein Durchlauf belegt.</p>
         <pre class="small mb-0 p-2" style="max-height:24rem;overflow:auto;background:var(--tblr-bg-surface-secondary);color:var(--tblr-body-color)"><%= JSON.stringify(entwurf, null, 2) %></pre>
       </div>
     </div>
@@ -455,6 +455,233 @@
     </div>
   </div>
 
+  <!-- ── Einstellungen (Baukasten B1, 2026-09-26) ───────────────────────── -->
+  <%
+    const nachweise = (pruefung && pruefung.ergebnis && Array.isArray(pruefung.ergebnis.einstellungen)) ? pruefung.ergebnis.einstellungen : null;
+    const nachweisVeraltet = pruefung && pruefHash !== entwurfHash;
+    const ROLLE = { player: 'beim Anlegen gefragt', owner: 'nur fachliche Ansicht (Betreiber)', expert: 'nur fachliche Ansicht (Experte)' };
+    const ZUSTAND = {
+      angekommen:       ['bg-green-lt',     'angekommen'],
+      nicht_gefunden:   ['bg-red-lt',       'Datei kennt den Schlüssel nicht'],
+      fehlgeschlagen:   ['bg-red-lt',       'Schreiben gescheitert'],
+      keine_meldung:    ['bg-orange-lt',    'keine Meldung'],
+      nicht_verdrahtet: ['bg-orange-lt',    'nichts holt den Wert'],
+      nicht_pruefbar:   ['bg-secondary-lt', 'im Durchlauf nicht prüfbar']
+    };
+    function zielText(z) {
+      if (z.target === 'file') return z.file + ' → ' + z.path + ' (' + z.parser + ')';
+      if (z.target === 'env')  return 'Umgebung ' + z.variable;
+      if (z.target === 'arg')  return 'Startzeile ({{setting:…}})';
+      if (z.target === 'rcon') return 'RCON: ' + z.command;
+      return z.target;
+    }
+    function nachweisFuer(s, z) {
+      if (!nachweise) return null;
+      return nachweise.find(function (n) {
+        return n.key === s.key && n.ziel === z.target
+          && (z.target !== 'file' || n.wo === z.file + ': ' + z.path)
+          && (z.target !== 'env' || n.wo === z.variable);
+      }) || null;
+    }
+  %>
+  <div class="col-12">
+    <div class="card" id="karteEinstellungen">
+      <div class="card-header">
+        <h3 class="card-title">Einstellungen</h3>
+        <div class="card-actions"><span class="text-secondary small"><%= einstellungen.length %> im Entwurf</span></div>
+      </div>
+      <div class="card-body">
+        <p class="text-secondary small">
+          Was ein Server dieses Spiels einstellbar machen soll. <strong>Rolle</strong> entscheidet, wer sie sieht:
+          „beim Anlegen gefragt" steht im Anlegeformular und in der einfachen Ansicht, die anderen nur in der fachlichen.
+          Was sich nur mit einer Neuinstallation ändern lässt (Wirkung „Neuinstallation"), wird immer beim Anlegen gefragt.
+          Ins Paket kommt nur, was der letzte grüne Prüfdurchlauf als <em>angekommen</em> belegt — Probestart und Durchlauf laufen mit dem Probewert, leer heißt: mit der Vorgabe.
+        </p>
+        <% if (einstellungen.some(function (e) { return (e.apply || []).some(function (z) { return z.target === 'arg'; }); })) { %>
+          <div class="alert alert-info py-2 small">Ziel „Startzeile": Der Wert kommt nur an, wenn eine Zeile im Startteil <code>{{setting:schlüssel}}</code> enthält, etwa <code>--name={{setting:name}}</code>.
+            Für „Umgebung" schreibt die Werkbank die Zeile selbst ins Paket.</div>
+        <% } %>
+
+        <% if (einstellungen.length) { %>
+          <div class="table-responsive mb-3">
+            <table class="table table-sm table-vcenter mb-0">
+              <thead><tr><th>Einstellung</th><th>Rolle · Wirkung</th><th>Ziele<%= nachweise ? (nachweisVeraltet ? ' (Nachweis veraltet)' : ' · Nachweis #' + pruefung.id) : '' %></th><th style="width:14rem">Probewert</th><th></th></tr></thead>
+              <tbody>
+                <% einstellungen.forEach(function (e) { %>
+                  <tr>
+                    <td>
+                      <div><%= (e.name && (e.name.de || e.name.en)) || e.key %><% if (e.required) { %> <span class="badge bg-secondary-lt">Pflicht</span><% } %></div>
+                      <div class="text-secondary small font-monospace"><%= e.key %> · <%= e.type %><%= e.group ? ' · ' + ((anzeige.GRUPPE[e.group]) || e.group) : '' %></div>
+                    </td>
+                    <td class="small">
+                      <div><%= ROLLE[e.role] || e.role %></div>
+                      <div class="text-secondary"><%= (anzeige.WIRKUNG[e.takes_effect] && anzeige.WIRKUNG[e.takes_effect].text) || e.takes_effect %><%= anzeige.RISIKO[e.risk] ? ' · ' + anzeige.RISIKO[e.risk] : '' %></div>
+                    </td>
+                    <td class="small">
+                      <% (e.apply || []).forEach(function (z) { const n = nachweisFuer(e, z); const zst = n ? (ZUSTAND[n.zustand] || ['bg-secondary-lt', n.zustand]) : null; %>
+                        <div>
+                          <span class="font-monospace"><%= zielText(z) %></span>
+                          <% if (zst) { %><span class="badge <%= nachweisVeraltet ? 'bg-secondary-lt' : zst[0] %>" <% if (n.hinweis) { %>title="<%= n.hinweis %>"<% } %>><%= zst[1] %></span><% } %>
+                        </div>
+                      <% }) %>
+                    </td>
+                    <td>
+                      <div class="input-group input-group-sm">
+                        <% if (e.type === 'boolean') { %>
+                          <select class="form-select" data-probewert="<%= e.key %>">
+                            <option value="" <%= !(e.key in probewerte) ? 'selected' : '' %>>Vorgabe (<%= e.default ? 'an' : 'aus' %>)</option>
+                            <option value="1" <%= probewerte[e.key] === '1' ? 'selected' : '' %>>an</option>
+                            <option value="0" <%= probewerte[e.key] === '0' ? 'selected' : '' %>>aus</option>
+                          </select>
+                        <% } else if (e.type === 'choice') { %>
+                          <select class="form-select" data-probewert="<%= e.key %>">
+                            <option value="" <%= !(e.key in probewerte) ? 'selected' : '' %>>Vorgabe<%= e.default !== undefined ? ' (' + e.default + ')' : '' %></option>
+                            <% (e.choices || []).forEach(function (c) { %><option value="<%= c.value %>" <%= probewerte[e.key] === String(c.value) ? 'selected' : '' %>><%= (c.name && c.name.de) || c.value %></option><% }) %>
+                          </select>
+                        <% } else { %>
+                          <input class="form-control" data-probewert="<%= e.key %>" type="<%= e.type === 'password' ? 'password' : 'text' %>"
+                                 value="<%= e.key in probewerte ? probewerte[e.key] : '' %>" placeholder="<%= e.default !== undefined && e.type !== 'password' ? 'Vorgabe: ' + e.default : 'Vorgabe' %>" autocomplete="off">
+                        <% } %>
+                        <button class="btn btn-outline-secondary" type="button" data-probewert-speichern="<%= e.key %>" title="Probewert speichern" <%= beschaeftigt ? 'disabled' : '' %>><i class="fa-solid fa-floppy-disk"></i></button>
+                      </div>
+                    </td>
+                    <td class="text-end text-nowrap">
+                      <button class="btn btn-sm btn-outline-secondary" type="button" data-einstellung-bearbeiten='<%= JSON.stringify(e) %>' <%= beschaeftigt ? 'disabled' : '' %>>Bearbeiten</button>
+                      <button class="btn btn-sm btn-outline-danger" type="button" data-einstellung-entfernen="<%= e.key %>" <%= beschaeftigt ? 'disabled' : '' %>>Entfernen</button>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+        <% if (belegt && belegt.weg.length && !nachweisVeraltet) { %>
+          <div class="alert alert-warning py-2 small">
+            <div class="mb-1">Diese Einstellungen kämen beim Veröffentlichen <strong>nicht</strong> ins Paket:</div>
+            <ul class="mb-0"><% belegt.weg.forEach(function (w) { %><li><span class="font-monospace"><%= w.key %></span> — <%= w.grund %></li><% }) %></ul>
+          </div>
+        <% } %>
+
+        <details id="einstellungDetails" <%= einstellungen.length ? '' : 'open' %>>
+          <summary class="mb-2"><span id="einstellungUeberschrift">Neue Einstellung</span></summary>
+          <form id="formEinstellung" class="row g-3">
+            <input type="hidden" name="alt" value="">
+            <div class="col-md-3">
+              <label class="form-label" for="eKey">Schlüssel</label>
+              <input class="form-control font-monospace" id="eKey" name="key" placeholder="max_players" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label" for="eNameDe">Name (deutsch)</label>
+              <input class="form-control" id="eNameDe" name="name_de" placeholder="Maximale Spieler" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label" for="eNameEn">Name (englisch)</label>
+              <input class="form-control" id="eNameEn" name="name_en">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label" for="eGruppe">Gruppe</label>
+              <select class="form-select" id="eGruppe" name="group">
+                <option value="">—</option>
+                <% Object.keys(anzeige.GRUPPE).forEach(function (g) { %><option value="<%= g %>"><%= anzeige.GRUPPE[g] %></option><% }) %>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="eBeschrDe">Beschreibung (deutsch)</label>
+              <input class="form-control" id="eBeschrDe" name="beschreibung_de" placeholder="Ein Satz: was sich im Spiel ändert">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="eBeschrEn">Beschreibung (englisch)</label>
+              <input class="form-control" id="eBeschrEn" name="beschreibung_en">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label" for="eTyp">Typ</label>
+              <select class="form-select" id="eTyp" name="type">
+                <option value="text">Text</option><option value="number">Zahl</option><option value="boolean">An/Aus</option>
+                <option value="choice">Auswahl</option><option value="password">Passwort</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label" for="eVorgabe">Vorgabe</label>
+              <input class="form-control" id="eVorgabe" name="default" placeholder="leer = keine">
+            </div>
+            <div class="col-md-3" data-nur-typ="number">
+              <label class="form-label">Grenzen</label>
+              <div class="input-group"><input class="form-control" name="min" placeholder="min"><input class="form-control" name="max" placeholder="max"></div>
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+              <label class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" name="required">
+                <span class="form-check-label">Pflicht — ohne Wert startet das Spiel nicht</span>
+              </label>
+            </div>
+            <div class="col-12" data-nur-typ="choice">
+              <label class="form-label" for="eAuswahl">Möglichkeiten</label>
+              <textarea class="form-control font-monospace" id="eAuswahl" name="choices" rows="3" placeholder="normal=Normal&#10;hard=Schwer"></textarea>
+              <div class="form-hint">Je Zeile „wert" oder „wert=Anzeigename".</div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="eRolle">Rolle</label>
+              <select class="form-select" id="eRolle" name="role">
+                <option value="player">beim Anlegen gefragt (einfache Ansicht)</option>
+                <option value="owner" selected>nur fachliche Ansicht (Betreiber)</option>
+                <option value="expert">nur fachliche Ansicht (Experte)</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="eWirkung">Wirkung</label>
+              <select class="form-select" id="eWirkung" name="takes_effect">
+                <% EINSTELLUNG.wirkung.forEach(function (w) { %><option value="<%= w %>" <%= w === 'restart' ? 'selected' : '' %>><%= (anzeige.WIRKUNG[w] && anzeige.WIRKUNG[w].text) || w %></option><% }) %>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="eRisiko">Risiko</label>
+              <select class="form-select" id="eRisiko" name="risk">
+                <option value="none">keins</option>
+                <option value="progress"><%= anzeige.RISIKO.progress %></option>
+                <option value="world_reset"><%= anzeige.RISIKO.world_reset %></option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Wohin der Wert geht</label>
+              <div id="eZiele"></div>
+              <button class="btn btn-sm btn-outline-secondary mt-2" type="button" id="knopfZielDazu"><i class="fa-solid fa-plus me-1"></i>Ziel</button>
+            </div>
+            <div class="col-12 d-flex gap-2">
+              <button class="btn btn-primary" type="submit" <%= beschaeftigt ? 'disabled' : '' %>><i class="fa-solid fa-floppy-disk me-1"></i>Einstellung speichern</button>
+              <button class="btn btn-outline-secondary" type="button" id="knopfEinstellungNeu">Leeren</button>
+            </div>
+          </form>
+          <template id="vorlageZiel">
+            <div class="row g-2 align-items-end mb-2" data-ziel>
+              <div class="col-md-2">
+                <select class="form-select form-select-sm" data-feld="target">
+                  <option value="file">Datei</option><option value="env">Umgebung</option><option value="arg">Startzeile</option><option value="rcon">RCON</option>
+                </select>
+              </div>
+              <div class="col-md-3" data-nur-ziel="file"><input class="form-control form-control-sm font-monospace" data-feld="file" placeholder="Datei relativ zu game/, etwa server-settings.json"></div>
+              <div class="col-md-2" data-nur-ziel="file">
+                <select class="form-select form-select-sm" data-feld="parser">
+                  <% EINSTELLUNG.parser.forEach(function (x) { %><option value="<%= x %>"><%= x %></option><% }) %>
+                </select>
+              </div>
+              <div class="col-md-2" data-nur-ziel="file"><input class="form-control form-control-sm font-monospace" data-feld="path" placeholder="Schlüssel, etwa max_players"></div>
+              <div class="col-md-3" data-nur-ziel="env"><input class="form-control form-control-sm font-monospace" data-feld="variable" placeholder="SERVER_NAME"></div>
+              <div class="col-md-5" data-nur-ziel="rcon"><input class="form-control form-control-sm font-monospace" data-feld="command" placeholder="/config set name {{value}}"></div>
+              <div class="col-md-5 small text-secondary" data-nur-ziel="arg">im Startteil <code>{{setting:schlüssel}}</code> verwenden</div>
+              <div class="col-md-2" data-nur-typ-ziel="boolean">
+                <select class="form-select form-select-sm" data-feld="as" title="Wie An/Aus an dieser Stelle geschrieben wird">
+                  <option value="">An/Aus als 1/0</option>
+                  <% EINSTELLUNG.als.forEach(function (x) { %><option value="<%= x %>"><%= x.replace('_', '/') %></option><% }) %>
+                </select>
+              </div>
+              <div class="col-auto"><button class="btn btn-sm btn-outline-danger" type="button" data-ziel-weg title="Ziel entfernen"><i class="fa-solid fa-xmark"></i></button></div>
+            </div>
+          </template>
+        </details>
+      </div>
+    </div>
+  </div>
+
   <!-- ── Prüfdurchlauf (Stufe 3) ────────────────────────────────────────── -->
   <div class="col-12">
     <div class="card">
@@ -474,7 +701,7 @@
           Das Prüf-Volume wird danach gelöscht.
         </p>
         <% if (pruefung && !pruefLaeuft && pruefHash !== entwurfHash) { %>
-          <div class="alert alert-warning py-2 small">Der technische Teil (Image, Ports, Schritte, Start) hat sich seit diesem Durchlauf geändert — das Urteil gilt für den alten Stand. Name, Beschreibung und Bild zählen nicht mit.</div>
+          <div class="alert alert-warning py-2 small">Der technische Teil (Image, Ports, Schritte, Start, Einstellungen) hat sich seit diesem Durchlauf geändert — das Urteil gilt für den alten Stand. Name, Beschreibung und Bild zählen nicht mit.</div>
         <% } %>
         <% if (durchlaufMaengel.length && !pruefLaeuft) { %>
           <div class="alert alert-info py-2 small mb-2">
@@ -923,6 +1150,13 @@
         if (unten) konsole.scrollTop = konsole.scrollHeight;
       } else if (d.action === 'ports') {
         zeichnePorts(d.ports || []);
+      } else if (d.action === 'einstellungen') {
+        (d.zeilen || []).forEach(function (text) {
+          var z = document.createElement('div');
+          z.textContent = text;
+          konsole.appendChild(z);
+        });
+        konsole.scrollTop = konsole.scrollHeight;
       } else if (d.action === 'bereitschaft') {
         var kasten = document.getElementById('laufBereitschaft');
         kasten.textContent = 'Bereitschaft: ' + (d.type || '') + (d.stage ? ' · ' + d.stage : '') + ((d.hinweis || d.note) ? ' — ' + (d.hinweis || d.note) : '');
@@ -943,5 +1177,126 @@
       }
     });
   }
+  // ── Einstellungen (Baukasten B1) ──────────────────────────────────────
+  var formE = document.getElementById('formEinstellung');
+  if (formE) {
+    var zieleBox = document.getElementById('eZiele');
+    var vorlageZiel = document.getElementById('vorlageZiel');
+    var typE = formE.querySelector('[name=type]');
+
+    function zeigeTypFelder() {
+      formE.querySelectorAll('[data-nur-typ]').forEach(function (el) { el.hidden = el.dataset.nurTyp !== typE.value; });
+      zieleBox.querySelectorAll('[data-nur-typ-ziel]').forEach(function (el) { el.hidden = el.dataset.nurTypZiel !== typE.value; });
+    }
+    function zeigeZielFelder(zeile) {
+      var t = zeile.querySelector('[data-feld=target]').value;
+      zeile.querySelectorAll('[data-nur-ziel]').forEach(function (el) { el.hidden = el.dataset.nurZiel !== t; });
+    }
+    function neuesZiel(z) {
+      var zeile = vorlageZiel.content.firstElementChild.cloneNode(true);
+      Object.keys(z || {}).forEach(function (k) {
+        var f = zeile.querySelector('[data-feld="' + k + '"]');
+        if (f) f.value = z[k];
+      });
+      zeile.querySelector('[data-feld=target]').addEventListener('change', function () { zeigeZielFelder(zeile); });
+      zeile.querySelector('[data-ziel-weg]').addEventListener('click', function () { zeile.remove(); });
+      zieleBox.appendChild(zeile);
+      zeigeZielFelder(zeile);
+      zeigeTypFelder();
+    }
+    function leeren() {
+      formE.reset();
+      formE.alt.value = '';
+      zieleBox.innerHTML = '';
+      neuesZiel({ target: 'file' });
+      document.getElementById('einstellungUeberschrift').textContent = 'Neue Einstellung';
+    }
+    document.getElementById('knopfZielDazu').addEventListener('click', function () { neuesZiel({ target: 'file' }); });
+    document.getElementById('knopfEinstellungNeu').addEventListener('click', leeren);
+    typE.addEventListener('change', zeigeTypFelder);
+    leeren();
+
+    // Bearbeiten: das Formular mit der gespeicherten Einstellung füllen.
+    document.querySelectorAll('[data-einstellung-bearbeiten]').forEach(function (k) {
+      k.addEventListener('click', function () {
+        var e = JSON.parse(k.dataset.einstellungBearbeiten);
+        leeren();
+        zieleBox.innerHTML = '';
+        formE.alt.value = e.key;
+        formE.key.value = e.key;
+        formE.name_de.value = (e.name && e.name.de) || '';
+        formE.name_en.value = (e.name && e.name.en) || '';
+        formE.beschreibung_de.value = (e.description && e.description.de) || '';
+        formE.beschreibung_en.value = (e.description && e.description.en) || '';
+        formE.group.value = e.group || '';
+        formE.type.value = e.type;
+        formE['default'].value = e['default'] === undefined || e['default'] === null ? '' : (e.type === 'boolean' ? (e['default'] ? '1' : '0') : e['default']);
+        formE.min.value = e.min === undefined ? '' : e.min;
+        formE.max.value = e.max === undefined ? '' : e.max;
+        formE.required.checked = !!e.required;
+        formE.choices.value = (e.choices || []).map(function (c) { return c.value + (c.name && c.name.de ? '=' + c.name.de : ''); }).join('\n');
+        formE.role.value = e.role;
+        formE.takes_effect.value = e.takes_effect;
+        formE.risk.value = e.risk || 'none';
+        (e.apply || []).forEach(neuesZiel);
+        document.getElementById('einstellungUeberschrift').textContent = 'Einstellung „' + e.key + '" bearbeiten';
+        document.getElementById('einstellungDetails').open = true;
+        formE.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+
+    formE.addEventListener('submit', async function (ev) {
+      ev.preventDefault();
+      var nutzlast = Object.fromEntries(new FormData(formE));
+      nutzlast.required = formE.required.checked;
+      // Nur die Felder des gewählten Ziels — versteckte gehören nicht dazu.
+      nutzlast.apply = Array.prototype.map.call(zieleBox.querySelectorAll('[data-ziel]'), function (zeile) {
+        var z = {};
+        zeile.querySelectorAll('[data-feld]').forEach(function (f) {
+          var huelle = f.closest('[data-nur-ziel], [data-nur-typ-ziel]');
+          if (!huelle || !huelle.hidden) z[f.dataset.feld] = f.value;
+        });
+        return z;
+      });
+      var knopf = formE.querySelector('button[type=submit]');
+      knopf.disabled = true;
+      try {
+        await schicke(hier + '/einstellungen', nutzlast);
+        window.location.reload();
+      } catch (fehler) {
+        knopf.disabled = false;
+        melde('error', fehler.message);
+      }
+    });
+  }
+
+  document.querySelectorAll('[data-einstellung-entfernen]').forEach(function (k) {
+    k.addEventListener('click', async function () {
+      if (!confirm('Einstellung „' + k.dataset.einstellungEntfernen + '" aus dem Entwurf nehmen?')) return;
+      k.disabled = true;
+      try {
+        await schicke(hier + '/einstellungen/' + encodeURIComponent(k.dataset.einstellungEntfernen) + '/entfernen');
+        window.location.reload();
+      } catch (fehler) {
+        k.disabled = false;
+        melde('error', fehler.message);
+      }
+    });
+  });
+
+  document.querySelectorAll('[data-probewert-speichern]').forEach(function (k) {
+    k.addEventListener('click', async function () {
+      var key = k.dataset.probewertSpeichern;
+      var feld = document.querySelector('[data-probewert="' + key + '"]');
+      k.disabled = true;
+      try {
+        await schicke(hier + '/einstellungen/' + encodeURIComponent(key) + '/probewert', { wert: feld.value });
+        melde('success', feld.value === '' ? 'Probewert entfernt — es gilt die Vorgabe.' : 'Probewert gespeichert.');
+      } catch (fehler) {
+        melde('error', fehler.message);
+      }
+      k.disabled = false;
+    });
+  });
 })();
 </script>
