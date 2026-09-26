@@ -630,7 +630,7 @@ router.get('/create', requirePermission('GAMESERVER.CREATE'), async (req, res) =
             }
 
             // game_data parsen — `?? {}`, siehe Schritt 2: NULL ist erlaubt, und
-            // die Migrationszeilen darunter greifen auf `gameData.variables` zu.
+            // die Portsuche darunter greift auf `gameData.variables` zu.
             let gameData = {};
             try {
                 gameData = (typeof addonData.game_data === 'string'
@@ -639,27 +639,6 @@ router.get('/create', requirePermission('GAMESERVER.CREATE'), async (req, res) =
             } catch (error) {
                 Logger.error(`[Gameserver] Fehler beim Parsen von game_data:`, error);
                 gameData = { variables: [], installation: {}, startup: {} };
-            }
-
-            // ========================================
-            // MIGRATION: Variables aus altem Template-Format extrahieren
-            // Alte Struktur: templates[0].variables
-            // Neue Struktur: variables (direkt in game_data)
-            // ========================================
-            if (!gameData.variables && gameData.templates?.[0]?.variables) {
-                Logger.warn(`[Gameserver] MIGRATION: Variables aus templates[0] nach root verschoben`);
-                gameData.variables = gameData.templates[0].variables;
-            }
-
-            // Ebenso für installation/startup falls in templates[0]
-            if (!gameData.installation && gameData.templates?.[0]?.installation) {
-                Logger.warn(`[Gameserver] MIGRATION: installation aus templates[0] nach root verschoben`);
-                gameData.installation = gameData.templates[0].installation;
-            }
-
-            if (!gameData.startup && gameData.templates?.[0]?.startup) {
-                Logger.warn(`[Gameserver] MIGRATION: startup aus templates[0] nach root verschoben`);
-                gameData.startup = gameData.templates[0].startup;
             }
 
             Logger.debug(`[Gameserver] Step 3 - Addon: ${addon}, Daemon: ${daemonId}`, {

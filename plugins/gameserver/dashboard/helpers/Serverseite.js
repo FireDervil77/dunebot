@@ -23,7 +23,7 @@
  *   Kopf, Adresse        gameservers + rootserver + packages
  *   Spieler samt Ping    QueryService (liefert name, ping, level, platform_id)
  *   Einstellungen        das PAKET (settings mit role/takes_effect/risk)
- *   deren Werte          gameservers.env_variables über die Übergangsdatei
+ *   deren Werte          gameservers.paket_werte (seit 2026-09-26 allein)
  *   Laufzeit             gameservers.laeuft_seit (neu, Migration 20260819_170000)
  *   Sicherungen          gameserver_backups
  *   Bereitschaftsstufe   NOCH NICHT — fb-init meldet sie, der Daemon hört nicht
@@ -33,7 +33,6 @@
  */
 
 const { lesePortzwecke } = require('./Portvergabe');
-const { ladeUebergang } = require('./StartPayload');
 
 /** Höhenstufen (B.7): wer welche Einstellungen zu sehen bekommt. */
 const HOEHE = {
@@ -315,10 +314,10 @@ function baueSpieler(server, live) {
  *
  * ── Woher der aktuelle Wert kommt ───────────────────────────────────────────
  *
- * Das Paket nennt seine Schlüssel bei den EIGENEN Namen (`world_name`), der
- * Bestandsserver hat sie unter den Egg-Namen gespeichert (`WORLD`). Die Brücke
- * dazwischen ist die Übergangsdatei — dieselbe, die auch der Startweg benutzt.
- * Sie fällt mit Stufe 5a; bis dahin ist sie die einzige ehrliche Zuordnung.
+ * Aus `paket_werte`, unter den Schlüsseln des Pakets (Stufe 5a). Die Brücke
+ * über Egg-Namen in `env_variables` (Übergangsdatei) ist seit dem 2026-09-26
+ * weg: Jeder Server hatte da längst `paket_werte`, und die Speicher-Route
+ * nimmt ohnehin nur Paketschlüssel an (Egg-Rückbau A2).
  *
  * Ein Wert, der sich nicht auflösen lässt, wird NICHT durch die Paketvorgabe
  * ersetzt. Genau das hätte am 2026-08-19 eine Welt gekostet: Die Vorgabe für
@@ -329,21 +328,12 @@ function baueEinstellungen(server, paket, hoehe) {
     if (alle.length === 0) return { sichtbar: [], verborgen: 0, ohnePaket: !paket };
 
     const erlaubt = HOEHE[hoehe];
-    const uebergang = ladeUebergang(paket?.identity?.slug || '');
-    let env = {};
-    try {
-        env = typeof server.env_variables === 'string'
-            ? JSON.parse(server.env_variables) : (server.env_variables || {});
-    } catch { env = {}; }
-
-    // Werte unter Paketschlüsseln (Stufe 5a). Leer heisst: diese Zeile ist noch
-    // nicht übersetzt — dann gilt der alte Weg über die Übergangsdatei.
-    let paketWerte = null;
+    let paketWerte = {};
     try {
         const p = typeof server.paket_werte === 'string'
             ? JSON.parse(server.paket_werte) : server.paket_werte;
-        if (p && Object.keys(p).length) paketWerte = p;
-    } catch { paketWerte = null; }
+        if (p && typeof p === 'object') paketWerte = p;
+    } catch { paketWerte = {}; }
 
     const sichtbar = [];
     let verborgen = 0;
@@ -370,35 +360,16 @@ function baueEinstellungen(server, paket, hoehe) {
         // Reiter, in dem man es waehlen koennte.
         if (e.managed_by === 'content') { verborgen++; continue; }
 
-        // ── Stufe 5a: Der Wert steht unter dem PAKETSCHLÜSSEL ───────────────
-        //
-        // Seit dem 2026-08-23 speichert ein Server seine Werte direkt so, wie
-        // das Paket sie nennt. Der Umweg über den Egg-Namen bleibt nur für
-        // Zeilen, die noch nichts davon haben.
-        //
-        // `aenderbar` haengt damit nicht mehr am Egg-Namen: Wer seine Werte
-        // unter Paketschluesseln hat, kann JEDE Einstellung des Pakets aendern
-        // — auch die, fuer die es nie eine Egg-Variable gab.
-        const eggName = uebergang?.zuordnung?.[e.key] || null;
-        const direkt = paketWerte
-            && Object.prototype.hasOwnProperty.call(paketWerte, e.key);
-        const roh = direkt
-            ? paketWerte[e.key]
-            : (eggName && Object.prototype.hasOwnProperty.call(env, eggName)
-                ? env[eggName] : undefined);
+        // Der Wert steht unter dem PAKETSCHLÜSSEL — JEDE Einstellung des
+        // Pakets ist änderbar, auch eine, die erst eine neuere Paketfassung
+        // mitbrachte und deshalb noch keinen gespeicherten Wert hat.
+        const roh = Object.prototype.hasOwnProperty.call(paketWerte, e.key)
+            ? paketWerte[e.key] : undefined;
 
         sichtbar.push({
             schluessel:  e.key,
-            // Der Egg-Name ist das, was gespeichert wird. Ohne ihn lässt sich
-            // die Einstellung ANZEIGEN, aber nicht ändern — und ein Feld, das
-            // sich bedienen lässt und nichts bewirkt, ist schlimmer als keines.
-            // Mit `paket_werte` ist es IMMER der Paketschlüssel — auch für
-            // eine Einstellung, die erst eine neuere Paketfassung mitbrachte
-            // und deshalb noch keinen gespeicherten Wert hat. Bis zum
-            // 2026-09-10 stand hier `direkt ? …`: Solche Felder hatten keinen
-            // Namen und liessen sich nicht speichern.
-            variable:    paketWerte ? e.key : eggName,
-            aenderbar:   Boolean(paketWerte) || Boolean(eggName),
+            variable:    e.key,
+            aenderbar:   true,
             gruppe:      e.group || 'sonstiges',
             gruppeName:  GRUPPE[e.group] || null,
             name:        e.name?.de || e.name?.en || e.key,
@@ -830,18 +801,13 @@ function bauePorts(server, paket) {
         belegt = typeof server.ports === 'string' ? JSON.parse(server.ports) : (server.ports || {});
     } catch { belegt = {}; }
 
-    // Der Bestandsserver führt seine Ports unter den EGG-Schlüsseln
-    // (`game_plus_1`), das Paket nennt Zwecke (`query`). Dieselbe Brücke wie im
-    // Startweg — ohne sie stünde hier „Abfrage —", obwohl der Port belegt ist.
-    // Genau diese Verwechslung wies der Daemon am 2026-08-18 zu Recht ab.
-    const uebergang = ladeUebergang(paket?.identity?.slug || '');
-    const zweckKey = (zweck) => uebergang?.portzwecke?.[zweck] || zweck;
-
+    // Belegt ist nach ZWECK (`query`), wie das Paket ihn nennt. Egg-Schlüssel
+    // (`game_plus_1`) gibt es in keiner Zeile mehr (Egg-Rückbau A2, 2026-09-26).
     const ZWECK = { game: 'Spiel', query: 'Abfrage', rcon: 'RCON', voice: 'Sprachchat' };
     const liste = [];
 
     for (const p of (paket?.ports || [])) {
-        const eintrag = belegt[p.purpose] || belegt[zweckKey(p.purpose)] || belegt[p.variable] || null;
+        const eintrag = belegt[p.purpose] || belegt[p.variable] || null;
         const nummer = eintrag?.external ?? eintrag?.internal
                     ?? (typeof eintrag === 'number' ? eintrag : null);
         liste.push({
@@ -860,7 +826,7 @@ function bauePorts(server, paket) {
     // Belegte Ports, die das Paket nicht kennt, gehören trotzdem gezeigt: Sie
     // sind belegt, und wer sie sucht, soll sie finden.
     const schonGezeigt = new Set((paket?.ports || []).flatMap(p =>
-        [p.purpose, zweckKey(p.purpose), p.variable].filter(Boolean)));
+        [p.purpose, p.variable].filter(Boolean)));
     for (const [schluessel, eintrag] of Object.entries(belegt)) {
         if (schonGezeigt.has(schluessel)) continue;
         const nummer = eintrag?.external ?? eintrag?.internal
@@ -1757,32 +1723,14 @@ module.exports.baueWerteSchritt = baueWerteSchritt;
  * und eine Ausdruckssprache zu erfinden, bevor es einen zweiten Fall gibt, wäre
  * genau die Sorte Vorratsbau, die dieses Vorhaben abräumt.
  */
-function bedingungTrifftZu(bedingung, alle, server = null, uebergang = null, paketWerte = null) {
+function bedingungTrifftZu(bedingung, alle) {
     if (typeof bedingung !== 'string' || !bedingung.includes('=')) return false;
 
     const [schluessel, erwartet] = bedingung.split('=');
 
-    // Den aktuellen Wert der ANDEREN Einstellung holen — auf demselben Weg wie
-    // oben, damit beide dieselbe Wahrheit sehen.
-    let wert;
-    if (paketWerte && Object.prototype.hasOwnProperty.call(paketWerte, schluessel)) {
-        wert = paketWerte[schluessel];
-    } else {
-        const eggName = uebergang?.zuordnung?.[schluessel];
-        let env = {};
-        try {
-            env = typeof server?.env_variables === 'string'
-                ? JSON.parse(server.env_variables) : (server?.env_variables || {});
-        } catch { env = {}; }
-        wert = eggName ? env[eggName] : undefined;
-    }
-
-    // Kein Wert gespeichert? Dann gilt die Vorgabe des Pakets — sonst hinge die
-    // Pflicht davon ab, ob jemand die andere Einstellung schon einmal angefasst
-    // hat.
-    if (wert === undefined) {
-        const anderer = (alle || []).find(x => x.key === schluessel);
-        wert = anderer ? anderer.default : undefined;
-    }
-    return String(wert) === String(erwartet);
+    // Gerufen nur beim ANLEGEN — gespeicherte Werte gibt es dort noch nicht,
+    // es gilt die Vorgabe des Pakets. Der Zweig über Server und Egg-Namen
+    // hatte keinen Aufrufer (Egg-Rückbau A2, 2026-09-26).
+    const anderer = (alle || []).find(x => x.key === schluessel);
+    return String(anderer ? anderer.default : undefined) === String(erwartet);
 }

@@ -30,47 +30,6 @@
 
 const crypto = require('crypto');
 const { loeseInhaltAuf } = require('./InhaltJeLader');
-const fs   = require('fs');
-const path = require('path');
-
-/** Wo die Übergangs-Zuordnungen liegen (packages/fbpkg/uebergang/<slug>.json). */
-const UEBERGANG_ORDNER = path.join(__dirname, '../../../../packages/fbpkg/uebergang');
-
-/** Einmal gelesen, dann behalten — die Dateien ändern sich zur Laufzeit nicht. */
-const uebergangCache = new Map();
-
-/**
- * Lädt die Übergangs-Zuordnung „Paketschlüssel → Egg-Variablenname".
- *
- * ⚠ Der Startweg und die Installation lesen sie seit dem 2026-09-10 NICHT
- * mehr. Übrig ist ein Leser: die Serverseite, die für Zeilen ohne
- * `paket_werte` noch auf die Egg-Namen zurückgreift. Beide heutigen Server
- * haben `paket_werte`; die Zuordnung fällt mit Stufe 3.
- *
- * @param {string} slug
- * @returns {object|null} Zuordnung oder null, wenn es keine gibt
- */
-function ladeUebergang(slug) {
-    if (uebergangCache.has(slug)) return uebergangCache.get(slug);
-    let uebergang = null;
-    try {
-        const datei = path.join(UEBERGANG_ORDNER, `${slug}.json`);
-        if (fs.existsSync(datei)) {
-            const roh = JSON.parse(fs.readFileSync(datei, 'utf8'));
-            if (roh.zuordnung) {
-                uebergang = {
-                    zuordnung:          roh.zuordnung,
-                    portzwecke:         roh.portzwecke || {},
-                    arbeitsverzeichnis: roh.arbeitsverzeichnis || null,
-                };
-            }
-        }
-    } catch {
-        uebergang = null;   // Der Aufrufer meldet es — hier wird nichts verschluckt
-    }
-    uebergangCache.set(slug, uebergang);
-    return uebergang;
-}
 
 /**
  * Die Image-Adresse aus dem Paket — gepinnt, wenn möglich.
@@ -523,7 +482,7 @@ async function ladePaketFuerAddon(dbService, addonId) {
 
 module.exports = {
     buildStartPayload, baueInstallNutzlast, paketWerteAnlegen, autoUpdateAus, istWahr,
-    loadServerForStart, ladePaketFuerAddon, imageAusPaket, ladeUebergang,
+    loadServerForStart, ladePaketFuerAddon, imageAusPaket,
     // Nur fuer scripts/check-startpayload.js: Die Regel, welcher Wert beim
     // Start gilt, ist zu teuer erkauft, um sie nur indirekt zu pruefen.
     werteFuerDaemon,
