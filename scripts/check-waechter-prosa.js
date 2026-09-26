@@ -90,6 +90,7 @@ const BEKANNT = new Set([
     'check-panel-bauteile.js',
     'check-profil.js',
     'check-render-settings.js',
+    'check-render-user.js',       // Rohtext nur für die Zeilennummer; gesucht wird ohne Kommentare
     'check-schalter.js',
     'check-seitenkopf.js',
     'check-sicherungsabruf.js',

@@ -26,6 +26,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const ejs = require('ejs');
+const { ohneKommentare } = require('./lib/quelltext');
 
 const WURZEL = path.join(__dirname, '..');
 
@@ -68,7 +69,8 @@ const orte = [...dateien(path.join(WURZEL, 'plugins')), ...dateien(path.join(WUR
     ...dateien(path.join(WURZEL, 'apps/dashboard/controllers'))];
 const funde = [];
 for (const datei of orte) {
-    const text = fs.readFileSync(datei, 'utf8');
+    // Ohne Kommentare: Ein Kommentar, der eine alte Render-Zeile zitiert, ist kein Fund.
+    const text = ohneKommentare(fs.readFileSync(datei, 'utf8'));
     const re = /render(?:View)?\(\s*res\s*,\s*[^,]+,\s*\{([\s\S]{0,4000}?)\}\s*\)/g;
     let m;
     while ((m = re.exec(text))) {
@@ -78,8 +80,14 @@ for (const datei of orte) {
         const wert = (t[1] || 'user').trim();
         // Derselbe Gegenstand wie in res.locals — harmlos.
         if (/^res\.locals\.user\b/.test(wert)) continue;
-        const zeile = text.slice(0, m.index).split('\n').length;
-        funde.push({ datei: path.relative(WURZEL, datei), zeile, wert });
+        // Zeilennummer im ORIGINAL — ohneKommentare verschiebt die Zeilen. Der
+        // Rohtext dient hier NUR der Positionssuche; gesucht wird oben im
+        // kommentarfreien Text (check-waechter-prosa: BEKANNT, mit diesem Grund).
+        const roh = fs.readFileSync(datei, 'utf8');
+        const kopf = m[0].split('\n')[0].trim();
+        const stelle = roh.indexOf(kopf);
+        const zeile = stelle >= 0 ? roh.slice(0, stelle).split('\n').length : 0;
+        funde.push({ datei: path.relative(WURZEL, datei), zeile, wert, davor: text.slice(0, m.index) });
     }
 }
 const ausnahmeGenutzt = new Set();
@@ -87,8 +95,7 @@ for (const f of funde) {
     if (AUSNAHMEN[f.datei]) { ausnahmeGenutzt.add(f.datei); continue; }
     // Kurzform `user,` — nachsehen, woher die Variable kommt.
     if (f.wert === 'user') {
-        const text = fs.readFileSync(path.join(WURZEL, f.datei), 'utf8').split('\n').slice(0, f.zeile).join('\n');
-        const herkunft = [...text.matchAll(/(?:const|let)\s+user\s*=\s*([^;\n]+)/g)].pop();
+        const herkunft = [...f.davor.matchAll(/(?:const|let)\s+user\s*=\s*([^;\n]+)/g)].pop();
         if (herkunft && /^res\.locals\.user\s*$/.test(herkunft[1].trim())) continue;
         f.wert = `user (${herkunft ? herkunft[1].trim() : 'Herkunft unbekannt'})`;
     }
