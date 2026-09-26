@@ -12,18 +12,6 @@
                     <span class="badge badge-lg <%= addon.visibility === 'public' || addon.visibility === 'official' ? 'bg-success-lt' : addon.visibility === 'unlisted' ? 'bg-warning-lt' : 'bg-secondary-lt' %>">
                         Visibility: <%= addon.visibility %>
                     </span>
-                    <span class="badge badge-lg <%= addon.runtime_type === 'docker_steam' ? 'bg-primary-lt' : addon.runtime_type === 'docker_standalone' ? 'bg-info-lt' : 'bg-secondary-lt' %>">
-                        <i class="fa-brands fa-docker"></i> <%= addon.runtime_type %>
-                    </span>
-                    <% if (addon.source_type === 'pelican') { %>
-                        <span class="badge badge-lg bg-warning-lt">
-                            <i class="fa-solid fa-egg"></i> Pelican Import
-                        </span>
-                    <% } else if (addon.source_type === 'native') { %>
-                        <span class="badge badge-lg bg-success-lt">
-                            <i class="fa-solid fa-crown"></i> Native
-                        </span>
-                    <% } %>
                 </div>
             </div>
 
@@ -49,21 +37,13 @@
                                 
                                 <div class="mb-3">
                                     <label>Slug</label>
-                                    <input type="text" class="form-control" name="slug" value="<%= addon.slug %>" required>
+                                    <input type="text" class="form-control" name="slug" value="<%= addon.slug %>" readonly>
+                                    <small class="form-hint">Fest: Über den Slug findet die Einlieferung ihren Anker. Eine Änderung hier trennte Paket und Anker.</small>
                                 </div>
                                 
                                 <div class="mb-3">
                                     <label>Beschreibung</label>
                                     <textarea class="form-control" name="description" rows="4"><%= addon.description || '' %></textarea>
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label>Runtime Type <small class="text-secondary">(wird automatisch aus game_data ermittelt)</small></label>
-                                    <select class="form-control" name="runtime_type" disabled>
-                                        <option value="docker_steam"      <%= addon.runtime_type === 'docker_steam'      ? 'selected' : '' %>>Docker + SteamCMD</option>
-                                        <option value="docker_standalone" <%= addon.runtime_type === 'docker_standalone' ? 'selected' : '' %>>Docker Standalone</option>
-                                    </select>
-                                    <small class="form-text text-secondary">Wird beim Speichern von game_data neu berechnet.</small>
                                 </div>
                                 
                                 <div class="mb-3">
@@ -140,121 +120,6 @@
 
                 </div>
 
-                <%# Rechte Spalte: Technical Details %>
-                <div class="col-md-6">
-                    
-                    <%# Docker Images %>
-                    <div class="card">
-                        <div class="card-header">
-                            <h3 class="card-title"><i class="fa-brands fa-docker"></i> Docker Images</h3>
-                        </div>
-                        <div class="card-body">
-                            <% const dockerImages = addon.game_data?.docker_images || {}; %>
-                            <% const imageEntries = Object.entries(dockerImages); %>
-                            <% if (imageEntries.length > 0) { %>
-                                <ul class="list-group list-group-flush">
-                                    <% imageEntries.forEach(([img, label]) => { %>
-                                        <li class="list-group-item py-1 px-2 small">
-                                            <code><%= img %></code>
-                                            <% if (label && label !== img) { %>
-                                                <span class="text-secondary ms-2">(<%= label %>)</span>
-                                            <% } %>
-                                        </li>
-                                    <% }); %>
-                                </ul>
-                            <% } else { %>
-                                <p class="text-secondary">Keine Docker-Images definiert</p>
-                            <% } %>
-                        </div>
-                    </div>
-
-                    <%# Startup %>
-                    <div class="card">
-                        <div class="card-header">
-                            <h3 class="card-title"><i class="fa-solid fa-play"></i> Startup</h3>
-                        </div>
-                        <div class="card-body">
-                            <label class="small fw-bold">Command:</label>
-                            <code class="d-block bg-dark text-white p-2 small rounded mb-2"><%= addon.game_data?.startup?.command || '–' %></code>
-                            <label class="small fw-bold">Done-String:</label>
-                            <code class="d-block bg-dark text-white p-2 small rounded"><%= addon.game_data?.startup?.done || '–' %></code>
-                        </div>
-                    </div>
-
-                    <%# Variables %>
-                    <div class="card">
-                        <div class="card-header">
-                            <h3 class="card-title"><i class="fa-solid fa-sliders"></i> Variables</h3>
-                        </div>
-                        <div class="card-body">
-                            <% const vars = addon.game_data?.variables || []; %>
-                            <p class="text-secondary">
-                                <strong><%= vars.length %></strong> Variable(n) definiert
-                                <small class="ms-2">(aus game_data — im Guild-Kontext bearbeitbar)</small>
-                            </p>
-                            <% if (vars.length > 0) { %>
-                                <div class="table-responsive">
-                                    <table class="table table-sm table-hover">
-                                        <thead><tr><th>ENV</th><th>Default</th><th>Typ</th></tr></thead>
-                                        <tbody>
-                                            <% vars.forEach(v => { %>
-                                                <tr>
-                                                    <td><code><%= v.env_variable %></code></td>
-                                                    <td class="text-secondary small"><%= v.default_value || '–' %></td>
-                                                    <td><span class="badge bg-secondary-lt"><%= v.field_type || 'text' %></span></td>
-                                                </tr>
-                                            <% }); %>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            <% } %>
-                        </div>
-                    </div>
-
-                    <%# Installation Script %>
-                    <div class="card">
-                        <div class="card-header">
-                            <h3 class="card-title"><i class="fa-solid fa-terminal"></i> Installation Script</h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <label class="small fw-bold">Container:</label>
-                                    <code class="d-block bg-dark text-white p-2 small rounded mb-2"><%= addon.game_data?.scripts?.installation?.container || '–' %></code>
-                                    <label class="small fw-bold">Entrypoint:</label>
-                                    <code class="d-block bg-dark text-white p-2 small rounded"><%= addon.game_data?.scripts?.installation?.entrypoint || 'bash' %></code>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="small fw-bold">Script (read-only Vorschau):</label>
-                                    <textarea class="form-control bg-dark text-light" rows="8"
-                                              style="font-family:monospace;font-size:0.8rem;resize:vertical;" readonly
-                                    ><%= addon.game_data?.scripts?.installation?.script || '' %></textarea>
-                                    <small class="text-secondary">Skript über <em>game_data JSON-Editor</em> bearbeiten.</small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <%# game_data JSON-Editor %>
-                    <div class="card">
-                        <div class="card-header bg-dark text-white">
-                            <h3 class="card-title"><i class="fa-solid fa-code"></i> game_data (FIREBOT_v2 JSON)</h3>
-                        </div>
-                        <div class="card-body">
-                            <textarea id="gameDataTextarea" class="form-control bg-dark text-white"
-                                      rows="14" style="font-family:monospace;font-size:0.8rem;resize:vertical;"
-                            ><%= JSON.stringify(addon.game_data || {}, null, 2) %></textarea>
-                            <div class="mt-2">
-                                <button type="button" id="btnSaveGameData" class="btn btn-warning btn-sm">
-                                    <i class="fa-solid fa-save"></i> game_data speichern
-                                </button>
-                                <small class="text-secondary ms-2">runtime_type wird automatisch neu berechnet.</small>
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-
             </div>
 
         </div>
@@ -271,7 +136,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const formData = new FormData(this);
         const payload = {
             name:        formData.get('name'),
-            slug:        formData.get('slug'),
             description: formData.get('description'),
             tags:        formData.get('tags'),
         };
@@ -323,84 +187,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error('Error:', error);
             toastr.error('Fehler beim Freigeben des Addons');
-        }
-    });
-    
-    // Quick-Approve Button (Header)
-    document.getElementById('btnApprove').addEventListener('click', async function() {
-        if (!confirm('Addon als VERIFIED und PUBLIC freigeben?')) return;
-        
-        try {
-            const response = await fetch(`/admin/addons/${addonId}/approve`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    trust_level: 'verified',
-                    visibility: 'public'
-                })
-            });
-            
-            const result = await response.json();
-            
-            if (result.success) {
-                toastr.success('Addon erfolgreich freigegeben!');
-                setTimeout(() => location.reload(), 1500);
-            } else {
-                toastr.error(result.message || 'Fehler beim Freigeben des Addons');
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            toastr.error('Fehler beim Freigeben des Addons');
-        }
-    });
-
-    // game_data JSON-Editor speichern
-    document.getElementById('btnSaveGameData').addEventListener('click', async function() {
-        const rawJson = document.getElementById('gameDataTextarea').value;
-
-        let gameData;
-        try {
-            gameData = JSON.parse(rawJson);
-        } catch {
-            toastr.error('Ungültiges JSON — bitte Syntax prüfen');
-            return;
-        }
-        if (gameData?.meta?.version !== 'FIREBOT_v2') {
-            toastr.error('meta.version muss "FIREBOT_v2" sein');
-            return;
-        }
-
-        this.disabled = true;
-        this.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Speichert...';
-
-        const form = document.getElementById('metadataForm');
-        const payload = {
-            name:        form.querySelector('[name=name]').value,
-            slug:        form.querySelector('[name=slug]').value,
-            description: form.querySelector('[name=description]').value,
-            tags:        form.querySelector('[name=tags]').value,
-            game_data:   JSON.stringify(gameData),
-        };
-
-        try {
-            const response = await fetch(`/admin/addons/${addonId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
-            const result = await response.json();
-            if (result.success) {
-                toastr.success('game_data gespeichert!');
-                setTimeout(() => location.reload(), 1200);
-            } else {
-                toastr.error(result.message || 'Fehler beim Speichern');
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            toastr.error('Netzwerkfehler beim Speichern');
-        } finally {
-            this.disabled = false;
-            this.innerHTML = '<i class="fa-solid fa-save"></i> game_data speichern';
         }
     });
 });

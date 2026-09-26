@@ -1,39 +1,21 @@
-<%# Admin: Addon Marketplace Management - Hauptseite %>
+<%# Admin: Spiele-Marktplatz - Hauptseite %>
 
     <div class="content">
         <div class="container-fluid">
 
             <%#
-              Aktionsleiste.
-
-              Sie fiel beim Umstellen auf Tabler heraus (19efb60). Damit gab es
-              keinen Weg mehr, ein Addon anzulegen oder zu importieren: Der
-              einzige verbliebene Knopf steckt weiter unten im Leer-Zustand und
-              erscheint nur, wenn ueberhaupt kein Addon vorhanden ist.
-
-              Die Attribute heissen jetzt data-bs-*: Tabler bringt Bootstrap 5
-              mit, die alte Schreibweise data-toggle/data-target stammt aus
-              Bootstrap 4 und oeffnet dort gar nichts.
+              Kopfzeile ohne Aktionen. Anlegen, Egg-Import und JSON-Einfügen sind
+              seit dem 2026-09-26 weg (Egg-Rückbau B): Sie schrieben FIREBOT_v2,
+              und seit dem 2026-09-10 startet der Daemon nur Server mit Paket.
+              Neue Spiele entstehen in der Werkbank; ihre Einlieferung legt den
+              Anker hier selbst an.
             %>
             <div class="row align-items-center mb-3">
                 <div class="col">
                     <h2 class="page-title mb-0">
                         <i class="fa-solid fa-puzzle-piece me-2"></i>
-                        Addon Marketplace Management
+                        Spiele-Marktplatz
                     </h2>
-                </div>
-                <div class="col-auto ms-auto">
-                    <div class="btn-list">
-                        <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#modalJsonPaste">
-                            <i class="fa-solid fa-code me-1"></i> Per JSON einfügen
-                        </button>
-                        <a href="/admin/addons/import" class="btn btn-primary">
-                            <i class="fa-solid fa-download me-1"></i> Egg importieren
-                        </a>
-                        <a href="/admin/addons/create" class="btn btn-success">
-                            <i class="fa-solid fa-plus me-1"></i> Manuell erstellen
-                        </a>
-                    </div>
                 </div>
             </div>
 
@@ -86,38 +68,6 @@
                       </div>
                     </div>
                 </div>
-                
-                <div class="col-lg-3 col-6">
-                    <div class="card card-sm">
-                      <div class="card-body">
-                        <div class="row align-items-center">
-                          <div class="col-auto">
-                            <span class="bg-primary text-white avatar"><i class="fa-brands fa-docker"></i></span>
-                          </div>
-                          <div class="col">
-                            <div class="h2 fw-medium mb-0"><%= stats.docker_steam %></div>
-                            <div class="text-secondary">Docker + SteamCMD</div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                </div>
-                
-                <div class="col-lg-3 col-6">
-                    <div class="card card-sm">
-                      <div class="card-body">
-                        <div class="row align-items-center">
-                          <div class="col-auto">
-                            <span class="bg-secondary text-white avatar"><i class="fa-solid fa-cube"></i></span>
-                          </div>
-                          <div class="col">
-                            <div class="h2 fw-medium mb-0"><%= stats.docker_standalone %></div>
-                            <div class="text-secondary">Docker Standalone</div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                </div>
             </div>
 
             <%# Addon-Tabelle %>
@@ -142,12 +92,9 @@
                             <tr>
                                 <th>ID</th>
                                 <th>Name</th>
-                                <th>Runtime</th>
-                                <th>Source</th>
                                 <th>Status</th>
                                 <th>Trust Level</th>
                                 <th>Visibility</th>
-                                <th>Last Tested</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -159,30 +106,6 @@
                                         <td>
                                             <strong><%= addon.name %></strong><br>
                                             <small class="text-secondary"><%= addon.slug %></small>
-                                        </td>
-                                        <td>
-                                            <% if (addon.runtime_type === 'docker_steam') { %>
-                                                <span class="badge bg-primary-lt">
-                                                    <i class="fa-brands fa-docker"></i> Docker + Steam
-                                                </span>
-                                            <% } else if (addon.runtime_type === 'docker_standalone') { %>
-                                                <span class="badge bg-info-lt">
-                                                    <i class="fa-solid fa-cube"></i> Docker Standalone
-                                                </span>
-                                            <% } else { %>
-                                                <span class="badge bg-secondary-lt">
-                                                    <i class="fa-solid fa-question"></i> <%= addon.runtime_type || 'Unbekannt' %>
-                                                </span>
-                                            <% } %>
-                                        </td>
-                                        <td>
-                                            <% if (addon.source_type === 'pelican') { %>
-                                                <i class="fa-solid fa-egg"></i> Pelican
-                                            <% } else if (addon.source_type === 'native') { %>
-                                                <i class="fa-solid fa-crown"></i> Native
-                                            <% } else { %>
-                                                <i class="fa-solid fa-users"></i> Community
-                                            <% } %>
                                         </td>
                                         <td>
                                             <% if (addon.status === 'approved') { %>
@@ -250,22 +173,11 @@
                                             <% } %>
                                         </td>
                                         <td>
-                                            <% if (addon.last_tested_at) { %>
-                                                <small><%= new Date(addon.last_tested_at).toLocaleDateString('de-DE') %></small>
-                                            <% } else { %>
-                                                <small class="text-secondary">Nie</small>
-                                            <% } %>
-                                        </td>
-                                        <td>
                                             <div class="btn-group btn-group-sm">
                                                 <a href="/admin/addons/<%= addon.id %>" 
                                                    class="btn btn-info" title="Edit">
                                                     <i class="fa-solid fa-edit"></i>
                                                 </a>
-                                                <button class="btn btn-success btn-test-addon" 
-                                                        data-addon-id="<%= addon.id %>" title="Test Installation">
-                                                    <i class="fa-solid fa-flask"></i>
-                                                </button>
                                                 <button class="btn btn-danger btn-delete-addon" 
                                                         data-addon-id="<%= addon.id %>" 
                                                         data-addon-name="<%= addon.name %>" 
@@ -278,12 +190,9 @@
                                 <% }); %>
                             <% } else { %>
                                 <tr>
-                                    <td colspan="9" class="text-center text-secondary">
+                                    <td colspan="6" class="text-center text-secondary">
                                         <i class="fa-solid fa-inbox"></i><br>
-                                        Keine Addons vorhanden<br>
-                                        <a href="/admin/addons/import" class="btn btn-primary btn-sm mt-2">
-                                            <i class="fa-solid fa-download"></i> Egg importieren
-                                        </a>
+                                        Keine Spiele vorhanden — neue entstehen in der Werkbank.
                                     </td>
                                 </tr>
                             <% } %>
@@ -307,33 +216,6 @@ document.addEventListener('DOMContentLoaded', () => {
         rows.forEach(row => {
             const text = row.textContent.toLowerCase();
             row.style.display = text.includes(searchTerm) ? '' : 'none';
-        });
-    });
-    
-    // Test-Installation
-    document.querySelectorAll('.btn-test-addon').forEach(btn => {
-        btn.addEventListener('click', async function() {
-            const addonId = this.dataset.addonId;
-            
-            if (!confirm('Test-Installation für dieses Addon starten?')) return;
-            
-            try {
-                const response = await fetch(`/admin/addons/${addonId}/test`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    alert('✅ ' + result.message);
-                } else {
-                    alert('❌ ' + result.message);
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Fehler beim Starten des Tests');
-            }
         });
     });
     
@@ -368,146 +250,5 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // ── JSON-Paste Modal ─────────────────────────────────────────────────────
-
-    const jsonTextarea = document.getElementById('jsonPasteContent');
-    const jsonNameField = document.getElementById('jsonPasteName');
-    const jsonSlugField = document.getElementById('jsonPasteSlug');
-
-    // JSON einfügen → Felder auto-befüllen
-    if (jsonTextarea) {
-        jsonTextarea.addEventListener('input', function () {
-            try {
-                const parsed = JSON.parse(this.value.trim());
-                const meta = parsed?.meta || {};
-                if (meta.name && !jsonNameField.value) jsonNameField.value = meta.name;
-                if (meta.slug && !jsonSlugField.value) jsonSlugField.value = meta.slug;
-            } catch (_) { /* JSON noch unvollständig */ }
-        });
-    }
-
-    document.getElementById('btnJsonPasteSubmit')?.addEventListener('click', async function () {
-        const rawJson = jsonTextarea?.value?.trim();
-        const name    = jsonNameField?.value?.trim();
-        const slug    = jsonSlugField?.value?.trim();
-        const category = document.getElementById('jsonPasteCategory')?.value;
-
-        if (!rawJson) return toastr.error('Bitte JSON einfügen');
-        if (!name)    return toastr.error('Bitte einen Namen angeben');
-        if (!slug)    return toastr.error('Bitte einen Slug angeben');
-
-        let parsed;
-        try {
-            parsed = JSON.parse(rawJson);
-        } catch (e) {
-            return toastr.error('Ungültiges JSON: ' + e.message);
-        }
-
-        const btn = this;
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Speichere…';
-
-        try {
-            const response = await fetch('/admin/addons/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name,
-                    slug,
-                    description: parsed?.meta?.description || '',
-                    category,
-                    game_data: JSON.stringify(parsed),
-                    source_type: 'native'
-                })
-            });
-            const result = await response.json();
-            if (result.success) {
-                toastr.success('Addon gespeichert – Weiterleitung…');
-                setTimeout(() => window.location.href = `/admin/addons/${result.id || ''}`, 1200);
-            } else {
-                toastr.error(result.message || 'Fehler beim Speichern');
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fa-solid fa-save me-1"></i> Speichern';
-            }
-        } catch (error) {
-            console.error('JSON-Paste Fehler:', error);
-            toastr.error('Netzwerkfehler');
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fa-solid fa-save me-1"></i> Speichern';
-        }
-    });
-
 });
 </script>
-
-<!-- ── Modal: Addon per JSON einfügen ──────────────────────────────────── -->
-<div class="modal fade" id="modalJsonPaste" tabindex="-1" role="dialog" aria-labelledby="modalJsonPasteLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="modalJsonPasteLabel">
-                    <i class="fa-solid fa-code me-2"></i>Addon per JSON einfügen
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" aria-label="Schließen"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label for="jsonPasteContent">
-                        <strong>FIREBOT_v2 JSON</strong>
-                        <span class="text-secondary ms-2">— vollständige Addon-Definition einfügen</span>
-                    </label>
-                    <textarea
-                        id="jsonPasteContent"
-                        class="form-control font-monospace"
-                        rows="10"
-                        placeholder='{ "meta": { "version": "FIREBOT_v2", "name": "My Server", ... }, ... }'
-                        style="font-size:12px;"></textarea>
-                </div>
-                <div class="row">
-                    <div class="col-md-5">
-                        <div class="mb-3">
-                            <label for="jsonPasteName">Name <span class="text-danger">*</span></label>
-                            <input type="text" id="jsonPasteName" class="form-control" placeholder="wird aus JSON befüllt">
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="mb-3">
-                            <label for="jsonPasteSlug">Slug <span class="text-danger">*</span></label>
-                            <input type="text" id="jsonPasteSlug" class="form-control" placeholder="z.B. valheim">
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="mb-3">
-                            <label for="jsonPasteCategory">Kategorie</label>
-                            <select id="jsonPasteCategory" class="form-control">
-                                <option value="other">Sonstiges</option>
-                                <option value="fps">FPS / Shooter</option>
-                                <option value="survival">Survival</option>
-                                <option value="sandbox">Sandbox</option>
-                                <option value="mmorpg">MMORPG</option>
-                                <option value="racing">Racing</option>
-                                <option value="strategy">Strategie</option>
-                                <option value="horror">Horror</option>
-                                <option value="scifi">Sci-Fi</option>
-                                <option value="community">Community</option>
-                                <option value="pelican">Pelican</option>
-                                <option value="native">Native</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-                <div class="alert alert-info mb-0">
-                    <i class="fa-solid fa-circle-info me-1"></i>
-                    Das Addon wird mit Status <strong>Pending Review</strong> gespeichert.
-                    Name und Slug werden automatisch aus dem <code>meta</code>-Block befüllt, können aber manuell überschrieben werden.
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
-                <button type="button" id="btnJsonPasteSubmit" class="btn btn-warning">
-                    <i class="fa-solid fa-save me-1"></i> Speichern
-                </button>
-            </div>
-        </div>
-    </div>
-</div>

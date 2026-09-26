@@ -14,9 +14,9 @@
   Die Inhalte sind nicht weg, sie sind einsortiert:
 
     Übersicht   → die neuen Karten (Zustand, Einstellungen, Befehle, Welt)
-    Variablen   → „Rohmodus" in der fachlichen Höhe; die Einstellungskarte
-                  bedient das Übliche, der Rohmodus alles
-    RCON        → die Befehle-Karte sagt, WAS geht; der Rohmodus ist das Werkzeug
+    Variablen   → die Einstellungskarte. Der „Rohmodus" zeigte die Variablen
+                  des Eggs und ist seit dem 2026-09-26 weg (Egg-Rückbau B)
+    RCON        → die Befehle-Karte sagt, WAS geht; der Bereich RCON ist das Werkzeug
     Konsole,    → Karten in der fachlichen Höhe
     Aufgaben,
     Panels,
@@ -222,7 +222,6 @@
        ['sicherungen',  'Sicherungen'],
        ['inhalte',      'Mods'],
        ['konsole',      'Konsole'],
-       ['rohmodus',     'Rohmodus'],
        // „RCON" statt „Fernsteuerung": Betreiber am 2026-09-22 — „das kennen
        // alle". Der PFAD bleibt `fernsteuerung`, damit Lesezeichen und Verweise
        // weiter treffen; nur der Name aendert sich.
@@ -285,8 +284,6 @@
           <%- include('partials/server-detail-inhalte', { server, guildId, userPermissions }) %>
         <% } else if (bereich === 'konsole') { %>
           <%- include('partials/server-detail-console', { server, guildId, userPermissions, consoleTransport: locals.consoleTransport }) %>
-        <% } else if (bereich === 'rohmodus') { %>
-          <%- include('partials/server-detail-variables', { server, gameData, guildId, userPermissions }) %>
         <% } else if (bereich === 'fernsteuerung') { %>
           <%- include('partials/server-detail-rcon', { server, guildId, userPermissions }) %>
         <% } else if (bereich === 'aufgaben') { %>

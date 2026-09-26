@@ -35,7 +35,6 @@ const { resolveStatusConfig } = require('../helpers/StatusSchema');
 // (Konzept 23.2 — kennzeichnen, nicht verstecken). Das ist eine Hilfe beim
 // Aufraeumen und nicht der Egg-Weg beim Anlegen oder Starten, den 69bedad
 // beseitigt hat.
-const { beurteileVariablen } = require('../helpers/EggVariables');
 const PanelService = require('../helpers/PanelService');
 const { validateCommand, rateLimiter } = require('../helpers/CommandFilter');
 const { resolveConsoleTransport } = require('../helpers/ConsoleTransport');
@@ -2214,7 +2213,7 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
         // Kein Bereich heisst: die Serverseite selbst.
         const BEREICHE = {
             dateien: 'Dateien', sicherungen: 'Sicherungen', inhalte: 'Mods', konsole: 'Konsole',
-            rohmodus: 'Einstellungen — Rohmodus', fernsteuerung: 'RCON',
+            fernsteuerung: 'RCON',
             aufgaben: 'Wiederkehrende Aufgaben', panels: 'Discord-Panels',
             oeffentlich: 'Öffentliche Seite',
         };
@@ -2276,8 +2275,7 @@ router.get('/:serverId/edit', requirePermission('GAMESERVER.EDIT'), async (req, 
                 gs.addon_version,
                 gs.auto_restart,
                 gs.auto_update,
-                gs.env_variables,
-                gs.frozen_game_data,
+                gs.paket_werte,
                 gs.rootserver_id,
                 gs.allocated_ram_mb,
                 gs.allocated_cpu_percent,
@@ -2299,43 +2297,18 @@ router.get('/:serverId/edit', requirePermission('GAMESERVER.EDIT'), async (req, 
             });
         }
 
-        // env_variables parsen falls als String gespeichert
-        if (typeof server.env_variables === 'string') {
-            try {
-                server.env_variables = JSON.parse(server.env_variables);
-            } catch (error) {
-                Logger.error(`[Gameserver] Fehler beim Parsen von env_variables:`, error);
-                server.env_variables = {};
-            }
-        }
-
-        // Sicherstellen dass env_variables ein Objekt ist
-        if (!server.env_variables || typeof server.env_variables !== 'object') {
-            server.env_variables = {};
-        }
-
-        // frozen_game_data ist die Vorlage, gegen die der Server wirklich läuft –
-        // nicht das Addon im Marktplatz, das inzwischen weitergezogen sein kann.
-        let frozenData = {};
+        // Slots stehen unter dem Paketschlüssel `max_players` — derselbe, den die
+        // Live-Anzeige nimmt (StatusService._maxSpielerAusWerten). Bis zum
+        // 2026-09-26 las diese Seite sie aus `env_variables` über Egg-Namen
+        // (MAX_PLAYERS, SLOTS …); die liest der Start seit dem 2026-09-10 nicht
+        // mehr, bei jedem Paket-Server stand hier „keine Slot-Variable".
+        let paketWerte = {};
         try {
-            frozenData = typeof server.frozen_game_data === 'string'
-                ? JSON.parse(server.frozen_game_data) : (server.frozen_game_data || {});
-        } catch (_) { /* unlesbar zählt als "nichts deklariert" */ }
-
-        // Slot-Anzahl kommt aus der Addon-Variable, nicht aus der Spalte (Konzept 23.1).
-        // Der Name der Variable wird nach derselben Reihenfolge gesucht wie der Wert,
-        // Addon-Übersteuerung eingeschlossen – sonst zeigte die Anzeige einen Wert aus
-        // der einen und einen Namen aus einer anderen Variable.
-        const slots = StatusService.resolveMaxPlayers(server.env_variables, frozenData);
-        const slotOverride = frozenData?.status?.merge?.max_players;
-        const slotKandidaten = typeof slotOverride === 'string' && slotOverride.startsWith('variable:')
-            ? [slotOverride.slice('variable:'.length), 'MAX_PLAYERS', 'MAXPLAYERS', 'SERVER_MAXPLAYERS', 'SLOTS']
-            : ['MAX_PLAYERS', 'MAXPLAYERS', 'SERVER_MAXPLAYERS', 'SLOTS'];
-        const slotVariable = slotKandidaten
-            .find(k => parseInt(server.env_variables?.[k], 10) > 0) || null;
-
-        // Welche Variablen kommen nirgends vor? (Konzept 23.2 – kennzeichnen, nicht verstecken)
-        const variablen = beurteileVariablen(frozenData, server.env_variables);
+            paketWerte = typeof server.paket_werte === 'string'
+                ? JSON.parse(server.paket_werte) : (server.paket_werte || {});
+        } catch (_) { paketWerte = {}; }
+        const slots = StatusService._maxSpielerAusWerten(paketWerte);
+        const slotVariable = slots ? 'max_players' : null;
 
         // ════════════════════════════════════════════════════════════════════
         // Wie viel darf dieser Server bekommen?
@@ -2384,7 +2357,6 @@ router.get('/:serverId/edit', requirePermission('GAMESERVER.EDIT'), async (req, 
             guildId,
             slots,
             slotVariable,
-            unbenutzteVariablen: variablen.filter(v => !v.verwendet)
         });
     } catch (error) {
         Logger.error('[Gameserver] Fehler beim Laden des Edit-Formulars:', error);
@@ -2595,13 +2567,13 @@ router.put('/:serverId', requirePermission('GAMESERVER.EDIT'), async (req, res) 
         const guildId = res.locals.guildId;
         const { serverId } = req.params;
         // `max_players` wird bewusst NICHT mehr aus dem Formular übernommen
-        // (Konzept 23.1): Die Slot-Anzahl steht in der Addon-Variable MAX_PLAYERS,
-        // nur die landet im Startbefehl. Die Spalte ist eine abgeleitete Anzeige,
+        // (Konzept 23.1): Die Slot-Anzahl ist die Einstellung `max_players` des
+        // Pakets (paket_werte), nur die landet im Startbefehl. Die Spalte ist eine abgeleitete Anzeige,
         // die der StatusPoller aus dem Snapshot pflegt. Wer sie hier von Hand
         // überschrieb, änderte am Spiel nichts - der Wert wanderte lautlos zurück,
         // sobald die nächste Abfrage durchlief.
         const {
-            name, auto_restart, auto_update, env_variables,
+            name, auto_restart, auto_update,
             allocated_ram_mb, allocated_cpu_percent, allocated_disk_gb,
             backup_keep, backup_keep_days
         } = req.body;
@@ -2693,86 +2665,17 @@ router.put('/:serverId', requirePermission('GAMESERVER.EDIT'), async (req, res) 
             neueRessourcen = { ramMB, cpuPercent, diskGB };
         }
 
-        // ENV-Variables JSON validieren
-        let envVarsJson = {};
-        if (env_variables && env_variables.trim().length > 0) {
-            try {
-                envVarsJson = JSON.parse(env_variables);
-            } catch (e) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Ungültiges JSON-Format bei Environment Variables'
-                });
-            }
-        }
-
-        // ════════════════════════════════════════════════════════════════════
-        // Portvariablen gegen die Allocation prüfen (Baustellen 39)
-        //
-        // Eine Variable wie `RCON_PORT` trägt eine Portnummer. Wer sie von Hand
-        // ändert, kann einen Port erwischen, den der RootServer gar nicht offen
-        // hat — oder der einem anderen Server gehört. Das fiele erst beim
-        // Verbinden auf, und dann sieht es nach einem kaputten Spiel aus.
-        //
-        // Erlaubt ist nur, was diesem Server als Allocation gehört. Beim Start
-        // speist die Allocation die Variable ohnehin (`StartPayload`); diese
-        // Prüfung sagt es dem Nutzer, statt seine Eingabe stillschweigend zu
-        // überschreiben.
-        // ════════════════════════════════════════════════════════════════════
-        const serverPorts = (() => {
-            try {
-                return typeof server.ports === 'string' ? JSON.parse(server.ports) : (server.ports || {});
-            } catch (_) { return {}; }
-        })();
-        const eigeneAllocations = new Set(
-            Object.values(serverPorts)
-                .map(p => String(p?.external ?? p?.internal ?? p))
-                .filter(Boolean)
-        );
-
-        // Nur beanstanden, was in DIESEM Speichervorgang geaendert wurde.
-        // Bestandsdaten tragen noch Portnummern aus der Zeit vor der Umstellung
-        // (Server 159: RCON_PORT=27020, nie eine Allocation) — wer die pauschal
-        // ablehnt, macht das Speichern genau der Server unmoeglich, die man
-        // gerade reparieren will.
-        const bisher = (() => {
-            try {
-                const roh = typeof server.env_variables === 'string'
-                    ? JSON.parse(server.env_variables) : (server.env_variables || {});
-                return roh || {};
-            } catch (_) { return {}; }
-        })();
-
-        if (eigeneAllocations.size) {
-            const verstoesse = [];
-            for (const [name, wert] of Object.entries(envVarsJson)) {
-                if (!/_PORT$/.test(name)) continue;
-                const nummer = String(wert || '').trim();
-                if (!nummer || !/^\d+$/.test(nummer)) continue;
-                if (eigeneAllocations.has(nummer)) continue;
-                if (String(bisher[name] ?? '').trim() === nummer) continue;  // unveraendert
-                verstoesse.push({ name, nummer });
-            }
-
-            if (verstoesse.length) {
-                const belegte = [...eigeneAllocations].sort((a, b) => Number(a) - Number(b)).join(', ');
-                return res.status(400).json({
-                    success: false,
-                    message: verstoesse.map(v =>
-                        `${v.name} = ${v.nummer} ist keiner der Ports dieses Servers`
-                    ).join('; ') + `. Verfügbar sind: ${belegte}. `
-                      + 'Portnummern kommen aus der Port-Verwaltung des RootServers, nicht aus dieser Variable.'
-                });
-            }
-        }
+        // `env_variables` nimmt diese Route seit dem 2026-09-26 nicht mehr an:
+        // Der Start liest sie seit dem 2026-09-10 nicht (Werte kommen aus
+        // `paket_werte`, Ports aus der Allocation). Das Feld speicherte, was nie
+        // ankam (Egg-Rückbau B).
 
         // Update ausführen
-        const felder = ['name = ?', 'auto_restart = ?', 'auto_update = ?', 'env_variables = ?'];
+        const felder = ['name = ?', 'auto_restart = ?', 'auto_update = ?'];
         const werte  = [
             name.trim(),
             toBool(auto_restart) ? 1 : 0,
             toBool(auto_update) ? 1 : 0,
-            JSON.stringify(envVarsJson)
         ];
 
         if (neueRessourcen) {
@@ -3543,86 +3446,10 @@ router.put('/:serverId/ports', requirePermission('GAMESERVER.EDIT'), async (req,
     }
 });
 
-// ============================================================
-// CONFIG-APPLY: Config-Dateien auf Disk patchen (ohne Server-Neustart)
-// POST /guild/:guildId/plugins/gameserver/servers/:serverId/apply-config
-// ============================================================
-router.post('/:serverId/apply-config', requirePermission('GAMESERVER.EDIT'), async (req, res) => {
-    const Logger = ServiceManager.get('Logger');
-    const dbService = ServiceManager.get('dbService');
-    const ipmServer = ServiceManager.get('ipmServer');
-
-    try {
-        const guildId = res.locals.guildId;
-        const serverId = req.params.serverId;
-
-        // Server mit game_data + daemon_id laden
-        const [server] = await dbService.query(`
-            SELECT gs.id, gs.env_variables, gs.ports,
-                   gs.frozen_game_data, gs.install_path, gs.bind_ip,
-                   r.daemon_id, r.system_user
-            FROM gameservers gs
-            LEFT JOIN rootserver r ON gs.rootserver_id = r.id
-            WHERE gs.id = ? AND gs.guild_id = ?
-        `, [serverId, guildId]);
-
-        if (!server) {
-            return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
-        }
-
-        if (!server.daemon_id) {
-            return res.status(400).json({ success: false, message: 'Kein Daemon zugewiesen' });
-        }
-
-        // frozen_game_data parsen
-        let frozenData = {};
-        try {
-            frozenData = typeof server.frozen_game_data === 'string'
-                ? JSON.parse(server.frozen_game_data)
-                : (server.frozen_game_data || {});
-        } catch (_) { frozenData = {}; }
-
-        const configFiles = frozenData?.config?.files || {};
-        if (Object.keys(configFiles).length === 0) {
-            return res.json({ success: true, message: 'Keine Config-Dateien zum Patchen definiert' });
-        }
-
-        // env_variables + ports parsen
-        let envVars = {};
-        try {
-            envVars = typeof server.env_variables === 'string'
-                ? JSON.parse(server.env_variables) : (server.env_variables || {});
-        } catch (_) { envVars = {}; }
-
-        let ports = {};
-        try {
-            ports = typeof server.ports === 'string'
-                ? JSON.parse(server.ports) : (server.ports || {});
-        } catch (_) { ports = {}; }
-
-        // IPM Command an Daemon senden
-        const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.apply_config', {
-            server_id: String(serverId),
-            config_files: configFiles,
-            env_variables: envVars,
-            ports: ports,
-            install_path: server.install_path,
-            bind_ip: server.bind_ip || null
-        }, 15000);
-
-        if (!response.success) {
-            Logger.warn(`[Gameserver] Config-Apply fehlgeschlagen für Server ${serverId}: ${response.message}`);
-            return res.status(500).json({ success: false, message: response.message || 'Config-Apply fehlgeschlagen' });
-        }
-
-        Logger.info(`[Gameserver] Config-Dateien gepatcht für Server ${serverId}`);
-        return res.json({ success: true, message: 'Config-Dateien erfolgreich gepatcht' });
-
-    } catch (error) {
-        Logger.error('[Gameserver] Fehler beim Config-Apply:', error);
-        return res.status(500).json({ success: false, message: 'Serverfehler beim Config-Apply' });
-    }
-});
+// Hier stand bis zum 2026-09-26 `POST /:serverId/apply-config` — der
+// Rohmodus patchte damit die `config.files` des Eggs (frozen_game_data) über
+// `gameserver.apply_config`. Paket-Server hatten dort nichts; Dateien setzt
+// das Paket selbst (`files.patch`, `apply` der Einstellungen) beim Start.
 
 // ============================================================
 // EINSTELLUNGEN: Werte des Servers ändern (Einstellungskarte)

@@ -1,38 +1,6 @@
 <!-- Addon Marketplace -->
 
 
-            <!-- Meine Addons Promo Card -->
-            <div class="row mb-4">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-status-top bg-primary"></div>
-                        <div class="card-body">
-                            <div class="row align-items-center">
-                                <div class="col-md-8">
-                                    <h4 class="mb-2">
-                                        <i class="fa-solid fa-egg"></i>
-                                        <%= tr('gameserver:MY_ADDONS.PROMO_TITLE') || 'Erstelle deine eigenen Addons!' %>
-                                    </h4>
-                                    <p class="text-secondary mb-0">
-                                        <%= tr('gameserver:MY_ADDONS.PROMO_TEXT') || 'Erstelle, bearbeite und teile deine eigenen Game-Server-Konfigurationen mit der Community. Nutze Templates oder starte von Grund auf!' %>
-                                    </p>
-                                </div>
-                                <div class="col-md-4 text-end">
-                                    <a href="/guild/<%= guildId %>/plugins/gameserver/addons/my-addons" class="btn btn-primary btn-lg">
-                                        <i class="fa-solid fa-egg"></i>
-                                        <%= tr('gameserver:MY_ADDONS.GO_TO_MY_ADDONS') || 'Zu meinen Addons' %>
-                                    </a>
-                                    <a href="/guild/<%= guildId %>/plugins/gameserver/addons/create" class="btn btn-success btn-lg">
-                                        <i class="fa-solid fa-plus"></i>
-                                        <%= tr('gameserver:MY_ADDONS.CREATE_NEW_ADDON') || 'Neues Addon erstellen' %>
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <div class="row">
                 <!-- Sidebar Filter -->
                 <div class="col-lg-3">
@@ -194,20 +162,6 @@
                                                 <span class="badge bg-info-lt ms-1">
                                                     <%= addon.category.toUpperCase() %>
                                                 </span>
-
-                                                <% if (addon.runtime_type === 'docker_steam') { %>
-                                                    <span class="badge bg-dark-lt ms-1">
-                                                        <i class="fa-brands fa-steam"></i> Steam
-                                                    </span>
-                                                <% } else if (addon.runtime_type === 'docker_standalone') { %>
-                                                    <span class="badge bg-dark-lt ms-1">
-                                                        <i class="fa-brands fa-docker"></i> Docker
-                                                    </span>
-                                                <% } else if (addon.runtime_type === 'native_steamcmd') { %>
-                                                    <span class="badge bg-secondary-lt ms-1">
-                                                        <i class="fa-brands fa-steam"></i> Native
-                                                    </span>
-                                                <% } %>
                                             </div>
 
                                             <!-- Addon Name -->

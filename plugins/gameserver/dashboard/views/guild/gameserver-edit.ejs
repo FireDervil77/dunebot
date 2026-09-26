@@ -298,63 +298,15 @@
                                                 </span>
                                             <% } %>
                                         <% } else { %>
-                                            <span class="text-secondary">&ndash; keine Slot-Variable gesetzt</span>
+                                            <span class="text-secondary">&ndash; das Spielpaket nennt keine Slot-Anzahl</span>
                                         <% } %>
                                     </div>
                                     <small class="form-text text-secondary">
-                                        Die Slot-Anzahl steht in den Environment Variables weiter unten
-                                        &ndash; nur die landet im Startbefehl des Spiels. Ein eigenes
-                                        Feld gab es hier bis zum 01.08.2026; es schrieb in eine reine
-                                        Anzeigespalte und änderte am Server nichts.
+                                        Die Slot-Anzahl ist eine Einstellung des Spiels
+                                        (<code>max_players</code>) und wird auf der Serverseite unter
+                                        &bdquo;Einstellungen&ldquo; geändert &ndash; nur die landet im
+                                        Startbefehl.
                                     </small>
-                                </div>
-
-                                <!-- Environment Variables (JSON Editor) -->
-                                <div class="mb-3">
-                                    <label for="env_variables">
-                                        <%= tr('gameserver:SERVER.ENV_VARIABLES') %>
-                                    </label>
-                                    <textarea class="form-control" 
-                                              id="env_variables" 
-                                              name="env_variables" 
-                                              rows="10"
-                                              placeholder='{"KEY": "value"}'><%= JSON.stringify(server.env_variables, null, 2) %></textarea>
-                                    <small class="form-text text-secondary">
-                                        <%= tr('gameserver:SERVER.ENV_VARIABLES_DESC') %>
-                                    </small>
-
-                                    <%
-                                        /*
-                                         * Kennzeichnen statt verstecken (Konzept 23.2): Diese Variablen
-                                         * kommen weder im Startbefehl noch im Installationsskript noch in
-                                         * den Konfigurationsvorlagen des Addons vor. Sie bleiben trotzdem
-                                         * im Editor stehen - man braucht sie vielleicht noch, und was man
-                                         * nicht sieht, findet man nicht wieder.
-                                         */
-                                        const ungenutzt = locals.unbenutzteVariablen || [];
-                                    %>
-                                    <% if (ungenutzt.length) { %>
-                                        <div class="alert alert-warning mt-2 mb-0 py-2">
-                                            <div class="mb-1">
-                                                <i class="fas fa-triangle-exclamation me-1"></i>
-                                                <strong>Diese Variablen werden von der Addon-Vorlage nicht eingesetzt:</strong>
-                                            </div>
-                                            <div class="mb-1">
-                                                <% ungenutzt.forEach(function (v) { %>
-                                                    <code class="me-2"
-                                                          title="<%= v.beschreibung || 'Keine Beschreibung im Addon' %>"><%= v.name %></code>
-                                                <% }); %>
-                                            </div>
-                                            <div class="small text-secondary">
-                                                Geprüft wurden Startbefehl, Stoppbefehl, Installationsskript und
-                                                Konfigurationsvorlagen &ndash; in den drei Schreibweisen
-                                                <code>{{NAME}}</code>, <code>${NAME}</code> und <code>$NAME</code>.
-                                                Ein Wert hier bleibt also voraussichtlich wirkungslos. Gelöscht
-                                                wird nichts: Falls das Container-Abbild die Variable selbst liest,
-                                                sieht diese Prüfung das nicht.
-                                            </div>
-                                        </div>
-                                    <% } %>
                                 </div>
 
                                 <!-- Server Status Info -->
