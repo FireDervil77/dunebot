@@ -74,7 +74,11 @@
                                 <div class="text-secondary"><%- notification.message %></div>
                                 <% if (notification.action_url && notification.action_text) { %>
                                     <div class="mt-3">
-                                        <a href="<%- notification.action_url %>" class="btn btn-primary btn-sm" target="_blank" rel="noopener">
+                                        <%# Verweise ins Dashboard im selben Fenster, nur fremde Adressen in
+                                            einem neuen (2026-09-26: die Daemon-Update-Meldung öffnete die
+                                            Rootserver-Seite in einem neuen Fenster). `//host` ist fremd. %>
+                                        <% const _intern = /^\/(?!\/)/.test(String(notification.action_url)); %>
+                                        <a href="<%= notification.action_url %>" class="btn btn-primary btn-sm"<% if (!_intern) { %> target="_blank" rel="noopener"<% } %>>
                                             <%- notification.action_text %>
                                         </a>
                                     </div>

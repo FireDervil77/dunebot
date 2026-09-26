@@ -68,6 +68,20 @@ const STAND = {
         assert.match(m[1].message, /&lt;img src=x onerror=alert\(1\)&gt;/);
     });
 
+    await check('der Knopf öffnet die Rootserver-Seite im selben Fenster, fremde Adressen in einem neuen', () => {
+        const ejs = require('ejs');
+        const fs = require('fs');
+        const datei = path.join(W, 'apps/dashboard/themes/default/views/layouts/guild.ejs');
+        const quelle = fs.readFileSync(datei, 'utf8');
+        const a = quelle.indexOf('<% if (notification.action_url');
+        assert.ok(a >= 0, 'Knopf der Meldung im Layout nicht gefunden');
+        const b = quelle.indexOf('<% } %>', quelle.indexOf('</a>', a)) + 7;
+        const knopf = (url) => ejs.render(quelle.slice(a, b), { notification: { action_url: url, action_text: 'x' } });
+        assert.ok(!/target=/.test(knopf(m[0].action_url)), knopf(m[0].action_url));
+        assert.match(knopf('https://example.com'), /target="_blank"/);
+        assert.match(knopf('//fremd.example'), /target="_blank"/);
+    });
+
     console.log('\n2. Wegklicken mit Textkennung');
     const { normalisiereKennung } = NotificationManager;
     await check('Zahl bleibt Zahl, Textkennung bleibt Text, Unsinn wird abgewiesen', () => {

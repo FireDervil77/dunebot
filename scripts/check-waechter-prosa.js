@@ -73,6 +73,7 @@ const BEKANNT = new Set([
     'check-chatansage.js',
     'check-conduit.js',
     'check-consent.js',
+    'check-daemon-meldung.js',    // rendert die echte Layout-Vorlage; EJS-Kommentare fallen beim Rendern weg
     'check-entwurfszustaende.js',
     'check-funktionskarte.js',
     'check-heimguild.js',
