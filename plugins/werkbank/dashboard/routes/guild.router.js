@@ -23,6 +23,10 @@
  *   POST /:kennung/pruefen              ganzes Rezept auf leerem Volume, Start, Stopp
  *   POST /:kennung/pruefung/abbrechen   hängenden Durchlauf von Hand rot setzen
  *
+ * Einstellungs-Baukasten B2-1 (Vorschläge aus einer Datei):
+ *   POST /:kennung/schluessel              Datei unter game/ lesen lassen → Funde
+ *   POST /:kennung/schluessel/uebernehmen  Angekreuztes als Einstellungen anlegen
+ *
  * Stufe 4 (Veröffentlichen):
  *   POST /:kennung/angaben              Slug, Name, Fassung, Beschreibung, Kategorie, Symbol, Banner
  *   POST /:kennung/veroeffentlichen     grün geprüften Entwurf in den Kanal test einliefern
@@ -257,6 +261,7 @@ router.get('/:kennung', requirePermission('WERKBANK.VIEW'), async (req, res) => 
             anzeige: { GRUPPE, WIRKUNG, RISIKO },
             belegt: pruefungen[0]?.ergebnis ? Sitzungen.belegteEinstellungen(pruefungen[0].entwurf, pruefungen[0].ergebnis) : null,
             laeufe,
+            vorschlagsDateien: Sitzungen.vorschlagsDateien(laeufe, entwurf.install?.steps),
             gruppiere: Sitzungen.gruppiere,
             // Die Adresse trägt die Kennung und trifft keinen Menüpunkt — ohne
             // Angabe klappte die Seitenleiste zu (check-navigation-treffer).
@@ -407,6 +412,24 @@ router.post('/:kennung/einstellungen', requirePermission('WERKBANK.BAUEN'), asyn
         return res.json({ success: true });
     } catch (error) {
         return fehler(res, error, 'Einstellung nicht gespeichert', 400);
+    }
+});
+
+router.post('/:kennung/schluessel', requirePermission('WERKBANK.VIEW'), async (req, res) => {
+    try {
+        const lesung = await Sitzungen.schluesselLesen(await offeneSitzung(req, res), req.body || {});
+        return res.json({ success: true, ...lesung });
+    } catch (error) {
+        return fehler(res, error, 'Datei nicht gelesen', 400);
+    }
+});
+
+router.post('/:kennung/schluessel/uebernehmen', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.vorschlaegeUebernehmen(await offeneSitzung(req, res), req.body || {});
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Nicht übernommen', 400);
     }
 });
 

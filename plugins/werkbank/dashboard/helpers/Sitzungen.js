@@ -1118,6 +1118,142 @@ async function dateienJetzt(sitzung) {
     return antwort.data?.dateien || null;
 }
 
+// ── Vorschläge aus einer Datei (Einstellungs-Baukasten B2-1, 2026-09-29) ─────
+//
+// Der Daemon liest die Datei mit derselben Schlüsselschreibweise wie sein
+// Schreiber (internal/parser/lesen.go) — hier wird NICHT zerlegt. Ein zweiter
+// Leser in JavaScript wäre eine zweite Auslegung von „ServerSettings.Name".
+
+/** Format aus der Endung — nur ein Vorschlag, im Formular änderbar. */
+const FORMAT_NACH_ENDUNG = { json: 'json', ini: 'ini', yml: 'yaml', yaml: 'yaml', properties: 'properties', xml: 'xml' };
+function formatVermuten(datei) {
+    const endung = String(datei).split('.').pop().toLowerCase();
+    return FORMAT_NACH_ENDUNG[endung] || '';
+}
+
+/**
+ * Welche Dateien sich anbieten, relativ zu game/ — so steht es später in
+ * `apply.file`. data/ fällt heraus: `apply: file` rechnet ab game/.
+ *
+ *   1. Ziele der template-Schritte. Gemessen an Factorio (2026-09-29): Die
+ *      server-settings.json legt die Installation an, das Spiel ändert sie
+ *      beim Start nicht — im Vorher/Nachher-Vergleich taucht die wichtigste
+ *      Datei deshalb nie auf.
+ *   2. Neu oder geändert unter game/ in den letzten Probestarts.
+ *
+ * Jeweils nur mit einer Endung, die ein Schreiber kennt.
+ */
+function vorschlagsDateien(laeufe, schritte = []) {
+    const gesehen = new Set();
+    const aus = [];
+    for (const schritt of schritte || []) {
+        const datei = schritt?.type === 'template' && typeof schritt.file === 'string' ? schritt.file.replace(/^game\//, '') : '';
+        if (!datei || gesehen.has(datei) || !formatVermuten(datei)) continue;
+        gesehen.add(datei);
+        aus.push({ datei, format: formatVermuten(datei), herkunft: 'template' });
+    }
+    const vorn = aus.length;
+    for (const lauf of laeufe || []) {
+        const d = json(lauf.dateien, null);
+        if (!d) continue;
+        for (const x of [...(d.neu || []), ...(d.geaendert || [])]) {
+            if (!x.pfad?.startsWith('game/')) continue;
+            const datei = x.pfad.slice(5);
+            if (gesehen.has(datei) || !formatVermuten(datei)) continue;
+            gesehen.add(datei);
+            aus.push({ datei, format: formatVermuten(datei), groesse: x.groesse, herkunft: 'probestart' });
+        }
+    }
+    const nachName = (a, b) => a.datei.localeCompare(b.datei);
+    return [...aus.slice(0, vorn).sort(nachName), ...aus.slice(vorn).sort(nachName)];
+}
+
+const RE_DATEI = /^(?!\/)(?!.*(^|\/)\.\.(\/|$))[^\0]{1,300}$/;
+
+/** Vom Daemon lesen lassen — gibt Funde, Auslassungen und die Zuordnung zu Vorhandenem. */
+async function schluesselLesen(sitzung, { datei, parser }) {
+    datei = String(datei || '').trim().replace(/^game\//, '');
+    if (!RE_DATEI.test(datei)) throw new Error('Datei relativ zu game/ angeben, ohne „..".');
+    if (!EINSTELLUNG.parser.includes(parser) || parser === 'text') {
+        throw new Error('Format: ini, json, yaml, properties oder xml.');
+    }
+    const daemon = await daemonFuer(sitzung);
+    const antwort = await daemon.senden('werkbank.schluessel', { datei, parser });
+    if (!antwort?.success) throw new Error(antwort?.error || 'Der Daemon hat nicht geantwortet');
+    const d = antwort.data || {};
+    const settings = sitzung.entwurf?.settings || [];
+    const vergeben = new Set(settings.map(s => s.key));
+    const funde = (d.funde || []).map((f) => {
+        const da = settings.find(s => (s.apply || []).some(z => z.target === 'file' && z.file === datei && z.path === f.pfad));
+        const key = da ? da.key : freierSchluessel(f.pfad, vergeben);
+        if (!da) vergeben.add(key);
+        return { ...f, vorhanden: da ? da.key : null, vorschlag: vorschlagAusFund(f, key) };
+    });
+    return { datei, parser, funde, ausgelassen: d.ausgelassen || [], anzahl_funde: d.anzahl_funde || funde.length };
+}
+
+/** Aus „ServerSettings.MaxPlayers" wird „max_players" — frei in dieser Sitzung. */
+function freierSchluessel(pfad, vergeben) {
+    const letzter = String(pfad).split('.').pop();
+    let basis = letzter.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    if (!/^[a-z]/.test(basis)) basis = 'wert_' + basis;
+    basis = basis.slice(0, 48) || 'wert';
+    let key = basis;
+    for (let n = 2; vergeben.has(key); n++) key = `${basis}_${n}`;
+    return key;
+}
+
+const RE_GEHEIM = /(pass(wor[dt])?|secret|token|kennwort)/i;
+
+/** Was beim Übernehmen angelegt würde — sichtbar, bevor angekreuzt wird. */
+function vorschlagAusFund(f, key) {
+    const name = String(f.pfad).split('.').pop().replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').trim();
+    let type = f.art === 'janein' ? 'boolean' : f.art === 'zahl' ? 'number' : 'text';
+    if (type === 'text' && RE_GEHEIM.test(f.pfad)) type = 'password';
+    return { key, name_de: name.charAt(0).toUpperCase() + name.slice(1), type, as: f.as || '' };
+}
+
+/**
+ * Angekreuztes als Einstellungen anlegen. Die Datei wird NOCH EINMAL gelesen:
+ * Übernommen wird nur ein Pfad, den der Daemon jetzt anbietet — nicht, was
+ * das Formular behauptet. Rolle „Experte", Wirkung „Neustart": sichtbar nur in
+ * der fachlichen Ansicht, bis ein Mensch es anders entscheidet.
+ */
+async function vorschlaegeUebernehmen(sitzung, { datei, parser, auswahl }) {
+    await pruefeFrei(sitzung);
+    if (!Array.isArray(auswahl) || !auswahl.length) throw new Error('Nichts angekreuzt.');
+    const lesung = await schluesselLesen(sitzung, { datei, parser });
+    const neu = [];
+    for (const a of auswahl) {
+        const f = lesung.funde.find(x => x.pfad === a?.pfad);
+        if (!f) throw new Error(`„${a?.pfad}" bietet die Datei nicht (mehr) an — neu lesen.`);
+        if (f.vorhanden) throw new Error(`„${f.pfad}" ist schon als „${f.vorhanden}" angelegt.`);
+        const v = f.vorschlag;
+        const formular = {
+            key: typeof a.key === 'string' && a.key.trim() ? a.key.trim() : v.key,
+            name_de: typeof a.name_de === 'string' && a.name_de.trim() ? a.name_de.trim() : v.name_de,
+            type: EINSTELLUNG.typen.includes(a.type) ? a.type : v.type,
+            role: 'expert', takes_effect: 'restart', risk: 'none',
+            apply: [{ target: 'file', file: lesung.datei, parser: lesung.parser, path: f.pfad, as: v.as }],
+        };
+        if (formular.type !== 'boolean') formular.apply[0].as = '';
+        // Der Wert aus der Datei ist die Vorgabe — bei Kennwörtern nicht: Was
+        // das Spiel beim ersten Start hineinschrieb, soll nicht in jedes Paket.
+        if (formular.type === 'boolean') formular.default = ['true', 'yes', 'on', 'enabled'].includes(String(f.wert).toLowerCase()) ? '1' : '0';
+        else if (formular.type === 'number') formular.default = Number.isFinite(Number(f.wert)) && f.wert !== '' ? f.wert : '';
+        else if (formular.type === 'text') formular.default = f.wert;
+        neu.push(einstellungAusFormular(formular));
+    }
+    const keys = neu.map(e => e.key);
+    if (new Set(keys).size !== keys.length) throw new Error('Zwei angekreuzte Einträge haben denselben Schlüssel.');
+    return entwurfSchreiben(sitzung, (e) => {
+        const liste = Array.isArray(e.settings) ? e.settings : [];
+        const doppelt = neu.find(n => liste.some(x => x.key === n.key));
+        if (doppelt) throw new Error(`Den Schlüssel „${doppelt.key}" gibt es schon.`);
+        e.settings = liste.concat(neu);
+    });
+}
+
 /**
  * Viele Dateien im selben Ordner zu einer Zeile zusammenfassen.
  *
@@ -1166,4 +1302,5 @@ module.exports = {
     werkbankTeil, ungenutztePorts, startSpeichern, starten, stoppen, eingabe, laeufe, laufenderLauf,
     portUebernehmen, portEntfernen, bereitschaftszeile,
     laufSetzen, konsoleAnhaengen, laufBeenden, dateienJetzt, gruppiere,
+    formatVermuten, vorschlagsDateien, schluesselLesen, vorschlaegeUebernehmen, freierSchluessel,
 };

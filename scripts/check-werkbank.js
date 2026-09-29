@@ -186,7 +186,7 @@ async function pruefe(name, fn) {
         const plugin = ohneKommentare(fs.readFileSync(path.join(HELFER, 'Sitzungen.js'), 'utf8'));
         // Zwei Schreibweisen: direkt, und über daemonFuer(...).senden('werkbank.x', …).
         const geschickt = [...plugin.matchAll(/(?:sendCommand\([^,]+,|senden\()\s*'(werkbank\.[a-z]+)'/g)].map(x => x[1]);
-        for (const b of ['werkbank.schritt', 'werkbank.verwerfen', 'werkbank.starten', 'werkbank.stoppen', 'werkbank.eingabe', 'werkbank.dateien', 'werkbank.pruefen']) {
+        for (const b of ['werkbank.schritt', 'werkbank.verwerfen', 'werkbank.starten', 'werkbank.stoppen', 'werkbank.eingabe', 'werkbank.dateien', 'werkbank.pruefen', 'werkbank.schluessel']) {
             assert.ok(geschickt.includes(b), `${b} wird nicht (mehr) geschickt — die Suche sieht ${geschickt}`);
         }
         for (const b of geschickt) assert.ok(client.includes(`case "${b}":`), `${b} fehlt im Daemon`);
@@ -800,6 +800,93 @@ async function pruefe(name, fn) {
         assert.ok(z, 'kein einstellungen-Ereignis');
         assert.match(z.daten.zeilen.join('\n'), /✓ max_players → file server-settings\.json: max_players: angekommen/);
         assert.match(z.daten.zeilen.join('\n'), /✗ oeffentlich .*nicht_gefunden — Schlüssel fehlt/);
+    });
+
+
+    console.log('\nVorschläge aus einer Datei (B2-1)');
+
+    await pruefe('Vertrag: die Formate der Vorschläge sind genau die, die der Daemon liest', async () => {
+        const go = ohneKommentare(fs.readFileSync(path.join(DAEMON, 'internal/parser/lesen.go'), 'utf8'));
+        const block = go.slice(go.indexOf('switch schreiber {'), go.indexOf('default:', go.indexOf('switch schreiber {')));
+        const liest = [...block.matchAll(/case "([a-z]+)":\s*\n\s*(?:err = )?lese/g)].map(x => x[1]).sort();
+        assert.deepStrictEqual(liest, ['ini', 'json', 'properties', 'xml', 'yaml'], 'der Daemon liest: ' + liest);
+        // text liest der Daemon ausdrücklich NICHT (Schreiber ersetzt ganze Zeilen).
+        assert.match(block, /case "text", "file":\s*\n[\s\S]*?return Lesung\{\}, fmt\.Errorf/);
+        const ejs = ohneKommentare(fs.readFileSync(path.join(__dirname, '../plugins/werkbank/dashboard/views/guild/werkbank-sitzung.ejs'), 'utf8'));
+        const m = ejs.match(/\['json', 'ini', 'yaml', 'properties', 'xml'\]\.forEach/);
+        assert.ok(m, 'die Formatauswahl der Seite hat sich geändert — hier nachziehen');
+        for (const f of ['json', 'ini', 'yaml', 'properties', 'xml']) assert.ok(Sitzungen.EINSTELLUNG.parser.includes(f));
+        await assert.rejects(Sitzungen.schluesselLesen(mitEinstellungen(), { datei: 'server.cfg', parser: 'text' }), /Format/);
+        assert.strictEqual(daemon.befehle.length, 0, 'text darf gar nicht erst beim Daemon ankommen');
+    });
+
+    await pruefe('Kandidaten: nur game/, nur bekannte Endungen, relativ zu game/', async () => {
+        const laeufe = [
+            { dateien: { neu: [{ pfad: 'game/server-settings.json', groesse: 3 }, { pfad: 'game/factorio-current.log', groesse: 9 },
+                { pfad: 'data/.config/x.json', groesse: 1 }], geaendert: [{ pfad: 'game/config/a.ini', groesse: 2 }] } },
+            { dateien: JSON.stringify({ neu: [{ pfad: 'game/server-settings.json', groesse: 3 }], geaendert: [] }) },
+            { dateien: null },
+        ];
+        assert.deepStrictEqual(Sitzungen.vorschlagsDateien(laeufe).map(v => v.datei + ':' + v.format),
+            ['config/a.ini:ini', 'server-settings.json:json']);
+        // Die Datei der Installation zuerst — auch wenn das Spiel sie nie anfasst (Factorio).
+        const schritte = [{ type: 'template', file: 'data/server.json' }, { type: 'script' }, { type: 'template', file: 'README' }];
+        assert.deepStrictEqual(Sitzungen.vorschlagsDateien([{ dateien: { neu: [{ pfad: 'game/b.json' }] } }], schritte).map(v => v.datei + ':' + v.herkunft),
+            ['data/server.json:template', 'b.json:probestart']);
+    });
+
+    const lesung = () => ({ success: true, data: { funde: [
+        { pfad: 'max_players', wert: '8', art: 'zahl' },
+        { pfad: 'visibility.public', wert: 'true', art: 'janein', as: 'true_false' },
+        { pfad: 'visibility.lan', wert: 'false', art: 'janein', as: 'true_false' },
+        { pfad: 'game_password', wert: 'geheim', art: 'text' },
+        { pfad: 'MaxPlayers', wert: '4', art: 'zahl' },
+    ], ausgelassen: [{ pfad: 'tags', grund: 'eine Liste' }], anzahl_funde: 5 } });
+
+    await pruefe('Lesen: Vorhandenes erkannt, freie Schlüssel, Kennwort ohne Vorgabe, game/-Präfix abgestreift', async () => {
+        daemon.antwort = lesung();
+        const l = await Sitzungen.schluesselLesen(mitEinstellungen(), { datei: 'game/server-settings.json', parser: 'json' });
+        assert.strictEqual(daemon.befehle[0].befehl, 'werkbank.schluessel');
+        assert.strictEqual(daemon.befehle[0].nutzlast.datei, 'server-settings.json');
+        const nach = Object.fromEntries(l.funde.map(f => [f.pfad, f]));
+        assert.strictEqual(nach['visibility.public'].vorhanden, 'oeffentlich');
+        assert.strictEqual(nach.max_players.vorhanden, 'max_players');
+        assert.strictEqual(nach['visibility.lan'].vorschlag.type, 'boolean');
+        assert.strictEqual(nach.game_password.vorschlag.type, 'password');
+        // max_players ist vergeben, MaxPlayers darf ihn nicht noch einmal bekommen
+        assert.strictEqual(nach.MaxPlayers.vorschlag.key, 'max_players_2');
+        assert.strictEqual(l.ausgelassen.length, 1);
+        await assert.rejects(Sitzungen.schluesselLesen(mitEinstellungen(), { datei: '../geheim.json', parser: 'json' }), /ohne/);
+    });
+
+    await pruefe('Übernehmen: nur was der Daemon jetzt anbietet, als Experte/Neustart, gültig nach Schema', async () => {
+        daemon.antwort = lesung();
+        const s = mitEinstellungen();
+        await Sitzungen.vorschlaegeUebernehmen(s, { datei: 'server-settings.json', parser: 'json', auswahl: [
+            { pfad: 'visibility.lan', key: 'lan', name_de: 'Im LAN sichtbar' },
+            { pfad: 'game_password' },
+        ] });
+        const neu = db.entwurf.settings.filter(x => ['lan', 'game_password'].includes(x.key));
+        assert.strictEqual(neu.length, 2, JSON.stringify(db.entwurf.settings.map(x => x.key)));
+        const lan = neu.find(x => x.key === 'lan');
+        assert.deepStrictEqual([lan.role, lan.takes_effect, lan.type, lan.default], ['expert', 'restart', 'boolean', false]);
+        assert.deepStrictEqual(lan.apply, [{ target: 'file', file: 'server-settings.json', parser: 'json', path: 'visibility.lan', as: 'true_false' }]);
+        const pw = neu.find(x => x.key === 'game_password');
+        assert.strictEqual(pw.type, 'password');
+        assert.ok(!('default' in pw), 'der Wert aus der Datei darf bei Kennwörtern nicht Vorgabe werden');
+        const Ajv = require('ajv');
+        const ajv = new Ajv({ allErrors: true, strict: false });
+        ajv.addSchema(require('../packages/fbpkg/schema/fbpkg-v1.schema.json'), 'fbpkg');
+        const pruef = ajv.compile({ $ref: 'fbpkg#/properties/settings/items' });
+        for (const x of neu) assert.ok(pruef(x), x.key + ': ' + JSON.stringify(pruef.errors));
+        assert.strictEqual(daemon.befehle.filter(b => b.befehl === 'werkbank.schluessel').length, 1, 'vor dem Übernehmen neu gelesen');
+
+        await assert.rejects(Sitzungen.vorschlaegeUebernehmen(mitEinstellungen(), { datei: 'server-settings.json', parser: 'json',
+            auswahl: [{ pfad: 'erfunden.pfad' }] }), /nicht \(mehr\)/);
+        await assert.rejects(Sitzungen.vorschlaegeUebernehmen(mitEinstellungen(), { datei: 'server-settings.json', parser: 'json',
+            auswahl: [{ pfad: 'visibility.public' }] }), /schon als „oeffentlich"/);
+        await assert.rejects(Sitzungen.vorschlaegeUebernehmen(mitEinstellungen(), { datei: 'server-settings.json', parser: 'json',
+            auswahl: [] }), /Nichts angekreuzt/);
     });
 
     console.log(`\n${bestanden} Prüfung(en) bestanden.\n`);
