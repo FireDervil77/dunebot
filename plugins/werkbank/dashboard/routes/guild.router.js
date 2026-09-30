@@ -40,6 +40,7 @@ const { ServiceManager } = require('dunebot-core');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 const { renderView, renderFehler, fehler } = require('./_shared');
 const Sitzungen = require('../helpers/Sitzungen');
+const { argsAusZeilen, zeilenAusArgs } = require('../helpers/Startzeile');
 // Dieselben Anzeigenamen wie die Einstellungskarte des Servers — eine Liste, nicht zwei.
 const { GRUPPE, WIRKUNG, RISIKO } = require('../../../gameserver/dashboard/helpers/Serverseite');
 
@@ -101,9 +102,10 @@ const SIGNALE = ['sigint', 'sigterm', 'sigkill'];
 /**
  * Den Startteil aus dem Formular bauen — in der Form des Schemas.
  *
- *   Argumente   eine Zeile = EIN argv-Eintrag (`parts`), Verweise wie
- *               {{port:game}} bleiben darin stehen und werden erst beim Start
- *               eingesetzt. Keine Shell: Leerzeichen trennen nichts.
+ *   Argumente   Zeilen des Startzeilen-Baukastens (`zeilen`: Form, Quelle,
+ *               Bedingung) — übersetzt in helpers/Startzeile.js. Bis zum
+ *               2026-09-30 war hier „eine Zeile = ein argv-Eintrag" ohne
+ *               Quelle und Bedingung.
  *   Stoppfolge  eine Zeile = `schritt [frist] [beendet|weiter]`. Signale
  *               beenden immer; bei command:/rcon: sagt man es dazu, sonst
  *               meldet der Auftragsbau die fehlende Angabe als Lücke.
@@ -115,8 +117,8 @@ function startAusFormular(b) {
     const start = { program: text('program').trim() };
     if (text('workdir').trim()) start.workdir = text('workdir').trim();
 
-    const args = zeilen('args');
-    if (args.length) start.args = args.map((z, i) => ({ key: `arg${i + 1}`, parts: [{ text: z }] }));
+    const args = argsAusZeilen(Array.isArray(b.zeilen) ? b.zeilen : []);
+    if (args.length) start.args = args;
 
     const folge = zeilen('stop').map((z) => {
         const m = z.match(/^(.+?)(?:\s+(\d+))?(?:\s+(beendet|weiter))?$/);
@@ -158,7 +160,6 @@ function startAusFormular(b) {
 /** Die Gegenrichtung für die Vorbelegung des Formulars. */
 function startAlsFormular(start) {
     const s = start || {};
-    const argZeile = (a) => (a.parts ? a.parts.map(t => t.text).join('') : [].concat(a.form || []).join(' '));
     const stoppZeile = (e) => {
         const x = typeof e === 'string' ? { step: e } : e;
         return [x.step, x.timeout_sec || '', SIGNALE.includes(x.step) || x.terminates === undefined ? '' : (x.terminates ? 'beendet' : 'weiter')]
@@ -167,7 +168,7 @@ function startAlsFormular(start) {
     const log = s.ready_when?.log_line;
     return {
         program: s.program || '', workdir: s.workdir || '',
-        args: (s.args || []).map(argZeile).join('\n'),
+        zeilen: zeilenAusArgs(s.args),
         // Leer: die übliche Folge vorschlagen — sichtbar im Feld, nicht still ergänzt.
         stop: (s.stop?.sequence || []).map(stoppZeile).join('\n') || 'sigint 30\nsigkill 10',
         ready_port: s.ready_when?.port || '',
@@ -316,6 +317,19 @@ router.post('/:kennung/start', requirePermission('WERKBANK.BAUEN'), async (req, 
         return res.json({ success: true });
     } catch (error) {
         return fehler(res, error, 'Startteil nicht gespeichert', 400);
+    }
+});
+
+// Vorschau der fertigen Startzeile (S1) — gerechnet vom Daemon, mit dem, was
+// gerade im Formular steht. Gespeichert wird dabei nichts.
+router.post('/:kennung/startzeile', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        const sitzung = await offeneSitzung(req, res);
+        const program = typeof req.body?.program === 'string' ? req.body.program.trim() : '';
+        const start = { program, args: argsAusZeilen(Array.isArray(req.body?.zeilen) ? req.body.zeilen : []) };
+        return res.json({ success: true, ...(await Sitzungen.startzeile(sitzung, start)) });
+    } catch (error) {
+        return fehler(res, error, 'Keine Vorschau', 400);
     }
 });
 

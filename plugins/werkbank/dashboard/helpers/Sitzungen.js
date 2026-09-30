@@ -651,6 +651,23 @@ async function starten(sitzung, liste) {
     return { laufId };
 }
 
+/**
+ * Vorschau der Startzeile (S1, 2026-09-30): der Daemon rechnet sie mit
+ * derselben Funktion wie beim Start, aus den Probewerten und den Portnummern
+ * dieser Sitzung. Nichts wird gestartet.
+ */
+async function startzeile(sitzung, start) {
+    const daemon = await daemonFuer(sitzung);
+    const antwort = await daemon.senden('werkbank.startzeile', {
+        start,
+        settings: probewerte(sitzung),
+        portnummern: werkbankTeil(sitzung).portnummern,
+    }, 10000);
+    if (!antwort?.success) throw new Error(antwort?.error || 'Der Daemon hat nicht geantwortet');
+    const d = antwort.data || {};
+    return { programm: d.programm || '', argumente: d.argumente || [], fehlend: d.fehlend || [] };
+}
+
 async function stoppen(sitzung) {
     const lauf = await laufenderLauf(sitzung.kennung);
     if (!lauf) throw new Error('Es läuft kein Probestart.');
@@ -1299,7 +1316,7 @@ module.exports = {
     pruefungAbbrechen, pruefProtokoll, pruefungBeenden,
     EINSTELLUNG, einstellungAusFormular, einstellungSpeichern, einstellungEntfernen, probewertSetzen, probewerte,
     umgebungAusEinstellungen, belegteEinstellungen,
-    werkbankTeil, ungenutztePorts, startSpeichern, starten, stoppen, eingabe, laeufe, laufenderLauf,
+    werkbankTeil, ungenutztePorts, startSpeichern, startzeile, starten, stoppen, eingabe, laeufe, laufenderLauf,
     portUebernehmen, portEntfernen, bereitschaftszeile,
     laufSetzen, konsoleAnhaengen, laufBeenden, dateienJetzt, gruppiere,
     formatVermuten, vorschlagsDateien, schluesselLesen, vorschlaegeUebernehmen, freierSchluessel,

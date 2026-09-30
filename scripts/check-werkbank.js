@@ -186,7 +186,7 @@ async function pruefe(name, fn) {
         const plugin = ohneKommentare(fs.readFileSync(path.join(HELFER, 'Sitzungen.js'), 'utf8'));
         // Zwei Schreibweisen: direkt, und über daemonFuer(...).senden('werkbank.x', …).
         const geschickt = [...plugin.matchAll(/(?:sendCommand\([^,]+,|senden\()\s*'(werkbank\.[a-z]+)'/g)].map(x => x[1]);
-        for (const b of ['werkbank.schritt', 'werkbank.verwerfen', 'werkbank.starten', 'werkbank.stoppen', 'werkbank.eingabe', 'werkbank.dateien', 'werkbank.pruefen', 'werkbank.schluessel']) {
+        for (const b of ['werkbank.schritt', 'werkbank.verwerfen', 'werkbank.starten', 'werkbank.stoppen', 'werkbank.eingabe', 'werkbank.dateien', 'werkbank.pruefen', 'werkbank.schluessel', 'werkbank.startzeile']) {
             assert.ok(geschickt.includes(b), `${b} wird nicht (mehr) geschickt — die Suche sieht ${geschickt}`);
         }
         for (const b of geschickt) assert.ok(client.includes(`case "${b}":`), `${b} fehlt im Daemon`);
@@ -306,10 +306,11 @@ async function pruefe(name, fn) {
         werkbank: { portnummern: { game: 34197 }, memory_mb: 2048, cpu_prozent: 150 },
     } });
 
-    await pruefe('Formular → Startteil: eine Zeile ein Argument, Stoppfolge mit Frist, gültig nach Schema', async () => {
-        const start = startAusFormular({ program: './bin/x64/factorio', args: '--start-server\nsaves/welt.zip\n{{port:game}}',
+    await pruefe('Formular → Startteil: Baukasten-Zeilen, Stoppfolge mit Frist, gültig nach Schema', async () => {
+        const start = startAusFormular({ program: './bin/x64/factorio',
+            zeilen: [{ form: '--start-server saves/welt.zip', quelle: 'fest' }, { form: '--port {{Wert}}', quelle: 'port:game' }],
             stop: 'command:/quit 30 beendet\nrcon:/save 60 weiter\nsigkill 5', ready_port: 'game', log_line: 'Hosting game', timeout_sec: '120' });
-        assert.deepStrictEqual(start.args[2], { key: 'arg3', parts: [{ text: '{{port:game}}' }] });
+        assert.deepStrictEqual(start.args[1], { key: 'port', form: ['--port', '{{value}}'], from: 'port:game' });
         assert.deepStrictEqual(start.stop.sequence, [
             { step: 'command:/quit', timeout_sec: 30, terminates: true },
             { step: 'rcon:/save', timeout_sec: 60, terminates: false },
@@ -887,6 +888,100 @@ async function pruefe(name, fn) {
             auswahl: [{ pfad: 'visibility.public' }] }), /schon als „oeffentlich"/);
         await assert.rejects(Sitzungen.vorschlaegeUebernehmen(mitEinstellungen(), { datei: 'server-settings.json', parser: 'json',
             auswahl: [] }), /Nichts angekreuzt/);
+    });
+
+    console.log('\nStartzeilen-Baukasten (S1)');
+    const { argsAusZeilen, zeilenAusArgs } = require(path.join(HELFER, 'Startzeile.js'));
+    const Ajv1 = require('ajv');
+    const fbpkg1 = require('../packages/fbpkg/schema/fbpkg-v1.schema.json');
+    const argGueltig = new Ajv1({ allErrors: true, strict: false })
+        .compile({ ...fbpkg1.definitions.startArg, definitions: fbpkg1.definitions });
+
+    await pruefe('Zeilen → start.args: Form, Quelle, Bedingung wie der Daemon sie liest, gültig nach Schema', async () => {
+        const a = argsAusZeilen([
+            { form: '-nographics', quelle: 'fest' },
+            { form: '-name {{Wert}}', quelle: 'setting:name' },
+            { form: '-Xmx{{Wert}}M', quelle: 'setting:memory' },
+            { form: '-password {{Wert}}', quelle: 'setting:password', bedingung: 'not_empty' },
+            { form: '-crossplay', quelle: 'setting:crossplay', bedingung: 'true' },
+            { form: '@{{Wert}}_args.txt', quelle: 'setting:loader', bedingung: '=forge,neoforge' },
+            { form: '--start-server "saves/meine welt.zip"', quelle: 'fest' },
+            { form: '-QueryPort={{port:query}}', quelle: 'text' },
+            { form: '?ServerPassword={{setting:pw}}', quelle: 'text', bedingung: 'not_empty' },
+            { form: '   ', quelle: 'fest' },
+        ]);
+        for (const x of a) assert.ok(argGueltig(x), JSON.stringify(x) + ' ' + JSON.stringify(argGueltig.errors));
+        assert.strictEqual(a.length, 9, 'leere Zeile fällt weg');
+        assert.deepStrictEqual(a[1], { key: 'name', form: ['-name', '{{value}}'], from: 'setting:name' });
+        assert.deepStrictEqual(a[2], { key: 'xmx', form: '-Xmx{{value}}M', from: 'setting:memory' });
+        assert.deepStrictEqual(a[3].when, 'not_empty');
+        assert.deepStrictEqual(a[5], { key: 'arg', form: '@{{value}}_args.txt', from: 'setting:loader', when: '=forge,neoforge' });
+        assert.deepStrictEqual(a[6].form, ['--start-server', 'saves/meine welt.zip'], '"…" hält zusammen');
+        assert.deepStrictEqual(a[7], { key: 'queryport', parts: [{ text: '-QueryPort={{port:query}}' }] });
+        assert.deepStrictEqual(a[8].parts, [{ text: '?ServerPassword={{setting:pw}}', when: 'not_empty' }],
+            'Bedingung am STÜCK — dort wertet BaueArgv sie aus, am Eintrag nicht');
+    });
+
+    await pruefe('Zeilen: was der Daemon nicht versteht, wird mit Grund abgewiesen', async () => {
+        assert.throws(() => argsAusZeilen([{ form: '-port {{Wert}}', quelle: 'fest' }]), /Quelle/);
+        assert.throws(() => argsAusZeilen([{ form: '-x', quelle: 'fest', bedingung: 'true' }]), /feste Zeile/);
+        assert.throws(() => argsAusZeilen([{ form: '-x', quelle: 'setting:a' }]), /immer dabei/);
+        assert.throws(() => argsAusZeilen([{ form: '-q={{Wert}}', quelle: 'text' }]), /kein \{\{Wert\}\}/);
+        assert.throws(() => argsAusZeilen([{ form: '-name "offen', quelle: 'fest' }]), /Anführungszeichen/);
+        assert.throws(() => argsAusZeilen([{ form: '-a {{Wert}}', quelle: 'setting:a', bedingung: 'vielleicht' }]), /gibt es nicht/);
+        assert.throws(() => argsAusZeilen([{ form: '-a', quelle: 'env:HOME' }]), /Quelle/);
+    });
+
+    await pruefe('Rundreise: alle Beispielpakete kommen unverändert zurück, Schlüssel bleiben', async () => {
+        const ordner = path.join(__dirname, '../packages/fbpkg/beispiele');
+        const gleich = (x) => JSON.stringify(x.map(a => (a.form === undefined ? a : { ...a, form: [].concat(a.form) })));
+        for (const f of fs.readdirSync(ordner).filter(n => n.endsWith('.json'))) {
+            const args = JSON.parse(fs.readFileSync(path.join(ordner, f), 'utf8')).start.args || [];
+            assert.strictEqual(gleich(argsAusZeilen(zeilenAusArgs(args))), gleich(args), f);
+        }
+        const doppelt = argsAusZeilen([{ key: 'port', form: '-a {{Wert}}', quelle: 'port:game' },
+            { key: 'port', form: '-b {{Wert}}', quelle: 'port:query' }]);
+        assert.deepStrictEqual(doppelt.map(a => a.key), ['port', 'b'], 'doppelter Schlüssel wird neu vergeben');
+    });
+
+    await pruefe('Rundreise: was eine Zeile nicht ausdrücken kann, geht unverändert durch', async () => {
+        const fremd = [
+            { key: 'frei', form: ['-x', '{{value}}'], from: 'free' },
+            { key: 'fest_bedingt', form: '-y', from: 'fixed', when: 'true' },
+            { key: 'stuecke', parts: [{ text: '?A={{setting:a}}', when: 'not_empty' }, { text: '?B=1', when: 'true' }] },
+        ];
+        const z = zeilenAusArgs(fremd);
+        assert.ok(z.every(x => x.roh), 'alle drei als roh');
+        assert.deepStrictEqual(argsAusZeilen(z), fremd);
+    });
+
+    await pruefe('Vorschau: werkbank.startzeile mit Probewerten und Portnummern, nichts gespeichert', async () => {
+        daemon.antwort = { success: true, data: { programm: './x', argumente: ['--port', '34197'], fehlend: ['xmx (setting:memory): …'] } };
+        const s = { ...sitzungMitStart(), entwurf: { ...sitzungMitStart().entwurf,
+            settings: [{ key: 'memory', type: 'number', default: 2048 }, { key: 'crossplay', type: 'boolean', default: true }] } };
+        const r = await Sitzungen.startzeile(s, { program: './x', args: [] });
+        const b = daemon.befehle[0];
+        assert.strictEqual(b.befehl, 'werkbank.startzeile');
+        assert.deepStrictEqual(b.nutzlast.portnummern, { game: 34197 });
+        assert.deepStrictEqual(b.nutzlast.settings, { memory: '2048', crossplay: '1' }, 'dieselben Werte wie beim Probestart');
+        assert.deepStrictEqual(r.argumente, ['--port', '34197']);
+        assert.strictEqual(r.fehlend.length, 1);
+        assert.strictEqual(db.entwurf, null, 'nichts geschrieben');
+        daemon.antwort = { success: false, error: 'kaputt' };
+        await assert.rejects(Sitzungen.startzeile(s, { program: './x' }), /kaputt/);
+    });
+
+    await pruefe('Oberfläche: Baukasten statt Textfeld, Zeilen ohne name, Vorschau über die Route', async () => {
+        const view = ohneKommentare(fs.readFileSync(path.join(__dirname, '../plugins/werkbank/dashboard/views/guild/werkbank-sitzung.ejs'), 'utf8'));
+        const router = ohneKommentare(fs.readFileSync(path.join(__dirname, '../plugins/werkbank/dashboard/routes/guild.router.js'), 'utf8'));
+        assert.ok(!/name="args"/.test(view), 'das alte Textfeld ist noch da');
+        assert.match(view, /id="startBaukasten"/);
+        assert.match(view, /n\.zeilen = baukasten \? zeilenEinsammeln\(\)/, 'Start/Speichern schicken die Zeilen');
+        assert.match(view, /querySelectorAll\('input\[name\], textarea\[name\], select\[name\]'\)/,
+            'nur benannte Felder einsammeln — sonst landen Zeilenfelder als Müll in der Nutzlast');
+        assert.match(view, /schicke\(hier \+ '\/startzeile'/);
+        assert.match(router, /router\.post\('\/:kennung\/startzeile'/);
+        assert.strictEqual((router.match(/argsAusZeilen\(/g) || []).length, 2, 'Speichern und Vorschau übersetzen gleich');
     });
 
     console.log(`\n${bestanden} Prüfung(en) bestanden.\n`);

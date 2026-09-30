@@ -260,10 +260,32 @@
                 <label class="form-label" for="sProgram">Programm (relativ zu game/)</label>
                 <input class="form-control font-monospace" id="sProgram" name="program" value="<%= startFormular.program %>" placeholder="./bin/x64/factorio">
               </div>
-              <div class="mb-3">
-                <label class="form-label" for="sArgs">Argumente — eins pro Zeile</label>
-                <textarea class="form-control font-monospace" id="sArgs" name="args" rows="5" placeholder="--start-server&#10;saves/welt.zip&#10;--port&#10;{{port:game}}"><%= startFormular.args %></textarea>
-                <div class="form-hint">Eine Zeile ist genau ein Argument, Leerzeichen trennen nichts — <code>--port</code> und <code>{{port:game}}</code> sind zwei Zeilen. Ein Schalter mit Wert steht direkt vor seinem Wert.</div>
+              <%
+                // Startzeilen-Baukasten (S1, 2026-09-30): Form · Quelle · Bedingung je Zeile.
+                var quellen = [{ wert: 'fest', text: 'fest' }]
+                  .concat(entwurfPorts.map(function (p) { return { wert: 'port:' + p.purpose, text: 'Port: ' + p.purpose }; }))
+                  .concat(einstellungen.map(function (e) {
+                    var name = (e.label && (e.label.de || e.label.en || e.label)) || e.key;
+                    return { wert: 'setting:' + e.key, text: 'Einstellung: ' + (typeof name === 'string' ? name : e.key) + ' (' + e.key + ')' };
+                  }))
+                  .concat([{ wert: 'text', text: 'Text mit Verweisen (ein Argument)' }]);
+              %>
+              <div class="mb-3" id="startBaukasten"
+                   data-zeilen="<%= JSON.stringify(startFormular.zeilen || []) %>"
+                   data-quellen="<%= JSON.stringify(quellen) %>">
+                <label class="form-label">Startparameter</label>
+                <div class="small text-secondary mb-1">So startet es mit den Probewerten (gerechnet vom Daemon, wie beim echten Start):</div>
+                <pre class="small p-2 mb-1" id="startVorschau" style="white-space:pre-wrap;word-break:break-all;background:var(--tblr-bg-surface-secondary);color:var(--tblr-body-color)">…</pre>
+                <div class="small text-warning mb-2" id="startFehlend" hidden></div>
+                <div id="startZeilen"></div>
+                <button class="btn btn-sm btn-outline-primary mt-1" type="button" id="knopfZeileNeu">+ Parameter</button>
+                <div class="form-hint mt-1">
+                  <strong>Form</strong> wie auf der Kommandozeile: <code>-port {{Wert}}</code>, <code>-Xmx{{Wert}}M</code>, <code>--start-server saves/welt.zip</code>.
+                  Leerzeichen trennen Argumente, <code>"…"</code> hält eins mit Leerzeichen zusammen.
+                  <code>{{Wert}}</code> ist der Wert der <strong>Quelle</strong> (Einstellung oder Port).
+                  „Text mit Verweisen" ist genau <em>ein</em> Argument, z. B. <code>-QueryPort={{port:query}}</code>.
+                  Die <strong>Bedingung</strong> prüft den Wert der Quelle: „wenn an" für Schalter, „wenn gesetzt" für ein Kennwort, <code>=forge,neoforge</code> für eine Auswahl.
+                </div>
               </div>
               <div class="mb-3">
                 <label class="form-label" for="sWorkdir">Arbeitsordner (leer = game/)</label>
@@ -945,24 +967,129 @@
 
   // ── Probestart ────────────────────────────────────────────────────────
   var formStart = document.getElementById('formStart');
-  function startNutzlast() {
-    // Eine Zeile ist EIN Argument (keine Shell). „--port {{port:game}}" in einer
-    // Zeile wird zu einem Argument mit Leerzeichen — gemessen am 2026-09-24:
-    // Factorio las "--port 34197" als Dateinamen. Wer so schreibt, meint fast
-    // immer zwei Argumente; gefragt wird trotzdem, denn ein Servername mit
-    // Leerzeichen ist genau ein Argument.
-    var feld = formStart.args;
-    var zeilen = feld.value.split(/\r?\n/);
-    var verdaechtig = zeilen.filter(function (z) { return /^\s*-{1,2}[^\s=]+\s+\S/.test(z); });
-    if (verdaechtig.length && confirm('Eine Zeile ist genau ein Argument. Diese Zeile(n) enthalten Schalter und Wert zusammen:\n\n  '
-        + verdaechtig.join('\n  ') + '\n\nAufteilen in Schalter und Wert (je eine Zeile)?\nOK = aufteilen, Abbrechen = so lassen')) {
-      feld.value = zeilen.map(function (z) {
-        var m = z.match(/^\s*(-{1,2}[^\s=]+)\s+(.+?)\s*$/);
-        return m ? m[1] + '\n' + m[2] : z;
-      }).join('\n');
+
+  // ── Startzeilen-Baukasten (S1, 2026-09-30) ────────────────────────────
+  // Je Zeile Form · Quelle · Bedingung. Übersetzt ins Paket wird auf dem
+  // Server (helpers/Startzeile.js), die Vorschau rechnet der Daemon — hier
+  // wird nur gezeichnet und eingesammelt.
+  var baukasten = document.getElementById('startBaukasten');
+  var zeilenKasten = document.getElementById('startZeilen');
+  var QUELLEN = baukasten ? JSON.parse(baukasten.dataset.quellen || '[]') : [];
+  var BEDINGUNGEN = [
+    ['', 'immer'], ['true', 'wenn an'], ['false', 'wenn aus'],
+    ['not_empty', 'wenn gesetzt'], ['empty', 'wenn leer'], ['=', 'gleich …'], ['!=', 'ungleich …'],
+  ];
+  function option(wert, text, gewaehlt) {
+    var o = document.createElement('option');
+    o.value = wert; o.textContent = text; o.selected = gewaehlt;
+    return o;
+  }
+  function zeileZeichnen(z) {
+    z = z || { form: '', quelle: 'fest', bedingung: '' };
+    var zeile = document.createElement('div');
+    zeile.className = 'border rounded p-2 mb-2';
+    if (z.key) zeile.dataset.key = z.key;
+    if (z.roh) {
+      // Unveränderlich übernommen — wird genau so wieder abgelegt.
+      zeile.dataset.roh = z.roh;
+      var code = document.createElement('code');
+      code.className = 'small'; code.textContent = z.roh;
+      var hinweis = document.createElement('div');
+      hinweis.className = 'small text-secondary';
+      hinweis.textContent = 'Übernommen, hier nicht bearbeitbar (Form, die der Baukasten nicht ausdrücken kann).';
+      zeile.append(code, hinweis);
+    } else {
+      var form = document.createElement('input');
+      form.className = 'form-control form-control-sm font-monospace mb-1';
+      form.placeholder = '-port {{Wert}}'; form.value = z.form || ''; form.dataset.teil = 'form';
+      var reihe = document.createElement('div');
+      reihe.className = 'd-flex gap-1 flex-wrap';
+      var quelle = document.createElement('select');
+      quelle.className = 'form-select form-select-sm w-auto'; quelle.dataset.teil = 'quelle';
+      var bekannt = QUELLEN.some(function (q) { return q.wert === z.quelle; });
+      QUELLEN.forEach(function (q) { quelle.append(option(q.wert, q.text, q.wert === z.quelle)); });
+      if (!bekannt && z.quelle) quelle.append(option(z.quelle, z.quelle + ' (nicht im Entwurf)', true));
+      var art = /^!?=/.test(z.bedingung || '') ? z.bedingung.replace(/^(!?=).*$/, '$1') : (z.bedingung || '');
+      var bedingung = document.createElement('select');
+      bedingung.className = 'form-select form-select-sm w-auto'; bedingung.dataset.teil = 'bedingung';
+      BEDINGUNGEN.forEach(function (b) { bedingung.append(option(b[0], b[1], b[0] === art)); });
+      var vergleich = document.createElement('input');
+      vergleich.className = 'form-control form-control-sm w-auto font-monospace'; vergleich.dataset.teil = 'vergleich';
+      vergleich.placeholder = 'forge,neoforge';
+      vergleich.value = /^!?=/.test(z.bedingung || '') ? z.bedingung.replace(/^!?=/, '') : '';
+      vergleich.hidden = !/^!?=$/.test(art);
+      bedingung.addEventListener('change', function () { vergleich.hidden = !/^!?=$/.test(bedingung.value); });
+      reihe.append(quelle, bedingung, vergleich);
+      zeile.append(form, reihe);
     }
+    var knoepfe = document.createElement('div');
+    knoepfe.className = 'd-flex gap-1 mt-1';
+    [['↑', 'hoch'], ['↓', 'runter'], ['✕', 'weg']].forEach(function (k) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'btn btn-sm btn-ghost-secondary px-2'; b.textContent = k[0]; b.dataset.aktion = k[1];
+      knoepfe.append(b);
+    });
+    zeile.append(knoepfe);
+    zeilenKasten.append(zeile);
+  }
+  function zeilenEinsammeln() {
+    return Array.prototype.map.call(zeilenKasten.children, function (zeile) {
+      if (zeile.dataset.roh) return { roh: zeile.dataset.roh };
+      var teil = function (n) { return zeile.querySelector('[data-teil="' + n + '"]'); };
+      var b = teil('bedingung').value;
+      return {
+        key: zeile.dataset.key || undefined,
+        form: teil('form').value,
+        quelle: teil('quelle').value,
+        bedingung: /^!?=$/.test(b) ? b + teil('vergleich').value.trim() : b,
+      };
+    });
+  }
+  var vorschauUhr = null, vorschauNr = 0;
+  function zeigeArg(a) { return a === '' || /\s/.test(a) ? '"' + a + '"' : a; }
+  async function vorschau() {
+    var nr = ++vorschauNr;
+    var ausgabe = document.getElementById('startVorschau');
+    var fehlend = document.getElementById('startFehlend');
+    try {
+      var r = await schicke(hier + '/startzeile', { program: formStart.program.value, zeilen: zeilenEinsammeln() });
+      if (nr !== vorschauNr) return; // eine neuere Anfrage ist unterwegs
+      ausgabe.textContent = [r.programm || '(kein Programm)'].concat((r.argumente || []).map(zeigeArg)).join(' ');
+      fehlend.hidden = !(r.fehlend || []).length;
+      fehlend.textContent = (r.fehlend || []).length ? 'Entfällt beim Start: ' + r.fehlend.join(' · ') : '';
+    } catch (fehler) {
+      if (nr !== vorschauNr) return;
+      ausgabe.textContent = '— ' + fehler.message;
+      fehlend.hidden = true;
+    }
+  }
+  function vorschauBald() { clearTimeout(vorschauUhr); vorschauUhr = setTimeout(vorschau, 400); }
+  if (baukasten) {
+    JSON.parse(baukasten.dataset.zeilen || '[]').forEach(zeileZeichnen);
+    document.getElementById('knopfZeileNeu').addEventListener('click', function () {
+      zeileZeichnen(); zeilenKasten.lastElementChild.querySelector('input').focus();
+    });
+    zeilenKasten.addEventListener('click', function (ev) {
+      var knopf = ev.target.closest('button[data-aktion]');
+      if (!knopf) return;
+      var zeile = knopf.closest('#startZeilen > div');
+      if (knopf.dataset.aktion === 'weg') zeile.remove();
+      if (knopf.dataset.aktion === 'hoch' && zeile.previousElementSibling) zeile.parentNode.insertBefore(zeile, zeile.previousElementSibling);
+      if (knopf.dataset.aktion === 'runter' && zeile.nextElementSibling) zeile.parentNode.insertBefore(zeile.nextElementSibling, zeile);
+      vorschauBald();
+    });
+    zeilenKasten.addEventListener('input', vorschauBald);
+    zeilenKasten.addEventListener('change', vorschauBald);
+    formStart.program.addEventListener('input', vorschauBald);
+    vorschau();
+  }
+
+  function startNutzlast() {
     var n = {};
-    formStart.querySelectorAll('input, textarea, select').forEach(function (e) { n[e.name] = e.value; });
+    // Nur benannte Felder: Die Baukasten-Zeilen haben keinen Namen, sie kommen
+    // gesammelt als `zeilen`.
+    formStart.querySelectorAll('input[name], textarea[name], select[name]').forEach(function (e) { n[e.name] = e.value; });
+    n.zeilen = baukasten ? zeilenEinsammeln() : [];
     return n;
   }
   if (formStart) {
