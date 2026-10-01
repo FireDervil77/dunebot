@@ -188,8 +188,12 @@
         <div class="fb-muted" style="padding:16px 0;font-size:13px">
           Dieser Server läuft noch über den alten Weg und hat kein Spielpaket.
         </div>
+      <% } else if (!(u.einstellungen.gruppen || []).length && !u.einstellungen.verborgen) { %>
+        <div class="fb-muted" style="padding:16px 0;font-size:13px">
+          Das Spielpaket bietet keine Einstellungen an.
+        </div>
       <% } else { %>
-        <% u.einstellungen.gruppen.forEach(function (g) { %>
+        <% (u.einstellungen.gruppen || []).forEach(function (g) { %>
           <% if (g.name) { %><div class="fb-abschnitt"><%= g.name %></div><% } %>
           <% g.eintraege.forEach(function (e) { %>
             <div class="fb-zeile">

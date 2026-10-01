@@ -325,7 +325,10 @@ function baueSpieler(server, live) {
  */
 function baueEinstellungen(server, paket, hoehe) {
     const alle = Array.isArray(paket?.settings) ? paket.settings : [];
-    if (alle.length === 0) return { sichtbar: [], verborgen: 0, ohnePaket: !paket };
+    // Dieselbe Form wie unten, auch ohne Einstellungen: Die Übersicht liest
+    // `gruppen` — fehlte es, riss ein Paket ohne Einstellungen die ganze
+    // Serverseite mit 500 (Hytale aus der Werkbank, Server 206, 2026-10-01).
+    if (alle.length === 0) return { sichtbar: [], gruppen: [], verborgen: 0, ohnePaket: !paket };
 
     const erlaubt = HOEHE[hoehe];
     let paketWerte = {};

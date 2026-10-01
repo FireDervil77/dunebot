@@ -108,6 +108,21 @@ pruefe('Die Detailseite waehlt gs.paket_werte aus', () => {
         + '"kein Wert hinterlegt", obwohl alles gespeichert ist');
 });
 
-console.log(bestanden === 4
+pruefe('Ein Paket OHNE Einstellungen reisst die Seite nicht (Hytale, Server 206)', () => {
+    // Am 2026-10-01 kam das erste Paket ohne `settings` aus der Werkbank — die
+    // Übersicht las `gruppen.forEach` und die Serverseite stand auf 500.
+    const ohne = { identity: { slug: 'hytale', name: 'Hytale' } };
+    for (const hoehe of ['einfach', 'fachlich']) {
+        const e = baueUebersicht({ id: 1, ansicht: hoehe, paket_werte: '{}' }, ohne, { sicherungen: [] }).einstellungen;
+        assert.ok(Array.isArray(e.gruppen), `gruppen fehlt (${hoehe})`);
+        assert.ok(Array.isArray(e.sichtbar), `sichtbar fehlt (${hoehe})`);
+        assert.strictEqual(e.ohnePaket, false);
+    }
+    const vorlage = ohneKommentare(fs.readFileSync(path.join(WURZEL,
+        'plugins/gameserver/dashboard/views/guild/partials/server-detail-uebersicht.ejs'), 'utf8'));
+    assert.match(vorlage, /keine Einstellungen an/, 'die Karte sagt nicht, dass es keine gibt');
+});
+
+console.log(bestanden === 5
     ? '\n✅ Die Karte zeigt, was wirklich gespeichert ist\n'
-    : `\n(${bestanden} von 4 bestanden)\n`);
+    : `\n(${bestanden} von 5 bestanden)\n`);
