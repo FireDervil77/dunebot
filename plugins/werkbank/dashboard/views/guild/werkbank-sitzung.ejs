@@ -105,6 +105,12 @@
                   <pre class="mt-2 mb-0 p-2 small" style="max-height:24rem;overflow:auto;background:var(--tblr-bg-surface-secondary);color:var(--tblr-body-color)" <%= x.status === 'laeuft' ? 'id=liveAusgabe' : '' %>><%= x.ausgabe || '' %></pre>
                 </details>
               <% } %>
+              <% if (x.dateien) { %>
+                <details class="mt-2">
+                  <summary class="text-secondary small">Dateien: <%= x.dateien.anzahl_neu || 0 %> neu · <%= x.dateien.anzahl_geaendert || 0 %> geändert · <%= x.dateien.anzahl_weg || 0 %> weg</summary>
+                  <div class="small mt-2"><%- include('werkbank-dateien', { d: x.dateien, gruppiere, groesse }) %></div>
+                </details>
+              <% } %>
               <% if (x.status === 'ok' || x.status === 'fehler') { %>
                 <div class="mt-2">
                   <button class="btn btn-sm btn-ghost-secondary" data-herausnehmen="<%= x.id %>"
@@ -168,7 +174,8 @@
             </div>
             <div class="mb-3">
               <label class="form-label" for="fChecksum">Prüfsumme</label>
-              <input class="form-control font-monospace" id="fChecksum" name="checksum" placeholder="sha256:… oder sha1:…">
+              <input class="form-control font-monospace" id="fChecksum" name="checksum" placeholder="sha256:… oder sha1:… — leer: wird beim Laden ausgerechnet">
+              <div class="form-hint">Kennst du sie nicht, lass das Feld leer: Die Werkbank lädt die Datei, rechnet die Summe aus und trägt sie in den Schritt ein. Gibt der Hersteller eine an, nimm seine — dann ist geprüft, dass du seine Datei hast.</div>
               <div class="form-hint">Pflicht. Stimmt sie nicht, bricht der Schritt ab, und die Datei bleibt nicht liegen.</div>
             </div>
           </fieldset>
@@ -451,23 +458,7 @@
                 <% if (!d) { %>
                   <span class="text-secondary"><%= spielLaeuft ? 'Während des Laufs auf Knopfdruck, nach dem Ende von selbst.' : (lauf ? 'Dieser Lauf hat keinen Vergleich (Daemon vor 1.0.93).' : '—') %></span>
                 <% } else { %>
-                  <% [['neu', 'bg-green-lt', 'neu'], ['geaendert', 'bg-yellow-lt', 'geändert'], ['weg', 'bg-red-lt', 'weg']].forEach(function (art) {
-                       const gruppen = gruppiere(d[art[0]]);
-                       const anzahl = d['anzahl_' + art[0]] || 0;
-                       if (!anzahl) return; %>
-                    <div class="mb-1"><span class="badge <%= art[1] %>"><%= art[2] %> · <%= anzahl %></span><% if (anzahl > (d[art[0]] || []).length) { %> <span class="text-secondary">(die ersten <%= d[art[0]].length %>)</span><% } %></div>
-                    <ul class="list-unstyled mb-2 ms-2 font-monospace">
-                      <% gruppen.forEach(function (g) { %>
-                        <% if (g.ordner) { %>
-                          <li class="text-secondary"><%= g.ordner %> — <%= g.anzahl %> Dateien, <%= groesse(g.groesse) %></li>
-                        <% } else { %>
-                          <li><%= g.pfad %> <span class="text-secondary">(<%= g.vorher !== undefined && g.vorher !== g.groesse ? groesse(g.vorher) + ' → ' : '' %><%= groesse(g.groesse) %>)</span></li>
-                        <% } %>
-                      <% }) %>
-                    </ul>
-                  <% }) %>
-                  <% if (!d.anzahl_neu && !d.anzahl_geaendert && !d.anzahl_weg) { %><span class="text-secondary">Nichts angelegt, nichts geändert.</span><% } %>
-                  <% if (d.unvollstaendig) { %><div class="text-warning">Unvollständig — zu viele Dateien für einen Vergleich.</div><% } %>
+                  <%- include('werkbank-dateien', { d, gruppiere, groesse }) %>
                 <% } %>
               </div>
             </div>
@@ -1423,6 +1414,27 @@
   if (wurzel.dataset.werkbankLaeuft === '1' || wurzel.dataset.werkbankSpiel === '1' || wurzel.dataset.werkbankPruefung === '1') {
     var live = document.getElementById('liveAusgabe');
     var strom = new EventSource(basis + '/events?sitzung=' + encodeURIComponent(kennung));
+    // Sobald der Kanal steht, einmal nachfragen, was WIRKLICH noch läuft.
+    // Nach „Starten" lädt die Seite neu und verbindet sich erst danach — ein
+    // Programm, das in dieser Lücke endet, hat sein `beendet` schon geschickt,
+    // und die Seite wartete für immer (2026-10-01). Nach einer Wiederverbindung
+    // fehlt, was in der Lücke kam: dann immer neu laden.
+    var ersteVerbindung = true;
+    strom.addEventListener('open', async function () {
+      var wieder = !ersteVerbindung;
+      ersteVerbindung = false;
+      try {
+        var antwort = await fetch(hier + '/zustand', { headers: { Accept: 'application/json' } });
+        var jetzt = await antwort.json();
+        if (!jetzt.success) throw new Error(jetzt.message || ('HTTP ' + antwort.status));
+        var vorbei = (wurzel.dataset.werkbankLaeuft === '1' && !jetzt.schritt)
+          || (wurzel.dataset.werkbankSpiel === '1' && !jetzt.spiel)
+          || (wurzel.dataset.werkbankPruefung === '1' && !jetzt.pruefung);
+        if (vorbei || wieder) { strom.close(); window.location.reload(); }
+      } catch (fehler) {
+        melde('warning', 'Live-Stand nicht abfragbar (' + fehler.message + ') — notfalls Seite neu laden.');
+      }
+    });
     strom.addEventListener('werkbank', function (e) {
       var d = {};
       try { d = JSON.parse(e.data); } catch (x) { return; }

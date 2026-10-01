@@ -100,6 +100,21 @@ const RE_STOPP = /^(save|sigint|sigterm|sigkill|command:.+|rcon:.+)$/;
 const SIGNALE = ['sigint', 'sigterm', 'sigkill'];
 
 /**
+ * Parameter im Feld „Programm" — der Daemon nähme den ganzen Text als
+ * Dateinamen und scheiterte mit „no such file" (Läufe 18/19, 2026-10-01:
+ * `./downloader/hytale-downloader-linux-amd64 --download-path hytale.zip`).
+ * Abgewiesen wird nur, was wie ein Schalter aussieht — ein Pfad mit
+ * Leerzeichen bleibt erlaubt.
+ */
+function pruefeProgramm(programm) {
+    const m = /\s(-{1,2}[A-Za-z]\S*)/.exec(programm || '');
+    if (m) {
+        throw new Error(`Im Feld „Programm" steht der Parameter „${m[1]}" — `
+            + 'Parameter gehören in die Startparameter darunter, das Programm ist nur die Datei.');
+    }
+}
+
+/**
  * Den Startteil aus dem Formular bauen — in der Form des Schemas.
  *
  *   Argumente   Zeilen des Startzeilen-Baukastens (`zeilen`: Form, Quelle,
@@ -115,6 +130,7 @@ function startAusFormular(b) {
     const text = (k) => (typeof b[k] === 'string' ? b[k] : typeof b[k] === 'number' ? String(b[k]) : '');
     const zeilen = (k) => text(k).split(/\r?\n/).map(z => z.trim()).filter(Boolean);
     const start = { program: text('program').trim() };
+    pruefeProgramm(start.program);
     if (text('workdir').trim()) start.workdir = text('workdir').trim();
 
     const args = argsAusZeilen(Array.isArray(b.zeilen) ? b.zeilen : []);
@@ -226,6 +242,18 @@ router.get('/events', requirePermission('WERKBANK.VIEW'), (req, res) => {
     });
 });
 
+// Was gerade läuft — die Seite fragt, sobald ihr Live-Kanal steht (siehe
+// Sitzungen.zustand): Ein Ende, das vor dem Verbinden kam, ginge sonst verloren.
+router.get('/:kennung/zustand', requirePermission('WERKBANK.VIEW'), async (req, res) => {
+    try {
+        const sitzung = await Sitzungen.laden(res.locals.guildId, req.params.kennung);
+        if (!sitzung) throw new Error('Sitzung nicht gefunden');
+        return res.json({ success: true, ...(await Sitzungen.zustand(sitzung.kennung)) });
+    } catch (error) {
+        return fehler(res, error, 'Kein Zustand', 400);
+    }
+});
+
 // ── Eine Sitzung ─────────────────────────────────────────────────────────────
 router.get('/:kennung', requirePermission('WERKBANK.VIEW'), async (req, res) => {
     const guildId = res.locals.guildId;
@@ -326,6 +354,7 @@ router.post('/:kennung/startzeile', requirePermission('WERKBANK.BAUEN'), async (
     try {
         const sitzung = await offeneSitzung(req, res);
         const program = typeof req.body?.program === 'string' ? req.body.program.trim() : '';
+        pruefeProgramm(program);
         const start = { program, args: argsAusZeilen(Array.isArray(req.body?.zeilen) ? req.body.zeilen : []) };
         return res.json({ success: true, ...(await Sitzungen.startzeile(sitzung, start)) });
     } catch (error) {

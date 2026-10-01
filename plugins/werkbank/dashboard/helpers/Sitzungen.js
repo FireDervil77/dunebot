@@ -175,7 +175,7 @@ async function laden(guildId, kennung) {
 async function schritte(sitzungId) {
     const zeilen = await db().query(
         'SELECT * FROM werkbank_schritte WHERE sitzung_id = ? ORDER BY nr, id', [sitzungId]);
-    return zeilen.map(z => ({ ...z, schritt: json(z.schritt, {}) }));
+    return zeilen.map(z => ({ ...z, schritt: json(z.schritt, {}), dateien: json(z.dateien, null) }));
 }
 
 /**
@@ -257,10 +257,30 @@ async function ausgabeAnhaengen(schrittId, text) {
           WHERE id = ?`, [text, MAX_AUSGABE, schrittId]);
 }
 
-async function beenden(schrittId, { status, fehler = null, bytes = null }) {
+async function beenden(schrittId, { status, fehler = null, bytes = null, dateien = null }) {
     await db().query(
-        `UPDATE werkbank_schritte SET status = ?, fehler = ?, bytes = ?, beendet_am = NOW()
-          WHERE id = ? AND status = 'laeuft'`, [status, fehler, bytes, schrittId]);
+        `UPDATE werkbank_schritte SET status = ?, fehler = ?, bytes = ?, dateien = ?, beendet_am = NOW()
+          WHERE id = ? AND status = 'laeuft'`,
+        [status, fehler, bytes, dateien ? JSON.stringify(dateien) : null, schrittId]);
+}
+
+const RE_SUMME = /^(sha256:[0-9a-f]{64}|sha1:[0-9a-f]{40})$/;
+
+/**
+ * Die vom Daemon gerechnete Prüfsumme in einen download-Schritt eintragen (W2).
+ *
+ * Nur, wenn der Schritt ein download OHNE Summe ist — eine angegebene wird nie
+ * überschrieben. Ab hier prüfen Prüfdurchlauf und jede Installation gegen sie.
+ * @returns {Promise<boolean>} ob eingetragen wurde
+ */
+async function pruefsummeEintragen(schrittId, summe) {
+    if (!RE_SUMME.test(String(summe || ''))) return false;
+    const [z] = await db().query('SELECT schritt FROM werkbank_schritte WHERE id = ?', [schrittId]);
+    const s = json(z?.schritt, null);
+    if (!s || s.type !== 'download' || s.checksum) return false;
+    s.checksum = summe;
+    await db().query('UPDATE werkbank_schritte SET schritt = ? WHERE id = ?', [JSON.stringify(s), schrittId]);
+    return true;
 }
 
 /** Den laufenden Schritt einer Sitzung finden (nach einem Neustart des Dashboards). */
@@ -603,6 +623,19 @@ async function laufenderLauf(kennung) {
     return z || null;
 }
 
+/**
+ * Was in der Sitzung gerade läuft — für die Seite, nachdem ihr Live-Kanal
+ * (wieder) steht. Ohne diese Abfrage blieb die Seite nach einem schnellen Ende
+ * hängen: Nach „Starten" lädt sie neu und verbindet sich erst DANACH; ein
+ * Programm, das nach einer Sekunde scheitert, hat sein `beendet` da schon
+ * geschickt (Betreiber 2026-10-01: „nach einem exit immer die Seite neu laden").
+ */
+async function zustand(kennung) {
+    const [schritt, spiel, pruefung] = await Promise.all([
+        laufenderSchritt(kennung), laufenderLauf(kennung), laufendePruefung(kennung)]);
+    return { schritt: Boolean(schritt), spiel: Boolean(spiel), pruefung: Boolean(pruefung) };
+}
+
 async function laeufe(sitzungId, anzahl = 5) {
     const zeilen = await db().query(
         'SELECT * FROM werkbank_laeufe WHERE sitzung_id = ? ORDER BY id DESC LIMIT ?', [sitzungId, anzahl]);
@@ -789,6 +822,11 @@ function durchlaufMaengel(paket) {
     const seq = paket.start?.stop?.sequence || [];
     if (seq.length < 2) m.push('Die Stoppfolge hat nur sigkill — grün verlangt, dass das Spiel VORHER endet (etwa „command:/quit 30 beendet").');
     for (const z of ungenutztePorts(paket)) m.push(`Auf den Port „${z}" verweist nichts — das Spiel erführe seine Nummer nicht.`);
+    for (const s of paket.install?.steps || []) {
+        if (s.type === 'download' && !s.checksum) {
+            m.push(`Der Download ${s.target || s.url} hat keine Prüfsumme — den Schritt einmal laufen lassen, die Werkbank trägt sie ein.`);
+        }
+    }
     return m;
 }
 
@@ -1309,14 +1347,14 @@ module.exports = {
     sitzungsImage,
     RE_KENNUNG, RE_ZWECK, SCHRITTTYPEN, MAX_AUSGABE, GRENZEN, VORGABE, ERKUNDUNG, hatBereitschaft,
     waehlbareImages, maschinen, liste, laden, schritte, anlegen,
-    schrittAusfuehren, ausgabeAnhaengen, beenden, laufenderSchritt,
+    schrittAusfuehren, ausgabeAnhaengen, beenden, pruefsummeEintragen, laufenderSchritt,
     herausnehmen, verwerfen, entwurfAlsPaket,
     PRUEF_SUFFIX, fingerabdruck, technisch,
     pruefeBildAdresse, angaben, angabenSpeichern, veroeffentlichungsStand, veroeffentlichungsPaket, veroeffentlichen, laufendePruefung, pruefungen, durchlaufMaengel, pruefen,
     pruefungAbbrechen, pruefProtokoll, pruefungBeenden,
     EINSTELLUNG, einstellungAusFormular, einstellungSpeichern, einstellungEntfernen, probewertSetzen, probewerte,
     umgebungAusEinstellungen, belegteEinstellungen,
-    werkbankTeil, ungenutztePorts, startSpeichern, startzeile, starten, stoppen, eingabe, laeufe, laufenderLauf,
+    werkbankTeil, ungenutztePorts, startSpeichern, startzeile, zustand, starten, stoppen, eingabe, laeufe, laufenderLauf,
     portUebernehmen, portEntfernen, bereitschaftszeile,
     laufSetzen, konsoleAnhaengen, laufBeenden, dateienJetzt, gruppiere,
     formatVermuten, vorschlagsDateien, schluesselLesen, vorschlaegeUebernehmen, freierSchluessel,

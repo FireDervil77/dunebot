@@ -57,9 +57,18 @@ const db = {
             this.schritte.push({ id, sitzung_id: p[0], nr: p[1], schritt: p[2], status: 'laeuft', ausgabe: '' });
             return { insertId: id };
         }
-        if (/^UPDATE werkbank_schritte SET status = \?, fehler = \?, bytes = \?, beendet_am = NOW\(\) WHERE id = \? AND status = 'laeuft'$/.test(t)) {
-            const s = this.schritte.find(x => x.id === p[3] && x.status === 'laeuft');
-            if (s) Object.assign(s, { status: p[0], fehler: p[1], bytes: p[2] });
+        if (/^UPDATE werkbank_schritte SET status = \?, fehler = \?, bytes = \?, dateien = \?, beendet_am = NOW\(\) WHERE id = \? AND status = 'laeuft'$/.test(t)) {
+            const s = this.schritte.find(x => x.id === p[4] && x.status === 'laeuft');
+            if (s) Object.assign(s, { status: p[0], fehler: p[1], bytes: p[2], dateien: p[3] });
+            return { affectedRows: s ? 1 : 0 };
+        }
+        // ── W2: Prüfsumme eintragen ──
+        if (/^SELECT schritt FROM werkbank_schritte WHERE id = \?$/.test(t)) {
+            return this.schritte.filter(x => x.id === p[0]).map(x => ({ schritt: x.schritt }));
+        }
+        if (/^UPDATE werkbank_schritte SET schritt = \? WHERE id = \?$/.test(t)) {
+            const s = this.schritte.find(x => x.id === p[1]);
+            if (s) s.schritt = p[0];
             return { affectedRows: s ? 1 : 0 };
         }
         if (/^UPDATE werkbank_schritte SET ausgabe = RIGHT\(CONCAT\(COALESCE\(ausgabe, ''\), \?\), \?\) WHERE id = \?$/.test(t)) {
@@ -485,7 +494,10 @@ async function pruefe(name, fn) {
         s.entwurf.start.stop = { sequence: [{ step: 'command:/quit', timeout_sec: 30, terminates: true }, { step: 'sigkill', timeout_sec: 10, terminates: true }] };
         return s;
     };
-    const liste = [{ status: 'ok', schritt: { type: 'download' } }, { status: 'herausgenommen', schritt: { type: 'mkdir' } }];
+    // Ein vollständiger Download — seit W2 meldet der Durchlauf einen ohne
+    // Summe als Mangel (vorher genügte hier `{ type: 'download' }`).
+    const liste = [{ status: 'ok', schritt: { type: 'download', url: 'https://x.de/a.zip', target: 'a.zip', checksum: 'sha256:' + 'ab'.repeat(32) } },
+        { status: 'herausgenommen', schritt: { type: 'mkdir' } }];
 
     await pruefe('Durchlauf schickt den Entwurf und hält ihn samt Fingerabdruck fest', async () => {
         const s = pruefbar();
@@ -982,6 +994,95 @@ async function pruefe(name, fn) {
         assert.match(view, /schicke\(hier \+ '\/startzeile'/);
         assert.match(router, /router\.post\('\/:kennung\/startzeile'/);
         assert.strictEqual((router.match(/argsAusZeilen\(/g) || []).length, 2, 'Speichern und Vorschau übersetzen gleich');
+    });
+
+    console.log('\nDateien je Schritt und Prüfsumme (W1, W2)');
+    const SUMME = 'sha256:' + 'ab'.repeat(32);
+    const VERGLEICH = { neu: [{ pfad: 'game/downloader.zip', groesse: 9724217 }], geaendert: [], weg: [], anzahl_neu: 1, anzahl_geaendert: 0, anzahl_weg: 0 };
+
+    await pruefe('W1: der Dateivergleich des Daemons wird am Schritt gespeichert — auch beim Scheitern', async () => {
+        await Sitzungen.schrittAusfuehren({ sitzung: db.sitzung, schritt: { type: 'mkdir', path: 'mods' } });
+        await Ereignisse.beiEnde({ sitzung_id: 'wbprobe', bytes: 1, dateien: VERGLEICH }, true);
+        assert.deepStrictEqual(JSON.parse(db.schritte[0].dateien), VERGLEICH);
+        db.schritte = [];
+        await Sitzungen.schrittAusfuehren({ sitzung: db.sitzung, schritt: { type: 'mkdir', path: 'mods' } });
+        await Ereignisse.beiEnde({ sitzung_id: 'wbprobe', error: 'Code 1', dateien: VERGLEICH }, false);
+        assert.ok(db.schritte[0].dateien, 'auch ein gescheiterter Schritt zeigt, was er hinterließ');
+        db.schritte = [];
+        await Sitzungen.schrittAusfuehren({ sitzung: db.sitzung, schritt: { type: 'mkdir', path: 'mods' } });
+        await Ereignisse.beiEnde({ sitzung_id: 'wbprobe', bytes: 1 }, true);
+        assert.strictEqual(db.schritte[0].dateien, null, 'älterer Daemon: kein Vergleich, kein Fehler');
+    });
+
+    await pruefe('W2: gerechnete Summe wird in einen Download OHNE Summe eingetragen, vor dem Status', async () => {
+        await Sitzungen.schrittAusfuehren({ sitzung: db.sitzung, schritt: { type: 'download', url: 'https://x.de/a.zip', target: 'a.zip', checksum: '' } });
+        await Ereignisse.beiEnde({ sitzung_id: 'wbprobe', bytes: 1, pruefsumme: SUMME }, true);
+        const s = db.schritte[0];
+        assert.strictEqual(JSON.parse(s.schritt).checksum, SUMME);
+        assert.match(s.ausgabe, /ausgerechnet und in den Schritt eingetragen/);
+        assert.strictEqual(s.status, 'ok');
+        const paket = Sitzungen.entwurfAlsPaket(db.sitzung, db.schritte.map(x => ({ ...x, schritt: JSON.parse(x.schritt) })));
+        assert.strictEqual(paket.install.steps[0].checksum, SUMME, 'der Entwurf trägt sie');
+    });
+
+    await pruefe('W2: eine angegebene Summe wird nie überschrieben; gescheitert oder Unsinn trägt nichts ein', async () => {
+        const eigene = 'sha1:' + 'c'.repeat(40);
+        await Sitzungen.schrittAusfuehren({ sitzung: db.sitzung, schritt: { type: 'download', url: 'https://x.de/a.zip', target: 'a.zip', checksum: eigene } });
+        await Ereignisse.beiEnde({ sitzung_id: 'wbprobe', bytes: 1, pruefsumme: SUMME }, true);
+        assert.strictEqual(JSON.parse(db.schritte[0].schritt).checksum, eigene);
+        db.schritte = [];
+        await Sitzungen.schrittAusfuehren({ sitzung: db.sitzung, schritt: { type: 'download', url: 'https://x.de/a.zip', target: 'a.zip' } });
+        await Ereignisse.beiEnde({ sitzung_id: 'wbprobe', error: 'curl', pruefsumme: SUMME }, false);
+        assert.ok(!JSON.parse(db.schritte[0].schritt).checksum, 'gescheitert: keine Summe');
+        assert.strictEqual(await Sitzungen.pruefsummeEintragen(db.schritte[0].id, 'md5:abc'), false);
+        assert.strictEqual(await Sitzungen.pruefsummeEintragen(db.schritte[0].id, 'sha256:ABC'), false);
+    });
+
+    await pruefe('W2: ohne Summe kein Prüfdurchlauf — der Mangel sagt, was zu tun ist', async () => {
+        const m = Sitzungen.durchlaufMaengel({ install: { steps: [{ type: 'download', url: 'https://x.de/a.zip', target: 'a.zip' }] },
+            start: { program: 'x', ready_when: { port: 'game' }, stop: { sequence: [{ step: 'sigint' }, { step: 'sigkill' }] } }, ports: [] });
+        assert.ok(m.some(x => /a\.zip hat keine Prüfsumme/.test(x)), m.join(' | '));
+    });
+
+    await pruefe('Vertrag: der Daemon schickt dateien und pruefsumme mit fertig, dateien mit fehlgeschlagen', async () => {
+        const ws = ohneKommentare(fs.readFileSync(path.join(DAEMON, 'internal/websocket/werkbank.go'), 'utf8'));
+        const fertig = ws.slice(ws.indexOf('fertig := map[string]interface{}{'));
+        assert.match(fertig.slice(0, 300), /"dateien":\s*erg\.Dateien/);
+        assert.match(fertig.slice(0, 500), /fertig\["pruefsumme"\]\s*=\s*erg\.Pruefsumme/);
+        const fehl = ws.slice(ws.indexOf('protocol.WerkbankFehlgeschlagen'));
+        assert.match(fehl.slice(0, 300), /"dateien":\s*erg\.Dateien/);
+        const go = ohneKommentare(fs.readFileSync(path.join(DAEMON, 'internal/gameserver/werkbank.go'), 'utf8'));
+        assert.match(go, /summeErmitteln:\s*summeErmitteln/, 'nur der Einzelschritt ermittelt');
+        const pruef = ohneKommentare(fs.readFileSync(path.join(DAEMON, 'internal/gameserver/werkbank_pruefung.go'), 'utf8'));
+        assert.ok(!/summeErmitteln|SummeErmitteln/.test(pruef), 'der Prüfdurchlauf darf nie ohne Summe laufen');
+    });
+
+    console.log('\nLive-Kanal und Programmfeld');
+
+    await pruefe('Zustand: was läuft, für die Seite nach dem Verbinden', async () => {
+        assert.deepStrictEqual(await Sitzungen.zustand('wbprobe'), { schritt: false, spiel: false, pruefung: false });
+        await Sitzungen.schrittAusfuehren({ sitzung: db.sitzung, schritt: { type: 'mkdir', path: 'mods' } });
+        assert.strictEqual((await Sitzungen.zustand('wbprobe')).schritt, true);
+        assert.strictEqual((await Sitzungen.zustand('wbfremd')).schritt, false, 'fremde Sitzung');
+    });
+
+    await pruefe('Seite: fragt beim (Wieder-)Verbinden den Zustand ab und lädt bei verpasstem Ende neu', async () => {
+        const view = ohneKommentare(fs.readFileSync(path.join(__dirname, '../plugins/werkbank/dashboard/views/guild/werkbank-sitzung.ejs'), 'utf8'));
+        const router = ohneKommentare(fs.readFileSync(path.join(__dirname, '../plugins/werkbank/dashboard/routes/guild.router.js'), 'utf8'));
+        const offen = view.slice(view.indexOf("strom.addEventListener('open'"));
+        assert.ok(offen.length > 30, 'kein open-Zuhörer am Live-Kanal');
+        assert.match(offen.slice(0, 1200), /fetch\(hier \+ '\/zustand'/);
+        assert.match(offen.slice(0, 1200), /werkbankSpiel === '1' && !jetzt\.spiel/);
+        assert.match(offen.slice(0, 1200), /if \(vorbei \|\| wieder\)/, 'nach Wiederverbindung immer neu laden');
+        assert.match(router, /router\.get\('\/:kennung\/zustand'/);
+    });
+
+    await pruefe('Programmfeld: ein Schalter darin wird mit Grund abgewiesen, ein Pfad mit Leerzeichen nicht', async () => {
+        const basis = { stop: 'sigkill 10' };
+        assert.throws(() => startAusFormular({ ...basis, program: './downloader/hytale-downloader-linux-amd64 --download-path hytale.zip' }),
+            /Parameter „--download-path"/);
+        assert.throws(() => startAusFormular({ ...basis, program: './x -download-path y' }), /-download-path/);
+        assert.strictEqual(startAusFormular({ ...basis, program: './Astro Colony/Server.x86_64' }).program, './Astro Colony/Server.x86_64');
     });
 
     console.log(`\n${bestanden} Prüfung(en) bestanden.\n`);

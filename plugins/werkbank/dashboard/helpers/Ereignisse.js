@@ -127,9 +127,17 @@ async function beiEnde(payload, ok) {
         return;
     }
     await schreibePuffer(lauf.schrittId);
+    // Die Summe VOR dem Statuswechsel: Wer auf „fertig" hin die Seite lädt,
+    // soll den Schritt schon mit eingetragener Summe sehen.
+    if (ok && payload.pruefsumme && await Sitzungen.pruefsummeEintragen(lauf.schrittId, payload.pruefsumme)) {
+        await Sitzungen.ausgabeAnhaengen(lauf.schrittId,
+            `==> Pruefsumme ausgerechnet und in den Schritt eingetragen: ${payload.pruefsumme}\n`
+            + '    (selbst gerechnet — nennt der Hersteller eine, vergleiche sie)\n');
+    }
+    const dateien = payload.dateien && typeof payload.dateien === 'object' ? payload.dateien : null;
     await Sitzungen.beenden(lauf.schrittId, ok
-        ? { status: 'ok', bytes: Number.isFinite(Number(payload.bytes)) ? Number(payload.bytes) : null }
-        : { status: 'fehler', fehler: String(payload.error || 'unbekannter Fehler') });
+        ? { status: 'ok', bytes: Number.isFinite(Number(payload.bytes)) ? Number(payload.bytes) : null, dateien }
+        : { status: 'fehler', fehler: String(payload.error || 'unbekannter Fehler'), dateien });
     vergiss(kennung);
     sende(lauf.guildId, {
         action: ok ? 'fertig' : 'fehlgeschlagen', sitzung_id: kennung,
