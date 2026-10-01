@@ -2185,6 +2185,8 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
         // Karte — die Seite bleibt benutzbar. Eine Übersicht ist kein Grund,
         // einen Server unerreichbar zu machen.
         let uebersicht = null;
+        // Auch für die Konsole: Ein Paket-Server nimmt Befehle an (ConsoleTransport).
+        let paketFuerKonsole = null;
         try {
             // Die Höhe hängt am SERVER, nicht am Betrachter (entschieden
             // 2026-08-18): Sonst sähen zwei Leute mit Rechten auf denselben
@@ -2213,6 +2215,7 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
                   WHERE server_id = ? AND status = 'completed' AND completed_at IS NOT NULL
                   ORDER BY completed_at DESC LIMIT 5`, [server.id]);
 
+            paketFuerKonsole = paket;
             uebersicht = baueUebersicht(server, paket, {
                 sicherungen: sicherungen || [],
             });
@@ -2242,7 +2245,7 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
             user,
             rootServers,
             // Entscheidet, ob der Konsolen-Tab ein Eingabefeld zeigt (Konzept 23.3)
-            consoleTransport: resolveConsoleTransport(gameData)
+            consoleTransport: resolveConsoleTransport(gameData, paketFuerKonsole)
         });
 
     } catch (error) {

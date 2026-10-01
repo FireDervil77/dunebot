@@ -116,6 +116,27 @@ check('konsoleNimmtBefehle ist nur bei native wahr', () => {
     assert.strictEqual(konsoleNimmtBefehle({ startup: { stop: '^C' } }), false);
 });
 
+check('Spielpaket → die Konsole nimmt Befehle an, auch mit leeren Egg-Daten (alle Server seit 2026-09-26)', () => {
+    // Am 2026-10-01 gefunden (Hytale #206): Alle sechs Server standen auf "none",
+    // weil die Regel nur das Egg las und die Egg-Daten geleert waren.
+    const t = resolveConsoleTransport({}, { identity: { slug: 'hytale' } });
+    assert.strictEqual(t.stdin, NATIVE);
+    assert.strictEqual(t.quelle, 'paket');
+    assert.strictEqual(resolveConsoleTransport({}, null).stdin, NONE, 'ohne Paket bleibt die alte Regel');
+});
+
+check('Beide Aufrufer geben das Paket mit — Eingabefeld UND Route', () => {
+    const fs = require('fs');
+    const { ohneKommentare } = require('./lib/quelltext');
+    const route = ohneKommentare(fs.readFileSync(path.join(__dirname, '../plugins/gameserver/dashboard/routes/console.js'), 'utf8'));
+    const seite = ohneKommentare(fs.readFileSync(path.join(__dirname, '../plugins/gameserver/dashboard/routes/servers.js'), 'utf8'));
+    assert.match(route, /resolveConsoleTransport\(gameData, paketZeile\?\.paket_json \? paketZeile : null\)/,
+        'die Befehls-Route entscheidet ohne Paket');
+    assert.match(seite, /consoleTransport: resolveConsoleTransport\(gameData, paketFuerKonsole\)/,
+        'das Eingabefeld entscheidet ohne Paket');
+    assert.match(seite, /paketFuerKonsole = paket;/);
+});
+
 console.log('\nBefehlsfilter auf der RCON-Route');
 
 check('shutdown ist blockiert, solange das Addon es nicht deklariert', () => {

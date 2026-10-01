@@ -154,7 +154,7 @@ router.post('/:serverId/send',
             // Zähler und das Protokoll der RCON-Route.
             const dbService = ServiceManager.get('dbService');
             const [eintrag] = await dbService.query(`
-                SELECT am.game_data
+                SELECT am.game_data, gs.addon_marketplace_id
                 FROM gameservers gs
                 LEFT JOIN addon_marketplace am ON gs.addon_marketplace_id = am.id
                 WHERE gs.id = ? AND gs.guild_id = ?
@@ -166,7 +166,10 @@ router.post('/:serverId/send',
                     ? JSON.parse(eintrag.game_data) : (eintrag?.game_data || {});
             } catch (_) { /* unlesbares game_data zählt als "nichts deklariert" */ }
 
-            const transport = resolveConsoleTransport(gameData);
+            const { ladePaketFuerAddon } = require('../helpers/StartPayload');
+            const paketZeile = eintrag?.addon_marketplace_id
+                ? await ladePaketFuerAddon(dbService, eintrag.addon_marketplace_id) : null;
+            const transport = resolveConsoleTransport(gameData, paketZeile?.paket_json ? paketZeile : null);
             if (transport.stdin !== NATIVE) {
                 Logger.warn(`[Console API] Befehl abgelehnt, stdin ist "${transport.stdin}"`, {
                     userId, serverId, guildId

@@ -82,7 +82,23 @@ function istStoppWort(stop) {
  * @param {object} [gameData] – aufgelöstes `game_data` des Addons
  * @returns {{stdin: string, quelle: 'addon'|'abgeleitet', begruendung: string}}
  */
-function resolveConsoleTransport(gameData) {
+function resolveConsoleTransport(gameData, paket = null) {
+    // ── Ein Server aus einem Spielpaket nimmt Befehle an (2026-10-01) ───────
+    //
+    // Alles darunter liest das EGG (`console.stdin`, `startup.stop`). Seit die
+    // Egg-Daten am 2026-09-26 geleert wurden, fiel jeder Paket-Server auf
+    // „none" — die Konsole hatte kein Eingabefeld, die Route wies jeden Befehl
+    // ab (Hytale #206: `/auth login device` war nicht einzugeben). Beim Paket
+    // reicht der Daemon die Zeile über den Agenten an die Standardeingabe des
+    // Spiels (Baustelle 157) — dort gibt es keine Brücke zu RCON.
+    if (paket) {
+        return {
+            stdin: NATIVE,
+            quelle: 'paket',
+            begruendung: 'Spielpaket: Der Daemon gibt Eingaben an die Standardeingabe des Spiels weiter.',
+        };
+    }
+
     const daten = gameData || {};
 
     // 1. Ausdrückliche Angabe des Addons schlägt jede Ableitung.
