@@ -1085,6 +1085,26 @@ async function pruefe(name, fn) {
         assert.strictEqual(startAusFormular({ ...basis, program: './Astro Colony/Server.x86_64' }).program, './Astro Colony/Server.x86_64');
     });
 
+    await pruefe('Konsole: Farbcodes der Spiele werden beim Anzeigen entfernt — an jeder Stelle', async () => {
+        const roh = fs.readFileSync(path.join(__dirname, '../plugins/werkbank/dashboard/views/guild/werkbank-sitzung.ejs'), 'utf8');
+        const view = ohneKommentare(roh);
+        // Die Regel selbst, an einer echten Hytale-Zeile (2026-10-01): `[m` landete in der Anmeldeadresse.
+        const m = /function lesbar\(t\) \{ return String\([^)]*\)\.replace\((\/.+\/g), ''\); \}/.exec(view);
+        assert.ok(m, 'lesbar() nicht gefunden');
+        const lesbar = new Function('t', `return String(t).replace(${m[1]}, '');`);
+        const zeile = '\x1b[m[2026/10/01 14:32:23   INFO] [AbstractCommand] Or visit: https://x/verify?user_code=ABCD1234\x1b[m';
+        assert.strictEqual(lesbar(zeile), '[2026/10/01 14:32:23   INFO] [AbstractCommand] Or visit: https://x/verify?user_code=ABCD1234');
+        assert.strictEqual(lesbar('\x1b[0;32mgrün\x1b[0m \x1b[38;5;226mgelb\x1b[0m'), 'grün gelb');
+        assert.strictEqual((view.match(/function lesbar\(t\)/g) || []).length, 2, 'Server-Teil UND Skript');
+        // Jede Stelle, die Spielausgabe zeigt, geht durch lesbar().
+        for (const muster of [/lesbar\(x\.ausgabe\)/, /lesbar\(lauf && lauf\.konsole\)/, /lesbar\(pruefung && pruefung\.protokoll\)/,
+            /pp\.textContent \+= lesbar\(d\.line\)/, /z\.textContent = lesbar\(d\.line\)/, /\+ lesbar\(d\.line\) \+ '\\n'/]) {
+            assert.match(view, muster);
+        }
+        assert.ok(!/textContent \+?= ?[^;]*\bd\.line\b(?![^;]*lesbar)/.test(view.replace(/lesbar\(d\.line\)/g, '')),
+            'eine Live-Zeile geht roh in die Seite');
+    });
+
     console.log(`\n${bestanden} Prüfung(en) bestanden.\n`);
     process.exit(process.exitCode || 0);
 })();

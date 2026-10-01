@@ -26,6 +26,10 @@
   const pruefLaeuft = Boolean(pruefung && pruefung.status === 'laeuft');
   const beschaeftigt = laeuft || spielLaeuft || pruefLaeuft;
   const entwurfPorts = sitzung.entwurf.ports || [];
+  // Farb- und Steuerzeichen der Spiele (ANSI) — beim ANZEIGEN entfernt, die
+  // Daten bleiben roh. Hytale färbt jede Zeile; kopiert landete `[m` in der
+  // Anmeldeadresse, und Hytale wies den Code ab (2026-10-01).
+  function lesbar(t) { return String(t || '').replace(/\x1b\[[0-?]*[ -\/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-Z\\-_]/g, ''); }
   function groesse(n) {
     n = Number(n) || 0;
     if (n < 1024) return n + ' B';
@@ -102,7 +106,7 @@
               <% if (x.ausgabe || x.status === 'laeuft') { %>
                 <details class="mt-2" <%= x.status === 'laeuft' ? 'open' : '' %>>
                   <summary class="text-secondary small">Ausgabe</summary>
-                  <pre class="mt-2 mb-0 p-2 small" style="max-height:24rem;overflow:auto;background:var(--tblr-bg-surface-secondary);color:var(--tblr-body-color)" <%= x.status === 'laeuft' ? 'id=liveAusgabe' : '' %>><%= x.ausgabe || '' %></pre>
+                  <pre class="mt-2 mb-0 p-2 small" style="max-height:24rem;overflow:auto;background:var(--tblr-bg-surface-secondary);color:var(--tblr-body-color)" <%= x.status === 'laeuft' ? 'id=liveAusgabe' : '' %>><%= lesbar(x.ausgabe) %></pre>
                 </details>
               <% } %>
               <% if (x.dateien) { %>
@@ -389,7 +393,7 @@
             </div>
             <div id="laufKonsole" class="mt-1 p-2 small font-monospace"
                  style="height:22rem;overflow:auto;white-space:pre-wrap;background:var(--tblr-bg-surface-secondary);color:var(--tblr-body-color);cursor:pointer"><%
-              ((lauf && lauf.konsole) || '').split('\n').filter(Boolean).forEach(function (z) { %><div><%= z %></div><% }) %></div>
+              lesbar(lauf && lauf.konsole).split('\n').filter(Boolean).forEach(function (z) { %><div><%= z %></div><% }) %></div>
             <form id="formEingabe" class="input-group mt-2">
               <input class="form-control font-monospace" name="zeile" placeholder="Befehl an das Spiel (Standardeingabe)" <%= spielLaeuft ? '' : 'disabled' %>>
               <button class="btn btn-outline-secondary" type="submit" <%= spielLaeuft ? '' : 'disabled' %>>Senden</button>
@@ -779,7 +783,7 @@
         <% } %>
         <details <%= pruefLaeuft ? 'open' : '' %>>
           <summary class="text-secondary small">Protokoll</summary>
-          <pre id="pruefProtokoll" class="mt-2 mb-0 p-2 small" style="max-height:24rem;overflow:auto;background:var(--tblr-bg-surface-secondary);color:var(--tblr-body-color)"><%= (pruefung && pruefung.protokoll) || '' %></pre>
+          <pre id="pruefProtokoll" class="mt-2 mb-0 p-2 small" style="max-height:24rem;overflow:auto;background:var(--tblr-bg-surface-secondary);color:var(--tblr-body-color)"><%= lesbar(pruefung && pruefung.protokoll) %></pre>
         </details>
       </div>
     </div>
@@ -879,6 +883,8 @@
   var kennung = wurzel.dataset.werkbankSitzung;
 
   function melde(art, text) { if (window.showToast) window.showToast(art, text); }
+  // Dieselbe Regel wie `lesbar` oben im Server-Teil — für die Live-Zeilen.
+  function lesbar(t) { return String(t == null ? '' : t).replace(/\x1b\[[0-?]*[ -\/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-Z\\-_]/g, ''); }
 
   async function schicke(pfad, nutzlast) {
     var antwort = await fetch(pfad, {
@@ -1442,7 +1448,7 @@
       if (d.action === 'pruefung_zeile') {
         var pp = document.getElementById('pruefProtokoll');
         var untenP = pp.scrollTop + pp.clientHeight >= pp.scrollHeight - 4;
-        pp.textContent += d.line + '\n';
+        pp.textContent += lesbar(d.line) + '\n';
         if (untenP) pp.scrollTop = pp.scrollHeight;
         return;
       }
@@ -1454,7 +1460,7 @@
       if (d.action === 'konsole') {
         var unten = konsole.scrollTop + konsole.clientHeight >= konsole.scrollHeight - 4;
         var z = document.createElement('div');
-        z.textContent = d.line;
+        z.textContent = lesbar(d.line);
         konsole.appendChild(z);
         if (unten) konsole.scrollTop = konsole.scrollHeight;
       } else if (d.action === 'ports') {
@@ -1476,7 +1482,7 @@
         window.location.reload();
       } else if (d.action === 'output' && live) {
         var unten = live.scrollTop + live.clientHeight >= live.scrollHeight - 4;
-        live.textContent += (d.finding ? '⚑ ' : '') + d.line + '\n';
+        live.textContent += (d.finding ? '⚑ ' : '') + lesbar(d.line) + '\n';
         if (unten) live.scrollTop = live.scrollHeight;
       } else if (d.action === 'status' && live && d.message) {
         live.textContent += '── ' + d.message + '\n';
