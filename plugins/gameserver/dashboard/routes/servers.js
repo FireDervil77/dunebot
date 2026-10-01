@@ -44,6 +44,17 @@ const { resolveConsoleTransport } = require('../helpers/ConsoleTransport');
 // ✅ PERMISSION-MIDDLEWARE IMPORTIEREN
 const { requirePermission, loadUserPermissions } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 
+// ── „Für den Server läuft schon eine Installation" (2026-10-01) ─────────────
+// Der Daemon lehnt einen zweiten Auftrag mit `code: install_laeuft` ab. Das ist
+// kein Fehler: Die laufende Installation geht weiter — oft wartet sie auf eine
+// Eingabe (Hytale: Anmeldecode des Downloaders, steht in der Konsole).
+const INSTALL_LAEUFT_TEXT = 'Die Installation läuft noch. Sie wartet vermutlich auf etwas — sieh in die Konsole, '
+    + 'dort steht ihre Ausgabe (z.B. ein Anmeldecode).';
+async function installLaeuftNoch(dbService, serverId) {
+    await dbService.query(
+        "UPDATE gameservers SET status = 'installing', error_message = NULL WHERE id = ?", [serverId]);
+}
+
 // ✅ WICHTIG: Permission-Middleware für ALLE Guild-Routes laden!
 router.use(loadUserPermissions);
 
@@ -2821,10 +2832,17 @@ router.post('/:serverId/retry-installation', requirePermission('GAMESERVER.CREAT
         }
 
     } catch (error) {
+        if (error?.code === 'install_laeuft') {
+            await installLaeuftNoch(dbService, req.params.serverId);
+            return res.status(409).json({ success: false, message: INSTALL_LAEUFT_TEXT });
+        }
         Logger.error('[Gameserver] Fehler beim Retry der Installation:', error);
+        await dbService.query('UPDATE gameservers SET status = ?, error_message = ? WHERE id = ? AND status = ?',
+            ['error', String(error?.message || 'Installation fehlgeschlagen').slice(0, 1000), req.params.serverId, 'installing'])
+            .catch(e => Logger.error('[Gameserver] Status nach gescheitertem Retry nicht gesetzt:', e));
         res.status(500).json({
             success: false,
-            message: 'Serverfehler beim Neustarten der Installation'
+            message: error?.message || 'Serverfehler beim Neustarten der Installation'
         });
     }
 });
@@ -3297,10 +3315,19 @@ router.post('/:serverId/reinstall', requirePermission('GAMESERVER.CREATE'), asyn
         }
 
     } catch (error) {
+        // `sendCommand` WIRFT bei einer Ablehnung — der `else`-Zweig oben
+        // war nie erreichbar, und der Server blieb auf „installing" stehen.
+        if (error?.code === 'install_laeuft') {
+            await installLaeuftNoch(dbService, req.params.serverId);
+            return res.status(409).json({ success: false, message: INSTALL_LAEUFT_TEXT });
+        }
         Logger.error('[Gameserver] Fehler beim Reinstall des Servers:', error);
+        await dbService.query('UPDATE gameservers SET status = ?, error_message = ? WHERE id = ? AND status = ?',
+            ['error', String(error?.message || 'Reinstall fehlgeschlagen').slice(0, 1000), req.params.serverId, 'installing'])
+            .catch(e => Logger.error('[Gameserver] Status nach gescheitertem Reinstall nicht gesetzt:', e));
         res.status(500).json({
             success: false,
-            message: 'Serverfehler beim Reinstall'
+            message: error?.message || 'Serverfehler beim Reinstall'
         });
     }
 });

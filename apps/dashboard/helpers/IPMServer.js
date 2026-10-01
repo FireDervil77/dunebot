@@ -1494,6 +1494,12 @@ class IPMServer {
             this.pendingCommands.set(commandId, {
                 resolve: (result) => {
                     clearTimeout(timeoutHandle);
+                    // Eine neue Installation beginnt: ihre Zeilen ab hier.
+                    // Erst bei ANNAHME — eine Ablehnung (`install_laeuft`)
+                    // darf die Zeilen der laufenden nicht löschen.
+                    if (command === 'gameserver.install' && payload?.server_id !== undefined) {
+                        this.installZeilenLeeren(payload.server_id);
+                    }
                     resolve(result);
                 },
                 reject: (error) => {
@@ -1515,6 +1521,43 @@ class IPMServer {
         });
     }
 
+    // ── Ausgabe der Installation (2026-10-01) ────────────────────────────────
+    //
+    // Die Zeilen einer Installation gingen nur LIVE an die Konsole. Wer sie
+    // erst danach öffnete, sah nichts — bei Hytale #206 genau die Zeile mit
+    // dem Anmeldecode des Downloaders, auf den die Installation wartete. Jetzt
+    // bleiben die letzten Zeilen je Server hier liegen, und die Konsole
+    // bekommt sie beim Öffnen nachgeliefert. Nur im Speicher: Ein Anmeldecode
+    // gilt Minuten, kein Neustart des Dashboards.
+    static INSTALL_ZEILEN = 300;
+    static INSTALL_ZEILE_LAENGE = 4000;
+
+    installZeileMerken(serverId, guildId, zeile) {
+        if (!this._installZeilen) this._installZeilen = new Map();
+        const id = String(serverId);
+        let e = this._installZeilen.get(id);
+        if (!e || e.guildId !== String(guildId)) {
+            e = { guildId: String(guildId), zeilen: [] };
+            this._installZeilen.set(id, e);
+        }
+        // Fortschrittsbalken ohne Zeilenumbruch werden eine Riesenzeile — das
+        // ENDE ist der aktuelle Stand.
+        const text = String(zeile ?? '');
+        e.zeilen.push(text.length > IPMServer.INSTALL_ZEILE_LAENGE
+            ? '…' + text.slice(-IPMServer.INSTALL_ZEILE_LAENGE) : text);
+        if (e.zeilen.length > IPMServer.INSTALL_ZEILEN) e.zeilen.splice(0, e.zeilen.length - IPMServer.INSTALL_ZEILEN);
+    }
+
+    /** Die gemerkten Zeilen — nur für die Guild, der der Server gehört. */
+    installZeilen(serverId, guildId) {
+        const e = this._installZeilen?.get(String(serverId));
+        return e && e.guildId === String(guildId) ? [...e.zeilen] : [];
+    }
+
+    installZeilenLeeren(serverId) {
+        this._installZeilen?.delete(String(serverId));
+    }
+
     /**
      * Command-Response verarbeiten
      * @private
@@ -1532,7 +1575,12 @@ class IPMServer {
         if (response && response.success) {
             pending.resolve(response);
         } else {
-            pending.reject(new Error(response?.error || 'Command failed'));
+            // Die Kennung geht mit (2026-10-01): `install_laeuft` heisst „keine
+            // neue Installation, die alte läuft" — kein Fehler. Nur der Text
+            // wäre eine Regel, die an einer Formulierung hängt.
+            const fehler = new Error(response?.error || 'Command failed');
+            if (response?.code) fehler.code = response.code;
+            pending.reject(fehler);
         }
     }
 
@@ -1835,6 +1883,14 @@ class IPMServer {
                     }
 
                 } catch (serverError) {
+                    // Die Installation läuft noch (der Daemon hat sie nie
+                    // verloren) — z.B. Hytale #206, der Downloader wartete auf
+                    // seinen Anmeldecode. Bis zum 2026-10-01 stand der Server
+                    // danach auf „Fehler", und der Start-Knopf wurde frei.
+                    if (serverError?.code === 'install_laeuft') {
+                        this.Logger.info(`[IPMServer] Installation von ${server.name} (ID: ${server.server_id}) läuft noch — nichts erneut gesendet`);
+                        continue;
+                    }
                     this.Logger.error(`[IPMServer] Fehler beim Re-trigger für Server ${server.server_id}:`, serverError);
                     
                     // Status auf 'error' setzen
@@ -1974,6 +2030,8 @@ class IPMServer {
                     [prozent, payload.server_id]
                 );
             }
+
+            if (payload.line !== undefined) this.installZeileMerken(payload.server_id, server.guild_id, payload.line);
 
             const sseManager = ServiceManager.get('sseManager');
             if (sseManager) {

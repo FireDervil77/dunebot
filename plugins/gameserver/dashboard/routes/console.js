@@ -70,6 +70,23 @@ router.post('/:serverId/attach',
                 Logger.info(`[Console API] Daemon-Attach nicht verfügbar (${attachErr?.message}) – SSE läuft trotzdem`);
             }
             
+            // Installiert der Server (oder scheiterte die Installation), gehört
+            // ihre Ausgabe vor alles andere — sie ging bisher nur live raus,
+            // und wer die Konsole später öffnete, sah z.B. den Anmeldecode des
+            // Hytale-Downloaders nie (#206, 2026-10-01).
+            try {
+                const [zeile] = await ServiceManager.get('dbService').query(
+                    'SELECT status FROM gameservers WHERE id = ? AND guild_id = ?', [serverId, guildId]);
+                if (zeile && (zeile.status === 'installing' || zeile.status === 'error')) {
+                    const install = ServiceManager.get('ipmServer')?.installZeilen(serverId, guildId) || [];
+                    if (install.length) {
+                        history = ['── Ausgabe der Installation (letzte ' + install.length + ' Zeilen) ──', ...install, ...history];
+                    }
+                }
+            } catch (fehler) {
+                Logger.warn(`[Console API] Installationszeilen für Server ${serverId} nicht geholt:`, fehler);
+            }
+
             Logger.info(`[Console API] Attach: Server ${serverId}, Client ${clientId}, History: ${history.length} Zeilen`);
             
             res.json({
