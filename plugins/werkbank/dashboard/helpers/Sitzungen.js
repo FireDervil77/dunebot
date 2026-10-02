@@ -502,6 +502,22 @@ async function einstellungEntfernen(sitzung, key) {
     });
 }
 
+/**
+ * Nur die Rolle umstellen — direkt aus der Tabelle, ohne das ganze Formular.
+ * Die Rolle entscheidet, wo die Einstellung später steht (Serverseite.js,
+ * HOEHE): `player` im Anlegeformular und in der einfachen Ansicht, `owner`
+ * und `expert` nur in der fachlichen.
+ */
+async function einstellungRolleSetzen(sitzung, key, rolle) {
+    await pruefeFrei(sitzung);
+    if (!EINSTELLUNG.rollen.includes(rolle)) throw new Error(`Rolle: ${EINSTELLUNG.rollen.join(', ')}.`);
+    if (!(sitzung.entwurf?.settings || []).some(x => x.key === key)) throw new Error(`Keine Einstellung „${key}".`);
+    return entwurfSchreiben(sitzung, (e) => {
+        const s = (e.settings || []).find(x => x.key === key);
+        if (s) s.role = rolle;
+    });
+}
+
 /** Der Wert, mit dem Probestart und Durchlauf laufen — leer heißt: die Vorgabe. */
 async function probewertSetzen(sitzung, key, wert) {
     await pruefeFrei(sitzung);
@@ -1352,7 +1368,7 @@ module.exports = {
     PRUEF_SUFFIX, fingerabdruck, technisch,
     pruefeBildAdresse, angaben, angabenSpeichern, veroeffentlichungsStand, veroeffentlichungsPaket, veroeffentlichen, laufendePruefung, pruefungen, durchlaufMaengel, pruefen,
     pruefungAbbrechen, pruefProtokoll, pruefungBeenden,
-    EINSTELLUNG, einstellungAusFormular, einstellungSpeichern, einstellungEntfernen, probewertSetzen, probewerte,
+    EINSTELLUNG, einstellungAusFormular, einstellungSpeichern, einstellungEntfernen, einstellungRolleSetzen, probewertSetzen, probewerte,
     umgebungAusEinstellungen, belegteEinstellungen,
     werkbankTeil, ungenutztePorts, startSpeichern, startzeile, zustand, starten, stoppen, eingabe, laeufe, laufenderLauf,
     portUebernehmen, portEntfernen, bereitschaftszeile,

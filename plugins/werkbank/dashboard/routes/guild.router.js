@@ -485,6 +485,15 @@ router.post('/:kennung/einstellungen/:key/entfernen', requirePermission('WERKBAN
     }
 });
 
+router.post('/:kennung/einstellungen/:key/rolle', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.einstellungRolleSetzen(await offeneSitzung(req, res), req.params.key, req.body?.rolle);
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Rolle nicht gespeichert', 400);
+    }
+});
+
 router.post('/:kennung/einstellungen/:key/probewert', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
     try {
         await Sitzungen.probewertSetzen(await offeneSitzung(req, res), req.params.key, req.body?.wert);

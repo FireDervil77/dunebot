@@ -476,6 +476,8 @@
   <%
     const nachweise = (pruefung && pruefung.ergebnis && Array.isArray(pruefung.ergebnis.einstellungen)) ? pruefung.ergebnis.einstellungen : null;
     const nachweisVeraltet = pruefung && pruefHash !== entwurfHash;
+    // Kurzform für die Auswahl in der Tabelle — dieselbe Zuordnung wie HOEHE in Serverseite.js.
+    const ROLLE_KURZ = { player: 'einfache Ansicht + Anlegen', owner: 'fachlich (Betreiber)', expert: 'fachlich (Experte)' };
     const ROLLE = { player: 'beim Anlegen gefragt', owner: 'nur fachliche Ansicht (Betreiber)', expert: 'nur fachliche Ansicht (Experte)' };
     const ZUSTAND = {
       angekommen:       ['bg-green-lt',     'angekommen'],
@@ -531,7 +533,9 @@
                       <div class="text-secondary small font-monospace"><%= e.key %> · <%= e.type %><%= e.group ? ' · ' + ((anzeige.GRUPPE[e.group]) || e.group) : '' %></div>
                     </td>
                     <td class="small">
-                      <div><%= ROLLE[e.role] || e.role %></div>
+                      <select class="form-select form-select-sm mb-1" data-rolle="<%= e.key %>" title="Wo die Einstellung später steht" <%= beschaeftigt ? 'disabled' : '' %>>
+                        <% EINSTELLUNG.rollen.forEach(function (r) { %><option value="<%= r %>" <%= (e.role || 'expert') === r ? 'selected' : '' %>><%= ROLLE_KURZ[r] || r %></option><% }) %>
+                      </select>
                       <div class="text-secondary"><%= (anzeige.WIRKUNG[e.takes_effect] && anzeige.WIRKUNG[e.takes_effect].text) || e.takes_effect %><%= anzeige.RISIKO[e.risk] ? ' · ' + anzeige.RISIKO[e.risk] : '' %></div>
                     </td>
                     <td class="small">
@@ -1594,6 +1598,23 @@
         window.location.reload();
       } catch (fehler) {
         k.disabled = false;
+        melde('error', fehler.message);
+      }
+    });
+  });
+
+  // Rolle direkt in der Tabelle umstellen. Neu laden, weil „Bearbeiten" die
+  // Einstellung samt alter Rolle im Knopf trägt und sie sonst zurückschriebe.
+  document.querySelectorAll('[data-rolle]').forEach(function (feld) {
+    var vorher = feld.value;
+    feld.addEventListener('change', async function () {
+      feld.disabled = true;
+      try {
+        await schicke(hier + '/einstellungen/' + encodeURIComponent(feld.dataset.rolle) + '/rolle', { rolle: feld.value });
+        window.location.reload();
+      } catch (fehler) {
+        feld.value = vorher;
+        feld.disabled = false;
         melde('error', fehler.message);
       }
     });
