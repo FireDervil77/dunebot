@@ -414,13 +414,13 @@
                   <% beobachtet.forEach(function (p) { %>
                     <% if (uebernommen[p.port + '/' + p.protocol]) { %>
                       <div class="d-flex gap-2 mb-1 align-items-center">
-                        <span class="badge bg-green-lt font-monospace"><%= p.port %>/<%= p.protocol %></span>
+                        <span class="badge bg-green-lt font-monospace flex-shrink-0"><%= p.port %>/<%= p.protocol %></span>
                         <span class="text-secondary small">im Entwurf als <span class="font-monospace"><%= uebernommen[p.port + '/' + p.protocol] %></span></span>
                       </div>
                       <% return; } %>
                     <form class="d-flex gap-1 mb-1" data-port-uebernehmen data-port="<%= p.port %>" data-protocol="<%= p.protocol %>">
-                      <span class="badge bg-azure-lt font-monospace align-self-center"><%= p.port %>/<%= p.protocol %></span>
-                      <input class="form-control form-control-sm font-monospace" name="zweck" placeholder="Zweck (game)" style="max-width:9rem">
+                      <span class="badge bg-azure-lt font-monospace align-self-center flex-shrink-0"><%= p.port %>/<%= p.protocol %></span>
+                      <input class="form-control form-control-sm font-monospace" name="zweck" placeholder="Zweck (game)" style="max-width:9rem;min-width:0">
                       <button class="btn btn-sm btn-outline-primary" type="submit">Übernehmen</button>
                     </form>
                   <% }) %>
@@ -1354,7 +1354,7 @@
         var zeile = document.createElement('div');
         zeile.className = 'd-flex gap-2 mb-1 align-items-center';
         var marke = document.createElement('span');
-        marke.className = 'badge bg-green-lt font-monospace';
+        marke.className = 'badge bg-green-lt font-monospace flex-shrink-0';
         marke.textContent = p.port + '/' + p.protocol;
         var hinweis = document.createElement('span');
         hinweis.className = 'text-secondary small';
@@ -1368,11 +1368,11 @@
       f.setAttribute('data-port-uebernehmen', '');
       f.dataset.port = p.port; f.dataset.protocol = p.protocol;
       var b = document.createElement('span');
-      b.className = 'badge bg-azure-lt font-monospace align-self-center';
+      b.className = 'badge bg-azure-lt font-monospace align-self-center flex-shrink-0';
       b.textContent = p.port + '/' + p.protocol;
       var i = document.createElement('input');
       i.className = 'form-control form-control-sm font-monospace'; i.name = 'zweck';
-      i.placeholder = 'Zweck (game)'; i.style.maxWidth = '9rem';
+      i.placeholder = 'Zweck (game)'; i.style.maxWidth = '9rem'; i.style.minWidth = '0';
       var k = document.createElement('button');
       k.className = 'btn btn-sm btn-outline-primary'; k.type = 'submit'; k.textContent = 'Übernehmen';
       f.append(b, i, k);
