@@ -37,6 +37,31 @@ const RE_KEY = /^[a-z][a-z0-9_]*$/;
 const RE_QUELLE = /^(fest|text|setting:[a-z][a-z0-9_]*|port:[a-z][a-z0-9_]*)$/;
 const BEDINGUNGEN = ['', 'true', 'false', 'not_empty', 'empty'];
 
+// Alles, was wie ein Platzhalter aussieht — und die Formen, die der Daemon
+// einsetzt (pkgspec.ArtenHinweis). Was dazwischen liegt, ginge wörtlich an das
+// Spiel; der Daemon weist es erst beim Start ab.
+const PLATZHALTER = /\{\{[^}]*\}\}/g;
+const RE_VERWEIS = /^\{\{(setting|port|content|env):[^}\s]+\}\}$/;
+
+/**
+ * Ein Platzhalter, den niemand einsetzt, ist ein Fehler beim Speichern — nicht
+ * erst beim Probestart. `-Port={{game}}` mit Quelle „Port: game" lief bis zum
+ * Daemon durch und kam als „Auftrag unvollständig" zurück (2026-10-05).
+ */
+function pruefePlatzhalter(form, quelle, nr) {
+    for (const p of form.match(PLATZHALTER) || []) {
+        WERT.lastIndex = 0;
+        if (WERT.test(p) || RE_VERWEIS.test(p)) continue;
+        const name = p.slice(2, -2).trim();
+        const rat = quelle === 'text' || quelle === 'fest'
+            ? `Schreib {{port:${name || 'zweck'}}} oder {{setting:${name || 'schlüssel'}}}`
+              + (quelle === 'fest' ? ' und wähl als Quelle „Text mit Verweisen".' : '.')
+            : `Die Quelle steht schon im Auswahlfeld — in die Zeile gehört {{Wert}}, also „${form.replace(p, '{{Wert}}')}".`;
+        throw new Error(`Zeile ${nr}: Den Platzhalter ${p} gibt es nicht. ${rat}`);
+    }
+    WERT.lastIndex = 0;
+}
+
 /** Die Bedingung, wie der Daemon sie versteht — sonst ein Fehler mit Grund. */
 function pruefeBedingung(b, nr) {
     if (BEDINGUNGEN.includes(b)) return b;
@@ -110,6 +135,7 @@ function argsAusZeilen(zeilen) {
         const quelle = String(z?.quelle || 'fest');
         if (!RE_QUELLE.test(quelle)) throw new Error(`Zeile ${nr}: Quelle „${quelle}" gibt es nicht.`);
         const bedingung = pruefeBedingung(String(z?.bedingung ?? '').trim(), nr);
+        pruefePlatzhalter(form, quelle, nr);
         const hatWert = WERT.test(form);
         WERT.lastIndex = 0;
         const key = schluessel(form, vergeben, z?.key);

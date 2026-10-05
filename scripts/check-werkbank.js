@@ -943,6 +943,13 @@ async function pruefe(name, fn) {
         assert.throws(() => argsAusZeilen([{ form: '-port {{Wert}}', quelle: 'fest' }]), /Quelle/);
         assert.throws(() => argsAusZeilen([{ form: '-x', quelle: 'fest', bedingung: 'true' }]), /feste Zeile/);
         assert.throws(() => argsAusZeilen([{ form: '-x', quelle: 'setting:a' }]), /immer dabei/);
+        // Unbekannter Platzhalter: beim Speichern, mit dem Vorschlag, nicht erst im Daemon.
+        assert.throws(() => argsAusZeilen([{ form: '-Port={{game}}', quelle: 'port:game', bedingung: 'not_empty' }]),
+            /\{\{game\}\} gibt es nicht.*-Port=\{\{Wert\}\}/);
+        assert.throws(() => argsAusZeilen([{ form: '-Port={{game}}', quelle: 'text' }]), /\{\{port:game\}\}/);
+        assert.throws(() => argsAusZeilen([{ form: '-Port={{game}}', quelle: 'fest' }]), /Text mit Verweisen/);
+        assert.doesNotThrow(() => argsAusZeilen([{ form: '-Port={{Wert}}', quelle: 'port:game' }]));
+        assert.doesNotThrow(() => argsAusZeilen([{ form: '-QueryPort={{port:query}}', quelle: 'text' }]));
         assert.throws(() => argsAusZeilen([{ form: '-q={{Wert}}', quelle: 'text' }]), /kein \{\{Wert\}\}/);
         assert.throws(() => argsAusZeilen([{ form: '-name "offen', quelle: 'fest' }]), /Anführungszeichen/);
         assert.throws(() => argsAusZeilen([{ form: '-a {{Wert}}', quelle: 'setting:a', bedingung: 'vielleicht' }]), /gibt es nicht/);
