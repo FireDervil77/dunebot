@@ -747,8 +747,15 @@ async function portUebernehmen(sitzung, { zweck, protocol, port }) {
     const n = Number(port);
     if (!Number.isInteger(n) || n < 1 || n > 65535) throw new Error('Keine gültige Portnummer.');
     return entwurfSchreiben(sitzung, (e) => {
+        // Dieselbe Nummer unter demselben Zweck, nur das andere Protokoll: Das
+        // ist EIN Port auf beiden Protokollen, kein Ersatz. Ohne das machte
+        // „7777/tcp als game" aus dem übernommenen 7777/udp ein reines tcp
+        // (StarRupture, 2026-10-05) — das Spiel wäre von aussen nicht erreichbar.
+        const vorher = (e.ports || []).find(p => p.purpose === z);
+        const gleicheNummer = vorher && e.werkbank?.portnummern?.[z] === n;
+        const beide = gleicheNummer && vorher.protocol !== protocol ? 'both' : protocol;
         e.ports = (e.ports || []).filter(p => p.purpose !== z);
-        e.ports.push({ purpose: z, protocol, assign: 'pool' });
+        e.ports.push({ purpose: z, protocol: beide, assign: 'pool' });
         e.werkbank = { ...(e.werkbank || {}) };
         e.werkbank.portnummern = { ...(e.werkbank.portnummern || {}), [z]: n };
     });

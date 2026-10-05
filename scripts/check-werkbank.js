@@ -449,6 +449,12 @@ async function pruefe(name, fn) {
         assert.ok(!('werkbank' in paket), 'Sitzungsteil gehört nicht ins Paket');
         assert.ok(!JSON.stringify(paket).includes('27015'), 'I2: keine Portnummer im Paket');
         assert.strictEqual(paket.start.program, './bin/x64/factorio');
+        // Dieselbe Nummer, anderes Protokoll: beide — nicht das zweite statt des ersten.
+        const rcon = () => db.entwurf.ports.find(p => p.purpose === 'rcon').protocol;
+        await Sitzungen.portUebernehmen({ ...s, entwurf: db.entwurf }, { zweck: 'rcon', protocol: 'udp', port: 27015 });
+        assert.strictEqual(rcon(), 'both');
+        await Sitzungen.portUebernehmen({ ...s, entwurf: db.entwurf }, { zweck: 'rcon', protocol: 'udp', port: 27016 });
+        assert.strictEqual(rcon(), 'udp', 'andere Nummer ersetzt');
     });
 
     await pruefe('Dateien: viele im selben Ordner werden eine Zeile, Einzelne bleiben', async () => {
