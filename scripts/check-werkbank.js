@@ -226,6 +226,11 @@ async function pruefe(name, fn) {
         assert.strictEqual(d.url, 'https://x/y');
         assert.strictEqual(d.checksum, 'sha256:ab', 'Prüfsumme klein — das Schema verlangt [0-9a-f]');
         assert.strictEqual(schrittAusFormular({ type: 'steamcmd', app: '896660', validate: 'on' }).app, 896660);
+        // Proton als Basis-Image heisst Windows-Build — sonst „Invalid platform" (Code 8).
+        const steam = { type: 'steamcmd', app: '3809400', validate: 'on' };
+        assert.strictEqual(schrittAusFormular(steam, { ref: 'registry.firenetworks.de/fb/proton', tag: 'x' }).platform, 'windows');
+        assert.strictEqual(schrittAusFormular(steam, { ref: 'registry.firenetworks.de/fb/steamcmd' }).platform, undefined);
+        assert.strictEqual(schrittAusFormular(steam).platform, undefined);
     });
 
     console.log('\nAusführen');

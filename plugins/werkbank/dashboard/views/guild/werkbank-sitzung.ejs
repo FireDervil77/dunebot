@@ -58,7 +58,7 @@
       case 'download': return s.url + ' → ' + s.target;
       case 'extract':  return s.archive + (s.target ? ' → ' + s.target : '') + (s.strip_components ? ' (strip ' + s.strip_components + ')' : '');
       case 'template': return s.file;
-      case 'steamcmd': return 'App ' + s.app + (s.branch ? ' · ' + s.branch : '');
+      case 'steamcmd': return 'App ' + s.app + (s.branch ? ' · ' + s.branch : '') + (s.platform === 'windows' ? ' · Windows-Build' : '');
       default:         return '';
     }
   }

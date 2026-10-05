@@ -54,8 +54,19 @@ function nutzerId(req, res) {
  * Alles andere fällt weg, statt beim Daemon als unbekanntes Feld ignoriert zu
  * werden: Was hier nicht steht, soll im Entwurf auch nicht stehen. Zahlen und
  * Ja/Nein kommen als Text aus dem Formular und werden hier umgewandelt.
+ *
+ * `image` ist das Basis-Image der Sitzung. Steht dort fb/proton, lädt ein
+ * steamcmd-Schritt den WINDOWS-Build — gefragt wird danach nicht: Wer Proton
+ * als Laufzeit wählt, hat die Plattform damit schon genannt. Ohne das meldet
+ * Steam bei einem reinen Windows-Server „Invalid platform" (Code 8, Sitzung
+ * „starrapture", 2026-10-05). Im Paket steht es weiter am Schritt, denn dort
+ * liest es der Daemon (Install.WindowsBuild).
  */
-function schrittAusFormular(b) {
+function istProtonImage(image) {
+    return /(^|\/)fb\/proton$/.test(String(image?.ref || ''));
+}
+
+function schrittAusFormular(b, image) {
     const text = (k) => (typeof b[k] === 'string' ? b[k] : '');
     const zahl = (k) => (b[k] === '' || b[k] === undefined ? undefined : Number(b[k]));
     const janein = (k) => b[k] === true || b[k] === 'true' || b[k] === 'on' || b[k] === '1';
@@ -91,6 +102,7 @@ function schrittAusFormular(b) {
             s.app = zahl('app');
             if (text('branch').trim()) s.branch = text('branch').trim();
             s.validate = janein('validate');
+            if (istProtonImage(image)) s.platform = 'windows';
             break;
     }
     return s;
@@ -305,7 +317,7 @@ router.post('/:kennung/schritte', requirePermission('WERKBANK.BAUEN'), async (re
     try {
         const sitzung = await Sitzungen.laden(res.locals.guildId, req.params.kennung);
         if (!sitzung || sitzung.status !== 'offen') throw new Error('Sitzung nicht gefunden');
-        const ergebnis = await Sitzungen.schrittAusfuehren({ sitzung, schritt: schrittAusFormular(req.body || {}) });
+        const ergebnis = await Sitzungen.schrittAusfuehren({ sitzung, schritt: schrittAusFormular(req.body || {}, sitzung.image) });
         return res.json({ success: true, ...ergebnis });
     } catch (error) {
         return fehler(res, error, 'Schritt nicht ausgeführt', 400);
