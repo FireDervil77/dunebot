@@ -765,7 +765,7 @@
         <div class="d-flex gap-2 mb-3">
           <% if (pruefLaeuft) { %>
             <button class="btn btn-outline-danger" type="button" id="knopfPruefAbbrechen"
-                    title="Nur wenn er hängt — etwa nach einem Neustart von Daemon oder Dashboard. Setzt den Durchlauf rot, das Prüf-Volume räumt der Daemon beim nächsten Durchlauf ab.">
+                    title="Nur wenn er hängt — etwa nach einem Neustart von Daemon oder Dashboard. Setzt den Eintrag hier rot; der Daemon wird dadurch NICHT angehalten. Läuft der Durchlauf dort noch, endet er von selbst, und bis dahin weist er einen neuen ab.">
               Als abgebrochen markieren
             </button>
           <% } else { %>
@@ -778,6 +778,10 @@
         <% if (pruefung && pruefung.ergebnis) { const e = pruefung.ergebnis; %>
           <% if (e.gruende && e.gruende.length) { %>
             <ul class="text-danger small mb-2"><% e.gruende.forEach(function (g) { %><li><%= g %></li><% }) %></ul>
+            <%# Der Daemon sagt nur „läuft bereits": Wer vorher „als abgebrochen markiert" hat, weiss nicht, dass DER gemeint ist (2026-10-05). %>
+            <% if (e.gruende.some(function (g) { return /läuft bereits eine Installation/.test(g); })) { %>
+              <div class="alert alert-info py-2 small mb-2">Auf dem Daemon lief noch ein früherer Durchlauf dieser Sitzung — etwa einer, der hier als abgebrochen markiert wurde. Er endet von selbst und räumt sein Prüf-Volume ab; danach geht ein neuer Durchlauf. Über das Paket sagt dieses Urteil nichts.</div>
+            <% } %>
           <% } %>
           <div class="small text-secondary mb-2">
             Installation <%= e.installation || '—' %><%= e.install_sek ? ' (' + e.install_sek + ' s)' : '' %>
@@ -1414,7 +1418,7 @@
   var knopfPruefAbbrechen = document.getElementById('knopfPruefAbbrechen');
   if (knopfPruefAbbrechen) {
     knopfPruefAbbrechen.addEventListener('click', async function () {
-      if (!confirm('Den Durchlauf als abgebrochen (rot) markieren? Nur sinnvoll, wenn er hängt.')) return;
+      if (!confirm('Den Durchlauf als abgebrochen (rot) markieren?\n\nDas hält ihn auf dem Daemon NICHT an. Läuft er dort noch, lädt und startet er weiter bis zum Ende — und bis dahin wird ein neuer Durchlauf abgewiesen. Sinnvoll nur, wenn er wirklich hängt.')) return;
       try { await schicke(hier + '/pruefung/abbrechen'); window.location.reload(); }
       catch (fehler) { melde('error', fehler.message); }
     });
