@@ -957,6 +957,18 @@ async function pruefe(name, fn) {
         assert.doesNotThrow(() => argsAusZeilen([{ form: '-Port={{Wert}}', quelle: 'port:game' }]));
         assert.doesNotThrow(() => argsAusZeilen([{ form: '-QueryPort={{port:query}}', quelle: 'text' }]));
         assert.throws(() => argsAusZeilen([{ form: '-q={{Wert}}', quelle: 'text' }]), /kein \{\{Wert\}\}/);
+        // „wenn an" an einem Text: beim Speichern, nicht als stumm fehlender Parameter
+        // (StarRupture, -ServerName, 2026-10-05). Ohne bekannten Typ geht es durch.
+        const typen = [{ key: 'name', type: 'text' }, { key: 'crossplay', type: 'boolean' }, { key: 'slots', type: 'number' }];
+        assert.throws(() => argsAusZeilen([{ form: '-ServerName={{Wert}}', quelle: 'setting:name', bedingung: 'true' }], typen),
+            /„wenn an" gilt nur für einen Schalter.*„name" ist vom Typ text.*„immer" oder „wenn gesetzt"/);
+        assert.throws(() => argsAusZeilen([{ form: '-open', quelle: 'setting:slots', bedingung: 'false' }], typen), /„wenn aus".*Typ number/);
+        assert.throws(() => argsAusZeilen([{ form: '-Port={{Wert}}', quelle: 'port:game', bedingung: 'true' }], typen), /ein Port ist eine Nummer/);
+        assert.doesNotThrow(() => argsAusZeilen([{ form: '-crossplay', quelle: 'setting:crossplay', bedingung: 'true' }], typen));
+        assert.doesNotThrow(() => argsAusZeilen([{ form: '-ServerName={{Wert}}', quelle: 'setting:name', bedingung: 'not_empty' }], typen));
+        assert.doesNotThrow(() => argsAusZeilen([{ form: '-ServerName={{Wert}}', quelle: 'setting:name' }], typen));
+        assert.doesNotThrow(() => argsAusZeilen([{ form: '-x', quelle: 'setting:gibtsnochnicht', bedingung: 'true' }], typen));
+        assert.doesNotThrow(() => argsAusZeilen([{ form: '-x', quelle: 'setting:name', bedingung: 'true' }]), 'ohne Typen keine Aussage');
         assert.throws(() => argsAusZeilen([{ form: '-name "offen', quelle: 'fest' }]), /Anführungszeichen/);
         assert.throws(() => argsAusZeilen([{ form: '-a {{Wert}}', quelle: 'setting:a', bedingung: 'vielleicht' }]), /gibt es nicht/);
         assert.throws(() => argsAusZeilen([{ form: '-a', quelle: 'env:HOME' }]), /Quelle/);

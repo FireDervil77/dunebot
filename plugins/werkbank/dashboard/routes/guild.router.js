@@ -137,7 +137,7 @@ function pruefeProgramm(programm) {
  *               beenden immer; bei command:/rcon: sagt man es dazu, sonst
  *               meldet der Auftragsbau die fehlende Angabe als Lücke.
  */
-function startAusFormular(b) {
+function startAusFormular(b, einstellungen) {
     // Zahlen zählen mit — die Nutzlast kommt als JSON, nicht nur aus Textfeldern.
     const text = (k) => (typeof b[k] === 'string' ? b[k] : typeof b[k] === 'number' ? String(b[k]) : '');
     const zeilen = (k) => text(k).split(/\r?\n/).map(z => z.trim()).filter(Boolean);
@@ -145,7 +145,7 @@ function startAusFormular(b) {
     pruefeProgramm(start.program);
     if (text('workdir').trim()) start.workdir = text('workdir').trim();
 
-    const args = argsAusZeilen(Array.isArray(b.zeilen) ? b.zeilen : []);
+    const args = argsAusZeilen(Array.isArray(b.zeilen) ? b.zeilen : [], einstellungen);
     if (args.length) start.args = args;
 
     const folge = zeilen('stop').map((z) => {
@@ -351,7 +351,7 @@ router.post('/:kennung/start', requirePermission('WERKBANK.BAUEN'), async (req, 
     try {
         const sitzung = await offeneSitzung(req, res);
         await Sitzungen.startSpeichern(sitzung, {
-            start: startAusFormular(req.body || {}),
+            start: startAusFormular(req.body || {}, sitzung.entwurf?.settings),
             memory_mb: req.body?.memory_mb, cpu_prozent: req.body?.cpu_prozent,
         });
         return res.json({ success: true });
@@ -367,7 +367,7 @@ router.post('/:kennung/startzeile', requirePermission('WERKBANK.BAUEN'), async (
         const sitzung = await offeneSitzung(req, res);
         const program = typeof req.body?.program === 'string' ? req.body.program.trim() : '';
         pruefeProgramm(program);
-        const start = { program, args: argsAusZeilen(Array.isArray(req.body?.zeilen) ? req.body.zeilen : []) };
+        const start = { program, args: argsAusZeilen(Array.isArray(req.body?.zeilen) ? req.body.zeilen : [], sitzung.entwurf?.settings) };
         return res.json({ success: true, ...(await Sitzungen.startzeile(sitzung, start)) });
     } catch (error) {
         return fehler(res, error, 'Keine Vorschau', 400);
@@ -380,7 +380,7 @@ router.post('/:kennung/starten', requirePermission('WERKBANK.BAUEN'), async (req
         // Mit Formular: erst speichern — gestartet wird, was auf dem Bildschirm steht.
         if (req.body?.program !== undefined) {
             await Sitzungen.startSpeichern(sitzung, {
-                start: startAusFormular(req.body),
+                start: startAusFormular(req.body, sitzung.entwurf?.settings),
                 memory_mb: req.body.memory_mb, cpu_prozent: req.body.cpu_prozent,
             });
         }

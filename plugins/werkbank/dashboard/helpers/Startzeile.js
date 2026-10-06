@@ -70,6 +70,37 @@ function pruefeBedingung(b, nr) {
 }
 
 /**
+ * „wenn an" und „wenn aus" prüfen einen Schalter. Der Daemon liest dafür nur
+ * `1/true/yes/on` als „an" (pkgspec.wahr) — an einem Text oder einer Zahl ist
+ * „wenn an" also nie erfüllt, und die Zeile fehlt still. So kam der Servername
+ * von StarRupture nie in der Startzeile an (`-ServerName={{Wert}}`, „wenn an",
+ * 2026-10-05); der Prüfdurchlauf blieb grün.
+ *
+ * Geprüft wird, was hier bekannt ist: der Typ der Einstellung aus dem Entwurf.
+ * Eine Einstellung, die es noch nicht gibt, geht durch — das meldet der
+ * Auftragsbau als Lücke.
+ */
+function pruefeSchalterBedingung(bedingung, quelle, nr, einstellungen) {
+    if (bedingung !== 'true' && bedingung !== 'false') return;
+    const wort = bedingung === 'true' ? '„wenn an"' : '„wenn aus"';
+    const rat = bedingung === 'true'
+        ? 'Nimm „immer" oder „wenn gesetzt".'
+        : 'Nimm „wenn leer" oder „ungleich …".';
+    if (quelle.startsWith('port:')) {
+        throw new Error(`Zeile ${nr}: ${wort} gilt nur für einen Schalter — ein Port ist eine Nummer. ${rat}`);
+    }
+    if (!quelle.startsWith('setting:') || !Array.isArray(einstellungen)) return;
+    const key = quelle.slice('setting:'.length);
+    const e = einstellungen.find(x => x && x.key === key);
+    if (!e || !e.type || e.type === 'boolean') return;
+    throw new Error(`Zeile ${nr}: ${wort} gilt nur für einen Schalter — „${key}" ist vom Typ ${e.type}. `
+        + (bedingung === 'true'
+            ? 'Die Zeile wäre nur dabei, wenn der Wert wörtlich 1, true, yes oder on lautet. '
+            : 'Die Zeile wäre immer dabei, außer der Wert lautet wörtlich 1, true, yes oder on. ')
+        + rat);
+}
+
+/**
  * Zerlegt eine Form in argv-Einträge: Leerzeichen trennen, "…" hält zusammen.
  * Keine Shell: Es gibt weder Maskierung noch Variablen, nur diese zwei Regeln.
  */
@@ -108,9 +139,11 @@ function schluessel(form, vergeben, bisher) {
 /**
  * Zeilen der Werkbank → `start.args`.
  * @param {Array<{form?: string, quelle?: string, bedingung?: string, roh?: string}>} zeilen
+ * @param {Array<{key: string, type?: string}>} [einstellungen]  die Einstellungen
+ *        des Entwurfs — an ihrem Typ hängt, ob „wenn an"/„wenn aus" Sinn hat
  * @returns {object[]}
  */
-function argsAusZeilen(zeilen) {
+function argsAusZeilen(zeilen, einstellungen) {
     if (!Array.isArray(zeilen)) return [];
     const vergeben = new Set();
     const args = [];
@@ -136,6 +169,7 @@ function argsAusZeilen(zeilen) {
         if (!RE_QUELLE.test(quelle)) throw new Error(`Zeile ${nr}: Quelle „${quelle}" gibt es nicht.`);
         const bedingung = pruefeBedingung(String(z?.bedingung ?? '').trim(), nr);
         pruefePlatzhalter(form, quelle, nr);
+        pruefeSchalterBedingung(bedingung, quelle, nr, einstellungen);
         const hatWert = WERT.test(form);
         WERT.lastIndex = 0;
         const key = schluessel(form, vergeben, z?.key);
