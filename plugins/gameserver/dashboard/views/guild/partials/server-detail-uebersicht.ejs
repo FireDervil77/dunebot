@@ -72,9 +72,12 @@
     Betreiber die Adresse weitergeben lassen, unter der Steam nichts findet. %>
         <div style="display:flex;flex-direction:column;gap:6px">
           <% if (u.adresse) { %>
+            <%# Die Beschriftungsspalte auch dann, wenn nur die IP-Zeile eine traegt —
+                sonst steht das Feld mit dem Namen links vom Feld mit der IP (Betreiber, 2026-10-06). %>
+            <% const adresseMitSpalte = u.adresse.zeilen.length > 1 || u.adresse.zeilen.some(function (z) { return z.ip; }); %>
             <% u.adresse.zeilen.forEach(function (z) { %>
               <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-                <% if (u.adresse.zeilen.length > 1) { %>
+                <% if (adresseMitSpalte) { %>
                   <span class="fb-muted" style="font-size:12px;min-width:112px"><%= z.label %></span>
                 <% } %>
                 <div class="fb-mono fb-chip"><%= z.text %></div>
