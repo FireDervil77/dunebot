@@ -36,7 +36,7 @@
                 <% if (!m.erreichbar) { %><span class="fb-pille">nicht erreichbar</span><% } %>
                 <% if (m.server) { %><span class="fb-pille"><%= m.server %> Server</span><% } %>
               </div>
-              <% if (m.host) { %><div class="fb-muted fb-mono" style="font-size:12px"><%= m.host %></div><% } %>
+              <% if (m.host) { %><div class="fb-muted fb-mono" style="font-size:12px"><%= m.host %><% if (m.ip) { %> · <%= m.ip %><% } %></div><% } %>
             </div>
 
             <div style="flex:2 1 320px;display:grid;grid-template-columns:repeat(3,1fr);gap:14px">

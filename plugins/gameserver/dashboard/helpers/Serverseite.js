@@ -257,14 +257,31 @@ function baueAdresse(server) {
 
     if (!host || !spiel) return null;   // null heisst: die Ansicht sagt „unbekannt"
 
+    // ── Zum Namen gehört die IP (2026-10-06) ────────────────────────────────
+    //
+    // StarRupture, Server 208: Über `node1.firenetworks.de:25011` fand der
+    // Spielclient den Server nicht, über `91.200.102.182:25011` trat der
+    // Betreiber sofort bei. Der Name löste richtig auf (auch bei 1.1.1.1), und
+    // im Spiel-Log stand vor dem Beitritt kein einziger Verbindungsversuch —
+    // die Anfrage verließ den Client gar nicht. Manche Spiele nehmen im
+    // Beitreten-Feld nur Adressen an.
+    //
+    // Deshalb steht unter einem Namen dieselbe Adresse noch einmal als IP
+    // (Betreiber). Nur wenn wirklich ein Name gezeigt wird: Unter einer IP
+    // wäre die zweite Zeile dieselbe noch einmal.
+    const zeigtName = host === server.fqdn && nameGilt;
+    const ip = zeigtName && server.rootserver_ip && server.rootserver_ip !== host
+        ? server.rootserver_ip : null;
+    const alsIp = (port) => (ip ? `${ip}:${port}` : null);
+
     const zeilen = [];
     // Die Serverliste zuerst: Danach sucht jemand, der den Server WEITERGIBT.
     // Nur wenn es wirklich ein zweiter Port ist — bei einem Spiel, das beides
     // auf demselben Port macht, wäre eine zweite Zeile eine erfundene Auskunft.
     if (abfrage && abfrage !== spiel) {
-        zeilen.push({ zweck: 'query', label: 'Serverliste', text: `${host}:${abfrage}`, port: abfrage });
+        zeilen.push({ zweck: 'query', label: 'Serverliste', text: `${host}:${abfrage}`, port: abfrage, ip: alsIp(abfrage) });
     }
-    zeilen.push({ zweck: 'game', label: zeilen.length ? 'Direktverbindung' : 'Adresse', text: `${host}:${spiel}`, port: spiel });
+    zeilen.push({ zweck: 'game', label: zeilen.length ? 'Direktverbindung' : 'Adresse', text: `${host}:${spiel}`, port: spiel, ip: alsIp(spiel) });
 
     return { text: `${host}:${spiel}`, host, port: spiel, zeilen };
 }
@@ -1511,6 +1528,8 @@ function baueMaschinenAuswahl(maschinen, gebucht, vorrat, paket) {
             // Dieselbe Regel wie bei der Serveradresse (M-1): ein Name nur,
             // wenn eine Messung ihn bestätigt hat. Sonst die IP.
             host:  (m.fqdn_gilt && m.fqdn) ? m.fqdn : (m.host || null),
+            // Die IP daneben, wenn oben ein Name steht — siehe baueAdresse.
+            ip:    (m.fqdn_gilt && m.fqdn && m.host && m.host !== m.fqdn) ? m.host : null,
             erreichbar: m.daemon_status === 'online',
             platte: { gebucht: g.disk_gb, gesamt: m.disk_total_gb ?? null },
             ram:    { gebucht: Math.round((g.ram_mb || 0) / 1024), gesamt: m.ram_total_gb ?? null },
@@ -1711,6 +1730,8 @@ function baueWerteSchritt(paket, maschine, imageLiegtDa) {
             maschine: maschine ? maschine.name : null,
             adresse: maschine && maschine.paar
                 ? (maschine.host || maschine.name) + ':' + maschine.paar.spiel : null,
+            adresseIp: maschine && maschine.paar && maschine.ip
+                ? maschine.ip + ':' + maschine.paar.spiel : null,
         },
     };
 }

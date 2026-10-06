@@ -165,6 +165,7 @@
                         <span class="fb-muted" style="font-size:11px"><%= z.label %></span>
                       <% } %>
                       <span class="fb-mono"><%= z.text %></span>
+                      <% if (z.ip) { %><div class="fb-mono fb-muted" style="font-size:11px"><%= z.ip %></div><% } %>
                     </div>
                   <% }); %>
                 <% } %>

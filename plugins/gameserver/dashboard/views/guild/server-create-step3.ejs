@@ -175,6 +175,9 @@
               <div style="padding:6px 0;border-top:1px solid var(--fb-border)">
                 <div class="fb-muted" style="font-size:12px">Deine Adresse</div>
                 <div class="fb-mono"><%= werte.passiert.adresse %></div>
+                <% if (werte.passiert.adresseIp) { %>
+                  <div class="fb-mono fb-muted" style="font-size:12px"><%= werte.passiert.adresseIp %> <span style="font-family:inherit">— als IP, falls das Spiel keinen Namen annimmt</span></div>
+                <% } %>
               </div>
             <% } %>
             <%# Keine Dauerangabe. Die Vorlage nennt „3–6 Min."; wir haben keine

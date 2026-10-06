@@ -80,10 +80,23 @@
                 <div class="fb-mono fb-chip"><%= z.text %></div>
                 <button type="button" class="btn btn-white btn-sm" data-fb-kopieren="<%= z.text %>">Kopieren</button>
               </div>
+              <%# Dieselbe Adresse als IP — manche Spiele nehmen im Beitreten-Feld keinen Namen an (StarRupture, 2026-10-06). %>
+              <% if (z.ip) { %>
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                  <span class="fb-muted" style="font-size:12px;min-width:112px">als IP</span>
+                  <div class="fb-mono fb-chip"><%= z.ip %></div>
+                  <button type="button" class="btn btn-white btn-sm" data-fb-kopieren="<%= z.ip %>">Kopieren</button>
+                </div>
+              <% } %>
             <% }); %>
             <% if (u.adresse.zeilen.length > 1) { %>
               <div class="fb-muted" style="font-size:12px">
                 In der Steam-Serverliste wird der Server unter der oberen Adresse gefunden.
+              </div>
+            <% } %>
+            <% if (u.adresse.zeilen.some(function (z) { return z.ip; })) { %>
+              <div class="fb-muted" style="font-size:12px">
+                Findet ein Spiel den Server unter dem Namen nicht, nimm die IP — manche Spiele nehmen nur Adressen an.
               </div>
             <% } %>
           <% } else { %>

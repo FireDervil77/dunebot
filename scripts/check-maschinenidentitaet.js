@@ -118,16 +118,21 @@ function pruefe(bedingung, was, zusatz = '') {
         console.log('\n▸ 4. Die Adresse zeigt nie einen ungeprüften Namen (M-1)');
         const ports = JSON.stringify({ game: { external: 25002 } });
         const faelle = [
-            ['ungeprüfter Name', { fqdn: 'node1.firenetworks.de', fqdn_gilt: 0, server_ip: '203.0.113.7' }, '203.0.113.7:25002'],
-            ['geprüfter Name',   { fqdn: 'node1.firenetworks.de', fqdn_gilt: 1, server_ip: '203.0.113.7' }, 'node1.firenetworks.de:25002'],
-            ['bind_ip schlägt alles', { bind_ip: '203.0.113.9', fqdn: 'node1.firenetworks.de', fqdn_gilt: 1, server_ip: '203.0.113.7' }, '203.0.113.9:25002'],
-            ['gar kein Name',    { fqdn: null, fqdn_gilt: 0, server_ip: '203.0.113.7' }, '203.0.113.7:25002'],
+            // Vierte Spalte: dieselbe Adresse als IP — nur unter einem Namen
+            // (StarRupture nahm am 2026-10-06 im Beitreten-Feld keinen an).
+            ['ungeprüfter Name', { fqdn: 'node1.firenetworks.de', fqdn_gilt: 0, server_ip: '203.0.113.7' }, '203.0.113.7:25002', null],
+            ['geprüfter Name',   { fqdn: 'node1.firenetworks.de', fqdn_gilt: 1, server_ip: '203.0.113.7' }, 'node1.firenetworks.de:25002', '203.0.113.7:25002'],
+            ['bind_ip schlägt alles', { bind_ip: '203.0.113.9', fqdn: 'node1.firenetworks.de', fqdn_gilt: 1, server_ip: '203.0.113.7' }, '203.0.113.9:25002', null],
+            ['gar kein Name',    { fqdn: null, fqdn_gilt: 0, server_ip: '203.0.113.7' }, '203.0.113.7:25002', null],
         ];
-        for (const [was, felder, erwartet] of faelle) {
+        for (const [was, felder, erwartet, alsIp] of faelle) {
             const liste = Serverseite.baueServerListe(
                 [{ id: 1, name: 'x', status: 'online', ports, ...felder }], {});
             const ist = liste.liste[0].adresse ? liste.liste[0].adresse.text : '(keine)';
             pruefe(ist === erwartet, `${was} → ${ist}`, ist === erwartet ? '' : `erwartet war ${erwartet}`);
+            const ip = liste.liste[0].adresse ? liste.liste[0].adresse.zeilen[0].ip : undefined;
+            pruefe(ip === alsIp, `${was}: als IP → ${ip === null ? 'keine zweite Zeile' : ip}`,
+                ip === alsIp ? '' : `erwartet war ${alsIp}`);
         }
     } finally {
         if (angelegt) {
