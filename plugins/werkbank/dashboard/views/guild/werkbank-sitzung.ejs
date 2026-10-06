@@ -487,8 +487,14 @@
       nicht_verdrahtet: ['bg-orange-lt',    'nichts holt den Wert'],
       nicht_pruefbar:   ['bg-secondary-lt', 'im Durchlauf nicht prüfbar']
     };
-    function zielText(z) {
-      if (z.target === 'file') return z.file + ' → ' + z.path + ' (' + z.parser + ')';
+    function zielText(z, e) {
+      if (z.target === 'file') {
+        // Bei einem Schalter gehört die Schreibweise dazu — sonst sieht man nicht, was in der Datei landet.
+        var als = e && e.type === 'boolean'
+          ? ' · An/Aus als ' + (z.as ? (z.as === 'one_zero' ? '1/0' : z.as.replace('_', '/')) : '1/0 — nicht gewählt')
+          : '';
+        return z.file + ' → ' + z.path + ' (' + z.parser + ')' + als;
+      }
       if (z.target === 'env')  return 'Umgebung ' + z.variable;
       if (z.target === 'arg')  return 'Startzeile ({{setting:…}})';
       if (z.target === 'rcon') return 'RCON: ' + z.command;
@@ -541,7 +547,7 @@
                     <td class="small">
                       <% (e.apply || []).forEach(function (z) { const n = nachweisFuer(e, z); const zst = n ? (ZUSTAND[n.zustand] || ['bg-secondary-lt', n.zustand]) : null; %>
                         <div>
-                          <span class="font-monospace"><%= zielText(z) %></span>
+                          <span class="font-monospace"><%= zielText(z, e) %></span>
                           <% if (zst) { %><span class="badge <%= nachweisVeraltet ? 'bg-secondary-lt' : zst[0] %>" <% if (n.hinweis) { %>title="<%= n.hinweis %>"<% } %>><%= zst[1] %></span><% } %>
                         </div>
                       <% }) %>
@@ -656,6 +662,7 @@
             <div class="col-md-3">
               <label class="form-label" for="eVorgabe">Vorgabe</label>
               <input class="form-control" id="eVorgabe" name="default" placeholder="leer = keine">
+              <div class="form-hint" data-nur-typ="boolean">1 = an, 0 = aus. Wie es in der Datei steht, wählst du unten am Ziel.</div>
             </div>
             <div class="col-md-3" data-nur-typ="number">
               <label class="form-label">Grenzen</label>
@@ -721,11 +728,15 @@
               <div class="col-md-3" data-nur-ziel="env"><input class="form-control form-control-sm font-monospace" data-feld="variable" placeholder="SERVER_NAME"></div>
               <div class="col-md-5" data-nur-ziel="rcon"><input class="form-control form-control-sm font-monospace" data-feld="command" placeholder="/config set name {{value}}"></div>
               <div class="col-md-5 small text-secondary" data-nur-ziel="arg">im Startteil <code>{{setting:schlüssel}}</code> verwenden</div>
-              <div class="col-md-2" data-nur-typ-ziel="boolean">
-                <select class="form-select form-select-sm" data-feld="as" title="Wie An/Aus an dieser Stelle geschrieben wird">
-                  <option value="">An/Aus als 1/0</option>
-                  <% EINSTELLUNG.als.forEach(function (x) { %><option value="<%= x %>"><%= x.replace('_', '/') %></option><% }) %>
-                </select>
+              <%# Nur Schalter → Datei: Dort übersetzt der Daemon, und jedes Spiel will es anders. Gewählt, nie still vorbelegt. %>
+              <div class="col-md-2" data-nur-ziel="file">
+                <div data-nur-typ-ziel="boolean">
+                  <label class="form-label small mb-1">An/Aus schreiben als</label>
+                  <select class="form-select form-select-sm" data-feld="as" title="Wie An/Aus in dieser Datei steht — jedes Spiel will es anders">
+                    <option value="">— wählen —</option>
+                    <% EINSTELLUNG.als.forEach(function (x) { %><option value="<%= x %>"><%= x === 'one_zero' ? '1 / 0' : x.replace('_', ' / ') %></option><% }) %>
+                  </select>
+                </div>
               </div>
               <div class="col-auto"><button class="btn btn-sm btn-outline-danger" type="button" data-ziel-weg title="Ziel entfernen"><i class="fa-solid fa-xmark"></i></button></div>
             </div>
@@ -1576,8 +1587,10 @@
       nutzlast.apply = Array.prototype.map.call(zieleBox.querySelectorAll('[data-ziel]'), function (zeile) {
         var z = {};
         zeile.querySelectorAll('[data-feld]').forEach(function (f) {
-          var huelle = f.closest('[data-nur-ziel], [data-nur-typ-ziel]');
-          if (!huelle || !huelle.hidden) z[f.dataset.feld] = f.value;
+          // Jede Hülle zählt: Die Schreibweise liegt in zweien (Ziel UND Typ).
+          var versteckt = false;
+          for (var h = f.parentElement; h && h !== zeile; h = h.parentElement) if (h.hidden) versteckt = true;
+          if (!versteckt) z[f.dataset.feld] = f.value;
         });
         return z;
       });

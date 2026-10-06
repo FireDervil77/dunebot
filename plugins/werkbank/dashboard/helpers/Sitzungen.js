@@ -462,8 +462,18 @@ function einstellungAusFormular(b) {
             if (!t('command')) throw new Error(`${nr}: der Befehl, etwa „/config set name {{value}}".`);
             ziel.command = t('command');
         }
-        if (t('as')) {
-            if (!EINSTELLUNG.als.includes(t('as'))) throw new Error(`${nr}: Schreibweise für Ja/Nein — ${EINSTELLUNG.als.join(', ')}.`);
+        // An/Aus in einer Datei: Jedes Spiel schreibt es anders, und nur der
+        // Paketbauer weiß, wie. Bis zum 2026-10-06 war das Feld unbeschriftet und
+        // still mit „1/0" vorbelegt — bei StarRupture stand danach
+        // `"StartNewGame": 1` als Zahl in DSSettings.txt, und das Spiel legte
+        // keine Welt an. Deshalb wird gewählt, nicht angenommen. Der Daemon
+        // übersetzt nur bei Datei-Zielen (auftrag/baue.go), also gilt es nur dort.
+        if (ziel.target === 'file' && e.type === 'boolean') {
+            if (!t('as')) {
+                throw new Error(`${nr}: Wie steht An/Aus in ${t('file')}? Wähl am Ziel die Schreibweise — `
+                    + 'true/false, 1/0, yes/no … Jedes Spiel will es anders.');
+            }
+            if (!EINSTELLUNG.als.includes(t('as'))) throw new Error(`${nr}: Schreibweise für An/Aus — ${EINSTELLUNG.als.join(', ')}.`);
             ziel.as = t('as');
         }
         return ziel;

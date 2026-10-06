@@ -710,6 +710,21 @@ async function pruefe(name, fn) {
         assert.throws(() => Sitzungen.einstellungAusFormular(formular({ apply: [] })), /Mindestens ein Ziel/);
         assert.throws(() => Sitzungen.einstellungAusFormular(formular({ default: 'viele' })), /keine Zahl/);
         assert.throws(() => Sitzungen.einstellungAusFormular(formular({ role: 'admin' })), /Rolle/);
+        // An/Aus in einer Datei: die Schreibweise wird gewählt, nie still als 1/0 angenommen
+        // (StarRupture, `"StartNewGame": 1` in DSSettings.txt, 2026-10-06).
+        const schalter = (ziel) => formular({ key: 'neu', name_de: 'Neue Welt', type: 'boolean', default: '0', apply: [ziel] });
+        const datei = { target: 'file', file: 'DSSettings.txt', parser: 'json', path: 'StartNewGame' };
+        assert.throws(() => Sitzungen.einstellungAusFormular(schalter(datei)), /Wie steht An\/Aus in DSSettings\.txt.*true\/false, 1\/0/);
+        assert.throws(() => Sitzungen.einstellungAusFormular(schalter({ ...datei, as: 'vielleicht' })), /Schreibweise für An\/Aus/);
+        assert.strictEqual(Sitzungen.einstellungAusFormular(schalter({ ...datei, as: 'true_false' })).apply[0].as, 'true_false');
+        assert.strictEqual(Sitzungen.einstellungAusFormular(schalter({ ...datei, as: 'one_zero' })).apply[0].as, 'one_zero', '1/0 bleibt wählbar');
+        // Der Daemon übersetzt nur bei Dateien — an Umgebung und Startzeile gibt es nichts zu wählen.
+        assert.ok(!('as' in Sitzungen.einstellungAusFormular(schalter({ target: 'env', variable: 'NEU' })).apply[0]));
+        assert.ok(!('as' in Sitzungen.einstellungAusFormular(schalter({ target: 'arg' })).apply[0]));
+        assert.ok(!('as' in Sitzungen.einstellungAusFormular(formular({ apply: [{ ...datei, as: 'true_false' }] })).apply[0]), 'keine Schreibweise an einer Zahl');
+        const seite = ohneKommentare(fs.readFileSync(path.join(__dirname, '../plugins/werkbank/dashboard/views/guild/werkbank-sitzung.ejs'), 'utf8'));
+        assert.match(seite, /An\/Aus schreiben als<\/label>/, 'das Feld ist beschriftet');
+        assert.ok(!/<option value="">An\/Aus als 1\/0<\/option>/.test(seite), 'keine stille Vorbelegung mit 1/0');
     });
 
     await pruefe('Speichern: anlegen, umbenennen samt Probewert, doppelter Schlüssel abgewiesen', async () => {
