@@ -132,7 +132,33 @@ function baueUebersicht(server, paket, zusatz = {}) {
         messwerte:     baueMesswerte(server),
         platz:         bauePlatz(server),
         welt:          baueWelt(zusatz.sicherungen ?? zusatz.letzteSicherung),
+        // Während der Installation die Hinweise dafür, sonst die für den Betrieb.
+        hinweise:      baueHinweise(paket, server.status === 'installing' ? 'install' : 'run'),
     };
+}
+
+/**
+ * Die Hinweise des Pakets für einen Zeitpunkt (`create`, `install`, `run`).
+ *
+ * Fester Text, den der Paketbauer in der Werkbank geschrieben hat — für das,
+ * was sich nicht einstellen lässt und was man trotzdem wissen muss. Anlass
+ * (2026-10-06, StarRupture): Der erste Start braucht „neue Welt", danach muss
+ * auf „laden" umgestellt werden; beitreten geht nur über die IP; ein Passwort
+ * gibt es nur über zwei Dateien. Nichts davon sagte das Panel.
+ *
+ * Hier wird nur ausgewählt und die Sprache aufgelöst — nichts ergänzt, nichts
+ * aus der Spielausgabe abgeleitet.
+ *
+ * @param {object|null} paket
+ * @param {'create'|'install'|'run'} wann
+ * @returns {Array<{key: string, text: string}>}
+ */
+function baueHinweise(paket, wann) {
+    const liste = Array.isArray(paket?.hints) ? paket.hints : [];
+    return liste
+        .filter(h => h && h.when === wann)
+        .map(h => ({ key: String(h.key || ''), text: h.text?.de || h.text?.en || '' }))
+        .filter(h => h.text);
 }
 
 /** Kopfzeile: Spiel gross, Herkunft klein. */
@@ -1733,10 +1759,13 @@ function baueWerteSchritt(paket, maschine, imageLiegtDa) {
             adresseIp: maschine && maschine.paar && maschine.ip
                 ? maschine.ip + ':' + maschine.paar.spiel : null,
         },
+        // Was man VOR dem Anlegen wissen muss — aus dem Paket (`hints`, create).
+        hinweise: baueHinweise(paket, 'create'),
     };
 }
 
 module.exports.baueWerteSchritt = baueWerteSchritt;
+module.exports.baueHinweise = baueHinweise;
 
 
 /**

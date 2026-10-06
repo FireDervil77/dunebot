@@ -25,6 +25,27 @@
       Umbau des Rahmens dorthin gehoben — und hier vergessen. Ergebnis waren
       zwei Kopfzeilen samt zwei Hoehenumschaltern uebereinander. %>
 
+  <%# ── Hinweise des Pakets (2026-10-06) ──────────────────────────────────
+      Fester Text aus dem Paket (`hints`): was sich nicht einstellen laesst und
+      was man trotzdem wissen muss. Steht VOR der Zustandskarte, weil er vor dem
+      ersten Klick auf „Starten" gelesen sein will (StarRupture: erst neue Welt,
+      dann auf Laden umstellen). Zuklappbar; der Browser merkt es sich je Server
+      — und klappt wieder auf, sobald sich an den Hinweisen etwas aendert. %>
+  <% if (u.hinweise && u.hinweise.length) { %>
+    <details class="fb-karte" open data-fb-hinweise="<%= server.id %>"
+             data-fb-stand="<%= u.hinweise.map(function (h) { return h.key + ':' + h.text.length; }).join('|') %>">
+      <summary class="fb-kopf" style="cursor:pointer;list-style:none">
+        <span>Hinweise zu diesem Spiel</span>
+        <span class="fb-muted" style="margin-left:auto;font-size:13px;font-weight:400" data-fb-hinweise-knopf>Zuklappen</span>
+      </summary>
+      <div class="fb-koerper" style="font-size:13px;display:flex;flex-direction:column;gap:10px">
+        <% u.hinweise.forEach(function (h) { %>
+          <div style="white-space:pre-line"><%= h.text %></div>
+        <% }); %>
+      </div>
+    </details>
+  <% } %>
+
   <%# ── Zustandskarte: zweispaltig, rechte Flanke 268 px ─────────────────── %>
   <div class="fb-karte" style="overflow:hidden">
     <div style="display:flex;align-items:stretch;flex-wrap:wrap">
@@ -491,6 +512,29 @@
   </div>
 
 </div>
+
+<script>
+/* Hinweise des Pakets: zugeklappt merkt sich der Browser je Server — bis sich
+ * an den Hinweisen etwas aendert. Ohne Speicher (privates Fenster) bleibt die
+ * Karte einfach offen. */
+(function () {
+  var karte = document.querySelector('[data-fb-hinweise]');
+  if (!karte) return;
+  var knopf = karte.querySelector('[data-fb-hinweise-knopf]');
+  var name = 'fb-hinweise:' + karte.dataset.fbHinweise;
+  var stand = karte.dataset.fbStand || '';
+  function beschrifte() { if (knopf) knopf.textContent = karte.open ? 'Zuklappen' : 'Aufklappen'; }
+  try { if (window.localStorage.getItem(name) === stand) karte.open = false; } catch (e) { /* kein Speicher */ }
+  beschrifte();
+  karte.addEventListener('toggle', function () {
+    beschrifte();
+    try {
+      if (karte.open) window.localStorage.removeItem(name);
+      else window.localStorage.setItem(name, stand);
+    } catch (e) { /* kein Speicher */ }
+  });
+})();
+</script>
 
 <script>
 /*

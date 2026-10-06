@@ -1390,6 +1390,35 @@
         }
       }
     },
+    "hints": {
+      "description": "Hinweise für den Betreiber eines Servers — fester Text aus dem Paket, nie aus der Spielausgabe abgeleitet. Für das, was sich nicht einstellen lässt und was man wissen muss (StarRupture, 2026-10-06: erst neue Welt, dann auf Laden umstellen; Beitritt nur über die IP; Passwort über zwei Dateien). Der Daemon liest das Feld nicht. Gezeigt wird im Dashboard: `create` im Anlegen-Assistenten, `install` auf der Serverseite während der Installation, `run` auf der Serverseite danach.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "key",
+          "when",
+          "text"
+        ],
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "when": {
+            "enum": [
+              "create",
+              "install",
+              "run"
+            ]
+          },
+          "text": {
+            "$ref": "#/definitions/text"
+          }
+        }
+      }
+    },
     "status": {
       "type": "object",
       "additionalProperties": false,

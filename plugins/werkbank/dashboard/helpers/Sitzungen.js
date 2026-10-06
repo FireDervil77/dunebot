@@ -334,7 +334,62 @@ function entwurfAlsPaket(sitzung, liste) {
     const env = { ...(e.env || {}), ...umgebungAusEinstellungen(settings, e.env || {}) };
     if (Object.keys(env).length) paket.env = env;
     if (settings.length) paket.settings = settings;
+    // Hinweise sind Text für Menschen — sie reisen mit, zählen aber nicht zum
+    // technischen Teil (`technisch`): Wer einen Satz verbessert, prüft nicht neu.
+    if (Array.isArray(e.hints) && e.hints.length) paket.hints = e.hints;
     return paket;
+}
+
+// ── Hinweise für Betreiber (2026-10-06) ─────────────────────────────────────
+//
+// Was sich nicht einstellen lässt und was man trotzdem wissen muss. Anlass war
+// StarRupture: Der erste Start braucht „neue Welt", danach muss auf „laden"
+// umgestellt werden; beitreten geht nur über die IP; ein Passwort gibt es nur
+// über zwei Dateien. Bis dahin stand das in einem Papier, das kein Betreiber
+// eines Servers je sieht.
+//
+// Fester Text aus dem Paket (de/en), mit einem Zeitpunkt. KEIN Auswerten der
+// Spielausgabe (Betreiber, 2026-09-30: Spiel-Internes und Externes nicht
+// mischen). Der Daemon liest das Feld nicht — es gehört dem Dashboard.
+const HINWEIS = {
+    wann: ['create', 'install', 'run'],
+    max: 600,
+};
+
+function hinweisAusFormular(b) {
+    const text = (k) => (typeof b?.[k] === 'string' ? b[k].trim() : '');
+    const key = text('key');
+    if (!RE_SCHLUESSEL.test(key)) throw new Error('Schlüssel: Kleinbuchstaben, Ziffern und _, beginnend mit einem Buchstaben — etwa „erste_einrichtung".');
+    if (!HINWEIS.wann.includes(text('when'))) throw new Error(`Zeitpunkt: ${HINWEIS.wann.join(', ')}.`);
+    const de = text('text_de'), en = text('text_en');
+    if (!de && !en) throw new Error('Der Hinweis braucht einen Text — deutsch, englisch oder beides.');
+    for (const [sprache, t] of [['deutsch', de], ['englisch', en]]) {
+        if (t.length > HINWEIS.max) throw new Error(`Der Text (${sprache}) hat ${t.length} Zeichen — höchstens ${HINWEIS.max}. Ein Hinweis ist ein Absatz, keine Anleitung.`);
+    }
+    const h = { key, when: text('when'), text: {} };
+    if (de) h.text.de = de;
+    if (en) h.text.en = en;
+    return h;
+}
+
+/** Anlegen oder ersetzen. `alt` ist der bisherige Schlüssel, wenn umbenannt wird. */
+async function hinweisSpeichern(sitzung, formular) {
+    const neu = hinweisAusFormular(formular);
+    const alt = typeof formular?.alt === 'string' ? formular.alt.trim() : '';
+    return entwurfSchreiben(sitzung, (e) => {
+        const liste = Array.isArray(e.hints) ? e.hints : [];
+        if (liste.find(x => x.key === neu.key && x.key !== alt)) throw new Error(`Den Hinweis „${neu.key}" gibt es schon.`);
+        const i = liste.findIndex(x => x.key === (alt || neu.key));
+        if (i >= 0) liste[i] = neu; else liste.push(neu);
+        e.hints = liste;
+    });
+}
+
+async function hinweisEntfernen(sitzung, key) {
+    return entwurfSchreiben(sitzung, (e) => {
+        e.hints = (e.hints || []).filter(x => x.key !== key);
+        if (!e.hints.length) delete e.hints;
+    });
 }
 
 // ── Einstellungs-Baukasten (B1, 2026-09-26) ─────────────────────────────────
@@ -1104,6 +1159,9 @@ function veroeffentlichungsPaket(sitzung, liste, pruefung, autor) {
             if (!Object.keys(teil.env).length) delete teil.env;
             return teil;
         })(),
+        // Hinweise aus dem Entwurf von JETZT, wie Name und Beschreibung — sie
+        // gehören nicht zum Geprüften und dürfen nach dem Durchlauf entstehen.
+        ...(Array.isArray(e.hints) && e.hints.length ? { hints: e.hints } : {}),
         // Angeheftet wird der Digest, auf dem der grüne Durchlauf WIRKLICH lief
         // (der Daemon meldet ihn) — nicht der, der beim Veröffentlichen gerade
         // hinter dem Tag steht (Baustelle 166).
@@ -1387,6 +1445,7 @@ module.exports = {
     pruefungAbbrechen, pruefProtokoll, pruefungBeenden,
     EINSTELLUNG, einstellungAusFormular, einstellungSpeichern, einstellungEntfernen, einstellungRolleSetzen, probewertSetzen, probewerte,
     umgebungAusEinstellungen, belegteEinstellungen,
+    HINWEIS, hinweisAusFormular, hinweisSpeichern, hinweisEntfernen,
     werkbankTeil, ungenutztePorts, startSpeichern, startzeile, zustand, starten, stoppen, eingabe, laeufe, laufenderLauf,
     portUebernehmen, portEntfernen, bereitschaftszeile,
     laufSetzen, konsoleAnhaengen, laufBeenden, dateienJetzt, gruppiere,

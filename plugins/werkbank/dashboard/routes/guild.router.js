@@ -297,6 +297,8 @@ router.get('/:kennung', requirePermission('WERKBANK.VIEW'), async (req, res) => 
             startFormular: startAlsFormular(sitzung.entwurf?.start),
             werkbankTeil: Sitzungen.werkbankTeil(sitzung),
             einstellungen: sitzung.entwurf?.settings || [],
+            hinweise: sitzung.entwurf?.hints || [],
+            HINWEIS: Sitzungen.HINWEIS,
             probewerte: sitzung.entwurf?.werkbank?.werte || {},
             EINSTELLUNG: Sitzungen.EINSTELLUNG,
             anzeige: { GRUPPE, WIRKUNG, RISIKO },
@@ -467,6 +469,25 @@ router.post('/:kennung/einstellungen', requirePermission('WERKBANK.BAUEN'), asyn
         return res.json({ success: true });
     } catch (error) {
         return fehler(res, error, 'Einstellung nicht gespeichert', 400);
+    }
+});
+
+// ── Hinweise für Betreiber (2026-10-06) ───────────────────────────────────────
+router.post('/:kennung/hinweise', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.hinweisSpeichern(await offeneSitzung(req, res), req.body || {});
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Hinweis nicht gespeichert', 400);
+    }
+});
+
+router.post('/:kennung/hinweise/:key/entfernen', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.hinweisEntfernen(await offeneSitzung(req, res), req.params.key);
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Hinweis nicht entfernt', 400);
     }
 });
 

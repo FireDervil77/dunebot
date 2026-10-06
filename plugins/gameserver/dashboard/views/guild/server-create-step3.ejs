@@ -148,6 +148,20 @@
       </div>
 
       <div>
+        <%# Hinweise des Pakets fuer das Anlegen (`hints`, create) — fester Text,
+            den der Paketbauer geschrieben hat. Steht ueber „Was jetzt passiert",
+            weil er die Wahl links beeinflussen kann. %>
+        <% if (werte.hinweise && werte.hinweise.length) { %>
+          <div class="fb-karte">
+            <div class="fb-kopf"><span>Gut zu wissen</span></div>
+            <div class="fb-koerper" style="font-size:13px;display:flex;flex-direction:column;gap:10px">
+              <% werte.hinweise.forEach(function (h) { %>
+                <div style="white-space:pre-line"><%= h.text %></div>
+              <% }); %>
+            </div>
+          </div>
+        <% } %>
+
         <div class="fb-karte">
           <div class="fb-kopf"><span>Was jetzt passiert</span></div>
           <div class="fb-koerper" style="font-size:13px">

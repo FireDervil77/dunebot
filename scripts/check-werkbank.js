@@ -649,6 +649,77 @@ async function pruefe(name, fn) {
         } finally { fs.rmSync(d, { recursive: true, force: true }); }
     });
 
+    await pruefe('Hinweise für Betreiber: geprüft, im Paket, ohne neuen Durchlauf — und bestehen das Tor', async () => {
+        const h = (x = {}) => ({ key: 'erste_einrichtung', when: 'run', text_de: 'Beim ersten Start neue Welt an.', text_en: '', ...x });
+        assert.deepStrictEqual(Sitzungen.hinweisAusFormular(h()),
+            { key: 'erste_einrichtung', when: 'run', text: { de: 'Beim ersten Start neue Welt an.' } });
+        assert.deepStrictEqual(Sitzungen.hinweisAusFormular(h({ text_de: '', text_en: 'Join by IP.' })).text, { en: 'Join by IP.' });
+        assert.throws(() => Sitzungen.hinweisAusFormular(h({ key: 'Erste Einrichtung' })), /Schlüssel/);
+        assert.throws(() => Sitzungen.hinweisAusFormular(h({ when: 'immer' })), /Zeitpunkt/);
+        assert.throws(() => Sitzungen.hinweisAusFormular(h({ text_de: '   ' })), /braucht einen Text/);
+        assert.throws(() => Sitzungen.hinweisAusFormular(h({ text_de: 'x'.repeat(Sitzungen.HINWEIS.max + 1) })), /höchstens/);
+
+        // Echte Bestandteile wie im Test darüber — sonst lehnt das Tor aus anderen Gründen ab.
+        const f = require('../packages/fbpkg/beispiele/factorio.json');
+        const s = mitAngaben();
+        s.image = f.image;
+        const echt = f.install.steps.map(schritt => ({ status: 'ok', schritt }));
+        const geprueft = gruenGeprueft(s, echt);
+        const vorher = Sitzungen.fingerabdruck(Sitzungen.entwurfAlsPaket(s, echt));
+
+        // Speichern, ersetzen, umbenennen, doppelt, entfernen.
+        await Sitzungen.hinweisSpeichern(s, h());
+        await Sitzungen.hinweisSpeichern(s, h({ key: 'beitreten', when: 'create', text_de: 'Nur über die IP.', text_en: 'Join by IP only.' }));
+        // Ein NEUER Hinweis mit vorhandenem Schlüssel ersetzt nichts still — wie bei den Einstellungen.
+        await assert.rejects(Sitzungen.hinweisSpeichern(s, h({ text_de: 'anderer Text' })), /gibt es schon/);
+        await Sitzungen.hinweisSpeichern(s, h({ alt: 'erste_einrichtung', text_de: 'Erst neue Welt, dann laden.' }));
+        assert.deepStrictEqual(s.entwurf.hints.map(x => x.key), ['erste_einrichtung', 'beitreten']);
+        assert.strictEqual(s.entwurf.hints[0].text.de, 'Erst neue Welt, dann laden.', 'Bearbeiten ersetzt an Ort und Stelle');
+        await assert.rejects(Sitzungen.hinweisSpeichern(s, h({ key: 'beitreten', alt: 'erste_einrichtung' })), /gibt es schon/);
+        await Sitzungen.hinweisSpeichern(s, h({ key: 'einrichtung', alt: 'erste_einrichtung', text_de: 'Erst neue Welt, dann laden.' }));
+        assert.deepStrictEqual(s.entwurf.hints.map(x => x.key), ['einrichtung', 'beitreten'], 'umbenennen behält den Platz');
+
+        // Hinweise gehören nicht zum Geprüften: derselbe Fingerabdruck, Veröffentlichen bleibt erlaubt.
+        assert.strictEqual(Sitzungen.fingerabdruck(Sitzungen.entwurfAlsPaket(s, echt)), vorher);
+        assert.ok(!('hints' in Sitzungen.technisch(Sitzungen.entwurfAlsPaket(s, echt))));
+        assert.deepStrictEqual(Sitzungen.entwurfAlsPaket(s, echt).hints, s.entwurf.hints);
+
+        // Ins Paket kommen die Hinweise von JETZT — auch die, die nach dem Durchlauf entstanden.
+        const paket = Sitzungen.veroeffentlichungsPaket(s, echt, geprueft, 'firedervil');
+        assert.deepStrictEqual(paket.hints, s.entwurf.hints);
+        const einl = require('../packages/fbpkg/lib/einlieferung');
+        const os = require('os');
+        const d = fs.mkdtempSync(path.join(os.tmpdir(), 'wb-check-'));
+        try {
+            const datei = path.join(d, 'factorio.json');
+            fs.writeFileSync(datei, JSON.stringify(paket));
+            const tor = einl.bestehtPruefung(datei);
+            assert.ok(tor.ok, einl.grundZeilen(tor.text || '').join(' | '));
+            // Gegenprobe: Das Tor liest das Feld wirklich — ein unbekannter Zeitpunkt fällt auf.
+            fs.writeFileSync(datei, JSON.stringify({ ...paket, hints: [{ key: 'x', when: 'immer', text: { de: 'y' } }] }));
+            assert.ok(!einl.bestehtPruefung(datei).ok, 'ein Zeitpunkt, den es nicht gibt, darf nicht durchgehen');
+        } finally { fs.rmSync(d, { recursive: true, force: true }); }
+
+        await Sitzungen.hinweisEntfernen(s, 'einrichtung');
+        await Sitzungen.hinweisEntfernen(s, 'beitreten');
+        assert.ok(!('hints' in s.entwurf), 'der letzte nimmt das Feld mit');
+        assert.ok(!('hints' in Sitzungen.veroeffentlichungsPaket(s, echt, geprueft, 'firedervil')), 'ohne Hinweise kein leeres Feld im Paket');
+
+        // Die Anzeige: nach Zeitpunkt gewählt, Sprache aufgelöst, nichts ergänzt.
+        const { baueHinweise } = require('../plugins/gameserver/dashboard/helpers/Serverseite');
+        const p2 = { hints: [
+            { key: 'a', when: 'run', text: { de: 'Deutsch', en: 'English' } },
+            { key: 'b', when: 'run', text: { en: 'Only English' } },
+            { key: 'c', when: 'create', text: { de: 'Vor dem Anlegen' } },
+            { key: 'd', when: 'install', text: { de: 'Während der Installation' } },
+        ] };
+        assert.deepStrictEqual(baueHinweise(p2, 'run'), [{ key: 'a', text: 'Deutsch' }, { key: 'b', text: 'Only English' }]);
+        assert.deepStrictEqual(baueHinweise(p2, 'create'), [{ key: 'c', text: 'Vor dem Anlegen' }]);
+        assert.deepStrictEqual(baueHinweise(p2, 'install'), [{ key: 'd', text: 'Während der Installation' }]);
+        assert.deepStrictEqual(baueHinweise({}, 'run'), []);
+        assert.deepStrictEqual(baueHinweise(null, 'run'), []);
+    });
+
     await pruefe('Angaben: Slug, Fassung, Kategorie und Bildadressen werden geprüft', async () => {
         const s = mitAngaben();
         await assert.rejects(Sitzungen.angabenSpeichern(s, { name: 'x', slug: 'Mit Leerzeichen' }), /Slug/);

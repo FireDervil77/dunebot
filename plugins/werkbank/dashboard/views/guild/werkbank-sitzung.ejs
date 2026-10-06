@@ -746,6 +746,85 @@
     </div>
   </div>
 
+  <!-- ── Hinweise für Betreiber (2026-10-06) ───────────────────────────── -->
+  <%
+    // Was sich nicht einstellen lässt und was man trotzdem wissen muss. Fester
+    // Text aus dem Paket, nie aus der Spielausgabe abgeleitet.
+    const WANN = { create: 'beim Anlegen', install: 'während der Installation', run: 'auf der Serverseite' };
+  %>
+  <div class="col-12">
+    <div class="card" id="karteHinweise">
+      <div class="card-header">
+        <h3 class="card-title">Hinweise für Betreiber</h3>
+        <div class="card-actions"><span class="text-secondary small"><%= hinweise.length %> im Entwurf</span></div>
+      </div>
+      <div class="card-body">
+        <p class="text-secondary small">
+          Was jemand wissen muss, der einen Server dieses Spiels betreibt, und was sich nicht einstellen lässt — etwa
+          „beim ersten Start neue Welt, danach auf Laden umstellen" oder „beitreten nur über die IP".
+          Der <strong>Zeitpunkt</strong> entscheidet, wo der Text steht: im Anlegen-Assistenten, auf der Serverseite während der
+          Installation oder auf der Serverseite danach. Hinweise gehören nicht zum Geprüften — du kannst sie nach einem grünen
+          Durchlauf ändern, ohne neu zu prüfen; ins Paket kommen sie beim nächsten Veröffentlichen.
+        </p>
+
+        <% if (hinweise.length) { %>
+          <div class="table-responsive mb-3">
+            <table class="table table-sm table-vcenter">
+              <thead><tr><th>Schlüssel</th><th>Zeitpunkt</th><th>Text</th><th class="w-1"></th></tr></thead>
+              <tbody>
+                <% hinweise.forEach(function (h) { %>
+                  <tr>
+                    <td class="font-monospace"><%= h.key %></td>
+                    <td class="text-nowrap"><%= WANN[h.when] || h.when %></td>
+                    <td>
+                      <div><%= (h.text && (h.text.de || h.text.en)) || '' %></div>
+                      <% if (h.text && h.text.de && h.text.en) { %><div class="text-secondary small"><%= h.text.en %></div><% } %>
+                      <% if (h.text && !h.text.en) { %><div class="text-secondary small">kein englischer Text — gezeigt wird der deutsche</div><% } %>
+                    </td>
+                    <td class="text-nowrap">
+                      <button class="btn btn-sm btn-outline-secondary" type="button" data-hinweis-bearbeiten="<%= JSON.stringify(h) %>">Bearbeiten</button>
+                      <button class="btn btn-sm btn-outline-danger" type="button" data-hinweis-entfernen="<%= h.key %>">Entfernen</button>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+
+        <details id="hinweisDetails" <%= hinweise.length ? '' : 'open' %>>
+          <summary class="mb-2"><span id="hinweisUeberschrift">Neuer Hinweis</span></summary>
+          <form id="formHinweis" class="row g-2" autocomplete="off">
+            <input type="hidden" name="alt" value="">
+            <div class="col-md-4">
+              <label class="form-label" for="hKey">Schlüssel</label>
+              <input class="form-control font-monospace" id="hKey" name="key" placeholder="erste_einrichtung" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="hWann">Zeitpunkt</label>
+              <select class="form-select" id="hWann" name="when">
+                <% HINWEIS.wann.forEach(function (w) { %><option value="<%= w %>" <%= w === 'run' ? 'selected' : '' %>><%= WANN[w] || w %></option><% }) %>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label" for="hTextDe">Text (deutsch)</label>
+              <textarea class="form-control" id="hTextDe" name="text_de" rows="3" maxlength="<%= HINWEIS.max %>" placeholder="Ein Absatz, in der Du-Form: was zu tun ist und warum."></textarea>
+            </div>
+            <div class="col-12">
+              <label class="form-label" for="hTextEn">Text (englisch)</label>
+              <textarea class="form-control" id="hTextEn" name="text_en" rows="3" maxlength="<%= HINWEIS.max %>"></textarea>
+              <div class="form-hint">Höchstens <%= HINWEIS.max %> Zeichen je Sprache. Fehlt eine Sprache, wird die andere gezeigt.</div>
+            </div>
+            <div class="col-12 d-flex gap-2">
+              <button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk me-1"></i>Hinweis speichern</button>
+              <button class="btn btn-outline-secondary" type="button" id="knopfHinweisNeu">Leeren</button>
+            </div>
+          </form>
+        </details>
+      </div>
+    </div>
+  </div>
+
   <!-- ── Prüfdurchlauf (Stufe 3) ────────────────────────────────────────── -->
   <div class="col-12">
     <div class="card">
@@ -1603,6 +1682,56 @@
         knopf.disabled = false;
         melde('error', fehler.message);
       }
+    });
+  }
+
+  // ── Hinweise für Betreiber (2026-10-06) ───────────────────────────────
+  var formH = document.getElementById('formHinweis');
+  if (formH) {
+    function hinweisLeeren() {
+      formH.reset();
+      formH.alt.value = '';
+      document.getElementById('hinweisUeberschrift').textContent = 'Neuer Hinweis';
+    }
+    document.getElementById('knopfHinweisNeu').addEventListener('click', hinweisLeeren);
+    document.querySelectorAll('[data-hinweis-bearbeiten]').forEach(function (k) {
+      k.addEventListener('click', function () {
+        var h = JSON.parse(k.dataset.hinweisBearbeiten);
+        hinweisLeeren();
+        formH.alt.value = h.key;
+        formH.key.value = h.key;
+        formH.when.value = h.when;
+        formH.text_de.value = (h.text && h.text.de) || '';
+        formH.text_en.value = (h.text && h.text.en) || '';
+        document.getElementById('hinweisUeberschrift').textContent = 'Hinweis „' + h.key + '" bearbeiten';
+        document.getElementById('hinweisDetails').open = true;
+        formH.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+    formH.addEventListener('submit', async function (ev) {
+      ev.preventDefault();
+      var knopf = formH.querySelector('button[type=submit]');
+      knopf.disabled = true;
+      try {
+        await schicke(hier + '/hinweise', Object.fromEntries(new FormData(formH)));
+        window.location.reload();
+      } catch (fehler) {
+        knopf.disabled = false;
+        melde('error', fehler.message);
+      }
+    });
+    document.querySelectorAll('[data-hinweis-entfernen]').forEach(function (k) {
+      k.addEventListener('click', async function () {
+        if (!confirm('Hinweis „' + k.dataset.hinweisEntfernen + '" aus dem Entwurf nehmen?')) return;
+        k.disabled = true;
+        try {
+          await schicke(hier + '/hinweise/' + encodeURIComponent(k.dataset.hinweisEntfernen) + '/entfernen');
+          window.location.reload();
+        } catch (fehler) {
+          k.disabled = false;
+          melde('error', fehler.message);
+        }
+      });
     });
   }
 
