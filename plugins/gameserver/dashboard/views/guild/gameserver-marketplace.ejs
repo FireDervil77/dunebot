@@ -4,7 +4,8 @@
             <div class="row">
                 <!-- Sidebar Filter -->
                 <div class="col-lg-3">
-                    <div class="card">
+                    <%# mb-3: Filter und Legende klebten ohne Abstand aneinander (Betreiber, 2026-10-07). %>
+                    <div class="card mb-3">
                         <div class="card-header">
                             <h3 class="card-title">
                                 <i class="fa-solid fa-filter"></i>
@@ -57,7 +58,7 @@
                                     </select>
                                 </div>
 
-                                <button type="submit" class="btn btn-primary w-100">
+                                <button type="submit" class="btn btn-primary w-100 mb-2">
                                     <i class="fa-solid fa-search"></i> <%= tr('gameserver:MARKETPLACE.APPLY_FILTER') %>
                                 </button>
                                 <a href="/guild/<%= guildId %>/plugins/gameserver/addons" class="btn btn-secondary w-100">
@@ -129,6 +130,18 @@
                             <% addons.forEach(addon => { %>
                                 <div class="col-lg-4 col-md-6 mb-4">
                                     <div class="card h-100">
+                                        <%# Das Bild des Spiels (2026-10-07). Die Liste zeigte bis dahin KEINS —
+                                            nicht mit Absicht: `icon_url`/`banner_url` wurden abgefragt und nie
+                                            gezeichnet. Banner fuellt die Flaeche, ein Symbol wird eingepasst
+                                            statt beschnitten. Hat ein Spiel kein Bild, steht keins da — kein
+                                            Platzhalter (Betreiber, 2026-09-24). %>
+                                        <% const bild = addon.banner_url || addon.icon_url; %>
+                                        <% if (bild) { %>
+                                            <a href="/guild/<%= guildId %>/plugins/gameserver/addons/<%= addon.slug %>" tabindex="-1" aria-hidden="true">
+                                                <img src="<%= bild %>" alt="" loading="lazy" class="card-img-top"
+                                                     style="height:140px;width:100%;object-fit:<%= addon.banner_url ? 'cover' : 'contain' %>;background:var(--tblr-bg-surface-secondary)">
+                                            </a>
+                                        <% } %>
                                         <!-- Featured Badge -->
                                         <% if (addon.featured) { %>
                                             <div class="ribbon-wrapper ribbon-lg">

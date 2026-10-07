@@ -6,6 +6,12 @@
                 <div class="col-12">
                     <div class="card">
                         <div class="card-status-top bg-primary"></div>
+                        <%# Das Bild des Spiels, wie in der Liste — nur wenn es eins gibt. %>
+                        <% const bild = addon.banner_url || addon.icon_url; %>
+                        <% if (bild) { %>
+                            <img src="<%= bild %>" alt="" class="card-img-top"
+                                 style="height:220px;width:100%;object-fit:<%= addon.banner_url ? 'cover' : 'contain' %>;background:var(--tblr-bg-surface-secondary)">
+                        <% } %>
                         <div class="card-body">
                             <div class="row">
                                 <div class="col-md-8">
