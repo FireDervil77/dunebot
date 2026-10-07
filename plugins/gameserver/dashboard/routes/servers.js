@@ -12,8 +12,12 @@ const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const { ServiceManager } = require('dunebot-core');
 const StatusService = require('../helpers/StatusService');
-const { buildStartPayload, loadServerForStart, ladePaketFuerAddon, baueInstallNutzlast,
+const { buildStartPayload, loadServerForStart, baueInstallNutzlast,
         paketWerteAnlegen, autoUpdateAus, istWahr } = require('../helpers/StartPayload');
+// Welche Paketfassung gilt — für einen Server, beim Anlegen — steht in EINER
+// Datei (Baustelle 172). Hier wird nur noch gefragt.
+const { FASSUNG_FUER_SERVER, ladePaketFuerServer, ladePaketFuerAnlegen, ladePaketeZuServern,
+        ladePaketeFuerAnlegen, kanalSetzen, istKontrollGuild } = require('../helpers/Paketfassung');
 const { vergibPortsAusPaket } = require('../helpers/Portvergabe');
 const Inhalte = require('../helpers/Inhalte');
 const Quellen = require('../helpers/Quellen');
@@ -77,42 +81,9 @@ function toBool(value, fallback = false) {
     return v === '1' || v === 'true' || v === 'on' || v === 'yes';
 }
 
-/**
- * Die Pakete zu einer Menge Server laden — in EINEM Zug, nicht je Zeile eine
- * Abfrage.
- *
- * Herausgezogen am 2026-09-17 (Baustelle 134): Bis dahin stand diese Abfrage
- * nur in der Übersichtsroute. Die Live-Route `/status` brauchte dieselben
- * Pakete, um dieselbe Bereitschaft zu rechnen — und ohne sie hätte sie die
- * Regel im Browser nachbauen müssen. Das wäre der zweite Weg gewesen.
- *
- * @param {object} dbService
- * @param {Array<{addon_marketplace_id: number}>} servers
- * @returns {Promise<Object<number, object>>} Addon-Kennung → FBPKG-Paket
- */
-async function ladePaketeZuServern(dbService, servers) {
-    const ids = [...new Set((servers || []).map(x => x.addon_marketplace_id).filter(Boolean))];
-    const paketNachAddon = {};
-    if (!ids.length) return paketNachAddon;
-
-    const zeilen = await dbService.query(`
-        SELECT pk.id, pv.fbpkg
-          FROM packages pk
-          LEFT JOIN package_versions pv ON pv.id = (
-              SELECT v.id FROM package_versions v
-               WHERE v.package_id = pk.id
-               ORDER BY (v.channel = 'stable') DESC, v.published_at DESC, v.id DESC
-               LIMIT 1)
-         WHERE pk.id IN (${ids.map(() => '?').join(',')})`, ids);
-
-    for (const z of zeilen) {
-        if (!z.fbpkg) continue;
-        try {
-            paketNachAddon[z.id] = typeof z.fbpkg === 'string' ? JSON.parse(z.fbpkg) : z.fbpkg;
-        } catch { /* ein unlesbares Paket kostet eine Zeile, nicht die Seite */ }
-    }
-    return paketNachAddon;
-}
+// `ladePaketeZuServern` stand hier bis zum 2026-10-07 und lud je ADDON ein Paket.
+// Seit ein Server einem Kanal folgt, hat jeder Server seine Fassung — die
+// Funktion wohnt jetzt in helpers/Paketfassung.js und ordnet nach Server.
 
 /**
  * GET /guild/:guildId/plugins/gameserver/servers
@@ -300,8 +271,8 @@ router.get('/', requirePermission('GAMESERVER.VIEW'), async (req, res) => {
             // Die Pakete zu allen vorkommenden Addons in EINEM Zug — nicht je
             // Zeile eine Abfrage. Bei acht Servern fiele das nicht auf, bei
             // achtzig schon.
-            const paketNachAddon = await ladePaketeZuServern(dbService, servers);
-            liste = baueServerListe(servers, paketNachAddon);
+            const paketNachServer = await ladePaketeZuServern(dbService, servers);
+            liste = baueServerListe(servers, paketNachServer);
         } catch (err) {
             Logger.error('[Gameserver] Serverliste konnte nicht aufbereitet werden', err);
         }
@@ -435,18 +406,16 @@ router.get('/create', requirePermission('GAMESERVER.CREATE'), async (req, res) =
             // Liste sauber aussieht.
             let auswahl = { pakete: [], ohnePaket: [] };
             try {
-                const paketZeilen = await dbService.query(`
-                    SELECT pk.id, pk.slug, pv.fbpkg, pv.version, pv.channel
-                      FROM packages pk
-                      JOIN package_versions pv ON pv.id = (
-                          SELECT v.id FROM package_versions v
-                           WHERE v.package_id = pk.id
-                           ORDER BY (v.channel = 'stable') DESC, v.published_at DESC, v.id DESC
-                           LIMIT 1)
-                     ORDER BY pk.slug`);
+                // Nur was diese Guild anlegen darf: freigegebene Pakete — und in
+                // der Guild des Betreibers auch die Entwürfe (Paketfassung.js).
+                const paketZeilen = await ladePaketeFuerAnlegen(dbService, guildId);
                 const mitPaket = new Set(paketZeilen.map(z => z.id));
                 const alle = [...(publicAddons || []), ...(guildAddons || [])];
-                auswahl = bauePaketAuswahl(paketZeilen, alle.filter(a => !mitPaket.has(a.id)));
+                // „Ohne Paket" heisst: es gibt KEINS. Ein Spiel, dessen Paket für
+                // diese Guild nur nicht freigegeben ist, gehört nicht in diese
+                // Liste — es ist ein Entwurf und erscheint ihr gar nicht.
+                const hatPaket = new Set((await dbService.query('SELECT id FROM packages')).map(z => z.id));
+                auswahl = bauePaketAuswahl(paketZeilen, alle.filter(a => !mitPaket.has(a.id) && !hatPaket.has(a.id)));
             } catch (err) {
                 Logger.error('[Gameserver] Spielauswahl konnte nicht aufgebaut werden', err);
             }
@@ -549,7 +518,7 @@ router.get('/create', requirePermission('GAMESERVER.CREATE'), async (req, res) =
             let maschinen = [];
             let paketFuerWahl = null;
             try {
-                const pz = await ladePaketFuerAddon(dbService, addonData.id);
+                const pz = await ladePaketFuerAnlegen(dbService, addonData.id, guildId);
                 paketFuerWahl = pz ? (typeof pz.paket_json === 'string'
                     ? JSON.parse(pz.paket_json) : pz.paket_json) : null;
 
@@ -704,7 +673,7 @@ router.get('/create', requirePermission('GAMESERVER.CREATE'), async (req, res) =
             let werte = { felder: [], aufVorgabe: 0, passiert: {} };
             let paketFuerWerte = null;
             try {
-                const pz = await ladePaketFuerAddon(dbService, addonData.id);
+                const pz = await ladePaketFuerAnlegen(dbService, addonData.id, guildId);
                 paketFuerWerte = pz ? (typeof pz.paket_json === 'string'
                     ? JSON.parse(pz.paket_json) : pz.paket_json) : null;
 
@@ -957,14 +926,19 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
             });
         }
 
-        const pz = await ladePaketFuerAddon(dbService, addon.id);
+        // Die Fassung, mit der dieser Server ENTSTEHT — und der Kanal, dem er
+        // danach folgt: `stable`, wenn es eine freigegebene Fassung gibt; ein
+        // Entwurf (`test`) nur in der Guild des Betreibers. Die Auswahl in
+        // Schritt 1 zeigt einer fremden Guild keine Entwürfe — hier wird es
+        // noch einmal geprüft, weil ein Formular sich auch von Hand abschicken lässt.
+        const pz = await ladePaketFuerAnlegen(dbService, addon.id, guildId);
         const paket = pz
             ? (typeof pz.paket_json === 'string' ? JSON.parse(pz.paket_json) : pz.paket_json)
             : null;
         if (!paket) {
             return res.status(400).json({
                 success: false,
-                message: `Für „${addon.name}" gibt es kein Spielpaket — ohne Paket lässt sich kein Server anlegen.`
+                message: `Für „${addon.name}" gibt es kein freigegebenes Spielpaket — ohne Paket lässt sich kein Server anlegen.`
             });
         }
         const templateName = paket.identity?.name || addon.name;
@@ -1060,9 +1034,10 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
                 allocated_cpu_percent,
                 allocated_disk_gb,
                 addon_version,
+                channel,
                 status,
                 created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, 'temp', ?, '{}', ?, '{}', NULL, ?, ?, ?, ?, ?, ?, 'installing', NOW())
+            ) VALUES (?, ?, ?, ?, ?, ?, 'temp', ?, '{}', ?, '{}', NULL, ?, ?, ?, ?, ?, ?, ?, 'installing', NOW())
         `, [
             guildId,
             userId,
@@ -1083,7 +1058,9 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
             ramMB,
             cpuPercent,
             diskGB,
-            paket.identity?.version || addon.version || '1.0.0'
+            paket.identity?.version || addon.version || '1.0.0',
+            // Der Kanal, dem der Server folgt — aus derselben Auskunft wie das Paket.
+            pz.kanal
         ]);
 
         const serverId = result.insertId;
@@ -1441,12 +1418,12 @@ router.get('/status', requirePermission('GAMESERVER.VIEW'), async (req, res) => 
             [guildId]
         );
 
-        const paketNachAddon = await ladePaketeZuServern(dbService, servers);
+        const paketNachServer = await ladePaketeZuServern(dbService, servers);
 
         res.json({
             success: true,
             servers: (servers || []).map((s) => {
-                const a = baueBereitschaftAuskunft(paketNachAddon[s.addon_marketplace_id] || null, s);
+                const a = baueBereitschaftAuskunft(paketNachServer[s.id] || null, s);
                 return {
                     id:              s.id,
                     status:          s.status,
@@ -1860,6 +1837,7 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
                 gs.id,
                 gs.guild_id,
                 gs.name,
+                gs.channel,
                 gs.status,
                 gs.error_message,
                 gs.current_players,
@@ -1944,11 +1922,7 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
             LEFT JOIN addon_marketplace am ON gs.addon_marketplace_id = am.id
             LEFT JOIN rootserver r ON gs.rootserver_id = r.id
             LEFT JOIN packages pk ON pk.id = gs.addon_marketplace_id
-            LEFT JOIN package_versions pv ON pv.id = (
-                SELECT v.id FROM package_versions v
-                 WHERE v.package_id = pk.id
-                 ORDER BY (v.channel = 'stable') DESC, v.published_at DESC, v.id DESC
-                 LIMIT 1)
+            LEFT JOIN package_versions pv ON pv.id = ${FASSUNG_FUER_SERVER}
             WHERE gs.id = ? AND gs.guild_id = ?
         `, [serverId, guildId]);
 
@@ -2200,7 +2174,7 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
                 server.ansicht = gewuenscht;
             }
 
-            const paketZeile = await ladePaketFuerAddon(dbService, server.addon_marketplace_id);
+            const paketZeile = await ladePaketFuerServer(dbService, server.id);
             const paket = paketZeile
                 ? (typeof paketZeile.paket_json === 'string'
                     ? JSON.parse(paketZeile.paket_json) : paketZeile.paket_json)
@@ -3405,6 +3379,38 @@ router.put('/:serverId/ports', requirePermission('GAMESERVER.EDIT'), async (req,
 // das Paket selbst (`files.patch`, `apply` der Einstellungen) beim Start.
 
 // ============================================================
+// KANAL: Welcher Paketfassung der Server folgt (Baustelle 172)
+// PUT /guild/:guildId/plugins/gameserver/servers/:serverId/kanal
+// ============================================================
+//
+// `stable` = die neueste freigegebene Fassung, `test` = die neueste überhaupt.
+// Die Regeln (test nur in der Guild des Betreibers, stable nur mit einer
+// freigegebenen Fassung) stehen in helpers/Paketfassung.js. Wirksam wird der
+// Wechsel beim nächsten Start — ein laufender Server behält, womit er läuft.
+router.put('/:serverId/kanal', requirePermission('GAMESERVER.EDIT'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    try {
+        const ergebnis = await kanalSetzen(dbService, {
+            serverId: req.params.serverId,
+            guildId: res.locals.guildId,
+            kanal: typeof req.body?.kanal === 'string' ? req.body.kanal : '',
+        });
+        if (ergebnis.geaendert) {
+            Logger.info(`[Gameserver] Server ${req.params.serverId} folgt jetzt dem Kanal ${ergebnis.kanal}`);
+        }
+        return res.json({
+            success: true, ...ergebnis,
+            message: ergebnis.kanal === 'test'
+                ? 'Der Server folgt jetzt „test" — ab dem nächsten Start mit der neuesten Fassung.'
+                : 'Der Server folgt jetzt „stable" — ab dem nächsten Start mit der neuesten freigegebenen Fassung.',
+        });
+    } catch (error) {
+        return res.status(400).json({ success: false, message: error.message });
+    }
+});
+
+// ============================================================
 // EINSTELLUNGEN: Werte des Servers ändern (Einstellungskarte)
 // PUT /guild/:guildId/plugins/gameserver/servers/:serverId/variables
 // ============================================================
@@ -3773,11 +3779,7 @@ router.post('/:serverId/rcon', requirePermission('GAMESERVER.RCON'), async (req,
             LEFT JOIN rootserver r ON gs.rootserver_id = r.id
             LEFT JOIN addon_marketplace am ON gs.addon_marketplace_id = am.id
             LEFT JOIN packages pk ON pk.id = gs.addon_marketplace_id
-            LEFT JOIN package_versions pv ON pv.id = (
-                SELECT v.id FROM package_versions v
-                 WHERE v.package_id = pk.id
-                 ORDER BY (v.channel = 'stable') DESC, v.published_at DESC, v.id DESC
-                 LIMIT 1)
+            LEFT JOIN package_versions pv ON pv.id = ${FASSUNG_FUER_SERVER}
             WHERE gs.id = ? AND gs.guild_id = ?
         `, [serverId, guildId]);
 

@@ -86,12 +86,16 @@ ServiceManager.register('Logger', { debug: still, info: still, warn: still, erro
     let daemonAufrufe = [];
     ServiceManager.register('dbService', {
         query: async (sql, params) => {
+            // Die Sperrliste kommt aus der Fassung, mit der DIESER Server läuft — also
+            // nach Server und Kanal gefragt, nicht mehr nach dem Addon (Baustelle 172).
+            // Zuerst geprüft: Auch diese Abfrage beginnt mit „FROM gameservers gs".
+            if (/FROM gameservers gs\s+JOIN packages pk/.test(sql)) {
+                assert.match(sql, /gs\.channel = 'test' OR v\.channel = 'stable'/, 'die Fassung hängt am Kanal des Servers');
+                assert.deepStrictEqual(params, [7]);
+                return [{ kanal: 'test', paket_json: JSON.stringify({ files: { denylist: LISTE } }) }];
+            }
             if (/FROM gameservers gs/.test(sql)) {
                 return [{ id: 7, guild_id: 'g1', rootserver_id: 3, daemon_id: 'd1', install_path: '', addon_marketplace_id: 1706 }];
-            }
-            if (/FROM packages pk/.test(sql)) {
-                assert.deepStrictEqual(params, [1706]);
-                return [{ paket_json: JSON.stringify({ files: { denylist: LISTE } }) }];
             }
             throw new Error(`Attrappe kennt die Abfrage nicht: ${sql.trim().slice(0, 80)}`);
         },

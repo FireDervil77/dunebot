@@ -463,8 +463,8 @@ class CronWorker {
         // Egg (`game_data.config.rcon`). Ein Paket-Server — Minecraft, Factorio —
         // hat dort `{}`, und jeder geplante RCON-Befehl scheiterte mit „keine
         // RCON-Konfiguration“. Gleiche Auflösung wie die Fernsteuerungs-Route.
-        const { ladePaketFuerAddon } = require('./StartPayload');
-        const eintrag = await ladePaketFuerAddon(dbService, server.addon_marketplace_id);
+        const { ladePaketFuerServer } = require('./StartPayload');
+        const eintrag = await ladePaketFuerServer(dbService, server.id);
         const paket = parse(eintrag?.paket_json, null);
         const rcon = StatusService.resolveRcon({
             gameData, ports, envVars,

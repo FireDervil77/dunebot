@@ -25,6 +25,24 @@
       Umbau des Rahmens dorthin gehoben — und hier vergessen. Ergebnis waren
       zwei Kopfzeilen samt zwei Hoehenumschaltern uebereinander. %>
 
+  <%# ── Kein Paket auf diesem Kanal (Baustelle 172) ───────────────────────
+      Der Server folgt „stable", und fuer sein Spiel ist nichts freigegeben.
+      Dann startet er nicht — das steht hier oben, nicht erst in der
+      Fehlermeldung nach dem Klick auf „Starten". %>
+  <% if (u.kanal && u.kanal.ohneFassung) { %>
+    <div class="fb-karte" style="border-color:var(--fb-warning)">
+      <div class="fb-koerper" style="font-size:13px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div style="flex:1 1 320px">
+          <strong>Für dieses Spiel ist keine Fassung freigegeben.</strong>
+          Der Server folgt dem Kanal „stable" und hat deshalb kein Paket — er lässt sich nicht starten, bis eine Fassung freigegeben ist.
+        </div>
+        <% if (u.kanal.waehlbar) { %>
+          <button type="button" class="btn btn-white btn-sm" data-fb-kanal-setzen="test">Auf „test" stellen</button>
+        <% } %>
+      </div>
+    </div>
+  <% } %>
+
   <%# ── Hinweise des Pakets (2026-10-06) ──────────────────────────────────
       Fester Text aus dem Paket (`hints`): was sich nicht einstellen laesst und
       was man trotzdem wissen muss. Steht VOR der Zustandskarte, weil er vor dem
@@ -486,8 +504,25 @@
     <div class="fb-karte">
       <div class="fb-kopf"><span>Paket und Image</span></div>
       <div class="fb-koerper" style="font-size:13px">
+        <%# Der Kanal, dem der SERVER folgt — in der Guild des Betreibers umstellbar.
+            Daneben, ob die Fassung, die er gerade bekommt, freigegeben ist. %>
+        <% if (u.kanal) { %>
+          <div style="display:flex;gap:10px;padding:5px 0;align-items:center">
+            <div class="fb-muted" style="flex:0 0 74px">Kanal</div>
+            <% if (u.kanal.waehlbar) { %>
+              <select class="form-select form-select-sm" style="width:auto" data-fb-kanal-wahl
+                      title="stable: die neueste freigegebene Fassung · test: die neueste überhaupt">
+                <option value="stable" <%= u.kanal.kanal === 'stable' ? 'selected' : '' %>>stable — freigegebene Fassung</option>
+                <option value="test" <%= u.kanal.kanal === 'test' ? 'selected' : '' %>>test — neueste Fassung</option>
+              </select>
+            <% } else { %>
+              <div class="fb-mono"><%= u.kanal.kanal %></div>
+            <% } %>
+            <span class="fb-muted" style="font-size:12px" data-fb-kanal-meldung></span>
+          </div>
+        <% } %>
         <% [['Paket', (u.paket.slug || '') + ' ' + (u.paket.version || '')],
-            ['Kanal', u.paket.kanal],
+            ['Fassung', u.paket.kanal === 'stable' ? 'freigegeben' : (u.paket.kanal === 'test' ? 'Testfassung, nicht freigegeben' : null)],
             ['Image', u.paket.image],
             ['Digest', u.paket.digest],
             ['Quelle', u.paket.quelle]].forEach(function (z) { %>
@@ -631,6 +666,39 @@
     }).catch(function (e) {
       knopf.disabled = false; knopf.textContent = 'Speichern';
       alert('Nicht gespeichert: ' + e.message);
+    });
+  });
+})();
+
+/* Kanal des Servers umstellen (Baustelle 172). Danach neu laden: Mit dem Kanal
+ * wechselt die Paketfassung, und von ihr haengt fast alles auf dieser Seite ab. */
+(function () {
+  var pfad = location.pathname.replace(/\/$/, '') + '/kanal';
+  function sage(text, fehler) {
+    var m = document.querySelector('[data-fb-kanal-meldung]');
+    if (window.showToast) window.showToast(fehler ? 'error' : 'success', text);
+    if (m) { m.textContent = text; m.style.color = fehler ? 'var(--fb-danger)' : ''; }
+  }
+  function setze(kanal, zurueck) {
+    fetch(pfad, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kanal: kanal }),
+    }).then(function (r) { return r.json(); }).then(function (a) {
+      if (a && a.success) { sage(a.message, false); setTimeout(function () { location.reload(); }, 1200); }
+      else { if (zurueck) zurueck(); sage((a && a.message) || 'Nicht umgestellt', true); }
+    }).catch(function (e) { if (zurueck) zurueck(); sage('Nicht umgestellt: ' + e.message, true); });
+  }
+  var wahl = document.querySelector('[data-fb-kanal-wahl]');
+  if (wahl) {
+    var vorher = wahl.value;
+    wahl.addEventListener('change', function () {
+      wahl.disabled = true;
+      setze(wahl.value, function () { wahl.value = vorher; wahl.disabled = false; });
+    });
+  }
+  document.querySelectorAll('[data-fb-kanal-setzen]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      b.disabled = true;
+      setze(b.getAttribute('data-fb-kanal-setzen'), function () { b.disabled = false; });
     });
   });
 })();

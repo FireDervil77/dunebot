@@ -89,12 +89,14 @@ const pruefe = (ok, was, zusatz = '') => {
     const [addonZeile] = await c.query(
         'SELECT addon_marketplace_id FROM gameservers WHERE addon_marketplace_id IS NOT NULL LIMIT 1');
     const addonId = addonZeile[0] ? addonZeile[0].addon_marketplace_id : 1;
-    const nachAddon = { [addonId]: paket };
+    // Nach SERVER, nicht nach Spiel (Baustelle 172): Seit ein Server einem Kanal
+    // folgt, hat jeder seine Fassung. Die Zeile unten trägt die Kennung 1.
+    const nachServer = { 1: paket };
     const zeile = (mehr) => ({
         id: 1, name: 'Prüfserver', addon_marketplace_id: addonId,
         current_players: null, max_players: null, ports: null, ...mehr,
     });
-    const einzige = (mehr) => Serverseite.baueServerListe([zeile(mehr)], nachAddon).liste[0];
+    const einzige = (mehr) => Serverseite.baueServerListe([zeile(mehr)], nachServer).liste[0];
 
     const listenFaelle = [
         ['Stufe query ohne Spielerzahl heisst BEREIT',
@@ -116,7 +118,9 @@ const pruefe = (ok, was, zusatz = '') => {
          { status: 'offline', bereitschaft_stufe: 'query' },
          (x) => !x.bereit && x.bereitschaftText === 'aus'],
         ['Ohne Paket wird nichts behauptet',
-         { status: 'online', bereitschaft_stufe: 'query', addon_marketplace_id: -1 },
+         // Kennung 2 steht nicht in `nachServer` — ein Server, dessen Kanal keine
+         // Fassung hat. Bis zum 2026-10-07 hiess „ohne Paket" hier „unbekanntes Addon".
+         { status: 'online', bereitschaft_stufe: 'query', id: 2 },
          (x) => !x.bereit && !x.stufen.length && x.bereitschaftText === 'nicht messbar'],
     ];
     for (const [was, mehr, erwartet, zusatz] of listenFaelle) {
@@ -149,7 +153,7 @@ const pruefe = (ok, was, zusatz = '') => {
     pruefe(!b160(null).bereit && b160(null).stufen.some(st => st.wartet),
         'alter Daemon ohne Meldungsart: die Leiter gilt wie bisher');
     const liste160 = Serverseite.baueServerListe([zeile({ status: 'online', bereitschaft_stufe: 'port',
-        bereitschaft_bereit: 1, bereitschaft_grund: grund160 })], { [addonId]: mitAbfrage }).liste[0];
+        bereitschaft_bereit: 1, bereitschaft_grund: grund160 })], { 1: mitAbfrage }).liste[0];
     pruefe(liste160.bereit && /nicht geprüft/.test(liste160.bereitschaftText),
         'die Liste sagt „nicht geprüft" dazu', `text="${liste160.bereitschaftText}"`);
     const { pillenZustand } = require('../plugins/gameserver/dashboard/assets/js/gameserver-live.js');

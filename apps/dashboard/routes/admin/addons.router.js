@@ -6,6 +6,8 @@
  *   GET    /admin/addons/:id          — Detail: Name, Beschreibung, Tags, Freigabe
  *   PUT    /admin/addons/:id          — Name, Beschreibung, Tags speichern
  *   POST   /admin/addons/:id/approve  — Freigeben (Vertrauensstufe, Sichtbarkeit)
+ *   POST   /admin/addons/:id/fassungen/:fassungId/freigeben      — Paketfassung test → stable
+ *   POST   /admin/addons/:id/fassungen/:fassungId/zuruecknehmen  — Paketfassung stable → test
  *   DELETE /admin/addons/:id          — Löschen (nie den Anker eines Pakets)
  *
  * Bis zum 2026-09-26 standen hier auch Egg-Import (Pelican-Repositories),
@@ -22,6 +24,12 @@
 const express = require('express');
 const router = express.Router();
 const { ServiceManager } = require('dunebot-core');
+
+// Die Freigabe einer Paketfassung (Baustelle 172). Die Regel — was freigegeben
+// werden darf und was ein Server danach bekommt — steht im Gameserver-Plugin an
+// EINER Stelle; hier ist nur der Knopf. Er gehört in den Adminbereich, weil eine
+// Freigabe alle Guilds betrifft, nicht die, in der gerade jemand sitzt.
+const Paketfassung = require('../../../../plugins/gameserver/dashboard/helpers/Paketfassung');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /admin/addons — Übersicht
@@ -91,7 +99,22 @@ router.get('/:id', async (req, res) => {
             catch { addon.tags = addon.tags.split(',').map(t => t.trim()).filter(Boolean); }
         }
 
-        await themeManager.renderView(res, 'admin/addons/edit', { addon, pageTitle: `Edit: ${addon.name}` });
+        // Fassungen des Pakets (packages.id = addon_marketplace.id) und wie viele
+        // Server welchem Kanal folgen. Ein Spiel ohne Paket hat keine — dann
+        // bleibt die Karte bei einem Satz. Ein Fehler hier kostet die Karte,
+        // nicht die Seite, wird aber gezeigt statt verschluckt.
+        let fassungen = [], serverJeKanal = { stable: 0, test: 0 }, fassungenFehler = null;
+        try {
+            fassungen = await Paketfassung.fassungenZuPaket(dbService, addon.id);
+            serverJeKanal = await Paketfassung.serverJeKanal(dbService, addon.id);
+        } catch (err) {
+            fassungenFehler = err.message;
+            Logger.error('[Addons] Fassungen laden fehlgeschlagen:', err);
+        }
+
+        await themeManager.renderView(res, 'admin/addons/edit', {
+            addon, fassungen, serverJeKanal, fassungenFehler, pageTitle: `Edit: ${addon.name}`,
+        });
 
     } catch (err) {
         Logger.error('[Addons] Detail laden fehlgeschlagen:', err);
@@ -134,6 +157,48 @@ router.put('/:id', async (req, res) => {
     } catch (err) {
         Logger.error('[Addons] Update fehlgeschlagen:', err);
         res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// ────────────────────────────────────────────────────────
+// POST /admin/addons/:id/fassungen/:fassungId/freigeben
+// POST /admin/addons/:id/fassungen/:fassungId/zuruecknehmen
+//
+// Eine Paketfassung freigeben (test → stable) oder die Freigabe zurücknehmen.
+// Freigegeben wird nur, was einen grünen Prüfdurchlauf hat (E-17) — die Prüfung
+// steht in Paketfassung.js und kommt von dort als Satz zurück.
+// ────────────────────────────────────────────────────────
+router.post('/:id/fassungen/:fassungId/freigeben', async (req, res) => {
+    const Logger    = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    try {
+        const f = await Paketfassung.freigeben(dbService, {
+            paketId: req.params.id, fassungId: req.params.fassungId,
+            userId: res.locals.user?.info?.id || null,
+        });
+        Logger.info(`[Addons] Paketfassung freigegeben: Paket ${req.params.id}, Fassung ${f.version}`);
+        res.json({ success: true, message: `Fassung ${f.version} ist freigegeben. Server auf „stable" nehmen sie beim nächsten Start.` });
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+router.post('/:id/fassungen/:fassungId/zuruecknehmen', async (req, res) => {
+    const Logger    = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    try {
+        const f = await Paketfassung.zuruecknehmen(dbService, {
+            paketId: req.params.id, fassungId: req.params.fassungId,
+        });
+        Logger.info(`[Addons] Freigabe zurückgenommen: Paket ${req.params.id}, Fassung ${f.version}`);
+        res.json({
+            success: true,
+            message: f.nochFreigegeben
+                ? `Freigabe von ${f.version} zurückgenommen. Server auf „stable" nehmen die vorige freigegebene Fassung.`
+                : `Freigabe von ${f.version} zurückgenommen. Es ist keine Fassung mehr freigegeben — Server auf „stable" lassen sich nicht starten, bis wieder eine freigegeben ist.`,
+        });
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
     }
 });
 

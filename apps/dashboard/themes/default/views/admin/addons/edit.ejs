@@ -122,12 +122,117 @@
 
             </div>
 
+            <%# ── Fassungen & Freigabe (Baustelle 172, 2026-10-07) ──────────────
+                Welche Fassung des Spielpakets Server bekommen. „stable" folgt der
+                neuesten FREIGEGEBENEN Fassung, „test" der neuesten ueberhaupt.
+                Freigegeben wird nur, was einen gruenen Pruefdurchlauf hat. %>
+            <%
+              const fListe = locals.fassungen || [];
+              const sjk = locals.serverJeKanal || { stable: 0, test: 0 };
+              const freigegeben = fListe.filter(function (f) { return f.channel === 'stable'; });
+              const zeit = function (t) { return t ? new Date(t).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' }) : '—'; };
+            %>
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="card" id="karteFassungen">
+                        <div class="card-header">
+                            <h3 class="card-title"><i class="fa-solid fa-code-branch"></i> Fassungen &amp; Freigabe</h3>
+                            <div class="card-actions text-secondary small">
+                                <%= sjk.stable %> Server auf stable · <%= sjk.test %> auf test
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <% if (locals.fassungenFehler) { %>
+                                <div class="alert alert-danger">Die Fassungen ließen sich nicht laden: <%= locals.fassungenFehler %></div>
+                            <% } else if (!fListe.length) { %>
+                                <p class="text-secondary mb-0">Zu diesem Spiel gibt es kein Spielpaket — es entsteht in der Werkbank.</p>
+                            <% } else { %>
+                                <p class="text-secondary small">
+                                    Ein Server auf <strong>stable</strong> startet mit der neuesten freigegebenen Fassung, einer auf <strong>test</strong> mit der neuesten überhaupt.
+                                    Freigeben lässt sich nur eine Fassung mit grünem Prüfdurchlauf aus der Werkbank.
+                                    Andere Guilds sehen das Spiel beim Anlegen erst, wenn eine Fassung freigegeben ist.
+                                </p>
+                                <% if (!freigegeben.length) { %>
+                                    <div class="alert alert-info py-2 small">
+                                        Noch keine Fassung freigegeben — das Spiel ist ein Entwurf und nur in deiner Guild anlegbar.
+                                        <% if (sjk.stable) { %><strong><%= sjk.stable %> Server folgen „stable" und haben damit kein Paket.</strong><% } %>
+                                    </div>
+                                <% } %>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-vcenter">
+                                        <thead><tr><th>Fassung</th><th>Kanal</th><th>Veröffentlicht</th><th>Prüfdurchlauf</th><th>Freigegeben</th><th class="w-1"></th></tr></thead>
+                                        <tbody>
+                                            <% fListe.forEach(function (f) { %>
+                                                <tr>
+                                                    <td class="font-monospace"><%= f.version %></td>
+                                                    <td>
+                                                        <% if (f.channel === 'stable') { %><span class="badge bg-green-lt">stable</span>
+                                                        <% } else { %><span class="badge bg-secondary-lt">test</span><% } %>
+                                                    </td>
+                                                    <td class="text-nowrap"><%= zeit(f.published_at) %></td>
+                                                    <td class="text-nowrap">
+                                                        <% if (f.test_passed_at) { %>grün · <%= zeit(f.test_passed_at) %>
+                                                        <% } else { %><span class="text-secondary">keiner</span><% } %>
+                                                    </td>
+                                                    <td class="text-nowrap"><%= zeit(f.released_at) %></td>
+                                                    <td class="text-nowrap">
+                                                        <% if (f.channel === 'stable') { %>
+                                                            <button class="btn btn-sm btn-outline-danger" type="button"
+                                                                    data-fassung-zuruecknehmen="<%= f.id %>" data-fassung-version="<%= f.version %>">Freigabe zurücknehmen</button>
+                                                        <% } else if (f.test_passed_at) { %>
+                                                            <button class="btn btn-sm btn-success" type="button"
+                                                                    data-fassung-freigeben="<%= f.id %>" data-fassung-version="<%= f.version %>">Freigeben</button>
+                                                        <% } else { %>
+                                                            <span class="text-secondary small" title="Freigegeben wird nur, was die Werkbank geprüft hat.">nicht freigebbar</span>
+                                                        <% } %>
+                                                    </td>
+                                                </tr>
+                                            <% }); %>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <% } %>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const addonId = <%= addon.id %>;
+
+    // ── Fassungen freigeben / Freigabe zurücknehmen ─────────────────────────
+    const melde = (art, text) => {
+        if (window.showToast) window.showToast(art, text);
+        else if (window.toastr) (art === 'success' ? toastr.success : toastr.error)(text);
+    };
+    const fassungsKnopf = (attribut, pfad, frage) => {
+        document.querySelectorAll('[' + attribut + ']').forEach((knopf) => {
+            knopf.addEventListener('click', async () => {
+                if (!confirm(frage(knopf.dataset.fassungVersion))) return;
+                knopf.disabled = true;
+                try {
+                    const antwort = await fetch(`/admin/addons/${addonId}/fassungen/${knopf.getAttribute(attribut)}/${pfad}`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
+                    });
+                    const ergebnis = await antwort.json();
+                    if (!ergebnis.success) throw new Error(ergebnis.message || 'Hat nicht geklappt');
+                    melde('success', ergebnis.message);
+                    setTimeout(() => location.reload(), 1500);
+                } catch (fehler) {
+                    knopf.disabled = false;
+                    melde('error', fehler.message);
+                }
+            });
+        });
+    };
+    fassungsKnopf('data-fassung-freigeben', 'freigeben',
+        (v) => `Fassung ${v} freigeben? Alle Server auf „stable" starten ab dem nächsten Start mit ihr.`);
+    fassungsKnopf('data-fassung-zuruecknehmen', 'zuruecknehmen',
+        (v) => `Freigabe von ${v} zurücknehmen? Server auf „stable" fallen auf die vorige freigegebene Fassung zurück — gibt es keine, lassen sie sich nicht starten.`);
     
     // Metadata-Form Submit
     document.getElementById('metadataForm').addEventListener('submit', async function(e) {

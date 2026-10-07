@@ -21,7 +21,7 @@
 const { ServiceManager } = require('dunebot-core');
 const QueryService = require('./QueryService');
 const { resolveStatusConfig, statusDatenAusPaket } = require('./StatusSchema');
-const { ladePaketFuerAddon } = require('./StartPayload');
+const { ladePaketFuerServer } = require('./StartPayload');
 
 /** ENV-Variablen, die als Slot-Anzahl in Frage kommen (Reihenfolge = Priorität) */
 const MAX_PLAYER_VARS = ['MAX_PLAYERS', 'MAXPLAYERS', 'SERVER_MAXPLAYERS', 'SLOTS'];
@@ -359,7 +359,7 @@ class StatusService {
         const [zeile] = await dbService.query(
             'SELECT addon_marketplace_id, paket_werte FROM gameservers WHERE id = ?', [server.id]);
         const eintrag = zeile?.addon_marketplace_id
-            ? await ladePaketFuerAddon(dbService, zeile.addon_marketplace_id)
+            ? await ladePaketFuerServer(dbService, server.id)
             : null;
         const paket = StatusService._parseJson(eintrag?.paket_json, null);
         if (!paket) {

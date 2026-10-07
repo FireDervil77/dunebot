@@ -133,9 +133,13 @@ function ohneKommentare(text) {
             assert.deepStrictEqual(params, [7]);
             return [{ addon_marketplace_id: addonId, paket_werte: JSON.stringify({ max_players: '12' }) }];
         }
-        if (/FROM packages pk/.test(sql)) {
-            assert.deepStrictEqual(params, [addonId]);
-            return paket ? [{ paket_json: JSON.stringify(paket) }] : [];
+        // Das Paket des SERVERS — die Fassung seines Kanals (Baustelle 172). Bis zum
+        // 2026-10-07 fragte der Code nach dem Addon; die Attrappe prüft deshalb mit,
+        // dass der Kanal in der Abfrage steht und die Server-Kennung ankommt.
+        if (/FROM gameservers gs\s+JOIN packages pk/.test(sql)) {
+            assert.match(sql, /gs\.channel = 'test' OR v\.channel = 'stable'/, 'die Fassung hängt am Kanal des Servers');
+            assert.deepStrictEqual(params, [7]);
+            return paket ? [{ kanal: 'test', paket_json: JSON.stringify(paket) }] : [];
         }
         return undefined;
     };

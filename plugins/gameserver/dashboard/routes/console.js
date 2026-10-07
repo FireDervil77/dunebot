@@ -166,9 +166,9 @@ router.post('/:serverId/send',
                     ? JSON.parse(eintrag.game_data) : (eintrag?.game_data || {});
             } catch (_) { /* unlesbares game_data zählt als "nichts deklariert" */ }
 
-            const { ladePaketFuerAddon } = require('../helpers/StartPayload');
+            const { ladePaketFuerServer } = require('../helpers/StartPayload');
             const paketZeile = eintrag?.addon_marketplace_id
-                ? await ladePaketFuerAddon(dbService, eintrag.addon_marketplace_id) : null;
+                ? await ladePaketFuerServer(dbService, serverId) : null;
             const transport = resolveConsoleTransport(gameData, paketZeile?.paket_json ? paketZeile : null);
             if (transport.stdin !== NATIVE) {
                 Logger.warn(`[Console API] Befehl abgelehnt, stdin ist "${transport.stdin}"`, {

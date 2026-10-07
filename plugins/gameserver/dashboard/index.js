@@ -1141,9 +1141,9 @@ class GameserverPlugin extends DashboardPlugin {
                    FROM gameservers WHERE id = ?`, [serverId]);
             if (!server) return;
 
-            const { ladePaketFuerAddon } = require('./helpers/StartPayload');
+            const { ladePaketFuerServer } = require('./helpers/StartPayload');
             const { loeseInhaltAuf } = require('./helpers/InhaltJeLader');
-            const paketZeile = await ladePaketFuerAddon(dbService, server.addon_marketplace_id);
+            const paketZeile = await ladePaketFuerServer(dbService, server.id);
             const roh = paketZeile
                 ? (typeof paketZeile.paket_json === 'string'
                     ? JSON.parse(paketZeile.paket_json) : paketZeile.paket_json)

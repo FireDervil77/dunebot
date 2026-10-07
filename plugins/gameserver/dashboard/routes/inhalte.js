@@ -24,7 +24,7 @@ const router = express.Router();
 const { ServiceManager } = require('dunebot-core');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 const { nimmDatei } = require('../helpers/DateiAnnahme');
-const { ladePaketFuerAddon } = require('../helpers/StartPayload');
+const { ladePaketFuerServer, ladePaketFuerAnlegen } = require('../helpers/StartPayload');
 const { loeseInhaltAuf } = require('../helpers/InhaltJeLader');
 const Inhalte = require('../helpers/Inhalte');
 const InhalteHolen = require('../helpers/InhalteHolen');
@@ -47,7 +47,7 @@ async function ladeServerUndPaket(dbService, serverId, guildId) {
     );
     if (!server) return null;
 
-    const zeile = await ladePaketFuerAddon(dbService, server.addon_marketplace_id);
+    const zeile = await ladePaketFuerServer(dbService, server.id);
     const roh = zeile
         ? (typeof zeile.paket_json === 'string' ? JSON.parse(zeile.paket_json) : zeile.paket_json)
         : null;
@@ -388,7 +388,8 @@ router.get('/mods/suche', requirePermission('GAMESERVER.CREATE'), async (req, re
     const dbService = ServiceManager.get('dbService');
 
     try {
-        const paketZeile = await ladePaketFuerAddon(dbService, parseInt(req.query.addon_id, 10));
+        // Die Modsuche beim ANLEGEN — dieselbe Fassung, mit der der Server entstünde.
+        const paketZeile = await ladePaketFuerAnlegen(dbService, parseInt(req.query.addon_id, 10), res.locals.guildId);
         const roh = paketZeile
             ? (typeof paketZeile.paket_json === 'string'
                 ? JSON.parse(paketZeile.paket_json) : paketZeile.paket_json)

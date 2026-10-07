@@ -26,7 +26,7 @@
  * ── Was dieser Wächter prüft ─────────────────────────────────────────────────
  *
  *  1. Jedes Paket hat einen Ankersatz, und zwar mit DERSELBEN Kennung
- *     (`packages.id = addon_marketplace.id`) — sonst findet `ladePaketFuerAddon`
+ *     (`packages.id = addon_marketplace.id`) — sonst findet `ladePaketFuerAnlegen`
  *     das Paket nicht, obwohl beide Zeilen da sind.
  *  2. `game_data` des Ankers ist lesbar (die Spalte ist NOT NULL, aber ein
  *     kaputter Text darin bricht Schritt 3).
@@ -85,7 +85,7 @@ const skip = (was, warum) => { uebersprungen++; console.log(`  ⏭  ${was} — $
     // Die Kennung des Pakets übernehmen, nicht eine neue vergeben.
     pruefe(/SELECT id FROM packages WHERE slug = \?/.test(lief),
         'er übernimmt die Kennung des vorhandenen Pakets',
-        '`ladePaketFuerAddon` sucht ueber `packages.id = addon_marketplace.id`. Eine neue'
+        '`ladePaketFuerAnlegen` sucht ueber `packages.id = addon_marketplace.id`. Eine neue'
       + ' Nummer waere ein zweiter Anker daneben.');
     pruefe(/author_user_id/.test(lief) && /ORDER BY COUNT\(\*\) DESC LIMIT 1/.test(lief),
         'und rät den Autor nicht, sondern nimmt den des Hauses');
@@ -258,7 +258,7 @@ const skip = (was, warum) => { uebersprungen++; console.log(`  ⏭  ${was} — $
                 if (p.anker_id === null) continue;
                 pruefe(Number(p.anker_id) === Number(p.id),
                     `${p.slug}: Anker und Paket tragen dieselbe Kennung`,
-                    `Anker ${p.anker_id}, Paket ${p.id} — \`ladePaketFuerAddon\` sucht das Paket `
+                    `Anker ${p.anker_id}, Paket ${p.id} — \`ladePaketFuerAnlegen\` sucht das Paket `
                   + 'ueber die Anker-Kennung und findet nichts.');
                 let lesbar = true;
                 try { if (typeof p.game_data === 'string') JSON.parse(p.game_data); }

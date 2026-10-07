@@ -69,7 +69,10 @@ const db = {
             return [{ id: 186, name: 'Bude', guild_id: 'g1', rootserver_id: 55,
                       install_path: '186-valheim', addon_marketplace_id: 173, status: this.serverStatus || 'online' }];
         }
-        if (/FROM packages pk/.test(sql)) {
+        // Zwei Fragen seit dem 2026-10-07 (Baustelle 172): das Paket eines
+        // bestehenden Servers (über gameservers, nach seinem Kanal) und das Paket
+        // beim Anlegen (über packages) — die Modsuche stellt die zweite.
+        if (/FROM gameservers gs\s+JOIN packages pk/.test(sql) || /FROM packages pk\s+LEFT JOIN package_versions pv/.test(sql)) {
             return [{ paket_slug: 'valheim', paket_version: '1.0.10', paket_channel: 'test',
                       paket_json: JSON.stringify({ identity: { slug: 'valheim' }, content: INHALT }) }];
         }

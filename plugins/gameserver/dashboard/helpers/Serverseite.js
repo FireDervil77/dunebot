@@ -33,6 +33,7 @@
  */
 
 const { lesePortzwecke } = require('./Portvergabe');
+const { istKontrollGuild } = require('./Paketfassung');
 
 /** Höhenstufen (B.7): wer welche Einstellungen zu sehen bekommt. */
 const HOEHE = {
@@ -121,6 +122,7 @@ function baueUebersicht(server, paket, zusatz = {}) {
         befehle:       baueBefehle(paket),
         ports:         bauePorts(server, paket),
         paket:         bauePaketkarte(server, paket, zusatz.paketZeile),
+        kanal:         baueKanal(server, paket),
         bereitschaft:  baueBereitschaft(paket, server),
         // Der ANFANGSZUSTAND der Knopfzeile — gerechnet mit derselben Funktion,
         // die der Browser danach benutzt (Baustelle 134).
@@ -889,12 +891,34 @@ function bauePorts(server, paket) {
  * niemanden eine Auskunft, der einen Server bloss betreibt. Für den, der einen
  * Fehler sucht, ist er die wichtigste Zeile der Seite.
  */
+/**
+ * Der Kanal, dem der Server folgt (Baustelle 172, 2026-10-07).
+ *
+ *   stable  die neueste freigegebene Fassung
+ *   test    die neueste Fassung überhaupt — nur in der Guild des Betreibers wählbar
+ *
+ * `ohneFassung`: Der Server folgt `stable`, und für sein Spiel ist nichts
+ * freigegeben. Dann hat er kein Paket und startet nicht — die Seite sagt das
+ * oben, statt mit leeren Karten dazustehen. Entsteht nur, wenn eine Freigabe
+ * zurückgenommen wird.
+ */
+function baueKanal(server, paket) {
+    const kanal = server.channel === 'test' ? 'test' : (server.channel === 'stable' ? 'stable' : null);
+    if (!kanal) return null;   // Zeile ohne die Spalte (vor der Migration, Tests): nichts behaupten
+    return {
+        kanal,
+        waehlbar: istKontrollGuild(server.guild_id),
+        ohneFassung: !paket && kanal === 'stable',
+    };
+}
+
 function bauePaketkarte(server, paket, zeile) {
     if (!paket) return null;
     const img = paket.image || {};
     return {
         slug:    paket.identity?.slug || null,
         version: paket.identity?.version || null,
+        // Ob DIESE Fassung freigegeben ist — der Kanal des Servers steht in `u.kanal`.
         kanal:   zeile?.paket_channel || null,
         image:   img.ref ? (img.tag ? img.ref + ':' + img.tag : img.ref) : null,
         digest:  img.digest || null,
@@ -1237,9 +1261,11 @@ function baueBereitschaftAuskunft(paket, s) {
     };
 }
 
-function baueServerListe(zeilen, paketNachAddon = {}) {
+function baueServerListe(zeilen, paketNachServer = {}) {
     const liste = (zeilen || []).map((s) => {
-        const paket = paketNachAddon[s.addon_marketplace_id] || null;
+        // Nach SERVER, nicht nach Spiel: Zwei Server desselben Spiels können
+        // verschiedenen Kanälen folgen und damit verschiedene Fassungen haben.
+        const paket = paketNachServer[s.id] || null;
         const zustand = baueZustand(s);
 
         const gefragt = s.current_players !== null && s.current_players !== undefined;

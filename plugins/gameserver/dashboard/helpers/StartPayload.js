@@ -30,6 +30,7 @@
 
 const crypto = require('crypto');
 const { loeseInhaltAuf } = require('./InhaltJeLader');
+const { FASSUNG_FUER_SERVER, ladePaketFuerServer, ladePaketFuerAnlegen } = require('./Paketfassung');
 
 /**
  * Die Image-Adresse aus dem Paket — gepinnt, wenn möglich.
@@ -199,6 +200,17 @@ async function buildStartPayload(server, guildId, Logger = null) {
     const paket = loeseInhaltAuf(parseJson(server.paket_json, null),
         parseJson(server.paket_werte, {}) || {});
     if (!paket) {
+        // Ein Server auf `stable`, dessen Spiel keine freigegebene Fassung hat,
+        // bekommt keine — und das wird gesagt, statt still eine Testfassung zu
+        // starten (Paketfassung.js). Entsteht, wenn eine Freigabe zurückgenommen
+        // wird; beim Anlegen kann es nicht passieren.
+        if (server.paket_slug && server.channel === 'stable') {
+            return {
+                payload: null, dockerImage: null,
+                error: `Kein Start: Für „${server.paket_slug}" ist keine Fassung freigegeben, und dieser Server `
+                     + 'folgt dem Kanal „stable". Gib im Adminbereich eine Fassung frei.',
+            };
+        }
         return {
             payload: null, dockerImage: null,
             error: `Server ${serverId} hat kein Spielpaket — ohne Paket gibt es keinen Start.`,
@@ -423,7 +435,8 @@ async function loadServerForStart(dbService, serverId, guildId = null) {
     // (siehe scripts/liefere-pakete.js). Ab dem Tabellenschnitt (E-1) trägt
     // `gameservers` stattdessen `package_slug` und `channel`.
     //
-    // Welche Fassung: `stable` schlägt `test`, danach die neueste.
+    // Welche Fassung: die des Kanals, dem der Server folgt (`gs.channel`) —
+    // die Regel steht in Paketfassung.js, nur dort.
     const [row] = await dbService.query(`
         SELECT gs.*,
                r.daemon_id, r.id AS rootserver_id, r.system_user,
@@ -435,54 +448,26 @@ async function loadServerForStart(dbService, serverId, guildId = null) {
         LEFT JOIN rootserver r ON gs.rootserver_id = r.id
         LEFT JOIN addon_marketplace am ON gs.addon_marketplace_id = am.id
         LEFT JOIN packages pk ON pk.id = gs.addon_marketplace_id
-        LEFT JOIN package_versions pv ON pv.id = (
-            SELECT v.id FROM package_versions v
-             WHERE v.package_id = pk.id
-             ORDER BY (v.channel = 'stable') DESC, v.published_at DESC, v.id DESC
-             LIMIT 1
-        )
+        LEFT JOIN package_versions pv ON pv.id = ${FASSUNG_FUER_SERVER}
         WHERE ${where}
     `, params);
     return row || null;
 }
 
-/**
- * Lädt das Spielpaket zu einem Addon — für das ANLEGEN eines Servers.
- *
- * loadServerForStart() geht über `gs.addon_marketplace_id`; beim Anlegen gibt es
- * noch keinen Server, also über die Addon-Kennung direkt. Die Auswahlregel ist
- * bewusst dieselbe (`stable` vor allem, danach das Neueste): Ein Server soll mit
- * derselben Fassung installiert werden, mit der er später startet.
- *
- * Kein Paket heisst: kein Server. Der Aufrufer weist ab — bis zum 2026-09-10
- * installierte der Daemon dann über den Egg-Weg weiter.
- *
- * @param {object} dbService
- * @param {number} addonId  addon_marketplace.id (= packages.id)
- * @returns {Promise<object|null>} { paket_slug, paket_version, paket_channel, paket_checksum, paket_json }
- */
-async function ladePaketFuerAddon(dbService, addonId) {
-    if (!addonId) return null;
-    const [row] = await dbService.query(`
-        SELECT pk.slug AS paket_slug,
-               pv.fbpkg AS paket_json, pv.version AS paket_version,
-               pv.channel AS paket_channel, pv.checksum AS paket_checksum
-        FROM packages pk
-        LEFT JOIN package_versions pv ON pv.id = (
-            SELECT v.id FROM package_versions v
-             WHERE v.package_id = pk.id
-             ORDER BY (v.channel = 'stable') DESC, v.published_at DESC, v.id DESC
-             LIMIT 1
-        )
-        WHERE pk.id = ?
-    `, [addonId]);
-    if (!row || !row.paket_json) return null;
-    return row;
-}
+// `ladePaketFuerAddon(addonId)` stand hier bis zum 2026-10-07. Es kannte weder
+// den Server noch die Guild und konnte deshalb nur „stable zuerst, sonst die
+// neueste" — für beide Fälle dieselbe Antwort. Seit ein Server einem Kanal
+// folgt, sind es zwei Fragen (Paketfassung.js):
+//
+//   ladePaketFuerServer(dbService, serverId)            ein bestehender Server
+//   ladePaketFuerAnlegen(dbService, addonId, guildId)   ein Server, der entsteht
+//
+// Die alte Funktion gibt es absichtlich nicht mehr: Ein Aufrufer, der sie
+// weiter benutzte, bekäme still die alte Regel.
 
 module.exports = {
     buildStartPayload, baueInstallNutzlast, paketWerteAnlegen, autoUpdateAus, istWahr,
-    loadServerForStart, ladePaketFuerAddon, imageAusPaket,
+    loadServerForStart, ladePaketFuerServer, ladePaketFuerAnlegen, imageAusPaket,
     // Nur fuer scripts/check-startpayload.js: Die Regel, welcher Wert beim
     // Start gilt, ist zu teuer erkauft, um sie nur indirekt zu pruefen.
     werteFuerDaemon,

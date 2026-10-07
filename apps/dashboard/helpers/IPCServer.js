@@ -583,19 +583,21 @@ class IPCServer {
                     );
                     if (!addon) return message.reply({ success: false, error: `Spiel \`${addon_slug}\` nicht gefunden` });
 
-                    const { ladePaketFuerAddon, paketWerteAnlegen, autoUpdateAus,
+                    const { ladePaketFuerAnlegen, paketWerteAnlegen, autoUpdateAus,
                             loadServerForStart, baueInstallNutzlast } =
                         require('../../../plugins/gameserver/dashboard/helpers/StartPayload');
                     const { vergibPortsAusPaket } =
                         require('../../../plugins/gameserver/dashboard/helpers/Portvergabe');
 
-                    const pz = await ladePaketFuerAddon(dbService, addon.id);
+                    // Dieselbe Regel wie im Dashboard (Paketfassung.js): freigegebene
+                    // Fassung, ein Entwurf nur in der Guild des Betreibers.
+                    const pz = await ladePaketFuerAnlegen(dbService, addon.id, guildId);
                     const paket = pz
                         ? (typeof pz.paket_json === 'string' ? JSON.parse(pz.paket_json) : pz.paket_json)
                         : null;
                     if (!paket) {
                         return message.reply({ success: false,
-                            error: `Für \`${addon_slug}\` gibt es kein Spielpaket — ohne Paket lässt sich kein Server anlegen.` });
+                            error: `Für \`${addon_slug}\` gibt es kein freigegebenes Spielpaket — ohne Paket lässt sich kein Server anlegen.` });
                     }
 
                     // Werte aus dem Discord-Modal — unter den Schlüsseln des Pakets
@@ -623,13 +625,14 @@ class IPCServer {
                                  name, install_path, ports, env_variables, paket_werte, frozen_game_data,
                                  launch_params, auto_restart, auto_update,
                                  allocated_ram_mb, allocated_cpu_percent, allocated_disk_gb,
-                                 addon_version, status, created_at)
-                             VALUES (?, ?, ?, ?, ?, ?, 'temp', ?, '{}', ?, '{}', NULL, 0, ?, NULL, NULL, NULL, ?, 'installing', NOW())`,
+                                 addon_version, channel, status, created_at)
+                             VALUES (?, ?, ?, ?, ?, ?, 'temp', ?, '{}', ?, '{}', NULL, 0, ?, NULL, NULL, NULL, ?, ?, 'installing', NOW())`,
                             [guildId, owner_user_id || '0', rootserverId, addon.id,
                              paket.identity?.name || addon.name, server_name,
                              JSON.stringify(vergabe.ports), JSON.stringify(paketWerte),
                              autoUpdateAus(paket, paketWerte) ? 1 : 0,
-                             paket.identity?.version || addon.version || '1.0.0']
+                             paket.identity?.version || addon.version || '1.0.0',
+                             pz.kanal]
                         );
                         newServerId = result.insertId;
                     } catch (err) {
@@ -1070,11 +1073,17 @@ class IPCServer {
 
                 // ── Addon-Liste (für Server-Erstellung per Autocomplete) ────────────────
                 case 'ADDON_LIST': {
-                    const rows = await dbService.query(
+                    const alle = await dbService.query(
                         `SELECT id, name, slug, category, version
                          FROM addon_marketplace WHERE status = 'approved'
                          ORDER BY name ASC LIMIT 100`
                     );
+                    // Nur was diese Guild auch anlegen darf (Baustelle 172): Spiele mit
+                    // freigegebenem Paket — in der Guild des Betreibers auch Entwürfe.
+                    // Vorher stand hier jedes Spiel, und SERVER_CREATE lehnte danach ab.
+                    const { ladePaketeFuerAnlegen } = require('../../../plugins/gameserver/dashboard/helpers/Paketfassung');
+                    const erlaubt = new Set((await ladePaketeFuerAnlegen(dbService, payload.guild_id)).map(z => z.id));
+                    const rows = alle.filter(a => erlaubt.has(a.id));
                     return message.reply({ success: true, data: rows });
                 }
 
@@ -1096,8 +1105,8 @@ class IPCServer {
                     );
                     if (!addon) return message.reply({ success: false, error: `Spiel \`${addon_slug}\` nicht gefunden` });
 
-                    const { ladePaketFuerAddon, istWahr } = require('../../../plugins/gameserver/dashboard/helpers/StartPayload');
-                    const pz = await ladePaketFuerAddon(dbService, addon.id);
+                    const { ladePaketFuerAnlegen, istWahr } = require('../../../plugins/gameserver/dashboard/helpers/StartPayload');
+                    const pz = await ladePaketFuerAnlegen(dbService, addon.id, payload.guild_id);
                     const paket = pz
                         ? (typeof pz.paket_json === 'string' ? JSON.parse(pz.paket_json) : pz.paket_json)
                         : null;

@@ -28,7 +28,7 @@
 'use strict';
 
 const path = require('path');
-const { ladePaketFuerAddon } = require('./StartPayload');
+const { ladePaketFuerServer } = require('./StartPayload');
 
 /** Pfad aus einer Anfrage → Teile ab der Volume-Wurzel; `null`, wenn er hinausführt. */
 function pfadTeile(pfad) {
@@ -67,12 +67,12 @@ function gesperrt(pfad, liste) {
 
 /**
  * Die Sperrliste des Servers — aus derselben Paketfassung, mit der er startet
- * (`ladePaketFuerAddon`, wie `buildStartPayload`). Ohne Paket: keine Liste.
+ * (`ladePaketFuerServer`, wie `buildStartPayload`). Ohne Paket: keine Liste.
  * Ein Fehler beim Laden geht weiter nach oben: lieber eine Fehlermeldung als
  * ein Dateimanager, der still alles freigibt.
  */
 async function ladeSperrliste(dbService, server) {
-    const eintrag = await ladePaketFuerAddon(dbService, server.addon_marketplace_id);
+    const eintrag = await ladePaketFuerServer(dbService, server.id);
     if (!eintrag) return [];
     const paket = typeof eintrag.paket_json === 'string' ? JSON.parse(eintrag.paket_json) : eintrag.paket_json;
     const liste = paket?.files?.denylist;
