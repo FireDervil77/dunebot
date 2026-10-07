@@ -19,6 +19,34 @@
 
 const crypto = require('crypto');
 const { ServiceManager } = require('dunebot-core');
+const Paketfassung = require('../../../gameserver/dashboard/helpers/Paketfassung');
+
+// ── Durchreichen (2026-10-07) ───────────────────────────────────────────────
+//
+// Die fünf Bestandspakete (Valheim, Minecraft, Astro Colony, Factorio) tragen
+// Teile, für die die Werkbank keine Karte hat: Abfrage und Fernsteuerung
+// (`management`), Mod-Verwaltung (`content`), Befehle, Sperrliste, feste Zeilen
+// in Dateien, Konsolenfilter, Systempakete. Eine Sitzung „Valheim", als
+// `valheim` veröffentlicht, hätte das volle Paket durch ein abgespecktes
+// ersetzt.
+//
+// Betreiber (2026-10-07): *„die werkbank muss genau das liefern können … wenn
+// das fehlt muss es rein"* — und als Weg: **erst durchreichen, dann Karte für
+// Karte.** Durchreichen heisst: Öffnet die Werkbank ein fertiges Paket, nimmt
+// sie diese Teile UNVERÄNDERT mit (`entwurf.durchgereicht`), zeigt sie und
+// liefert sie wieder ein. Bekommt ein Teil seine Karte, verlässt er diese Liste.
+//
+// Dieselbe Haltung wie bei den Startzeilen: Was sich nicht ausdrücken lässt,
+// wird nie still umgebaut oder verworfen.
+const DURCHGEREICHT = ['management', 'content', 'commands', 'files', 'config', 'console', 'requirements'];
+/** Vom `install`-Block trägt die Werkbank nur `steps` selbst; der Rest reist mit. */
+const INSTALL_DURCHGEREICHT = ['cache', 'entfernen'];
+
+// Ein Schritt gehört zum Entwurf, wenn er in dieser Sitzung gelaufen ist (`ok`)
+// oder aus einem geöffneten Paket stammt (`uebernommen` — dort hat er sich
+// längst bewährt, im Volume DIESER Sitzung lief er noch nicht).
+const IM_ENTWURF = ['ok', 'uebernommen'];
+const imEntwurf = (s) => IM_ENTWURF.includes(s.status);
 
 /** Dieselbe Regel wie `reSitzung` im Daemon (internal/gameserver/werkbank.go). */
 const RE_KENNUNG = /^[a-z0-9][a-z0-9-]{0,62}$/;
@@ -155,7 +183,7 @@ async function maschinen(guildId) {
 async function liste(guildId) {
     return db().query(`
         SELECT s.id, s.kennung, s.name, s.rootserver_id, s.status, s.created_at, s.updated_at,
-               (SELECT COUNT(*) FROM werkbank_schritte x WHERE x.sitzung_id = s.id AND x.status = 'ok') AS schritte_ok,
+               (SELECT COUNT(*) FROM werkbank_schritte x WHERE x.sitzung_id = s.id AND x.status IN ('ok', 'uebernommen')) AS schritte_ok,
                (SELECT COUNT(*) FROM werkbank_schritte x WHERE x.sitzung_id = s.id AND x.status = 'laeuft') AS laeuft
           FROM werkbank_sitzungen s
          WHERE s.guild_id = ? AND s.status = 'offen'
@@ -300,7 +328,7 @@ async function laufenderSchritt(kennung) {
  */
 async function herausnehmen(sitzung, schrittId) {
     await db().query(
-        "UPDATE werkbank_schritte SET status = 'herausgenommen' WHERE id = ? AND sitzung_id = ? AND status IN ('ok','fehler')",
+        "UPDATE werkbank_schritte SET status = 'herausgenommen' WHERE id = ? AND sitzung_id = ? AND status IN ('ok','fehler','uebernommen')",
         [schrittId, sitzung.id]);
 }
 
@@ -327,11 +355,15 @@ function entwurfAlsPaket(sitzung, liste) {
         identity: { slug: '', version: '0.1.0', ...(e.identity || {}) },
         image: sitzungsImage(sitzung),
         ports: e.ports || [],
-        install: { steps: liste.filter(s => s.status === 'ok').map(s => s.schritt) },
+        install: { steps: liste.filter(imEntwurf).map(s => s.schritt) },
     };
+    // Durchgereichtes aus einem geöffneten Paket: unverändert zurück ins Paket.
+    const d = e.durchgereicht || {};
+    for (const k of INSTALL_DURCHGEREICHT) if (d.install && d.install[k] !== undefined) paket.install[k] = d.install[k];
+    for (const k of DURCHGEREICHT) if (d[k] !== undefined) paket[k] = d[k];
     if (e.start) paket.start = e.start;
     const settings = Array.isArray(e.settings) ? e.settings : [];
-    const env = { ...(e.env || {}), ...umgebungAusEinstellungen(settings, e.env || {}) };
+    const env = { ...(e.env || {}), ...umgebungAusEinstellungen(settings, e.env || {}, uebernommeneZiele(sitzung)) };
     if (Object.keys(env).length) paket.env = env;
     if (settings.length) paket.settings = settings;
     // Hinweise sind Text für Menschen — sie reisen mit, zählen aber nicht zum
@@ -392,6 +424,242 @@ async function hinweisEntfernen(sitzung, key) {
     });
 }
 
+// Welche Felder die Formulare der Werkbank selbst schreiben. Alles andere an
+// demselben Gegenstand gehört einem geöffneten Paket und bleibt beim Speichern
+// stehen (`behalteUnbekanntes`).
+const START_FELDER = ['program', 'workdir', 'args', 'stop', 'ready_when'];
+const BEREIT_FELDER = ['port', 'log_line', 'without_port', 'timeout_sec'];
+const EINSTELLUNG_FELDER = ['key', 'group', 'name', 'description', 'type', 'default', 'min', 'max',
+    'choices', 'apply', 'takes_effect', 'risk', 'role', 'required'];
+
+/**
+ * `neu` ersetzt in `vorher` genau die Felder, die das Formular kennt — ein
+ * bekanntes Feld, das `neu` nicht mehr trägt, ist damit weg (geleert). Jedes
+ * andere Feld von `vorher` bleibt.
+ */
+function behalteUnbekanntes(vorher, neu, bekannt) {
+    const aus = {};
+    for (const [k, v] of Object.entries(vorher || {})) if (!bekannt.includes(k)) aus[k] = v;
+    return { ...aus, ...(neu || {}) };
+}
+
+/**
+ * Die Ziele der Einstellungen, wie sie im geöffneten Paket standen: Schlüssel →
+ * Liste der Ziele als stabiler Text. Leer bei einer Sitzung, die nichts geöffnet hat.
+ */
+function uebernommeneZiele(sitzung) {
+    return sitzung?.entwurf?.werkbank?.geoeffnet?.ziele || {};
+}
+
+/** Stand genau dieses Ziel unter diesem Schlüssel schon im geöffneten Paket? */
+function istUebernommen(uebernommen, key, ziel) {
+    const liste = uebernommen?.[key];
+    return Array.isArray(liste) && liste.includes(stabil(ziel));
+}
+
+/** Aus einem Paket: Schlüssel → seine Ziele als stabiler Text (für `geoeffnet.ziele`). */
+function zieleAusPaket(paket) {
+    const aus = {};
+    // Auch Einstellungen OHNE Ziel stehen drin (leere Liste): Minecrafts `loader`
+    // wirkt über Bedingungen der Startzeile, `modpack` verwaltet die Mod-Karte.
+    for (const s of paket?.settings || []) aus[s.key] = (Array.isArray(s.apply) ? s.apply : []).map(stabil);
+    return aus;
+}
+
+/** Der Startteil aus dem Formular, über den vorhandenen gelegt — Unbekanntes bleibt. */
+function mischeStart(vorher, neu) {
+    const bereitVorher = vorher?.ready_when;
+    const aus = behalteUnbekanntes(vorher, neu, START_FELDER);
+    if (neu?.ready_when || bereitVorher) {
+        aus.ready_when = behalteUnbekanntes(bereitVorher, neu?.ready_when || {}, BEREIT_FELDER);
+        if (!Object.keys(aus.ready_when).length) delete aus.ready_when;
+    }
+    return aus;
+}
+
+/**
+ * Eine Einstellung aus dem Formular, über die vorhandene gelegt. Unbekannte
+ * Felder bleiben — auch an den Auswahlmöglichkeiten: Der Typ eines Werts (Zahl,
+ * Wahrheitswert), der englische Name und ein Hinweistext gehören dem Paket, das
+ * Formular kennt davon nur Wert und deutschen Namen.
+ */
+function mischeEinstellung(vorher, neu) {
+    const aus = behalteUnbekanntes(vorher, neu, EINSTELLUNG_FELDER);
+    // Zwei Dinge, die das Formular nicht unterscheiden kann und die das Paket
+    // unterscheidet (gemessen an den Bestandspaketen, 2026-10-07):
+    //
+    //   - Eine LEERE Vorgabe (`""`, `null`) ist ein Wert — Valheims `beta_branch`
+    //     heisst mit "" „kein Beta-Zweig". Ein leeres Feld im Formular heisst
+    //     dagegen „keine Vorgabe" und liesse sie verschwinden; der Start schickte
+    //     die Einstellung dann gar nicht mehr.
+    //   - Kein `risk` und `risk: none` sind dasselbe; das Formular schreibt immer eins.
+    if (vorher && aus.default === undefined && (vorher.default === '' || vorher.default === null)) aus.default = vorher.default;
+    if (vorher && vorher.risk === undefined && aus.risk === 'none') delete aus.risk;
+    if (Array.isArray(aus.choices) && Array.isArray(vorher?.choices)) {
+        aus.choices = aus.choices.map((c) => {
+            const alt = vorher.choices.find(v => String(v.value) === String(c.value));
+            if (!alt) return c;
+            const name = (c.name || alt.name) ? { ...(alt.name || {}), ...(c.name || {}) } : undefined;
+            return { ...alt, ...c, value: alt.value, ...(name ? { name } : {}) };
+        });
+    }
+    return aus;
+}
+
+/** Die nächste Fassung nach `1.2.3` → `1.2.4` — der Vorschlag beim Öffnen. */
+function naechsteFassung(version) {
+    const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(String(version || ''));
+    return m ? `${m[1]}.${m[2]}.${Number(m[3]) + 1}` : '1.0.0';
+}
+
+/**
+ * Ein fertiges Paket in einen Entwurf zerlegen — die Gegenrichtung von
+ * `entwurfAlsPaket`. Reine Funktion; `paketOeffnen` legt daraus die Sitzung an.
+ *
+ * Die Probe, an der das hängt (`scripts/check-werkbank-oeffnen.js`): Jedes
+ * eingelieferte Paket, so zerlegt und wieder zusammengesetzt, ergibt in seinem
+ * technischen Teil DASSELBE Paket. Was diese Funktion nicht kennt, landet in
+ * `rest` und hält das Öffnen an — lieber kein Öffnen als ein stiller Verlust.
+ *
+ * @returns {{entwurf: object, image: object, schritte: object[], rest: string[]}}
+ */
+function entwurfAusPaket(paket) {
+    const p = paket || {};
+    const id = p.identity || {};
+    const entwurf = {
+        identity: {
+            ...(id.slug ? { slug: id.slug } : {}),
+            name: id.name || id.slug || '',
+            version: naechsteFassung(id.version),
+            ...(id.description ? { description: id.description } : {}),
+            ...(id.category ? { category: id.category } : {}),
+        },
+        ports: Array.isArray(p.ports) ? p.ports : [],
+    };
+    if (p.start) entwurf.start = p.start;
+    if (p.env && Object.keys(p.env).length) entwurf.env = p.env;
+    if (Array.isArray(p.settings) && p.settings.length) entwurf.settings = p.settings;
+    if (Array.isArray(p.hints) && p.hints.length) entwurf.hints = p.hints;
+
+    const d = {};
+    for (const k of DURCHGEREICHT) if (p[k] !== undefined) d[k] = p[k];
+    const inst = {};
+    for (const k of INSTALL_DURCHGEREICHT) if (p.install && p.install[k] !== undefined) inst[k] = p.install[k];
+    if (Object.keys(inst).length) d.install = inst;
+    if (Object.keys(d).length) entwurf.durchgereicht = d;
+
+    // Alles, wofür es weder eine Karte noch einen Platz im Durchgereichten gibt.
+    const bekannt = ['format', 'identity', 'image', 'ports', 'install', 'start', 'env', 'settings', 'hints', 'status', ...DURCHGEREICHT];
+    const rest = Object.keys(p).filter(k => !bekannt.includes(k));
+    for (const k of Object.keys(p.install || {})) {
+        if (k !== 'steps' && !INSTALL_DURCHGEREICHT.includes(k)) rest.push(`install.${k}`);
+    }
+    return {
+        entwurf,
+        image: { ref: p.image?.ref, tag: p.image?.tag },
+        schritte: Array.isArray(p.install?.steps) ? p.install.steps : [],
+        rest,
+    };
+}
+
+/**
+ * Ein fertiges Paket als Sitzung öffnen (S3, 2026-10-07).
+ *
+ * Geöffnet wird die NEUESTE Fassung — der Arbeitsstand, den auch ein Server auf
+ * `test` bekommt. Die Schritte kommen als `uebernommen` in die Liste: Sie
+ * gehören zum Entwurf, sind im Volume dieser Sitzung aber noch nicht gelaufen
+ * (der Prüfdurchlauf fährt sie ohnehin auf einem leeren Volume). Symbol und
+ * Banner des Spiels gehen mit, damit das nächste Veröffentlichen sie nicht leert.
+ */
+async function paketOeffnen({ guildId, userId, paketId, rootserverId }) {
+    const zeile = await Paketfassung.ladeNeuesteFassung(db(), { paketId });
+    if (!zeile) throw new Error('Dieses Paket gibt es nicht.');
+    const paket = json(zeile.fbpkg, null);
+    if (!paket) throw new Error(`Das Paket „${zeile.slug}" ${zeile.version} lässt sich nicht lesen.`);
+
+    const { entwurf, image, schritte: stufen, rest } = entwurfAusPaket(paket);
+    if (rest.length) {
+        throw new Error(`„${zeile.slug}" trägt Teile, die die Werkbank weder bearbeiten noch durchreichen kann: ${rest.join(', ')}. `
+            + 'Geöffnet wird erst, wenn nichts davon verloren ginge.');
+    }
+    const erlaubt = await waehlbareImages();
+    const img = erlaubt.find(i => i.ref === image.ref && i.tag === image.tag);
+    if (!img) throw new Error(`Das Image des Pakets (${image.ref}:${image.tag}) ist nicht wählbar.`);
+    const maschine = (await maschinen(guildId)).find(m => String(m.id) === String(rootserverId));
+    if (!maschine) throw new Error('Diese Maschine gehört nicht zu dieser Guild.');
+
+    const [anker] = await db().query('SELECT icon_url, banner_url FROM addon_marketplace WHERE id = ?', [zeile.paket_id]);
+    entwurf.werkbank = {
+        // Vorläufige Nummern, damit der Prüfdurchlauf ohne vorherigen Probestart
+        // laufen kann — eine frische Sitzung bekommt ihre aus der Beobachtung.
+        portnummern: vorlaeufigePortnummern(entwurf.ports),
+        geoeffnet: {
+            slug: zeile.slug, version: zeile.version, paket_id: zeile.paket_id, am: new Date().toISOString(),
+            // Woran später erkannt wird, was unverändert mitreist (siehe belegteEinstellungen).
+            ziele: zieleAusPaket(paket),
+        },
+        praesentation: { icon_url: anker?.icon_url || '', banner_url: anker?.banner_url || '' },
+    };
+
+    const kennung = neueKennung();
+    const name = String(paket.identity?.name || zeile.slug).slice(0, 100);
+    const r = await db().query(
+        `INSERT INTO werkbank_sitzungen (kennung, guild_id, angelegt_von, name, rootserver_id, image, entwurf)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [kennung, guildId, userId || null, name, maschine.id, JSON.stringify(img), JSON.stringify(entwurf)]);
+    let nr = 0;
+    for (const schritt of stufen) {
+        nr++;
+        await db().query(
+            `INSERT INTO werkbank_schritte (sitzung_id, nr, schritt, status, ausgabe, beendet_am)
+             VALUES (?, ?, ?, 'uebernommen', ?, NOW())`,
+            [r.insertId, nr, JSON.stringify(schritt),
+             `Aus ${zeile.slug} ${zeile.version} übernommen — in dieser Sitzung noch nicht gelaufen.\n`]);
+    }
+    return { kennung, slug: zeile.slug, version: zeile.version, schritte: nr, durchgereicht: Object.keys(entwurf.durchgereicht || {}) };
+}
+
+/**
+ * Portnummern für eine Sitzung, die ein Paket geöffnet hat: je Pool-Port eine
+ * eigene, gekoppelte (`game+1`) daneben. Im Container der Werkbank ist jede
+ * Nummer frei — nach aussen wird dort nichts veröffentlicht.
+ */
+function vorlaeufigePortnummern(ports) {
+    const nr = {};
+    let naechste = 28000;
+    for (const p of ports || []) {
+        if (!p.assign || p.assign === 'pool') { nr[p.purpose] = naechste; naechste += 10; }
+    }
+    for (const p of ports || []) {
+        const m = /^([a-z][a-z0-9_]*)\+(\d+)$/.exec(p.assign || '');
+        if (m && nr[m[1]] !== undefined) nr[p.purpose] = nr[m[1]] + Number(m[2]);
+    }
+    return nr;
+}
+
+/** Die Pakete, die sich öffnen lassen — je mit ihrer neuesten Fassung. */
+async function oeffenbarePakete() {
+    return Paketfassung.ladeNeuesteFassungen(db());
+}
+
+/**
+ * Die durchgereichten Teile, die der DAEMON zum Laufen braucht — er kennt genau
+ * diese vier (pkgspec.Paket). Befehle, Sperrliste und Systempakete liest nur
+ * das Dashboard.
+ */
+const LAUFZEIT_TEILE = ['management', 'content', 'config', 'console'];
+function laufzeitTeile(paket) {
+    const aus = {};
+    for (const k of LAUFZEIT_TEILE) if (paket?.[k] !== undefined) aus[k] = paket[k];
+    return aus;
+}
+
+/** Was eine Sitzung unverändert mitträgt — für die Karte, die es zeigt. */
+function durchgereichtes(sitzung) {
+    const d = sitzung.entwurf?.durchgereicht || {};
+    return Object.keys(d).map(k => ({ teil: k, inhalt: d[k] }));
+}
+
 // ── Einstellungs-Baukasten (B1, 2026-09-26) ─────────────────────────────────
 //
 // Eine Einstellung wird in der Sitzung von Hand beschrieben — Schlüssel, Name,
@@ -422,11 +690,20 @@ const EINSTELLUNG = {
 const RE_SCHLUESSEL = /^[a-z][a-z0-9_]*$/;
 const RE_VARIABLE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
-/** Die Verdrahtung für `apply: env` — nur, was im Wurzelfeld noch fehlt. */
-function umgebungAusEinstellungen(settings, env) {
+/**
+ * Die Verdrahtung für `apply: env` — nur, was im Wurzelfeld noch fehlt.
+ *
+ * Ein Ziel, das unverändert aus einem geöffneten Paket stammt (`uebernommen`),
+ * wird NICHT nachträglich verdrahtet: Stand die Variable dort nicht im
+ * Wurzelfeld, soll sie es nach dem Öffnen auch nicht — Valheims `AUTO_UPDATE`
+ * liest die Installation, nicht das Spiel. Verdrahten hiesse, das Paket beim
+ * blossen Öffnen zu ändern.
+ */
+function umgebungAusEinstellungen(settings, env, uebernommen = {}) {
     const aus = {};
     for (const s of settings) {
         for (const z of s.apply || []) {
+            if (istUebernommen(uebernommen, s.key, z)) continue;
             if (z.target === 'env' && z.variable && !(z.variable in env) && !(z.variable in aus)) {
                 aus[z.variable] = `{{setting:${s.key}}}`;
             }
@@ -551,7 +828,11 @@ async function einstellungSpeichern(sitzung, formular) {
         const doppelt = liste.find(x => x.key === neu.key && x.key !== alt);
         if (doppelt) throw new Error(`Den Schlüssel „${neu.key}" gibt es schon.`);
         const i = liste.findIndex(x => x.key === (alt || neu.key));
-        if (i >= 0) liste[i] = neu; else liste.push(neu);
+        // Felder, die das Formular nicht kennt (`managed_by`, `warn_text`,
+        // `required_when` … an einer Einstellung aus einem geöffneten Paket),
+        // bleiben beim Bearbeiten stehen — ebenso an den Auswahlmöglichkeiten.
+        if (i >= 0) liste[i] = mischeEinstellung(liste[i], neu);
+        else liste.push(neu);
         e.settings = liste;
         // Der Probewert zieht beim Umbenennen mit.
         const w = e.werkbank?.werte;
@@ -688,9 +969,12 @@ async function startSpeichern(sitzung, { start, memory_mb, cpu_prozent }) {
     const mb = grenze('memory_mb', memory_mb);
     const cpu = grenze('cpu_prozent', cpu_prozent);
     return entwurfSchreiben(sitzung, (e) => {
-        // Ganz ersetzt: Das Formular trägt jedes Feld des Startteils, auch die
-        // per Klick übernommene Bereitschaftszeile (vorbelegt).
-        e.start = start;
+        // Das Formular trägt jedes Feld des Startteils, das es KENNT — auch die
+        // per Klick übernommene Bereitschaftszeile (vorbelegt). Was es nicht
+        // kennt, bleibt stehen (2026-10-07): `ready_when.query` und
+        // `extra_args` eines geöffneten Pakets gingen sonst mit dem ersten
+        // „Speichern" verloren, ohne dass jemand sie angefasst hätte.
+        e.start = mischeStart(e.start, start);
         e.werkbank = { ...(e.werkbank || {}), memory_mb: mb, cpu_prozent: cpu };
     });
 }
@@ -741,17 +1025,22 @@ async function starten(sitzung, liste) {
     const laufId = r.insertId;
     require('./Ereignisse').merkeLauf(sitzung.kennung, { laufId, guildId: sitzung.guild_id });
 
+    // Durchgereichtes aus einem geöffneten Paket geht mit (2026-10-07): Abfrage,
+    // Fernsteuerung, feste Zeilen in Dateien bestimmen, wie der Server läuft.
+    // Ohne sie startete hier ein anderes Paket als das, was eingeliefert wird.
+    const ganz = entwurfAlsPaket(sitzung, liste);
     const antwort = await daemon.senden('werkbank.starten', {
         guild_id: sitzung.guild_id,
         image: sitzungsImage(sitzung),
         start: hatBereitschaft(start) ? start : alsErkundung(start),
-        env: entwurfAlsPaket(sitzung, liste).env || {},
+        env: ganz.env || {},
+        ...laufzeitTeile(ganz),
         ports: sitzung.entwurf?.ports || [],
         portnummern: w.portnummern,
         settings: probewerte(sitzung),
         einstellungen: sitzung.entwurf?.settings || [],
         // Nur, damit der Daemon Proton erkennt wie beim echten Start.
-        install: { steps: liste.filter(s => s.status === 'ok').map(s => s.schritt) },
+        install: { steps: liste.filter(imEntwurf).map(s => s.schritt) },
         memory_mb: w.memory_mb,
         cpu_prozent: w.cpu_prozent,
     });
@@ -819,8 +1108,14 @@ async function portUebernehmen(sitzung, { zweck, protocol, port }) {
         const vorher = (e.ports || []).find(p => p.purpose === z);
         const gleicheNummer = vorher && e.werkbank?.portnummern?.[z] === n;
         const beide = gleicheNummer && vorher.protocol !== protocol ? 'both' : protocol;
-        e.ports = (e.ports || []).filter(p => p.purpose !== z);
-        e.ports.push({ purpose: z, protocol: beide, assign: 'pool' });
+        // Ein vorhandener Port behält, was er sonst trägt (Kopplung `game+1`,
+        // `needed_by`, Beschreibung) und seinen Platz in der Liste — neu ist nur
+        // das Protokoll, das die Beobachtung zeigt.
+        const liste = e.ports || [];
+        const platz = liste.findIndex(p => p.purpose === z);
+        const neu = { ...(vorher || {}), purpose: z, protocol: beide, assign: vorher?.assign || 'pool' };
+        if (platz >= 0) liste[platz] = neu; else liste.push(neu);
+        e.ports = liste;
         e.werkbank = { ...(e.werkbank || {}) };
         e.werkbank.portnummern = { ...(e.werkbank.portnummern || {}), [z]: n };
     });
@@ -873,6 +1168,10 @@ function technisch(paket) {
     // hat einen Nachweis für etwas, das es nicht mehr gibt.
     const t = { image: p.image || null, ports: p.ports || [], install: p.install || {}, start: p.start || null, env: p.env || {} };
     if (Array.isArray(p.settings) && p.settings.length) t.settings = p.settings;
+    // Durchgereichtes zählt mit — es bestimmt, wie der Server läuft (Abfrage,
+    // feste Zeilen in Dateien). Nur wenn vorhanden: Eine Sitzung ohne diese
+    // Teile behält ihren Fingerabdruck, und ihr grüner Durchlauf bleibt gültig.
+    for (const k of DURCHGEREICHT) if (p[k] !== undefined) t[k] = p[k];
     return t;
 }
 
@@ -939,6 +1238,7 @@ async function pruefen(sitzung, liste) {
     const antwort = await daemon.senden('werkbank.pruefen', {
         guild_id: sitzung.guild_id, image: sitzungsImage(sitzung),
         start: paket.start, env: paket.env || {}, ports: paket.ports,
+        ...laufzeitTeile(paket),
         portnummern: w.portnummern, install: paket.install,
         settings: probewerte(sitzung), einstellungen: paket.settings || [],
         memory_mb: w.memory_mb, cpu_prozent: w.cpu_prozent,
@@ -1046,15 +1346,33 @@ function fassungGroesser(a, b) {
  *
  * `weg` nennt je Einstellung den Grund, so wie der Daemon ihn meldete.
  */
-function belegteEinstellungen(entwurf, ergebnis) {
+function belegteEinstellungen(entwurf, ergebnis, uebernommen = {}) {
     const nachweis = Array.isArray(ergebnis?.einstellungen) ? ergebnis.einstellungen : null;
-    const belegt = (s, z) => (nachweis || []).some(n => n.key === s.key && n.ziel === z.target
+    const nachgewiesen = (s, z) => (nachweis || []).some(n => n.key === s.key && n.ziel === z.target
         && n.zustand === 'angekommen'
         && (z.target !== 'file' || n.wo === `${z.file}: ${z.path}`)
         && (z.target !== 'env' || n.wo === z.variable));
+    // Ein Ziel, das unverändert aus einem geöffneten Paket stammt, bleibt auch
+    // ohne Beleg (2026-10-07): „Ins Paket nur Nachgewiesenes" gilt für das, was
+    // in der Werkbank ENTSTEHT oder geändert wird. Ein Bestandspaket zu öffnen
+    // und wieder einzuliefern darf ihm keine Einstellung nehmen — sonst wäre
+    // Durchreichen ein Abspecken auf Raten. Wie viele so mitreisen, steht in
+    // `ohneBeleg` und im Paket unter `status.open`.
+    let ohneBeleg = 0;
+    const belegt = (s, z) => {
+        if (nachgewiesen(s, z)) return true;
+        if (istUebernommen(uebernommen, s.key, z)) { ohneBeleg++; return true; }
+        return false;
+    };
     const behalten = [];
     const weg = [];
     for (const s of entwurf?.settings || []) {
+        // Eine Einstellung, die schon im geöffneten Paket kein Ziel hatte, wirkt
+        // auf anderem Weg (Bedingung einer Startzeile, Mod-Karte). Sie bleibt.
+        if (!(s.apply || []).length && Array.isArray(uebernommen?.[s.key]) && !uebernommen[s.key].length) {
+            behalten.push(s);
+            continue;
+        }
         const ziele = (s.apply || []).filter(z => belegt(s, z));
         if (ziele.length) {
             behalten.push({ ...s, apply: ziele });
@@ -1077,7 +1395,7 @@ function belegteEinstellungen(entwurf, ergebnis) {
             delete env[name];
         }
     }
-    return { behalten, weg, env };
+    return { behalten, weg, env, ohneBeleg };
 }
 
 /** Benutzt der Entwurf außerhalb von `env` eine Einstellung (`setting:key`)? */
@@ -1113,7 +1431,7 @@ async function veroeffentlichungsStand(sitzung, liste, pruefListe) {
         // Eine Einstellung ohne Beleg fällt beim Veröffentlichen weg. Benutzt
         // die Startzeile oder ein Schritt sie trotzdem, hinge dort ein Verweis
         // ins Leere — das Paket wäre kaputt, nicht bloß kleiner.
-        for (const w of belegteEinstellungen(letzte.entwurf, letzte.ergebnis).weg) {
+        for (const w of belegteEinstellungen(letzte.entwurf, letzte.ergebnis, uebernommeneZiele(sitzung)).weg) {
             if (benutztEinstellung(letzte.entwurf, w.key)) {
                 gruende.push(`„${w.key}" wird in Startzeile oder Schritten benutzt, hat aber kein belegtes Ziel (${w.grund}).`);
             }
@@ -1129,6 +1447,20 @@ async function veroeffentlichungsStand(sitzung, liste, pruefListe) {
         for (const z of zeilen) if (!neueste || fassungGroesser(z.version, neueste)) neueste = z.version;
         if (neueste && id.version && !fassungGroesser(id.version, neueste)) {
             gruende.push(`„${id.slug}" gibt es schon bis ${neueste} — die Fassung muss höher sein.`);
+        }
+        // Unter diesem Slug liegt schon ein Paket: Was es trägt und diese Sitzung
+        // nicht, ginge mit dem Veröffentlichen verloren — beim nächsten Start
+        // jedes Servers auf `test` (2026-10-07). Das trifft eine Sitzung, die ein
+        // Bestandspaket NEU baut, statt es zu öffnen.
+        if (neueste) {
+            const vorhanden = await Paketfassung.ladeNeuesteFassung(db(), { slug: id.slug });
+            const alt = json(vorhanden?.fbpkg, null) || {};
+            const fehlt = DURCHGEREICHT.filter(k => alt[k] !== undefined && paket[k] === undefined);
+            if (fehlt.length) {
+                gruende.push(`„${id.slug}" ${vorhanden.version} trägt ${fehlt.join(', ')} — diese Sitzung nicht. `
+                    + 'Veröffentlicht ginge das verloren (Abfrage, Mods, Sperrliste …). Öffne das Paket in der Werkbank, statt es neu zu bauen, '
+                    + 'oder nimm einen eigenen Slug.');
+            }
         }
     }
     return { darf: gruende.length === 0, gruende, neueste, pruefung: letzte };
@@ -1153,7 +1485,7 @@ function veroeffentlichungsPaket(sitzung, liste, pruefung, autor) {
         ...technisch(pruefung.entwurf),
         // Nur belegte Einstellungen (B1) — die übrigen bleiben in der Sitzung.
         ...(() => {
-            const b = belegteEinstellungen(pruefung.entwurf, pruefung.ergebnis);
+            const b = belegteEinstellungen(pruefung.entwurf, pruefung.ergebnis, uebernommeneZiele(sitzung));
             const teil = { settings: b.behalten, env: b.env };
             if (!teil.settings.length) delete teil.settings;
             if (!Object.keys(teil.env).length) delete teil.env;
@@ -1176,7 +1508,7 @@ function veroeffentlichungsPaket(sitzung, liste, pruefung, autor) {
                 `Aus der Werkbank (Sitzung ${sitzung.kennung}). Prüfdurchlauf #${pruefung.id} grün am ${am} UTC: `
                     + `ganzes Rezept auf leerem Volume, bereit über den Port, Stoppfolge endete vor sigkill.`,
                 ...(() => {
-                    const b = belegteEinstellungen(pruefung.entwurf, pruefung.ergebnis);
+                    const b = belegteEinstellungen(pruefung.entwurf, pruefung.ergebnis, uebernommeneZiele(sitzung));
                     const zeilen = [];
                     if (!b.behalten.length && !b.weg.length) {
                         zeilen.push('Keine Einstellungen — der Server ist startbar, aber nicht einstellbar.');
@@ -1186,8 +1518,21 @@ function veroeffentlichungsPaket(sitzung, liste, pruefung, autor) {
                             + '(Datei per fb-init-Meldung, Startzeile/Umgebung per Gegenwert). Ob das Spiel den Wert BEACHTET, '
                             + 'ist damit nicht gezeigt.');
                     }
+                    if (b.ohneBeleg) {
+                        zeilen.push(`Davon ${b.ohneBeleg} Ziel(e) unverändert aus dem geöffneten Paket übernommen — im Durchlauf nicht belegt.`);
+                    }
                     for (const w of b.weg) zeilen.push(`Nicht aufgenommen: Einstellung „${w.key}" — ${w.grund}`);
                     return zeilen;
+                })(),
+                // Durchgereichtes steht im Paket, wie es war — die Werkbank hat es
+                // weder gebaut noch im Durchlauf einzeln belegt. Das gehört gesagt.
+                ...(() => {
+                    const teile = DURCHGEREICHT.filter(k => pruefung.entwurf?.[k] !== undefined);
+                    const von = sitzung.entwurf?.werkbank?.geoeffnet;
+                    return teile.length
+                        ? [`Unverändert übernommen${von ? ` aus ${von.slug} ${von.version}` : ''}: ${teile.join(', ')} — `
+                            + 'von Hand gepflegt, in der Werkbank nicht bearbeitet und nicht einzeln geprüft.']
+                        : [];
                 })(),
                 // Der Notausgang gehört genannt (check-pakete, BEFUND) — samt dem
                 // Grund, den die Werkbank beim Anlegen des Schritts erfragt.
@@ -1446,6 +1791,7 @@ module.exports = {
     EINSTELLUNG, einstellungAusFormular, einstellungSpeichern, einstellungEntfernen, einstellungRolleSetzen, probewertSetzen, probewerte,
     umgebungAusEinstellungen, belegteEinstellungen,
     HINWEIS, hinweisAusFormular, hinweisSpeichern, hinweisEntfernen,
+    DURCHGEREICHT, IM_ENTWURF, imEntwurf, entwurfAusPaket, paketOeffnen, durchgereichtes, naechsteFassung, behalteUnbekanntes, mischeStart, mischeEinstellung, zieleAusPaket, uebernommeneZiele, vorlaeufigePortnummern, oeffenbarePakete, LAUFZEIT_TEILE,
     werkbankTeil, ungenutztePorts, startSpeichern, startzeile, zustand, starten, stoppen, eingabe, laeufe, laufenderLauf,
     portUebernehmen, portEntfernen, bereitschaftszeile,
     laufSetzen, konsoleAnhaengen, laufBeenden, dateienJetzt, gruppiere,

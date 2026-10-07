@@ -42,6 +42,7 @@ const db = {
     pruefungen: [],          // {id, sitzung_id, status, entwurf, entwurf_hash, ergebnis, protokoll}
     pruefSchreiben: [],      // Protokoll-Stücke mit dem Status der Prüfung in dem Moment
     fassungen: {},           // slug → [version] in package_versions
+    vorhandenesPaket: {},    // slug → zusätzliche Teile der neuesten Fassung (management, content …)
     sitzung: { id: 7, kennung: 'wbprobe', guild_id: 'g1', rootserver_id: 54, image: { ref: 'r/fb/base', tag: '2026.09', digest: 'sha256:x' } },
     async query(sql, p) {
         const t = String(sql).replace(/\s+/g, ' ').trim();
@@ -145,6 +146,15 @@ const db = {
         // ── Stufe 4 ──
         if (/^SELECT pv\.version FROM package_versions pv JOIN packages p ON p\.id = pv\.package_id WHERE p\.slug = \?$/.test(t)) {
             return (this.fassungen[p[0]] || []).map(version => ({ version }));
+        }
+        // Die neueste Fassung eines Slugs (Paketfassung.ladeNeuesteFassung) — die Werkbank
+        // prüft daran, ob ein Veröffentlichen dem vorhandenen Paket etwas nähme (2026-10-07).
+        if (/^SELECT pk\.id AS paket_id, pk\.slug, v\.version, v\.channel, v\.fbpkg FROM packages pk JOIN package_versions v ON v\.package_id = pk\.id WHERE pk\.slug = \? ORDER BY v\.published_at DESC, v\.id DESC LIMIT 1$/.test(t)) {
+            const alle = this.fassungen[p[0]] || [];
+            if (!alle.length) return [];
+            const version = alle[alle.length - 1];
+            const fbpkg = { identity: { slug: p[0], version }, ...(this.vorhandenesPaket[p[0]] || {}) };
+            return [{ paket_id: 1, slug: p[0], version, channel: 'test', fbpkg: JSON.stringify(fbpkg) }];
         }
         if (/^UPDATE werkbank_sitzungen SET entwurf = \? WHERE id = \?$/.test(t)) {
             this.entwurf = JSON.parse(p[0]);
@@ -620,6 +630,13 @@ async function pruefe(name, fn) {
         db.fassungen.factorio = ['1.0.0', '1.0.10'];
         st = await Sitzungen.veroeffentlichungsStand(s, liste, [g]);
         assert.strictEqual(st.darf, true, st.gruende.join(' '));
+        // Trägt das vorhandene Paket Teile, die diese Sitzung nicht hat, ginge das mit dem
+        // Veröffentlichen verloren — abgewiesen, mit dem Rat, das Paket zu öffnen (2026-10-07).
+        db.vorhandenesPaket.factorio = { management: { rcon: { port: 'rcon' } }, files: { denylist: ['bin'] } };
+        st = await Sitzungen.veroeffentlichungsStand(s, liste, [g]);
+        assert.strictEqual(st.darf, false);
+        assert.match(st.gruende.join(' '), /trägt management, files — diese Sitzung nicht.*Öffne das Paket/);
+        db.vorhandenesPaket = {};
     });
 
     await pruefe('das gebaute Paket besteht check-pakete — dasselbe Tor wie die Kommandozeile', async () => {
@@ -757,6 +774,15 @@ async function pruefe(name, fn) {
     await pruefe('Vertrag: der Daemon liest das Feld „einstellungen" bei Start und Durchlauf', async () => {
         const go = ohneKommentare(fs.readFileSync(path.join(DAEMON, 'internal/websocket/werkbank.go'), 'utf8'));
         assert.strictEqual((go.match(/"einstellungen":\s*&a\.Einstellungen/g) || []).length, 2);
+        // Durchgereichtes aus einem geöffneten Paket (2026-10-07): Start und Durchlauf lesen
+        // dieselben vier Teile, die das Dashboard schickt — sonst prüfte der Durchlauf ein
+        // anderes Paket als das, was eingeliefert wird.
+        for (const teil of Sitzungen.LAUFZEIT_TEILE) {
+            const feld = teil.charAt(0).toUpperCase() + teil.slice(1);
+            assert.strictEqual((go.match(new RegExp(`"${teil}":\\s*&a\\.${feld}`, 'g')) || []).length, 2, `der Daemon liest „${teil}" nicht bei Start UND Durchlauf`);
+        }
+        const start = ohneKommentare(fs.readFileSync(path.join(DAEMON, 'internal/gameserver/werkbank_start.go'), 'utf8'));
+        assert.match(start, /Management:\s*a\.Management,\s*Content:\s*a\.Content,\s*Config:\s*a\.Config,\s*Console:\s*a\.Console,/, 'der Probestart baut sein Paket ohne das Durchgereichte');
         const nw = ohneKommentare(fs.readFileSync(path.join(DAEMON, 'internal/gameserver/werkbank_nachweis.go'), 'utf8'));
         assert.match(nw, /NachweisAngekommen\s*=\s*"angekommen"/, 'der Zustand, den das Dashboard als Beleg liest');
         assert.match(nw, /json:"zustand"/);

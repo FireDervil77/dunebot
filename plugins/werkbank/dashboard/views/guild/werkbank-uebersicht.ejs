@@ -107,6 +107,44 @@
         <% } %>
       </div>
     </div>
+
+    <%# Ein fertiges Paket oeffnen (Durchreichen, 2026-10-07): Die Sitzung traegt
+        dann alles, was das Paket hat — auch die Teile, fuer die es hier noch
+        keine Karte gibt. Die reisen unveraendert mit. %>
+    <% const oeffenbar = locals.pakete || []; %>
+    <div class="card mt-3">
+      <div class="card-header"><h3 class="card-title">Fertiges Paket öffnen</h3></div>
+      <div class="card-body">
+        <% if (!oeffenbar.length) { %>
+          <p class="text-secondary mb-0">Es ist noch kein Paket eingeliefert.</p>
+        <% } else if (!online.length) { %>
+          <p class="text-secondary mb-0">Keine Maschine dieser Guild ist gerade erreichbar.</p>
+        <% } else { %>
+          <form id="formOeffnen">
+            <div class="mb-3">
+              <label class="form-label" for="oeffnenPaket">Paket</label>
+              <select class="form-select" id="oeffnenPaket" name="paket_id">
+                <% oeffenbar.forEach(function (p) { %>
+                  <option value="<%= p.paket_id %>"><%= p.name || p.slug %> — <%= p.slug %> <%= p.version %></option>
+                <% }) %>
+              </select>
+              <div class="form-hint">Geöffnet wird die neueste Fassung. Was die Werkbank noch nicht bearbeiten kann (Abfrage, Fernsteuerung, Mods, Sperrliste …), nimmt sie unverändert mit.</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="oeffnenMaschine">Maschine</label>
+              <select class="form-select" id="oeffnenMaschine" name="rootserver_id">
+                <% online.forEach(function (m) { %>
+                  <option value="<%= m.id %>"><%= m.name %></option>
+                <% }) %>
+              </select>
+            </div>
+            <button class="btn btn-outline-primary w-100" type="submit">
+              <i class="fa-solid fa-folder-open me-1"></i>Als Sitzung öffnen
+            </button>
+          </form>
+        <% } %>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -135,6 +173,34 @@
     } catch (fehler) {
       knopf.disabled = false;
       if (window.showToast) window.showToast('error', 'Sitzung nicht angelegt: ' + fehler.message);
+    }
+  });
+})();
+
+// Ein fertiges Paket öffnen — eigener Block: Das Formular „Neue Sitzung" fehlt,
+// wenn kein Image wählbar ist, und der Block oben kehrt dann früh zurück.
+(function () {
+  var wurzel = document.getElementById('werkbankUebersicht');
+  var form = document.getElementById('formOeffnen');
+  if (!wurzel || !form) return;
+  var basis = wurzel.dataset.werkbankBasis;
+  form.addEventListener('submit', async function (ev) {
+    ev.preventDefault();
+    var knopf = form.querySelector('button[type=submit]');
+    knopf.disabled = true;
+    try {
+      var antwort = await fetch(basis + '/oeffnen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(Object.fromEntries(new FormData(form)))
+      });
+      var daten = {};
+      try { daten = await antwort.json(); } catch (e) { /* kein JSON */ }
+      if (!antwort.ok || !daten.success) throw new Error(daten.message || ('HTTP ' + antwort.status));
+      window.location.href = basis + '/' + daten.kennung;
+    } catch (fehler) {
+      knopf.disabled = false;
+      if (window.showToast) window.showToast('error', 'Paket nicht geöffnet: ' + fehler.message);
     }
   });
 })();

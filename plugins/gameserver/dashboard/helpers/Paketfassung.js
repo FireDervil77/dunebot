@@ -173,6 +173,39 @@ async function ladePaketeFuerAnlegen(dbService, guildId) {
          ORDER BY pk.slug`, [istKontrollGuild(guildId) ? 1 : 0]);
 }
 
+/**
+ * Die neueste Fassung eines Pakets überhaupt — der Arbeitsstand, den auch ein
+ * Server auf `test` bekommt. Für die Werkbank: ein fertiges Paket öffnen heisst,
+ * an DIESEM Stand weiterzuarbeiten, nicht an einem freigegebenen von früher.
+ *
+ * @param {object} dbService
+ * @param {{paketId?: number|string, slug?: string}} wonach
+ * @returns {Promise<{paket_id, slug, version, channel, fbpkg}|null>}
+ */
+async function ladeNeuesteFassung(dbService, { paketId = null, slug = null } = {}) {
+    if (!paketId && !slug) return null;
+    const [z] = await dbService.query(`
+        SELECT pk.id AS paket_id, pk.slug, v.version, v.channel, v.fbpkg
+          FROM packages pk
+          JOIN package_versions v ON v.package_id = pk.id
+         WHERE ${paketId ? 'pk.id = ?' : 'pk.slug = ?'}
+         ORDER BY v.published_at DESC, v.id DESC
+         LIMIT 1`, [paketId || slug]);
+    return z || null;
+}
+
+/** Alle Pakete mit ihrer neuesten Fassung — ohne das Dokument (für Auswahllisten). */
+async function ladeNeuesteFassungen(dbService) {
+    return dbService.query(`
+        SELECT pk.id AS paket_id, pk.slug, pk.name, v.version, v.channel, v.published_at
+          FROM packages pk
+          JOIN package_versions v ON v.id = (
+              SELECT n.id FROM package_versions n
+               WHERE n.package_id = pk.id
+               ORDER BY n.published_at DESC, n.id DESC LIMIT 1)
+         ORDER BY pk.slug`);
+}
+
 // ── Freigabe (Adminbereich) ─────────────────────────────────────────────────
 
 /** Alle Fassungen eines Pakets, neueste zuerst — ohne das Dokument selbst. */
@@ -269,6 +302,6 @@ async function kanalSetzen(dbService, { serverId, guildId, kanal }) {
 
 module.exports = {
     KANAELE, istKontrollGuild, FASSUNG_FUER_SERVER, FASSUNG_FUER_ANLEGEN,
-    ladePaketFuerServer, ladePaketFuerAnlegen, ladePaketeZuServern, ladePaketeFuerAnlegen,
+    ladePaketFuerServer, ladePaketFuerAnlegen, ladePaketeZuServern, ladePaketeFuerAnlegen, ladeNeuesteFassung, ladeNeuesteFassungen,
     fassungenZuPaket, serverJeKanal, freigeben, zuruecknehmen, kanalSetzen,
 };

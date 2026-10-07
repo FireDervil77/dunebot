@@ -216,10 +216,11 @@ async function offeneSitzung(req, res) {
 router.get('/', requirePermission('WERKBANK.VIEW'), async (req, res) => {
     const guildId = res.locals.guildId;
     try {
-        const [sitzungen, images, maschinen] = await Promise.all([
+        const [sitzungen, images, maschinen, pakete] = await Promise.all([
             Sitzungen.liste(guildId), Sitzungen.waehlbareImages(), Sitzungen.maschinen(guildId),
+            Sitzungen.oeffenbarePakete(),
         ]);
-        return await renderView(res, 'guild/werkbank-uebersicht', { guildId, sitzungen, images, maschinen });
+        return await renderView(res, 'guild/werkbank-uebersicht', { guildId, sitzungen, images, maschinen, pakete });
     } catch (error) {
         return renderFehler(res, error, 'Die Werkbank konnte nicht geladen werden');
     }
@@ -235,6 +236,20 @@ router.post('/sitzungen', requirePermission('WERKBANK.BAUEN'), async (req, res) 
         return res.json({ success: true, kennung });
     } catch (error) {
         return fehler(res, error, 'Sitzung nicht angelegt', 400);
+    }
+});
+
+// Ein fertiges Paket als Sitzung öffnen (Durchreichen, 2026-10-07): Was die
+// Werkbank noch nicht bearbeiten kann, nimmt sie unverändert mit.
+router.post('/oeffnen', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        const ergebnis = await Sitzungen.paketOeffnen({
+            guildId: res.locals.guildId, userId: nutzerId(req, res),
+            paketId: req.body?.paket_id, rootserverId: req.body?.rootserver_id,
+        });
+        return res.json({ success: true, ...ergebnis });
+    } catch (error) {
+        return fehler(res, error, 'Paket nicht geöffnet', 400);
     }
 });
 
@@ -298,11 +313,13 @@ router.get('/:kennung', requirePermission('WERKBANK.VIEW'), async (req, res) => 
             werkbankTeil: Sitzungen.werkbankTeil(sitzung),
             einstellungen: sitzung.entwurf?.settings || [],
             hinweise: sitzung.entwurf?.hints || [],
+            durchgereicht: Sitzungen.durchgereichtes(sitzung),
+            geoeffnet: sitzung.entwurf?.werkbank?.geoeffnet || null,
             HINWEIS: Sitzungen.HINWEIS,
             probewerte: sitzung.entwurf?.werkbank?.werte || {},
             EINSTELLUNG: Sitzungen.EINSTELLUNG,
             anzeige: { GRUPPE, WIRKUNG, RISIKO },
-            belegt: pruefungen[0]?.ergebnis ? Sitzungen.belegteEinstellungen(pruefungen[0].entwurf, pruefungen[0].ergebnis) : null,
+            belegt: pruefungen[0]?.ergebnis ? Sitzungen.belegteEinstellungen(pruefungen[0].entwurf, pruefungen[0].ergebnis, Sitzungen.uebernommeneZiele(sitzung)) : null,
             laeufe,
             vorschlagsDateien: Sitzungen.vorschlagsDateien(laeufe, entwurf.install?.steps),
             gruppiere: Sitzungen.gruppiere,
