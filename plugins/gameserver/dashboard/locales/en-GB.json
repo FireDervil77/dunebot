@@ -1,7 +1,7 @@
 {
     "NAV": {
         "GAMESERVER": "Gameserver",
-        "ADDONS": "Games",
+        "ADDONS": "Game database",
         "MY_ADDONS": "My Addons",
         "SERVERS": "Servers"
     },
@@ -25,7 +25,7 @@
         "VIEW_ALL_SERVERS": "View All Servers",
         "CREATE_SERVER": "Create Server",
         "QUICK_LINKS": "Quick Links",
-        "ADDON_MARKETPLACE": "Addon Marketplace",
+        "ADDON_MARKETPLACE": "Game database",
         "BROWSE_ADDONS": "Browse official and community-created server addons",
         "SETTINGS": "Settings",
         "MORE_INFO": "More Info",
@@ -35,7 +35,7 @@
         "ERROR_STOP": "Error stopping server"
     },
     "MARKETPLACE": {
-        "TITLE": "Addon Marketplace",
+        "TITLE": "Game database",
         "SEARCH": "Search",
         "SEARCH_PLACEHOLDER": "Search for addons...",
         "FILTER": "Filter",

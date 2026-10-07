@@ -2,7 +2,7 @@
     "NAV": {
         "DASHBOARD": "Dashboard",
         "GAMESERVER": "Gameserver",
-        "ADDONS": "Spiele",
+        "ADDONS": "Spiele-Datenbank",
         "MY_ADDONS": "Meine Addons",
         "SERVERS": "Server"
     },
@@ -26,7 +26,7 @@
         "VIEW_ALL_SERVERS": "Alle Server anzeigen",
         "CREATE_SERVER": "Server erstellen",
         "QUICK_LINKS": "Schnellzugriff",
-        "ADDON_MARKETPLACE": "Addon-Marktplatz",
+        "ADDON_MARKETPLACE": "Spiele-Datenbank",
         "BROWSE_ADDONS": "Addons durchsuchen",
         "SETTINGS": "Einstellungen",
         "MORE_INFO": "Mehr Info",
@@ -36,7 +36,7 @@
         "ERROR_STOP": "Fehler beim Stoppen des Servers"
     },
     "MARKETPLACE": {
-        "TITLE": "Addon-Marktplatz",
+        "TITLE": "Spiele-Datenbank",
         "SEARCH": "Suche",
         "SEARCH_PLACEHOLDER": "Nach Addons suchen...",
         "FILTER": "Filter",
@@ -112,7 +112,7 @@
         "STEP1_TITLE": "Schritt 1: Spiel auswählen",
         "STEP2_TITLE": "Schritt 2: Server & Template",
         "STEP3_TITLE": "Schritt 3: Konfiguration",
-        "SELECT_GAME": "Wähle ein Spiel aus dem Addon-Marktplatz",
+        "SELECT_GAME": "Wähle ein Spiel aus der Spiele-Datenbank",
         "SELECT_ADDON": "Addon auswählen",
         "SELECT_TEMPLATE": "Template auswählen",
         "SELECT_DAEMON_SERVER": "Host-Server auswählen",

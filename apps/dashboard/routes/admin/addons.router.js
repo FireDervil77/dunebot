@@ -68,7 +68,7 @@ router.get('/', async (req, res) => {
             pending_review:    addons.filter(a => a.status === 'pending_review').length,
         };
 
-        await themeManager.renderView(res, 'admin/addons/index', { addons, stats, pageTitle: 'Addon Marketplace' });
+        await themeManager.renderView(res, 'admin/addons/index', { addons, stats, pageTitle: 'Spiele-Marktplatz' });
 
     } catch (err) {
         Logger.error('[Addons] Fehler Übersicht:', err);

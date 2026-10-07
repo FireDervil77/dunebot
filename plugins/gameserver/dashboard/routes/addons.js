@@ -81,7 +81,7 @@ router.get('/', requirePermission('GAMESERVER.ADDONS.VIEW'), async (req, res) =>
         for (const a of (addons || [])) a.tags = tagsJeSpiel[a.id] || [];
 
         await themeManager.renderView(res, 'guild/gameserver-marketplace', {
-            title: 'Addon Marketplace',
+            title: 'Spiele-Datenbank',
             activeMenu: `/guild/${guildId}/plugins/gameserver/addons`,
             addons: addons || [],
             categories: categories || [],
@@ -137,7 +137,7 @@ router.get('/:slug', requirePermission('GAMESERVER.ADDONS.VIEW'), async (req, re
         ]);
 
         await themeManager.renderView(res, 'guild/gameserver-addon-detail', {
-            title: `${addon.name} - Addon Details`,
+            title: `${addon.name} — Spiele-Datenbank`,
             activeMenu: `/guild/${guildId}/plugins/gameserver/addons`,
             addon,
             ratings: ratings || [],
