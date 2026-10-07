@@ -47,9 +47,24 @@
                                 </div>
                                 
                                 <div class="mb-3">
-                                    <label>Tags (comma-separated)</label>
-                                    <input type="text" class="form-control" name="tags" 
-                                           value="<%= addon.tags ? (() => { try { return JSON.parse(addon.tags).join(', '); } catch(e) { return addon.tags; } })() : '' %>">
+                                    <%# Tags aus der Tag-Bibliothek (2026-10-07): tippen, Enter uebernimmt.
+                                        Vorhandene werden vorgeschlagen und wiederverwendet; ein neues Wort
+                                        kommt beim Speichern in die Bibliothek. %>
+                                    <label for="tagEingabe">Tags</label>
+                                    <% if (locals.tagsFehler) { %>
+                                        <div class="alert alert-danger py-2 small">Die Tags ließen sich nicht laden (<%= locals.tagsFehler %>) — sie werden beim Speichern nicht angefasst.</div>
+                                    <% } else { %>
+                                        <div class="form-control d-flex flex-wrap align-items-center gap-1" id="tagFeld" style="cursor:text"
+                                             data-tags="<%= JSON.stringify(addon.tags || []) %>">
+                                            <input type="text" id="tagEingabe" list="tagVorschlaege" autocomplete="off" maxlength="40"
+                                                   class="border-0 flex-fill bg-transparent" style="outline:none;min-width:140px"
+                                                   placeholder="Tag tippen, Enter übernimmt">
+                                        </div>
+                                        <datalist id="tagVorschlaege">
+                                            <% (locals.alleTags || []).forEach(function (t) { %><option value="<%= t.name %>"></option><% }); %>
+                                        </datalist>
+                                        <div class="form-hint">Vorhandene Tags werden beim Tippen vorgeschlagen. Ein neues Wort kommt beim Speichern in die Bibliothek und steht dann auch anderen Spielen zur Wahl.</div>
+                                    <% } %>
                                 </div>
                                 
                                 <button type="submit" class="btn btn-primary">
@@ -239,16 +254,60 @@ document.addEventListener('DOMContentLoaded', () => {
     fassungsKnopf('data-fassung-zuruecknehmen', 'zuruecknehmen',
         (v) => `Freigabe von ${v} zurücknehmen? Server auf „stable" fallen auf die vorige freigegebene Fassung zurück — gibt es keine, lassen sie sich nicht starten.`);
     
+    // ── Tags: kleine Marken im Feld, Vorschläge aus der Bibliothek ─────────
+    // `tagListe` ist null, wenn die Tags nicht geladen werden konnten — dann
+    // schickt das Formular kein `tags` mit, und der Server fasst sie nicht an.
+    const tagFeld = document.getElementById('tagFeld');
+    const tagEingabe = document.getElementById('tagEingabe');
+    let tagListe = tagFeld ? JSON.parse(tagFeld.dataset.tags || '[]') : null;
+    const gleich = (a, b) => a.trim().replace(/\s+/g, ' ').toLowerCase() === b.trim().replace(/\s+/g, ' ').toLowerCase();
+    const zeichneTags = () => {
+        tagFeld.querySelectorAll('[data-tag]').forEach((m) => m.remove());
+        tagListe.forEach((name) => {
+            const marke = document.createElement('span');
+            marke.className = 'badge bg-secondary-lt d-inline-flex align-items-center gap-1';
+            marke.dataset.tag = name;
+            marke.append(document.createTextNode(name));
+            const weg = document.createElement('button');
+            weg.type = 'button'; weg.className = 'btn-close'; weg.style.fontSize = '.55rem';
+            weg.title = 'Tag entfernen'; weg.setAttribute('aria-label', name + ' entfernen');
+            weg.addEventListener('click', () => { tagListe = tagListe.filter((t) => t !== name); zeichneTags(); });
+            marke.append(weg);
+            tagFeld.insertBefore(marke, tagEingabe);
+        });
+    };
+    const nimmTag = () => {
+        const name = tagEingabe.value.trim().replace(/\s+/g, ' ');
+        if (!name) return;
+        if (/[,<>"]/.test(name)) { melde('error', 'Ein Tag darf kein Komma, <, > oder " enthalten.'); return; }
+        if (tagListe.length >= 12 && !tagListe.some((t) => gleich(t, name))) { melde('error', 'Höchstens 12 Tags je Spiel.'); return; }
+        if (!tagListe.some((t) => gleich(t, name))) tagListe.push(name);
+        tagEingabe.value = '';
+        zeichneTags();
+    };
+    if (tagFeld) {
+        zeichneTags();
+        tagFeld.addEventListener('click', (e) => { if (e.target === tagFeld) tagEingabe.focus(); });
+        tagEingabe.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); nimmTag(); }
+            else if (e.key === 'Backspace' && !tagEingabe.value && tagListe.length) { tagListe.pop(); zeichneTags(); }
+        });
+        // Ein Klick auf einen Vorschlag füllt das Feld, ohne dass Enter fällt.
+        tagEingabe.addEventListener('change', nimmTag);
+    }
+
     // Metadata-Form Submit
     document.getElementById('metadataForm').addEventListener('submit', async function(e) {
         e.preventDefault();
+        // Was noch im Feld steht, gehört dazu — sonst geht das letzte getippte Tag verloren.
+        if (tagFeld) nimmTag();
         
         const formData = new FormData(this);
         const payload = {
             name:        formData.get('name'),
             description: formData.get('description'),
-            tags:        formData.get('tags'),
         };
+        if (tagListe) payload.tags = tagListe;
         
         try {
             const response = await fetch(`/admin/addons/${addonId}`, {

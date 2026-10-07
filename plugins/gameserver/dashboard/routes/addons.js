@@ -20,6 +20,9 @@ const express = require('express');
 const router  = express.Router();
 const { ServiceManager } = require('dunebot-core');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
+// Tags eines Spiels kommen aus der Tag-Bibliothek des Kerns (2026-10-07) —
+// nicht mehr aus dem Kommafeld `addon_marketplace.tags`.
+const Tags = require('../../../../apps/dashboard/helpers/Tags');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET / — Marketplace
@@ -34,7 +37,7 @@ router.get('/', requirePermission('GAMESERVER.ADDONS.VIEW'), async (req, res) =>
         const { category, search, sort } = req.query;
 
         let query = `
-            SELECT id, slug, name, description, category, tags,
+            SELECT id, slug, name, description, category,
                    steam_app_id, author_user_id, trust_level, visibility,
                    status, rating_avg, rating_count, install_count,
                    icon_url, banner_url, created_at
@@ -49,7 +52,9 @@ router.get('/', requirePermission('GAMESERVER.ADDONS.VIEW'), async (req, res) =>
             params.push(category);
         }
         if (search) {
-            query += ' AND (name LIKE ? OR description LIKE ? OR tags LIKE ?)';
+            // Der dritte Platzhalter sucht in den Tags der Bibliothek — vorher
+            // im rohen Text der Spalte (samt JSON-Klammern).
+            query += ` AND (name LIKE ? OR description LIKE ? OR ${Tags.sucheSql('spiel', 'addon_marketplace.id')})`;
             const term = `%${search}%`;
             params.push(term, term, term);
         }
@@ -70,6 +75,10 @@ router.get('/', requirePermission('GAMESERVER.ADDONS.VIEW'), async (req, res) =>
                 GROUP BY category ORDER BY count DESC
             `),
         ]);
+
+        // Die Tags aller gezeigten Spiele in EINEM Zug, als Liste am Spiel.
+        const tagsJeSpiel = await Tags.fuerViele(dbService, 'spiel', (addons || []).map(a => a.id));
+        for (const a of (addons || [])) a.tags = tagsJeSpiel[a.id] || [];
 
         await themeManager.renderView(res, 'guild/gameserver-marketplace', {
             title: 'Addon Marketplace',
@@ -98,7 +107,7 @@ router.get('/:slug', requirePermission('GAMESERVER.ADDONS.VIEW'), async (req, re
         const guildId = res.locals.guildId;
 
         const [addon] = await dbService.query(`
-            SELECT id, slug, name, description, category, tags,
+            SELECT id, slug, name, description, category,
                    steam_app_id, steam_server_app_id, author_user_id,
                    trust_level, visibility, status,
                    rating_avg, rating_count, install_count,
@@ -110,6 +119,8 @@ router.get('/:slug', requirePermission('GAMESERVER.ADDONS.VIEW'), async (req, re
         if (!addon) {
             return res.status(404).render('error', { message: 'Addon nicht gefunden' });
         }
+
+        addon.tags = await Tags.fuer(dbService, 'spiel', addon.id);
 
         const [ratings, comments] = await Promise.all([
             dbService.query(`

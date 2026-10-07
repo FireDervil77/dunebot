@@ -31,6 +31,10 @@ const { ServiceManager } = require('dunebot-core');
 // Freigabe alle Guilds betrifft, nicht die, in der gerade jemand sitzt.
 const Paketfassung = require('../../../../plugins/gameserver/dashboard/helpers/Paketfassung');
 
+// Tags kommen aus der Tag-Bibliothek (helpers/Tags.js) — nicht mehr aus dem
+// Kommafeld `addon_marketplace.tags`.
+const Tags = require('../../helpers/Tags');
+
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /admin/addons — Übersicht
 // ─────────────────────────────────────────────────────────────────────────────
@@ -94,9 +98,17 @@ router.get('/:id', async (req, res) => {
 
         const addon = rows[0];
 
-        if (addon.tags) {
-            try   { addon.tags = JSON.parse(addon.tags); }
-            catch { addon.tags = addon.tags.split(',').map(t => t.trim()).filter(Boolean); }
+        // Die Tags dieses Spiels und die ganze Bibliothek für die Vorschläge.
+        // Ein Fehler hier darf nicht so aussehen, als hätte das Spiel keine Tags
+        // — sonst speichert der nächste Klick eine leere Liste darüber.
+        let alleTags = [], tagsFehler = null;
+        try {
+            addon.tags = await Tags.fuer(dbService, 'spiel', addon.id);
+            alleTags = await Tags.alle(dbService);
+        } catch (err) {
+            addon.tags = [];
+            tagsFehler = err.message;
+            Logger.error('[Addons] Tags laden fehlgeschlagen:', err);
         }
 
         // Fassungen des Pakets (packages.id = addon_marketplace.id) und wie viele
@@ -113,7 +125,7 @@ router.get('/:id', async (req, res) => {
         }
 
         await themeManager.renderView(res, 'admin/addons/edit', {
-            addon, fassungen, serverJeKanal, fassungenFehler, pageTitle: `Edit: ${addon.name}`,
+            addon, alleTags, tagsFehler, fassungen, serverJeKanal, fassungenFehler, pageTitle: `Edit: ${addon.name}`,
         });
 
     } catch (err) {
@@ -141,15 +153,18 @@ router.put('/:id', async (req, res) => {
             return res.status(400).json({ success: false, message: 'name ist erforderlich' });
         }
 
-        const tagsJson = tags
-            ? JSON.stringify(tags.split(',').map(t => t.trim()).filter(Boolean))
-            : null;
+        // Erst prüfen, dann schreiben: Ein Tag, das nicht passt, soll nicht den
+        // halben Eintrag speichern. `tags` fehlt in der Nutzlast (undefined) heisst
+        // „nicht anfassen" — eine leere Liste heisst „keine Tags".
+        if (tags !== undefined) Tags.bereinige(tags);
 
         await dbService.query(`
             UPDATE addon_marketplace
-            SET name = ?, description = ?, tags = ?, updated_at = NOW()
+            SET name = ?, description = ?, updated_at = NOW()
             WHERE id = ?
-        `, [name, description || '', tagsJson, id]);
+        `, [name, description || '', id]);
+
+        if (tags !== undefined) await Tags.setze(dbService, 'spiel', id, tags);
 
         Logger.info(`[Addons] Aktualisiert: ID ${id} → ${name}`);
         res.json({ success: true, message: 'Addon gespeichert' });

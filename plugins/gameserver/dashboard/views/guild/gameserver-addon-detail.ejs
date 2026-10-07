@@ -40,11 +40,14 @@
                                     <p class="lead"><%= addon.description %></p>
 
                                     <!-- Tags -->
-                                    <% if (addon.tags) { %>
+                                    <%# Eine LISTE aus der Tag-Bibliothek. Bis zum 2026-10-07 stand hier
+                                        `addon.tags.split(',')` — auf einem Feld, das der Adminbereich als
+                                        JSON schrieb: gezeigt wurde `["SCI-FI"` samt Klammer. %>
+                                    <% if (Array.isArray(addon.tags) && addon.tags.length) { %>
                                         <div class="mb-3">
-                                            <% addon.tags.split(',').forEach(tag => { %>
+                                            <% addon.tags.forEach(tag => { %>
                                                 <span class="badge bg-secondary-lt me-1">
-                                                    <i class="fa-solid fa-tag"></i> <%= tag.trim() %>
+                                                    <i class="fa-solid fa-tag"></i> <%= tag %>
                                                 </span>
                                             <% }) %>
                                         </div>
