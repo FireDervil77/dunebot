@@ -314,6 +314,9 @@ router.get('/:kennung', requirePermission('WERKBANK.VIEW'), async (req, res) => 
             einstellungen: sitzung.entwurf?.settings || [],
             hinweise: sitzung.entwurf?.hints || [],
             durchgereicht: Sitzungen.durchgereichtes(sitzung),
+            abfrage: Sitzungen.abfrageStand(sitzung),
+            abfrageKennungen: Sitzungen.abfrageKennungen(),
+            PORT: Sitzungen.PORT,
             geoeffnet: sitzung.entwurf?.werkbank?.geoeffnet || null,
             HINWEIS: Sitzungen.HINWEIS,
             probewerte: sitzung.entwurf?.werkbank?.werte || {},
@@ -445,6 +448,34 @@ router.post('/:kennung/ports/:zweck/entfernen', requirePermission('WERKBANK.BAUE
         return res.json({ success: true });
     } catch (error) {
         return fehler(res, error, 'Port nicht entfernt', 400);
+    }
+});
+
+// Ports und Abfrage (Karte, 2026-10-07): bearbeiten, was die Beobachtung nicht zeigt.
+router.post('/:kennung/ports/speichern', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.portSpeichern(await offeneSitzung(req, res), req.body || {});
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Port nicht gespeichert', 400);
+    }
+});
+
+router.post('/:kennung/abfrage', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.abfrageSpeichern(await offeneSitzung(req, res), req.body || {});
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Abfrage nicht gespeichert', 400);
+    }
+});
+
+router.post('/:kennung/abfrage/entfernen', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.abfrageEntfernen(await offeneSitzung(req, res));
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Abfrage nicht entfernt', 400);
     }
 });
 

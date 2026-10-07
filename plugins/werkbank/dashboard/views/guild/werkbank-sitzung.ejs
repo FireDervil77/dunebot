@@ -474,6 +474,180 @@
     </div>
   </div>
 
+  <!-- ── Ports und Abfrage (Karte, 2026-10-07) ─────────────────────────── -->
+  <%
+    // Ports entstehen aus der Beobachtung im Probestart; hier bekommen sie, was
+    // ein Paket sonst noch an ihnen trägt. Die Abfrage sagt, womit und wo das
+    // Panel Spielerzahl und Servername holt.
+    const abfrageTeil = locals.abfrage || { query: null, bereit: false, belegbar: false, bekannt: false };
+    const kennungenListe = locals.abfrageKennungen || [];
+    const gesehenePorts = (sitzung.entwurf.werkbank && sitzung.entwurf.werkbank.beobachtet) || {};
+    const bereitPort = (sitzung.entwurf.start && sitzung.entwurf.start.ready_when && sitzung.entwurf.start.ready_when.port) || '';
+    function kopplung(p) { const m = /^([a-z][a-z0-9_]*)\+([0-9]+)$/.exec(p.assign || ''); return m ? { basis: m[1], abstand: Number(m[2]) } : null; }
+  %>
+  <div class="col-12">
+    <div class="card" id="kartePorts">
+      <div class="card-header">
+        <h3 class="card-title">Ports und Abfrage</h3>
+        <div class="card-actions"><span class="text-secondary small">
+          <%= entwurfPorts.length %> Port<%= entwurfPorts.length === 1 ? '' : 's' %> ·
+          Abfrage: <%= abfrageTeil.query ? abfrageTeil.query.protocol : 'keine' %>
+        </span></div>
+      </div>
+      <div class="card-body">
+        <div class="row g-4">
+          <div class="col-lg-7">
+            <p class="text-secondary small">
+              Ports kommen aus der <strong>Beobachtung</strong> im Probestart — Nummern trägst du nicht ein. Hier legst du fest, was das
+              Paket sonst über sie sagt: ob ein Port fest an einem anderen hängt, ob er Pflicht ist und wie das Spiel seine Nummer erfährt.
+            </p>
+            <% if (!entwurfPorts.length) { %>
+              <p class="text-secondary small mb-3">Noch kein Port im Entwurf. Starte das Spiel im Probestart und übernimm, was lauscht.</p>
+            <% } else { %>
+              <div class="table-responsive mb-3">
+                <table class="table table-sm table-vcenter">
+                  <thead><tr><th>Zweck</th><th>Nummer</th><th>Vergabe</th><th>Pflicht</th><th>Erfährt das Spiel über</th><th class="w-1"></th></tr></thead>
+                  <tbody>
+                    <% entwurfPorts.forEach(function (p) { const k = kopplung(p); const nr = werkbankTeil.portnummern[p.purpose]; %>
+                      <tr>
+                        <td>
+                          <span class="font-monospace"><%= p.purpose %></span>
+                          <% if (p.description && (p.description.de || p.description.en)) { %><div class="text-secondary small"><%= p.description.de || p.description.en %></div><% } %>
+                        </td>
+                        <td class="text-nowrap">
+                          <span class="badge bg-green-lt font-monospace"><%= nr || '?' %>/<%= p.protocol %></span>
+                          <div class="text-secondary small"><%= k ? 'gerechnet' : (gesehenePorts[p.purpose] ? 'beobachtet' : 'vorläufig') %></div>
+                        </td>
+                        <td class="text-nowrap"><% if (k) { %><span class="font-monospace"><%= k.basis %></span> + <%= k.abstand %><% } else { %>eigene Nummer<% } %></td>
+                        <td>
+                          <%= p.required === false ? 'optional' : 'Pflicht' %>
+                          <% if (p.needed_by) { %><div class="text-secondary small">nur wenn <span class="font-monospace"><%= p.needed_by %></span> da ist</div><% } %>
+                        </td>
+                        <td>
+                          <% if (p.variable) { %><span class="font-monospace"><%= p.variable %></span>
+                          <% } else if (k) { %><span class="text-secondary small">leitet es selbst ab</span>
+                          <% } else if (ungenutztePorts.includes(p.purpose)) { %><span class="text-warning small">nichts — es fehlt <code>{{port:<%= p.purpose %>}}</code></span>
+                          <% } else { %><span class="text-secondary small">Startzeile, Umgebung oder Datei</span><% } %>
+                        </td>
+                        <td class="text-nowrap">
+                          <button class="btn btn-sm btn-outline-secondary" type="button" data-port-bearbeiten="<%= JSON.stringify(p) %>" <%= beschaeftigt ? 'disabled' : '' %>>Bearbeiten</button>
+                          <button class="btn btn-sm btn-outline-danger" type="button" data-port-entfernen="<%= p.purpose %>" <%= beschaeftigt ? 'disabled' : '' %>>Entfernen</button>
+                        </td>
+                      </tr>
+                    <% }) %>
+                  </tbody>
+                </table>
+              </div>
+            <% } %>
+
+            <details id="portDetails">
+              <summary class="mb-2"><span id="portUeberschrift">Mod-Port von Hand anlegen</span></summary>
+              <form id="formPort" class="row g-2" autocomplete="off">
+                <input type="hidden" name="alt" value="">
+                <div class="col-md-4">
+                  <label class="form-label" for="pZweck">Zweck</label>
+                  <input class="form-control font-monospace" id="pZweck" name="zweck" placeholder="voice" required>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label" for="pProtokoll">Protokoll</label>
+                  <select class="form-select" id="pProtokoll" name="protocol">
+                    <option value="udp">udp</option><option value="tcp">tcp</option><option value="both">beide (tcp + udp)</option>
+                  </select>
+                </div>
+                <div class="col-md-5 d-flex align-items-end">
+                  <label class="form-check form-switch mb-2">
+                    <input class="form-check-input" type="checkbox" name="optional">
+                    <span class="form-check-label">Optional — der Server startet auch ohne ihn</span>
+                  </label>
+                </div>
+                <div class="col-md-5">
+                  <label class="form-label" for="pBasis">Vergabe</label>
+                  <select class="form-select" id="pBasis" name="basis">
+                    <option value="">eigene Nummer</option>
+                    <% entwurfPorts.filter(function (p) { return !kopplung(p); }).forEach(function (p) { %>
+                      <option value="<%= p.purpose %>">fest über „<%= p.purpose %>"</option>
+                    <% }) %>
+                  </select>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label" for="pAbstand">Abstand</label>
+                  <input class="form-control" id="pAbstand" name="abstand" type="number" min="<%= PORT.abstand[0] %>" max="<%= PORT.abstand[1] %>" value="1" disabled>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label" for="pVariable">Umgebungsvariable</label>
+                  <input class="form-control font-monospace" id="pVariable" name="variable" placeholder="leer = keine">
+                </div>
+                <div class="col-12 form-hint">
+                  <strong>Fest über einem anderen Port</strong> heißt: Das Spiel leitet die Nummer selbst ab (Valheims Abfrage ist immer Spielport + 1) —
+                  der Server bekommt dann zwei zusammenhängende Nummern, oder er wird nicht angelegt.
+                  Die <strong>Umgebungsvariable</strong> ist nur nötig, wenn das Spiel die Nummer weder über die Startzeile noch über eine Datei erfährt.
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="pTextDe">Beschreibung (deutsch)</label>
+                  <textarea class="form-control" id="pTextDe" name="beschreibung_de" rows="2" maxlength="<%= PORT.beschreibung %>"></textarea>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="pTextEn">Beschreibung (englisch)</label>
+                  <textarea class="form-control" id="pTextEn" name="beschreibung_en" rows="2" maxlength="<%= PORT.beschreibung %>"></textarea>
+                </div>
+                <div class="col-12">
+                  <label class="form-label" for="pNurWenn">Nur wenn diese Datei da ist</label>
+                  <input class="form-control font-monospace" id="pNurWenn" name="needed_by" placeholder="leer lassen — oder etwa game/mods/voicechat-*.jar">
+                  <div class="form-hint">Für Ports, die erst ein Mod mitbringt. Geprüft wird vor jedem Start: Passt eine Datei, wird der Port gebucht, sonst freigegeben. Geht nur optional und mit eigener Nummer. Nur solche Ports lassen sich von Hand anlegen — ohne den Mod lauscht nichts, was sich beobachten ließe.</div>
+                </div>
+                <div class="col-12 d-flex gap-2">
+                  <button class="btn btn-primary" type="submit" <%= beschaeftigt ? 'disabled' : '' %>><i class="fa-solid fa-floppy-disk me-1"></i>Port speichern</button>
+                  <button class="btn btn-outline-secondary" type="button" id="knopfPortNeu">Leeren</button>
+                </div>
+              </form>
+            </details>
+          </div>
+
+          <div class="col-lg-5">
+            <p class="text-secondary small">
+              Die <strong>Abfrage</strong> sagt dem Panel, womit und auf welchem Port es Spielerzahl und Servernamen holt.
+              Ohne sie zeigt die Serverseite nur „läuft".
+            </p>
+            <form id="formAbfrage" class="row g-2" autocomplete="off">
+              <div class="col-md-7">
+                <label class="form-label" for="aProtokoll">Protokoll</label>
+                <input class="form-control font-monospace" id="aProtokoll" name="protocol" list="abfrageKennungen" placeholder="tippen: valheim, minecraft, a2s …"
+                       value="<%= abfrageTeil.query ? abfrageTeil.query.protocol : '' %>" required>
+                <datalist id="abfrageKennungen">
+                  <% kennungenListe.forEach(function (k) { %><option value="<%= k.kennung %>" data-belegbar="<%= k.belegbar ? '1' : '' %>"><%= k.name %></option><% }) %>
+                </datalist>
+              </div>
+              <div class="col-md-5">
+                <label class="form-label" for="aPort">Port</label>
+                <select class="form-select" id="aPort" name="port" required>
+                  <% entwurfPorts.forEach(function (p) { %><option value="<%= p.purpose %>" <%= abfrageTeil.query && abfrageTeil.query.port === p.purpose ? 'selected' : '' %>><%= p.purpose %></option><% }) %>
+                </select>
+              </div>
+              <div class="col-12 form-hint" id="abfrageBelegbar"></div>
+              <div class="col-12">
+                <label class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" name="bereit" <%= abfrageTeil.bereit ? 'checked' : '' %>>
+                  <span class="form-check-label">Erst bereit, wenn die Abfrage antwortet</span>
+                </label>
+                <div class="form-hint">
+                  Dann gilt ein Server erst als bereit, wenn das Spiel wirklich antwortet — nicht schon, wenn der Port offen ist.
+                  Der Prüfdurchlauf wird damit erst grün, wenn die Abfrage geantwortet hat<%= bereitPort ? '' : ' (braucht im Startteil „Bereit, wenn Port")' %>.
+                </div>
+              </div>
+              <% if (abfrageTeil.query && !abfrageTeil.bekannt) { %>
+                <div class="col-12"><div class="alert alert-warning py-2 small mb-0">„<%= abfrageTeil.query.protocol %>" steht nicht im Katalog — die Paketprüfung lehnt das beim Veröffentlichen ab.</div></div>
+              <% } %>
+              <div class="col-12 d-flex gap-2">
+                <button class="btn btn-primary" type="submit" <%= (beschaeftigt || !entwurfPorts.length) ? 'disabled' : '' %>><i class="fa-solid fa-floppy-disk me-1"></i>Abfrage speichern</button>
+                <% if (abfrageTeil.query) { %><button class="btn btn-outline-danger" type="button" id="knopfAbfrageWeg" <%= beschaeftigt ? 'disabled' : '' %>>Abfrage entfernen</button><% } %>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ── Einstellungen (Baukasten B1, 2026-09-26) ───────────────────────── -->
   <%
     const nachweise = (pruefung && pruefung.ergebnis && Array.isArray(pruefung.ergebnis.einstellungen)) ? pruefung.ergebnis.einstellungen : null;
@@ -753,7 +927,7 @@
     // Teile eines geöffneten Pakets, für die die Werkbank noch keine Karte hat.
     // Sie reisen unverändert mit und stehen hier, damit man sieht, WAS mitreist.
     const TEIL_NAME = {
-      management:   'Abfrage, Fernsteuerung, Spielstände, Aktualisieren',
+      management:   'Fernsteuerung, Spielstände, Aktualisieren',
       content:      'Mod-Verwaltung',
       commands:     'Befehle im Panel (Spieler listen, kicken, bannen, speichern, Durchsage)',
       files:        'Sperrliste im Dateimanager',
@@ -1729,6 +1903,99 @@
         window.location.reload();
       } catch (fehler) {
         knopf.disabled = false;
+        melde('error', fehler.message);
+      }
+    });
+  }
+
+  // ── Ports und Abfrage (2026-10-07) ────────────────────────────────────
+  var formP = document.getElementById('formPort');
+  if (formP) {
+    var portTitel = document.getElementById('portUeberschrift');
+    function zeigeKopplung() {
+      formP.abstand.disabled = !formP.basis.value;
+      // Ein Port kann nicht an sich selbst hängen.
+      Array.prototype.forEach.call(formP.basis.options, function (o) { o.disabled = Boolean(o.value) && o.value === formP.zweck.value; });
+    }
+    function portLeeren() {
+      formP.reset();
+      formP.alt.value = '';
+      formP.zweck.readOnly = false;
+      portTitel.textContent = 'Mod-Port von Hand anlegen';
+      zeigeKopplung();
+    }
+    formP.basis.addEventListener('change', zeigeKopplung);
+    document.getElementById('knopfPortNeu').addEventListener('click', portLeeren);
+    document.querySelectorAll('[data-port-bearbeiten]').forEach(function (k) {
+      k.addEventListener('click', function () {
+        var p = JSON.parse(k.dataset.portBearbeiten);
+        var m = /^([a-z][a-z0-9_]*)\+([0-9]+)$/.exec(p.assign || '');
+        portLeeren();
+        formP.alt.value = p.purpose;
+        formP.zweck.value = p.purpose;
+        formP.zweck.readOnly = true;
+        formP.protocol.value = p.protocol;
+        formP.optional.checked = p.required === false;
+        formP.basis.value = m ? m[1] : '';
+        zeigeKopplung();
+        formP.abstand.value = m ? m[2] : '1';
+        formP.variable.value = p.variable || '';
+        formP.beschreibung_de.value = (p.description && p.description.de) || '';
+        formP.beschreibung_en.value = (p.description && p.description.en) || '';
+        formP.needed_by.value = p.needed_by || '';
+        portTitel.textContent = 'Port „' + p.purpose + '" bearbeiten';
+        document.getElementById('portDetails').open = true;
+        formP.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    });
+    formP.addEventListener('submit', async function (ev) {
+      ev.preventDefault();
+      var knopf = formP.querySelector('button[type=submit]');
+      knopf.disabled = true;
+      try {
+        await schicke(hier + '/ports/speichern', Object.fromEntries(new FormData(formP)));
+        window.location.reload();
+      } catch (fehler) {
+        knopf.disabled = false;
+        melde('error', fehler.message);
+      }
+    });
+  }
+
+  var formA = document.getElementById('formAbfrage');
+  if (formA) {
+    var belegText = document.getElementById('abfrageBelegbar');
+    function zeigeBelegbar() {
+      var wert = formA.protocol.value.trim().toLowerCase();
+      var eintrag = Array.prototype.find.call(document.getElementById('abfrageKennungen').options, function (o) { return o.value === wert; });
+      if (!wert) belegText.textContent = '';
+      else if (!eintrag) belegText.textContent = 'Diese Kennung steht nicht im Katalog — so lässt sie sich nicht speichern.';
+      else if (eintrag.dataset.belegbar) belegText.textContent = 'Der Prüfdurchlauf kann diese Abfrage belegen — mit dem Schalter unten wartet er auf ihre Antwort.';
+      else belegText.textContent = 'Dieses Protokoll fragt erst das Panel am laufenden Server. Der Prüfdurchlauf kann es nicht belegen; die Abfrage kommt mit diesem Vermerk ins Paket.';
+    }
+    formA.protocol.addEventListener('input', zeigeBelegbar);
+    zeigeBelegbar();
+    formA.addEventListener('submit', async function (ev) {
+      ev.preventDefault();
+      var knopf = formA.querySelector('button[type=submit]');
+      knopf.disabled = true;
+      try {
+        await schicke(hier + '/abfrage', Object.fromEntries(new FormData(formA)));
+        window.location.reload();
+      } catch (fehler) {
+        knopf.disabled = false;
+        melde('error', fehler.message);
+      }
+    });
+    var abfrageWeg = document.getElementById('knopfAbfrageWeg');
+    if (abfrageWeg) abfrageWeg.addEventListener('click', async function () {
+      if (!confirm('Abfrage aus dem Entwurf nehmen? Die Serverseite zeigt dann keine Spielerzahl mehr.')) return;
+      abfrageWeg.disabled = true;
+      try {
+        await schicke(hier + '/abfrage/entfernen');
+        window.location.reload();
+      } catch (fehler) {
+        abfrageWeg.disabled = false;
         melde('error', fehler.message);
       }
     });

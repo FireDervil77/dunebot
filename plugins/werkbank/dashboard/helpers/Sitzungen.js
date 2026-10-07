@@ -196,7 +196,9 @@ async function laden(guildId, kennung) {
         'SELECT * FROM werkbank_sitzungen WHERE guild_id = ? AND kennung = ?', [guildId, kennung]);
     if (!s) return null;
     s.image = json(s.image, {});
-    s.entwurf = json(s.entwurf, {});
+    // Geordnet: Eine Sitzung, die vor einer neuen Karte geöffnet wurde, trägt
+    // deren Stück noch im Durchgereichten (siehe EIGENE).
+    s.entwurf = ordne(json(s.entwurf, {}));
     return s;
 }
 
@@ -361,6 +363,12 @@ function entwurfAlsPaket(sitzung, liste) {
     const d = e.durchgereicht || {};
     for (const k of INSTALL_DURCHGEREICHT) if (d.install && d.install[k] !== undefined) paket.install[k] = d.install[k];
     for (const k of DURCHGEREICHT) if (d[k] !== undefined) paket[k] = d[k];
+    // Was eine eigene Karte hat, liegt im Entwurf und kommt hier dazu (EIGENE).
+    for (const [teil, felder] of Object.entries(EIGENE)) {
+        const eigen = {};
+        for (const f of felder) if (e[teil]?.[f] !== undefined) eigen[f] = e[teil][f];
+        if (Object.keys(eigen).length) paket[teil] = { ...(paket[teil] || {}), ...eigen };
+    }
     if (e.start) paket.start = e.start;
     const settings = Array.isArray(e.settings) ? e.settings : [];
     const env = { ...(e.env || {}), ...umgebungAusEinstellungen(settings, e.env || {}, uebernommeneZiele(sitzung)) };
@@ -506,6 +514,61 @@ function mischeEinstellung(vorher, neu) {
     return aus;
 }
 
+/**
+ * Welche Stücke eines sonst durchgereichten Teils eine EIGENE Karte haben.
+ *
+ * Mit jeder neuen Karte wandert ein Stück aus „Unverändert übernommen" in den
+ * bearbeitbaren Entwurf. Es liegt dann unter demselben Namen wie im Paket
+ * (`entwurf.management.query`), der Rest des Teils bleibt in
+ * `entwurf.durchgereicht.management`; `entwurfAlsPaket` legt beides wieder
+ * zusammen. Eine Karte mehr heisst: hier einen Namen dazuschreiben — offene
+ * Sitzungen ziehen beim nächsten Laden nach (`ordne`).
+ *
+ *   management.query   Karte „Ports und Abfrage" (2026-10-07)
+ */
+const EIGENE = { management: ['query'] };
+
+/**
+ * Den Entwurf ordnen: Was eine Karte hat, raus aus dem Durchgereichten. Rein —
+ * das Paket, aus dem ein Entwurf entsteht, wird nicht angefasst. Läuft beim
+ * Zerlegen eines Pakets UND beim Laden einer Sitzung, damit es genau eine
+ * Stelle gibt, an der ein Stück liegt.
+ */
+function ordne(entwurf) {
+    const e = entwurf || {};
+    if (!e.durchgereicht) return e;
+    const d = { ...e.durchgereicht };
+    for (const [teil, felder] of Object.entries(EIGENE)) {
+        if (!d[teil] || typeof d[teil] !== 'object') continue;
+        const rest = { ...d[teil] };
+        const eigen = { ...(e[teil] || {}) };
+        for (const f of felder) {
+            if (rest[f] === undefined) continue;
+            if (eigen[f] === undefined) eigen[f] = rest[f];
+            delete rest[f];
+        }
+        if (Object.keys(eigen).length) e[teil] = eigen;
+        if (Object.keys(rest).length) d[teil] = rest; else delete d[teil];
+    }
+    if (Object.keys(d).length) e.durchgereicht = d; else delete e.durchgereicht;
+    return e;
+}
+
+/**
+ * Die durchgereichten Teile eines Pakets, wie sie im Paket benannt werden —
+ * ohne die Stücke, die eine Karte haben: `management (saves, update)`.
+ */
+function durchgereichteTeile(paket) {
+    const aus = [];
+    for (const k of DURCHGEREICHT) {
+        if (paket?.[k] === undefined) continue;
+        if (!EIGENE[k]) { aus.push(k); continue; }
+        const rest = Object.keys(paket[k] || {}).filter(f => !EIGENE[k].includes(f));
+        if (rest.length) aus.push(`${k} (${rest.join(', ')})`);
+    }
+    return aus;
+}
+
 /** Die nächste Fassung nach `1.2.3` → `1.2.4` — der Vorschlag beim Öffnen. */
 function naechsteFassung(version) {
     const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(String(version || ''));
@@ -547,6 +610,7 @@ function entwurfAusPaket(paket) {
     for (const k of INSTALL_DURCHGEREICHT) if (p.install && p.install[k] !== undefined) inst[k] = p.install[k];
     if (Object.keys(inst).length) d.install = inst;
     if (Object.keys(d).length) entwurf.durchgereicht = d;
+    ordne(entwurf);
 
     // Alles, wofür es weder eine Karte noch einen Platz im Durchgereichten gibt.
     const bekannt = ['format', 'identity', 'image', 'ports', 'install', 'start', 'env', 'settings', 'hints', 'status', ...DURCHGEREICHT];
@@ -1117,15 +1181,246 @@ async function portUebernehmen(sitzung, { zweck, protocol, port }) {
         if (platz >= 0) liste[platz] = neu; else liste.push(neu);
         e.ports = liste;
         e.werkbank = { ...(e.werkbank || {}) };
+        // Ein gekoppelter Port hat keine eigene Wahl: Lauscht er woanders, als
+        // die Kopplung sagt, stimmt die Kopplung nicht — oder das Spiel lässt
+        // sich den Port doch einzeln sagen, dann ist er nicht gekoppelt.
+        const k = kopplungVon(neu);
+        const basisNr = k && e.werkbank.portnummern?.[k.basis];
+        if (k && basisNr !== undefined && basisNr + k.abstand !== n) {
+            throw new Error(`„${z}" ist an „${k.basis}" gekoppelt (+${k.abstand}) und müsste auf ${basisNr + k.abstand} lauschen — `
+                + `beobachtet ist ${n}. Entweder stimmt die Kopplung nicht, oder der Port bekommt eine eigene Nummer (Vergabe „eigene Nummer").`);
+        }
         e.werkbank.portnummern = { ...(e.werkbank.portnummern || {}), [z]: n };
+        e.werkbank.beobachtet = { ...(e.werkbank.beobachtet || {}), [z]: true };
+        nummernNachziehen(e, z);
     });
 }
 
 async function portEntfernen(sitzung, zweck) {
     return entwurfSchreiben(sitzung, (e) => {
+        // Woran der Port hängt, bliebe als Verweis ins Leere stehen — die
+        // Paketprüfung lehnte das erst beim Veröffentlichen ab.
+        const haengt = (e.ports || []).filter(p => kopplungVon(p)?.basis === zweck).map(p => `der Port „${p.purpose}" (Kopplung)`);
+        if (e.management?.query?.port === zweck) haengt.push('die Abfrage');
+        if (e.durchgereicht?.management?.rcon?.port === zweck) haengt.push('die Fernsteuerung des geöffneten Pakets');
+        if (haengt.length) throw new Error(`Am Port „${zweck}" hängt noch ${haengt.join(' und ')} — erst das umstellen oder entfernen.`);
         e.ports = (e.ports || []).filter(p => p.purpose !== zweck);
         if (e.werkbank?.portnummern) delete e.werkbank.portnummern[zweck];
+        if (e.werkbank?.beobachtet) delete e.werkbank.beobachtet[zweck];
         if (e.start?.ready_when?.port === zweck) delete e.start.ready_when.port;
+    });
+}
+
+// ── Ports und Abfrage (Karte, 2026-10-07) ────────────────────────────────────
+//
+// Was ein Port im Paket ausser Zweck und Protokoll trägt — gemessen an den acht
+// eingelieferten Paketen: die Kopplung `game+1` (Valheim, Astro Colony), die
+// Variable, über die das Spiel die Nummer erfährt (`SERVER_PORT`), „nur wenn
+// diese Datei da ist" (Minecrafts Sprachchat) und eine Beschreibung. Bis zu
+// dieser Karte reiste das bei geöffneten Paketen nur mit; ein in der Werkbank
+// gebautes Spiel konnte es gar nicht bekommen.
+//
+// Zwei Regeln, abgesprochen am 2026-10-07:
+//
+//   - Ports entstehen aus der BEOBACHTUNG. Von Hand anlegen lässt sich nur ein
+//     Port mit `needed_by` — den bringt ein Mod mit, ohne den Mod lauscht nichts.
+//   - Die Abfrage kommt auch unbelegt ins Paket, dann mit Vermerk (`abfrageVermerk`).
+const PORT_FELDER = ['purpose', 'protocol', 'assign', 'required', 'variable', 'description', 'needed_by'];
+const RE_KOPPLUNG = /^([a-z][a-z0-9_]*)\+([0-9]+)$/;
+const RE_NUR_WENN = /^[^/.][^\\]*$/; // Schema: port.needed_by
+// Beschreibung: Die längste im Bestand hat 318 Zeichen (Minecrafts Sprachchat) —
+// eine knappere Grenze liesse ein geöffnetes Paket nicht mehr speichern.
+const PORT = { abstand: [1, 100], beschreibung: 600 };
+
+/** `game+1` → { basis: 'game', abstand: 1 }; `pool` → null. */
+function kopplungVon(port) {
+    const m = RE_KOPPLUNG.exec(port?.assign || '');
+    return m ? { basis: m[1], abstand: Number(m[2]) } : null;
+}
+
+/**
+ * Gekoppelte Ports rechnen ihre Nummer aus der Basis — nach jeder Änderung.
+ * `geaendert` ist der Zweck, dessen Nummer oder Vergabe sich gerade änderte:
+ * Hängt jemand an ihm, ist dessen frühere Beobachtung damit überholt.
+ */
+function nummernNachziehen(e, geaendert) {
+    e.werkbank = { ...(e.werkbank || {}) };
+    const nr = { ...(e.werkbank.portnummern || {}) };
+    const gesehen = { ...(e.werkbank.beobachtet || {}) };
+    for (const p of e.ports || []) {
+        const k = kopplungVon(p);
+        if (!k || nr[k.basis] === undefined) continue;
+        const soll = nr[k.basis] + k.abstand;
+        if (nr[p.purpose] !== soll && k.basis === geaendert) delete gesehen[p.purpose];
+        nr[p.purpose] = soll;
+    }
+    e.werkbank.portnummern = nr;
+    if (Object.keys(gesehen).length) e.werkbank.beobachtet = gesehen; else delete e.werkbank.beobachtet;
+}
+
+/** Ein Port aus dem Formular — nur die Felder, die das Formular kennt. */
+function portAusFormular(b, vorher) {
+    const text = (k) => (typeof b?.[k] === 'string' ? b[k].trim() : '');
+    const an = (k) => b?.[k] === true || b?.[k] === 'on' || b?.[k] === '1';
+    const zweck = text('zweck');
+    if (!RE_ZWECK.test(zweck)) throw new Error('Zweck: Kleinbuchstaben, Ziffern und _, beginnend mit einem Buchstaben (game, query, rcon …).');
+    if (!['tcp', 'udp', 'both'].includes(text('protocol'))) throw new Error('Protokoll: tcp, udp oder both.');
+    const p = { purpose: zweck, protocol: text('protocol'), assign: 'pool' };
+
+    if (text('basis')) {
+        const n = Number(text('abstand'));
+        if (!RE_ZWECK.test(text('basis'))) throw new Error('Kopplung: der Zweck des anderen Ports fehlt.');
+        if (!Number.isInteger(n) || n < PORT.abstand[0] || n > PORT.abstand[1]) {
+            throw new Error(`Kopplung: der Abstand ist eine ganze Zahl von ${PORT.abstand[0]} bis ${PORT.abstand[1]}.`);
+        }
+        p.assign = `${text('basis')}+${n}`;
+    }
+    // Pflicht ist die Vorgabe des Schemas. Ein ausdrückliches `required: true`
+    // aus einem geöffneten Paket bleibt stehen, geschrieben wird es sonst nicht.
+    if (an('optional')) p.required = false;
+    else if (vorher?.required === true) p.required = true;
+
+    if (text('variable')) {
+        if (!RE_VARIABLE.test(text('variable'))) throw new Error('Variable: Buchstaben, Ziffern und _, nicht mit einer Ziffer beginnend (SERVER_PORT).');
+        p.variable = text('variable');
+    }
+    const de = text('beschreibung_de'), en = text('beschreibung_en');
+    for (const t of [de, en]) if (t.length > PORT.beschreibung) throw new Error(`Beschreibung: höchstens ${PORT.beschreibung} Zeichen.`);
+    if (de || en) p.description = { ...(de ? { de } : {}), ...(en ? { en } : {}) };
+
+    if (text('needed_by')) {
+        if (!RE_NUR_WENN.test(text('needed_by'))) {
+            throw new Error('„Nur wenn Datei": ein Pfad ab der Wurzel des Volumes, etwa game/mods/voicechat-*.jar — ohne führenden Schrägstrich oder Punkt.');
+        }
+        // Dieselbe Bedingung wie im Schema: nachgebucht wird aus dem Pool, und
+        // ein Pflichtport, der nur manchmal gebraucht wird, ist ein Widerspruch.
+        if (p.assign !== 'pool' || p.required !== false) {
+            throw new Error('„Nur wenn Datei" geht nur mit eigener Nummer und als optionaler Port — er wird erst gebucht, wenn die Datei da ist.');
+        }
+        p.needed_by = text('needed_by');
+    }
+    return p;
+}
+
+/**
+ * Einen Port bearbeiten (`alt` = sein Zweck) oder von Hand anlegen (ohne `alt`,
+ * nur mit „nur wenn Datei"). Der Zweck selbst ist nicht änderbar: An ihm hängen
+ * Startzeile, Bereitschaft, Abfrage und die Nummern der Sitzung.
+ */
+async function portSpeichern(sitzung, b) {
+    await pruefeFrei(sitzung);
+    const alt = typeof b?.alt === 'string' ? b.alt.trim() : '';
+    return entwurfSchreiben(sitzung, (e) => {
+        const liste = e.ports || [];
+        const platz = alt ? liste.findIndex(p => p.purpose === alt) : -1;
+        if (alt && platz < 0) throw new Error(`Den Port „${alt}" gibt es im Entwurf nicht.`);
+        const vorher = platz >= 0 ? liste[platz] : null;
+        const neu = portAusFormular(b, vorher);
+        if (vorher && neu.purpose !== vorher.purpose) {
+            throw new Error('Der Zweck lässt sich nicht umbenennen — an ihm hängen Startzeile, Bereitschaft und Abfrage. Entfernen und neu übernehmen.');
+        }
+        if (!vorher) {
+            if (liste.some(p => p.purpose === neu.purpose)) throw new Error(`Den Port „${neu.purpose}" gibt es schon.`);
+            if (!neu.needed_by) {
+                throw new Error('Von Hand anlegen lässt sich nur ein Port mit „nur wenn Datei" (den bringt ein Mod mit). '
+                    + 'Jeder andere kommt aus der Beobachtung: Spiel starten, Port übernehmen.');
+            }
+        }
+        const k = kopplungVon(neu);
+        if (k) {
+            const basis = liste.find(p => p.purpose === k.basis);
+            if (!basis || k.basis === neu.purpose) throw new Error(`Kopplung: Den Port „${k.basis}" gibt es im Entwurf nicht.`);
+            if (kopplungVon(basis)) throw new Error(`Kopplung: „${k.basis}" ist selbst gekoppelt — gekoppelt wird an einen Port mit eigener Nummer.`);
+            if (liste.some(p => kopplungVon(p)?.basis === neu.purpose)) {
+                throw new Error(`An „${neu.purpose}" ist schon ein anderer Port gekoppelt — er braucht deshalb eine eigene Nummer.`);
+            }
+            // Eine BEOBACHTETE Nummer, die der Kopplung widerspricht, ist ein
+            // Befund und kein Rundungsfehler. Vorläufige Nummern (geöffnetes
+            // Paket) rechnen einfach nach.
+            const nr = e.werkbank?.portnummern || {};
+            if (e.werkbank?.beobachtet?.[neu.purpose] && nr[k.basis] !== undefined && nr[neu.purpose] !== nr[k.basis] + k.abstand) {
+                throw new Error(`„${neu.purpose}" wurde auf ${nr[neu.purpose]} beobachtet, „${k.basis}" auf ${nr[k.basis]} — `
+                    + `das sind nicht ${k.abstand} Abstand. Die Kopplung stimmt so nicht.`);
+            }
+        }
+        const fertig = behalteUnbekanntes(vorher, neu, PORT_FELDER);
+        if (platz >= 0) liste[platz] = fertig; else liste.push(fertig);
+        e.ports = liste;
+        e.werkbank = { ...(e.werkbank || {}) };
+        // Ein von Hand angelegter Port braucht eine Nummer, sonst entsteht kein
+        // Auftrag — vorläufig, wie beim Öffnen.
+        if (!vorher && !k) {
+            const nr = e.werkbank.portnummern || {};
+            e.werkbank.portnummern = { ...nr, [neu.purpose]: Math.max(27990, ...Object.values(nr).map(Number).filter(Number.isFinite)) + 10 };
+        }
+        nummernNachziehen(e, neu.purpose);
+    });
+}
+
+/**
+ * Die Kennungen, die eine Abfrage tragen darf — dieselbe Regel wie
+ * `scripts/check-pakete.js`: GameDigs Katalog, dazu unser `a2s` für Spiele, die
+ * Source Query sprechen und dort fehlen (Baustelle 160).
+ *
+ * `belegbar`: fb-init spricht genau GameDigs `valve`-Protokoll selbst — aus
+ * derselben Tabelle erzeugt `scripts/erzeuge-a2s-kennungen.js` seine Liste.
+ */
+function abfrageKennungen() {
+    const katalog = require('gamedig').games;
+    const aus = [{ kennung: 'a2s', name: 'Source Query (Spiel steht nicht im Katalog)', belegbar: true }];
+    for (const k of Object.keys(katalog).sort()) {
+        aus.push({ kennung: k, name: katalog[k].name || k, belegbar: katalog[k].options?.protocol === 'valve' });
+    }
+    return aus;
+}
+
+/** Was die Karte über die Abfrage zeigt. */
+function abfrageStand(sitzung) {
+    const q = sitzung.entwurf?.management?.query || null;
+    const eintrag = q ? abfrageKennungen().find(k => k.kennung === q.protocol) : null;
+    return {
+        query: q,
+        bereit: sitzung.entwurf?.start?.ready_when?.query === true,
+        belegbar: Boolean(eintrag?.belegbar),
+        bekannt: Boolean(eintrag),
+    };
+}
+
+async function abfrageSpeichern(sitzung, b) {
+    await pruefeFrei(sitzung);
+    const text = (k) => (typeof b?.[k] === 'string' ? b[k].trim() : '');
+    const bereit = b?.bereit === true || b?.bereit === 'on' || b?.bereit === '1';
+    const protocol = text('protocol').toLowerCase();
+    if (!abfrageKennungen().some(k => k.kennung === protocol)) {
+        throw new Error(`„${protocol || '(leer)'}" ist keine Kennung aus GameDigs Katalog und nicht „a2s" — damit könnte niemand fragen.`);
+    }
+    return entwurfSchreiben(sitzung, (e) => {
+        if (!(e.ports || []).some(p => p.purpose === text('port'))) throw new Error('Abfrage: Diesen Port gibt es im Entwurf nicht.');
+        const bereitTeil = e.start?.ready_when;
+        if (bereit && !bereitTeil?.port) {
+            throw new Error('„Erst bereit, wenn die Abfrage antwortet" braucht im Startteil „Bereit, wenn Port" — die Abfrage ist die Stufe danach.');
+        }
+        e.management = { ...(e.management || {}) };
+        e.management.query = behalteUnbekanntes(e.management.query, { protocol, port: text('port') }, ['protocol', 'port']);
+        // Der Schalter gehört zum Startteil (`ready_when.query`), sein Formular
+        // kennt ihn aber nicht und lässt ihn stehen (BEREIT_FELDER).
+        if (bereit) e.start = { ...e.start, ready_when: { ...bereitTeil, query: true } };
+        else if (bereitTeil?.query === true) { const { query, ...ohne } = bereitTeil; e.start = { ...e.start, ready_when: ohne }; }
+    });
+}
+
+async function abfrageEntfernen(sitzung) {
+    await pruefeFrei(sitzung);
+    return entwurfSchreiben(sitzung, (e) => {
+        if (e.management) {
+            delete e.management.query;
+            if (!Object.keys(e.management).length) delete e.management;
+        }
+        // Ohne Abfrage kann die Bereitschaft nicht auf sie warten (check-pakete).
+        if (e.start?.ready_when && 'query' in e.start.ready_when) {
+            const { query, ...ohne } = e.start.ready_when;
+            e.start = { ...e.start, ready_when: ohne };
+        }
     });
 }
 
@@ -1455,7 +1750,21 @@ async function veroeffentlichungsStand(sitzung, liste, pruefListe) {
         if (neueste) {
             const vorhanden = await Paketfassung.ladeNeuesteFassung(db(), { slug: id.slug });
             const alt = json(vorhanden?.fbpkg, null) || {};
-            const fehlt = DURCHGEREICHT.filter(k => alt[k] !== undefined && paket[k] === undefined);
+            // Stückweise: `management` kann da sein (die Abfrage hat eine Karte) und
+            // trotzdem die Fernsteuerung verloren haben. Ein Stück MIT Karte zählt
+            // nur, wenn die Sitzung das Paket nicht geöffnet hat — dort heisst
+            // „fehlt": bewusst entfernt.
+            const vonHier = sitzung.entwurf?.werkbank?.geoeffnet?.slug === id.slug;
+            const fehlt = [];
+            for (const k of DURCHGEREICHT) {
+                if (alt[k] === undefined) continue;
+                if (!EIGENE[k]) { if (paket[k] === undefined) fehlt.push(k); continue; }
+                for (const f of Object.keys(alt[k] || {})) {
+                    if (paket[k]?.[f] !== undefined) continue;
+                    if (EIGENE[k].includes(f) && vonHier) continue;
+                    fehlt.push(`${k}.${f}`);
+                }
+            }
             if (fehlt.length) {
                 gruende.push(`„${id.slug}" ${vorhanden.version} trägt ${fehlt.join(', ')} — diese Sitzung nicht. `
                     + 'Veröffentlicht ginge das verloren (Abfrage, Mods, Sperrliste …). Öffne das Paket in der Werkbank, statt es neu zu bauen, '
@@ -1464,6 +1773,27 @@ async function veroeffentlichungsStand(sitzung, liste, pruefListe) {
         }
     }
     return { darf: gruende.length === 0, gruende, neueste, pruefung: letzte };
+}
+
+/**
+ * Was der Durchlauf über die Abfrage weiss (Absprache 2026-10-07: sie kommt
+ * auch unbelegt ins Paket — dann steht es dabei).
+ *
+ * Belegt ist sie genau dann, wenn der Durchlauf die Stufe `query` erreichte.
+ * Das geht nur mit dem Schalter „erst bereit, wenn die Abfrage antwortet", und
+ * nur bei Protokollen, die fb-init selbst spricht (Source Query). Minecrafts
+ * Abfrage etwa beantwortet erst das Dashboard über GameDig am laufenden Server.
+ */
+function abfrageVermerk(pruefung) {
+    const q = pruefung.entwurf?.management?.query;
+    if (!q) return [];
+    const wo = `Abfrage (${q.protocol}, Port „${q.port}")`;
+    if (pruefung.ergebnis?.bereitschaft === 'query') {
+        return [`${wo}: im Durchlauf #${pruefung.id} belegt — das Spiel hat geantwortet.`];
+    }
+    return [pruefung.entwurf?.start?.ready_when?.query === true
+        ? `${wo}: im Durchlauf NICHT belegt — fb-init spricht dieses Protokoll nicht selbst. Ob sie antwortet, zeigt erst der laufende Server im Dashboard.`
+        : `${wo}: im Durchlauf NICHT belegt — die Bereitschaft wartet nicht auf sie (Schalter „erst bereit, wenn die Abfrage antwortet" ist aus).`];
 }
 
 /** Die Stufe, mit der der Durchlauf grün wurde — so, wie sie im Paket stehen soll. */
@@ -1557,10 +1887,11 @@ function veroeffentlichungsPaket(sitzung, liste, pruefung, autor, imageVorher = 
                     for (const w of b.weg) zeilen.push(`Nicht aufgenommen: Einstellung „${w.key}" — ${w.grund}`);
                     return zeilen;
                 })(),
+                ...abfrageVermerk(pruefung),
                 // Durchgereichtes steht im Paket, wie es war — die Werkbank hat es
                 // weder gebaut noch im Durchlauf einzeln belegt. Das gehört gesagt.
                 ...(() => {
-                    const teile = DURCHGEREICHT.filter(k => pruefung.entwurf?.[k] !== undefined);
+                    const teile = durchgereichteTeile(pruefung.entwurf);
                     const von = sitzung.entwurf?.werkbank?.geoeffnet;
                     return teile.length
                         ? [`Unverändert übernommen${von ? ` aus ${von.slug} ${von.version}` : ''}: ${teile.join(', ')} — `
@@ -1827,6 +2158,8 @@ module.exports = {
     DURCHGEREICHT, IM_ENTWURF, imEntwurf, entwurfAusPaket, paketOeffnen, durchgereichtes, naechsteFassung, behalteUnbekanntes, mischeStart, mischeEinstellung, zieleAusPaket, uebernommeneZiele, vorlaeufigePortnummern, oeffenbarePakete, LAUFZEIT_TEILE,
     werkbankTeil, ungenutztePorts, startSpeichern, startzeile, zustand, starten, stoppen, eingabe, laeufe, laufenderLauf,
     portUebernehmen, portEntfernen, bereitschaftszeile,
+    portSpeichern, portAusFormular, kopplungVon, abfrageKennungen, abfrageStand, abfrageSpeichern, abfrageEntfernen,
+    EIGENE, ordne, durchgereichteTeile, PORT,
     laufSetzen, konsoleAnhaengen, laufBeenden, dateienJetzt, gruppiere,
     formatVermuten, vorschlagsDateien, schluesselLesen, vorschlaegeUebernehmen, freierSchluessel,
 };

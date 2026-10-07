@@ -635,7 +635,7 @@ async function pruefe(name, fn) {
         db.vorhandenesPaket.factorio = { management: { rcon: { port: 'rcon' } }, files: { denylist: ['bin'] } };
         st = await Sitzungen.veroeffentlichungsStand(s, liste, [g]);
         assert.strictEqual(st.darf, false);
-        assert.match(st.gruende.join(' '), /trägt management, files — diese Sitzung nicht.*Öffne das Paket/);
+        assert.match(st.gruende.join(' '), /trägt management\.rcon, files — diese Sitzung nicht.*Öffne das Paket/);
         db.vorhandenesPaket = {};
     });
 
