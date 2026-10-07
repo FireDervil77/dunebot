@@ -1466,8 +1466,36 @@ async function veroeffentlichungsStand(sitzung, liste, pruefListe) {
     return { darf: gruende.length === 0, gruende, neueste, pruefung: letzte };
 }
 
+/** Die Stufe, mit der der Durchlauf grün wurde — so, wie sie im Paket stehen soll. */
+function bereitUeber(stufe) {
+    if (stufe === 'query') return 'bereit über die Abfrage (das Spiel hat geantwortet)';
+    if (stufe === 'log_line') return 'bereit über die Logzeile (Ausnahme ohne Port)';
+    return 'bereit über den Port';
+}
+
+/**
+ * Was ein geöffnetes Paket am Image trägt, ohne dass die Werkbank es kennt —
+ * alles außer Name, Tag und Anheftung. Nur solange es dasselbe Image ist: Ein
+ * anderes Image hat seine eigene Plattform.
+ */
+function imageBeiwerk(vorher, jetzt) {
+    if (!vorher || typeof vorher !== 'object') return {};
+    if (jetzt && (vorher.ref !== jetzt.ref || (vorher.tag || '') !== (jetzt.tag || ''))) return {};
+    const { ref, tag, digest, pinned_at, ...beiwerk } = vorher;
+    return beiwerk;
+}
+
+/** Das Image der Fassung, aus der diese Sitzung geöffnet wurde — oder null. */
+async function imageDerGeoeffnetenFassung(sitzung) {
+    const von = sitzung.entwurf?.werkbank?.geoeffnet;
+    if (!von?.paket_id || !von?.version) return null;
+    const [z] = await db().query(
+        'SELECT fbpkg FROM package_versions WHERE package_id = ? AND version = ?', [von.paket_id, von.version]);
+    return json(z?.fbpkg, null)?.image || null;
+}
+
 /** Das Paket, wie es eingeliefert wird. */
-function veroeffentlichungsPaket(sitzung, liste, pruefung, autor) {
+function veroeffentlichungsPaket(sitzung, liste, pruefung, autor, imageVorher = null) {
     const e = entwurfAlsPaket(sitzung, liste);
     const heute = new Date().toISOString().slice(0, 10);
     const am = pruefung.beendet_am ? new Date(pruefung.beendet_am).toISOString().slice(0, 16).replace('T', ' ') : heute;
@@ -1497,7 +1525,12 @@ function veroeffentlichungsPaket(sitzung, liste, pruefung, autor) {
         // Angeheftet wird der Digest, auf dem der grüne Durchlauf WIRKLICH lief
         // (der Daemon meldet ihn) — nicht der, der beim Veröffentlichen gerade
         // hinter dem Tag steht (Baustelle 166).
+        //
+        // Was das geöffnete Paket am Image sonst noch trug (`platform`, `arch`),
+        // bleibt — die Sitzung kennt vom Image nur Name und Tag. Valheim 1.0.21
+        // verlor beides am 2026-10-07; der Wächter verglich bis dahin nur `ref:tag`.
         image: {
+            ...imageBeiwerk(imageVorher, pruefung.entwurf?.image),
             ...(pruefung.entwurf?.image || {}),
             digest: pruefung.ergebnis?.image_digest,
             pinned_at: heute,
@@ -1506,7 +1539,7 @@ function veroeffentlichungsPaket(sitzung, liste, pruefung, autor) {
             complete: false,
             open: [
                 `Aus der Werkbank (Sitzung ${sitzung.kennung}). Prüfdurchlauf #${pruefung.id} grün am ${am} UTC: `
-                    + `ganzes Rezept auf leerem Volume, bereit über den Port, Stoppfolge endete vor sigkill.`,
+                    + `ganzes Rezept auf leerem Volume, ${bereitUeber(pruefung.ergebnis?.bereitschaft)}, Stoppfolge endete vor sigkill.`,
                 ...(() => {
                     const b = belegteEinstellungen(pruefung.entwurf, pruefung.ergebnis, uebernommeneZiele(sitzung));
                     const zeilen = [];
@@ -1547,7 +1580,7 @@ function veroeffentlichungsPaket(sitzung, liste, pruefung, autor) {
 async function veroeffentlichen(sitzung, liste, pruefListe, { autor } = {}) {
     const stand = await veroeffentlichungsStand(sitzung, liste, pruefListe);
     if (!stand.darf) throw new Error(stand.gruende.join(' '));
-    const paket = veroeffentlichungsPaket(sitzung, liste, stand.pruefung, autor);
+    const paket = veroeffentlichungsPaket(sitzung, liste, stand.pruefung, autor, await imageDerGeoeffnetenFassung(sitzung));
     // Dasselbe Tor wie die Kommandozeile: check-pakete.js über eine Datei.
     const fs = require('fs'), os = require('os'), path = require('path');
     const ordner = fs.mkdtempSync(path.join(os.tmpdir(), 'werkbank-'));

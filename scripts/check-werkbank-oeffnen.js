@@ -143,8 +143,18 @@ function alsFormular(e) {
             const geprueft = S.entwurfAlsPaket(sitzung, liste);
             const pruefung = { id: 1, status: 'gruen', entwurf: geprueft, beendet_am: new Date(),
                 ergebnis: { gruen: true, image_digest: paket.image.digest, einstellungen: [] } };
-            const neu = S.veroeffentlichungsPaket(sitzung, liste, pruefung, 'waechter');
+            const neu = S.veroeffentlichungsPaket(sitzung, liste, pruefung, 'waechter', paket.image);
             assert.deepStrictEqual(vergleiche(paket, neu), []);
+            // Das Image als Ganzes — bis 2026-10-07 stand hier nur `ref:tag`, und
+            // Valheim 1.0.21 verlor `platform` und `arch`, ohne dass es auffiel.
+            // Neu sein darf allein der Tag der Anheftung.
+            assert.deepStrictEqual(abweichungen({ ...paket.image, pinned_at: 0 }, { ...neu.image, pinned_at: 0 }, 'image'), []);
+            // Ein ANDERES Image erbt nichts: Seine Plattform ist nicht die des alten.
+            const fremd = S.veroeffentlichungsPaket(sitzung, liste, pruefung, 'waechter', { ...paket.image, ref: 'anderes/image', platform: 'windows', arch: ['arm64'] });
+            assert.deepStrictEqual(Object.keys(fremd.image).sort(), Object.keys(geprueft.image).concat(['digest', 'pinned_at']).filter((k, i, a) => a.indexOf(k) === i).sort());
+            // Die Zeile im Paket nennt die Stufe, die der Durchlauf wirklich erreichte.
+            const mitAbfrage = S.veroeffentlichungsPaket(sitzung, liste, { ...pruefung, ergebnis: { ...pruefung.ergebnis, bereitschaft: 'query' } }, 'waechter', paket.image);
+            assert.ok(/bereit über die Abfrage/.test(mitAbfrage.status.open[0]) && !/bereit über den Port/.test(mitAbfrage.status.open[0]));
             gesamt.einstellungen += (neu.settings || []).length;
             gesamt.ziele += (neu.settings || []).reduce((n, e) => n + (e.apply || []).length, 0);
             const teile = S.DURCHGEREICHT.filter(k => paket[k] !== undefined);
