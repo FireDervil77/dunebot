@@ -497,9 +497,12 @@
       <div class="card-body">
         <div class="row g-4">
           <div class="col-lg-7">
+            <%# Hilfstexte dieser Karte: ein Satz auf der Seite, der Rest hinter dem
+                runden „?" (werkbank-hilfe.ejs, 2026-10-08). %>
+            <style>.popover.werkbank-hilfe { --tblr-popover-max-width: 24rem; }</style>
             <p class="text-secondary small">
-              Ports kommen aus der <strong>Beobachtung</strong> im Probestart — Nummern trägst du nicht ein. Hier legst du fest, was das
-              Paket sonst über sie sagt: ob ein Port fest an einem anderen hängt, ob er Pflicht ist und wie das Spiel seine Nummer erfährt.
+              Ports kommen aus der <strong>Beobachtung</strong> im Probestart — Nummern trägst du nicht ein.<%- include('werkbank-hilfe', { text:
+                'Hier legst du fest, was das Paket sonst über einen Port sagt: ob er fest an einem anderen hängt, ob er Pflicht ist und wie das Spiel seine Nummer erfährt.' }) %>
             </p>
             <% if (!entwurfPorts.length) { %>
               <p class="text-secondary small mb-3">Noch kein Port im Entwurf. Starte das Spiel im Probestart und übernimm, was lauscht.</p>
@@ -510,9 +513,8 @@
                   <tbody>
                     <% entwurfPorts.forEach(function (p) { const k = kopplung(p); const nr = werkbankTeil.portnummern[p.purpose]; %>
                       <tr>
-                        <td>
-                          <span class="font-monospace"><%= p.purpose %></span>
-                          <% if (p.description && (p.description.de || p.description.en)) { %><div class="text-secondary small"><%= p.description.de || p.description.en %></div><% } %>
+                        <td class="text-nowrap">
+                          <span class="font-monospace"><%= p.purpose %></span><% if (p.description && (p.description.de || p.description.en)) { %><%- include('werkbank-hilfe', { text: p.description.de || p.description.en }) %><% } %>
                         </td>
                         <td class="text-nowrap">
                           <span class="badge bg-green-lt font-monospace"><%= nr || '?' %>/<%= p.protocol %></span>
@@ -561,7 +563,8 @@
                   </label>
                 </div>
                 <div class="col-md-5">
-                  <label class="form-label" for="pBasis">Vergabe</label>
+                  <div class="form-label"><label for="pBasis">Vergabe</label><%- include('werkbank-hilfe', { text:
+                    'Fest über einem anderen Port heißt: Das Spiel leitet die Nummer selbst ab (Valheims Abfrage ist immer Spielport + 1) — der Server bekommt dann zwei zusammenhängende Nummern, oder er wird nicht angelegt.' }) %></div>
                   <select class="form-select" id="pBasis" name="basis">
                     <option value="">eigene Nummer</option>
                     <% entwurfPorts.filter(function (p) { return !kopplung(p); }).forEach(function (p) { %>
@@ -574,13 +577,9 @@
                   <input class="form-control" id="pAbstand" name="abstand" type="number" min="<%= PORT.abstand[0] %>" max="<%= PORT.abstand[1] %>" value="1" disabled>
                 </div>
                 <div class="col-md-4">
-                  <label class="form-label" for="pVariable">Umgebungsvariable</label>
+                  <div class="form-label"><label for="pVariable">Umgebungsvariable</label><%- include('werkbank-hilfe', { text:
+                    'Nur nötig, wenn das Spiel die Nummer weder über die Startzeile noch über eine Datei erfährt.' }) %></div>
                   <input class="form-control font-monospace" id="pVariable" name="variable" placeholder="leer = keine">
-                </div>
-                <div class="col-12 form-hint">
-                  <strong>Fest über einem anderen Port</strong> heißt: Das Spiel leitet die Nummer selbst ab (Valheims Abfrage ist immer Spielport + 1) —
-                  der Server bekommt dann zwei zusammenhängende Nummern, oder er wird nicht angelegt.
-                  Die <strong>Umgebungsvariable</strong> ist nur nötig, wenn das Spiel die Nummer weder über die Startzeile noch über eine Datei erfährt.
                 </div>
                 <div class="col-md-6">
                   <label class="form-label" for="pTextDe">Beschreibung (deutsch)</label>
@@ -593,7 +592,8 @@
                 <div class="col-12">
                   <label class="form-label" for="pNurWenn">Nur wenn diese Datei da ist</label>
                   <input class="form-control font-monospace" id="pNurWenn" name="needed_by" placeholder="leer lassen — oder etwa game/mods/voicechat-*.jar">
-                  <div class="form-hint">Für Ports, die erst ein Mod mitbringt. Geprüft wird vor jedem Start: Passt eine Datei, wird der Port gebucht, sonst freigegeben. Geht nur optional und mit eigener Nummer. Nur solche Ports lassen sich von Hand anlegen — ohne den Mod lauscht nichts, was sich beobachten ließe.</div>
+                  <div class="form-hint">Für Ports, die erst ein Mod mitbringt.<%- include('werkbank-hilfe', { text:
+                    'Geprüft wird vor jedem Start: Passt eine Datei, wird der Port gebucht, sonst freigegeben. Geht nur optional und mit eigener Nummer. Nur solche Ports lassen sich von Hand anlegen — ohne den Mod lauscht nichts, was sich beobachten ließe.' }) %></div>
                 </div>
                 <div class="col-12 d-flex gap-2">
                   <button class="btn btn-primary" type="submit" <%= beschaeftigt ? 'disabled' : '' %>><i class="fa-solid fa-floppy-disk me-1"></i>Port speichern</button>
@@ -605,8 +605,8 @@
 
           <div class="col-lg-5">
             <p class="text-secondary small">
-              Die <strong>Abfrage</strong> sagt dem Panel, womit und auf welchem Port es Spielerzahl und Servernamen holt.
-              Ohne sie zeigt die Serverseite nur „läuft".
+              Die <strong>Abfrage</strong> sagt dem Panel, womit und auf welchem Port es Spielerzahl und Servernamen holt.<%- include('werkbank-hilfe', { text:
+                'Ohne sie zeigt die Serverseite nur „läuft".' }) %>
             </p>
             <form id="formAbfrage" class="row g-2" autocomplete="off">
               <div class="col-md-7">
@@ -625,14 +625,15 @@
               </div>
               <div class="col-12 form-hint" id="abfrageBelegbar"></div>
               <div class="col-12">
-                <label class="form-check form-switch">
-                  <input class="form-check-input" type="checkbox" name="bereit" <%= abfrageTeil.bereit ? 'checked' : '' %>>
-                  <span class="form-check-label">Erst bereit, wenn die Abfrage antwortet</span>
-                </label>
-                <div class="form-hint">
-                  Dann gilt ein Server erst als bereit, wenn das Spiel wirklich antwortet — nicht schon, wenn der Port offen ist.
-                  Der Prüfdurchlauf wird damit erst grün, wenn die Abfrage geantwortet hat<%= bereitPort ? '' : ' (braucht im Startteil „Bereit, wenn Port")' %>.
+                <div class="d-flex align-items-center">
+                  <label class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" name="bereit" <%= abfrageTeil.bereit ? 'checked' : '' %>>
+                    <span class="form-check-label">Erst bereit, wenn die Abfrage antwortet</span>
+                  </label><%- include('werkbank-hilfe', { text:
+                    'Dann gilt ein Server erst als bereit, wenn das Spiel wirklich antwortet — nicht schon, wenn der Port offen ist. Der Prüfdurchlauf wird damit erst grün, wenn die Abfrage geantwortet hat.' }) %>
                 </div>
+                <%# Was hier zu TUN ist, bleibt auf der Seite — nur die Erklärung wandert hinter das „?". %>
+                <% if (!bereitPort) { %><div class="form-hint">Braucht im Startteil „Bereit, wenn Port".</div><% } %>
               </div>
               <% if (abfrageTeil.query && !abfrageTeil.bekannt) { %>
                 <div class="col-12"><div class="alert alert-warning py-2 small mb-0">„<%= abfrageTeil.query.protocol %>" steht nicht im Katalog — die Paketprüfung lehnt das beim Veröffentlichen ab.</div></div>

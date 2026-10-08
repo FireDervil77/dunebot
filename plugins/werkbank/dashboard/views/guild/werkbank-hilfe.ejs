@@ -1,0 +1,21 @@
+<%#
+  Ein rundes „?" — der ausführliche Text steht dahinter (2026-10-08).
+
+  Betreiber: Die langen Hilfstexte „zerreißen das Layout" — in der Karte „Ports
+  und Abfrage" drückte die Beschreibung eines Ports seine Zeile auf zwanzig
+  Zeilen. Auf der Seite bleibt ein Satz, der Rest kommt hierher.
+
+  Aufruf:  include('werkbank-hilfe', { text: '…' }) — unescaped ausgeben.
+
+  Tabler richtet `data-bs-toggle="popover"` beim Laden selbst ein (dieselbe
+  Stelle wie die Tooltips) — hier wird nichts eigens gestartet. Der Text geht
+  als REINER Text hinein (kein `data-bs-html`): Beschreibungen kommen aus
+  Paketen. Zeigen, wenn die Maus darüber steht oder das „?" den Fokus hat —
+  so geht es auch mit Tastatur und am Telefon.
+
+  NEBEN ein <label> setzen, nicht hinein: Ein Klick auf alles in einem Label
+  gilt seinem Feld — das „?" schaltete sonst den Schalter um oder klappte die
+  Auswahl auf.
+%><span class="form-help ms-1" tabindex="0" role="button" aria-label="Mehr dazu"
+      data-bs-toggle="popover" data-bs-trigger="hover focus" data-bs-placement="auto"
+      data-bs-custom-class="werkbank-hilfe" data-bs-content="<%= text %>">?</span>
