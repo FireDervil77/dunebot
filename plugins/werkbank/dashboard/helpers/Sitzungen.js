@@ -453,6 +453,10 @@ function entwurfAlsPaket(sitzung, liste) {
     for (const k of DURCHGEREICHT) if (d[k] !== undefined) paket[k] = d[k];
     // Was eine eigene Karte hat, liegt im Entwurf und kommt hier dazu (EIGENE).
     for (const teil of Object.keys(EIGENE)) {
+        if (Array.isArray(e[teil])) {
+            if (e[teil].length) paket[teil] = e[teil];
+            continue;
+        }
         const eigen = {};
         for (const f of eigeneFelder(teil, e[teil])) if (e[teil]?.[f] !== undefined) eigen[f] = e[teil][f];
         if (Object.keys(eigen).length) paket[teil] = { ...(paket[teil] || {}), ...eigen };
@@ -616,9 +620,12 @@ function mischeEinstellung(vorher, neu) {
  *   management.rcon    Karte „Fernsteuerung" (2026-10-08)
  *   commands           Karte „Fernsteuerung" — der GANZE Teil: Jeder Schlüssel
  *                      darin ist ein Befehl, und jeder ist bearbeitbar.
+ *   config             Karte „Feste Zeilen in Dateien" (2026-10-08) — der ganze
+ *                      Teil. Im Paket eine LISTE (je Datei ein Eintrag), kein
+ *                      Objekt: Sie zieht als Ganzes um, nie stückweise.
  */
 const GANZ = '*';
-const EIGENE = { management: ['query', 'rcon'], commands: GANZ };
+const EIGENE = { management: ['query', 'rcon'], commands: GANZ, config: GANZ };
 /** Die Stücke eines Teils, die eine Karte haben — bei GANZ alle, die `objekt` trägt. */
 const eigeneFelder = (teil, objekt) => (EIGENE[teil] === GANZ ? Object.keys(objekt || {}) : EIGENE[teil]);
 /** Hat dieses Stück eine Karte? */
@@ -636,6 +643,13 @@ function ordne(entwurf) {
     const d = { ...e.durchgereicht };
     for (const teil of Object.keys(EIGENE)) {
         if (!d[teil] || typeof d[teil] !== 'object') continue;
+        if (Array.isArray(d[teil])) {
+            // Eine Liste hat keine Stücke: ganz in den Entwurf, oder — steht dort
+            // schon eine — die aus dem Durchgereichten ist der ältere Stand.
+            if (e[teil] === undefined && d[teil].length) e[teil] = d[teil];
+            delete d[teil];
+            continue;
+        }
         const rest = { ...d[teil] };
         const eigen = { ...(e[teil] || {}) };
         for (const f of eigeneFelder(teil, d[teil])) {
@@ -659,6 +673,7 @@ function durchgereichteTeile(paket) {
     for (const k of DURCHGEREICHT) {
         if (paket?.[k] === undefined) continue;
         if (!EIGENE[k]) { aus.push(k); continue; }
+        if (Array.isArray(paket[k])) continue;
         const rest = Object.keys(paket[k] || {}).filter(f => !hatKarte(k, f));
         if (rest.length) aus.push(`${k} (${rest.join(', ')})`);
     }
@@ -1008,6 +1023,12 @@ async function einstellungSpeichern(sitzung, formular) {
 async function einstellungEntfernen(sitzung, key) {
     await pruefeFrei(sitzung);
     return entwurfSchreiben(sitzung, (e) => {
+        // Der Daemon überspringt einen Schlüssel, dessen Verweis ins Leere geht —
+        // die Zeile fehlte dann still in der Datei.
+        const haengt = festzeilenFlach(e).filter(z => z.value.includes(`{{setting:${key}}}`));
+        if (haengt.length) {
+            throw new Error(`Die feste Zeile ${haengt.map(z => `${z.file} → ${z.key}`).join(', ')} verweist auf „${key}" — erst dort ändern oder entfernen.`);
+        }
         e.settings = (e.settings || []).filter(x => x.key !== key);
         if (e.werkbank?.werte) delete e.werkbank.werte[key];
     });
@@ -1456,6 +1477,9 @@ async function portEntfernen(sitzung, zweck) {
         const haengt = (e.ports || []).filter(p => kopplungVon(p)?.basis === zweck).map(p => `der Port „${p.purpose}" (Kopplung)`);
         if (e.management?.query?.port === zweck) haengt.push('die Abfrage');
         if (e.management?.rcon?.port === zweck) haengt.push('die Fernsteuerung');
+        for (const z of festzeilenFlach(e)) {
+            if (z.value.includes(`{{port:${zweck}}}`)) haengt.push(`die feste Zeile ${z.file} → ${z.key}`);
+        }
         if (haengt.length) throw new Error(`Am Port „${zweck}" hängt noch ${haengt.join(' und ')} — erst das umstellen oder entfernen.`);
         e.ports = (e.ports || []).filter(p => p.purpose !== zweck);
         if (e.werkbank?.portnummern) delete e.werkbank.portnummern[zweck];
@@ -2040,6 +2064,12 @@ async function veroeffentlichungsStand(sitzung, liste, pruefListe) {
             for (const k of DURCHGEREICHT) {
                 if (alt[k] === undefined) continue;
                 if (!EIGENE[k]) { if (paket[k] === undefined) fehlt.push(k); continue; }
+                if (Array.isArray(alt[k])) {
+                    // Eine Liste (config) fehlt ganz oder gar nicht — und in einer
+                    // Sitzung, die das Paket geöffnet hat, heisst „fehlt": entfernt.
+                    if (alt[k].length && paket[k] === undefined && !vonHier) fehlt.push(k);
+                    continue;
+                }
                 for (const f of Object.keys(alt[k] || {})) {
                     if (paket[k]?.[f] !== undefined) continue;
                     if (hatKarte(k, f) && vonHier) continue;
@@ -2322,6 +2352,131 @@ async function befehlEntfernen(sitzung, key) {
         if (!e.commands || e.commands[key] === undefined) throw new Error(`Den Befehl „${key}" gibt es im Entwurf nicht.`);
         delete e.commands[key];
         if (!Object.keys(e.commands).length) delete e.commands;
+    });
+}
+
+// ── Feste Zeilen in Dateien (`config`, 2026-10-08) ───────────────────────────
+//
+// Was das PAKET in eine Datei schreibt — im Unterschied zu einer Einstellung,
+// die der Betreiber wählt. Gebraucht für jedes Spiel, das einen Wert nur in
+// seiner eigenen Datei erwartet: Craftopia liest den Port allein aus
+// `ServerSetting.ini` ([Host] port) — kein Startparameter, keine Umgebung
+// (im Programmcode nachgesehen, 2026-10-08). Mit der Nummer aus dem Probestart
+// fiel das nicht auf: Sie war zufällig die Vorgabe des Spiels.
+//
+// Im Entwurf liegt der Teil in der Form des Pakets (`entwurf.config`: je Datei
+// ein Eintrag mit `file`, `parser`, `set`). Der Daemon schreibt ihn bei jedem
+// Start NACH den Einstellungen (auftrag/baue.go): Schreibt eine Einstellung
+// denselben Schlüssel, gewinnt die feste Zeile — die Karte sagt das dazu.
+//
+// Ein Verweis, den der Daemon nicht auflösen kann, lässt ihn den Schlüssel
+// ÜBERSPRINGEN. Deshalb hier beim Speichern: Port und Einstellung muss es im
+// Entwurf geben.
+
+const FESTZEILE = { parser: EINSTELLUNG.parser, max: { datei: 200, schluessel: 200, wert: 600 } };
+const RE_FEST_VERWEIS = /^\{\{(setting|port|content|env):([A-Za-z][A-Za-z0-9_]*)\}\}$/;
+
+/** `entwurf.config` als flache Liste — eine Zeile je Schlüssel. */
+function festzeilenFlach(entwurf) {
+    const aus = [];
+    for (const d of Array.isArray(entwurf?.config) ? entwurf.config : []) {
+        for (const [key, value] of Object.entries(d?.set || {})) {
+            aus.push({ file: d.file, parser: d.parser, key, value: String(value ?? '') });
+        }
+    }
+    return aus;
+}
+
+/**
+ * Was die Karte zeigt: die Zeilen, und je Zeile die Einstellungen, die
+ * denselben Schlüssel derselben Datei schreiben (sie verlieren).
+ */
+function festzeilenStand(sitzung) {
+    const e = sitzung.entwurf || {};
+    const einstellungen = Array.isArray(e.settings) ? e.settings : [];
+    return festzeilenFlach(e).map(z => ({
+        ...z,
+        ueberschreibt: einstellungen
+            .filter(s => (s.apply || []).some(a => a.target === 'file' && a.file === z.file && a.path === z.key))
+            .map(s => s.key),
+    }));
+}
+
+function festzeileAusFormular(b, e) {
+    const text = (k) => (typeof b?.[k] === 'string' ? b[k].trim() : '');
+    const file = text('file'), parser = text('parser'), key = text('key');
+    // Der Wert wird NICHT gestutzt, nur auf eine Zeile gebracht: Ein führendes
+    // Leerzeichen kann gemeint sein.
+    const value = typeof b?.value === 'string' ? b.value : '';
+    if (!file || !key) throw new Error('Datei und Schlüssel gehören beide dazu.');
+    if (file.startsWith('/') || file.split('/').includes('..')) throw new Error('Datei: ein Pfad relativ zu game/, ohne „.." und ohne führenden Schrägstrich.');
+    if (file.length > FESTZEILE.max.datei) throw new Error(`Datei: höchstens ${FESTZEILE.max.datei} Zeichen.`);
+    if (!FESTZEILE.parser.includes(parser)) throw new Error(`Format der Datei — ${FESTZEILE.parser.join(', ')}.`);
+    if (key.length > FESTZEILE.max.schluessel || /[\r\n]/.test(key)) throw new Error(`Schlüssel: eine Zeile, höchstens ${FESTZEILE.max.schluessel} Zeichen.`);
+    if (value.length > FESTZEILE.max.wert || /[\r\n]/.test(value)) throw new Error(`Wert: eine Zeile, höchstens ${FESTZEILE.max.wert} Zeichen.`);
+
+    for (const p of value.match(/\{\{[^}]*\}\}/g) || []) {
+        const m = RE_FEST_VERWEIS.exec(p);
+        if (!m) {
+            throw new Error(`Den Platzhalter ${p} gibt es nicht — er stünde wörtlich in der Datei. `
+                + 'Schreib {{port:zweck}} oder {{setting:schlüssel}}.');
+        }
+        if (m[1] === 'port' && !(e.ports || []).some(x => x.purpose === m[2])) {
+            throw new Error(`${p}: Den Port „${m[2]}" gibt es im Entwurf nicht — der Daemon ließe die Zeile dann aus. Erst den Port übernehmen.`);
+        }
+        if (m[1] === 'setting' && !(e.settings || []).some(x => x.key === m[2])) {
+            throw new Error(`${p}: Die Einstellung „${m[2]}" gibt es im Entwurf nicht — der Daemon ließe die Zeile dann aus.`);
+        }
+    }
+    return { file, parser, key, value };
+}
+
+/** Eine Zeile herausnehmen; leere Einträge und eine leere Liste verschwinden. */
+function festzeileLoesen(e, file, key) {
+    let gefunden = false;
+    e.config = (Array.isArray(e.config) ? e.config : []).filter((d) => {
+        if (d.file !== file || !d.set || d.set[key] === undefined) return true;
+        gefunden = true;
+        delete d.set[key];
+        return Object.keys(d.set).length > 0;
+    });
+    if (!e.config.length) delete e.config;
+    return gefunden;
+}
+
+/** Anlegen oder ersetzen. `alt_file`/`alt_key` nennen die Zeile, die bearbeitet wird. */
+async function festzeileSpeichern(sitzung, b) {
+    await pruefeFrei(sitzung);
+    return entwurfSchreiben(sitzung, (e) => {
+        const neu = festzeileAusFormular(b, e);
+        const altDatei = typeof b?.alt_file === 'string' ? b.alt_file.trim() : '';
+        const altKey = typeof b?.alt_key === 'string' ? b.alt_key.trim() : '';
+        const bearbeitet = altDatei && altKey;
+        const selbe = bearbeitet && altDatei === neu.file && altKey === neu.key;
+        if (!selbe && festzeilenFlach(e).some(z => z.file === neu.file && z.key === neu.key)) {
+            throw new Error(`${neu.file} → ${neu.key} ist schon festgelegt — dort „Bearbeiten".`);
+        }
+        if (bearbeitet && !selbe) festzeileLoesen(e, altDatei, altKey);
+
+        const liste = Array.isArray(e.config) ? e.config : [];
+        const eintrag = liste.find(d => d.file === neu.file);
+        if (eintrag && eintrag.parser !== neu.parser) {
+            // Der Daemon nähme das Format des ersten Eintrags und meldete den
+            // Widerspruch erst beim Start.
+            throw new Error(`${neu.file} wird schon als „${eintrag.parser}" gelesen — eine Datei hat ein Format.`);
+        }
+        if (eintrag) eintrag.set = { ...(eintrag.set || {}), [neu.key]: neu.value };
+        else liste.push({ file: neu.file, parser: neu.parser, set: { [neu.key]: neu.value } });
+        e.config = liste;
+    });
+}
+
+async function festzeileEntfernen(sitzung, b) {
+    await pruefeFrei(sitzung);
+    const file = typeof b?.file === 'string' ? b.file.trim() : '';
+    const key = typeof b?.key === 'string' ? b.key.trim() : '';
+    return entwurfSchreiben(sitzung, (e) => {
+        if (!festzeileLoesen(e, file, key)) throw new Error(`Die feste Zeile ${file} → ${key} gibt es im Entwurf nicht.`);
     });
 }
 
@@ -2721,6 +2876,7 @@ function gruppiere(liste, ab = 6) {
 module.exports = {
     uebernommeneAusfuehren, ketteFortsetzen, offeneUebernommene,
     angabenTags, tagsUebergeben, portBild, konsolenZeileZu, laufPortsMerken,
+    FESTZEILE, festzeilenStand, festzeileSpeichern, festzeileEntfernen,
     RCON, BEFEHL, GANZ, rconStand, rconSpeichern, rconEntfernen, rconVermerk, rconPruefbefehl, befehlSpeichern, befehlEntfernen,
     sitzungsImage,
     RE_KENNUNG, RE_ZWECK, SCHRITTTYPEN, MAX_AUSGABE, GRENZEN, VORGABE, ERKUNDUNG, hatBereitschaft,

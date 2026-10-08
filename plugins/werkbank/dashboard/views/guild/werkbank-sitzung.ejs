@@ -1265,6 +1265,109 @@
     </div>
   </div>
 
+  <!-- ── Feste Zeilen in Dateien (config, 2026-10-08) ───────────────────── -->
+  <%
+    // Was das PAKET in eine Datei schreibt — kein Feld im Panel, bei jedem Start
+    // neu gesetzt. Gerechnet in Sitzungen.festzeilenStand; hier wird gezeichnet.
+    const festListe = locals.festzeilen || [];
+    const FZ = locals.FESTZEILE || { parser: [], max: { datei: 200, schluessel: 200, wert: 600 } };
+    // Dateien, die der Entwurf schon kennt (Ziele der Einstellungen, feste
+    // Zeilen) — als Vorschlag, mit ihrem Format.
+    const festDateien = {};
+    einstellungen.forEach(function (e) { (e.apply || []).forEach(function (z) { if (z.target === 'file' && z.file && !festDateien[z.file]) festDateien[z.file] = z.parser; }); });
+    festListe.forEach(function (z) { festDateien[z.file] = z.parser; });
+  %>
+  <div class="col-12">
+    <div class="card" id="karteFestzeilen">
+      <div class="card-header">
+        <h3 class="card-title">Feste Zeilen in Dateien</h3>
+        <div class="card-actions"><span class="text-secondary small"><%= festListe.length %> im Entwurf</span></div>
+      </div>
+      <div class="card-body">
+        <p class="text-secondary small">
+          Was der Server zum Laufen braucht und kein Betreiber verstellen soll — etwa der Port oder der Ort des Spielstands.
+          Eine <strong>Einstellung</strong> wählt der Betreiber; eine <strong>feste Zeile</strong> legt das Paket fest.<%- include('werkbank-hilfe', { text:
+            'Das Paket schreibt eine feste Zeile bei jedem Start in die Datei, nach den Einstellungen. Im Panel gibt es dafür kein Feld. '
+            + 'Schreibt eine Einstellung denselben Schlüssel, gewinnt die feste Zeile. '
+            + 'Der Wert darf Verweise tragen: {{port:zweck}} wird bei jedem Server zu dessen eigener Nummer, {{setting:schlüssel}} zum Wert einer Einstellung. '
+            + 'Gebraucht für Spiele, die ihren Port nur aus einer Datei lesen.' }) %>
+        </p>
+
+        <% if (festListe.length) { %>
+          <div class="table-responsive mb-3">
+            <table class="table table-sm table-vcenter">
+              <thead><tr><th>Datei</th><th>Schlüssel</th><th>Wert</th><th class="w-1"></th></tr></thead>
+              <tbody>
+                <% festListe.forEach(function (z) { %>
+                  <tr>
+                    <td><span class="font-monospace"><%= z.file %></span> <span class="text-secondary small">(<%= z.parser %>)</span></td>
+                    <td>
+                      <span class="font-monospace"><%= z.key %></span>
+                      <% if (z.ueberschreibt.length) { %>
+                        <div class="text-warning small">
+                          <%= z.ueberschreibt.length === 1 ? 'Die Einstellung' : 'Die Einstellungen' %>
+                          <%= z.ueberschreibt.map(function (k) { return '„' + k + '"'; }).join(', ') %>
+                          <%= z.ueberschreibt.length === 1 ? 'schreibt' : 'schreiben' %> denselben Schlüssel — die feste Zeile gewinnt, das Feld im Panel bliebe ohne Wirkung.
+                        </div>
+                      <% } %>
+                    </td>
+                    <td class="font-monospace" style="word-break:break-all"><%= z.value %><% if (z.value === '') { %><span class="text-secondary small" style="font-family:var(--tblr-font-sans-serif)">leer</span><% } %></td>
+                    <td class="text-nowrap">
+                      <button class="btn btn-sm btn-outline-secondary" type="button" data-festzeile-bearbeiten="<%= JSON.stringify({ file: z.file, parser: z.parser, key: z.key, value: z.value }) %>" <%= beschaeftigt ? 'disabled' : '' %>>Bearbeiten</button>
+                      <button class="btn btn-sm btn-outline-danger" type="button" data-festzeile-entfernen="<%= JSON.stringify({ file: z.file, key: z.key }) %>" <%= beschaeftigt ? 'disabled' : '' %>>Entfernen</button>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+
+        <details id="festzeileDetails" <%= festListe.length ? '' : 'open' %>>
+          <summary class="mb-2"><span id="festzeileUeberschrift">Neue feste Zeile</span></summary>
+          <form id="formFestzeile" class="row g-2" autocomplete="off" data-dateien="<%= JSON.stringify(festDateien) %>">
+            <input type="hidden" name="alt_file" value="">
+            <input type="hidden" name="alt_key" value="">
+            <div class="col-md-5">
+              <label class="form-label" for="fzDatei">Datei (relativ zu game/)</label>
+              <input class="form-control font-monospace" id="fzDatei" name="file" list="fzDateien" maxlength="<%= FZ.max.datei %>" placeholder="ServerSetting.ini" required>
+              <datalist id="fzDateien"><% Object.keys(festDateien).forEach(function (d) { %><option value="<%= d %>"></option><% }) %></datalist>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label" for="fzParser">Format</label>
+              <select class="form-select" id="fzParser" name="parser">
+                <% FZ.parser.forEach(function (pa) { %><option value="<%= pa %>"><%= pa %></option><% }) %>
+              </select>
+            </div>
+            <div class="col-md-5">
+              <div class="form-label"><label for="fzKey">Schlüssel in der Datei</label><%- include('werkbank-hilfe', { text:
+                'ini: Abschnitt.Schlüssel, etwa Host.port. properties: der Name vor dem Gleichheitszeichen, etwa server-port. '
+                + 'xml: der Name der Eigenschaft, etwa ServerPort. json und yaml: der Pfad mit Punkten, etwa server.port. '
+                + 'Dieselbe Schreibweise wie beim Ziel „Datei" einer Einstellung.' }) %></div>
+              <input class="form-control font-monospace" id="fzKey" name="key" maxlength="<%= FZ.max.schluessel %>" placeholder="Host.port" required>
+            </div>
+            <div class="col-md-8">
+              <label class="form-label" for="fzWert">Wert</label>
+              <input class="form-control font-monospace" id="fzWert" name="value" maxlength="<%= FZ.max.wert %>" placeholder="{{port:game}}">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="fzVerweis">Verweis einfügen</label>
+              <select class="form-select" id="fzVerweis">
+                <option value="">— wählen —</option>
+                <% entwurfPorts.forEach(function (po) { %><option value="{{port:<%= po.purpose %>}}">Port: <%= po.purpose %></option><% }) %>
+                <% einstellungen.forEach(function (e) { %><option value="{{setting:<%= e.key %>}}">Einstellung: <%= e.key %></option><% }) %>
+              </select>
+            </div>
+            <div class="col-12 d-flex gap-2">
+              <button class="btn btn-primary" type="submit" <%= beschaeftigt ? 'disabled' : '' %>><i class="fa-solid fa-floppy-disk me-1"></i>Feste Zeile speichern</button>
+              <button class="btn btn-outline-secondary" type="button" id="knopfFestzeileNeu">Leeren</button>
+            </div>
+          </form>
+        </details>
+      </div>
+    </div>
+  </div>
+
   <!-- ── Hinweise für Betreiber (2026-10-06) ───────────────────────────── -->
   <%
     // Was sich nicht einstellen lässt und was man trotzdem wissen muss. Fester
@@ -2580,6 +2683,76 @@
         abfrageWeg.disabled = false;
         melde('error', fehler.message);
       }
+    });
+  }
+
+  // ── Feste Zeilen in Dateien (2026-10-08) ──────────────────────────────
+  var formFz = document.getElementById('formFestzeile');
+  if (formFz) {
+    var fzDateien = JSON.parse(formFz.dataset.dateien || '{}');
+    function festzeileLeeren() {
+      formFz.reset();
+      formFz.alt_file.value = '';
+      formFz.alt_key.value = '';
+      document.getElementById('festzeileUeberschrift').textContent = 'Neue feste Zeile';
+    }
+    document.getElementById('knopfFestzeileNeu').addEventListener('click', festzeileLeeren);
+    // Eine Datei, die der Entwurf schon kennt, bringt ihr Format mit.
+    formFz.file.addEventListener('change', function () {
+      var bekannt = fzDateien[formFz.file.value.trim()];
+      if (bekannt) formFz.parser.value = bekannt;
+    });
+    // Verweis an der Schreibmarke einsetzen — niemand soll die Klammern tippen müssen.
+    var fzVerweis = document.getElementById('fzVerweis');
+    fzVerweis.addEventListener('change', function () {
+      if (!fzVerweis.value) return;
+      var feld = formFz.elements.value;
+      var von = feld.selectionStart == null ? feld.value.length : feld.selectionStart;
+      var bis = feld.selectionEnd == null ? feld.value.length : feld.selectionEnd;
+      feld.value = feld.value.slice(0, von) + fzVerweis.value + feld.value.slice(bis);
+      fzVerweis.value = '';
+      feld.focus();
+    });
+    document.querySelectorAll('[data-festzeile-bearbeiten]').forEach(function (k) {
+      k.addEventListener('click', function () {
+        var z = JSON.parse(k.dataset.festzeileBearbeiten);
+        festzeileLeeren();
+        formFz.alt_file.value = z.file;
+        formFz.alt_key.value = z.key;
+        formFz.file.value = z.file;
+        formFz.parser.value = z.parser;
+        formFz.key.value = z.key;
+        formFz.elements.value.value = z.value;
+        document.getElementById('festzeileUeberschrift').textContent = 'Feste Zeile „' + z.file + ' → ' + z.key + '" bearbeiten';
+        document.getElementById('festzeileDetails').open = true;
+        formFz.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+    formFz.addEventListener('submit', async function (ev) {
+      ev.preventDefault();
+      var knopf = formFz.querySelector('button[type=submit]');
+      knopf.disabled = true;
+      try {
+        await schicke(hier + '/festzeilen', Object.fromEntries(new FormData(formFz)));
+        window.location.reload();
+      } catch (fehler) {
+        knopf.disabled = false;
+        melde('error', fehler.message);
+      }
+    });
+    document.querySelectorAll('[data-festzeile-entfernen]').forEach(function (k) {
+      k.addEventListener('click', async function () {
+        var z = JSON.parse(k.dataset.festzeileEntfernen);
+        if (!confirm('Feste Zeile „' + z.file + ' → ' + z.key + '" aus dem Entwurf nehmen?')) return;
+        k.disabled = true;
+        try {
+          await schicke(hier + '/festzeilen/entfernen', z);
+          window.location.reload();
+        } catch (fehler) {
+          k.disabled = false;
+          melde('error', fehler.message);
+        }
+      });
     });
   }
 

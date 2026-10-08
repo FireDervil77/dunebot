@@ -25,6 +25,10 @@
  *   POST /:kennung/befehle                 eine Befehlsgruppe speichern
  *   POST /:kennung/befehle/entfernen
  *
+ * Karte „Feste Zeilen in Dateien" (2026-10-08) — der Abschnitt `config`:
+ *   POST /:kennung/festzeilen              eine Zeile speichern (Datei, Format, Schlüssel, Wert)
+ *   POST /:kennung/festzeilen/entfernen
+ *
  * Stufe 3 (Prüfdurchlauf):
  *   POST /:kennung/pruefen              ganzes Rezept auf leerem Volume, Start, Stopp
  *   POST /:kennung/pruefung/abbrechen   hängenden Durchlauf von Hand rot setzen
@@ -348,6 +352,8 @@ router.get('/:kennung', requirePermission('WERKBANK.VIEW'), async (req, res) => 
             werkbankTeil: Sitzungen.werkbankTeil(sitzung),
             einstellungen: sitzung.entwurf?.settings || [],
             hinweise: sitzung.entwurf?.hints || [],
+            festzeilen: Sitzungen.festzeilenStand(sitzung),
+            FESTZEILE: Sitzungen.FESTZEILE,
             durchgereicht: Sitzungen.durchgereichtes(sitzung),
             abfrage: Sitzungen.abfrageStand(sitzung),
             abfrageKennungen: Sitzungen.abfrageKennungen(),
@@ -634,6 +640,27 @@ router.post('/:kennung/hinweise/:key/entfernen', requirePermission('WERKBANK.BAU
         return res.json({ success: true });
     } catch (error) {
         return fehler(res, error, 'Hinweis nicht entfernt', 400);
+    }
+});
+
+// ── Feste Zeilen in Dateien (`config`, 2026-10-08) ────────────────────────────
+router.post('/:kennung/festzeilen', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.festzeileSpeichern(await offeneSitzung(req, res), req.body || {});
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Feste Zeile nicht gespeichert', 400);
+    }
+});
+
+// Datei und Schlüssel im Rumpf, nicht in der Adresse: Beide tragen Schrägstriche
+// und Punkte (`config/voicechat/voicechat-server.properties`, `Host.port`).
+router.post('/:kennung/festzeilen/entfernen', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.festzeileEntfernen(await offeneSitzung(req, res), req.body || {});
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Feste Zeile nicht entfernt', 400);
     }
 });
 
