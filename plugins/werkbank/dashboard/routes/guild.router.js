@@ -213,6 +213,11 @@ function startAlsFormular(start) {
     };
 }
 
+/** Das eingeordnete Bild der Ports einer Sitzung — für Seite, Antwort und Meldung dasselbe. */
+async function portBildFuer(sitzung) {
+    return Sitzungen.portBild(sitzung, await Sitzungen.schritte(sitzung.id), await Sitzungen.laeufe(sitzung.id));
+}
+
 async function offeneSitzung(req, res) {
     const sitzung = await Sitzungen.laden(res.locals.guildId, req.params.kennung);
     if (!sitzung || sitzung.status !== 'offen') throw new Error('Sitzung nicht gefunden');
@@ -346,6 +351,7 @@ router.get('/:kennung', requirePermission('WERKBANK.VIEW'), async (req, res) => 
             durchgereicht: Sitzungen.durchgereichtes(sitzung),
             abfrage: Sitzungen.abfrageStand(sitzung),
             abfrageKennungen: Sitzungen.abfrageKennungen(),
+            portBild: Sitzungen.portBild(sitzung, liste, laeufe),
             fernsteuerung: Sitzungen.rconStand(sitzung),
             befehle: sitzung.entwurf?.commands || {},
             RCON: Sitzungen.RCON, BEFEHL: Sitzungen.BEFEHL,
@@ -482,10 +488,14 @@ router.post('/:kennung/eingabe', requirePermission('WERKBANK.BAUEN'), async (req
 
 router.post('/:kennung/ports', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
     try {
-        await Sitzungen.portUebernehmen(await offeneSitzung(req, res), {
+        const sitzung = await offeneSitzung(req, res);
+        await Sitzungen.portUebernehmen(sitzung, {
             zweck: req.body?.zweck, protocol: req.body?.protocol, port: req.body?.port,
+            basis: req.body?.basis, abstand: req.body?.abstand,
         });
-        return res.json({ success: true });
+        // Das neue Bild gleich mit — die Karte zeichnet sich neu, ohne die Seite
+        // zu laden (das Spiel läuft dabei meist, und die Konsole soll stehen bleiben).
+        return res.json({ success: true, bild: await portBildFuer(sitzung) });
     } catch (error) {
         return fehler(res, error, 'Port nicht übernommen', 400);
     }
@@ -493,8 +503,9 @@ router.post('/:kennung/ports', requirePermission('WERKBANK.BAUEN'), async (req, 
 
 router.post('/:kennung/ports/:zweck/entfernen', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
     try {
-        await Sitzungen.portEntfernen(await offeneSitzung(req, res), String(req.params.zweck));
-        return res.json({ success: true });
+        const sitzung = await offeneSitzung(req, res);
+        await Sitzungen.portEntfernen(sitzung, String(req.params.zweck));
+        return res.json({ success: true, bild: await portBildFuer(sitzung) });
     } catch (error) {
         return fehler(res, error, 'Port nicht entfernt', 400);
     }

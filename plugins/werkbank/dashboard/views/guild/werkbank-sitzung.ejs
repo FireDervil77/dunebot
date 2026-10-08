@@ -548,51 +548,24 @@
               <button class="btn btn-outline-secondary" type="submit" <%= spielLaeuft ? '' : 'disabled' %>>Senden</button>
             </form>
 
-            <div class="row g-3 mt-2">
-              <div class="col-md-6">
-                <div class="text-secondary small mb-1">Beobachtet (lauscht im Container)</div>
-                <%# Schon übernommene Ports (gleiche Nummer und Protokoll) nicht noch einmal anbieten. %>
-                <% const uebernommen = {};
-                   entwurfPorts.forEach(function (p) {
-                     const n = werkbankTeil.portnummern[p.purpose];
-                     if (n) (p.protocol === 'both' ? ['tcp', 'udp'] : [p.protocol]).forEach(function (pr) { uebernommen[n + '/' + pr] = p.purpose; });
-                   }); %>
-                <div id="laufPorts" data-uebernommen="<%= JSON.stringify(uebernommen) %>">
-                  <% const beobachtet = (lauf && lauf.ports) || []; %>
-                  <% if (!beobachtet.length) { %><span class="text-secondary small">Noch keiner. Öffnet das Spiel einen Port, erscheint er hier mit Nummer — dann Zweck eintragen (game, query, rcon …) und übernehmen.</span><% } %>
-                  <% beobachtet.forEach(function (p) { %>
-                    <% if (uebernommen[p.port + '/' + p.protocol]) { %>
-                      <div class="d-flex gap-2 mb-1 align-items-center">
-                        <span class="badge bg-green-lt font-monospace flex-shrink-0"><%= p.port %>/<%= p.protocol %></span>
-                        <span class="text-secondary small">im Entwurf als <span class="font-monospace"><%= uebernommen[p.port + '/' + p.protocol] %></span></span>
-                      </div>
-                      <% return; } %>
-                    <form class="d-flex gap-1 mb-1" data-port-uebernehmen data-port="<%= p.port %>" data-protocol="<%= p.protocol %>">
-                      <span class="badge bg-azure-lt font-monospace align-self-center flex-shrink-0"><%= p.port %>/<%= p.protocol %></span>
-                      <input class="form-control form-control-sm font-monospace" name="zweck" placeholder="Zweck (game)" style="max-width:9rem;min-width:0">
-                      <button class="btn btn-sm btn-outline-primary" type="submit">Übernehmen</button>
-                    </form>
-                  <% }) %>
-                </div>
+            <%# ── Was lauscht da? (2026-10-08) ─────────────────────────────────
+                Der Server ordnet ein (Sitzungen.portBild), der Browser zeichnet —
+                beim Aufbau der Seite, bei jeder Meldung des Daemons und nach dem
+                Übernehmen aus DEMSELBEN Bild. Vorher gab es die Liste zweimal
+                (hier und im Skript), und sie zeigte nur Nummern.
+
+                Diese Karte bleibt bedienbar, während das Spiel läuft: Übernehmen
+                und Entfernen ändern, was der NÄCHSTE Start bekommt. Die Karte
+                unter „Verbindung" ändert den Entwurf und bleibt dann gesperrt. %>
+            <div class="row g-3 mt-2" id="laufPortBild"
+                 data-bild="<%= JSON.stringify(locals.portBild || { laeuft: false, stand: 'leer', beobachtet: [], entwurf: [], ungenutzt: [] }) %>">
+              <div class="col-md-7">
+                <div class="text-secondary small mb-1" id="laufPortsTitel">Beobachtet (lauscht im Container)</div>
+                <div id="laufPorts"></div>
               </div>
-              <div class="col-md-6">
+              <div class="col-md-5">
                 <div class="text-secondary small mb-1">Im Entwurf</div>
-                <% if (!entwurfPorts.length) { %><span class="text-secondary small">Noch kein Port. Nummern trägst du nicht ein — die Werkbank beobachtet sie.</span><% } %>
-                <% if (ungenutztePorts.length) { %>
-                  <div class="alert alert-warning py-2 small mb-2">
-                    Auf <strong class="font-monospace"><%= ungenutztePorts.join(', ') %></strong> verweist nichts.
-                    Ein echter Server bekommt seine Nummer aus dem Pool — erfährt das Spiel sie nicht, lauscht es auf seinem Standard,
-                    und niemand kommt herein. Meist fehlt ein Argument wie <code>--port</code> gefolgt von
-                    <code>{{port:<%= ungenutztePorts[0] %>}}</code>.
-                  </div>
-                <% } %>
-                <% entwurfPorts.forEach(function (p) { %>
-                  <div class="d-flex align-items-center gap-2 mb-1">
-                    <span class="font-monospace small"><%= p.purpose %></span>
-                    <span class="badge bg-green-lt font-monospace"><%= werkbankTeil.portnummern[p.purpose] || '?' %>/<%= p.protocol %></span>
-                    <button class="btn btn-sm btn-ghost-secondary ms-auto" data-port-entfernen="<%= p.purpose %>" <%= spielLaeuft ? 'disabled' : '' %>>entfernen</button>
-                  </div>
-                <% }) %>
+                <div id="laufPortsEntwurf"></div>
               </div>
             </div>
 
@@ -1839,22 +1812,148 @@
 
   // Ports übernehmen / entfernen — Formulare entstehen auch per SSE neu,
   // deshalb am Container horchen.
+  // ── Ports im Probestart: ein Bild, eine Zeichnung (2026-10-08) ─────────
+  // Das Bild rechnet der Server (Sitzungen.portBild); gezeichnet wird es hier —
+  // beim Aufbau, bei jeder Meldung des Daemons und nach Übernehmen/Entfernen.
+  var portRahmen = document.getElementById('laufPortBild');
   var portsKasten = document.getElementById('laufPorts');
+  var portsEntwurf = document.getElementById('laufPortsEntwurf');
+  var portsTitel = document.getElementById('laufPortsTitel');
+  var portBild = { laeuft: false, stand: 'leer', beobachtet: [], entwurf: [], ungenutzt: [] };
+  try { portBild = JSON.parse(portRahmen.dataset.bild || '{}'); } catch (e) { /* leer */ }
+
+  function el(art, klasse, text) {
+    var e = document.createElement(art);
+    if (klasse) e.className = klasse;
+    if (text !== undefined) e.textContent = text;   // nie innerHTML: Konsolenzeilen kommen vom Spiel
+    return e;
+  }
+  function protText(p) { return p === 'both' ? 'tcp+udp' : p; }
+
+  function zeichnePortBild(bild) {
+    portBild = bild || portBild;
+    var b = portBild;
+    portsTitel.textContent = b.stand === 'gesehen' ? 'Beim letzten Start gesehen' : 'Beobachtet (lauscht im Container)';
+    portsKasten.textContent = '';
+    if (!(b.beobachtet || []).length) {
+      portsKasten.appendChild(el('span', 'text-secondary small', b.laeuft
+        ? 'Gerade lauscht nichts.'
+        : 'Noch keiner. Öffnet das Spiel einen Port, erscheint er hier mit Nummer — dann Zweck eintragen (game, query, rcon …) und übernehmen.'));
+    }
+    (b.beobachtet || []).forEach(function (p) {
+      var block = el('div', 'mb-2');
+      var marke = el('span', 'badge font-monospace flex-shrink-0 align-self-center ' + (p.zweck ? 'bg-green-lt' : (p.zufall ? 'bg-secondary-lt' : 'bg-azure-lt')), p.port + '/' + protText(p.protocol));
+      if (p.zweck) {
+        var zeile = el('div', 'd-flex flex-wrap gap-2 align-items-center');
+        zeile.appendChild(marke);
+        zeile.appendChild(el('span', 'text-secondary small', 'im Entwurf als ' + p.zweck));
+        if ((p.fehlt || []).length) {
+          // Lauscht auf einem Protokoll, das der Entwurf für diesen Port noch nicht nennt.
+          zeile.appendChild(el('span', 'text-warning small', 'lauscht auch auf ' + p.fehlt.join(' und ')));
+          var dazu = el('button', 'btn btn-sm btn-outline-primary', p.fehlt[0] + ' dazunehmen');
+          dazu.type = 'button';
+          dazu.dataset.portDazu = p.zweck; dazu.dataset.port = p.port; dazu.dataset.protocol = p.fehlt[0];
+          zeile.appendChild(dazu);
+        }
+        block.appendChild(zeile);
+      } else {
+        var f = el('form', 'd-flex flex-wrap gap-1');
+        f.setAttribute('data-port-uebernehmen', '');
+        f.dataset.port = p.port; f.dataset.protocol = p.protocol;
+        var eingabe = el('input', 'form-control form-control-sm font-monospace');
+        eingabe.name = 'zweck'; eingabe.placeholder = 'Zweck (game)'; eingabe.style.maxWidth = '9rem'; eingabe.style.minWidth = '0';
+        eingabe.setAttribute('aria-label', 'Zweck für Port ' + p.port);
+        f.append(marke, eingabe);
+        if (p.vorschlag) {
+          // Wenige Nummern über einem Port des Entwurfs: vermutlich an ihn gekoppelt.
+          var wahl = el('select', 'form-select form-select-sm');
+          wahl.name = 'vergabe'; wahl.style.maxWidth = '12rem';
+          wahl.title = 'Fest über einem anderen Port heißt: Das Spiel leitet die Nummer selbst ab — der Server bekommt dann zusammenhängende Nummern.';
+          wahl.add(new Option('fest: ' + p.vorschlag.basis + ' + ' + p.vorschlag.abstand, p.vorschlag.basis + '|' + p.vorschlag.abstand, true, true));
+          wahl.add(new Option('eigene Nummer', ''));
+          f.appendChild(wahl);
+        }
+        var knopf = el('button', 'btn btn-sm btn-outline-primary', 'Übernehmen');
+        knopf.type = 'submit';
+        f.appendChild(knopf);
+        block.appendChild(f);
+      }
+      if (p.konsole) {
+        var k = el('div', 'small text-secondary mt-1');
+        k.appendChild(el('span', '', 'Das Spiel sagt: '));
+        k.appendChild(el('span', 'font-monospace', p.konsole));
+        block.appendChild(k);
+      }
+      if (p.zufall) block.appendChild(el('div', 'small text-secondary mt-1', p.zufall));
+      portsKasten.appendChild(block);
+    });
+
+    portsEntwurf.textContent = '';
+    if (!(b.entwurf || []).length) {
+      portsEntwurf.appendChild(el('span', 'text-secondary small', 'Noch kein Port. Nummern trägst du nicht ein — die Werkbank beobachtet sie.'));
+    }
+    if ((b.ungenutzt || []).length) {
+      var warn = el('div', 'alert alert-warning py-2 small mb-2');
+      warn.appendChild(el('span', '', 'Auf '));
+      warn.appendChild(el('strong', 'font-monospace', b.ungenutzt.join(', ')));
+      warn.appendChild(el('span', '', ' verweist nichts. Ein echter Server bekommt seine Nummer aus dem Pool — erfährt das Spiel sie nicht, lauscht es auf seinem Standard, und niemand kommt herein. Meist fehlt ein Startparameter mit '));
+      warn.appendChild(el('code', '', '{{port:' + b.ungenutzt[0] + '}}'));
+      warn.appendChild(el('span', '', '. Ein gekoppelter Port braucht keinen.'));
+      portsEntwurf.appendChild(warn);
+    }
+    (b.entwurf || []).forEach(function (p) {
+      var zeile = el('div', 'd-flex flex-wrap align-items-center gap-2 mb-1');
+      zeile.appendChild(el('span', 'font-monospace small', p.purpose));
+      zeile.appendChild(el('span', 'badge bg-green-lt font-monospace', (p.nummer === null ? '?' : p.nummer) + '/' + protText(p.protocol)));
+      if (p.kopplung) zeile.appendChild(el('span', 'text-secondary small', '= ' + p.kopplung.basis + ' + ' + p.kopplung.abstand));
+      if (b.laeuft && !p.lauscht) zeile.appendChild(el('span', 'text-warning small', 'lauscht gerade nicht'));
+      var weg = el('button', 'btn btn-sm btn-ghost-secondary ms-auto', 'entfernen');
+      weg.type = 'button'; weg.dataset.portEntfernen = p.purpose; weg.dataset.portOrt = 'probestart';
+      zeile.appendChild(weg);
+      portsEntwurf.appendChild(zeile);
+    });
+  }
+  zeichnePortBild(portBild);
+
+  // Nach einer Änderung: Läuft das Spiel, nur die Karte neu zeichnen — die
+  // Konsole soll stehen bleiben. Sonst neu laden, damit auch „Verbindung" stimmt.
+  function nachPortAenderung(antwort, meldung) {
+    if (wurzel.dataset.werkbankSpiel === '1') {
+      zeichnePortBild(antwort.bild);
+      melde('success', meldung);
+    } else {
+      window.location.reload();
+    }
+  }
   portsKasten.addEventListener('submit', async function (ev) {
     var f = ev.target.closest('[data-port-uebernehmen]');
     if (!f) return;
     ev.preventDefault();
+    var nutzlast = { zweck: f.zweck.value, port: Number(f.dataset.port), protocol: f.dataset.protocol };
+    var vergabe = f.vergabe ? f.vergabe.value : '';
+    if (vergabe) { nutzlast.basis = vergabe.split('|')[0]; nutzlast.abstand = Number(vergabe.split('|')[1]); }
     try {
-      await schicke(hier + '/ports', { zweck: f.zweck.value, port: Number(f.dataset.port), protocol: f.dataset.protocol });
-      if (wurzel.dataset.werkbankSpiel === '1') melde('success', 'Übernommen — die Nummer gilt ab dem nächsten Start.');
-      else window.location.reload();
+      nachPortAenderung(await schicke(hier + '/ports', nutzlast), 'Übernommen — die Nummer gilt ab dem nächsten Start.');
     } catch (fehler) { melde('error', fehler.message); }
   });
-  document.querySelectorAll('[data-port-entfernen]').forEach(function (k) {
-    k.addEventListener('click', async function () {
-      try { await schicke(hier + '/ports/' + encodeURIComponent(k.dataset.portEntfernen) + '/entfernen'); window.location.reload(); }
-      catch (fehler) { melde('error', fehler.message); }
-    });
+  portsKasten.addEventListener('click', async function (ev) {
+    var k = ev.target.closest('[data-port-dazu]');
+    if (!k) return;
+    try {
+      nachPortAenderung(await schicke(hier + '/ports', { zweck: k.dataset.portDazu, port: Number(k.dataset.port), protocol: k.dataset.protocol }),
+        'Der Port gilt jetzt für beide Protokolle.');
+    } catch (fehler) { melde('error', fehler.message); }
+  });
+  // Entfernen: im Probestart (gezeichnet, deshalb über den Rahmen) und in der
+  // Karte unter „Verbindung" (steht fest im Aufbau der Seite).
+  document.addEventListener('click', async function (ev) {
+    var k = ev.target.closest ? ev.target.closest('[data-port-entfernen]') : null;
+    if (!k || k.disabled) return;
+    try {
+      var antwort = await schicke(hier + '/ports/' + encodeURIComponent(k.dataset.portEntfernen) + '/entfernen');
+      if (k.dataset.portOrt === 'probestart') nachPortAenderung(antwort, 'Entfernt — gilt ab dem nächsten Start.');
+      else window.location.reload();
+    } catch (fehler) { melde('error', fehler.message); }
   });
 
   // Dateien: während des Laufs auf Knopfdruck beim Daemon nachsehen.
@@ -2058,43 +2157,6 @@
     } catch (fehler) { melde('error', fehler.message); }
   });
 
-  var uebernommen = {};
-  try { uebernommen = JSON.parse(portsKasten.dataset.uebernommen || '{}'); } catch (e) { /* leer */ }
-  function zeichnePorts(ports) {
-    portsKasten.innerHTML = '';
-    if (!ports.length) { portsKasten.innerHTML = '<span class="text-secondary small">Gerade lauscht nichts.</span>'; return; }
-    ports.forEach(function (p) {
-      var zweck = uebernommen[p.port + '/' + p.protocol];
-      if (zweck) {
-        var zeile = document.createElement('div');
-        zeile.className = 'd-flex gap-2 mb-1 align-items-center';
-        var marke = document.createElement('span');
-        marke.className = 'badge bg-green-lt font-monospace flex-shrink-0';
-        marke.textContent = p.port + '/' + p.protocol;
-        var hinweis = document.createElement('span');
-        hinweis.className = 'text-secondary small';
-        hinweis.textContent = 'im Entwurf als ' + zweck;
-        zeile.append(marke, hinweis);
-        portsKasten.appendChild(zeile);
-        return;
-      }
-      var f = document.createElement('form');
-      f.className = 'd-flex gap-1 mb-1';
-      f.setAttribute('data-port-uebernehmen', '');
-      f.dataset.port = p.port; f.dataset.protocol = p.protocol;
-      var b = document.createElement('span');
-      b.className = 'badge bg-azure-lt font-monospace align-self-center flex-shrink-0';
-      b.textContent = p.port + '/' + p.protocol;
-      var i = document.createElement('input');
-      i.className = 'form-control form-control-sm font-monospace'; i.name = 'zweck';
-      i.placeholder = 'Zweck (game)'; i.style.maxWidth = '9rem'; i.style.minWidth = '0';
-      var k = document.createElement('button');
-      k.className = 'btn btn-sm btn-outline-primary'; k.type = 'submit'; k.textContent = 'Übernehmen';
-      f.append(b, i, k);
-      portsKasten.appendChild(f);
-    });
-  }
-
   // ── Angaben & Veröffentlichen ─────────────────────────────────────────
   var formAngaben = document.getElementById('formAngaben');
   // Die Tags stehen nicht in einem Formularfeld, sondern im Tag-Feld. `null`
@@ -2192,7 +2254,14 @@
         konsole.appendChild(z);
         if (unten) konsole.scrollTop = konsole.scrollHeight;
       } else if (d.action === 'ports') {
-        zeichnePorts(d.ports || []);
+        // Mit Bild: das eingeordnete zeichnen. Ohne (das Einordnen scheiterte
+        // beim Server): wenigstens die Nummern, mit dem Entwurf von vorhin.
+        zeichnePortBild(d.bild || {
+          laeuft: true, stand: 'laeuft', entwurf: portBild.entwurf, ungenutzt: portBild.ungenutzt,
+          beobachtet: (d.ports || []).map(function (p) {
+            return { port: p.port, protokolle: [p.protocol], protocol: p.protocol, zweck: null, fehlt: [], vorschlag: null, konsole: null, zufall: null };
+          })
+        });
       } else if (d.action === 'einstellungen') {
         (d.zeilen || []).forEach(function (text) {
           var z = document.createElement('div');

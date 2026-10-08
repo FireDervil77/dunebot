@@ -233,8 +233,19 @@ const beiBereitschaft = zumLauf('bereitschaft', async (p, lauf, kennung) => {
 
 const beiPorts = zumLauf('ports', async (p, lauf, kennung) => {
     const ports = Array.isArray(p.ports) ? p.ports : [];
-    await Sitzungen.laufSetzen(lauf.laufId, { ports });
-    sende(lauf.guildId, { action: 'ports', sitzung_id: kennung, ports });
+    await Sitzungen.laufPortsMerken(lauf.laufId, ports);
+    // Der Server rechnet, der Browser zeichnet (2026-10-08): Mit den Nummern
+    // geht das eingeordnete Bild hinaus — dieselbe Funktion wie beim Aufbau der
+    // Seite. Scheitert das Einordnen, gehen die Nummern trotzdem; die Seite
+    // zeichnet dann nur sie.
+    let bild = null;
+    try {
+        const sitzung = await Sitzungen.laden(lauf.guildId, kennung);
+        if (sitzung) bild = Sitzungen.portBild(sitzung, await Sitzungen.schritte(sitzung.id), await Sitzungen.laeufe(sitzung.id));
+    } catch (fehler) {
+        ServiceManager.get('Logger').error(`[Werkbank] Sitzung ${kennung}: Ports nicht eingeordnet`, fehler);
+    }
+    sende(lauf.guildId, { action: 'ports', sitzung_id: kennung, ports, bild });
 });
 
 const beiBeendet = zumLauf('beendet', async (p, lauf, kennung) => {

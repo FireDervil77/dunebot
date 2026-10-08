@@ -122,6 +122,26 @@ const db = {
             if (l) l.konsole = (l.konsole + p[0]).slice(-p[1]);
             return { affectedRows: 1 };
         }
+        // ── Ports eines Laufs (2026-10-08): was gerade lauscht UND was er je sah ──
+        if (/^SELECT gesehen, ports FROM werkbank_laeufe WHERE id = \?$/.test(t)) {
+            return this.laeufe.filter(x => x.id === p[0]).map(x => ({ gesehen: x.gesehen || null, ports: x.ports || null }));
+        }
+        if (/^UPDATE werkbank_laeufe SET ports = \?, gesehen = \? WHERE id = \?$/.test(t)) {
+            const l = this.laeufe.find(x => x.id === p[2]);
+            if (l) Object.assign(l, { ports: p[0], gesehen: p[1] });
+            return { affectedRows: l ? 1 : 0 };
+        }
+        // Das Bild der Ports lädt die Sitzung, ihre Schritte und ihre Läufe.
+        if (/^SELECT \* FROM werkbank_sitzungen WHERE guild_id = \? AND kennung = \?$/.test(t)) {
+            if (p[1] !== this.sitzung.kennung) return [];
+            return [{ ...this.sitzung, status: 'offen', image: JSON.stringify(this.sitzung.image), entwurf: JSON.stringify(this.entwurf || this.sitzung.entwurf || {}) }];
+        }
+        if (/^SELECT \* FROM werkbank_schritte WHERE sitzung_id = \? ORDER BY nr, id$/.test(t)) {
+            return this.schritte.filter(s => s.sitzung_id === p[0]);
+        }
+        if (/^SELECT \* FROM werkbank_laeufe WHERE sitzung_id = \? ORDER BY id DESC LIMIT \?$/.test(t)) {
+            return [...this.laeufe].filter(l => l.sitzung_id === p[0]).reverse().slice(0, p[1]);
+        }
         const setzen = t.match(/^UPDATE werkbank_laeufe SET ((?:(?:status|luecken|bereitschaft|ports) = \?(?:, )?)+) WHERE id = \?$/);
         if (setzen) {
             const spalten = setzen[1].split(', ').map(x => x.replace(' = ?', ''));
@@ -435,6 +455,17 @@ async function pruefe(name, fn) {
         assert.strictEqual(db.konsole.length, 0, 'noch gebündelt');
         await Ereignisse.beiPorts({ sitzung_id: 'wbprobe', ports: [{ protocol: 'udp', port: 34197 }] });
         assert.deepStrictEqual(JSON.parse(lauf.ports), [{ protocol: 'udp', port: 34197 }]);
+        // Mit den Nummern geht das eingeordnete Bild hinaus — der Browser zeichnet nur.
+        const meldung = sse.gesendet.filter(x => x.daten.action === 'ports').pop().daten;
+        assert.deepStrictEqual(meldung.ports, [{ protocol: 'udp', port: 34197 }]);
+        assert.ok(meldung.bild && Array.isArray(meldung.bild.beobachtet), 'die Meldung trägt kein Bild');
+        assert.deepStrictEqual(meldung.bild.beobachtet.map(b => [b.port, b.protocol]), [[34197, 'udp']]);
+        assert.strictEqual(meldung.bild.laeuft, true);
+        // Was der Lauf je sah, bleibt — auch wenn später nichts mehr lauscht.
+        await Ereignisse.beiPorts({ sitzung_id: 'wbprobe', ports: [{ protocol: 'tcp', port: 27015 }] });
+        await Ereignisse.beiPorts({ sitzung_id: 'wbprobe', ports: [] });
+        assert.deepStrictEqual(JSON.parse(lauf.ports), []);
+        assert.deepStrictEqual(JSON.parse(lauf.gesehen), [{ port: 27015, protocol: 'tcp' }, { port: 34197, protocol: 'udp' }]);
         await Ereignisse.beiBereitschaft({ sitzung_id: 'wbprobe', server_id: 'werkbank-wbprobe', type: 'ready', stage: 'port' });
         assert.ok(!('server_id' in JSON.parse(lauf.bereitschaft)), 'server_id des Daemons gehört nicht in die Anzeige');
         const dateien = { neu: [{ pfad: 'game/config/config.ini', groesse: 5 }], geaendert: [], weg: [],

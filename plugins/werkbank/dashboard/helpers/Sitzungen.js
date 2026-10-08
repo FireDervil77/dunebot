@@ -1196,7 +1196,7 @@ async function laeufe(sitzungId, anzahl = 5) {
     const zeilen = await db().query(
         'SELECT * FROM werkbank_laeufe WHERE sitzung_id = ? ORDER BY id DESC LIMIT ?', [sitzungId, anzahl]);
     return zeilen.map(z => ({
-        ...z, start: json(z.start, {}), ports: json(z.ports, []),
+        ...z, start: json(z.start, {}), ports: json(z.ports, []), gesehen: json(z.gesehen, null),
         bereitschaft: json(z.bereitschaft, null), luecken: json(z.luecken, []),
         dateien: json(z.dateien, null),
     }));
@@ -1285,13 +1285,30 @@ async function eingabe(sitzung, zeile) {
  * (I2), die Nummer bleibt bei der Sitzung — sie ist die, mit der das Spiel hier
  * gestartet wurde, und wird beim nächsten Start für `{{port:zweck}}` eingesetzt.
  */
-async function portUebernehmen(sitzung, { zweck, protocol, port }) {
+async function portUebernehmen(sitzung, { zweck, protocol, port, basis = '', abstand = null }) {
     const z = String(zweck || '').trim();
     if (!RE_ZWECK.test(z)) throw new Error('Zweck: Kleinbuchstaben, Ziffern und _, beginnend mit einem Buchstaben (game, query, rcon …).');
     if (!['tcp', 'udp', 'both'].includes(protocol)) throw new Error('Protokoll: tcp, udp oder both.');
     const n = Number(port);
     if (!Number.isInteger(n) || n < 1 || n > 65535) throw new Error('Keine gültige Portnummer.');
+    // Kopplung gleich beim Übernehmen (2026-10-08): „dieser Port ist immer game + 2".
+    // Bis dahin ging das nur in der Karte unter „Verbindung" — und die ist
+    // gesperrt, solange das Spiel läuft, also genau dann, wenn man den Port sieht.
+    const b = String(basis || '').trim();
+    const d = Number(abstand);
+    if (b) {
+        if (!RE_ZWECK.test(b)) throw new Error('Kopplung: der Zweck des anderen Ports fehlt.');
+        if (b === z) throw new Error('Kopplung: Ein Port kann nicht an sich selbst hängen.');
+        if (!Number.isInteger(d) || d < PORT.abstand[0] || d > PORT.abstand[1]) {
+            throw new Error(`Kopplung: der Abstand ist eine ganze Zahl von ${PORT.abstand[0]} bis ${PORT.abstand[1]}.`);
+        }
+    }
     return entwurfSchreiben(sitzung, (e) => {
+        if (b) {
+            const anker = (e.ports || []).find(p => p.purpose === b);
+            if (!anker) throw new Error(`Kopplung: Den Port „${b}" gibt es im Entwurf nicht.`);
+            if (kopplungVon(anker)) throw new Error(`Kopplung: „${b}" hängt selbst an einem anderen Port — gekoppelt wird an einen mit eigener Nummer.`);
+        }
         // Dieselbe Nummer unter demselben Zweck, nur das andere Protokoll: Das
         // ist EIN Port auf beiden Protokollen, kein Ersatz. Ohne das machte
         // „7777/tcp als game" aus dem übernommenen 7777/udp ein reines tcp
@@ -1304,7 +1321,7 @@ async function portUebernehmen(sitzung, { zweck, protocol, port }) {
         // das Protokoll, das die Beobachtung zeigt.
         const liste = e.ports || [];
         const platz = liste.findIndex(p => p.purpose === z);
-        const neu = { ...(vorher || {}), purpose: z, protocol: beide, assign: vorher?.assign || 'pool' };
+        const neu = { ...(vorher || {}), purpose: z, protocol: beide, assign: b ? `${b}+${d}` : (vorher?.assign || 'pool') };
         if (platz >= 0) liste[platz] = neu; else liste.push(neu);
         e.ports = liste;
         e.werkbank = { ...(e.werkbank || {}) };
@@ -1321,6 +1338,115 @@ async function portUebernehmen(sitzung, { zweck, protocol, port }) {
         e.werkbank.beobachtet = { ...(e.werkbank.beobachtet || {}), [z]: true };
         nummernNachziehen(e, z);
     });
+}
+
+// ── Was lauscht da? (Probestart, 2026-10-08) ─────────────────────────────────
+//
+// Betreiber, an 7 Days to Die: „einen Gameport zu sehen ist leicht, aber die
+// anderen Ports … was da Query-Port ist und was nicht, lässt sich für mich auch
+// nicht immer zweifelsfrei bestimmen." Beobachtet waren fünf Zeilen — 11000/udp,
+// 26900/tcp, 26900/udp, 26902/udp, 51333/udp —, und übernommen hatte er den
+// falschen als Spielport. Die Liste zeigte Nummern, sonst nichts.
+//
+// Das Bild ordnet ein, was sich OHNE Wissen über das Spiel sagen lässt:
+//
+//   - Dieselbe Nummer auf tcp und udp ist EIN Port auf beiden Protokollen.
+//   - Liegt ein Port wenige Nummern über einem des Entwurfs, ist er vermutlich
+//     an ihn gekoppelt (26902 = game + 2) — der Vorschlag steht gleich dabei.
+//   - Sagt die Konsole etwas zu der Nummer („listening on 11000"), steht die
+//     Zeile daneben. Das Spiel weiss es am besten.
+//   - Eine Nummer aus dem Bereich, aus dem Linux ausgehende Ports vergibt, die
+//     im vorigen Start nicht da war, ist vermutlich kein Dienst.
+//
+// Gerechnet wird hier, gezeichnet im Browser (wie bei der Live-Anzeige der
+// Gameserver): dieselbe Funktion für den Seitenaufbau, die Meldung des Daemons
+// und die Antwort nach dem Übernehmen — eine Regel, ein Bild.
+const ZUFALL_VON = 32768, ZUFALL_BIS = 60999;   // net.ipv4.ip_local_port_range, Vorgabe von Linux
+const KOPPEL_NAEHE = 10;                         // so weit über einem Port des Entwurfs gilt als „vermutlich gekoppelt"
+const RE_KONSOLE_STARK = /listen|lausch|started|start(ed|ing)? .*on|bound|bind|serving|running on|opened|geöffnet/i;
+
+/** Die Zeile der Konsole, in der das Spiel selbst etwas zu dieser Nummer sagt — oder null. */
+function konsolenZeileZu(konsole, nummer) {
+    // Die Nummer als eigene Zahl: nicht Teil einer längeren, kein Nachkommateil,
+    // keine Uhrzeit. `10.0.0.1:26900` zählt — so nennen Spiele ihre Adresse.
+    const re = new RegExp(`(^|[^0-9.])${nummer}(?![0-9]|:[0-9]|\\.[0-9])`);
+    for (const roh of String(konsole || '').split('\n')) {
+        // Was fb-init meldet, ist unsere eigene Auskunft, nicht die des Spiels.
+        if (!roh || roh.startsWith('fb-init:') || !re.test(roh) || !RE_KONSOLE_STARK.test(roh)) continue;
+        const zeile = roh.replace(/\x1b\[[0-?]*[ -\/]*[@-~]/g, '')
+            .replace(/^\d{4}-\d\d-\d\dT[\d:.]+\s+[\d.]+\s+[A-Z]{3}\s+/, '').trim();
+        return zeile.length > 160 ? zeile.slice(0, 157) + '…' : zeile;
+    }
+    return null;
+}
+
+/**
+ * @param {object} sitzung
+ * @param {Array}  liste   Schritte (für die Frage, worauf im Paket verwiesen wird)
+ * @param {Array}  laeufe  Läufe der Sitzung, neuester zuerst
+ * @returns {{laeuft: boolean, beobachtet: Array, entwurf: Array, ungenutzt: string[]}}
+ */
+function portBild(sitzung, liste, laeufe) {
+    const e = sitzung.entwurf || {};
+    const nummern = e.werkbank?.portnummern || {};
+    const lauf = (laeufe || [])[0] || null;
+    const laeuft = Boolean(lauf && lauf.status !== 'beendet');
+    // Was ein Lauf gesehen hat — bei Läufen von vor dem 2026-10-08 nur, was am
+    // Ende noch in `ports` stand (meist nichts).
+    const gesehenIn = (l) => (Array.isArray(l?.gesehen) && l.gesehen.length ? l.gesehen : (Array.isArray(l?.ports) ? l.ports : []));
+    // Läuft das Spiel: was JETZT lauscht. Danach: was der Lauf gesehen hat —
+    // sonst wäre nach dem Stoppen nichts mehr zu übernehmen.
+    const quelle = laeuft ? (lauf.ports || []) : gesehenIn(lauf);
+    const frueher = (laeufe || []).slice(1).map(gesehenIn).filter(l => l.length);
+    const frueherGesehen = new Set(frueher.flatMap(l => l.map(p => Number(p.port))));
+
+    // Nach Nummer zusammenlegen: tcp und udp derselben Nummer sind ein Port.
+    const jeNummer = new Map();
+    for (const p of quelle) {
+        const n = Number(p.port);
+        if (!jeNummer.has(n)) jeNummer.set(n, new Set());
+        jeNummer.get(n).add(p.protocol);
+    }
+    const eigene = (e.ports || []).filter(p => !kopplungVon(p) && Number.isInteger(nummern[p.purpose]));
+    const beobachtet = [...jeNummer.keys()].sort((a, b) => a - b).map((n) => {
+        const protokolle = ['tcp', 'udp'].filter(x => jeNummer.get(n).has(x));
+        const imEntwurf = (e.ports || []).find(p => nummern[p.purpose] === n) || null;
+        const gedeckt = imEntwurf ? (imEntwurf.protocol === 'both' ? ['tcp', 'udp'] : [imEntwurf.protocol]) : [];
+        // Der nächste Port des Entwurfs darunter, in Reichweite.
+        let vorschlag = null;
+        if (!imEntwurf) {
+            for (const p of eigene) {
+                const abstand = n - nummern[p.purpose];
+                if (abstand >= 1 && abstand <= KOPPEL_NAEHE && (!vorschlag || abstand < vorschlag.abstand)) vorschlag = { basis: p.purpose, abstand };
+            }
+        }
+        const imBereich = n >= ZUFALL_VON && n <= ZUFALL_BIS;
+        return {
+            port: n, protokolle, protocol: protokolle.length === 2 ? 'both' : protokolle[0],
+            zweck: imEntwurf ? imEntwurf.purpose : null,
+            // Lauscht auf einem Protokoll, das der Entwurf für diesen Port noch nicht nennt.
+            fehlt: imEntwurf ? protokolle.filter(x => !gedeckt.includes(x)) : [],
+            vorschlag,
+            konsole: konsolenZeileZu(lauf?.konsole, n),
+            zufall: !imEntwurf && imBereich && !frueherGesehen.has(n)
+                ? (frueher.length ? 'Im vorigen Start nicht dabei und aus dem Bereich, aus dem Linux ausgehende Ports vergibt — vermutlich kein Dienst. Nicht übernehmen.'
+                                  : `Aus dem Bereich, aus dem Linux ausgehende Ports vergibt (${ZUFALL_VON}–${ZUFALL_BIS}) — vermutlich kein Dienst. Nach dem nächsten Start vergleichen: Ist die Nummer eine andere, war es keiner.`)
+                : null,
+        };
+    });
+    return {
+        laeuft,
+        // `gesehen`: Die Liste stammt vom letzten, beendeten Lauf.
+        stand: laeuft ? 'laeuft' : (beobachtet.length ? 'gesehen' : 'leer'),
+        beobachtet,
+        entwurf: (e.ports || []).map((p) => {
+            const k = kopplungVon(p);
+            return { purpose: p.purpose, protocol: p.protocol, nummer: nummern[p.purpose] ?? null,
+                kopplung: k ? { basis: k.basis, abstand: k.abstand } : null,
+                lauscht: jeNummer.has(nummern[p.purpose]) };
+        }),
+        ungenutzt: ungenutztePorts(entwurfAlsPaket(sitzung, liste || [])),
+    };
 }
 
 async function portEntfernen(sitzung, zweck) {
@@ -2380,6 +2506,26 @@ async function laufSetzen(laufId, felder) {
         [...spalten.map(k => (felder[k] !== null && typeof felder[k] === 'object' ? JSON.stringify(felder[k]) : felder[k])), laufId]);
 }
 
+/**
+ * Die Ports eines Laufs: was GERADE lauscht (`ports`) und, dazugerechnet, was
+ * er je gesehen hat (`gesehen`). Das zweite bleibt nach dem Ende stehen — für
+ * das Übernehmen nach dem Stoppen und den Vergleich mit dem nächsten Start.
+ */
+async function laufPortsMerken(laufId, ports) {
+    const [z] = await db().query('SELECT gesehen, ports FROM werkbank_laeufe WHERE id = ?', [laufId]);
+    const vereint = new Map();
+    // Auch was bisher in `ports` stand: Ein Lauf, der schon lief, als diese
+    // Spalte kam, hätte sonst am Ende nichts gesehen.
+    for (const p of [...(json(z?.gesehen, null) || []), ...(json(z?.ports, null) || []), ...ports]) {
+        const n = Number(p?.port);
+        if (Number.isInteger(n) && (p.protocol === 'tcp' || p.protocol === 'udp')) vereint.set(n + '/' + p.protocol, { port: n, protocol: p.protocol });
+    }
+    const gesehen = [...vereint.values()].sort((a, b) => a.port - b.port || a.protocol.localeCompare(b.protocol));
+    await db().query('UPDATE werkbank_laeufe SET ports = ?, gesehen = ? WHERE id = ?',
+        [JSON.stringify(ports), JSON.stringify(gesehen), laufId]);
+    return gesehen;
+}
+
 async function konsoleAnhaengen(laufId, text) {
     await db().query(
         `UPDATE werkbank_laeufe SET konsole = RIGHT(CONCAT(COALESCE(konsole, ''), ?), ?) WHERE id = ?`,
@@ -2574,7 +2720,7 @@ function gruppiere(liste, ab = 6) {
 
 module.exports = {
     uebernommeneAusfuehren, ketteFortsetzen, offeneUebernommene,
-    angabenTags, tagsUebergeben,
+    angabenTags, tagsUebergeben, portBild, konsolenZeileZu, laufPortsMerken,
     RCON, BEFEHL, GANZ, rconStand, rconSpeichern, rconEntfernen, rconVermerk, rconPruefbefehl, befehlSpeichern, befehlEntfernen,
     sitzungsImage,
     RE_KENNUNG, RE_ZWECK, SCHRITTTYPEN, MAX_AUSGABE, GRENZEN, VORGABE, ERKUNDUNG, hatBereitschaft,
