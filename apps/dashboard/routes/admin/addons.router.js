@@ -5,7 +5,6 @@
  *   GET    /admin/addons              — Übersicht
  *   GET    /admin/addons/:id          — Detail: Name, Beschreibung, Tags, Freigabe
  *   PUT    /admin/addons/:id          — Name, Beschreibung, Tags speichern
- *   POST   /admin/addons/:id/approve  — Freigeben (Vertrauensstufe, Sichtbarkeit)
  *   POST   /admin/addons/:id/fassungen/:fassungId/freigeben      — Paketfassung test → stable
  *   POST   /admin/addons/:id/fassungen/:fassungId/zuruecknehmen  — Paketfassung stable → test
  *   DELETE /admin/addons/:id          — Löschen (nie den Anker eines Pakets)
@@ -15,6 +14,14 @@
  * einen Zeitstempel setzte. Alles davon schrieb FIREBOT_v2 — seit dem
  * 2026-09-10 startet der Daemon nur Server mit Spielpaket. Neue Spiele
  * entstehen in der Werkbank (Egg-Rückbau B, Baustelle 166).
+ *
+ * Bis zum 2026-10-08 gab es dazu `POST /:id/approve` („SuperAdmin Approval"):
+ * Es setzte `status`, `trust_level` und `visibility`. Der Prüfablauf dahinter
+ * (draft → pending_review → approved) ist nie gelaufen — die Einlieferung legt
+ * jeden Anker als `approved`/`public` an, und die Vertrauensstufe wurde für
+ * den einzigen Autor ohnehin auf `official` überschrieben. Was ein Spiel
+ * freigibt, ist die Freigabe einer Fassung; eine zweite daneben war eine
+ * Auskunft, die nichts bedeutete.
  *
  * @author FireDervil
  */
@@ -46,29 +53,28 @@ router.get('/', async (req, res) => {
     res.locals.layout = themeManager.getLayout('guild');
 
     try {
-        const addons = await dbService.query(`
-            SELECT
-                id, name, slug,
-                status, trust_level, visibility,
-                verified_at, verified_by, created_at
-            FROM addon_marketplace
-            ORDER BY
-                CASE trust_level
-                    WHEN 'official' THEN 1
-                    WHEN 'trusted'  THEN 2
-                    WHEN 'verified' THEN 3
-                    ELSE 4
-                END,
-                created_at DESC
-        `);
+        const addons = await dbService.query(
+            'SELECT id, name, slug, created_at FROM addon_marketplace ORDER BY name ASC');
+
+        // Freigegeben oder Entwurf — aus den Fassungen, nicht aus einer Spalte am
+        // Anker. Ein Fehler hier darf nicht wie „alles Entwürfe" aussehen: Dann
+        // bleibt die Spalte leer, und die Seite sagt, warum.
+        let freigabeFehler = null;
+        try {
+            const stand = await Paketfassung.freigabeJePaket(dbService);
+            for (const a of addons) a.freigabe = stand[a.id] || { fassungen: 0, freigegeben: null };
+        } catch (err) {
+            freigabeFehler = err.message;
+            Logger.error('[Addons] Freigabestand laden fehlgeschlagen:', err);
+        }
 
         const stats = {
-            total:             addons.length,
-            official:          addons.filter(a => a.trust_level === 'official').length,
-            pending_review:    addons.filter(a => a.status === 'pending_review').length,
+            total:       addons.length,
+            freigegeben: freigabeFehler ? null : addons.filter(a => a.freigabe.freigegeben).length,
+            entwuerfe:   freigabeFehler ? null : addons.filter(a => !a.freigabe.freigegeben).length,
         };
 
-        await themeManager.renderView(res, 'admin/addons/index', { addons, stats, pageTitle: 'Spiele-Marktplatz' });
+        await themeManager.renderView(res, 'admin/addons/index', { addons, stats, freigabeFehler, pageTitle: 'Spiele-Marktplatz' });
 
     } catch (err) {
         Logger.error('[Addons] Fehler Übersicht:', err);
@@ -214,52 +220,6 @@ router.post('/:id/fassungen/:fassungId/zuruecknehmen', async (req, res) => {
         });
     } catch (err) {
         res.status(400).json({ success: false, message: err.message });
-    }
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// POST /admin/addons/:id/approve — Addon freigeben
-// ─────────────────────────────────────────────────────────────────────────────
-router.post('/:id/approve', async (req, res) => {
-    const Logger    = ServiceManager.get('Logger');
-    const dbService = ServiceManager.get('dbService');
-    const user      = res.locals.user;
-
-    try {
-        const { trust_level, visibility } = req.body;
-
-        const validTrust      = ['official', 'trusted', 'verified', 'unverified'];
-        const validVisibility = ['official', 'public', 'unlisted', 'private'];
-
-        if (!validTrust.includes(trust_level)) {
-            return res.status(400).json({ success: false, message: 'Ungültiger trust_level' });
-        }
-        if (!validVisibility.includes(visibility)) {
-            return res.status(400).json({ success: false, message: 'Ungültige visibility' });
-        }
-
-        const rows = await dbService.query(
-            'SELECT author_user_id FROM addon_marketplace WHERE id = ?',
-            [req.params.id]
-        );
-        // FireDervil bekommt immer official trust_level
-        const finalTrustLevel = rows[0]?.author_user_id === '544578232704565262'
-            ? 'official'
-            : trust_level;
-
-        await dbService.query(`
-            UPDATE addon_marketplace
-            SET status = 'approved', trust_level = ?, visibility = ?,
-                source_type = 'native', verified_by = ?, verified_at = NOW(), published_at = NOW()
-            WHERE id = ?
-        `, [finalTrustLevel, visibility, user?.info?.id || null, req.params.id]);
-
-        Logger.info(`[Addons] Approved: ID ${req.params.id} (${finalTrustLevel}/${visibility})`);
-        res.json({ success: true, message: 'Addon freigegeben' });
-
-    } catch (err) {
-        Logger.error('[Addons] Approve fehlgeschlagen:', err);
-        res.status(500).json({ success: false, message: err.message });
     }
 });
 

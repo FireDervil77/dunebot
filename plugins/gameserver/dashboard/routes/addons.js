@@ -23,6 +23,9 @@ const { requirePermission } = require('../../../../apps/dashboard/middlewares/pe
 // Tags eines Spiels kommen aus der Tag-Bibliothek des Kerns (2026-10-07) —
 // nicht mehr aus dem Kommafeld `addon_marketplace.tags`.
 const Tags = require('../../../../apps/dashboard/helpers/Tags');
+// Entwurf oder freigegeben sagt die Fassung des Spielpakets (2026-10-08) —
+// nicht mehr `addon_marketplace.trust_level`.
+const Paketfassung = require('../helpers/Paketfassung');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET / — Marketplace
@@ -38,8 +41,8 @@ router.get('/', requirePermission('GAMESERVER.ADDONS.VIEW'), async (req, res) =>
 
         let query = `
             SELECT id, slug, name, description, category,
-                   steam_app_id, author_user_id, trust_level, visibility,
-                   status, rating_avg, rating_count, install_count,
+                   steam_app_id, author_user_id,
+                   rating_avg, rating_count, install_count,
                    icon_url, banner_url, created_at
             FROM addon_marketplace
             WHERE status = 'approved'
@@ -64,7 +67,7 @@ router.get('/', requirePermission('GAMESERVER.ADDONS.VIEW'), async (req, res) =>
             popular: 'ORDER BY install_count DESC',
             rating:  'ORDER BY rating_avg DESC, rating_count DESC',
         };
-        query += ` ${orderMap[sort] || 'ORDER BY trust_level DESC, rating_avg DESC, install_count DESC'}`;
+        query += ` ${orderMap[sort] || 'ORDER BY rating_avg DESC, install_count DESC, name ASC'}`;
 
         const [addons, categories] = await Promise.all([
             dbService.query(query, params),
@@ -79,6 +82,10 @@ router.get('/', requirePermission('GAMESERVER.ADDONS.VIEW'), async (req, res) =>
         // Die Tags aller gezeigten Spiele in EINEM Zug, als Liste am Spiel.
         const tagsJeSpiel = await Tags.fuerViele(dbService, 'spiel', (addons || []).map(a => a.id));
         for (const a of (addons || [])) a.tags = tagsJeSpiel[a.id] || [];
+
+        // Entwurf oder freigegeben — für die Marke an der Kachel.
+        const stand = await Paketfassung.freigabeJePaket(dbService);
+        for (const a of (addons || [])) a.freigabe = stand[a.id] || null;
 
         await themeManager.renderView(res, 'guild/gameserver-marketplace', {
             title: 'Spiele-Datenbank',
@@ -109,7 +116,6 @@ router.get('/:slug', requirePermission('GAMESERVER.ADDONS.VIEW'), async (req, re
         const [addon] = await dbService.query(`
             SELECT id, slug, name, description, category,
                    steam_app_id, steam_server_app_id, author_user_id,
-                   trust_level, visibility, status,
                    rating_avg, rating_count, install_count,
                    icon_url, banner_url, screenshots, created_at
             FROM addon_marketplace
@@ -121,6 +127,7 @@ router.get('/:slug', requirePermission('GAMESERVER.ADDONS.VIEW'), async (req, re
         }
 
         addon.tags = await Tags.fuer(dbService, 'spiel', addon.id);
+        addon.freigabe = (await Paketfassung.freigabeJePaket(dbService))[addon.id] || null;
 
         const [ratings, comments] = await Promise.all([
             dbService.query(`

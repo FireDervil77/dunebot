@@ -218,6 +218,30 @@ async function fassungenZuPaket(dbService, paketId) {
          ORDER BY v.published_at DESC, v.id DESC`, [paketId]);
 }
 
+/**
+ * Je Paket: wie viele Fassungen es hat und welche freigegeben ist — für
+ * Übersichten, die sagen, ob ein Spiel freigegeben oder ein Entwurf ist.
+ *
+ * Seit dem 2026-10-08 die einzige Auskunft darüber. Vorher zeigten die
+ * Übersichten `addon_marketplace.status`/`trust_level` — Felder, die bei jedem
+ * Spiel gleich standen und über das Anlegen nichts sagten.
+ *
+ * @returns {Promise<Object<number, {fassungen: number, freigegeben: string|null}>>}
+ *          Paket-Kennung → Stand; ein Spiel ohne Paket fehlt
+ */
+async function freigabeJePaket(dbService) {
+    const zeilen = await dbService.query(`
+        SELECT pk.id,
+               (SELECT COUNT(*) FROM package_versions n WHERE n.package_id = pk.id) AS fassungen,
+               (SELECT s.version FROM package_versions s
+                 WHERE s.package_id = pk.id AND s.channel = 'stable'
+                 ORDER BY s.published_at DESC, s.id DESC LIMIT 1) AS freigegeben
+          FROM packages pk`);
+    const aus = {};
+    for (const z of zeilen) aus[z.id] = { fassungen: Number(z.fassungen), freigegeben: z.freigegeben || null };
+    return aus;
+}
+
 /** Wie viele Server dieses Pakets welchem Kanal folgen. */
 async function serverJeKanal(dbService, paketId) {
     const zeilen = await dbService.query(
@@ -303,5 +327,5 @@ async function kanalSetzen(dbService, { serverId, guildId, kanal }) {
 module.exports = {
     KANAELE, istKontrollGuild, FASSUNG_FUER_SERVER, FASSUNG_FUER_ANLEGEN,
     ladePaketFuerServer, ladePaketFuerAnlegen, ladePaketeZuServern, ladePaketeFuerAnlegen, ladeNeuesteFassung, ladeNeuesteFassungen,
-    fassungenZuPaket, serverJeKanal, freigeben, zuruecknehmen, kanalSetzen,
+    fassungenZuPaket, freigabeJePaket, serverJeKanal, freigeben, zuruecknehmen, kanalSetzen,
 };

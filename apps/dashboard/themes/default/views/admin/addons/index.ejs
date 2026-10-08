@@ -19,7 +19,14 @@
                 </div>
             </div>
 
-            <%# Stats-Cards %>
+            <%# Stats-Cards. „Freigegeben" und „Entwürfe" kommen aus den Fassungen der
+                Spielpakete (Paketfassung.freigabeJePaket). Bis zum 2026-10-08 standen
+                hier „Official" und „Pending Review" und in der Tabelle Status, Trust
+                Level und Visibility — Spalten am Anker, die bei jedem Spiel gleich
+                standen und mit dem Anlegen nichts zu tun hatten. %>
+            <% if (locals.freigabeFehler) { %>
+                <div class="alert alert-danger">Der Freigabestand ließ sich nicht laden: <%= locals.freigabeFehler %></div>
+            <% } %>
             <div class="row">
                 <div class="col-lg-3 col-6">
                     <div class="card card-sm">
@@ -42,11 +49,11 @@
                       <div class="card-body">
                         <div class="row align-items-center">
                           <div class="col-auto">
-                            <span class="bg-success text-white avatar"><i class="fa-solid fa-crown"></i></span>
+                            <span class="bg-success text-white avatar"><i class="fa-solid fa-check"></i></span>
                           </div>
                           <div class="col">
-                            <div class="h2 fw-medium mb-0"><%= stats.official %></div>
-                            <div class="text-secondary">Official</div>
+                            <div class="h2 fw-medium mb-0"><%= stats.freigegeben === null ? '—' : stats.freigegeben %></div>
+                            <div class="text-secondary">Freigegeben</div>
                           </div>
                         </div>
                       </div>
@@ -58,11 +65,11 @@
                       <div class="card-body">
                         <div class="row align-items-center">
                           <div class="col-auto">
-                            <span class="bg-warning text-white avatar"><i class="fa-solid fa-clock"></i></span>
+                            <span class="bg-secondary text-white avatar"><i class="fa-solid fa-file"></i></span>
                           </div>
                           <div class="col">
-                            <div class="h2 fw-medium mb-0"><%= stats.pending_review %></div>
-                            <div class="text-secondary">Pending Review</div>
+                            <div class="h2 fw-medium mb-0"><%= stats.entwuerfe === null ? '—' : stats.entwuerfe %></div>
+                            <div class="text-secondary">Entwürfe</div>
                           </div>
                         </div>
                       </div>
@@ -92,9 +99,8 @@
                             <tr>
                                 <th>ID</th>
                                 <th>Name</th>
-                                <th>Status</th>
-                                <th>Trust Level</th>
-                                <th>Visibility</th>
+                                <th>Freigabe</th>
+                                <th>Fassungen</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -107,71 +113,25 @@
                                             <strong><%= addon.name %></strong><br>
                                             <small class="text-secondary"><%= addon.slug %></small>
                                         </td>
+                                        <% const fr = addon.freigabe; %>
                                         <td>
-                                            <% if (addon.status === 'approved') { %>
+                                            <% if (!fr) { %>
+                                                <span class="text-secondary">—</span>
+                                            <% } else if (fr.freigegeben) { %>
                                                 <span class="badge bg-success-lt">
-                                                    <i class="fa-solid fa-check"></i> Approved
+                                                    <i class="fa-solid fa-check"></i> freigegeben · <%= fr.freigegeben %>
                                                 </span>
-                                            <% } else if (addon.status === 'pending_review') { %>
-                                                <span class="badge bg-warning-lt">
-                                                    <i class="fa-solid fa-clock"></i> Pending
-                                                </span>
-                                            <% } else if (addon.status === 'rejected') { %>
-                                                <span class="badge bg-danger-lt">
-                                                    <i class="fa-solid fa-times"></i> Rejected
-                                                </span>
-                                            <% } else if (addon.status === 'draft') { %>
-                                                <span class="badge bg-secondary-lt">
-                                                    <i class="fa-solid fa-file"></i> Draft
+                                            <% } else if (fr.fassungen) { %>
+                                                <span class="badge bg-secondary-lt" title="Keine Fassung freigegeben — nur in deiner Guild anlegbar.">
+                                                    <i class="fa-solid fa-file"></i> Entwurf
                                                 </span>
                                             <% } else { %>
-                                                <span class="badge bg-secondary-lt">
-                                                    <i class="fa-solid fa-question"></i> <%= addon.status || 'Unknown' %>
+                                                <span class="badge bg-warning-lt" title="Zu diesem Spiel gibt es kein Spielpaket — es entsteht in der Werkbank.">
+                                                    <i class="fa-solid fa-triangle-exclamation"></i> kein Paket
                                                 </span>
                                             <% } %>
                                         </td>
-                                        <td>
-                                            <% if (addon.trust_level === 'official') { %>
-                                                <span class="badge bg-success-lt">
-                                                    <i class="fa-solid fa-crown"></i> Official
-                                                </span>
-                                            <% } else if (addon.trust_level === 'trusted') { %>
-                                                <span class="badge bg-primary-lt">
-                                                    <i class="fa-solid fa-shield-check"></i> Trusted
-                                                </span>
-                                            <% } else if (addon.trust_level === 'verified') { %>
-                                                <span class="badge bg-info-lt">
-                                                    <i class="fa-solid fa-check-circle"></i> Verified
-                                                </span>
-                                            <% } else { %>
-                                                <span class="badge bg-secondary-lt">
-                                                    <i class="fa-solid fa-question-circle"></i> Unverified
-                                                </span>
-                                            <% } %>
-                                        </td>
-                                        <td>
-                                            <% if (addon.visibility === 'official') { %>
-                                                <span class="badge bg-danger-lt">
-                                                    <i class="fa-solid fa-crown"></i> Official
-                                                </span>
-                                            <% } else if (addon.visibility === 'public') { %>
-                                                <span class="badge bg-success-lt">
-                                                    <i class="fa-solid fa-eye"></i> Public
-                                                </span>
-                                            <% } else if (addon.visibility === 'unlisted') { %>
-                                                <span class="badge bg-info-lt">
-                                                    <i class="fa-solid fa-link"></i> Unlisted
-                                                </span>
-                                            <% } else if (addon.visibility === 'private') { %>
-                                                <span class="badge bg-secondary-lt">
-                                                    <i class="fa-solid fa-eye-slash"></i> Private
-                                                </span>
-                                            <% } else { %>
-                                                <span class="badge bg-warning-lt">
-                                                    <i class="fa-solid fa-question"></i> <%= addon.visibility || 'Unknown' %>
-                                                </span>
-                                            <% } %>
-                                        </td>
+                                        <td><%= fr ? fr.fassungen : '—' %></td>
                                         <td>
                                             <div class="btn-group btn-group-sm">
                                                 <a href="/admin/addons/<%= addon.id %>" 
@@ -190,7 +150,7 @@
                                 <% }); %>
                             <% } else { %>
                                 <tr>
-                                    <td colspan="6" class="text-center text-secondary">
+                                    <td colspan="5" class="text-center text-secondary">
                                         <i class="fa-solid fa-inbox"></i><br>
                                         Keine Spiele vorhanden — neue entstehen in der Werkbank.
                                     </td>

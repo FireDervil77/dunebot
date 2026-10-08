@@ -17,21 +17,13 @@
                                 <div class="col-md-8">
                                     <!-- Title & Badges -->
                                     <div class="mb-3">
-                                        <% if (addon.trust_level === 'official') { %>
-                                            <span class="badge bg-danger-lt badge-lg">
-                                                <i class="fa-solid fa-crown"></i> OFFICIAL
-                                            </span>
-                                        <% } else if (addon.trust_level === 'trusted') { %>
-                                            <span class="badge bg-success-lt badge-lg">
-                                                <i class="fa-solid fa-shield-check"></i> TRUSTED
-                                            </span>
-                                        <% } else if (addon.trust_level === 'verified') { %>
-                                            <span class="badge bg-primary-lt badge-lg">
-                                                <i class="fa-solid fa-check-circle"></i> VERIFIED
+                                        <% if (addon.freigabe && !addon.freigabe.freigegeben) { %>
+                                            <span class="badge bg-secondary-lt badge-lg me-2" title="<%= tr('gameserver:MARKETPLACE.DRAFT_HINT') %>">
+                                                <i class="fa-solid fa-file"></i> <%= tr('gameserver:MARKETPLACE.DRAFT') %>
                                             </span>
                                         <% } %>
 
-                                        <span class="badge bg-info-lt badge-lg ms-2">
+                                        <span class="badge bg-info-lt badge-lg">
                                             <%= addon.category.toUpperCase() %>
                                         </span>
 

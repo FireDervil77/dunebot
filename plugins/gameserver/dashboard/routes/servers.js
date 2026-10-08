@@ -337,12 +337,11 @@ router.get('/create', requirePermission('GAMESERVER.CREATE'), async (req, res) =
                     steam_app_id,
                     rating_avg,
                     rating_count,
-                    trust_level,
                     'public' as addon_type
                 FROM addon_marketplace
                 WHERE status = 'approved'
                 AND (visibility = 'official' OR visibility = 'public')
-                ORDER BY trust_level DESC, rating_avg DESC
+                ORDER BY rating_avg DESC, name ASC
             `);
 
             // ========================================
@@ -359,7 +358,6 @@ router.get('/create', requirePermission('GAMESERVER.CREATE'), async (req, res) =
                     steam_app_id,
                     rating_avg,
                     rating_count,
-                    trust_level,
                     'guild' as addon_type
                 FROM addon_marketplace
                 WHERE status = 'approved'

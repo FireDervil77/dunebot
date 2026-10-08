@@ -67,50 +67,6 @@
                             </form>
                         </div>
                     </div>
-
-                    <!-- Legend -->
-                    <div class="card">
-                        <div class="card-header">
-                            <h3 class="card-title">
-                                <i class="fa-solid fa-shield"></i>
-                                <%= tr('gameserver:MARKETPLACE.TRUST_LEVELS') %>
-                            </h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="mb-2">
-                                <span class="badge bg-danger-lt">
-                                    👑 OFFICIAL
-                                </span>
-                                <small class="d-block text-secondary">
-                                    <%= tr('gameserver:MARKETPLACE.TRUST_OFFICIAL') %>
-                                </small>
-                            </div>
-                            <div class="mb-2">
-                                <span class="badge bg-success-lt">
-                                    🛡️ TRUSTED
-                                </span>
-                                <small class="d-block text-secondary">
-                                    <%= tr('gameserver:MARKETPLACE.TRUST_TRUSTED') %>
-                                </small>
-                            </div>
-                            <div class="mb-2">
-                                <span class="badge bg-primary-lt">
-                                    ✓ VERIFIED
-                                </span>
-                                <small class="d-block text-secondary">
-                                    <%= tr('gameserver:MARKETPLACE.TRUST_VERIFIED') %>
-                                </small>
-                            </div>
-                            <div>
-                                <span class="badge bg-secondary-lt">
-                                    <i class="fa-solid fa-question-circle"></i> UNVERIFIED
-                                </span>
-                                <small class="d-block text-secondary">
-                                    <%= tr('gameserver:MARKETPLACE.TRUST_UNVERIFIED') %>
-                                </small>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
                 <!-- Addon Grid -->
@@ -152,27 +108,18 @@
                                         <% } %>
 
                                         <div class="card-body">
-                                            <!-- Trust Level Badge -->
+                                            <%# Nur die Ausnahme bekommt eine Marke: ein Spiel ohne
+                                                freigegebene Fassung (Paketfassung.freigabeJePaket).
+                                                Bis zum 2026-10-08 stand hier die Vertrauensstufe
+                                                aus addon_marketplace.trust_level. %>
                                             <div class="mb-2">
-                                                <% if (addon.trust_level === 'official') { %>
-                                                    <span class="badge bg-danger-lt">
-                                                        👑 OFFICIAL
-                                                    </span>
-                                                <% } else if (addon.trust_level === 'trusted') { %>
-                                                    <span class="badge bg-success-lt">
-                                                        🛡️ TRUSTED
-                                                    </span>
-                                                <% } else if (addon.trust_level === 'verified') { %>
-                                                    <span class="badge bg-primary-lt">
-                                                        ✓ VERIFIED
-                                                    </span>
-                                                <% } else { %>
-                                                    <span class="badge bg-secondary-lt">
-                                                        <i class="fa-solid fa-question-circle"></i> UNVERIFIED
+                                                <% if (addon.freigabe && !addon.freigabe.freigegeben) { %>
+                                                    <span class="badge bg-secondary-lt" title="<%= tr('gameserver:MARKETPLACE.DRAFT_HINT') %>">
+                                                        <i class="fa-solid fa-file"></i> <%= tr('gameserver:MARKETPLACE.DRAFT') %>
                                                     </span>
                                                 <% } %>
 
-                                                <span class="badge bg-info-lt ms-1">
+                                                <span class="badge bg-info-lt">
                                                     <%= addon.category.toUpperCase() %>
                                                 </span>
                                             </div>

@@ -1,25 +1,20 @@
-<%# Admin: Addon Edit/Review %>
+<%# Admin: ein Spiel — Name, Beschreibung, Tags und die Freigabe seiner Fassungen.
+
+    Bis zum 2026-10-08 standen hier oben zwei Marken (Trust, Visibility) und
+    rechts eine Karte „SuperAdmin Approval". Sie setzte `status`, `trust_level`
+    und `visibility` in `addon_marketplace` — Felder des Marktplatz-Modells, in
+    dem Fremde Spiele einreichen. Das gab es nie: Alle Spiele standen von der
+    Einlieferung an auf `approved`/`public`. Ob eine Guild ein Spiel anlegen
+    kann, entscheidet allein die Freigabe einer Fassung (rechte Karte). %>
 
     <div class="content">
         <div class="container-fluid">
-            
-            <%# Status-Badges %>
-            <div class="row mb-3">
-                <div class="col-md-12">
-                    <span class="badge badge-lg <%= addon.trust_level === 'official' ? 'bg-success-lt' : addon.trust_level === 'verified' ? 'bg-info-lt' : 'bg-secondary-lt' %>">
-                        Trust: <%= addon.trust_level %>
-                    </span>
-                    <span class="badge badge-lg <%= addon.visibility === 'public' || addon.visibility === 'official' ? 'bg-success-lt' : addon.visibility === 'unlisted' ? 'bg-warning-lt' : 'bg-secondary-lt' %>">
-                        Visibility: <%= addon.visibility %>
-                    </span>
-                </div>
-            </div>
 
             <div class="row">
-                
+
                 <%# Linke Spalte: Metadata %>
-                <div class="col-md-6">
-                    
+                <div class="col-lg-5">
+
                     <%# Basis-Informationen %>
                     <div class="card">
                         <div class="card-header">
@@ -76,84 +71,17 @@
 
                 </div>
 
-                <%# Rechte Spalte: Approval-Settings — neben den Basis-Informationen,
-                    nicht darunter (Betreiber, 2026-10-07: die rechte Haelfte stand leer). %>
-                <div class="col-md-6">
-
-                    <div class="card">
-                        <div class="card-header bg-warning">
-                            <h3 class="card-title">
-                                <i class="fa-solid fa-shield-check"></i>
-                                SuperAdmin Approval
-                            </h3>
-                        </div>
-                        <div class="card-body">
-                            <form id="approvalForm">
-                                <div class="mb-3">
-                                    <label>Trust Level</label>
-                                    <select class="form-control" name="trust_level">
-                                        <option value="unverified" <%= addon.trust_level === 'unverified' ? 'selected' : '' %>>
-                                            Unverified (Neu, nicht getestet)
-                                        </option>
-                                        <option value="verified" <%= addon.trust_level === 'verified' ? 'selected' : '' %>>
-                                            Verified (Getestet, funktioniert)
-                                        </option>
-                                        <option value="trusted" <%= addon.trust_level === 'trusted' ? 'selected' : '' %>>
-                                            Trusted (10+ Installs, 4+ Rating)
-                                        </option>
-                                        <option value="official" <%= addon.trust_level === 'official' ? 'selected' : '' %>>
-                                            Official (FireBot Team)
-                                        </option>
-                                    </select>
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label>Visibility</label>
-                                    <select class="form-control" name="visibility">
-                                        <option value="unlisted" <%= addon.visibility === 'unlisted' ? 'selected' : '' %>>
-                                            Unlisted (Nicht gelistet, über Link erreichbar)
-                                        </option>
-                                        <option value="public" <%= addon.visibility === 'public' ? 'selected' : '' %>>
-                                            Public (Im Marketplace sichtbar)
-                                        </option>
-                                        <option value="private" <%= addon.visibility === 'private' ? 'selected' : '' %>>
-                                            Private (Nur für bestimmte Guilds)
-                                        </option>
-                                        <option value="official" <%= addon.visibility === 'official' ? 'selected' : '' %>>
-                                            Official (Offiziell von FireBot Team)
-                                        </option>
-                                    </select>
-                                </div>
-                                
-                                <div class="alert alert-info">
-                                    <i class="fa-solid fa-info-circle"></i>
-                                    <strong>Verified:</strong> <%= addon.verified_at ? new Date(addon.verified_at).toLocaleString('de-DE') : 'Noch nicht verifiziert' %><br>
-                                    <strong>Last Tested:</strong> <%= addon.last_tested_at ? new Date(addon.last_tested_at).toLocaleString('de-DE') : 'Nie' %>
-                                </div>
-                                
-                                <button type="submit" class="btn btn-success w-100">
-                                    <i class="fa-solid fa-check"></i> Approve & Update
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-
-                </div>
-
-            </div>
-
-            <%# ── Fassungen & Freigabe (Baustelle 172, 2026-10-07) ──────────────
-                Welche Fassung des Spielpakets Server bekommen. „stable" folgt der
-                neuesten FREIGEGEBENEN Fassung, „test" der neuesten ueberhaupt.
-                Freigegeben wird nur, was einen gruenen Pruefdurchlauf hat. %>
-            <%
-              const fListe = locals.fassungen || [];
-              const sjk = locals.serverJeKanal || { stable: 0, test: 0 };
-              const freigegeben = fListe.filter(function (f) { return f.channel === 'stable'; });
-              const zeit = function (t) { return t ? new Date(t).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' }) : '—'; };
-            %>
-            <div class="row mt-3">
-                <div class="col-12">
+                <%# ── Rechte Spalte: Fassungen & Freigabe (Baustelle 172, 2026-10-07) ──
+                    Welche Fassung des Spielpakets Server bekommen. „stable" folgt der
+                    neuesten FREIGEGEBENEN Fassung, „test" der neuesten ueberhaupt.
+                    Freigegeben wird nur, was einen gruenen Pruefdurchlauf hat. %>
+                <%
+                  const fListe = locals.fassungen || [];
+                  const sjk = locals.serverJeKanal || { stable: 0, test: 0 };
+                  const freigegeben = fListe.filter(function (f) { return f.channel === 'stable'; });
+                  const zeit = function (t) { return t ? new Date(t).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' }) : '—'; };
+                %>
+                <div class="col-lg-7">
                     <div class="card" id="karteFassungen">
                         <div class="card-header">
                             <h3 class="card-title"><i class="fa-solid fa-code-branch"></i> Fassungen &amp; Freigabe</h3>
@@ -326,36 +254,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error('Error:', error);
             toastr.error('Fehler beim Speichern der Metadaten');
-        }
-    });
-    
-    // Approval-Form Submit
-    document.getElementById('approvalForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
-        
-        const formData = new FormData(this);
-        const payload = Object.fromEntries(formData);
-        
-        if (!confirm('Addon wirklich mit diesen Einstellungen freigeben?')) return;
-        
-        try {
-            const response = await fetch(`/admin/addons/${addonId}/approve`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            
-            const result = await response.json();
-            
-            if (result.success) {
-                toastr.success('Addon erfolgreich freigegeben!');
-                setTimeout(() => location.reload(), 1500);
-            } else {
-                toastr.error(result.message || 'Fehler beim Freigeben des Addons');
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            toastr.error('Fehler beim Freigeben des Addons');
         }
     });
 });
