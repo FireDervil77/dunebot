@@ -247,7 +247,20 @@ router.post('/oeffnen', requirePermission('WERKBANK.BAUEN'), async (req, res) =>
             guildId: res.locals.guildId, userId: nutzerId(req, res),
             paketId: req.body?.paket_id, rootserverId: req.body?.rootserver_id,
         });
-        return res.json({ success: true, ...ergebnis });
+        // Die übernommenen Schritte laufen sofort im Volume der Sitzung (Betreiber,
+        // 2026-10-08: „beim Öffnen sofort") — sonst hat sie keins, und nichts lässt
+        // sich probieren. Geht das gerade nicht (Maschine weg), ist das Paket
+        // trotzdem geöffnet: Die Sitzung sagt es und hat den Knopf zum Nachholen.
+        let schritteLaufen = false, startHinweis = null;
+        try {
+            const sitzung = await Sitzungen.laden(res.locals.guildId, ergebnis.kennung);
+            const start = await Sitzungen.uebernommeneAusfuehren(sitzung);
+            schritteLaufen = start.angenommen;
+            if (start.schrittId && !start.angenommen) startHinweis = start.fehler;
+        } catch (error) {
+            startHinweis = error.message;
+        }
+        return res.json({ success: true, ...ergebnis, schritteLaufen, startHinweis });
     } catch (error) {
         return fehler(res, error, 'Paket nicht geöffnet', 400);
     }
@@ -343,6 +356,21 @@ router.post('/:kennung/schritte', requirePermission('WERKBANK.BAUEN'), async (re
         return res.json({ success: true, ...ergebnis });
     } catch (error) {
         return fehler(res, error, 'Schritt nicht ausgeführt', 400);
+    }
+});
+
+// Die übernommenen Schritte eines geöffneten Pakets im Volume der Sitzung
+// ausführen — der Reihe nach, ab dem ersten, der noch nicht gelaufen ist.
+// Öffnen stösst das selbst an; der Knopf holt es nach (Maschine war weg, ein
+// Schritt ist gescheitert, die Sitzung ist älter als diese Funktion).
+router.post('/:kennung/schritte/uebernommene', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        const sitzung = await offeneSitzung(req, res);
+        const ergebnis = await Sitzungen.uebernommeneAusfuehren(sitzung);
+        if (!ergebnis.schrittId) throw new Error('In dieser Sitzung wartet kein übernommener Schritt.');
+        return res.json({ success: true, ...ergebnis });
+    } catch (error) {
+        return fehler(res, error, 'Nicht gestartet', 400);
     }
 });
 

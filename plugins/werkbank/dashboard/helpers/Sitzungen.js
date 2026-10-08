@@ -45,8 +45,13 @@ const INSTALL_DURCHGEREICHT = ['cache', 'entfernen'];
 // Ein Schritt gehört zum Entwurf, wenn er in dieser Sitzung gelaufen ist (`ok`)
 // oder aus einem geöffneten Paket stammt (`uebernommen` — dort hat er sich
 // längst bewährt, im Volume DIESER Sitzung lief er noch nicht).
+//
+// Ein übernommener Schritt bleibt auch im Entwurf, WÄHREND er läuft
+// (2026-10-08): Er gehört zum Paket, ob er hier gerade durch ist oder nicht —
+// der Entwurf darf nicht für die Dauer eines SteamCMD-Laufs einen Schritt
+// weniger haben. Ein von Hand angelegter kommt erst hinein, wenn er gelungen ist.
 const IM_ENTWURF = ['ok', 'uebernommen'];
-const imEntwurf = (s) => IM_ENTWURF.includes(s.status);
+const imEntwurf = (s) => IM_ENTWURF.includes(s.status) || (s.status === 'laeuft' && Boolean(s.uebernommen_aus));
 
 /** Dieselbe Regel wie `reSitzung` im Daemon (internal/gameserver/werkbank.go). */
 const RE_KENNUNG = /^[a-z0-9][a-z0-9-]{0,62}$/;
@@ -183,7 +188,8 @@ async function maschinen(guildId) {
 async function liste(guildId) {
     return db().query(`
         SELECT s.id, s.kennung, s.name, s.rootserver_id, s.status, s.created_at, s.updated_at,
-               (SELECT COUNT(*) FROM werkbank_schritte x WHERE x.sitzung_id = s.id AND x.status IN ('ok', 'uebernommen')) AS schritte_ok,
+               (SELECT COUNT(*) FROM werkbank_schritte x WHERE x.sitzung_id = s.id
+                   AND (x.status IN ('ok', 'uebernommen') OR (x.status = 'laeuft' AND x.uebernommen_aus IS NOT NULL))) AS schritte_ok,
                (SELECT COUNT(*) FROM werkbank_schritte x WHERE x.sitzung_id = s.id AND x.status = 'laeuft') AS laeuft
           FROM werkbank_sitzungen s
          WHERE s.guild_id = ? AND s.status = 'offen'
@@ -256,14 +262,21 @@ async function schrittAusfuehren({ sitzung, schritt }) {
     const r = await db().query(
         "INSERT INTO werkbank_schritte (sitzung_id, nr, schritt, status) VALUES (?, ?, ?, 'laeuft')",
         [sitzung.id, naechste, JSON.stringify(schritt)]);
-    const schrittId = r.insertId;
+    return schickeSchritt(sitzung, daemon, r.insertId, schritt, {});
+}
+
+/**
+ * Einen Schritt, der schon als `laeuft` in der Liste steht, an den Daemon geben.
+ * Der eine Weg für beide Arten: von Hand angelegt und aus einem Paket übernommen.
+ */
+async function schickeSchritt(sitzung, daemon, schrittId, schritt, settings) {
     require('./Ereignisse').merke(sitzung.kennung, { schrittId, guildId: sitzung.guild_id });
 
     const antwort = await daemon.senden('werkbank.schritt', {
         guild_id: sitzung.guild_id,
         image: sitzungsImage(sitzung),
         schritt,
-        settings: {},
+        settings,
         // Seit Stufe 2 hat die Sitzung Portnummern — ein template-Schritt mit
         // {{port:game}} bekommt dieselbe Zahl wie der Probestart.
         ports: werkbankTeil(sitzung).portnummern,
@@ -279,6 +292,67 @@ async function schrittAusfuehren({ sitzung, schritt }) {
     return { schrittId, angenommen: true };
 }
 
+/**
+ * Die übernommenen Schritte einer geöffneten Sitzung im Volume ausführen
+ * (2026-10-08) — den nächsten in der Reihe; `nachSchritt` setzt die Kette fort.
+ *
+ * Bis dahin standen sie nur in der Liste. Das Volume einer Sitzung entsteht
+ * aber mit dem ersten Schritt, der dort LÄUFT: Eine geöffnete Sitzung hatte
+ * keins, und der Probestart scheiterte mit „die Sitzung hat noch kein Volume"
+ * (Betreiber, Astro Colony). Die Annahme dahinter — „der Prüfdurchlauf fährt
+ * sie ohnehin" — übersah, dass vor dem Durchlauf probiert wird.
+ *
+ * Anders als ein von Hand angelegter Schritt bekommt ein übernommener die
+ * Probewerte der Sitzung mit: Schritte fertiger Pakete setzen Einstellungen
+ * ein (Astro Colony schreibt elf davon in seine Datei, Valheim wählt den
+ * Zweig), und der Prüfdurchlauf gibt ihnen dieselben.
+ *
+ * @returns {Promise<{schrittId: number|null, angenommen: boolean, fehler?: string}>}
+ *          `schrittId: null` — es gibt keinen übernommenen Schritt mehr
+ */
+async function uebernommeneAusfuehren(sitzung) {
+    await pruefeFrei(sitzung);
+    const [z] = await db().query(
+        "SELECT id, schritt FROM werkbank_schritte WHERE sitzung_id = ? AND status = 'uebernommen' ORDER BY nr, id LIMIT 1",
+        [sitzung.id]);
+    if (!z) return { schrittId: null, angenommen: false };
+    const schritt = json(z.schritt, null);
+    if (!schritt || !SCHRITTTYPEN.includes(schritt.type)) {
+        throw new Error(`Der übernommene Schritt #${z.id} hat einen Typ, den die Werkbank nicht ausführt („${schritt?.type || ''}").`);
+    }
+    const daemon = await daemonFuer(sitzung);
+    // Erst jetzt umstellen — ohne Daemon bleibt der Schritt, wie er war.
+    const r = await db().query(
+        `UPDATE werkbank_schritte
+            SET status = 'laeuft', fehler = NULL, dateien = NULL, begonnen_am = NOW(), beendet_am = NULL,
+                ausgabe = CONCAT(COALESCE(ausgabe, ''), '==> Läuft jetzt im Volume dieser Sitzung.\n')
+          WHERE id = ? AND status = 'uebernommen'`, [z.id]);
+    if (!r?.affectedRows) throw new Error('Der Schritt wurde gerade von anderer Stelle gestartet oder herausgenommen.');
+    return schickeSchritt(sitzung, daemon, z.id, schritt, probewerte(sitzung));
+}
+
+/**
+ * Nach dem Ende eines Schritts: War er übernommen und ist gelungen, läuft der
+ * nächste übernommene an. Aus der Datenbank abgelesen, nicht aus dem Speicher —
+ * die Kette übersteht so einen Neustart des Dashboards mitten im Lauf.
+ *
+ * @returns {Promise<object|null>} das Ergebnis des nächsten Starts, oder null
+ */
+async function ketteFortsetzen(guildId, kennung, schrittId) {
+    const [z] = await db().query(
+        'SELECT status, uebernommen_aus FROM werkbank_schritte WHERE id = ?', [schrittId]);
+    if (!z || z.status !== 'ok' || !z.uebernommen_aus) return null;
+    const sitzung = await laden(guildId, kennung);
+    if (!sitzung || sitzung.status !== 'offen') return null;
+    const ergebnis = await uebernommeneAusfuehren(sitzung);
+    return ergebnis.schrittId ? ergebnis : null;
+}
+
+/** Wie viele übernommene Schritte in dieser Sitzung noch nicht gelaufen sind. */
+function offeneUebernommene(liste) {
+    return (liste || []).filter(s => s.status === 'uebernommen').length;
+}
+
 /** Ausgabe anhängen — begrenzt auf die letzten MAX_AUSGABE Zeichen. */
 async function ausgabeAnhaengen(schrittId, text) {
     await db().query(
@@ -287,11 +361,22 @@ async function ausgabeAnhaengen(schrittId, text) {
           WHERE id = ?`, [text, MAX_AUSGABE, schrittId]);
 }
 
+/**
+ * Einen laufenden Schritt beenden.
+ *
+ * Ein Schritt aus einem geöffneten Paket (`uebernommen_aus`), der scheitert,
+ * fällt auf `uebernommen` zurück statt auf `fehler`: Er gehört weiter zum
+ * Entwurf und lässt sich wiederholen. Als `fehler` fiele er heraus, und das
+ * nächste veröffentlichte Paket hätte einen Schritt weniger — wegen eines
+ * Netzwerkfehlers. Der Grund steht trotzdem am Schritt.
+ */
 async function beenden(schrittId, { status, fehler = null, bytes = null, dateien = null }) {
     await db().query(
-        `UPDATE werkbank_schritte SET status = ?, fehler = ?, bytes = ?, dateien = ?, beendet_am = NOW()
+        `UPDATE werkbank_schritte
+            SET status = IF(? = 'fehler' AND uebernommen_aus IS NOT NULL, 'uebernommen', ?),
+                fehler = ?, bytes = ?, dateien = ?, beendet_am = NOW()
           WHERE id = ? AND status = 'laeuft'`,
-        [status, fehler, bytes, dateien ? JSON.stringify(dateien) : null, schrittId]);
+        [status, status, fehler, bytes, dateien ? JSON.stringify(dateien) : null, schrittId]);
 }
 
 const RE_SUMME = /^(sha256:[0-9a-f]{64}|sha1:[0-9a-f]{40})$/;
@@ -631,9 +716,11 @@ function entwurfAusPaket(paket) {
  *
  * Geöffnet wird die NEUESTE Fassung — der Arbeitsstand, den auch ein Server auf
  * `test` bekommt. Die Schritte kommen als `uebernommen` in die Liste: Sie
- * gehören zum Entwurf, sind im Volume dieser Sitzung aber noch nicht gelaufen
- * (der Prüfdurchlauf fährt sie ohnehin auf einem leeren Volume). Symbol und
- * Banner des Spiels gehen mit, damit das nächste Veröffentlichen sie nicht leert.
+ * gehören zum Entwurf, sind im Volume dieser Sitzung aber noch nicht gelaufen.
+ * Das holt der Aufrufer gleich nach (`uebernommeneAusfuehren`, seit 2026-10-08)
+ * — ohne sie hat die Sitzung kein Volume und nichts lässt sich probieren.
+ * Symbol und Banner des Spiels gehen mit, damit das nächste Veröffentlichen sie
+ * nicht leert.
  */
 async function paketOeffnen({ guildId, userId, paketId, rootserverId }) {
     const zeile = await Paketfassung.ladeNeuesteFassung(db(), { paketId });
@@ -675,9 +762,9 @@ async function paketOeffnen({ guildId, userId, paketId, rootserverId }) {
     for (const schritt of stufen) {
         nr++;
         await db().query(
-            `INSERT INTO werkbank_schritte (sitzung_id, nr, schritt, status, ausgabe, beendet_am)
-             VALUES (?, ?, ?, 'uebernommen', ?, NOW())`,
-            [r.insertId, nr, JSON.stringify(schritt),
+            `INSERT INTO werkbank_schritte (sitzung_id, nr, schritt, status, uebernommen_aus, ausgabe, beendet_am)
+             VALUES (?, ?, ?, 'uebernommen', ?, ?, NOW())`,
+            [r.insertId, nr, JSON.stringify(schritt), `${zeile.slug} ${zeile.version}`.slice(0, 120),
              `Aus ${zeile.slug} ${zeile.version} übernommen — in dieser Sitzung noch nicht gelaufen.\n`]);
     }
     return { kennung, slug: zeile.slug, version: zeile.version, schritte: nr, durchgereicht: Object.keys(entwurf.durchgereicht || {}) };
@@ -2144,6 +2231,7 @@ function gruppiere(liste, ab = 6) {
 }
 
 module.exports = {
+    uebernommeneAusfuehren, ketteFortsetzen, offeneUebernommene,
     sitzungsImage,
     RE_KENNUNG, RE_ZWECK, SCHRITTTYPEN, MAX_AUSGABE, GRENZEN, VORGABE, ERKUNDUNG, hatBereitschaft,
     waehlbareImages, maschinen, liste, laden, schritte, anlegen,

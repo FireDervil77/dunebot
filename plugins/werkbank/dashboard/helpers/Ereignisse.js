@@ -139,6 +139,21 @@ async function beiEnde(payload, ok) {
         ? { status: 'ok', bytes: Number.isFinite(Number(payload.bytes)) ? Number(payload.bytes) : null, dateien }
         : { status: 'fehler', fehler: String(payload.error || 'unbekannter Fehler'), dateien });
     vergiss(kennung);
+    // Übernommene Schritte eines geöffneten Pakets laufen als Kette (2026-10-08):
+    // Ist dieser gelungen, startet der nächste — VOR der Meldung an den Browser.
+    // Die Seite lädt auf „fertig" neu und soll den nächsten schon laufen sehen;
+    // andersherum zeigte sie einen Moment lang eine Sitzung, in der nichts läuft.
+    // Gelingt der Start nicht, bleibt der nächste `uebernommen` und zeigt, warum.
+    if (ok) {
+        try {
+            const weiter = await Sitzungen.ketteFortsetzen(lauf.guildId, kennung, lauf.schrittId);
+            if (weiter && !weiter.angenommen) {
+                Logger.warn(`[Werkbank] Sitzung ${kennung}: nächster übernommener Schritt nicht gestartet — ${weiter.fehler}`);
+            }
+        } catch (fehler) {
+            Logger.error(`[Werkbank] Sitzung ${kennung}: nächster übernommener Schritt nicht gestartet`, fehler);
+        }
+    }
     sende(lauf.guildId, {
         action: ok ? 'fertig' : 'fehlgeschlagen', sitzung_id: kennung,
         schritt_id: lauf.schrittId, error: ok ? null : String(payload.error || ''),

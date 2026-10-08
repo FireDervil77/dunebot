@@ -274,6 +274,14 @@ function alsFormular(e) {
     await c2.query('CREATE TEMPORARY TABLE werkbank_sitzungen LIKE wb_form_s');
     await c2.query('CREATE TEMPORARY TABLE werkbank_schritte LIKE wb_form_x');
     await c2.query('DROP TEMPORARY TABLE wb_form_s, wb_form_x');
+    // Läufe und Prüfungen ebenfalls verdecken, leer: Die temporären Sitzungen
+    // zählen wieder ab 1, und „läuft in dieser Sitzung etwas?" träfe sonst einen
+    // echten Probestart mit zufällig derselben Nummer.
+    for (const tab of ['werkbank_laeufe', 'werkbank_pruefungen']) {
+        await c2.query(`CREATE TEMPORARY TABLE wb_form_t LIKE ${tab}`);
+        await c2.query(`CREATE TEMPORARY TABLE ${tab} LIKE wb_form_t`);
+        await c2.query('DROP TEMPORARY TABLE wb_form_t');
+    }
     ServiceManager.register('dbService', {
         query: async (sql, params) => {
             const t = sql.trim();
@@ -288,6 +296,10 @@ function alsFormular(e) {
     });
     // Der Zustand `uebernommen` kommt mit der Migration — hier an der temporären Tabelle.
     await require('../plugins/werkbank/migrations/20261007_160000_werkbank_schritt_uebernommen.js')
+        .up({ query: async (sql, params) => (await c2.query(sql, params))[0] });
+    // Ebenso die Herkunft der Schritte (2026-10-08). Die Migration fragt selbst,
+    // ob die Spalte schon da ist — der Wächter läuft vor und nach dem Ausrollen.
+    await require('../plugins/werkbank/migrations/20261008_090000_werkbank_schritt_herkunft.js')
         .up({ query: async (sql, params) => (await c2.query(sql, params))[0] });
 
     const [[maschine]] = await c2.query(
@@ -323,11 +335,109 @@ function alsFormular(e) {
             }
         });
     }
+    // ── Übernommene Schritte laufen im Volume der Sitzung (2026-10-08) ───────
+    //
+    // Bis dahin standen sie nur in der Liste: Eine geöffnete Sitzung hatte kein
+    // Volume, der Probestart scheiterte mit „die Sitzung hat noch kein Volume"
+    // (Betreiber, Astro Colony). Der Daemon ist hier eine Attrappe, die mitschreibt,
+    // was sie bekommt; sein Ende meldet der Wächter über denselben Eingang wie er.
+    console.log('\nÜbernommene Schritte laufen im Volume der Sitzung');
+    const E = require('../plugins/werkbank/dashboard/helpers/Ereignisse');
+    const still = () => {};
+    if (!ServiceManager.has('Logger')) ServiceManager.register('Logger', { debug: still, info: still, warn: still, error: still, success: still });
+    const gesendet = [];
+    let daemonAntwort = { success: true };
+    const zustaende = async (sitzungId) => (await S.schritte(sitzungId)).map(x => x.status).join(' ');
+    const mitZweien = paketZeilen.find(z => (neueste.get(z.slug).install.steps || []).length === 2 && (neueste.get(z.slug).settings || []).length);
+    let offen = null;
+    await pruefe('ohne erreichbaren Daemon bleibt jeder Schritt, wie er war', async () => {
+        assert.ok(mitZweien, 'kein Paket mit zwei Schritten und Einstellungen im Bestand');
+        const r = await S.paketOeffnen({ guildId: maschine.guild_id, userId: '1', paketId: mitZweien.id, rootserverId: maschine.id });
+        offen = await S.laden(maschine.guild_id, r.kennung);
+        await assert.rejects(S.uebernommeneAusfuehren(offen), /nicht erreichbar/);
+        assert.strictEqual(await zustaende(offen.id), 'uebernommen uebernommen');
+    });
+    ServiceManager.register('ipmServer', {
+        isDaemonOnline: () => true,
+        sendCommand: async (daemonId, befehl, nutzlast) => { gesendet.push({ befehl, nutzlast }); return daemonAntwort; },
+    });
+    await pruefe('der erste läuft — mit dem Schritt des Pakets und den Probewerten der Sitzung', async () => {
+        const [[m]] = await c2.query('SELECT daemon_id FROM rootserver WHERE id = ?', [maschine.id]);
+        assert.ok(m.daemon_id, 'die Maschine des Wächters hat keinen Daemon — ohne ihn lässt sich der Weg nicht prüfen');
+        const paket = neueste.get(mitZweien.slug);
+        const e = await S.uebernommeneAusfuehren(offen);
+        assert.strictEqual(e.angenommen, true);
+        assert.strictEqual(await zustaende(offen.id), 'laeuft uebernommen');
+        assert.strictEqual(gesendet.length, 1);
+        assert.strictEqual(gesendet[0].befehl, 'werkbank.schritt');
+        assert.strictEqual(gesendet[0].nutzlast.sitzung_id, offen.kennung);
+        assert.deepStrictEqual(gesendet[0].nutzlast.schritt, paket.install.steps[0]);
+        assert.deepStrictEqual(gesendet[0].nutzlast.settings, S.probewerte(offen));
+        assert.strictEqual(Object.keys(gesendet[0].nutzlast.settings).length, paket.settings.length, 'jede Einstellung des Pakets hat einen Wert');
+    });
+    await pruefe('während er läuft: im Entwurf fehlt nichts, und ein zweiter Start wird abgewiesen', async () => {
+        const liste = await S.schritte(offen.id);
+        assert.strictEqual(S.entwurfAlsPaket(offen, liste).install.steps.length, 2, 'der laufende Schritt ist aus dem Entwurf gefallen');
+        await assert.rejects(S.uebernommeneAusfuehren(offen), /läuft schon ein Schritt/);
+        assert.strictEqual(gesendet.length, 1);
+    });
+    await pruefe('scheitert er, steht er wieder als übernommen da — mit Grund, im Entwurf, und nichts läuft weiter', async () => {
+        await E.beiEnde({ sitzung_id: offen.kennung, error: 'Netz weg' }, false);
+        const liste = await S.schritte(offen.id);
+        assert.strictEqual(liste.map(x => x.status).join(' '), 'uebernommen uebernommen');
+        assert.strictEqual(liste[0].fehler, 'Netz weg');
+        assert.strictEqual(S.entwurfAlsPaket(offen, liste).install.steps.length, 2);
+        assert.strictEqual(gesendet.length, 1, 'nach einem Fehler darf der nächste nicht starten');
+    });
+    await pruefe('gelingt er, startet der nächste von selbst', async () => {
+        await S.uebernommeneAusfuehren(offen);
+        assert.strictEqual(gesendet.length, 2);
+        await E.beiEnde({ sitzung_id: offen.kennung, bytes: 1000 }, true);
+        const liste = await S.schritte(offen.id);
+        assert.strictEqual(liste.map(x => x.status).join(' '), 'ok laeuft');
+        assert.strictEqual(liste[0].fehler, null, 'der alte Grund steht noch am gelungenen Schritt');
+        assert.strictEqual(gesendet.length, 3);
+        assert.deepStrictEqual(gesendet[2].nutzlast.schritt, neueste.get(mitZweien.slug).install.steps[1]);
+    });
+    await pruefe('nach dem letzten ist Schluss: beide durch, nichts wartet, das Paket ist dasselbe', async () => {
+        await E.beiEnde({ sitzung_id: offen.kennung, bytes: 2000 }, true);
+        const liste = await S.schritte(offen.id);
+        assert.strictEqual(liste.map(x => x.status).join(' '), 'ok ok');
+        assert.strictEqual(gesendet.length, 3);
+        assert.strictEqual(S.offeneUebernommene(liste), 0);
+        assert.deepStrictEqual(await S.uebernommeneAusfuehren(offen), { schrittId: null, angenommen: false });
+        assert.deepStrictEqual(vergleiche(neueste.get(mitZweien.slug), S.entwurfAlsPaket(offen, liste)), []);
+    });
+    await pruefe('weist der Daemon ab, bleibt der Schritt übernommen und nennt den Grund', async () => {
+        const r = await S.paketOeffnen({ guildId: maschine.guild_id, userId: '1', paketId: mitZweien.id, rootserverId: maschine.id });
+        const s2 = await S.laden(maschine.guild_id, r.kennung);
+        daemonAntwort = { success: false, error: 'Platte voll' };
+        const e = await S.uebernommeneAusfuehren(s2);
+        daemonAntwort = { success: true };
+        assert.strictEqual(e.angenommen, false);
+        const liste = await S.schritte(s2.id);
+        assert.strictEqual(liste.map(x => x.status).join(' '), 'uebernommen uebernommen');
+        assert.strictEqual(liste[0].fehler, 'Platte voll');
+    });
+    await pruefe('ein von Hand angelegter Schritt, der scheitert, bleibt gescheitert — und zieht keine Kette nach', async () => {
+        const vorher = gesendet.length;
+        const e = await S.schrittAusfuehren({ sitzung: offen, schritt: { type: 'mkdir', path: 'probe' } });
+        assert.strictEqual(e.angenommen, true);
+        assert.deepStrictEqual(gesendet[gesendet.length - 1].nutzlast.settings, {});
+        await E.beiEnde({ sitzung_id: offen.kennung, error: 'kaputt' }, false);
+        assert.strictEqual(await zustaende(offen.id), 'ok ok fehler');
+        const f = await S.schrittAusfuehren({ sitzung: offen, schritt: { type: 'mkdir', path: 'probe2' } });
+        await E.beiEnde({ sitzung_id: offen.kennung }, true);
+        assert.strictEqual(await zustaende(offen.id), 'ok ok fehler ok');
+        assert.strictEqual(gesendet.length, vorher + 2);
+        assert.ok(f.schrittId);
+    });
+
     await pruefe('ein Paket, das es nicht gibt, und eine fremde Maschine werden abgewiesen', async () => {
         await assert.rejects(S.paketOeffnen({ guildId: maschine.guild_id, userId: '1', paketId: 99999999, rootserverId: maschine.id }), /gibt es nicht/);
         await assert.rejects(S.paketOeffnen({ guildId: 'fremd', userId: '1', paketId: paketZeilen[0].id, rootserverId: maschine.id }), /gehört nicht zu dieser Guild/);
     });
-    await c2.query('DROP TEMPORARY TABLE werkbank_sitzungen, werkbank_schritte');
+    await c2.query('DROP TEMPORARY TABLE werkbank_sitzungen, werkbank_schritte, werkbank_laeufe, werkbank_pruefungen');
     await pruefe('die echten Werkbank-Tabellen sind unberührt', async () => {
         assert.strictEqual(await zaehle(), vorher);
     });

@@ -58,10 +58,18 @@ const db = {
             this.schritte.push({ id, sitzung_id: p[0], nr: p[1], schritt: p[2], status: 'laeuft', ausgabe: '' });
             return { insertId: id };
         }
-        if (/^UPDATE werkbank_schritte SET status = \?, fehler = \?, bytes = \?, dateien = \?, beendet_am = NOW\(\) WHERE id = \? AND status = 'laeuft'$/.test(t)) {
-            const s = this.schritte.find(x => x.id === p[4] && x.status === 'laeuft');
-            if (s) Object.assign(s, { status: p[0], fehler: p[1], bytes: p[2], dateien: p[3] });
+        // Seit dem 2026-10-08 fällt ein gescheiterter Schritt aus einem geöffneten
+        // Paket (`uebernommen_aus`) auf `uebernommen` zurück statt auf `fehler`.
+        // Die Schritte dieser Attrappe sind von Hand angelegt — den anderen Weg
+        // prüft check-werkbank-oeffnen.js an der Datenbank.
+        if (/^UPDATE werkbank_schritte SET status = IF\(\? = 'fehler' AND uebernommen_aus IS NOT NULL, 'uebernommen', \?\), fehler = \?, bytes = \?, dateien = \?, beendet_am = NOW\(\) WHERE id = \? AND status = 'laeuft'$/.test(t)) {
+            const s = this.schritte.find(x => x.id === p[5] && x.status === 'laeuft');
+            if (s) Object.assign(s, { status: (p[0] === 'fehler' && s.uebernommen_aus) ? 'uebernommen' : p[1], fehler: p[2], bytes: p[3], dateien: p[4] });
             return { affectedRows: s ? 1 : 0 };
+        }
+        // Nach einem gelungenen Schritt fragt die Kette, ob er übernommen war.
+        if (/^SELECT status, uebernommen_aus FROM werkbank_schritte WHERE id = \?$/.test(t)) {
+            return this.schritte.filter(x => x.id === p[0]).map(x => ({ status: x.status, uebernommen_aus: x.uebernommen_aus || null }));
         }
         // ── W2: Prüfsumme eintragen ──
         if (/^SELECT schritt FROM werkbank_schritte WHERE id = \?$/.test(t)) {

@@ -49,7 +49,7 @@
     fehler:         '<span class="badge bg-red-lt">gescheitert</span>',
     herausgenommen: '<span class="badge bg-secondary-lt">herausgenommen</span>',
     // Aus einem geöffneten Paket: gehört zum Entwurf, lief in DIESER Sitzung aber noch nicht.
-    uebernommen:    '<span class="badge bg-azure-lt" title="Aus dem geöffneten Paket übernommen — im Volume dieser Sitzung noch nicht gelaufen. Der Prüfdurchlauf führt ihn aus.">übernommen</span>'
+    uebernommen:    '<span class="badge bg-azure-lt" title="Aus dem geöffneten Paket übernommen — im Volume dieser Sitzung noch nicht gelaufen.">übernommen</span>'
   };
 
   // Eine Zeile, die sagt, was der Schritt tut — ohne ihn aufzuklappen.
@@ -93,6 +93,26 @@
           }) %>
         </div>
       <% } else { %>
+        <%# Übernommene Schritte, die hier noch nicht gelaufen sind (2026-10-08).
+            Öffnen startet sie selbst; stehen trotzdem welche da (Maschine war weg,
+            einer ist gescheitert, die Sitzung ist älter), holt der Knopf es nach.
+            Ohne sie hat die Sitzung kein Volume mit dem Spiel darin. %>
+        <% const wartend = schritte.filter(function (x) { return x.status === 'uebernommen'; }).length; %>
+        <% if (wartend && !laeuft) { %>
+          <div class="card-body border-bottom">
+            <div class="alert alert-warning mb-0" id="hinweisUebernommene">
+              <div class="d-flex flex-wrap align-items-center gap-2">
+                <div style="flex:1 1 16rem">
+                  <strong><%= wartend === 1 ? 'Ein übernommener Schritt ist' : wartend + ' übernommene Schritte sind' %> in dieser Sitzung noch nicht gelaufen.</strong>
+                  Solange fehlt dem Volume das Spiel — Probestart, Beobachtung der Ports und der Blick in die Dateien brauchen es.
+                </div>
+                <button class="btn btn-warning" type="button" id="knopfUebernommene" <%= beschaeftigt ? 'disabled' : '' %>>
+                  <i class="fa-solid fa-play me-1"></i>Übernommene Schritte ausführen
+                </button>
+              </div>
+            </div>
+          </div>
+        <% } %>
         <div class="list-group list-group-flush">
           <% schritte.forEach(function (x) { %>
             <div class="list-group-item" data-schritt="<%= x.id %>">
@@ -1250,6 +1270,24 @@
       } catch (fehler) {
         knopf.disabled = false;
         melde('error', 'Schritt nicht ausgeführt: ' + fehler.message);
+      }
+    });
+  }
+
+  // ── Übernommene Schritte ausführen ────────────────────────────────────
+  // Startet den ersten, der noch nicht gelaufen ist; die übrigen folgen von
+  // selbst, jeder nach dem Ende seines Vorgängers.
+  var knopfUebernommene = document.getElementById('knopfUebernommene');
+  if (knopfUebernommene) {
+    knopfUebernommene.addEventListener('click', async function () {
+      knopfUebernommene.disabled = true;
+      try {
+        var daten = await schicke(hier + '/schritte/uebernommene');
+        if (!daten.angenommen) melde('error', 'Der Daemon hat den Schritt abgewiesen: ' + (daten.fehler || ''));
+        window.location.reload();
+      } catch (fehler) {
+        knopfUebernommene.disabled = false;
+        melde('error', 'Nicht gestartet: ' + fehler.message);
       }
     });
   }

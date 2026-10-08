@@ -128,7 +128,7 @@
                   <option value="<%= p.paket_id %>"><%= p.name || p.slug %> — <%= p.slug %> <%= p.version %></option>
                 <% }) %>
               </select>
-              <div class="form-hint">Geöffnet wird die neueste Fassung. Was die Werkbank noch nicht bearbeiten kann (Abfrage, Fernsteuerung, Mods, Sperrliste …), nimmt sie unverändert mit.</div>
+              <div class="form-hint">Geöffnet wird die neueste Fassung, und ihre Installationsschritte laufen gleich auf der Maschine — bei Steam-Spielen dauert das. Was die Werkbank noch nicht bearbeiten kann (Fernsteuerung, Mods, Sperrliste …), nimmt sie unverändert mit.</div>
             </div>
             <div class="mb-3">
               <label class="form-label" for="oeffnenMaschine">Maschine</label>
@@ -197,7 +197,16 @@
       var daten = {};
       try { daten = await antwort.json(); } catch (e) { /* kein JSON */ }
       if (!antwort.ok || !daten.success) throw new Error(daten.message || ('HTTP ' + antwort.status));
-      window.location.href = basis + '/' + daten.kennung;
+      // Die Schritte des Pakets laufen sofort im Volume der Sitzung. Ging das
+      // nicht, ist das Paket trotzdem geöffnet — der Grund bleibt kurz stehen,
+      // die Sitzung hat den Knopf zum Nachholen.
+      var ziel = basis + '/' + daten.kennung;
+      if (daten.startHinweis && window.showToast) {
+        window.showToast('warning', 'Geöffnet, aber die Schritte laufen noch nicht: ' + daten.startHinweis);
+        setTimeout(function () { window.location.href = ziel; }, 3000);
+      } else {
+        window.location.href = ziel;
+      }
     } catch (fehler) {
       knopf.disabled = false;
       if (window.showToast) window.showToast('error', 'Paket nicht geöffnet: ' + fehler.message);
