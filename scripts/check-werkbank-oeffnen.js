@@ -159,10 +159,18 @@ function alsFormular(e) {
             gesamt.ziele += (neu.settings || []).reduce((n, e) => n + (e.apply || []).length, 0);
             // Ein Teil, der als Ganzes eine Karte hat (seit 2026-10-08: `commands`),
             // reist nicht mehr „unverändert" mit — er ist bearbeitbar wie Ports.
-            const teile = S.DURCHGEREICHT.filter(k => paket[k] !== undefined && S.EIGENE[k] !== S.GANZ);
+            // Gefragt wird dieselbe Stelle wie beim Veröffentlichen
+            // (durchgereichteTeile): Ein Teil, dessen Stücke ALLE eine Karte haben,
+            // reist nicht mit. `7day2die` trägt `management` nur mit der Abfrage —
+            // die Fassung davor erwartete den Vermerk trotzdem (rot seit seiner
+            // Einlieferung am 2026-10-08).
+            const teile = S.durchgereichteTeile(paket);
             if (teile.length) {
                 assert.ok(neu.status.open.some(z => /Unverändert übernommen/.test(z) && teile.every(t => z.includes(t))),
                     'das Paket sagt nicht, was ungeprüft mitreist');
+            } else {
+                assert.ok(!neu.status.open.some(z => /Unverändert übernommen/.test(z)),
+                    'das Paket nennt etwas als unverändert übernommen, obwohl jedes Stück eine Karte hat');
             }
             for (const k of S.DURCHGEREICHT.filter(x => S.EIGENE[x] === S.GANZ)) {
                 assert.ok(!neu.status.open.some(z => /Unverändert übernommen/.test(z) && new RegExp(`\\b${k}\\b`).test(z)),
@@ -213,11 +221,21 @@ function alsFormular(e) {
         await pruefe('Port übernehmen: Kopplung, Beschreibung und Platz in der Liste bleiben', async () => {
             const s2 = { ...sitzung, entwurf: JSON.parse(JSON.stringify(entwurf)) };
             const vorher = JSON.parse(JSON.stringify(s2.entwurf.ports));
-            let nr = 30000;
+            // Ein gekoppelter Port lauscht dort, wo die Kopplung es sagt
+            // (`game+2` → Nummer von game plus 2) — fortlaufende Nummern passten
+            // nur, solange jede Kopplung `+1` hiess und gleich hinter ihrer Basis
+            // stand (rot seit `7day2die`, 2026-10-08).
+            const vergeben = {};
+            let frei = 30000;
             for (const p of vorher) {
+                const k = /^([a-z][a-z0-9_]*)\+(\d+)$/.exec(p.assign || '');
+                if (k) assert.ok(vergeben[k[1]] !== undefined, `„${p.purpose}" steht vor seiner Basis „${k[1]}" in der Liste`);
+                const nr = k ? vergeben[k[1]] + Number(k[2]) : frei;
+                vergeben[p.purpose] = nr;
+                // Platz lassen, damit eine Kopplung nie auf einen freien Port fällt.
+                if (!k) frei += 100;
                 await S.portUebernehmen(s2, { zweck: p.purpose, protocol: p.protocol === 'both' ? 'udp' : p.protocol, port: nr });
                 if (p.protocol === 'both') await S.portUebernehmen(s2, { zweck: p.purpose, protocol: 'tcp', port: nr });
-                nr++;
             }
             assert.deepStrictEqual(abweichungen(vorher, s2.entwurf.ports, 'ports'), []);
             assert.strictEqual(Object.keys(s2.entwurf.werkbank.portnummern).length, vorher.length, 'jeder Zweck hat seine Nummer');
