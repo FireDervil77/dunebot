@@ -669,6 +669,209 @@
     </div>
   </div>
 
+  <!-- ── Fernsteuerung (Karte, 2026-10-08) ──────────────────────────────── -->
+  <%
+    // Die RCON-Verbindung des Pakets und seine Befehlsgruppen. Die Stoppfolge
+    // (auch `rcon:…`) steht im Startteil. Belegt wird die Verbindung im
+    // Prüfdurchlauf: anmelden, einen harmlosen Befehl senden, Antwort lesen.
+    const fern = locals.fernsteuerung || { rcon: null, kandidaten: [], quelle: null, warnungen: [], eigener: '', pruefbefehl: '', vorschlag: '', abhaengige: [] };
+    const befehlListe = Object.entries(locals.befehle || {});
+    const RC = locals.RCON || { protokolle: [], gebaut: [], befehl: 200 };
+    const BF = locals.BEFEHL || { gruppen: [], wege: [], arten: [], text: 300 };
+    const bfName = locals.befehlNamen || {};
+    const WEG = { rcon: ['bg-green-lt', 'Fernsteuerung'], console: ['bg-green-lt', 'Konsole'], file: ['bg-blue-lt', 'Datei'],
+                  query: ['bg-green-lt', 'Abfrage'], unsupported: ['bg-secondary-lt', 'nicht möglich'] };
+    const ART = { append_line: 'Zeile anhängen', remove_line: 'Zeile entfernen', rewrite: 'Datei neu schreiben' };
+    const rconBeleg = (pruefung && pruefung.ergebnis && pruefung.ergebnis.rcon) || null;
+    const tcpPorts = entwurfPorts.filter(function (p) { return p.protocol !== 'udp'; });
+    const fernPorts = (fern.rcon && !tcpPorts.some(function (p) { return p.purpose === fern.rcon.port; }))
+      ? tcpPorts.concat([{ purpose: fern.rcon.port, fehlt: true }]) : tcpPorts;
+    const fernVariablen = fern.kandidaten.slice();
+    if (fern.rcon && fern.rcon.password_variable && !fernVariablen.some(function (k) { return k.variable === fern.rcon.password_variable; })) {
+      fernVariablen.push({ key: null, variable: fern.rcon.password_variable });
+    }
+    function befehlDetail(c) {
+      if (c.via === 'file') return (c.file || '') + (c.mode ? ' · ' + (ART[c.mode] || c.mode) : '') + (c.value ? ' · ' + c.value : '');
+      if (c.via === 'unsupported') return (c.reason && (c.reason.de || c.reason.en)) || '';
+      return [c.command, c.parse ? 'Auswertung: ' + c.parse : ''].filter(Boolean).join(' · ');
+    }
+  %>
+  <div class="col-12">
+    <div class="card" id="karteFernsteuerung">
+      <div class="card-header">
+        <h3 class="card-title">Fernsteuerung</h3>
+        <div class="card-actions"><span class="text-secondary small">
+          RCON: <%= fern.rcon ? fern.rcon.protocol : 'keine' %> · <%= befehlListe.length %> Befehl<%= befehlListe.length === 1 ? '' : 'e' %>
+        </span></div>
+      </div>
+      <div class="card-body">
+        <div class="row g-4">
+
+          <div class="col-lg-5">
+            <p class="text-secondary small">
+              Über die <strong>Fernsteuerung</strong> (RCON) spricht der Daemon mit dem laufenden Spiel.<%- include('werkbank-hilfe', { text:
+                'Er braucht sie für Schritte wie „rcon:stop" in der Stoppfolge (die steht im Startteil), für Einstellungen mit Ziel rcon und für Befehle im Panel. Ohne sie endet ein Spiel, das nur über RCON speichert, beim Stopp hart.' }) %>
+            </p>
+            <% fern.warnungen.forEach(function (w) { %>
+              <div class="alert alert-warning py-2 small"><%= w %></div>
+            <% }) %>
+            <% if (!fernPorts.length) { %>
+              <p class="text-secondary small mb-0">Die Fernsteuerung braucht einen tcp-Port im Entwurf — im Probestart beobachten und unter „Ports" übernehmen.</p>
+            <% } else if (!fernVariablen.length) { %>
+              <p class="text-secondary small mb-0">Die Fernsteuerung braucht ein Kennwort: Lege unter „Einstellungen" eine Kennwort-Einstellung mit dem Ziel „Umgebungsvariable" an — dann lässt sie sich hier wählen.</p>
+            <% } else { %>
+              <form id="formFern" class="row g-2" autocomplete="off">
+                <div class="col-md-6">
+                  <label class="form-label" for="fProtokoll">Protokoll</label>
+                  <select class="form-select" id="fProtokoll" name="protocol">
+                    <% RC.protokolle.forEach(function (pr) { const gebaut = RC.gebaut.includes(pr); const gewaehlt = fern.rcon ? fern.rcon.protocol === pr : pr === 'source'; %>
+                      <option value="<%= pr %>" <%= gewaehlt ? 'selected' : '' %> <%= (!gebaut && !gewaehlt) ? 'disabled' : '' %>><%= pr %><%= gebaut ? '' : ' — spricht der Daemon nicht' %></option>
+                    <% }) %>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="fPort">Port</label>
+                  <select class="form-select" id="fPort" name="port">
+                    <% fernPorts.forEach(function (p) { %>
+                      <option value="<%= p.purpose %>" <%= fern.rcon && fern.rcon.port === p.purpose ? 'selected' : '' %>><%= p.purpose %><%= p.fehlt ? ' — fehlt im Entwurf' : '' %></option>
+                    <% }) %>
+                  </select>
+                </div>
+                <div class="col-12">
+                  <div class="form-label"><label for="fVariable">Kennwort aus</label><%- include('werkbank-hilfe', { text:
+                    'Das Kennwort steht nie im Paket. Eine Einstellung schreibt es in eine Umgebungsvariable, und von dort lesen es Spiel und Daemon. Hier wählst du, welche das ist.' }) %></div>
+                  <select class="form-select" id="fVariable" name="password_variable">
+                    <% fernVariablen.forEach(function (k) { %>
+                      <option value="<%= k.variable %>" <%= fern.rcon && fern.rcon.password_variable === k.variable ? 'selected' : '' %>><%= k.key ? 'Einstellung „' + k.key + '" → ' + k.variable + (k.kennwort ? '' : ' (kein Kennwortfeld)') : k.variable + ' — keine Einstellung schreibt sie' %></option>
+                    <% }) %>
+                  </select>
+                </div>
+                <div class="col-12">
+                  <div class="form-label"><label for="fPruefbefehl">Prüfbefehl</label><%- include('werkbank-hilfe', { text:
+                    'Der Prüfdurchlauf meldet sich über die Fernsteuerung an, sendet diesen Befehl und liest die Antwort — erst dann gilt sie als belegt. Nimm einen, der nur liest. Bei Factorio ist Text ohne Schrägstrich eine Chatnachricht. Der Befehl gehört der Sitzung und kommt nicht ins Paket.' }) %></div>
+                  <input class="form-control font-monospace" id="fPruefbefehl" name="pruefbefehl" maxlength="<%= RC.befehl %>"
+                         value="<%= fern.eigener %>" placeholder="<%= fern.vorschlag ? 'leer = ' + fern.vorschlag + ' (die Spielerliste)' : 'etwa list' %>">
+                  <% if (!fern.pruefbefehl) { %>
+                    <div class="form-hint text-warning">Ohne Prüfbefehl meldet sich der Durchlauf nicht an — die Fernsteuerung käme als „nicht belegt" ins Paket.</div>
+                  <% } %>
+                </div>
+                <div class="col-12 d-flex gap-2">
+                  <button class="btn btn-primary" type="submit" <%= beschaeftigt ? 'disabled' : '' %>><i class="fa-solid fa-floppy-disk me-1"></i>Fernsteuerung speichern</button>
+                  <% if (fern.rcon) { %><button class="btn btn-outline-danger" type="button" id="knopfFernWeg" <%= beschaeftigt ? 'disabled' : '' %>>Entfernen</button><% } %>
+                </div>
+              </form>
+            <% } %>
+            <% if (fern.rcon) { %>
+              <div class="small mt-3" id="fernBeleg">
+                <% if (rconBeleg && rconBeleg.angemeldet) { %>
+                  <span class="badge bg-green-lt">belegt</span>
+                  Durchlauf #<%= pruefung.id %>: angemeldet nach <%= rconBeleg.nach_sek %> s, „<span class="font-monospace"><%= rconBeleg.befehl %></span>" beantwortet<%= pruefHash !== entwurfHash ? ' — der Entwurf ist seither geändert' : '' %>.
+                  <% if (rconBeleg.antwort) { %><details class="mt-1"><summary class="text-secondary">Antwort des Spiels</summary><pre class="mt-1 mb-0 p-2 small" style="background:var(--tblr-bg-surface-secondary);color:var(--tblr-body-color);white-space:pre-wrap"><%= lesbar(rconBeleg.antwort) %></pre></details><% } %>
+                <% } else if (rconBeleg) { %>
+                  <span class="badge bg-red-lt">gescheitert</span>
+                  Durchlauf #<%= pruefung.id %>, <%= rconBeleg.versuche %> Versuch<%= rconBeleg.versuche === 1 ? '' : 'e' %>: <%= rconBeleg.fehler %>
+                <% } else if (pruefung && pruefung.ergebnis) { %>
+                  <span class="badge bg-secondary-lt">nicht belegt</span>
+                  Der letzte Durchlauf hat sich nicht angemeldet<%= fern.pruefbefehl ? ' — er lief vor dieser Karte oder auf einem älteren Daemon' : '' %>.
+                <% } else { %>
+                  <span class="badge bg-secondary-lt">noch kein Durchlauf</span>
+                <% } %>
+              </div>
+              <% if (fern.abhaengige.length) { %>
+                <div class="text-secondary small mt-2">Daran hängt: <%= fern.abhaengige.join(', ') %>.</div>
+              <% } %>
+            <% } %>
+          </div>
+
+          <div class="col-lg-7">
+            <p class="text-secondary small">
+              <strong>Befehle</strong> sagen, wie das Panel Spieler auflistet, entfernt, sperrt, die Welt speichert und Nachrichten sendet.<%- include('werkbank-hilfe', { text:
+                'Je Gruppe ein Weg: über die Fernsteuerung, die Konsole, eine Datei, die Abfrage — oder „nicht möglich" mit Begründung. Stand heute zeigt die Serverseite diese Liste in der fachlichen Ansicht nur an; ausgeführt wird daraus noch nichts.' }) %>
+            </p>
+            <% if (!befehlListe.length) { %>
+              <p class="text-secondary small mb-3">Noch kein Befehl im Entwurf.</p>
+            <% } else { %>
+              <div class="table-responsive mb-3">
+                <table class="table table-sm table-vcenter">
+                  <thead><tr><th>Gruppe</th><th>Weg</th><th>Was</th><th class="w-1"></th></tr></thead>
+                  <tbody>
+                    <% befehlListe.forEach(function (z) { const key = z[0], c = z[1] || {}; const w = WEG[c.via] || ['bg-secondary-lt', c.via || '?']; %>
+                      <tr>
+                        <td class="text-nowrap"><%= bfName[key] || key %><div class="text-secondary small font-monospace"><%= key %></div></td>
+                        <td><span class="badge <%= w[0] %>"><%= w[1] %></span></td>
+                        <td class="small<%= c.via === 'unsupported' ? ' text-secondary' : ' font-monospace' %>" style="word-break:break-word"><%= befehlDetail(c) %></td>
+                        <td class="text-nowrap">
+                          <button class="btn btn-sm btn-outline-secondary" type="button" data-befehl-bearbeiten="<%= JSON.stringify({ key: key, c: c }) %>" <%= beschaeftigt ? 'disabled' : '' %>>Bearbeiten</button>
+                          <button class="btn btn-sm btn-outline-danger" type="button" data-befehl-entfernen="<%= key %>" <%= beschaeftigt ? 'disabled' : '' %>>Entfernen</button>
+                        </td>
+                      </tr>
+                    <% }) %>
+                  </tbody>
+                </table>
+              </div>
+            <% } %>
+
+            <details id="befehlDetails">
+              <summary class="mb-2"><span id="befehlUeberschrift">Befehl anlegen</span></summary>
+              <form id="formBefehl" class="row g-2" autocomplete="off">
+                <div class="col-md-6">
+                  <label class="form-label" for="bKey">Gruppe</label>
+                  <input class="form-control font-monospace" id="bKey" name="key" list="befehlGruppen" placeholder="players.list" required>
+                  <datalist id="befehlGruppen">
+                    <% BF.gruppen.forEach(function (g) { %><option value="<%= g %>"><%= bfName[g] || g %></option><% }) %>
+                  </datalist>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="bWeg">Weg</label>
+                  <select class="form-select" id="bWeg" name="via">
+                    <% BF.wege.forEach(function (v) { %><option value="<%= v %>" <%= (v === 'rcon' && !fern.rcon) ? 'disabled' : '' %>><%= (WEG[v] || ['', v])[1] %><%= (v === 'rcon' && !fern.rcon) ? ' — erst links anlegen' : '' %></option><% }) %>
+                  </select>
+                </div>
+                <div class="col-12" data-weg="rcon console">
+                  <div class="form-label"><label for="bBefehl">Befehl</label><%- include('werkbank-hilfe', { text:
+                    'So, wie das Spiel ihn erwartet. Platzhalter, die das Panel einsetzt: {{player_id}}, {{reason}}, {{message}}.' }) %></div>
+                  <input class="form-control font-monospace" id="bBefehl" name="command" maxlength="<%= BF.text %>" placeholder="kick {{player_id}} {{reason}}">
+                </div>
+                <div class="col-md-6" data-weg="file">
+                  <label class="form-label" for="bDatei">Datei</label>
+                  <input class="form-control font-monospace" id="bDatei" name="file" maxlength="<%= BF.text %>" placeholder="bannedlist.txt">
+                </div>
+                <div class="col-md-6" data-weg="file">
+                  <label class="form-label" for="bArt">Art</label>
+                  <select class="form-select" id="bArt" name="mode">
+                    <% BF.arten.forEach(function (a) { %><option value="<%= a %>"><%= ART[a] || a %></option><% }) %>
+                  </select>
+                </div>
+                <div class="col-12" data-weg="file">
+                  <label class="form-label" for="bWert">Wert</label>
+                  <input class="form-control font-monospace" id="bWert" name="value" maxlength="<%= BF.text %>" placeholder="{{player_id}}">
+                </div>
+                <div class="col-12" data-weg="rcon console query">
+                  <div class="form-label"><label for="bLesen">Auswertung</label><%- include('werkbank-hilfe', { text:
+                    'Wie die Antwort gelesen wird — etwa minecraft:list oder table:name,ping. Leer lassen, wenn die Antwort nicht ausgewertet wird.' }) %></div>
+                  <input class="form-control font-monospace" id="bLesen" name="parse" maxlength="<%= BF.text %>" placeholder="leer = nicht auswerten">
+                </div>
+                <div class="col-md-6" data-weg="unsupported">
+                  <label class="form-label" for="bGrundDe">Begründung (deutsch)</label>
+                  <textarea class="form-control" id="bGrundDe" name="grund_de" rows="2" maxlength="600"></textarea>
+                </div>
+                <div class="col-md-6" data-weg="unsupported">
+                  <label class="form-label" for="bGrundEn">Begründung (englisch)</label>
+                  <textarea class="form-control" id="bGrundEn" name="grund_en" rows="2" maxlength="600"></textarea>
+                </div>
+                <div class="col-12 d-flex gap-2">
+                  <button class="btn btn-primary" type="submit" <%= beschaeftigt ? 'disabled' : '' %>><i class="fa-solid fa-floppy-disk me-1"></i>Befehl speichern</button>
+                  <button class="btn btn-outline-secondary" type="button" id="knopfBefehlNeu">Leeren</button>
+                </div>
+              </form>
+            </details>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ── Einstellungen (Baukasten B1, 2026-09-26) ───────────────────────── -->
   <%
     const nachweise = (pruefung && pruefung.ergebnis && Array.isArray(pruefung.ergebnis.einstellungen)) ? pruefung.ergebnis.einstellungen : null;
@@ -1121,6 +1324,7 @@
             Installation <%= e.installation || '—' %><%= e.install_sek ? ' (' + e.install_sek + ' s)' : '' %>
             · bereit <%= e.bereitschaft ? 'über ' + e.bereitschaft + ' nach ' + e.bereit_nach_sek + ' s' : 'nie' %>
             · Ende Code <%= e.exit_code !== undefined ? e.exit_code : '—' %><%= e.stopp_sek !== undefined && e.bereitschaft ? ', Stopp ' + e.stopp_sek + ' s' : '' %>
+            <% if (e.rcon) { %>· Fernsteuerung <%= e.rcon.angemeldet ? 'angemeldet nach ' + e.rcon.nach_sek + ' s' : 'nicht erreicht' %><% } %>
           </div>
         <% } %>
         <details <%= pruefLaeuft ? 'open' : '' %>>
@@ -1852,6 +2056,107 @@
       }
     });
   }
+  // ── Fernsteuerung (2026-10-08) ────────────────────────────────────────
+  var formF = document.getElementById('formFern');
+  if (formF) {
+    formF.addEventListener('submit', async function (ev) {
+      ev.preventDefault();
+      var knopf = formF.querySelector('button[type=submit]');
+      knopf.disabled = true;
+      try {
+        await schicke(hier + '/fernsteuerung', Object.fromEntries(new FormData(formF)));
+        window.location.reload();
+      } catch (fehler) {
+        knopf.disabled = false;
+        melde('error', fehler.message);
+      }
+    });
+  }
+  var fernWeg = document.getElementById('knopfFernWeg');
+  if (fernWeg) {
+    fernWeg.addEventListener('click', async function () {
+      if (!confirm('Fernsteuerung aus dem Entwurf entfernen?')) return;
+      fernWeg.disabled = true;
+      try { await schicke(hier + '/fernsteuerung/entfernen'); window.location.reload(); }
+      catch (fehler) { fernWeg.disabled = false; melde('error', fehler.message); }
+    });
+  }
+
+  var formB = document.getElementById('formBefehl');
+  if (formB) {
+    var befehlTitel = document.getElementById('befehlUeberschrift');
+    // Je Weg nur seine Felder — und nur die gehen mit (siehe Absenden).
+    function zeigeWeg() {
+      formB.querySelectorAll('[data-weg]').forEach(function (f) {
+        f.hidden = f.dataset.weg.split(' ').indexOf(formB.via.value) < 0;
+      });
+    }
+    function befehlLeeren() {
+      formB.reset();
+      formB.key.readOnly = false;
+      // Der erste Weg, der wählbar ist — „Fernsteuerung" ist ohne RCON gesperrt.
+      var frei = Array.prototype.find.call(formB.via.options, function (o) { return !o.disabled; });
+      if (frei) formB.via.value = frei.value;
+      befehlTitel.textContent = 'Befehl anlegen';
+      zeigeWeg();
+    }
+    formB.via.addEventListener('change', zeigeWeg);
+    document.getElementById('knopfBefehlNeu').addEventListener('click', befehlLeeren);
+    befehlLeeren();
+    document.querySelectorAll('[data-befehl-bearbeiten]').forEach(function (k) {
+      k.addEventListener('click', function () {
+        var d = JSON.parse(k.dataset.befehlBearbeiten), c = d.c || {};
+        befehlLeeren();
+        formB.key.value = d.key;
+        formB.key.readOnly = true;
+        // Ein Weg, den das Formular nicht anbietet (`api`), bleibt wählbar,
+        // solange er schon dasteht.
+        if (!Array.prototype.some.call(formB.via.options, function (o) { return o.value === c.via; })) {
+          formB.via.add(new Option(c.via, c.via));
+        }
+        formB.via.value = c.via;
+        formB.command.value = c.command || '';
+        formB.parse.value = c.parse || '';
+        formB.file.value = c.file || '';
+        if (c.mode) formB.mode.value = c.mode;
+        formB.value.value = c.value || '';
+        formB.grund_de.value = (c.reason && c.reason.de) || '';
+        formB.grund_en.value = (c.reason && c.reason.en) || '';
+        befehlTitel.textContent = 'Befehl „' + d.key + '" bearbeiten';
+        zeigeWeg();
+        document.getElementById('befehlDetails').open = true;
+        formB.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    });
+    document.querySelectorAll('[data-befehl-entfernen]').forEach(function (k) {
+      k.addEventListener('click', async function () {
+        if (!confirm('Befehl „' + k.dataset.befehlEntfernen + '" aus dem Entwurf entfernen?')) return;
+        k.disabled = true;
+        try { await schicke(hier + '/befehle/entfernen', { key: k.dataset.befehlEntfernen }); window.location.reload(); }
+        catch (fehler) { k.disabled = false; melde('error', fehler.message); }
+      });
+    });
+    formB.addEventListener('submit', async function (ev) {
+      ev.preventDefault();
+      var knopf = formB.querySelector('button[type=submit]');
+      knopf.disabled = true;
+      // Nur die sichtbaren Felder: Was zu einem anderen Weg gehört, käme sonst
+      // als Rest eines früheren Eintrags mit.
+      var nutzlast = { key: formB.key.value, via: formB.via.value };
+      formB.querySelectorAll('[data-weg]').forEach(function (f) {
+        if (f.hidden) return;
+        f.querySelectorAll('input, textarea, select').forEach(function (e) { nutzlast[e.name] = e.value; });
+      });
+      try {
+        await schicke(hier + '/befehle', nutzlast);
+        window.location.reload();
+      } catch (fehler) {
+        knopf.disabled = false;
+        melde('error', fehler.message);
+      }
+    });
+  }
+
   // ── Einstellungen (Baukasten B1) ──────────────────────────────────────
   var formE = document.getElementById('formEinstellung');
   if (formE) {

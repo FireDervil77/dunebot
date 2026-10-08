@@ -157,10 +157,25 @@ function alsFormular(e) {
             assert.ok(/bereit über die Abfrage/.test(mitAbfrage.status.open[0]) && !/bereit über den Port/.test(mitAbfrage.status.open[0]));
             gesamt.einstellungen += (neu.settings || []).length;
             gesamt.ziele += (neu.settings || []).reduce((n, e) => n + (e.apply || []).length, 0);
-            const teile = S.DURCHGEREICHT.filter(k => paket[k] !== undefined);
+            // Ein Teil, der als Ganzes eine Karte hat (seit 2026-10-08: `commands`),
+            // reist nicht mehr „unverändert" mit — er ist bearbeitbar wie Ports.
+            const teile = S.DURCHGEREICHT.filter(k => paket[k] !== undefined && S.EIGENE[k] !== S.GANZ);
             if (teile.length) {
                 assert.ok(neu.status.open.some(z => /Unverändert übernommen/.test(z) && teile.every(t => z.includes(t))),
                     'das Paket sagt nicht, was ungeprüft mitreist');
+            }
+            for (const k of S.DURCHGEREICHT.filter(x => S.EIGENE[x] === S.GANZ)) {
+                assert.ok(!neu.status.open.some(z => /Unverändert übernommen/.test(z) && new RegExp(`\\b${k}\\b`).test(z)),
+                    `„${k}" hat eine Karte und steht trotzdem als unverändert übernommen im Paket`);
+            }
+            // Die Fernsteuerung kommt auch unbelegt ins Paket — dann steht es dabei.
+            if (paket.management?.rcon) {
+                assert.ok(neu.status.open.some(z => /^Fernsteuerung \(.*NICHT belegt/.test(z)), 'der Vermerk zur unbelegten Fernsteuerung fehlt');
+                const belegt = S.veroeffentlichungsPaket(sitzung, liste,
+                    { ...pruefung, ergebnis: { ...pruefung.ergebnis, rcon: { befehl: 'list', angemeldet: true } } }, 'waechter', paket.image);
+                assert.ok(belegt.status.open.some(z => /^Fernsteuerung \(.*belegt — angemeldet, „list" beantwortet/.test(z)), 'der Vermerk zur belegten Fernsteuerung fehlt');
+            } else {
+                assert.ok(!neu.status.open.some(z => /^Fernsteuerung/.test(z)), 'ein Vermerk zur Fernsteuerung, obwohl das Paket keine hat');
             }
             const ordner = fs.mkdtempSync(path.join(os.tmpdir(), 'wb-oeffnen-'));
             try {

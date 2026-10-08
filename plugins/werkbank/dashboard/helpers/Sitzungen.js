@@ -449,9 +449,9 @@ function entwurfAlsPaket(sitzung, liste) {
     for (const k of INSTALL_DURCHGEREICHT) if (d.install && d.install[k] !== undefined) paket.install[k] = d.install[k];
     for (const k of DURCHGEREICHT) if (d[k] !== undefined) paket[k] = d[k];
     // Was eine eigene Karte hat, liegt im Entwurf und kommt hier dazu (EIGENE).
-    for (const [teil, felder] of Object.entries(EIGENE)) {
+    for (const teil of Object.keys(EIGENE)) {
         const eigen = {};
-        for (const f of felder) if (e[teil]?.[f] !== undefined) eigen[f] = e[teil][f];
+        for (const f of eigeneFelder(teil, e[teil])) if (e[teil]?.[f] !== undefined) eigen[f] = e[teil][f];
         if (Object.keys(eigen).length) paket[teil] = { ...(paket[teil] || {}), ...eigen };
     }
     if (e.start) paket.start = e.start;
@@ -610,8 +610,16 @@ function mischeEinstellung(vorher, neu) {
  * Sitzungen ziehen beim nächsten Laden nach (`ordne`).
  *
  *   management.query   Karte „Ports und Abfrage" (2026-10-07)
+ *   management.rcon    Karte „Fernsteuerung" (2026-10-08)
+ *   commands           Karte „Fernsteuerung" — der GANZE Teil: Jeder Schlüssel
+ *                      darin ist ein Befehl, und jeder ist bearbeitbar.
  */
-const EIGENE = { management: ['query'] };
+const GANZ = '*';
+const EIGENE = { management: ['query', 'rcon'], commands: GANZ };
+/** Die Stücke eines Teils, die eine Karte haben — bei GANZ alle, die `objekt` trägt. */
+const eigeneFelder = (teil, objekt) => (EIGENE[teil] === GANZ ? Object.keys(objekt || {}) : EIGENE[teil]);
+/** Hat dieses Stück eine Karte? */
+const hatKarte = (teil, feld) => EIGENE[teil] === GANZ || (EIGENE[teil] || []).includes(feld);
 
 /**
  * Den Entwurf ordnen: Was eine Karte hat, raus aus dem Durchgereichten. Rein —
@@ -623,11 +631,11 @@ function ordne(entwurf) {
     const e = entwurf || {};
     if (!e.durchgereicht) return e;
     const d = { ...e.durchgereicht };
-    for (const [teil, felder] of Object.entries(EIGENE)) {
+    for (const teil of Object.keys(EIGENE)) {
         if (!d[teil] || typeof d[teil] !== 'object') continue;
         const rest = { ...d[teil] };
         const eigen = { ...(e[teil] || {}) };
-        for (const f of felder) {
+        for (const f of eigeneFelder(teil, d[teil])) {
             if (rest[f] === undefined) continue;
             if (eigen[f] === undefined) eigen[f] = rest[f];
             delete rest[f];
@@ -648,7 +656,7 @@ function durchgereichteTeile(paket) {
     for (const k of DURCHGEREICHT) {
         if (paket?.[k] === undefined) continue;
         if (!EIGENE[k]) { aus.push(k); continue; }
-        const rest = Object.keys(paket[k] || {}).filter(f => !EIGENE[k].includes(f));
+        const rest = Object.keys(paket[k] || {}).filter(f => !hatKarte(k, f));
         if (rest.length) aus.push(`${k} (${rest.join(', ')})`);
     }
     return aus;
@@ -1289,7 +1297,7 @@ async function portEntfernen(sitzung, zweck) {
         // Paketprüfung lehnte das erst beim Veröffentlichen ab.
         const haengt = (e.ports || []).filter(p => kopplungVon(p)?.basis === zweck).map(p => `der Port „${p.purpose}" (Kopplung)`);
         if (e.management?.query?.port === zweck) haengt.push('die Abfrage');
-        if (e.durchgereicht?.management?.rcon?.port === zweck) haengt.push('die Fernsteuerung des geöffneten Pakets');
+        if (e.management?.rcon?.port === zweck) haengt.push('die Fernsteuerung');
         if (haengt.length) throw new Error(`Am Port „${zweck}" hängt noch ${haengt.join(' und ')} — erst das umstellen oder entfernen.`);
         e.ports = (e.ports || []).filter(p => p.purpose !== zweck);
         if (e.werkbank?.portnummern) delete e.werkbank.portnummern[zweck];
@@ -1624,6 +1632,10 @@ async function pruefen(sitzung, liste) {
         portnummern: w.portnummern, install: paket.install,
         settings: probewerte(sitzung), einstellungen: paket.settings || [],
         memory_mb: w.memory_mb, cpu_prozent: w.cpu_prozent,
+        // Belegt die Fernsteuerung (2026-10-08): anmelden, diesen Befehl senden,
+        // Antwort lesen. Nur mit Fernsteuerung im Entwurf — der Daemon weist
+        // einen Befehl ohne sie ab.
+        ...(paket.management?.rcon && rconPruefbefehl(sitzung) ? { rcon_pruefbefehl: rconPruefbefehl(sitzung) } : {}),
     });
     if (!antwort?.success) {
         const grund = antwort?.error || 'Der Daemon hat nicht geantwortet';
@@ -1848,7 +1860,7 @@ async function veroeffentlichungsStand(sitzung, liste, pruefListe) {
                 if (!EIGENE[k]) { if (paket[k] === undefined) fehlt.push(k); continue; }
                 for (const f of Object.keys(alt[k] || {})) {
                     if (paket[k]?.[f] !== undefined) continue;
-                    if (EIGENE[k].includes(f) && vonHier) continue;
+                    if (hatKarte(k, f) && vonHier) continue;
                     fehlt.push(`${k}.${f}`);
                 }
             }
@@ -1881,6 +1893,254 @@ function abfrageVermerk(pruefung) {
     return [pruefung.entwurf?.start?.ready_when?.query === true
         ? `${wo}: im Durchlauf NICHT belegt — fb-init spricht dieses Protokoll nicht selbst. Ob sie antwortet, zeigt erst der laufende Server im Dashboard.`
         : `${wo}: im Durchlauf NICHT belegt — die Bereitschaft wartet nicht auf sie (Schalter „erst bereit, wenn die Abfrage antwortet" ist aus).`];
+}
+
+// ── Fernsteuerung (Karte, 2026-10-08) ───────────────────────────────────────
+//
+// Zwei Stücke, gemessen an den acht eingelieferten Paketen:
+//
+//   management.rcon   Protokoll, Port, und die Umgebungsvariable, aus der das
+//                     Kennwort gelesen wird (Factorio, Minecraft). Der Daemon
+//                     braucht es für `rcon:` in der Stoppfolge, für Einstellungen
+//                     mit Ziel rcon und für die Eingabe im Panel.
+//   commands          Die Befehlsgruppen (Spielerliste, entfernen, sperren, Welt
+//                     speichern, Servernachricht) mit ihrem Weg (Factorio,
+//                     Minecraft, Valheim).
+//
+// Die Stoppfolge gehört NICHT hierher — sie steht im Startteil, und der kann
+// `rcon:…` seit Stufe 2.
+//
+// ⚠ Befund beim Bau: Die Befehlsgruppen führt bisher NIEMAND aus. Die Serverseite
+// zeigt sie in der fachlichen Ansicht an (`Serverseite.baueBefehle`); weder
+// Dashboard noch Daemon senden daraus einen Befehl. Die Karte schreibt sie
+// trotzdem — die Werkbank soll alles schreiben können, was ein Paket trägt —
+// und sagt es dazu.
+//
+// Der Nachweis (Betreiber, 2026-10-08: „Mit Daemon-Bau"): Der Prüfdurchlauf
+// meldet sich über die Fernsteuerung an, sendet einen harmlosen Befehl und
+// liest die Antwort (`ergebnis.rcon`). Den Befehl nennt die Sitzung — was
+// harmlos ist, weiss das Spiel, nicht das Protokoll.
+const RCON = {
+    // Was das Schema erlaubt …
+    protokolle: ['source', 'webrcon', 'telnet', 'rest'],
+    // … und was der Daemon spricht (internal/gameserver/rcon: srcds, palworld_rest;
+    // check-werkbank-fernsteuerung.js liest die Liste dort nach).
+    gebaut: ['source', 'rest'],
+    befehl: 200,
+};
+const RCON_FELDER = ['protocol', 'port', 'password_variable'];
+const RE_ENV = /^[A-Za-z_][A-Za-z0-9_]*$/; // Schema: envKey
+
+/** Die Einstellungen, die einen Wert in die Umgebung schreiben — Kandidaten für das Kennwort. */
+function umgebungsEinstellungen(entwurf) {
+    const aus = [];
+    for (const s of entwurf?.settings || []) {
+        for (const z of s.apply || []) {
+            if (z.target === 'env' && z.variable) aus.push({ key: s.key, variable: z.variable, kennwort: s.type === 'password' });
+        }
+    }
+    return aus;
+}
+
+/** Was an der Fernsteuerung hängt — solange etwas davon da ist, bleibt sie. */
+function rconAbhaengige(entwurf) {
+    const aus = [];
+    for (const s of entwurf?.start?.stop?.sequence || []) {
+        if (String(s.step || '').startsWith('rcon:')) aus.push(`der Stoppschritt „${s.step}"`);
+    }
+    for (const s of entwurf?.settings || []) {
+        if ((s.apply || []).some(z => z.target === 'rcon')) aus.push(`die Einstellung „${s.key}" (Ziel rcon)`);
+    }
+    for (const [key, c] of Object.entries(entwurf?.commands || {})) {
+        if (c?.via === 'rcon') aus.push(`der Befehl „${key}"`);
+    }
+    return aus;
+}
+
+/** Ein harmloser Befehl aus dem Entwurf: die Spielerliste, wenn sie über rcon läuft. */
+function rconVorschlag(entwurf) {
+    const c = entwurf?.commands?.['players.list'];
+    return c?.via === 'rcon' && c.command && !String(c.command).includes('{{') ? String(c.command) : '';
+}
+
+/**
+ * Der Prüfbefehl, den der Durchlauf sendet — gehört der Sitzung, nicht dem Paket.
+ *
+ * Nennt die Sitzung keinen, gilt die Spielerliste des Entwurfs, wenn sie über
+ * die Fernsteuerung läuft: Das Paket sagt damit selbst, welcher Befehl nur
+ * liest. So ist ein geöffnetes Minecraft oder Factorio ohne einen Handgriff
+ * belegbar. Gibt es beides nicht, wird nicht geprüft — geraten wird kein Befehl.
+ */
+function rconPruefbefehl(sitzung) {
+    return String(sitzung.entwurf?.werkbank?.rcon_pruefbefehl || '').trim() || rconVorschlag(sitzung.entwurf);
+}
+
+/** Was die Karte über die Fernsteuerung zeigt. */
+function rconStand(sitzung) {
+    const e = sitzung.entwurf || {};
+    const r = e.management?.rcon || null;
+    const kandidaten = umgebungsEinstellungen(e);
+    const port = r ? (e.ports || []).find(p => p.purpose === r.port) : null;
+    const quelle = r ? kandidaten.find(k => k.variable === r.password_variable) : null;
+    const warnungen = [];
+    if (r) {
+        if (!RCON.gebaut.includes(r.protocol)) warnungen.push(`Das Protokoll „${r.protocol}" spricht der Daemon nicht — bekannt sind ${RCON.gebaut.join(', ')}.`);
+        if (!port) warnungen.push(`Den Port „${r.port}" gibt es im Entwurf nicht.`);
+        else if (port.protocol === 'udp') warnungen.push(`Der Port „${r.port}" ist udp — die Fernsteuerung läuft über tcp.`);
+        if (!r.password_variable) warnungen.push('Es ist keine Variable für das Kennwort genannt.');
+        else if (!quelle) warnungen.push(`Keine Einstellung schreibt „${r.password_variable}" in die Umgebung — das Kennwort käme nie an.`);
+        else if (probewerte(sitzung)[quelle.key] === '') {
+            warnungen.push(`„${quelle.key}" hat keinen Probewert — ohne Kennwort scheitert die Anmeldung im Durchlauf. Unter „Einstellungen" einen setzen.`);
+        }
+    }
+    return {
+        rcon: r, kandidaten, quelle: quelle ? quelle.key : null, warnungen,
+        // `eigener`: was die Sitzung selbst nennt; `pruefbefehl`: was der Durchlauf sendet.
+        eigener: String(e.werkbank?.rcon_pruefbefehl || '').trim(),
+        pruefbefehl: rconPruefbefehl(sitzung), vorschlag: rconVorschlag(e),
+        abhaengige: rconAbhaengige(e),
+    };
+}
+
+async function rconSpeichern(sitzung, b) {
+    await pruefeFrei(sitzung);
+    const text = (k) => (typeof b?.[k] === 'string' ? b[k].trim() : '');
+    const protocol = text('protocol').toLowerCase();
+    const befehl = text('pruefbefehl');
+    return entwurfSchreiben(sitzung, (e) => {
+        const vorher = e.management?.rcon || null;
+        if (!RCON.protokolle.includes(protocol)) throw new Error(`Fernsteuerung: Protokoll ${RCON.protokolle.join(', ')}.`);
+        // Ein Protokoll ohne Treiber nur, wenn es unverändert aus dem geöffneten
+        // Paket kommt — neu wählen lässt sich, was der Daemon auch spricht.
+        if (!RCON.gebaut.includes(protocol) && vorher?.protocol !== protocol) {
+            throw new Error(`Das Protokoll „${protocol}" spricht der Daemon nicht (bekannt: ${RCON.gebaut.join(', ')}) — die Fernsteuerung bliebe stumm.`);
+        }
+        const port = (e.ports || []).find(p => p.purpose === text('port'));
+        if (!port) throw new Error('Fernsteuerung: Diesen Port gibt es im Entwurf nicht.');
+        if (port.protocol === 'udp') throw new Error(`Fernsteuerung: Der Port „${port.purpose}" ist udp — sie läuft über tcp. Unter „Ports" umstellen.`);
+        const variable = text('password_variable');
+        if (!RE_ENV.test(variable)) throw new Error('Fernsteuerung: Die Variable für das Kennwort fehlt oder ist kein gültiger Name.');
+        // Wie beim Protokoll: Eine Variable, die keine Einstellung füllt, nur
+        // unverändert aus dem geöffneten Paket — sonst sähe die Lücke vollständig aus.
+        if (!umgebungsEinstellungen(e).some(k => k.variable === variable) && vorher?.password_variable !== variable) {
+            throw new Error(`Keine Einstellung schreibt „${variable}" in die Umgebung. Erst eine Kennwort-Einstellung mit Ziel „Umgebungsvariable" anlegen.`);
+        }
+        if (befehl.length > RCON.befehl || /[\r\n]/.test(befehl)) throw new Error(`Prüfbefehl: eine Zeile, höchstens ${RCON.befehl} Zeichen.`);
+        if (befehl.includes('{{')) throw new Error('Prüfbefehl: ohne Platzhalter — er wird so gesendet, wie er dasteht.');
+        e.management = { ...(e.management || {}) };
+        e.management.rcon = behalteUnbekanntes(vorher, { protocol, port: port.purpose, password_variable: variable }, RCON_FELDER);
+        e.werkbank = { ...(e.werkbank || {}) };
+        if (befehl) e.werkbank.rcon_pruefbefehl = befehl; else delete e.werkbank.rcon_pruefbefehl;
+    });
+}
+
+async function rconEntfernen(sitzung) {
+    await pruefeFrei(sitzung);
+    return entwurfSchreiben(sitzung, (e) => {
+        const haengt = rconAbhaengige(e);
+        if (haengt.length) {
+            throw new Error(`An der Fernsteuerung hängt noch ${haengt.join(', ')} — erst das umstellen oder entfernen.`);
+        }
+        if (e.management) {
+            delete e.management.rcon;
+            if (!Object.keys(e.management).length) delete e.management;
+        }
+        if (e.werkbank) delete e.werkbank.rcon_pruefbefehl;
+    });
+}
+
+/**
+ * Was der Durchlauf über die Fernsteuerung weiss — für die Vermerke im Paket.
+ * Wie bei der Abfrage: Sie kommt auch unbelegt hinein, dann steht es dabei.
+ * (Ein Durchlauf, der es versucht hat und scheiterte, ist rot — der kommt
+ * hier nie an.)
+ */
+function rconVermerk(pruefung) {
+    const r = pruefung.entwurf?.management?.rcon;
+    if (!r) return [];
+    const wo = `Fernsteuerung (${r.protocol}, Port „${r.port}")`;
+    const n = pruefung.ergebnis?.rcon;
+    if (n?.angemeldet) {
+        return [`${wo}: im Durchlauf #${pruefung.id} belegt — angemeldet, „${n.befehl}" beantwortet.`];
+    }
+    return [`${wo}: im Durchlauf NICHT belegt — er hat sich nicht angemeldet (kein Prüfbefehl in der Sitzung, oder der Daemon ist älter als dieser Nachweis).`];
+}
+
+// Die Befehlsgruppen. Die fünf Namen kennt die Serverseite (BEFEHL_NAME); das
+// Schema erlaubt weitere nach demselben Muster.
+const BEFEHL = {
+    gruppen: ['players.list', 'players.kick', 'players.ban', 'world.save', 'broadcast'],
+    // `api` erlaubt das Schema, ausgeführt wird es nirgends und beschrieben ist es
+    // nicht — wählbar ist es deshalb nicht, ein geöffnetes Paket behält es aber.
+    wege: ['rcon', 'console', 'file', 'query', 'unsupported'],
+    arten: ['append_line', 'remove_line', 'rewrite'],
+    text: 300,
+};
+const BEFEHL_FELDER = ['via', 'command', 'parse', 'file', 'mode', 'value', 'reason'];
+const RE_BEFEHL = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)?$/; // Schema: commands.propertyNames
+
+function befehlAusFormular(b, vorher) {
+    const text = (k) => (typeof b?.[k] === 'string' ? b[k].trim() : '');
+    const kurz = (k, was) => {
+        const v = text(k);
+        if (v.length > BEFEHL.text || /[\r\n]/.test(v)) throw new Error(`${was}: eine Zeile, höchstens ${BEFEHL.text} Zeichen.`);
+        return v;
+    };
+    const via = text('via');
+    if (!BEFEHL.wege.includes(via) && !(via && vorher?.via === via)) {
+        throw new Error(`Weg: ${BEFEHL.wege.join(', ')}.`);
+    }
+    const neu = { via };
+    if (via === 'rcon' || via === 'console') {
+        neu.command = kurz('command', 'Befehl');
+        if (!neu.command) throw new Error(`Über ${via === 'rcon' ? 'die Fernsteuerung' : 'die Konsole'} braucht es den Befehl, der gesendet wird.`);
+    }
+    if (via === 'file') {
+        neu.file = kurz('file', 'Datei');
+        if (!neu.file || neu.file.startsWith('/') || neu.file.split('/').includes('..')) {
+            throw new Error('Datei: ein Pfad im Spielordner, ohne „..“ und ohne führenden Schrägstrich.');
+        }
+        neu.mode = text('mode');
+        if (!BEFEHL.arten.includes(neu.mode)) throw new Error(`Art: ${BEFEHL.arten.join(', ')}.`);
+        const wert = kurz('value', 'Wert');
+        if (wert) neu.value = wert;
+    }
+    if (via === 'rcon' || via === 'console' || via === 'query') {
+        const lesen = kurz('parse', 'Auswertung');
+        if (lesen) neu.parse = lesen;
+    }
+    if (via === 'unsupported') {
+        const de = text('grund_de').slice(0, 600), en = text('grund_en').slice(0, 600);
+        // Schema: Ein grauer Knopf mit Begründung ist besser als ein fehlender.
+        if (!de && !en) throw new Error('„Nicht möglich" braucht eine Begründung — sie steht später am grauen Knopf.');
+        neu.reason = { ...(de ? { de } : {}), ...(en ? { en } : {}) };
+    }
+    return neu;
+}
+
+async function befehlSpeichern(sitzung, b) {
+    await pruefeFrei(sitzung);
+    const key = typeof b?.key === 'string' ? b.key.trim() : '';
+    if (!RE_BEFEHL.test(key) || key.length > 60) {
+        throw new Error('Befehlsgruppe: Kleinbuchstaben, Ziffern, _, höchstens ein Punkt — etwa players.kick.');
+    }
+    return entwurfSchreiben(sitzung, (e) => {
+        const vorher = e.commands?.[key] || null;
+        const neu = befehlAusFormular(b, vorher);
+        if (neu.via === 'rcon' && !e.management?.rcon) {
+            throw new Error('Dieser Befehl soll über die Fernsteuerung laufen, der Entwurf hat aber keine — erst links die Fernsteuerung anlegen.');
+        }
+        e.commands = { ...(e.commands || {}), [key]: behalteUnbekanntes(vorher, neu, BEFEHL_FELDER) };
+    });
+}
+
+async function befehlEntfernen(sitzung, key) {
+    await pruefeFrei(sitzung);
+    return entwurfSchreiben(sitzung, (e) => {
+        if (!e.commands || e.commands[key] === undefined) throw new Error(`Den Befehl „${key}" gibt es im Entwurf nicht.`);
+        delete e.commands[key];
+        if (!Object.keys(e.commands).length) delete e.commands;
+    });
 }
 
 /** Die Stufe, mit der der Durchlauf grün wurde — so, wie sie im Paket stehen soll. */
@@ -1975,6 +2235,7 @@ function veroeffentlichungsPaket(sitzung, liste, pruefung, autor, imageVorher = 
                     return zeilen;
                 })(),
                 ...abfrageVermerk(pruefung),
+                ...rconVermerk(pruefung),
                 // Durchgereichtes steht im Paket, wie es war — die Werkbank hat es
                 // weder gebaut noch im Durchlauf einzeln belegt. Das gehört gesagt.
                 ...(() => {
@@ -2232,6 +2493,7 @@ function gruppiere(liste, ab = 6) {
 
 module.exports = {
     uebernommeneAusfuehren, ketteFortsetzen, offeneUebernommene,
+    RCON, BEFEHL, GANZ, rconStand, rconSpeichern, rconEntfernen, rconVermerk, rconPruefbefehl, befehlSpeichern, befehlEntfernen,
     sitzungsImage,
     RE_KENNUNG, RE_ZWECK, SCHRITTTYPEN, MAX_AUSGABE, GRENZEN, VORGABE, ERKUNDUNG, hatBereitschaft,
     waehlbareImages, maschinen, liste, laden, schritte, anlegen,

@@ -19,6 +19,12 @@
  *   POST /:kennung/bereitschaftszeile   Konsolenzeile als ready_when.log_line
  *   POST /:kennung/dateien              was das laufende Spiel angelegt/geändert hat
  *
+ * Karte „Fernsteuerung" (2026-10-08):
+ *   POST /:kennung/fernsteuerung           RCON-Verbindung und Prüfbefehl speichern
+ *   POST /:kennung/fernsteuerung/entfernen
+ *   POST /:kennung/befehle                 eine Befehlsgruppe speichern
+ *   POST /:kennung/befehle/entfernen
+ *
  * Stufe 3 (Prüfdurchlauf):
  *   POST /:kennung/pruefen              ganzes Rezept auf leerem Volume, Start, Stopp
  *   POST /:kennung/pruefung/abbrechen   hängenden Durchlauf von Hand rot setzen
@@ -329,6 +335,10 @@ router.get('/:kennung', requirePermission('WERKBANK.VIEW'), async (req, res) => 
             durchgereicht: Sitzungen.durchgereichtes(sitzung),
             abfrage: Sitzungen.abfrageStand(sitzung),
             abfrageKennungen: Sitzungen.abfrageKennungen(),
+            fernsteuerung: Sitzungen.rconStand(sitzung),
+            befehle: sitzung.entwurf?.commands || {},
+            RCON: Sitzungen.RCON, BEFEHL: Sitzungen.BEFEHL,
+            befehlNamen: require('../../../gameserver/dashboard/helpers/Serverseite').BEFEHL_NAME,
             PORT: Sitzungen.PORT,
             geoeffnet: sitzung.entwurf?.werkbank?.geoeffnet || null,
             HINWEIS: Sitzungen.HINWEIS,
@@ -504,6 +514,44 @@ router.post('/:kennung/abfrage/entfernen', requirePermission('WERKBANK.BAUEN'), 
         return res.json({ success: true });
     } catch (error) {
         return fehler(res, error, 'Abfrage nicht entfernt', 400);
+    }
+});
+
+// ── Fernsteuerung (Karte, 2026-10-08) ────────────────────────────────────────
+// RCON-Verbindung samt Prüfbefehl der Sitzung, und die Befehlsgruppen.
+router.post('/:kennung/fernsteuerung', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.rconSpeichern(await offeneSitzung(req, res), req.body || {});
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Fernsteuerung nicht gespeichert', 400);
+    }
+});
+
+router.post('/:kennung/fernsteuerung/entfernen', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.rconEntfernen(await offeneSitzung(req, res));
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Fernsteuerung nicht entfernt', 400);
+    }
+});
+
+router.post('/:kennung/befehle', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.befehlSpeichern(await offeneSitzung(req, res), req.body || {});
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Befehl nicht gespeichert', 400);
+    }
+});
+
+router.post('/:kennung/befehle/entfernen', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.befehlEntfernen(await offeneSitzung(req, res), String(req.body?.key || ''));
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Befehl nicht entfernt', 400);
     }
 });
 

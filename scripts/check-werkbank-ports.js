@@ -145,7 +145,9 @@ const UDP = (purpose, mehr = {}) => ({ purpose, protocol: 'udp', assign: 'pool',
             gleich(paket, vorher, 'das Zerlegen hat das Paket verändert');
             assert.strictEqual(frischZerlegt.durchgereicht?.management?.query, undefined, 'die Abfrage steht noch im Durchgereichten');
             gleich(frischZerlegt.management?.query, paket.management?.query);
-            const rest = Object.keys(paket.management || {}).filter(k => k !== 'query');
+            // Was in `management` KEINE Karte hat — seit 2026-10-08 hat auch die
+            // Fernsteuerung eine (check-werkbank-fernsteuerung.js).
+            const rest = Object.keys(paket.management || {}).filter(k => !S.EIGENE.management.includes(k));
             gleich(Object.keys(frischZerlegt.durchgereicht?.management || {}).sort(), rest.sort());
             // Eine Sitzung aus der Zeit VOR der Karte trägt die Abfrage im Durchgereichten — `ordne` zieht sie um, einmal.
             if (paket.management) {
@@ -239,8 +241,9 @@ const UDP = (purpose, mehr = {}) => ({ purpose, protocol: 'udp', assign: 'pool',
     });
     await pruefe('entfernen: nicht, solange Abfrage, Kopplung oder Fernsteuerung daran hängen', async () => {
         const s = frisch([UDP('game'), UDP('query', { assign: 'game+1' }), { purpose: 'rcon', protocol: 'tcp', assign: 'pool' }], { game: 7777, query: 7778, rcon: 7780 });
-        s.entwurf.management = { query: { protocol: 'a2s', port: 'query' } };
-        s.entwurf.durchgereicht = { management: { rcon: { protocol: 'source', port: 'rcon' } } };
+        // Beides liegt im Entwurf — die Fernsteuerung seit ihrer Karte (2026-10-08);
+        // eine ältere Sitzung zieht `ordne` beim Laden nach.
+        s.entwurf.management = { query: { protocol: 'a2s', port: 'query' }, rcon: { protocol: 'source', port: 'rcon' } };
         await assert.rejects(S.portEntfernen(s, 'game'), /Kopplung/);
         await assert.rejects(S.portEntfernen(s, 'query'), /die Abfrage/);
         await assert.rejects(S.portEntfernen(s, 'rcon'), /Fernsteuerung/);
