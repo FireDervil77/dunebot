@@ -26,7 +26,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const { ServiceManager } = require('dunebot-core');
-const { ohneKommentare } = require('./lib/quelltext');
+const { ohneKommentare, ohneKommentareEjs } = require('./lib/quelltext');
 
 const DAEMON = '/home/firedervil/firebot_daemon';
 const still = () => {};
@@ -868,6 +868,44 @@ async function pruefe(name, fn) {
         const t = mitEinstellungen();
         t.entwurf.settings[0].apply[0].path = 'anders';
         assert.notStrictEqual(Sitzungen.fingerabdruck(Sitzungen.entwurfAlsPaket(t, liste)), vorher, 'Einstellungen zählen zum technischen Teil');
+    });
+
+    // Ein Knopf für alle Probewerte (2026-10-08) — bis dahin je Zeile ein eigener
+    // Weg, gesperrt, sobald etwas lief. Betreiber, mit laufendem Probestart: „der
+    // Tab Einstellungen lässt mich nicht speichern".
+    await pruefe('Probewerte: mehrere in einem Zug, leer entfernt, unbekannter Schlüssel speichert nichts halb', async () => {
+        const s = mitEinstellungen();
+        assert.deepStrictEqual(await Sitzungen.probewerteSetzen(s, { max_players: '16', name: 'Probe', oeffentlich: '0' }), { gesetzt: 3, entfernt: 0 });
+        assert.deepStrictEqual(db.entwurf.werkbank.werte, { max_players: '16', name: 'Probe', oeffentlich: '0' });
+        assert.deepStrictEqual(await Sitzungen.probewerteSetzen(s, { name: '', max_players: '32' }), { gesetzt: 1, entfernt: 1 });
+        assert.deepStrictEqual(db.entwurf.werkbank.werte, { max_players: '32', oeffentlich: '0' });
+        await assert.rejects(Sitzungen.probewerteSetzen(s, { max_players: '64', gibtsnicht: 'x' }), /Keine Einstellung „gibtsnicht"/);
+        assert.deepStrictEqual(db.entwurf.werkbank.werte, { max_players: '32', oeffentlich: '0' }, 'ein abgelehnter Zug hat trotzdem etwas gespeichert');
+        for (const unsinn of [undefined, null, {}, [], 'text']) await assert.rejects(Sitzungen.probewerteSetzen(s, unsinn), /nichts zu speichern/);
+        // Der Sitzungsteil daneben bleibt, und der Entwurf des Pakets ändert sich nicht.
+        assert.deepStrictEqual(db.entwurf.werkbank.portnummern, { game: 34197 });
+        assert.ok(!JSON.stringify(Sitzungen.entwurfAlsPaket(s, [])).includes('"werte"'), 'Probewerte stehen im Paket');
+    });
+    await pruefe('Probewerte gehen auch, während das Spiel läuft — die Einstellung selbst nicht', async () => {
+        const s = mitEinstellungen();
+        const vorher = Sitzungen.fingerabdruck(Sitzungen.entwurfAlsPaket(s, []));
+        db.laeufe.push({ id: 777, sitzung_id: s.id, status: 'laeuft', konsole: '' });
+        try {
+            await assert.rejects(Sitzungen.einstellungSpeichern(s, formular({ key: 'neu_waehrend_lauf' })), /Spiel der Sitzung läuft/);
+            assert.deepStrictEqual(await Sitzungen.probewerteSetzen(s, { max_players: '12' }), { gesetzt: 1, entfernt: 0 });
+            assert.strictEqual(db.entwurf.werkbank.werte.max_players, '12');
+            assert.strictEqual(Sitzungen.fingerabdruck(Sitzungen.entwurfAlsPaket(s, [])), vorher, 'ein Probewert hat den Fingerabdruck verändert — ein grüner Durchlauf gälte nicht mehr');
+        } finally { db.laeufe = []; }
+    });
+    await pruefe('Probewerte: ein Weg, ein Knopf — die Zeilenknöpfe und ihr Weg sind weg', async () => {
+        const ansicht = ohneKommentareEjs(fs.readFileSync(path.join(__dirname, '..', 'plugins/werkbank/dashboard/views/guild/werkbank-sitzung.ejs'), 'utf8'));
+        assert.ok(ansicht.includes('id="knopfProbewerte"'), 'der Knopf fehlt');
+        assert.ok(ansicht.includes("hier + '/einstellungen/probewerte'"), 'die Ansicht ruft den Sammelweg nicht auf');
+        assert.ok(!/data-probewert-speichern/.test(ansicht), 'die Knöpfe je Zeile stehen noch da');
+        assert.ok(!/id="knopfProbewerte"[^>]*beschaeftigt/.test(ansicht), 'der Knopf ist gesperrt, wenn etwas läuft');
+        const router = ohneKommentare(fs.readFileSync(path.join(__dirname, '..', 'plugins/werkbank/dashboard/routes/guild.router.js'), 'utf8'));
+        assert.ok(router.includes("router.post('/:kennung/einstellungen/probewerte', requirePermission('WERKBANK.BAUEN')"), 'der Sammelweg fehlt oder verlangt das Baurecht nicht');
+        assert.ok(!router.includes("/einstellungen/:key/probewert'"), 'der Weg je Zeile steht noch da');
     });
 
     await pruefe('Start und Durchlauf schicken Definitionen, Probewerte (Vorgabe, Ja/Nein als 1/0) und die Verdrahtung', async () => {

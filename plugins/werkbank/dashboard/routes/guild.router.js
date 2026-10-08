@@ -662,12 +662,15 @@ router.post('/:kennung/einstellungen/:key/rolle', requirePermission('WERKBANK.BA
     }
 });
 
-router.post('/:kennung/einstellungen/:key/probewert', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+// Alle geänderten Probewerte der Karte in einem Zug (2026-10-08) — bis dahin je
+// Zeile ein eigener Weg (`…/:key/probewert`). Geht auch, während etwas läuft:
+// Probewerte gelten ab dem nächsten Start.
+router.post('/:kennung/einstellungen/probewerte', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
     try {
-        await Sitzungen.probewertSetzen(await offeneSitzung(req, res), req.params.key, req.body?.wert);
-        return res.json({ success: true });
+        const ergebnis = await Sitzungen.probewerteSetzen(await offeneSitzung(req, res), req.body?.werte);
+        return res.json({ success: true, ...ergebnis });
     } catch (error) {
-        return fehler(res, error, 'Probewert nicht gespeichert', 400);
+        return fehler(res, error, 'Probewerte nicht gespeichert', 400);
     }
 });
 

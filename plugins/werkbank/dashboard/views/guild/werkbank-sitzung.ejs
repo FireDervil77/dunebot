@@ -1088,6 +1088,8 @@
                       <% }) %>
                     </td>
                     <td>
+                      <%# Kein Knopf je Zeile mehr: Unter der Tabelle speichert EINER alle
+                          geänderten Werte (2026-10-08). %>
                       <div class="input-group input-group-sm">
                         <% if (e.type === 'boolean') { %>
                           <select class="form-select" data-probewert="<%= e.key %>">
@@ -1104,7 +1106,6 @@
                           <input class="form-control" data-probewert="<%= e.key %>" type="<%= e.type === 'password' ? 'password' : 'text' %>"
                                  value="<%= e.key in probewerte ? probewerte[e.key] : '' %>" placeholder="<%= e.default !== undefined && e.type !== 'password' ? 'Vorgabe: ' + e.default : 'Vorgabe' %>" autocomplete="off">
                         <% } %>
-                        <button class="btn btn-outline-secondary" type="button" data-probewert-speichern="<%= e.key %>" title="Probewert speichern" <%= beschaeftigt ? 'disabled' : '' %>><i class="fa-solid fa-floppy-disk"></i></button>
                       </div>
                     </td>
                     <td class="text-end text-nowrap">
@@ -1115,6 +1116,16 @@
                 <% }) %>
               </tbody>
             </table>
+          </div>
+          <%# Ein Knopf für alle Probewerte. Er ist NICHT gesperrt, wenn etwas läuft:
+              Probewerte gehören der Sitzung und gelten ab dem nächsten Start. %>
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+            <button class="btn btn-primary" type="button" id="knopfProbewerte" disabled>
+              <i class="fa-solid fa-floppy-disk me-1"></i><span id="knopfProbewerteText">Probewerte speichern</span>
+            </button>
+            <span class="text-secondary small">
+              Probewerte gelten ab dem nächsten Probestart oder Prüfdurchlauf<%= beschaeftigt ? ' — was gerade läuft, behält seine' : '' %>. Leer heißt: die Vorgabe.
+            </span>
           </div>
         <% } %>
         <% if (belegt && belegt.weg.length && !nachweisVeraltet) { %>
@@ -2579,19 +2590,57 @@
     });
   });
 
-  document.querySelectorAll('[data-probewert-speichern]').forEach(function (k) {
-    k.addEventListener('click', async function () {
-      var key = k.dataset.probewertSpeichern;
-      var feld = document.querySelector('[data-probewert="' + key + '"]');
-      k.disabled = true;
+  // ── Probewerte: ein Knopf für alle geänderten Zeilen (2026-10-08) ──────
+  var knopfPW = document.getElementById('knopfProbewerte');
+  if (knopfPW) {
+    var felderPW = document.querySelectorAll('[data-probewert]');
+    var textPW = document.getElementById('knopfProbewerteText');
+    var anfangPW = {};
+    Array.prototype.forEach.call(felderPW, function (f) { anfangPW[f.dataset.probewert] = f.value; });
+    function geaendertePW() {
+      var aus = {};
+      Array.prototype.forEach.call(felderPW, function (f) {
+        if (f.value !== anfangPW[f.dataset.probewert]) aus[f.dataset.probewert] = f.value;
+      });
+      return aus;
+    }
+    function zeigePW() {
+      var n = Object.keys(geaendertePW()).length;
+      knopfPW.disabled = n === 0;
+      textPW.textContent = n === 0 ? 'Probewerte speichern' : (n === 1 ? 'Einen geänderten Probewert speichern' : n + ' geänderte Probewerte speichern');
+      // Was noch nicht gespeichert ist, soll man der Zeile ansehen.
+      Array.prototype.forEach.call(felderPW, function (f) {
+        f.classList.toggle('border-primary', f.value !== anfangPW[f.dataset.probewert]);
+      });
+    }
+    Array.prototype.forEach.call(felderPW, function (f) {
+      f.addEventListener('input', zeigePW);
+      f.addEventListener('change', zeigePW);
+    });
+    // Ein anderer Speicherweg auf der Seite lädt neu — ungespeicherte Probewerte
+    // gingen dabei still verloren. Der Browser fragt dann nach.
+    var speichertPW = false;
+    window.addEventListener('beforeunload', function (ev) {
+      if (speichertPW || Object.keys(geaendertePW()).length === 0) return;
+      ev.preventDefault();
+      ev.returnValue = '';
+    });
+    knopfPW.addEventListener('click', async function () {
+      var werte = geaendertePW();
+      if (!Object.keys(werte).length) return;
+      knopfPW.disabled = true;
       try {
-        await schicke(hier + '/einstellungen/' + encodeURIComponent(key) + '/probewert', { wert: feld.value });
-        melde('success', feld.value === '' ? 'Probewert entfernt — es gilt die Vorgabe.' : 'Probewert gespeichert.');
+        await schicke(hier + '/einstellungen/probewerte', { werte: werte });
+        speichertPW = true;
+        // Neu laden: Hinweise in anderen Reitern hängen an den Probewerten
+        // (etwa das Kennwort der Fernsteuerung). Reiter und Stelle bleiben.
+        window.location.reload();
       } catch (fehler) {
+        knopfPW.disabled = false;
         melde('error', fehler.message);
       }
-      k.disabled = false;
     });
-  });
+    zeigePW();
+  }
 })();
 </script>

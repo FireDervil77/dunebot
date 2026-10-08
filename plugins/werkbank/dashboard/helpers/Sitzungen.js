@@ -1029,17 +1029,43 @@ async function einstellungRolleSetzen(sitzung, key, rolle) {
     });
 }
 
-/** Der Wert, mit dem Probestart und Durchlauf laufen — leer heißt: die Vorgabe. */
-async function probewertSetzen(sitzung, key, wert) {
-    await pruefeFrei(sitzung);
-    const s = (sitzung.entwurf?.settings || []).find(x => x.key === key);
-    if (!s) throw new Error(`Keine Einstellung „${key}".`);
-    return entwurfSchreiben(sitzung, (e) => {
+/**
+ * Die Werte, mit denen Probestart und Durchlauf laufen — leer heißt: die Vorgabe.
+ * Mehrere auf einmal: Die Karte hat EINEN Knopf für alle geänderten Zeilen.
+ *
+ * Bis zum 2026-10-08 ging das nur je Zeile (ein Disketten-Symbol), und nur,
+ * wenn nichts lief. Betreiber: „der Tab Einstellungen lässt mich nicht
+ * speichern, weil in der Karte ein genereller Save-Button fehlt" — sein
+ * Probestart lief, also war auch jedes Symbol gesperrt.
+ *
+ * Bewusst OHNE die Sperre der anderen Speicherwege (`pruefeFrei`): Probewerte
+ * gehören der Sitzung, nicht dem Entwurf. Sie zählen nicht zum Fingerabdruck,
+ * ein laufendes Spiel hat seine Werte beim Start bekommen, und ein Durchlauf
+ * belegt mit denen, die er selbst mitbekam. Geändert wird, was der NÄCHSTE
+ * Start bekommt — und gerade während das Spiel läuft, sieht man, was man
+ * ändern will.
+ *
+ * Erst prüfen, dann schreiben: Ein unbekannter Schlüssel speichert nichts halb.
+ *
+ * @param {Object<string, string>} werte  Schlüssel → Wert; '' entfernt den Probewert
+ * @returns {Promise<{gesetzt: number, entfernt: number}>}
+ */
+async function probewerteSetzen(sitzung, werte) {
+    if (!werte || typeof werte !== 'object' || Array.isArray(werte)) throw new Error('Probewerte: nichts zu speichern.');
+    const bekannt = new Set((sitzung.entwurf?.settings || []).map(x => x.key));
+    const eintraege = Object.entries(werte);
+    if (!eintraege.length) throw new Error('Probewerte: nichts zu speichern.');
+    for (const [key] of eintraege) if (!bekannt.has(key)) throw new Error(`Keine Einstellung „${key}".`);
+    let gesetzt = 0, entfernt = 0;
+    await entwurfSchreiben(sitzung, (e) => {
         e.werkbank = e.werkbank || {};
         e.werkbank.werte = e.werkbank.werte || {};
-        if (wert === '' || wert === null || wert === undefined) delete e.werkbank.werte[key];
-        else e.werkbank.werte[key] = String(wert).slice(0, 2000);
+        for (const [key, wert] of eintraege) {
+            if (wert === '' || wert === null || wert === undefined) { if (key in e.werkbank.werte) entfernt++; delete e.werkbank.werte[key]; }
+            else { e.werkbank.werte[key] = String(wert).slice(0, 2000); gesetzt++; }
+        }
     });
+    return { gesetzt, entfernt };
 }
 
 /**
@@ -2558,7 +2584,7 @@ module.exports = {
     PRUEF_SUFFIX, fingerabdruck, technisch,
     pruefeBildAdresse, angaben, angabenSpeichern, veroeffentlichungsStand, veroeffentlichungsPaket, veroeffentlichen, laufendePruefung, pruefungen, durchlaufMaengel, pruefen,
     pruefungAbbrechen, pruefProtokoll, pruefungBeenden,
-    EINSTELLUNG, einstellungAusFormular, einstellungSpeichern, einstellungEntfernen, einstellungRolleSetzen, probewertSetzen, probewerte,
+    EINSTELLUNG, einstellungAusFormular, einstellungSpeichern, einstellungEntfernen, einstellungRolleSetzen, probewerteSetzen, probewerte,
     umgebungAusEinstellungen, belegteEinstellungen,
     HINWEIS, hinweisAusFormular, hinweisSpeichern, hinweisEntfernen,
     DURCHGEREICHT, IM_ENTWURF, imEntwurf, entwurfAusPaket, paketOeffnen, durchgereichtes, naechsteFassung, behalteUnbekanntes, mischeStart, mischeEinstellung, zieleAusPaket, uebernommeneZiele, vorlaeufigePortnummern, oeffenbarePakete, LAUFZEIT_TEILE,
