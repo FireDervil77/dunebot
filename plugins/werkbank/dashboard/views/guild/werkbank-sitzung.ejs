@@ -1694,7 +1694,12 @@
       var reihe = document.createElement('div');
       reihe.className = 'd-flex gap-1 flex-wrap';
       var quelle = document.createElement('select');
-      quelle.className = 'form-select form-select-sm w-auto'; quelle.dataset.teil = 'quelle';
+      // Nicht `w-auto`: Ein Auswahlfeld ist so breit wie sein längster Eintrag —
+      // bei 69 Einstellungen („Einstellung: Name (schlüssel)") ragte es über die
+      // Spalte hinaus bis unter die Konsole (Betreiber, 7 Days to Die, 2026-10-08).
+      // Es füllt den Rest der Reihe neben der Bedingung und schrumpft mit ihr.
+      quelle.className = 'form-select form-select-sm'; quelle.dataset.teil = 'quelle';
+      quelle.style.flex = '1 1 10rem'; quelle.style.minWidth = '0';
       var bekannt = QUELLEN.some(function (q) { return q.wert === z.quelle; });
       QUELLEN.forEach(function (q) { quelle.append(option(q.wert, q.text, q.wert === z.quelle)); });
       if (!bekannt && z.quelle) quelle.append(option(z.quelle, z.quelle + ' (nicht im Entwurf)', true));
