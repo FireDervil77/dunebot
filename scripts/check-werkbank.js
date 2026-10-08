@@ -1161,6 +1161,12 @@ async function pruefe(name, fn) {
         assert.doesNotThrow(() => argsAusZeilen([{ form: '-Port={{Wert}}', quelle: 'port:game' }]));
         assert.doesNotThrow(() => argsAusZeilen([{ form: '-QueryPort={{port:query}}', quelle: 'text' }]));
         assert.throws(() => argsAusZeilen([{ form: '-q={{Wert}}', quelle: 'text' }]), /kein \{\{Wert\}\}/);
+        // Ein echter Verweis ausserhalb von „Text": der Daemon setzt ihn dort nicht ein
+        // (7 Days to Die, 2026-10-08 — gespeichert, beim Probestart „Auftrag unvollständig").
+        assert.throws(() => argsAusZeilen([{ form: '-ServerPort={{port:game}}', quelle: 'fest' }]), /wörtlich an das Spiel.*Text mit Verweisen/);
+        assert.throws(() => argsAusZeilen([{ form: '-port {{port:game}}', quelle: 'fest' }]), /Quelle „Port: game" und schreib „-port \{\{Wert\}\}"/);
+        assert.throws(() => argsAusZeilen([{ form: '-port={{port:game}}', quelle: 'port:game', bedingung: 'not_empty' }]), /schreib „-port=\{\{Wert\}\}"/);
+        assert.throws(() => argsAusZeilen([{ form: '-a={{Wert}}:{{port:query}}', quelle: 'port:game' }]), /nur \{\{Wert\}\} eingesetzt/);
         // „wenn an" an einem Text: beim Speichern, nicht als stumm fehlender Parameter
         // (StarRupture, -ServerName, 2026-10-05). Ohne bekannten Typ geht es durch.
         const typen = [{ key: 'name', type: 'text' }, { key: 'crossplay', type: 'boolean' }, { key: 'slots', type: 'number' }];

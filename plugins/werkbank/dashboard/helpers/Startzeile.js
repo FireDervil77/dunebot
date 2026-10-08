@@ -44,6 +44,34 @@ const PLATZHALTER = /\{\{[^}]*\}\}/g;
 const RE_VERWEIS = /^\{\{(setting|port|content|env):[^}\s]+\}\}$/;
 
 /**
+ * Ein Verweis in einer Zeile, deren Quelle nicht „Text mit Verweisen" ist.
+ *
+ * Der Daemon setzt Verweise nur in `parts` ein; in `form` ersetzt er allein
+ * `{{value}}` (pkgspec.BaueArgv). `-ServerPort={{port:game}}` mit Quelle „fest"
+ * wurde gespeichert und scheiterte erst beim Probestart als „Auftrag
+ * unvollständig" (Betreiber, 7 Days to Die, 2026-10-08).
+ *
+ * Der Rat nennt den kürzesten Weg: Trennt die Zeile mehrere Argumente
+ * (`-port {{port:game}}`), wäre „Text" EIN Argument und damit falsch — dann
+ * die Quelle wählen und {{Wert}} schreiben.
+ */
+function ratZumVerweis(form, p, quelle) {
+    const [, art, name] = p.match(/^\{\{(setting|port|content|env):([^}\s]+)\}\}$/);
+    const mitWert = form.replace(p, '{{Wert}}');
+    const text = 'Wähl als Quelle „Text mit Verweisen (ein Argument)"';
+    if (quelle !== 'fest') {
+        return `${art}:${name}` === quelle
+            ? `Die Quelle steht schon im Auswahlfeld — schreib „${mitWert}".`
+            : `In dieser Zeile wird nur {{Wert}} eingesetzt. ${text} und schreib alle Verweise aus.`;
+    }
+    const alsQuelle = (art === 'port' || art === 'setting') && (form.match(PLATZHALTER) || []).length === 1;
+    if (alsQuelle && /\s/.test(form)) {
+        return `Wähl als Quelle „${art === 'port' ? 'Port' : 'Einstellung'}: ${name}" und schreib „${mitWert}".`;
+    }
+    return `${text}.`;
+}
+
+/**
  * Ein Platzhalter, den niemand einsetzt, ist ein Fehler beim Speichern — nicht
  * erst beim Probestart. `-Port={{game}}` mit Quelle „Port: game" lief bis zum
  * Daemon durch und kam als „Auftrag unvollständig" zurück (2026-10-05).
@@ -51,7 +79,12 @@ const RE_VERWEIS = /^\{\{(setting|port|content|env):[^}\s]+\}\}$/;
 function pruefePlatzhalter(form, quelle, nr) {
     for (const p of form.match(PLATZHALTER) || []) {
         WERT.lastIndex = 0;
-        if (WERT.test(p) || RE_VERWEIS.test(p)) continue;
+        if (WERT.test(p)) continue;
+        if (RE_VERWEIS.test(p)) {
+            if (quelle === 'text') continue;
+            throw new Error(`Zeile ${nr}: ${p} würde hier nicht eingesetzt und ginge wörtlich an das Spiel. `
+                + ratZumVerweis(form, p, quelle));
+        }
         const name = p.slice(2, -2).trim();
         const rat = quelle === 'text' || quelle === 'fest'
             ? `Schreib {{port:${name || 'zweck'}}} oder {{setting:${name || 'schlüssel'}}}`
