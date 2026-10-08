@@ -164,4 +164,57 @@ function sucheSql(art, idSpalte) {
                      WHERE tl.entity_type = '${art}' AND tl.entity_id = ${idSpalte} AND tt.name LIKE ?)`;
 }
 
-module.exports = { ARTEN, MAX_LAENGE, MAX_JE_EINTRAG, slugVon, bereinige, alle, fuer, fuerViele, setze, sucheSql };
+/**
+ * Bedingung „dieser Eintrag trägt das Tag" — als EXISTS-Unterabfrage mit EINEM
+ * Platzhalter (der `slug` des Tags). Für Filter: „zeige alle Spiele mit …".
+ */
+function hatTagSql(art, idSpalte) {
+    pruefeArt(art);
+    if (!/^[a-z_][a-z0-9_.]*$/i.test(idSpalte)) throw new Error('Tags: ungültige Spalte.');
+    return `EXISTS (SELECT 1 FROM tag_links tl JOIN tags tt ON tt.id = tl.tag_id
+                     WHERE tl.entity_type = '${art}' AND tl.entity_id = ${idSpalte} AND tt.slug = ?)`;
+}
+
+/**
+ * Die Tags, die an Einträgen dieser Art hängen — die häufigsten zuerst. Für
+ * Filterleisten: Was niemand trägt, steht nicht zur Wahl.
+ *
+ * @param {Array<number>|null} ids  nur diese Einträge zählen (null = alle der Art)
+ * @returns {Promise<Array<{name: string, slug: string, anzahl: number}>>}
+ */
+async function benutzte(db, art, ids = null) {
+    pruefeArt(art);
+    const liste = ids === null ? null : [...new Set(ids.filter(x => x !== null && x !== undefined))];
+    if (liste && !liste.length) return [];
+    const zeilen = await db.query(`
+        SELECT t.name, t.slug, COUNT(*) AS anzahl
+          FROM tag_links l
+          JOIN tags t ON t.id = l.tag_id
+         WHERE l.entity_type = ?${liste ? ` AND l.entity_id IN (${liste.map(() => '?').join(',')})` : ''}
+         GROUP BY t.id, t.name, t.slug
+         ORDER BY anzahl DESC, t.name`, [art, ...(liste || [])]);
+    return zeilen.map(z => ({ name: z.name, slug: z.slug, anzahl: Number(z.anzahl) }));
+}
+
+/**
+ * Einträge derselben Art, die Tags mit diesem teilen — die mit den meisten
+ * gemeinsamen zuerst. Das ist, was eine feste Kategorie nicht konnte: Zwei
+ * Spiele gehören zusammen, weil sie etwas gemeinsam haben, nicht weil jemand
+ * sie in dieselbe Schublade gelegt hat (Betreiber, 2026-10-08).
+ *
+ * @returns {Promise<Array<{id: number, gemeinsam: number}>>}
+ */
+async function verwandte(db, art, id, hoechstens = 6) {
+    pruefeArt(art);
+    const zeilen = await db.query(`
+        SELECT b.entity_id AS id, COUNT(*) AS gemeinsam
+          FROM tag_links a
+          JOIN tag_links b ON b.tag_id = a.tag_id AND b.entity_type = a.entity_type AND b.entity_id <> a.entity_id
+         WHERE a.entity_type = ? AND a.entity_id = ?
+         GROUP BY b.entity_id
+         ORDER BY gemeinsam DESC, b.entity_id
+         LIMIT ${Math.max(1, Math.min(50, Number(hoechstens) || 6))}`, [art, id]);
+    return zeilen.map(z => ({ id: z.id, gemeinsam: Number(z.gemeinsam) }));
+}
+
+module.exports = { ARTEN, MAX_LAENGE, MAX_JE_EINTRAG, slugVon, bereinige, alle, fuer, fuerViele, setze, sucheSql, hatTagSql, benutzte, verwandte };

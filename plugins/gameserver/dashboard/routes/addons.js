@@ -2,7 +2,7 @@
  * Guild: Spiele-Marktplatz
  *
  * Endpunkte:
- *   GET  /        — Marktplatz (approved + public/official)
+ *   GET  /        — Marktplatz (approved + public/official), Filter nach Tag
  *   GET  /:slug   — Detailseite eines Spiels
  *
  * Bis zum 2026-09-26 lagen hier auch „Meine Addons“ und der Addon-Editor
@@ -37,10 +37,10 @@ router.get('/', requirePermission('GAMESERVER.ADDONS.VIEW'), async (req, res) =>
 
     try {
         const guildId = res.locals.guildId;
-        const { category, search, sort } = req.query;
+        const { tag, search, sort } = req.query;
 
         let query = `
-            SELECT id, slug, name, description, category,
+            SELECT id, slug, name, description,
                    steam_app_id, author_user_id,
                    rating_avg, rating_count, install_count,
                    icon_url, banner_url, created_at
@@ -50,9 +50,13 @@ router.get('/', requirePermission('GAMESERVER.ADDONS.VIEW'), async (req, res) =>
         `;
         const params = [];
 
-        if (category && category !== 'all') {
-            query += ' AND category = ?';
-            params.push(category);
+        // Gefiltert wird nach einem Tag (2026-10-08) — bis dahin nach der einen
+        // Kategorie, die jedes Spiel hatte. Der Wert darf der Name oder der
+        // slug sein; verglichen wird der slug.
+        const tagSlug = tag && tag !== 'all' ? Tags.slugVon(tag) : '';
+        if (tagSlug) {
+            query += ` AND ${Tags.hatTagSql('spiel', 'addon_marketplace.id')}`;
+            params.push(tagSlug);
         }
         if (search) {
             // Der dritte Platzhalter sucht in den Tags der Bibliothek — vorher
@@ -69,15 +73,15 @@ router.get('/', requirePermission('GAMESERVER.ADDONS.VIEW'), async (req, res) =>
         };
         query += ` ${orderMap[sort] || 'ORDER BY rating_avg DESC, install_count DESC, name ASC'}`;
 
-        const [addons, categories] = await Promise.all([
+        const [addons, sichtbare] = await Promise.all([
             dbService.query(query, params),
             dbService.query(`
-                SELECT DISTINCT category, COUNT(*) as count
-                FROM addon_marketplace
+                SELECT id FROM addon_marketplace
                 WHERE status = 'approved' AND (visibility = 'official' OR visibility = 'public')
-                GROUP BY category ORDER BY count DESC
             `),
         ]);
+        // Zur Wahl steht, was die gezeigten Spiele wirklich tragen — häufigstes zuerst.
+        const tagListe = await Tags.benutzte(dbService, 'spiel', sichtbare.map(z => z.id));
 
         // Die Tags aller gezeigten Spiele in EINEM Zug, als Liste am Spiel.
         const tagsJeSpiel = await Tags.fuerViele(dbService, 'spiel', (addons || []).map(a => a.id));
@@ -91,8 +95,8 @@ router.get('/', requirePermission('GAMESERVER.ADDONS.VIEW'), async (req, res) =>
             title: 'Spiele-Datenbank',
             activeMenu: `/guild/${guildId}/plugins/gameserver/addons`,
             addons: addons || [],
-            categories: categories || [],
-            filters: { category: category || 'all', search: search || '', sort: sort || 'default' },
+            tagListe,
+            filters: { tag: tagSlug || 'all', search: search || '', sort: sort || 'default' },
             guildId,
         });
     } catch (err) {
@@ -114,7 +118,7 @@ router.get('/:slug', requirePermission('GAMESERVER.ADDONS.VIEW'), async (req, re
         const guildId = res.locals.guildId;
 
         const [addon] = await dbService.query(`
-            SELECT id, slug, name, description, category,
+            SELECT id, slug, name, description,
                    steam_app_id, steam_server_app_id, author_user_id,
                    rating_avg, rating_count, install_count,
                    icon_url, banner_url, screenshots, created_at
@@ -128,6 +132,24 @@ router.get('/:slug', requirePermission('GAMESERVER.ADDONS.VIEW'), async (req, re
 
         addon.tags = await Tags.fuer(dbService, 'spiel', addon.id);
         addon.freigabe = (await Paketfassung.freigabeJePaket(dbService))[addon.id] || null;
+
+        // Ähnliche Spiele: die, die Tags mit diesem teilen — die mit den meisten
+        // gemeinsamen zuerst. Nur was auch in der Liste stünde.
+        let aehnliche = [];
+        const verwandt = await Tags.verwandte(dbService, 'spiel', addon.id, 6);
+        if (verwandt.length) {
+            const zeilen = await dbService.query(`
+                SELECT id, slug, name, icon_url FROM addon_marketplace
+                WHERE id IN (${verwandt.map(() => '?').join(',')})
+                  AND status = 'approved' AND (visibility = 'official' OR visibility = 'public')`, verwandt.map(v => v.id));
+            const nachId = new Map(zeilen.map(z => [z.id, z]));
+            const tagsJe = await Tags.fuerViele(dbService, 'spiel', zeilen.map(z => z.id));
+            const eigene = new Set(addon.tags.map(Tags.slugVon));
+            aehnliche = verwandt.filter(v => nachId.has(v.id)).map(v => ({
+                ...nachId.get(v.id),
+                gemeinsam: (tagsJe[v.id] || []).filter(n => eigene.has(Tags.slugVon(n))),
+            }));
+        }
 
         const [ratings, comments] = await Promise.all([
             dbService.query(`
@@ -147,6 +169,7 @@ router.get('/:slug', requirePermission('GAMESERVER.ADDONS.VIEW'), async (req, re
             title: `${addon.name} — Spiele-Datenbank`,
             activeMenu: `/guild/${guildId}/plugins/gameserver/addons`,
             addon,
+            aehnliche,
             ratings: ratings || [],
             comments: comments || [],
             guildId,

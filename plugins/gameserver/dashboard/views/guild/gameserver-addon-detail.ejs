@@ -23,10 +23,6 @@
                                             </span>
                                         <% } %>
 
-                                        <span class="badge bg-info-lt badge-lg">
-                                            <%= addon.category.toUpperCase() %>
-                                        </span>
-
                                         <% if (addon.featured) { %>
                                             <span class="badge bg-warning-lt badge-lg ms-2">
                                                 <i class="fa-solid fa-star"></i> FEATURED
@@ -44,9 +40,9 @@
                                     <% if (Array.isArray(addon.tags) && addon.tags.length) { %>
                                         <div class="mb-3">
                                             <% addon.tags.forEach(tag => { %>
-                                                <span class="badge bg-secondary-lt me-1">
+                                                <a class="badge bg-info-lt me-1 text-decoration-none" href="/guild/<%= guildId %>/plugins/gameserver/addons?tag=<%= encodeURIComponent(tag) %>">
                                                     <i class="fa-solid fa-tag"></i> <%= tag %>
-                                                </span>
+                                                </a>
                                             <% }) %>
                                         </div>
                                     <% } %>
@@ -184,6 +180,27 @@
                                    class="btn btn-dark btn-sm w-100 mt-3">
                                     <i class="fa-brands fa-steam"></i> <%= tr('gameserver:ADDON.VIEW_ON_STEAM') %>
                                 </a>
+                            </div>
+                        </div>
+                    <% } %>
+
+                    <%# Ähnliche Spiele (2026-10-08): die, die Tags mit diesem teilen — mit den
+                        meisten gemeinsamen zuerst. Das konnte die feste Kategorie nicht. %>
+                    <% if ((locals.aehnliche || []).length) { %>
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h3 class="card-title">
+                                    <i class="fa-solid fa-tags"></i>
+                                    <%= tr('gameserver:MARKETPLACE.SIMILAR') %>
+                                </h3>
+                            </div>
+                            <div class="list-group list-group-flush">
+                                <% aehnliche.forEach(function (a) { %>
+                                    <a class="list-group-item list-group-item-action" href="/guild/<%= guildId %>/plugins/gameserver/addons/<%= a.slug %>">
+                                        <div class="fw-medium"><%= a.name %></div>
+                                        <div class="text-secondary small"><%= a.gemeinsam.join(' · ') %></div>
+                                    </a>
+                                <% }) %>
                             </div>
                         </div>
                     <% } %>

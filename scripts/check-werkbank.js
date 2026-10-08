@@ -745,18 +745,33 @@ async function pruefe(name, fn) {
         assert.deepStrictEqual(baueHinweise(null, 'run'), []);
     });
 
-    await pruefe('Angaben: Slug, Fassung, Kategorie und Bildadressen werden geprüft', async () => {
+    // Seit dem 2026-10-08 fragt das Formular keine Kategorie mehr — Tags ersetzen
+    // sie. Was ein Entwurf in `identity.category` trägt, bleibt stehen.
+    await pruefe('Angaben: Slug, Fassung, Tags und Bildadressen werden geprüft', async () => {
         const s = mitAngaben();
         await assert.rejects(Sitzungen.angabenSpeichern(s, { name: 'x', slug: 'Mit Leerzeichen' }), /Slug/);
         await assert.rejects(Sitzungen.angabenSpeichern(s, { name: 'x', version: '1.0' }), /Fassung/);
-        await assert.rejects(Sitzungen.angabenSpeichern(s, { name: 'x', kategorie: 'erfunden' }), /Kategorie/);
+        await assert.rejects(Sitzungen.angabenSpeichern(s, { name: 'x', tags: ['gut', 'mit,komma'] }), /Zeichen, das nicht geht/);
+        await assert.rejects(Sitzungen.angabenSpeichern(s, { name: 'x', tags: Array.from({ length: 13 }, (_, i) => 'tag' + i) }), /Höchstens 12 Tags/);
         await assert.rejects(Sitzungen.angabenSpeichern(s, { name: 'x', icon_url: 'javascript:alert(1)' }), /Symbol/);
         await assert.rejects(Sitzungen.angabenSpeichern(s, { name: 'x', banner_url: 'http://unsicher/x.png' }), /Banner/);
-        await Sitzungen.angabenSpeichern(s, { name: 'Factorio', slug: 'factorio', version: '1.2.0', kategorie: 'strategy',
-            beschreibung_de: 'Fabriken', icon_url: '/uploads/media/g/1.png', banner_url: 'https://cdn.example/b.jpg' });
-        assert.deepStrictEqual(db.entwurf.werkbank.praesentation, { icon_url: '/uploads/media/g/1.png', banner_url: 'https://cdn.example/b.jpg' });
+        const kategorieVorher = db.entwurf?.identity?.category ?? s.entwurf.identity.category;
+        await Sitzungen.angabenSpeichern(s, { name: 'Factorio', slug: 'factorio', version: '1.2.0', kategorie: 'erfunden',
+            beschreibung_de: 'Fabriken', icon_url: '/uploads/media/g/1.png', banner_url: 'https://cdn.example/b.jpg',
+            tags: ['Strategie', ' Fabrik-Aufbauspiel ', 'strategie'] });
+        assert.deepStrictEqual(db.entwurf.werkbank.praesentation,
+            { icon_url: '/uploads/media/g/1.png', banner_url: 'https://cdn.example/b.jpg', tags: ['Strategie', 'Fabrik-Aufbauspiel'] });
+        assert.strictEqual(db.entwurf.identity.category, kategorieVorher, 'das Formular hat die Kategorie des Entwurfs angefasst');
         assert.strictEqual(db.entwurf.identity.version, '1.2.0');
         assert.deepStrictEqual(db.entwurf.werkbank.portnummern, { game: 34197 }, 'der Sitzungsteil bleibt erhalten');
+        // Ohne `tags` in der Nutzlast (das Feld liess sich nicht laden) bleiben die gesetzten stehen …
+        await Sitzungen.angabenSpeichern(s, { name: 'Factorio', slug: 'factorio', version: '1.2.0' });
+        assert.deepStrictEqual(db.entwurf.werkbank.praesentation.tags, ['Strategie', 'Fabrik-Aufbauspiel'], 'fehlende Tags wurden als „keine" gelesen');
+        // … eine leere Liste dagegen heisst „keine".
+        await Sitzungen.angabenSpeichern(s, { name: 'Factorio', slug: 'factorio', version: '1.2.0', tags: [] });
+        assert.deepStrictEqual(db.entwurf.werkbank.praesentation.tags, []);
+        // Die Tags stehen NICHT im Paket — sie gehören dem Spiel im Panel.
+        assert.ok(!JSON.stringify(Sitzungen.entwurfAlsPaket(s, [])).includes('"tags"'), 'die Tags stehen im Paket');
     });
 
     console.log('\nEinstellungen (Baukasten B1)');

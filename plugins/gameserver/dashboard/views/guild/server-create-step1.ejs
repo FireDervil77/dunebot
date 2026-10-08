@@ -40,7 +40,7 @@
               <div style="flex:1 1 auto">
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                   <span style="font-weight:600;font-size:15px"><%= p.name %></span>
-                  <% if (p.kategorie) { %><span class="fb-pille"><%= p.kategorie %></span><% } %>
+                  <% (p.tags || []).slice(0, 4).forEach(function (tag) { %><span class="fb-pille"><%= tag %></span><% }) %>
                   <% if (p.version) { %>
                     <span class="fb-pille fb-mono"><%= p.version %><%= p.kanal ? ' · ' + p.kanal : '' %></span>
                   <% } %>

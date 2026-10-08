@@ -49,6 +49,7 @@ const Sitzungen = require('../helpers/Sitzungen');
 const { argsAusZeilen, zeilenAusArgs } = require('../helpers/Startzeile');
 // Dieselben Anzeigenamen wie die Einstellungskarte des Servers — eine Liste, nicht zwei.
 const { GRUPPE, WIRKUNG, RISIKO } = require('../../../gameserver/dashboard/helpers/Serverseite');
+const Tags = require('../../../../apps/dashboard/helpers/Tags');
 
 function nutzerId(req, res) {
     return res.locals.user?.id || req.session?.user?.info?.id || null;
@@ -324,7 +325,17 @@ router.get('/:kennung', requirePermission('WERKBANK.VIEW'), async (req, res) => 
             // ältere Durchläufe hätten sonst alle als „geändert" gegolten.
             pruefHash: pruefungen[0]?.entwurf ? Sitzungen.fingerabdruck(pruefungen[0].entwurf) : null,
             angaben: Sitzungen.angaben(sitzung),
-            kategorien: [...require('../../../../packages/fbpkg/lib/einlieferung').KATEGORIEN],
+            // Tags statt Kategorie (2026-10-08). Ein Fehler beim Laden darf nicht
+            // wie „keine Tags" aussehen — dann fehlt das Feld, und Speichern
+            // fasst die Tags nicht an.
+            ...(await (async () => {
+                try {
+                    return { angabenTags: await Sitzungen.angabenTags(sitzung), alleTags: await Tags.alle(ServiceManager.get('dbService')), tagsFehler: null };
+                } catch (error) {
+                    ServiceManager.get('Logger').error('[Werkbank] Tags laden fehlgeschlagen', error);
+                    return { angabenTags: [], alleTags: [], tagsFehler: error.message };
+                }
+            })()),
             veroeffentlichung: await Sitzungen.veroeffentlichungsStand(sitzung, liste, pruefungen),
             veroeffentlicht: sitzung.entwurf?.werkbank?.veroeffentlicht || [],
             durchlaufMaengel: Sitzungen.durchlaufMaengel(entwurf),

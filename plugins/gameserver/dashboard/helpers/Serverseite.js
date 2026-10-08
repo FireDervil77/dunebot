@@ -1396,8 +1396,9 @@ module.exports.baueBereitschaft = baueBereitschaft;
  *
  * @param {Array} paketZeilen  { id, slug, fbpkg } aus packages/package_versions
  * @param {Array} ohnePaket    Addons, zu denen es noch kein Paket gibt
+ * @param {Object} tagsJeSpiel Kennung → Tags (Tags.fuerViele)
  */
-function bauePaketAuswahl(paketZeilen, ohnePaket = []) {
+function bauePaketAuswahl(paketZeilen, ohnePaket = [], tagsJeSpiel = {}) {
     const pakete = [];
     for (const z of (paketZeilen || [])) {
         let p;
@@ -1413,7 +1414,9 @@ function bauePaketAuswahl(paketZeilen, ohnePaket = []) {
             addonId:  z.id,
             slug:     id.slug || z.slug,
             name:     id.name || z.slug,
-            kategorie: id.category || null,
+            // Tags des Spiels im Panel — sie ersetzen die Kategorie des Pakets
+            // (2026-10-08): mehrere je Spiel, und woran Spiele einander gleichen.
+            tags:     tagsJeSpiel[z.id] || [],
             beschreibung: id.description?.de || id.description?.en || '',
             version:  id.version || z.version || null,
             kanal:    z.channel || null,

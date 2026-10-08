@@ -20,6 +20,9 @@
 const crypto = require('crypto');
 const { ServiceManager } = require('dunebot-core');
 const Paketfassung = require('../../../gameserver/dashboard/helpers/Paketfassung');
+// Die Tags eines Spiels gehören dem Spiel im Panel, nicht dem Paket (2026-10-08) —
+// die Werkbank reicht sie beim Veröffentlichen weiter, wie Symbol und Banner.
+const Tags = require('../../../../apps/dashboard/helpers/Tags');
 
 // ── Durchreichen (2026-10-07) ───────────────────────────────────────────────
 //
@@ -757,7 +760,10 @@ async function paketOeffnen({ guildId, userId, paketId, rootserverId }) {
             // Woran später erkannt wird, was unverändert mitreist (siehe belegteEinstellungen).
             ziele: zieleAusPaket(paket),
         },
-        praesentation: { icon_url: anker?.icon_url || '', banner_url: anker?.banner_url || '' },
+        // Auch die Tags: Sie gehören dem Spiel im Panel, und das nächste
+        // Veröffentlichen setzt genau diese Liste.
+        praesentation: { icon_url: anker?.icon_url || '', banner_url: anker?.banner_url || '',
+            tags: await Tags.fuer(db(), 'spiel', zeile.paket_id) },
     };
 
     const kennung = neueKennung();
@@ -1696,9 +1702,25 @@ function angaben(sitzung) {
         slug: id.slug || '', name: id.name || sitzung.name || '', version: id.version || '1.0.0',
         beschreibung_de: typeof b === 'object' ? (b.de || '') : String(b || ''),
         beschreibung_en: typeof b === 'object' ? (b.en || '') : '',
-        kategorie: id.category || 'other',
         icon_url: p.icon_url || '', banner_url: p.banner_url || '',
+        // null = diese Sitzung hat noch keine Tags gesetzt — das Formular belegt
+        // dann mit dem vor, was das Spiel im Panel heute trägt (Route).
+        tags: Array.isArray(p.tags) ? p.tags : null,
     };
+}
+
+/**
+ * Die Tags für das Formular: was die Sitzung gesetzt hat — sonst, was das
+ * Spiel unter diesem Slug im Panel heute trägt. So nimmt das erste Speichern
+ * der Angaben einem vorhandenen Spiel nichts.
+ */
+async function angabenTags(sitzung) {
+    const eigene = sitzung.entwurf?.werkbank?.praesentation?.tags;
+    if (Array.isArray(eigene)) return eigene;
+    const slug = sitzung.entwurf?.identity?.slug;
+    if (!slug) return [];
+    const [paket] = await db().query('SELECT id FROM packages WHERE slug = ?', [slug]);
+    return paket ? Tags.fuer(db(), 'spiel', paket.id) : [];
 }
 
 async function angabenSpeichern(sitzung, f) {
@@ -1708,19 +1730,27 @@ async function angabenSpeichern(sitzung, f) {
     if (!name) throw new Error('Name fehlt.');
     const version = String(f.version || '').trim();
     if (version && !RE_FASSUNG.test(version)) throw new Error('Fassung: drei Zahlen, etwa 1.0.0.');
-    const kategorie = String(f.kategorie || 'other');
-    if (!einlieferung.KATEGORIEN.has(kategorie)) throw new Error('Unbekannte Kategorie.');
+    // Die Kategorie wird nicht mehr gefragt (2026-10-08) — Tags ersetzen sie.
+    // Was ein geöffnetes Paket in `identity.category` trägt, bleibt stehen: Es
+    // muss unverändert wieder herauskommen.
+    //
+    // `tags` fehlt in der Nutzlast = nicht anfassen (das Feld liess sich nicht
+    // laden); eine leere Liste = keine Tags.
+    const tags = f.tags === undefined ? undefined : Tags.bereinige(f.tags).map(x => x.name);
     const icon = pruefeBildAdresse(f.icon_url, 'Symbol');
     const banner = pruefeBildAdresse(f.banner_url, 'Banner');
     const de = String(f.beschreibung_de || '').trim().slice(0, 2000);
     const en = String(f.beschreibung_en || '').trim().slice(0, 2000);
     return entwurfSchreiben(sitzung, (e) => {
-        const id = { ...(e.identity || {}), name, category: kategorie };
+        const id = { ...(e.identity || {}), name };
         if (slug) id.slug = slug; else delete id.slug;
         if (version) id.version = version; else delete id.version;
         if (de || en) id.description = { ...(de ? { de } : {}), ...(en ? { en } : {}) }; else delete id.description;
         e.identity = id;
-        e.werkbank = { ...(e.werkbank || {}), praesentation: { icon_url: icon, banner_url: banner } };
+        const vorher = e.werkbank?.praesentation?.tags;
+        const bleibt = tags !== undefined ? tags : vorher;
+        e.werkbank = { ...(e.werkbank || {}), praesentation: {
+            icon_url: icon, banner_url: banner, ...(Array.isArray(bleibt) ? { tags: bleibt } : {}) } };
     });
 }
 
@@ -2256,6 +2286,30 @@ function veroeffentlichungsPaket(sitzung, liste, pruefung, autor, imageVorher = 
     };
 }
 
+/**
+ * Die Tags der Sitzung an das Spiel im Panel geben (packages.id =
+ * addon_marketplace.id) — nur, wenn die Sitzung welche gesetzt hat; sonst
+ * bleibt, was das Spiel trägt.
+ *
+ * Aufgerufen NACH dem Einliefern: Scheitert das Setzen, wird es gemeldet, nicht
+ * verschwiegen — das Veröffentlichen ist an der Stelle nicht mehr ungeschehen
+ * zu machen, und ein Paket ohne seine Tags ist besser als eine Meldung „nicht
+ * veröffentlicht" über einem Paket, das längst im Kanal liegt.
+ *
+ * @returns {Promise<string[]|null>} die Tags am Spiel danach; null = nicht angefasst
+ */
+async function tagsUebergeben(sitzung, paketId, zeilen = []) {
+    const eigeneTags = sitzung.entwurf?.werkbank?.praesentation?.tags;
+    if (!Array.isArray(eigeneTags) || !paketId) return null;
+    try {
+        return await Tags.setze(db(), 'spiel', paketId, eigeneTags);
+    } catch (fehler) {
+        zeilen.push(`⚠ Eingeliefert, aber die Tags liessen sich nicht setzen: ${fehler.message}`);
+        ServiceManager.get('Logger').error(`[Werkbank] Tags für Paket ${paketId} nicht gesetzt`, fehler);
+        return null;
+    }
+}
+
 async function veroeffentlichen(sitzung, liste, pruefListe, { autor } = {}) {
     const stand = await veroeffentlichungsStand(sitzung, liste, pruefListe);
     if (!stand.darf) throw new Error(stand.gruende.join(' '));
@@ -2279,6 +2333,7 @@ async function veroeffentlichen(sitzung, liste, pruefListe, { autor } = {}) {
         log: (z) => zeilen.push(z),
     });
     if (r.art !== 'neu') throw new Error(r.grund || zeilen.join(' ') || 'nicht eingeliefert');
+    await tagsUebergeben(sitzung, r.paketId, zeilen);
     await entwurfSchreiben(sitzung, (e) => {
         e.werkbank = { ...(e.werkbank || {}) };
         e.werkbank.veroeffentlicht = [...(e.werkbank.veroeffentlicht || []), {
@@ -2493,6 +2548,7 @@ function gruppiere(liste, ab = 6) {
 
 module.exports = {
     uebernommeneAusfuehren, ketteFortsetzen, offeneUebernommene,
+    angabenTags, tagsUebergeben,
     RCON, BEFEHL, GANZ, rconStand, rconSpeichern, rconEntfernen, rconVermerk, rconPruefbefehl, befehlSpeichern, befehlEntfernen,
     sitzungsImage,
     RE_KENNUNG, RE_ZWECK, SCHRITTTYPEN, MAX_AUSGABE, GRENZEN, VORGABE, ERKUNDUNG, hatBereitschaft,

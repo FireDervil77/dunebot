@@ -8,6 +8,7 @@ const { ServiceManager } = require("dunebot-core");
 
 const { NewsHelper } = require('dunebot-sdk/utils');
 const FrontpageSection = require('dunebot-db-client/models/FrontpageSection');
+const Tags = require('../helpers/Tags');
 
 /**
  * Controller für Frontend-Routen
@@ -139,15 +140,27 @@ module.exports.getIndex = async (req, res) => {
 
         // Addons (Spiele aus dem Marketplace) laden
         let addonsList = [];
+        // Die Tags, nach denen die Startseite filtert — häufigste zuerst.
+        let addonTags = [];
         if (sectionTypes.has('addons')) {
             try {
                 addonsList = await dbService.query(
-                    `SELECT id, name, slug, description, category, icon_url, banner_url, image_url,
-                            version, steam_app_id, install_count, rating_avg, rating_count, tags
+                    `SELECT id, name, slug, description, icon_url, banner_url, image_url,
+                            version, steam_app_id, install_count, rating_avg, rating_count
                      FROM addon_marketplace
                      WHERE status = 'approved' AND visibility IN ('official', 'public')
                      ORDER BY install_count DESC, rating_avg DESC`
                 );
+                // Tags aus der Bibliothek (2026-10-08). Bis dahin las diese Abfrage
+                // die Kategorie und die alte Kommaspalte `tags` — die dritte Stelle,
+                // die noch an ihr hing, und die einzige, die sie nie anzeigte.
+                const ids = addonsList.map(a => a.id);
+                const tagsJe = await Tags.fuerViele(dbService, 'spiel', ids);
+                for (const a of addonsList) {
+                    a.tags = tagsJe[a.id] || [];
+                    a.tagSlugs = a.tags.map(Tags.slugVon);
+                }
+                addonTags = await Tags.benutzte(dbService, 'spiel', ids);
                 Logger.debug(`Addons für Frontpage geladen: ${addonsList.length}`);
             } catch (err) {
                 Logger.error("Fehler beim Laden der Addons:", err);
@@ -163,7 +176,8 @@ module.exports.getIndex = async (req, res) => {
             carouselNews,
             changelogsList: localizedChangelogsList,
             pluginsList,
-            addonsList
+            addonsList,
+            addonTags
         });
     } catch (error) {
         Logger.error("Fehler beim Rendern der Landing Page:", error);

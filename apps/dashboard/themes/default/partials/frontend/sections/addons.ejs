@@ -1,16 +1,11 @@
 <%# Addons/Games Section Partial — Spiele aus dem Addon-Marketplace %>
 
 <%
-  const categoryIcons = {
-    fps: 'bi-bullseye', survival: 'bi-tree', sandbox: 'bi-box',
-    mmorpg: 'bi-globe', racing: 'bi-speedometer2', strategy: 'bi-diagram-3',
-    horror: 'bi-bug', scifi: 'bi-rocket', other: 'bi-controller'
-  };
-  const categoryLabels = {
-    fps: 'FPS', survival: 'Survival', sandbox: 'Sandbox',
-    mmorpg: 'MMORPG', racing: 'Racing', strategy: 'Strategie',
-    horror: 'Horror', scifi: 'Sci-Fi', other: 'Sonstige'
-  };
+  // Gefiltert wird nach Tags (2026-10-08). Bis dahin stand hier eine feste
+  // Liste von neun Kategorien mit je einem Symbol, und jedes Spiel gehörte in
+  // genau eine — fünf von acht in „Sandbox". Tags kommen aus der
+  // Tag-Bibliothek; zur Wahl stehen die häufigsten der gezeigten Spiele.
+  const filterTags = (locals.addonTags || []).slice(0, 8);
 %>
 
 <section id="addons" class="addons section dark-background">
@@ -23,32 +18,30 @@
   <div class="container">
     <% if (locals.addonsList && addonsList.length > 0) { %>
 
-      <!-- Kategorie-Filter -->
+      <!-- Tag-Filter -->
+      <% if (filterTags.length) { %>
       <div class="text-center mb-4" data-aos="fade-up" data-aos-delay="50">
         <div class="btn-group flex-wrap" role="group" id="addon-filter">
           <button type="button" class="btn btn-outline-light btn-sm active" data-filter="all">
             <i class="bi bi-grid me-1"></i> Alle
           </button>
-          <%
-            const usedCategories = [...new Set(addonsList.map(a => a.category).filter(Boolean))];
-            usedCategories.forEach(cat => {
-          %>
-            <button type="button" class="btn btn-outline-light btn-sm" data-filter="<%= cat %>">
-              <i class="bi <%= categoryIcons[cat] || 'bi-controller' %> me-1"></i> <%= categoryLabels[cat] || cat %>
+          <% filterTags.forEach(function (t) { %>
+            <button type="button" class="btn btn-outline-light btn-sm" data-filter="<%= t.slug %>">
+              <i class="bi bi-tag me-1"></i> <%= t.name %>
             </button>
           <% }); %>
         </div>
       </div>
+      <% } %>
 
       <!-- Game Grid -->
       <div class="row g-4" id="addon-grid">
         <% addonsList.forEach(function(addon, index) {
           const imgSrc = addon.banner_url || addon.image_url || addon.icon_url || '';
-          let tags = [];
-          try { tags = typeof addon.tags === 'string' ? JSON.parse(addon.tags) : (addon.tags || []); } catch(e) {}
+          const tags = Array.isArray(addon.tags) ? addon.tags : [];
         %>
         <div class="col-xl-3 col-lg-4 col-md-6 addon-card-wrapper" 
-             data-category="<%= addon.category || 'other' %>"
+             data-tags="<%= JSON.stringify(addon.tagSlugs || []) %>"
              data-aos="fade-up" data-aos-delay="<%= 50 + (index % 8) * 50 %>">
           <div class="addon-card">
             <% if (imgSrc) { %>
@@ -57,7 +50,7 @@
               </div>
             <% } else { %>
               <div class="addon-card-img addon-card-placeholder">
-                <i class="bi <%= categoryIcons[addon.category] || 'bi-controller' %>"></i>
+                <i class="bi bi-controller"></i>
               </div>
             <% } %>
             <div class="addon-card-body">
@@ -71,9 +64,9 @@
               </div>
               <p class="addon-card-desc"><%= addon.description ? addon.description.substring(0, 100) + (addon.description.length > 100 ? '...' : '') : '' %></p>
               <div class="addon-card-meta">
-                <span class="badge bg-primary bg-opacity-25 text-primary">
-                  <i class="bi <%= categoryIcons[addon.category] || 'bi-controller' %> me-1"></i><%= categoryLabels[addon.category] || addon.category || 'Game' %>
-                </span>
+                <% tags.slice(0, 3).forEach(function (tag) { %>
+                  <span class="badge bg-primary bg-opacity-25 text-primary"><i class="bi bi-tag me-1"></i><%= tag %></span>
+                <% }); %>
                 <% if (addon.version) { %>
                   <span class="badge bg-secondary bg-opacity-25 text-secondary">v<%= addon.version %></span>
                 <% } %>
@@ -116,7 +109,7 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  // Kategorie-Filter
+  // Tag-Filter: Eine Karte bleibt, wenn sie das gewählte Tag trägt.
   var filterBtns = document.querySelectorAll('#addon-filter [data-filter]');
   filterBtns.forEach(function(btn) {
     btn.addEventListener('click', function() {
@@ -124,7 +117,9 @@ document.addEventListener('DOMContentLoaded', function() {
       this.classList.add('active');
       var filter = this.dataset.filter;
       document.querySelectorAll('.addon-card-wrapper').forEach(function(card) {
-        if (filter === 'all' || card.dataset.category === filter) {
+        var traegt = [];
+        try { traegt = JSON.parse(card.dataset.tags || '[]'); } catch (e) { /* leer */ }
+        if (filter === 'all' || traegt.indexOf(filter) >= 0) {
           card.style.display = '';
         } else {
           card.style.display = 'none';

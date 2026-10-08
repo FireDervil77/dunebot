@@ -1,0 +1,115 @@
+<%
+/**
+ * Das Tag-Feld — kleine Marken in einem Eingabefeld, Vorschläge aus der
+ * Tag-Bibliothek.
+ *
+ * **Warum es das gibt (2026-10-08).** Das Feld stand in der Spielverwaltung
+ * unter /admin. Seit die Tags die Kategorie eines Spiels ersetzen, setzt sie
+ * auch die Werkbank — und zwei Kopien desselben Felds wären beim nächsten
+ * Handgriff zwei verschiedene.
+ *
+ * ## Aufruf
+ *
+ *     include('shared/tagfeld', {
+ *         id:      'spielTags',          // eindeutig auf der Seite
+ *         tags:    ['SCI-FI', 'CO-OP'],  // was der Eintrag heute trägt
+ *         alle:    [{ name: '…' }],      // die Bibliothek, für die Vorschläge
+ *         fehler:  null,                 // Text, wenn die Tags nicht ladbar waren
+ *         hinweis: '…'                   // steht unter dem Feld; '' = keiner
+ *     })
+ *
+ * Alle fünf Angaben IMMER mitgeben: Ein Baustein erbt, was die Seite unter
+ * demselben Namen trägt — ein weggelassenes `hinweis` wäre das der Seite.
+ *
+ * ## Lesen im Seitenskript
+ *
+ *     var liste = window.tagfeld('spielTags');
+ *     if (liste) nutzlast.tags = liste;
+ *
+ * `null` heisst: Das Feld gibt es nicht — die Tags liessen sich nicht laden.
+ * Dann schickt das Formular KEINE mit, und der Server fasst sie nicht an. Eine
+ * leere Liste dagegen heisst „keine Tags".
+ *
+ * Was noch im Feld steht, zählt beim Lesen mit — sonst ginge das zuletzt
+ * getippte Tag verloren.
+ */
+// Gelesen wie in den anderen Bausteinen hier: über `typeof`, nicht über
+// `locals.` — das zeigt je nach Aufrufer auf die Angaben der SEITE, nicht auf
+// die dieses Aufrufs (beim ersten Bau gemessen: das Feld blieb leer).
+const _tfId      = (typeof id === 'string' && id) ? id : 'tagfeld';
+const _tfTags    = (typeof tags !== 'undefined' && Array.isArray(tags)) ? tags : [];
+const _tfAlle    = (typeof alle !== 'undefined' && Array.isArray(alle)) ? alle : [];
+const _tfFehler  = (typeof fehler !== 'undefined' && fehler) ? fehler : null;
+const _tfHinweis = (typeof hinweis === 'string' && hinweis) ? hinweis : '';
+const _tfMax     = 12; // Tags.MAX_JE_EINTRAG
+%>
+<% if (_tfFehler) { %>
+  <div class="alert alert-danger py-2 small">Die Tags ließen sich nicht laden (<%= _tfFehler %>) — sie werden beim Speichern nicht angefasst.</div>
+<% } else { %>
+  <div class="form-control d-flex flex-wrap align-items-center gap-1" style="cursor:text"
+       data-tagfeld="<%= _tfId %>" data-max="<%= _tfMax %>" data-tags="<%= JSON.stringify(_tfTags) %>">
+    <input type="text" id="<%= _tfId %>" list="<%= _tfId %>Vorschlaege" autocomplete="off" maxlength="40"
+           class="border-0 flex-fill bg-transparent" style="outline:none;min-width:140px"
+           placeholder="Tag tippen, Enter übernimmt">
+  </div>
+  <datalist id="<%= _tfId %>Vorschlaege">
+    <% _tfAlle.forEach(function (t) { %><option value="<%= t.name %>"></option><% }); %>
+  </datalist>
+  <% if (_tfHinweis) { %><div class="form-hint"><%= _tfHinweis %></div><% } %>
+<% } %>
+<script>
+(function () {
+  var felder = window.__tagfelder = window.__tagfelder || {};
+  function melde(text) { if (window.showToast) window.showToast('error', text); }
+  function sauber(text) { return text.trim().replace(/\s+/g, ' '); }
+  function gleich(a, b) { return sauber(a).toLowerCase() === sauber(b).toLowerCase(); }
+
+  function richte(feld) {
+    var eingabe = feld.querySelector('input');
+    var hoechstens = Number(feld.dataset.max) || 12;
+    var liste = [];
+    try { liste = JSON.parse(feld.dataset.tags || '[]'); } catch (e) { /* leer */ }
+
+    function zeichne() {
+      feld.querySelectorAll('[data-tag]').forEach(function (m) { m.remove(); });
+      liste.forEach(function (name) {
+        var marke = document.createElement('span');
+        marke.className = 'badge bg-secondary-lt d-inline-flex align-items-center gap-1';
+        marke.dataset.tag = name;
+        marke.append(document.createTextNode(name));
+        var weg = document.createElement('button');
+        weg.type = 'button'; weg.className = 'btn-close'; weg.style.fontSize = '.55rem';
+        weg.title = 'Tag entfernen'; weg.setAttribute('aria-label', name + ' entfernen');
+        weg.addEventListener('click', function () { liste = liste.filter(function (t) { return t !== name; }); zeichne(); });
+        marke.append(weg);
+        feld.insertBefore(marke, eingabe);
+      });
+    }
+    function nimm() {
+      var name = sauber(eingabe.value);
+      if (!name) return;
+      var schonDa = liste.some(function (t) { return gleich(t, name); });
+      if (/[,<>"]/.test(name)) { melde('Ein Tag darf kein Komma, <, > oder " enthalten.'); return; }
+      if (liste.length >= hoechstens && !schonDa) { melde('Höchstens ' + hoechstens + ' Tags je Eintrag.'); return; }
+      if (!schonDa) liste.push(name);
+      eingabe.value = '';
+      zeichne();
+    }
+    zeichne();
+    feld.addEventListener('click', function (e) { if (e.target === feld) eingabe.focus(); });
+    eingabe.addEventListener('keydown', function (e) {
+      // Enter übernimmt das Tag — und darf das Formular drumherum nicht absenden.
+      if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); nimm(); }
+      else if (e.key === 'Backspace' && !eingabe.value && liste.length) { liste.pop(); zeichne(); }
+    });
+    // Ein Klick auf einen Vorschlag füllt das Feld, ohne dass Enter fällt.
+    eingabe.addEventListener('change', nimm);
+    return { werte: function () { nimm(); return liste.slice(); } };
+  }
+
+  document.querySelectorAll('[data-tagfeld]').forEach(function (feld) {
+    if (!felder[feld.dataset.tagfeld]) felder[feld.dataset.tagfeld] = richte(feld);
+  });
+  window.tagfeld = function (id) { return felder[id] ? felder[id].werte() : null; };
+})();
+</script>

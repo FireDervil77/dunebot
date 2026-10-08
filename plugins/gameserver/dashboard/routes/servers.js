@@ -47,6 +47,8 @@ const { resolveConsoleTransport } = require('../helpers/ConsoleTransport');
 
 // ✅ PERMISSION-MIDDLEWARE IMPORTIEREN
 const { requirePermission, loadUserPermissions } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
+// Tags eines Spiels — sie stehen im Anlege-Assistenten, wo bis zum 2026-10-08 die Kategorie stand.
+const Tags = require('../../../../apps/dashboard/helpers/Tags');
 
 // ── „Für den Server läuft schon eine Installation" (2026-10-01) ─────────────
 // Der Daemon lehnt einen zweiten Auftrag mit `code: install_laeuft` ab. Das ist
@@ -413,7 +415,8 @@ router.get('/create', requirePermission('GAMESERVER.CREATE'), async (req, res) =
                 // diese Guild nur nicht freigegeben ist, gehört nicht in diese
                 // Liste — es ist ein Entwurf und erscheint ihr gar nicht.
                 const hatPaket = new Set((await dbService.query('SELECT id FROM packages')).map(z => z.id));
-                auswahl = bauePaketAuswahl(paketZeilen, alle.filter(a => !mitPaket.has(a.id) && !hatPaket.has(a.id)));
+                const tagsJeSpiel = await Tags.fuerViele(dbService, 'spiel', paketZeilen.map(z => z.id));
+                auswahl = bauePaketAuswahl(paketZeilen, alle.filter(a => !mitPaket.has(a.id) && !hatPaket.has(a.id)), tagsJeSpiel);
             } catch (err) {
                 Logger.error('[Gameserver] Spielauswahl konnte nicht aufgebaut werden', err);
             }

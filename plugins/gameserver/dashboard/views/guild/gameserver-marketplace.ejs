@@ -24,16 +24,17 @@
                                            value="<%= filters.search %>">
                                 </div>
 
-                                <!-- Category -->
+                                <%# Filter nach Tag (2026-10-08) — bis dahin nach der einen Kategorie,
+                                    die jedes Spiel hatte. Zur Wahl steht, was Spiele wirklich tragen. %>
                                 <div class="mb-3">
-                                    <label><%= tr('gameserver:MARKETPLACE.CATEGORY') %></label>
-                                    <select class="form-control" name="category">
-                                        <option value="all" <%= filters.category === 'all' ? 'selected' : '' %>>
-                                            <%= tr('gameserver:MARKETPLACE.ALL_CATEGORIES') %>
+                                    <label><%= tr('gameserver:MARKETPLACE.TAG') %></label>
+                                    <select class="form-control" name="tag">
+                                        <option value="all" <%= filters.tag === 'all' ? 'selected' : '' %>>
+                                            <%= tr('gameserver:MARKETPLACE.ALL_TAGS') %>
                                         </option>
-                                        <% categories.forEach(cat => { %>
-                                            <option value="<%= cat.category %>" <%= filters.category === cat.category ? 'selected' : '' %>>
-                                                <%= cat.category.toUpperCase() %> (<%= cat.count %>)
+                                        <% (locals.tagListe || []).forEach(function (t) { %>
+                                            <option value="<%= t.slug %>" <%= filters.tag === t.slug ? 'selected' : '' %>>
+                                                <%= t.name %> (<%= t.anzahl %>)
                                             </option>
                                         <% }) %>
                                     </select>
@@ -119,9 +120,10 @@
                                                     </span>
                                                 <% } %>
 
-                                                <span class="badge bg-info-lt">
-                                                    <%= addon.category.toUpperCase() %>
-                                                </span>
+                                                <%# Tags statt der Kategorie — jedes führt zu den Spielen, die es teilen. %>
+                                                <% (addon.tags || []).slice(0, 4).forEach(function (tag) { %>
+                                                    <a class="badge bg-info-lt text-decoration-none" href="/guild/<%= guildId %>/plugins/gameserver/addons?tag=<%= encodeURIComponent(tag) %>"><%= tag %></a>
+                                                <% }) %>
                                             </div>
 
                                             <!-- Addon Name -->

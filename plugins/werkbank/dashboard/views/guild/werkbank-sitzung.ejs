@@ -1368,11 +1368,14 @@
             <label class="form-label" for="aEn">Beschreibung (englisch)</label>
             <textarea class="form-control" id="aEn" name="beschreibung_en" rows="2"><%= angaben.beschreibung_en %></textarea>
           </div>
+          <%# Tags statt Kategorie (Betreiber, 2026-10-08): Ein Spiel gehört in
+              mehrere Gruppen, und die feste Liste zwang jedes in eine — fünf von
+              acht standen auf „sandbox". Die Tags gehören dem Spiel im Panel und
+              gehen beim Veröffentlichen dorthin, wie Symbol und Banner. %>
           <div class="col-md-4">
-            <label class="form-label" for="aKat">Kategorie</label>
-            <select class="form-select" id="aKat" name="kategorie">
-              <% kategorien.forEach(function (k) { %><option value="<%= k %>" <%= angaben.kategorie === k ? 'selected' : '' %>><%= k %></option><% }) %>
-            </select>
+            <div class="form-label"><label for="aTags">Tags</label><%- include('werkbank-hilfe', { text:
+              'Woran man das Spiel findet und was es mit anderen gemeinsam hat — etwa Survival, CO-OP, SCI-FI. Vorhandene Tags werden beim Tippen vorgeschlagen. Sie gehen beim Veröffentlichen an das Spiel im Panel, nicht ins Paket.' }) %></div>
+            <%- include('shared/tagfeld', { id: 'aTags', tags: locals.angabenTags || [], alle: locals.alleTags || [], fehler: locals.tagsFehler || null, hinweis: '' }) %>
           </div>
           <div class="col-md-4">
             <label class="form-label" for="aIcon">Symbol</label>
@@ -1942,10 +1945,19 @@
 
   // ── Angaben & Veröffentlichen ─────────────────────────────────────────
   var formAngaben = document.getElementById('formAngaben');
+  // Die Tags stehen nicht in einem Formularfeld, sondern im Tag-Feld. `null`
+  // heisst, sie liessen sich nicht laden — dann gehen keine mit, und der Server
+  // fasst sie nicht an.
+  function angabenNutzlast() {
+    var nutzlast = Object.fromEntries(new FormData(formAngaben));
+    var tags = window.tagfeld('aTags');
+    if (tags) nutzlast.tags = tags;
+    return nutzlast;
+  }
   formAngaben.addEventListener('submit', async function (ev) {
     ev.preventDefault();
     try {
-      await schicke(hier + '/angaben', Object.fromEntries(new FormData(formAngaben)));
+      await schicke(hier + '/angaben', angabenNutzlast());
       window.location.reload();
     } catch (fehler) { melde('error', fehler.message); }
   });
@@ -1955,7 +1967,7 @@
     knopfVeroeffentlichen.disabled = true;
     try {
       // Erst die Angaben, wie sie gerade im Formular stehen — veröffentlicht wird, was man sieht.
-      await schicke(hier + '/angaben', Object.fromEntries(new FormData(formAngaben)));
+      await schicke(hier + '/angaben', angabenNutzlast());
       var d = await schicke(hier + '/veroeffentlichen');
       melde('success', d.slug + ' ' + d.version + ' ist im Kanal test.');
       setTimeout(function () { window.location.reload(); }, 800);

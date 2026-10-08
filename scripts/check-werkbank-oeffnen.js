@@ -339,6 +339,10 @@ function alsFormular(e) {
                 if (m) assert.strictEqual(nr[p.purpose], nr[m[1]] + Number(m[2]), `„${p.purpose}" ist nicht an „${m[1]}" gekoppelt`);
             }
             assert.strictEqual(sitzung.entwurf.werkbank.geoeffnet.slug, z.slug);
+            // Die Tags des Spiels gehen mit (2026-10-08) — das nächste Veröffentlichen setzt genau diese Liste.
+            const [tagZeilen] = await c2.query(
+                "SELECT t.name FROM tag_links l JOIN tags t ON t.id = l.tag_id WHERE l.entity_type = 'spiel' AND l.entity_id = ? ORDER BY t.name", [z.id]);
+            assert.deepStrictEqual(sitzung.entwurf.werkbank.praesentation.tags, tagZeilen.map(x => x.name), 'beim Öffnen gingen die Tags des Spiels nicht mit');
             // Was der Daemon für Start und Durchlauf bekommt, sind genau die vier Laufzeit-Teile des Pakets.
             const ganz = S.entwurfAlsPaket(sitzung, liste);
             for (const k of S.LAUFZEIT_TEILE) assert.deepStrictEqual(ganz[k], alt[k], `„${k}" käme beim Daemon anders an`);
