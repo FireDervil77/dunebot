@@ -2394,12 +2394,43 @@ function festzeilenFlach(entwurf) {
 function festzeilenStand(sitzung) {
     const e = sitzung.entwurf || {};
     const einstellungen = Array.isArray(e.settings) ? e.settings : [];
+    // Die Dateien, in die Einstellungen schreiben — meist aus der echten Datei
+    // gelesen (Vorschläge) und damit richtig geschrieben.
+    const bekannt = [...new Set(einstellungen.flatMap(s => (s.apply || []).filter(a => a.target === 'file' && a.file).map(a => a.file)))];
     return festzeilenFlach(e).map(z => ({
         ...z,
         ueberschreibt: einstellungen
             .filter(s => (s.apply || []).some(a => a.target === 'file' && a.file === z.file && a.path === z.key))
             .map(s => s.key),
+        aehnlich: aehnlicheDatei(z.file, bekannt),
     }));
+}
+
+/** Wie viele Zeichen einzufügen, zu löschen oder zu tauschen sind (Levenshtein). */
+function abstand(a, b) {
+    let zeile = Array.from({ length: b.length + 1 }, (_, i) => i);
+    for (let i = 1; i <= a.length; i++) {
+        const neu = [i];
+        for (let k = 1; k <= b.length; k++) {
+            neu[k] = Math.min(zeile[k] + 1, neu[k - 1] + 1, zeile[k - 1] + (a[i - 1] === b[k - 1] ? 0 : 1));
+        }
+        zeile = neu;
+    }
+    return zeile[b.length];
+}
+
+/**
+ * Eine bekannte Datei, die fast so heisst wie diese — der Verdacht auf einen
+ * Tippfehler. Betreiber am 2026-10-08, erste Zeile in der neuen Karte:
+ * `ServerSettings.ini` statt `ServerSetting.ini`. Der Daemon legt eine fehlende
+ * Datei an; das Spiel läse sie nie, und nichts meldete es.
+ *
+ * Nur ein HINWEIS, keine Sperre: `config.ini` neben `config2.ini` gibt es.
+ */
+function aehnlicheDatei(datei, bekannt) {
+    if (bekannt.includes(datei)) return null;
+    const klein = datei.toLowerCase();
+    return bekannt.find(b => b.toLowerCase() === klein || abstand(b.toLowerCase(), klein) <= 2) || null;
 }
 
 function festzeileAusFormular(b, e) {
@@ -2415,6 +2446,10 @@ function festzeileAusFormular(b, e) {
     if (key.length > FESTZEILE.max.schluessel || /[\r\n]/.test(key)) throw new Error(`Schlüssel: eine Zeile, höchstens ${FESTZEILE.max.schluessel} Zeichen.`);
     if (value.length > FESTZEILE.max.wert || /[\r\n]/.test(value)) throw new Error(`Wert: eine Zeile, höchstens ${FESTZEILE.max.wert} Zeichen.`);
 
+    // Derselbe Verweis zweimal hintereinander ist ein Versehen (Auswahl doppelt
+    // getroffen, 2026-10-08): `{{port:game}}{{port:game}}` ergäbe 65876587.
+    const doppelt = /(\{\{[^}]*\}\})\1/.exec(value);
+    if (doppelt) throw new Error(`${doppelt[1]} steht zweimal hintereinander — in der Datei stünde der Wert doppelt. Einmal genügt.`);
     for (const p of value.match(/\{\{[^}]*\}\}/g) || []) {
         const m = RE_FEST_VERWEIS.exec(p);
         if (!m) {

@@ -244,6 +244,25 @@ const PORT_ZEILE = { file: 'ServerSetting.ini', parser: 'ini', key: 'Host.port',
         gleich(stand.find(z => z.key === 'Host.port').ueberschreibt, []);
         gleich(stand.find(z => z.key === 'Save.savePath').ueberschreibt, ['save_path']);
     });
+    await pruefe('die ersten zwei Vertipper in der Karte fallen auf: Dateiname und doppelter Verweis (Betreiber, 2026-10-08)', async () => {
+        const s = frisch();
+        await wirft(() => S.festzeileSpeichern(s, { ...PORT_ZEILE, value: '{{port:game}}{{port:game}}' }), /zweimal hintereinander/);
+        // Zweimal derselbe Verweis mit etwas dazwischen ist gemeint.
+        await S.festzeileSpeichern(s, { ...PORT_ZEILE, key: 'Host.beide', value: '{{port:game}},{{port:game}}' });
+        // Ein fast gleicher Dateiname wird gespeichert — und an der Zeile genannt.
+        await S.festzeileSpeichern(s, { ...PORT_ZEILE, file: 'ServerSettings.ini' });
+        await S.festzeileSpeichern(s, { file: 'serversetting.INI'.toLowerCase(), parser: 'ini', key: 'a', value: '1' });
+        await S.festzeileSpeichern(s, { file: 'ganz/anders.cfg', parser: 'ini', key: 'a', value: '1' });
+        const stand = S.festzeilenStand(s);
+        const zu = (datei) => stand.find(z => z.file === datei).aehnlich;
+        assert.strictEqual(zu('ServerSettings.ini'), 'ServerSetting.ini');
+        assert.strictEqual(zu('serversetting.ini'), 'ServerSetting.ini', 'Gross-/Kleinschreibung: unter Linux eine andere Datei');
+        assert.strictEqual(zu('ServerSetting.ini'), null, 'die richtige Datei gilt als Tippfehler');
+        assert.strictEqual(zu('ganz/anders.cfg'), null);
+        const ansicht = ohneKommentareEjs(fs.readFileSync(path.join(WURZEL, 'plugins/werkbank/dashboard/views/guild/werkbank-sitzung.ejs'), 'utf8'));
+        assert.match(ansicht, /if \(z\.aehnlich\) \{ %>[\s\S]{0,200}Tippfehler\?/, 'die Karte zeigt den Verdacht nicht');
+        assert.ok(!/id="fzWert"[^>]*placeholder="\{\{/.test(ansicht), 'der Platzhalter des Wertfelds sieht aus wie ein eingetragener Verweis');
+    });
     await pruefe('solange etwas läuft, ändert die Karte nichts', async () => {
         const s = frisch();
         beschaeftigt = true;

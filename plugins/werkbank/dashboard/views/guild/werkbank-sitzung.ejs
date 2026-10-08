@@ -1275,7 +1275,8 @@
     // Zeilen) — als Vorschlag, mit ihrem Format.
     const festDateien = {};
     einstellungen.forEach(function (e) { (e.apply || []).forEach(function (z) { if (z.target === 'file' && z.file && !festDateien[z.file]) festDateien[z.file] = z.parser; }); });
-    festListe.forEach(function (z) { festDateien[z.file] = z.parser; });
+    // Ein vermuteter Tippfehler wird nicht auch noch vorgeschlagen.
+    festListe.forEach(function (z) { if (!z.aehnlich) festDateien[z.file] = z.parser; });
   %>
   <div class="col-12">
     <div class="card" id="karteFestzeilen">
@@ -1300,7 +1301,12 @@
               <tbody>
                 <% festListe.forEach(function (z) { %>
                   <tr>
-                    <td><span class="font-monospace"><%= z.file %></span> <span class="text-secondary small">(<%= z.parser %>)</span></td>
+                    <td>
+                      <span class="font-monospace"><%= z.file %></span> <span class="text-secondary small">(<%= z.parser %>)</span>
+                      <% if (z.aehnlich) { %>
+                        <div class="text-warning small">Tippfehler? Die Einstellungen schreiben nach <span class="font-monospace"><%= z.aehnlich %></span>. Eine Datei, die es nicht gibt, legt der Server an — das Spiel läse sie nie.</div>
+                      <% } %>
+                    </td>
                     <td>
                       <span class="font-monospace"><%= z.key %></span>
                       <% if (z.ueberschreibt.length) { %>
@@ -1348,7 +1354,7 @@
             </div>
             <div class="col-md-8">
               <label class="form-label" for="fzWert">Wert</label>
-              <input class="form-control font-monospace" id="fzWert" name="value" maxlength="<%= FZ.max.wert %>" placeholder="{{port:game}}">
+              <input class="form-control font-monospace" id="fzWert" name="value" maxlength="<%= FZ.max.wert %>" placeholder="fester Wert oder Verweis">
             </div>
             <div class="col-md-4">
               <label class="form-label" for="fzVerweis">Verweis einfügen</label>
@@ -2709,7 +2715,12 @@
       var feld = formFz.elements.value;
       var von = feld.selectionStart == null ? feld.value.length : feld.selectionStart;
       var bis = feld.selectionEnd == null ? feld.value.length : feld.selectionEnd;
-      feld.value = feld.value.slice(0, von) + fzVerweis.value + feld.value.slice(bis);
+      // Steht genau dieser Verweis schon unmittelbar davor, nicht noch einmal:
+      // Die Auswahl springt nach dem Einfügen zurück und sieht aus wie ungetan.
+      var davor = feld.value.slice(0, von);
+      if (davor.slice(-fzVerweis.value.length) !== fzVerweis.value) {
+        feld.value = davor + fzVerweis.value + feld.value.slice(bis);
+      }
       fzVerweis.value = '';
       feld.focus();
     });
