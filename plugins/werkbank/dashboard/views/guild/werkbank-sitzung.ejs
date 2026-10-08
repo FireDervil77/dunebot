@@ -26,6 +26,36 @@
   const pruefLaeuft = Boolean(pruefung && pruefung.status === 'laeuft');
   const beschaeftigt = laeuft || spielLaeuft || pruefLaeuft;
   const entwurfPorts = sitzung.entwurf.ports || [];
+
+  // ── Reiter (2026-10-08): die Karten nach Arbeitsschritt ──────────────────
+  // `marke`: [Farbe, Text, Erklärung] — was man wissen soll, ohne hineinzusehen.
+  const _imEntwurf = schritte.filter(function (x) { return x.status === 'ok' || x.status === 'uebernommen'; }).length;
+  const _wartend = schritte.filter(function (x) { return x.status === 'uebernommen'; }).length;
+  const _fern = locals.fernsteuerung || { rcon: null, warnungen: [] };
+  const _warnVerbindung = (_fern.warnungen || []).length + (locals.ungenutztePorts || []).length;
+  const _einst = (locals.einstellungen || []).length;
+  const _veraltet = Boolean(pruefung && pruefung.status === 'gruen' && locals.pruefHash !== locals.entwurfHash);
+  const REITER = [
+    { id: 'aufbauen', titel: 'Aufbauen', satz: 'Schritte der Installation', icon: 'fa-solid fa-list-check',
+      marke: laeuft ? ['bg-blue-lt', 'läuft', 'Ein Schritt läuft']
+           : _wartend ? ['bg-yellow-lt', _wartend + ' offen', 'Übernommene Schritte, die in dieser Sitzung noch nicht gelaufen sind']
+           : _imEntwurf ? ['bg-secondary-lt', String(_imEntwurf), 'Schritte im Entwurf'] : null },
+    { id: 'starten', titel: 'Starten', satz: 'Probestart, Konsole, Ports beobachten', icon: 'fa-solid fa-play',
+      marke: spielLaeuft ? ['bg-blue-lt', 'läuft', 'Das Spiel läuft'] : null },
+    { id: 'verbindung', titel: 'Verbindung', satz: 'Ports, Abfrage, Fernsteuerung', icon: 'fa-solid fa-network-wired',
+      marke: _warnVerbindung ? ['bg-yellow-lt', '⚠ ' + _warnVerbindung, 'Hinweise in diesem Reiter']
+           : entwurfPorts.length ? ['bg-secondary-lt', String(entwurfPorts.length), 'Ports im Entwurf'] : null },
+    { id: 'einstellungen', titel: 'Einstellungen', satz: 'Einstellungen und Hinweise für Betreiber', icon: 'fa-solid fa-sliders',
+      marke: _einst ? ['bg-secondary-lt', String(_einst), 'Einstellungen im Entwurf'] : null },
+    { id: 'pruefen', titel: 'Prüfen & Veröffentlichen', satz: 'Durchlauf, Angaben, in test einliefern', icon: 'fa-solid fa-flask',
+      marke: pruefLaeuft ? ['bg-blue-lt', 'läuft', 'Der Prüfdurchlauf läuft']
+           : !pruefung ? null
+           : _veraltet ? ['bg-yellow-lt', 'veraltet', 'Grün — aber der Entwurf ist seither geändert']
+           : pruefung.status === 'gruen' ? ['bg-green-lt', 'grün', 'Der letzte Durchlauf ist grün']
+           : ['bg-red-lt', 'rot', 'Der letzte Durchlauf ist rot'] },
+  ];
+  // Ohne `#…` in der Adresse: dorthin, wo gerade etwas läuft — sonst an den Anfang.
+  const reiterStart = pruefLaeuft ? 'pruefen' : (spielLaeuft ? 'starten' : 'aufbauen');
   // Farb- und Steuerzeichen der Spiele (ANSI) — beim ANZEIGEN entfernt, die
   // Daten bleiben roh. Hytale färbt jede Zeile; kopiert landete `[m` in der
   // Anmeldeadresse, und Hytale wies den Code ab (2026-10-01).
@@ -79,7 +109,100 @@
 <div class="row row-cards" id="werkbankSitzung"
      data-werkbank-hier="<%= hier %>" data-werkbank-basis="<%= basis %>"
      data-werkbank-sitzung="<%= sitzung.kennung %>" data-werkbank-laeuft="<%= laeuft ? '1' : '0' %>"
-     data-werkbank-spiel="<%= spielLaeuft ? '1' : '0' %>" data-werkbank-pruefung="<%= pruefLaeuft ? '1' : '0' %>">
+     data-werkbank-spiel="<%= spielLaeuft ? '1' : '0' %>" data-werkbank-pruefung="<%= pruefLaeuft ? '1' : '0' %>"
+     data-aktiv="<%= reiterStart %>">
+
+  <%# ── Reiter (2026-10-08) ────────────────────────────────────────────────
+      Die Seite war elf Karten lang, und es kommen noch welche. Betreiber: „Wir
+      legen alles in Tabs? Das würde das Handling und die ganze UI
+      verschlanken." Die Karten sind dieselben geblieben — sie liegen jetzt
+      nach Arbeitsschritt in fünf Reitern.
+
+      Drei Dinge, damit ein Reiter nichts versteckt:
+        - Er steht in der Adresse (#starten). Nach dem Neuladen ist man wieder
+          dort; die Stelle auf der Seite hält rollstand.js.
+        - Jeder Reiter zeigt seinen Zustand (läuft, grün, rot, Warnung, Anzahl).
+        - Läuft etwas, sagt es die Zeile über den Reitern — dann sind in ALLEN
+          Reitern Knöpfe gesperrt, und man soll sehen, warum.
+
+      Kein Bootstrap-Tab: Welcher Reiter offen ist, steht als `data-aktiv` am
+      Rahmen, und das Skript direkt hinter der Leiste setzt es aus der Adresse,
+      BEVOR die Karten gelesen werden — sonst sähe man kurz den falschen. %>
+  <style>
+    #werkbankSitzung > [data-reiter] { display: none; }
+    <%- REITER.map(function (r) { return '#werkbankSitzung[data-aktiv="' + r.id + '"] > [data-reiter="' + r.id + '"]'; }).join(',\n    ') %> { display: block; }
+  </style>
+  <div class="col-12">
+    <% if (beschaeftigt) { %>
+      <div class="alert alert-info py-2 mb-2 d-flex flex-wrap align-items-center gap-2" id="reiterZustand">
+        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+        <span style="flex:1 1 14rem">
+          <strong><%= laeuft ? 'Ein Schritt läuft' : (spielLaeuft ? 'Das Spiel läuft (Probestart)' : 'Der Prüfdurchlauf läuft') %></strong>
+          — solange sind in allen Reitern die Knöpfe gesperrt, die den Entwurf ändern.
+        </span>
+        <button class="btn btn-sm btn-outline-primary" type="button" data-reiter-sprung="<%= laeuft ? 'aufbauen' : (spielLaeuft ? 'starten' : 'pruefen') %>">Dorthin</button>
+      </div>
+    <% } %>
+    <div class="reiter" role="tablist" id="reiterLeiste">
+      <% REITER.forEach(function (r) { %>
+        <button class="reiter__knopf <%= r.id === reiterStart ? 'active' : '' %>" type="button" role="tab" id="reiter-<%= r.id %>"
+                data-reiter-knopf="<%= r.id %>" aria-selected="<%= r.id === reiterStart %>">
+          <span class="reiter__symbol"><i class="<%= r.icon %>"></i></span>
+          <span>
+            <span class="reiter__titel"><%= r.titel %></span>
+            <span class="reiter__satz"><%= r.satz %></span>
+          </span>
+          <% if (r.marke) { %><span class="reiter__marke badge <%= r.marke[0] %>" title="<%= r.marke[2] || '' %>"><%= r.marke[1] %></span><% } %>
+        </button>
+      <% }) %>
+    </div>
+  </div>
+  <script>
+  (function () {
+    var rahmen = document.getElementById('werkbankSitzung');
+    var knoepfe = document.querySelectorAll('[data-reiter-knopf]');
+    var bekannt = Array.prototype.map.call(knoepfe, function (k) { return k.dataset.reiterKnopf; });
+    // Kästen, die mit der Ausgabe mitlaufen: In einem verborgenen Reiter haben
+    // sie keine Höhe — beim Öffnen ans Ende, wo das Neueste steht.
+    var MITLAUFEND = ['liveAusgabe', 'laufKonsole', 'pruefProtokoll'];
+
+    function zeige(id, merken) {
+      if (bekannt.indexOf(id) < 0) return false;
+      rahmen.dataset.aktiv = id;
+      Array.prototype.forEach.call(knoepfe, function (k) {
+        var an = k.dataset.reiterKnopf === id;
+        k.classList.toggle('active', an);
+        k.setAttribute('aria-selected', an ? 'true' : 'false');
+      });
+      if (merken) {
+        // Ersetzen, nicht anhängen: „Zurück" soll die Seite verlassen, nicht
+        // durch die Reiter blättern.
+        history.replaceState(null, '', '#' + id);
+        MITLAUFEND.forEach(function (kennung) {
+          var kasten = document.getElementById(kennung);
+          if (kasten) kasten.scrollTop = kasten.scrollHeight;
+        });
+        // Steht die Leiste oberhalb des Sichtbaren, zu ihr zurück — sonst
+        // landete man mitten in einem kürzeren Reiter.
+        var leiste = document.getElementById('reiterLeiste');
+        if (leiste && leiste.getBoundingClientRect().top < 0) leiste.scrollIntoView({ block: 'start' });
+      }
+      return true;
+    }
+    // Aus der Adresse — vor den Karten, damit nichts aufblitzt.
+    zeige(location.hash.slice(1), false);
+    Array.prototype.forEach.call(knoepfe, function (k) {
+      k.addEventListener('click', function () { zeige(k.dataset.reiterKnopf, true); });
+    });
+    window.addEventListener('hashchange', function () { zeige(location.hash.slice(1), false); });
+    document.addEventListener('click', function (ev) {
+      var sprung = ev.target.closest ? ev.target.closest('[data-reiter-sprung]') : null;
+      if (sprung) zeige(sprung.dataset.reiterSprung, true);
+    });
+  })();
+  </script>
+
+  <div class="col-12" data-reiter="aufbauen" role="tabpanel" aria-labelledby="reiter-aufbauen"><div class="row row-cards">
 
   <div class="col-lg-7">
     <div class="card">
@@ -277,6 +400,10 @@
       </div>
     </div>
   </div>
+
+  </div></div>
+
+  <div class="col-12" data-reiter="starten" role="tabpanel" aria-labelledby="reiter-starten"><div class="row row-cards">
 
   <!-- ── Probestart (Stufe 2) ─────────────────────────────────────────── -->
   <div class="col-12">
@@ -493,6 +620,10 @@
       </div>
     </div>
   </div>
+
+  </div></div>
+
+  <div class="col-12" data-reiter="verbindung" role="tabpanel" aria-labelledby="reiter-verbindung"><div class="row row-cards">
 
   <!-- ── Ports und Abfrage (Karte, 2026-10-07) ─────────────────────────── -->
   <%
@@ -872,6 +1003,10 @@
     </div>
   </div>
 
+  </div></div>
+
+  <div class="col-12" data-reiter="einstellungen" role="tabpanel" aria-labelledby="reiter-einstellungen"><div class="row row-cards">
+
   <!-- ── Einstellungen (Baukasten B1, 2026-09-26) ───────────────────────── -->
   <%
     const nachweise = (pruefung && pruefung.ergebnis && Array.isArray(pruefung.ergebnis.einstellungen)) ? pruefung.ergebnis.einstellungen : null;
@@ -1146,53 +1281,6 @@
     </div>
   </div>
 
-  <!-- ── Unverändert übernommen (Durchreichen, 2026-10-07) ─────────────── -->
-  <%
-    // Teile eines geöffneten Pakets, für die die Werkbank noch keine Karte hat.
-    // Sie reisen unverändert mit und stehen hier, damit man sieht, WAS mitreist.
-    const TEIL_NAME = {
-      management:   'Fernsteuerung, Spielstände, Aktualisieren',
-      content:      'Mod-Verwaltung',
-      commands:     'Befehle im Panel (Spieler listen, kicken, bannen, speichern, Durchsage)',
-      files:        'Sperrliste im Dateimanager',
-      config:       'feste Zeilen in Dateien',
-      console:      'Konsolenfilter',
-      requirements: 'Systempakete',
-      install:      'Zusätze zur Installation (Zwischenspeicher, Aufräumen)'
-    };
-    const mitgereist = locals.durchgereicht || [];
-    const offenAus = locals.geoeffnet || null;
-  %>
-  <% if (mitgereist.length || offenAus) { %>
-  <div class="col-12">
-    <div class="card" id="karteDurchgereicht">
-      <div class="card-header">
-        <h3 class="card-title">Unverändert übernommen</h3>
-        <div class="card-actions"><span class="text-secondary small">
-          <% if (offenAus) { %>geöffnet aus <span class="font-monospace"><%= offenAus.slug %> <%= offenAus.version %></span><% } %>
-        </span></div>
-      </div>
-      <div class="card-body">
-        <% if (!mitgereist.length) { %>
-          <p class="text-secondary small mb-0">Dieses Paket trägt nichts, wofür der Werkbank eine Karte fehlt.</p>
-        <% } else { %>
-          <p class="text-secondary small">
-            Diese Teile hat das geöffnete Paket, und die Werkbank kann sie noch nicht bearbeiten. Sie stehen <strong>unverändert</strong>
-            im Entwurf, laufen im Prüfdurchlauf mit und kommen beim Veröffentlichen wieder ins Paket — im Paket steht dann dazu, dass sie
-            nicht einzeln geprüft sind. Ändern lassen sie sich hier erst, wenn ihr Teil eine Karte bekommt.
-          </p>
-          <% mitgereist.forEach(function (t) { %>
-            <details class="mb-2">
-              <summary><span class="font-monospace"><%= t.teil %></span> <span class="text-secondary">— <%= TEIL_NAME[t.teil] || 'ohne Beschreibung' %></span></summary>
-              <pre class="mt-2 mb-0 p-2 small" style="max-height:20rem;overflow:auto;background:var(--tblr-bg-surface-secondary);color:var(--tblr-body-color)"><%= JSON.stringify(t.inhalt, null, 2) %></pre>
-            </details>
-          <% }) %>
-        <% } %>
-      </div>
-    </div>
-  </div>
-  <% } %>
-
   <!-- ── Hinweise für Betreiber (2026-10-06) ───────────────────────────── -->
   <%
     // Was sich nicht einstellen lässt und was man trotzdem wissen muss. Fester
@@ -1271,6 +1359,10 @@
       </div>
     </div>
   </div>
+
+  </div></div>
+
+  <div class="col-12" data-reiter="pruefen" role="tabpanel" aria-labelledby="reiter-pruefen"><div class="row row-cards">
 
   <!-- ── Prüfdurchlauf (Stufe 3) ────────────────────────────────────────── -->
   <div class="col-12">
@@ -1419,6 +1511,55 @@
       </div>
     </div>
   </div>
+
+  <!-- ── Unverändert übernommen (Durchreichen, 2026-10-07) ─────────────── -->
+  <%
+    // Teile eines geöffneten Pakets, für die die Werkbank noch keine Karte hat.
+    // Sie reisen unverändert mit und stehen hier, damit man sieht, WAS mitreist.
+    const TEIL_NAME = {
+      management:   'Spielstände, Umleitungen, Aktualisieren',
+      content:      'Mod-Verwaltung',
+      commands:     'Befehle im Panel (Spieler listen, kicken, bannen, speichern, Durchsage)',
+      files:        'Sperrliste im Dateimanager',
+      config:       'feste Zeilen in Dateien',
+      console:      'Konsolenfilter',
+      requirements: 'Systempakete',
+      install:      'Zusätze zur Installation (Zwischenspeicher, Aufräumen)'
+    };
+    const mitgereist = locals.durchgereicht || [];
+    const offenAus = locals.geoeffnet || null;
+  %>
+  <% if (mitgereist.length || offenAus) { %>
+  <div class="col-12">
+    <div class="card" id="karteDurchgereicht">
+      <div class="card-header">
+        <h3 class="card-title">Unverändert übernommen</h3>
+        <div class="card-actions"><span class="text-secondary small">
+          <% if (offenAus) { %>geöffnet aus <span class="font-monospace"><%= offenAus.slug %> <%= offenAus.version %></span><% } %>
+        </span></div>
+      </div>
+      <div class="card-body">
+        <% if (!mitgereist.length) { %>
+          <p class="text-secondary small mb-0">Dieses Paket trägt nichts, wofür der Werkbank eine Karte fehlt.</p>
+        <% } else { %>
+          <p class="text-secondary small">
+            Diese Teile hat das geöffnete Paket, und die Werkbank kann sie noch nicht bearbeiten. Sie stehen <strong>unverändert</strong>
+            im Entwurf, laufen im Prüfdurchlauf mit und kommen beim Veröffentlichen wieder ins Paket — im Paket steht dann dazu, dass sie
+            nicht einzeln geprüft sind. Ändern lassen sie sich hier erst, wenn ihr Teil eine Karte bekommt.
+          </p>
+          <% mitgereist.forEach(function (t) { %>
+            <details class="mb-2">
+              <summary><span class="font-monospace"><%= t.teil %></span> <span class="text-secondary">— <%= TEIL_NAME[t.teil] || 'ohne Beschreibung' %></span></summary>
+              <pre class="mt-2 mb-0 p-2 small" style="max-height:20rem;overflow:auto;background:var(--tblr-bg-surface-secondary);color:var(--tblr-body-color)"><%= JSON.stringify(t.inhalt, null, 2) %></pre>
+            </details>
+          <% }) %>
+        <% } %>
+      </div>
+    </div>
+  </div>
+  <% } %>
+
+  </div></div>
 </div>
 
 <%- include('shared/medienwahl', { guildId }) %>

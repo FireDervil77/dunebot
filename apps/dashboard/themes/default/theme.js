@@ -169,6 +169,9 @@ class DefaultTheme {
         // nicht; sie liegt hier als eigene Kopie.
         am.registerScript('data-table', 'data-table.js', { deps: ['jquery'], version: this.version });
         am.registerScript('guild', 'guild.js', { deps: ['jquery'], version: this.version });
+        // Nach dem Neuladen wieder an derselben Stelle — der Inhaltsbereich rollt
+        // selbst, und dessen Position merkt sich kein Browser (2026-10-08).
+        am.registerScript('rollstand', 'rollstand.js', { version: this.version });
     }
 
     /**
@@ -267,6 +270,7 @@ class DefaultTheme {
         am.enqueueScript('button-loading');
         am.enqueueScript('data-table');
         am.enqueueScript('guild');
+        am.enqueueScript('rollstand');
     }
 }
 

@@ -694,6 +694,11 @@ input[type="checkbox"]:not(.form-check-input):disabled {
 .reiter__titel { font-weight: 600; font-size: 0.88rem; display: block; }
 .reiter__satz  { font-size: 0.74rem; color: var(--fb-text-muted); display: block; }
 
+/* Eine Marke am Reiter — sein Zustand, ohne ihn zu öffnen (Werkbank,
+   2026-10-08: „läuft", „grün", „⚠ 2"). Rechts, damit die Titel in einer
+   Flucht bleiben. */
+.reiter__marke { margin-left: auto; flex: none; }
+
 @media (max-width: 560px) {
   .reiter { grid-template-columns: 1fr; }
   .reiter__knopf { border-right: 0; border-bottom: 1px solid var(--fb-border); }
