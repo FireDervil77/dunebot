@@ -994,3 +994,23 @@ body.layout-boxed {
   display: flex;
   align-items: center;
 }
+
+/* ==========================================================================
+   Das runde „?" für Hilfstexte (Tablers .form-help)
+   ========================================================================== */
+/*
+   Tabler zeichnet es grau auf hellgrau — neben Text ging es unter (Betreiber,
+   2026-10-08: „kann man schnell übersehen"). Jetzt in der Hauptfarbe: Zeichen
+   und feiner Rand voll, die Fläche getönt. Schwebt die Maus darüber oder ist
+   der Hilfstext offen, füllt Tabler es wie bisher ganz mit der Hauptfarbe —
+   jene Regel ist die genauere und bleibt deshalb unberührt.
+
+   Bewusst an der Klasse von Tabler und nicht an einer eigenen: So sieht jedes
+   „?" im Panel gleich aus, egal welches Plugin es setzt.
+*/
+
+.form-help {
+  color: var(--fb-primary);
+  background: color-mix(in srgb, var(--fb-primary) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fb-primary) 50%, transparent);
+}
