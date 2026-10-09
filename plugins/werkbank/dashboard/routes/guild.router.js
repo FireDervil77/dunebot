@@ -240,7 +240,7 @@ router.get('/', requirePermission('WERKBANK.VIEW'), async (req, res) => {
             Sitzungen.liste(guildId), Sitzungen.waehlbareImages(), Sitzungen.maschinen(guildId),
             Sitzungen.oeffenbarePakete(),
         ]);
-        return await renderView(res, 'guild/werkbank-uebersicht', { guildId, sitzungen, images, maschinen, pakete });
+        return await renderView(res, 'guild/werkbank-uebersicht', { guildId, sitzungen, images, maschinen, pakete, imageName: Sitzungen.imageName });
     } catch (error) {
         return renderFehler(res, error, 'Die Werkbank konnte nicht geladen werden');
     }
@@ -359,6 +359,7 @@ router.get('/:kennung', requirePermission('WERKBANK.VIEW'), async (req, res) => 
             festzeilen: Sitzungen.festzeilenStand(sitzung),
             FESTZEILE: Sitzungen.FESTZEILE,
             voraussetzungen: Sitzungen.voraussetzungenStand(sitzung),
+            imageName: Sitzungen.imageName,
             VORAUSSETZUNG: Sitzungen.VORAUSSETZUNG,
             durchgereicht: Sitzungen.durchgereichtes(sitzung),
             abfrage: Sitzungen.abfrageStand(sitzung),

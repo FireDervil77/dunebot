@@ -18,7 +18,8 @@
 <%
   const basis = `/guild/${guildId}/plugins/werkbank`;
   const hier = `${basis}/${sitzung.kennung}`;
-  const bildName = (sitzung.image.ref || '').replace(/^.*\//, '') + (sitzung.image.tag ? ':' + sitzung.image.tag : '');
+  // Ohne Monat: Die Sitzung nimmt bei jedem Lauf den neuesten Bau ihres Images (2026-10-09).
+  const bildName = imageName(sitzung.image) + ' · neuester Bau';
   const laeuft = schritte.some(s => s.status === 'laeuft');
   const lauf = laeufe[0] || null;
   const spielLaeuft = Boolean(lauf && lauf.status !== 'beendet');
@@ -653,9 +654,9 @@
           </div>
           <% if (vor.geprueftAm) { %>
             <p class="text-secondary small mb-3">
-              Nachgezählt am <%= new Date(vor.geprueftAm).toLocaleString('de-DE') %> an
-              <span class="font-monospace" style="word-break:break-all"><%= vor.geprueftAn %></span>.
-              Nach einem Image-Bau zeigt der Tag auf ein anderes Image — dann neu nachzählen.
+              Nachgezählt am <%= new Date(vor.geprueftAm).toLocaleString('de-DE') %> am Bau
+              <% if (vor.geprueftFassung) { %><strong><%= vor.geprueftFassung %></strong> (<% } %><span class="font-monospace" style="word-break:break-all"><%= vor.geprueftAn %></span><% if (vor.geprueftFassung) { %>)<% } %>.
+              Die Sitzung nimmt immer den neuesten Bau — nach einem Image-Bau also neu nachzählen.
             </p>
           <% } %>
         <% } %>

@@ -345,7 +345,7 @@ const UDP = (purpose, mehr = {}) => ({ purpose, protocol: 'udp', assign: 'pool',
             return null;
         };
         try {
-            const gruen = (paket) => [{ id: 2, status: 'gruen', entwurf: paket, ergebnis: { image_digest: 'sha256:' + 'a'.repeat(64), einstellungen: [] } }];
+            const gruen = (paket) => [{ id: 2, status: 'gruen', entwurf: paket, ergebnis: { image_digest: 'sha256:' + 'a'.repeat(64), image_tag: '2026.10', einstellungen: [] } }];
             const liste = alt.install.steps.map(schritt => ({ status: 'ok', schritt }));
             // Neu gebaut, MIT eigener Abfrage: `management` ist da, die Fernsteuerung fehlt trotzdem.
             const neu = { id: 2, kennung: 'wbneu', image: { ref: alt.image.ref, tag: alt.image.tag }, entwurf: {

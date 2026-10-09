@@ -139,6 +139,25 @@ function neueKennung() {
     return 'wb' + crypto.randomBytes(5).toString('hex');
 }
 
+// ── Der neueste Bau (2026-10-09) ─────────────────────────────────────────────
+//
+// `images/bauen.sh` vergibt die Fassung nach dem Datum: Ein Bau im Oktober
+// heisst 2026.10. Sitzungen und Pakete nannten bis dahin den Monat, in dem sie
+// entstanden — und der erste Bau im neuen Monat erreichte niemanden: Die
+// Sitzung fragte weiter 2026.09, und angeboten wurde nur, was ein Paket schon
+// benutzte.
+//
+// Abgesprochen mit dem Betreiber (2026-10-09): Eine Sitzung nimmt IMMER den
+// neuesten Bau ihres Images. Den zeigt der Tag `latest` bzw.
+// `latest-<variante>`, den bauen.sh bei jedem Bau mitschiebt — kein Monat,
+// keine Liste. Der Daemon löst ihn je Lauf zum Digest auf (festesImage), und
+// der Prüfdurchlauf meldet Digest UND Kalenderfassung des Images zurück
+// (`image_digest`, `image_tag`); genau die stehen danach im Paket.
+//
+// Die Ausprägung bleibt Teil der Wahl: proton GE-Proton10-32 und GE-Proton11-5
+// sind zwei Images, nicht zwei Stände von einem.
+const { imageVariante, neuesterTag, istKalendertag, imageName } = require('../../../../packages/fbpkg/lib/imagetag');
+
 /**
  * Das Image einer Sitzung, wie es an den Daemon geht: Image und Tag, KEIN Digest.
  *
@@ -150,7 +169,9 @@ function neueKennung() {
  */
 function sitzungsImage(sitzung) {
     const i = sitzung?.image || {};
-    return { ref: i.ref, ...(i.tag ? { tag: i.tag } : {}), ...(i.platform ? { platform: i.platform } : {}) };
+    // Was die Sitzung gespeichert hat, kann noch ein Monat sein (2026.09) —
+    // gefragt wird immer der neueste Bau derselben Ausprägung.
+    return { ref: i.ref, ...(i.tag ? { tag: neuesterTag(i.tag) } : {}), ...(i.platform ? { platform: i.platform } : {}) };
 }
 
 /**
@@ -171,8 +192,11 @@ async function waehlbareImages() {
     for (const z of zeilen) {
         const img = json(z.fbpkg, {})?.image;
         if (!img?.ref || !img?.tag) continue;
-        const schluessel = `${img.ref}:${img.tag}`;
-        if (!gesehen.has(schluessel)) gesehen.set(schluessel, { ref: img.ref, tag: img.tag });
+        // Angeboten wird das Image in seiner Ausprägung, nicht ein Monat davon:
+        // Zwei Pakete auf 2026.09 und 2026.10 nennen dasselbe Image.
+        const tag = neuesterTag(img.tag);
+        const schluessel = `${img.ref}:${tag}`;
+        if (!gesehen.has(schluessel)) gesehen.set(schluessel, { ref: img.ref, tag, variante: imageVariante(img.tag) || '' });
     }
     return [...gesehen.values()].sort((a, b) => (a.ref + a.tag).localeCompare(b.ref + b.tag));
 }
@@ -239,7 +263,7 @@ async function anlegen({ guildId, userId, name, rootserverId, image, iconUrl }) 
     await db().query(
         `INSERT INTO werkbank_sitzungen (kennung, guild_id, angelegt_von, name, rootserver_id, image, entwurf)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [kennung, guildId, userId || null, name2, maschine.id, JSON.stringify(img),
+        [kennung, guildId, userId || null, name2, maschine.id, JSON.stringify({ ref: img.ref, tag: img.tag }),
          JSON.stringify(entwurf)]);
     return kennung;
 }
@@ -763,7 +787,10 @@ async function paketOeffnen({ guildId, userId, paketId, rootserverId }) {
             + 'Geöffnet wird erst, wenn nichts davon verloren ginge.');
     }
     const erlaubt = await waehlbareImages();
-    const img = erlaubt.find(i => i.ref === image.ref && i.tag === image.tag);
+    // Geöffnet wird auf dem neuesten Bau desselben Images — das ist der Weg,
+    // auf dem ein Paket auf einen neuen Bau umzieht (Prüfdurchlauf, dann
+    // veröffentlichen: neue Fassung, neuer Tag, neuer Digest).
+    const img = erlaubt.find(i => i.ref === image.ref && i.tag === neuesterTag(image.tag));
     if (!img) throw new Error(`Das Image des Pakets (${image.ref}:${image.tag}) ist nicht wählbar.`);
     const maschine = (await maschinen(guildId)).find(m => String(m.id) === String(rootserverId));
     if (!maschine) throw new Error('Diese Maschine gehört nicht zu dieser Guild.');
@@ -789,7 +816,7 @@ async function paketOeffnen({ guildId, userId, paketId, rootserverId }) {
     const r = await db().query(
         `INSERT INTO werkbank_sitzungen (kennung, guild_id, angelegt_von, name, rootserver_id, image, entwurf)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [kennung, guildId, userId || null, name, maschine.id, JSON.stringify(img), JSON.stringify(entwurf)]);
+        [kennung, guildId, userId || null, name, maschine.id, JSON.stringify({ ref: img.ref, tag: img.tag }), JSON.stringify(entwurf)]);
     let nr = 0;
     for (const schritt of stufen) {
         nr++;
@@ -2033,6 +2060,12 @@ async function veroeffentlichungsStand(sitzung, liste, pruefListe) {
     else if (!letzte.ergebnis?.image_digest) {
         gruende.push('Der grüne Durchlauf nennt sein Image nicht (älter als die Digest-Aufzeichnung) — neu prüfen.');
     }
+    // Die Sitzung fragt „den neuesten Bau"; welcher das war, sagt nur der
+    // Durchlauf. Ohne den Namen stünde „latest" im Paket — ein Tag, der morgen
+    // etwas anderes meint.
+    else if (!paketTag(letzte)) {
+        gruende.push('Der grüne Durchlauf nennt die Fassung seines Images nicht (Daemon vor 1.0.116) — nach dem Daemon-Update neu prüfen.');
+    }
     else {
         // Eine Einstellung ohne Beleg fällt beim Veröffentlichen weg. Benutzt
         // die Startzeile oder ein Schritt sie trotzdem, hinge dort ein Verweis
@@ -2589,6 +2622,8 @@ function voraussetzungenStand(sitzung) {
         gefragt: voraussetzungenGefragt(sitzung),
         geprueftAm: befund ? gemerkt.am : null,
         geprueftAn: befund ? gemerkt.image : null,
+        // Der Bau, an dem gezählt wurde (2026.10) — der Daemon nennt ihn ab 1.0.116.
+        geprueftFassung: befund ? (gemerkt.fassung || '') : '',
         fehlt: befund ? (befund.fehlt || []) : [],
         // Warum es keinen Befund gibt, wenn es einen geben müsste.
         ungeprueft: befund ? null
@@ -2667,7 +2702,7 @@ async function voraussetzungenPruefen(sitzung) {
     await entwurfSchreiben(sitzung, (e) => {
         e.werkbank = e.werkbank || {};
         e.werkbank.voraussetzungen = ergebnis
-            ? { frage, am, image: ergebnis.image, pakete: ergebnis.pakete, fehlt: ergebnis.fehlt || [],
+            ? { frage, am, image: ergebnis.image, fassung: ergebnis.fassung || '', pakete: ergebnis.pakete, fehlt: ergebnis.fehlt || [],
                 display_verlangt: !!ergebnis.display_verlangt, display_vorhanden: !!ergebnis.display_vorhanden }
             : { frage, am, fehler: grund };
     });
@@ -2688,7 +2723,11 @@ function bereitUeber(stufe) {
  */
 function imageBeiwerk(vorher, jetzt) {
     if (!vorher || typeof vorher !== 'object') return {};
-    if (jetzt && (vorher.ref !== jetzt.ref || (vorher.tag || '') !== (jetzt.tag || ''))) return {};
+    // Dasselbe Image heisst: derselbe Name, dieselbe Ausprägung. Der Monat
+    // darf wechseln — ein Umzug auf einen neuen Bau ist genau das, und
+    // `platform`/`arch` gingen sonst bei jedem Umzug verloren (wie Valheim
+    // 1.0.21 am 2026-10-07).
+    if (jetzt && (vorher.ref !== jetzt.ref || imageVariante(vorher.tag) !== imageVariante(jetzt.tag))) return {};
     const { ref, tag, digest, pinned_at, ...beiwerk } = vorher;
     return beiwerk;
 }
@@ -2700,6 +2739,19 @@ async function imageDerGeoeffnetenFassung(sitzung) {
     const [z] = await db().query(
         'SELECT fbpkg FROM package_versions WHERE package_id = ? AND version = ?', [von.paket_id, von.version]);
     return json(z?.fbpkg, null)?.image || null;
+}
+
+/**
+ * Der Tag, der ins Paket kommt: die Kalenderfassung des Images, auf dem der
+ * Durchlauf lief. Nennt der Durchlauf sie nicht (Daemon vor 1.0.116), gilt
+ * der Tag des geprüften Entwurfs — aber nur, wenn DER eine Kalenderfassung
+ * ist. „latest" kommt nie ins Paket: null, und das Veröffentlichen sagt es.
+ */
+function paketTag(pruefung) {
+    const ausLauf = pruefung?.ergebnis?.image_tag;
+    if (istKalendertag(ausLauf)) return ausLauf;
+    const ausEntwurf = pruefung?.entwurf?.image?.tag;
+    return istKalendertag(ausEntwurf) ? ausEntwurf : null;
 }
 
 /** Das Paket, wie es eingeliefert wird. */
@@ -2737,9 +2789,15 @@ function veroeffentlichungsPaket(sitzung, liste, pruefung, autor, imageVorher = 
         // Was das geöffnete Paket am Image sonst noch trug (`platform`, `arch`),
         // bleibt — die Sitzung kennt vom Image nur Name und Tag. Valheim 1.0.21
         // verlor beides am 2026-10-07; der Wächter verglich bis dahin nur `ref:tag`.
+        //
+        // Der TAG kommt seit 2026-10-09 ebenfalls aus dem Durchlauf: Die Sitzung
+        // fragt nur noch „den neuesten Bau" (`latest…`), und ins Paket gehört
+        // der Name des Standes, auf dem geprüft wurde (`image_tag`, aus dem
+        // Etikett des Images).
         image: {
             ...imageBeiwerk(imageVorher, pruefung.entwurf?.image),
             ...(pruefung.entwurf?.image || {}),
+            tag: paketTag(pruefung),
             digest: pruefung.ergebnis?.image_digest,
             pinned_at: heute,
         },
@@ -3073,7 +3131,7 @@ module.exports = {
     FESTZEILE, festzeilenStand, festzeileSpeichern, festzeileEntfernen,
     VORAUSSETZUNG, voraussetzungenStand, voraussetzungenSpeichern, voraussetzungenPruefen,
     RCON, BEFEHL, GANZ, rconStand, rconSpeichern, rconEntfernen, rconVermerk, rconPruefbefehl, befehlSpeichern, befehlEntfernen,
-    sitzungsImage,
+    sitzungsImage, imageVariante, neuesterTag, istKalendertag, paketTag, imageName,
     RE_KENNUNG, RE_ZWECK, SCHRITTTYPEN, MAX_AUSGABE, GRENZEN, VORGABE, ERKUNDUNG, hatBereitschaft,
     waehlbareImages, maschinen, liste, laden, schritte, anlegen,
     schrittAusfuehren, ausgabeAnhaengen, beenden, pruefsummeEintragen, laufenderSchritt,

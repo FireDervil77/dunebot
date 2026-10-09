@@ -134,7 +134,12 @@ function alsFormular(e) {
         await pruefe('zerlegen und zusammensetzen ergibt dasselbe Paket', async () => {
             const zurueck = S.entwurfAlsPaket(sitzung, liste);
             assert.deepStrictEqual(vergleiche(paket, zurueck), []);
-            assert.strictEqual(`${zurueck.image.ref}:${zurueck.image.tag}`, `${paket.image.ref}:${paket.image.tag}`);
+            // Dasselbe Image in derselben Ausprägung — aber ohne Monat: Die Sitzung
+            // fragt seit 2026-10-09 den neuesten Bau (`latest…`). Welcher das war,
+            // sagt der Durchlauf, und erst das Veröffentlichen schreibt ihn hin.
+            assert.strictEqual(`${zurueck.image.ref}:${zurueck.image.tag}`, `${paket.image.ref}:${S.neuesterTag(paket.image.tag)}`);
+            assert.ok(/^latest(-|$)/.test(zurueck.image.tag), `der Entwurf nennt einen Monat: ${zurueck.image.tag}`);
+            assert.strictEqual(S.imageVariante(zurueck.image.tag), S.imageVariante(paket.image.tag), 'die Ausprägung ist beim Öffnen verloren gegangen');
             assert.strictEqual(zurueck.identity.slug, slug);
             assert.strictEqual(zurueck.identity.version, S.naechsteFassung(paket.identity.version), 'vorgeschlagen wird die nächste Fassung');
         });
@@ -142,9 +147,31 @@ function alsFormular(e) {
         await pruefe('veröffentlichen ohne einen einzigen Nachweis nimmt dem Paket nichts — und besteht das Tor', async () => {
             const geprueft = S.entwurfAlsPaket(sitzung, liste);
             const pruefung = { id: 1, status: 'gruen', entwurf: geprueft, beendet_am: new Date(),
-                ergebnis: { gruen: true, image_digest: paket.image.digest, einstellungen: [] } };
+                // Der Durchlauf lief auf DEMSELBEN Bau wie das Paket: Digest und
+                // Kalenderfassung meldet der Daemon (image_digest, image_tag).
+                ergebnis: { gruen: true, image_digest: paket.image.digest, image_tag: paket.image.tag, einstellungen: [] } };
             const neu = S.veroeffentlichungsPaket(sitzung, liste, pruefung, 'waechter', paket.image);
             assert.deepStrictEqual(vergleiche(paket, neu), []);
+
+            // ── Der Umzug (2026-10-09): derselbe Entwurf, geprüft auf einem NEUEN Bau ──
+            // Im Paket steht dann genau der Stand des Durchlaufs — und sonst nichts
+            // anderes: `platform` und `arch` bleiben, der Rest des Pakets auch.
+            const v = S.imageVariante(paket.image.tag);
+            const neuerTag = '2099.01' + (v ? `-${v}` : '');
+            const neuerDigest = 'sha256:' + 'f'.repeat(64);
+            const umzug = S.veroeffentlichungsPaket(sitzung, liste,
+                { ...pruefung, ergebnis: { ...pruefung.ergebnis, image_digest: neuerDigest, image_tag: neuerTag } }, 'waechter', paket.image);
+            assert.strictEqual(umzug.image.tag, neuerTag, 'der Tag des neuen Baus steht nicht im Paket');
+            assert.strictEqual(umzug.image.digest, neuerDigest, 'der Digest des neuen Baus steht nicht im Paket');
+            assert.deepStrictEqual(
+                abweichungen({ ...paket.image, tag: 0, digest: 0, pinned_at: 0 }, { ...umzug.image, tag: 0, digest: 0, pinned_at: 0 }, 'image'), [],
+                'beim Umzug ist am Image mehr anders als Tag und Digest');
+            assert.deepStrictEqual(vergleiche(paket, umzug), [], 'beim Umzug hat sich am Paket etwas ausser dem Image geändert');
+            // „latest" kommt nie ins Paket: Nennt der Durchlauf die Fassung nicht
+            // (Daemon vor 1.0.116), gibt es keinen Tag — und das Veröffentlichen
+            // weist ab (veroeffentlichungsStand, geprüft in check-werkbank.js).
+            assert.strictEqual(S.paketTag({ ...pruefung, ergebnis: { gruen: true, image_digest: neuerDigest } }), null);
+            assert.strictEqual(S.paketTag({ ...pruefung, ergebnis: { gruen: true, image_tag: 'latest' } }), null);
             // Das Image als Ganzes — bis 2026-10-07 stand hier nur `ref:tag`, und
             // Valheim 1.0.21 verlor `platform` und `arch`, ohne dass es auffiel.
             // Neu sein darf allein der Tag der Anheftung.
@@ -256,7 +283,7 @@ function alsFormular(e) {
             entwurf: { identity: { slug, name: slug, version: S.naechsteFassung(alt.identity.version) }, ports: alt.ports, start: alt.start } };
         const liste = alt.install.steps.map(schritt => ({ status: 'ok', schritt }));
         const paket = S.entwurfAlsPaket(frisch, liste);
-        const gruen = [{ id: 1, status: 'gruen', entwurf: paket, ergebnis: { image_digest: 'sha256:' + 'a'.repeat(64), einstellungen: [] } }];
+        const gruen = [{ id: 1, status: 'gruen', entwurf: paket, ergebnis: { image_digest: 'sha256:' + 'a'.repeat(64), image_tag: alt.image.tag, einstellungen: [] } }];
         const st = await S.veroeffentlichungsStand(frisch, liste, gruen);
         assert.strictEqual(st.darf, false);
         assert.match(st.gruende.join(' '), /ginge das verloren/);
@@ -267,7 +294,7 @@ function alsFormular(e) {
         const liste2 = offen.schritte.map(schritt => ({ status: 'uebernommen', schritt }));
         const p2 = S.entwurfAlsPaket(geoeffnet, liste2);
         const st2 = await S.veroeffentlichungsStand(geoeffnet, liste2,
-            [{ id: 2, status: 'gruen', entwurf: p2, ergebnis: { image_digest: 'sha256:' + 'a'.repeat(64), einstellungen: [] } }]);
+            [{ id: 2, status: 'gruen', entwurf: p2, ergebnis: { image_digest: 'sha256:' + 'a'.repeat(64), image_tag: alt.image.tag, einstellungen: [] } }]);
         assert.deepStrictEqual(st2.gruende, [], 'eine geöffnete Sitzung darf wieder einliefern');
         erlaubt = () => null;
     });

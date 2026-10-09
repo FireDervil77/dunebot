@@ -10,7 +10,8 @@
 -->
 <%
   const basis = `/guild/${guildId}/plugins/werkbank`;
-  const bildName = (i) => i.ref.replace(/^.*\//, '') + (i.tag ? ':' + i.tag : '');
+  // Ohne Monat: Eine Sitzung nimmt immer den neuesten Bau ihres Images (2026-10-09).
+  const bildName = (i) => imageName(i);
   const online = maschinen.filter(m => m.online);
 %>
 
