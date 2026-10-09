@@ -497,6 +497,107 @@ function alsFormular(e) {
         assert.ok(f.schrittId);
     });
 
+    // ── Erneut ausführen (2026-10-09) ────────────────────────────────────────
+    //
+    // Betreiber: „wenn ich den Entpacken-Schritt nach dem Lauf wieder hinausnehme,
+    // ist er weg und ich kann ihn nicht noch einmal ausführen." Die Sitzung
+    // `offen` steht hier bei: ok ok fehler ok — zwei aus dem Paket, zwei von Hand.
+    console.log('\nErneut ausführen');
+    const reihe = async () => (await S.schritte(offen.id)).map(x => ({ id: x.id, nr: x.nr, status: x.status, typ: x.schritt.type, pfad: x.schritt.path, fehler: x.fehler, ausgabe: x.ausgabe, dateien: x.dateien }));
+    await pruefe('herausgenommen: kommt zurück — an seine ALTE Stelle im Rezept, nicht ans Ende', async () => {
+        const paket = neueste.get(mitZweien.slug);
+        const vorher = await reihe();
+        await S.herausnehmen(offen, vorher[1].id);
+        assert.strictEqual(await zustaende(offen.id), 'ok herausgenommen fehler ok');
+        assert.strictEqual(S.entwurfAlsPaket(offen, await S.schritte(offen.id)).install.steps.length, 2);
+        const n = gesendet.length;
+        const e = await S.schrittWiederholen(offen, vorher[1].id);
+        assert.strictEqual(e.angenommen, true);
+        assert.strictEqual(e.schrittId, vorher[1].id, 'es ist ein NEUER Schritt entstanden — er stünde am Ende des Rezepts');
+        assert.strictEqual(await zustaende(offen.id), 'ok laeuft fehler ok');
+        assert.strictEqual(gesendet.length, n + 1);
+        assert.deepStrictEqual(gesendet[n].nutzlast.schritt, paket.install.steps[1]);
+        // Ein Schritt aus einem geöffneten Paket bekommt die Probewerte, wie beim ersten Lauf.
+        assert.deepStrictEqual(gesendet[n].nutzlast.settings, S.probewerte(offen));
+        await E.beiEnde({ sitzung_id: offen.kennung, bytes: 5 }, true);
+        const danach = await reihe();
+        assert.strictEqual(danach.map(x => x.status).join(' '), 'ok ok fehler ok');
+        assert.deepStrictEqual(danach.map(x => [x.id, x.nr]), vorher.map(x => [x.id, x.nr]), 'Nummern oder Zeilen haben sich verschoben');
+        const schritte = S.entwurfAlsPaket(offen, await S.schritte(offen.id)).install.steps;
+        assert.deepStrictEqual(schritte.slice(0, 2), paket.install.steps, 'der Schritt steht nicht wieder an zweiter Stelle');
+        assert.strictEqual(schritte.length, 3);
+        assert.match(danach[1].ausgabe, /==> Erneut ausgeführt \(vorher: herausgenommen\)\./);
+        assert.strictEqual(gesendet.length, n + 1, 'nach dem Gelingen ist eine Kette angelaufen, obwohl nichts mehr wartet');
+    });
+    await pruefe('gescheitert: der zweite Versuch — ein von Hand angelegter ohne Probewerte', async () => {
+        const vorher = await reihe();
+        assert.strictEqual(vorher[2].status, 'fehler');
+        const n = gesendet.length;
+        await S.schrittWiederholen(offen, vorher[2].id);
+        assert.deepStrictEqual(gesendet[n].nutzlast.schritt, { type: 'mkdir', path: 'probe' });
+        assert.deepStrictEqual(gesendet[n].nutzlast.settings, {});
+        await E.beiEnde({ sitzung_id: offen.kennung }, true);
+        const danach = await reihe();
+        assert.strictEqual(danach.map(x => x.status).join(' '), 'ok ok ok ok');
+        assert.strictEqual(danach[2].fehler, null, 'der alte Grund steht noch am gelungenen Schritt');
+        assert.strictEqual(S.entwurfAlsPaket(offen, await S.schritte(offen.id)).install.steps.length, 4);
+    });
+    await pruefe('gelungen und jetzt gescheitert: er ist eben nicht gelungen — fehler, mit Grund, aus dem Entwurf', async () => {
+        const vorher = await reihe();
+        await S.schrittWiederholen(offen, vorher[3].id);
+        await E.beiEnde({ sitzung_id: offen.kennung, error: 'Platte voll' }, false);
+        const danach = await reihe();
+        assert.strictEqual(danach.map(x => x.status).join(' '), 'ok ok ok fehler');
+        assert.strictEqual(danach[3].fehler, 'Platte voll');
+        assert.strictEqual(S.entwurfAlsPaket(offen, await S.schritte(offen.id)).install.steps.length, 3);
+        // Und er lässt sich wiederholen, bis er gelingt.
+        await S.schrittWiederholen(offen, vorher[3].id);
+        await E.beiEnde({ sitzung_id: offen.kennung }, true);
+        assert.strictEqual(await zustaende(offen.id), 'ok ok ok ok');
+    });
+    await pruefe('nimmt der Daemon ihn nicht an, ist nichts gelaufen: der Schritt steht wie vorher, gelungen bleibt gelungen', async () => {
+        const vorher = await reihe();
+        daemonAntwort = { success: false, error: 'Volume belegt' };
+        const e = await S.schrittWiederholen(offen, vorher[3].id);
+        daemonAntwort = { success: true };
+        assert.strictEqual(e.angenommen, false);
+        assert.strictEqual(e.fehler, 'Volume belegt');
+        const danach = await reihe();
+        assert.strictEqual(danach.map(x => x.status).join(' '), 'ok ok ok ok', 'ein gelungener Schritt ist aus dem Entwurf gefallen, obwohl nichts lief');
+        assert.strictEqual(danach[3].fehler, null, 'am gelungenen Schritt steht jetzt ein Fehler');
+        assert.match(danach[3].ausgabe, /==> Nicht gestartet: Volume belegt/);
+        assert.strictEqual(S.entwurfAlsPaket(offen, await S.schritte(offen.id)).install.steps.length, 4);
+        // Die Sitzung ist danach frei — nichts gilt als laufend.
+        await S.schrittWiederholen(offen, vorher[3].id);
+        await E.beiEnde({ sitzung_id: offen.kennung }, true);
+    });
+    await pruefe('abgewiesen: läuft schon etwas, ein Schritt, den es nicht gibt, der Schritt einer anderen Sitzung', async () => {
+        const vorher = await reihe();
+        await S.schrittWiederholen(offen, vorher[0].id);
+        await assert.rejects(S.schrittWiederholen(offen, vorher[1].id), /läuft schon ein Schritt/);
+        await E.beiEnde({ sitzung_id: offen.kennung }, true);
+        await E.beiEnde({ sitzung_id: offen.kennung }, true); // die Kette, falls eine anlief
+        await assert.rejects(S.schrittWiederholen(offen, 99999999), /gibt es in dieser Sitzung nicht/);
+        // Ein Schritt einer ANDEREN Sitzung lässt sich über diese nicht starten.
+        const [[fremd]] = await c2.query('SELECT x.id FROM werkbank_schritte x WHERE x.sitzung_id <> ? LIMIT 1', [offen.id]);
+        assert.ok(fremd, 'kein Schritt einer anderen Sitzung da — der Fall wäre ungeprüft');
+        await assert.rejects(S.schrittWiederholen(offen, fremd.id), /gibt es in dieser Sitzung nicht/);
+    });
+
+    await pruefe('Route und Knopf: jeder ruhende Schritt hat ihn — auch der herausgenommene, und gesperrt, wenn etwas läuft', async () => {
+        const { ohneKommentare, ohneKommentareEjs } = require('./lib/quelltext');
+        const router = ohneKommentare(fs.readFileSync(path.join(__dirname, '../plugins/werkbank/dashboard/routes/guild.router.js'), 'utf8'));
+        assert.match(router, /router\.post\('\/:kennung\/schritte\/:id\/wiederholen', requirePermission\('WERKBANK\.BAUEN'\)/);
+        assert.match(router, /Sitzungen\.schrittWiederholen\(await offeneSitzung\(req, res\), Number\(req\.params\.id\)\)/);
+        const ansicht = ohneKommentareEjs(fs.readFileSync(path.join(__dirname, '../plugins/werkbank/dashboard/views/guild/werkbank-sitzung.ejs'), 'utf8'));
+        assert.match(ansicht, /x\.status === 'ok' \|\| x\.status === 'fehler' \|\| x\.status === 'uebernommen' \|\| x\.status === 'herausgenommen'\) \{ %>\s*<div[^>]*>\s*<button[^>]*data-wiederholen="<%= x\.id %>" <%= beschaeftigt \? 'disabled' : '' %>/,
+            'der Knopf fehlt bei einem der vier ruhenden Zustände, oder er ist nicht gesperrt, wenn etwas läuft');
+        assert.ok(ansicht.includes('Wieder aufnehmen und ausführen') && ansicht.includes('Erneut ausführen'));
+        assert.ok(ansicht.includes("schicke(hier + '/schritte/' + k.dataset.wiederholen + '/wiederholen')"));
+        // Ein herausgenommener lässt sich nicht noch einmal herausnehmen.
+        assert.match(ansicht, /x\.status !== 'herausgenommen'\) \{ %>\s*<button[^>]*data-herausnehmen=/);
+    });
+
     await pruefe('ein Paket, das es nicht gibt, und eine fremde Maschine werden abgewiesen', async () => {
         await assert.rejects(S.paketOeffnen({ guildId: maschine.guild_id, userId: '1', paketId: 99999999, rootserverId: maschine.id }), /gibt es nicht/);
         await assert.rejects(S.paketOeffnen({ guildId: 'fremd', userId: '1', paketId: paketZeilen[0].id, rootserverId: maschine.id }), /gehört nicht zu dieser Guild/);

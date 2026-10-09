@@ -7,6 +7,7 @@
  *   GET  /:kennung                      eine Sitzung: Schritte, Ausgabe, Entwurf
  *   POST /:kennung/schritte             einen Schritt ausführen
  *   POST /:kennung/schritte/:id/herausnehmen
+ *   POST /:kennung/schritte/:id/wiederholen  noch einmal ausführen, an derselben Stelle im Rezept
  *   POST /:kennung/verwerfen            Volume löschen, Sitzung schließen
  *
  * Stufe 2 (Probestart):
@@ -434,6 +435,17 @@ router.post('/:kennung/schritte/uebernommene', requirePermission('WERKBANK.BAUEN
         return res.json({ success: true, ...ergebnis });
     } catch (error) {
         return fehler(res, error, 'Nicht gestartet', 400);
+    }
+});
+
+// Einen Schritt der Liste noch einmal ausführen — in seiner Zeile, an seiner
+// Stelle im Rezept. Auch ein herausgenommener kommt so zurück (2026-10-09).
+router.post('/:kennung/schritte/:id/wiederholen', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        const ergebnis = await Sitzungen.schrittWiederholen(await offeneSitzung(req, res), Number(req.params.id));
+        return res.json({ success: true, ...ergebnis });
+    } catch (error) {
+        return fehler(res, error, 'Schritt nicht ausgeführt', 400);
     }
 });
 

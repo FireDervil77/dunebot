@@ -261,12 +261,20 @@
                   <div class="small mt-2"><%- include('werkbank-dateien', { d: x.dateien, gruppiere, groesse }) %></div>
                 </details>
               <% } %>
-              <% if (x.status === 'ok' || x.status === 'fehler' || x.status === 'uebernommen') { %>
-                <div class="mt-2">
-                  <button class="btn btn-sm btn-ghost-secondary" data-herausnehmen="<%= x.id %>"
-                          title="Nimmt den Schritt aus dem Rezept. Was er im Volume angelegt hat, bleibt dort.">
-                    <i class="fa-solid fa-xmark me-1"></i>Aus dem Entwurf nehmen
+              <% if (x.status === 'ok' || x.status === 'fehler' || x.status === 'uebernommen' || x.status === 'herausgenommen') { %>
+                <div class="mt-2 d-flex flex-wrap gap-2">
+                  <button class="btn btn-sm btn-ghost-secondary" data-wiederholen="<%= x.id %>" <%= beschaeftigt ? 'disabled' : '' %>
+                          title="<%= x.status === 'herausgenommen'
+                              ? 'Führt den Schritt noch einmal aus und nimmt ihn wieder in das Rezept — an seine alte Stelle.'
+                              : 'Führt den Schritt noch einmal im Volume dieser Sitzung aus. Er bleibt an seiner Stelle im Rezept.' %>">
+                    <i class="fa-solid fa-rotate-right me-1"></i><%= x.status === 'herausgenommen' ? 'Wieder aufnehmen und ausführen' : 'Erneut ausführen' %>
                   </button>
+                  <% if (x.status !== 'herausgenommen') { %>
+                    <button class="btn btn-sm btn-ghost-secondary" data-herausnehmen="<%= x.id %>"
+                            title="Nimmt den Schritt aus dem Rezept. Was er im Volume angelegt hat, bleibt dort.">
+                      <i class="fa-solid fa-xmark me-1"></i>Aus dem Entwurf nehmen
+                    </button>
+                  <% } %>
                 </div>
               <% } %>
             </div>
@@ -2409,6 +2417,26 @@
       }
     });
   }
+
+  // ── Erneut ausführen (2026-10-09) ─────────────────────────────────────
+  document.querySelectorAll('[data-wiederholen]').forEach(function (k) {
+    k.addEventListener('click', async function () {
+      k.disabled = true;
+      try {
+        var daten = await schicke(hier + '/schritte/' + k.dataset.wiederholen + '/wiederholen');
+        if (daten.angenommen === false) {
+          // Nichts ist gelaufen, der Schritt steht wie vorher — die Meldung soll lesbar bleiben.
+          k.disabled = false;
+          melde('error', 'Nicht gestartet: ' + (daten.fehler || 'der Daemon hat abgelehnt'));
+          return;
+        }
+        window.location.reload();
+      } catch (fehler) {
+        k.disabled = false;
+        melde('error', fehler.message);
+      }
+    });
+  });
 
   // ── Aus dem Entwurf nehmen ────────────────────────────────────────────
   document.querySelectorAll('[data-herausnehmen]').forEach(function (k) {

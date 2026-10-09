@@ -360,6 +360,67 @@ async function uebernommeneAusfuehren(sitzung) {
 }
 
 /**
+ * Einen Schritt, der schon in der Liste steht, noch einmal ausführen — in
+ * seiner Zeile, also an seiner Stelle im Rezept (2026-10-09).
+ *
+ * Betreiber: „wenn ich … den Entpacken-Schritt nach dem Lauf wieder
+ * hinausnehme, ist er weg und ich kann ihn nicht noch einmal ausführen."
+ * Herausgenommen stand er weiter in der Liste, nur ohne Knopf — wer ihn
+ * zurückwollte, tippte ihn neu, und er landete am ENDE des Rezepts statt
+ * hinter dem Download, zu dem er gehört.
+ *
+ * Geht für jeden Schritt, der nicht gerade läuft:
+ *
+ *   herausgenommen   kommt zurück in den Entwurf, an seine alte Stelle
+ *   fehler           der zweite Versuch (Netz weg, Platte voll)
+ *   ok, uebernommen  noch einmal — etwa damit der Dateivergleich neu zählt
+ *
+ * Gelingt er, steht er als `ok` im Entwurf. Scheitert er, gilt die Regel von
+ * `beenden`: ein von Hand angelegter steht als `fehler` da und fällt aus dem
+ * Entwurf (auch wenn er vorher `ok` war — er ist eben gerade NICHT gelungen);
+ * einer aus einem geöffneten Paket fällt auf `uebernommen` zurück.
+ * Die bisherige Ausgabe bleibt stehen, die neue hängt sich an.
+ */
+const WIEDERHOLBAR = ['ok', 'fehler', 'herausgenommen', 'uebernommen'];
+async function schrittWiederholen(sitzung, schrittId) {
+    await pruefeFrei(sitzung);
+    const [z] = await db().query(
+        'SELECT id, schritt, status, uebernommen_aus, fehler, begonnen_am, beendet_am FROM werkbank_schritte WHERE id = ? AND sitzung_id = ?',
+        [Number(schrittId), sitzung.id]);
+    if (!z) throw new Error('Diesen Schritt gibt es in dieser Sitzung nicht.');
+    if (!WIEDERHOLBAR.includes(z.status)) throw new Error('Dieser Schritt läuft gerade — erst nach seinem Ende.');
+    const schritt = json(z.schritt, null);
+    if (!schritt || !SCHRITTTYPEN.includes(schritt.type)) {
+        throw new Error(`Der Schritt #${z.id} hat einen Typ, den die Werkbank nicht ausführt („${schritt?.type || ''}").`);
+    }
+    const daemon = await daemonFuer(sitzung);
+    // Erst jetzt umstellen — ohne Daemon bleibt der Schritt, wie er war.
+    const r = await db().query(
+        `UPDATE werkbank_schritte
+            SET status = 'laeuft', fehler = NULL, begonnen_am = NOW(), beendet_am = NULL,
+                ausgabe = CONCAT(COALESCE(ausgabe, ''), ?)
+          WHERE id = ? AND status = ?`,
+        [`==> Erneut ausgeführt (vorher: ${z.status}).\n`, z.id, z.status]);
+    if (!r?.affectedRows) throw new Error('Der Schritt wurde gerade von anderer Stelle gestartet oder geändert.');
+    // Wie beim ersten Lauf: Ein Schritt aus einem geöffneten Paket setzt
+    // Einstellungen ein und bekommt die Probewerte, ein von Hand angelegter nicht.
+    const ergebnis = await schickeSchritt(sitzung, daemon, z.id, schritt, z.uebernommen_aus ? probewerte(sitzung) : {});
+    if (!ergebnis.angenommen) {
+        // Der Daemon hat ihn gar nicht erst angenommen: Dann ist nichts gelaufen,
+        // und der Schritt steht wieder da, wie er war — ein gelungener bleibt
+        // gelungen und im Entwurf, samt seiner Dateiliste. Warum es nicht
+        // losging, steht in der Ausgabe und in der Antwort.
+        await db().query(
+            `UPDATE werkbank_schritte
+                SET status = ?, fehler = ?, begonnen_am = ?, beendet_am = ?,
+                    ausgabe = CONCAT(COALESCE(ausgabe, ''), ?)
+              WHERE id = ? AND status <> 'laeuft'`,
+            [z.status, z.fehler, z.begonnen_am, z.beendet_am, `==> Nicht gestartet: ${ergebnis.fehler}\n`, z.id]);
+    }
+    return ergebnis;
+}
+
+/**
  * Nach dem Ende eines Schritts: War er übernommen und ist gelungen, läuft der
  * nächste übernommene an. Aus der Datenbank abgelesen, nicht aus dem Speicher —
  * die Kette übersteht so einen Neustart des Dashboards mitten im Lauf.
@@ -3875,7 +3936,7 @@ module.exports = {
     RE_KENNUNG, RE_ZWECK, SCHRITTTYPEN, MAX_AUSGABE, GRENZEN, VORGABE, ERKUNDUNG, hatBereitschaft,
     waehlbareImages, maschinen, liste, laden, schritte, anlegen,
     schrittAusfuehren, ausgabeAnhaengen, beenden, pruefsummeEintragen, laufenderSchritt,
-    herausnehmen, verwerfen, entwurfAlsPaket,
+    herausnehmen, schrittWiederholen, verwerfen, entwurfAlsPaket,
     PRUEF_SUFFIX, fingerabdruck, technisch,
     pruefeBildAdresse, angaben, angabenSpeichern, veroeffentlichungsStand, veroeffentlichungsPaket, veroeffentlichen, laufendePruefung, pruefungen, durchlaufMaengel, pruefen,
     pruefungAbbrechen, pruefProtokoll, pruefungBeenden,
