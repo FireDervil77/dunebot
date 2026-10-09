@@ -208,6 +208,23 @@ async function ladeNeuesteFassungen(dbService) {
 
 // ── Freigabe (Adminbereich) ─────────────────────────────────────────────────
 
+/**
+ * Je Paket die neueste Fassung MIT ihrem Inhalt — für die Image-Übersicht
+ * (helpers/Imagestand.js), die wissen muss, an welchem Image ein Paket hängt.
+ * Getrennt von `ladeNeuesteFassungen`: Die füllt Auswahllisten und soll dafür
+ * nicht jedes Paket im Volltext laden.
+ */
+async function ladeNeuesteFassungenMitInhalt(dbService) {
+    return dbService.query(`
+        SELECT pk.id AS paket_id, pk.slug, pk.name, v.version, v.channel, v.published_at, v.fbpkg
+          FROM packages pk
+          JOIN package_versions v ON v.id = (
+              SELECT n.id FROM package_versions n
+               WHERE n.package_id = pk.id
+               ORDER BY n.published_at DESC, n.id DESC LIMIT 1)
+         ORDER BY pk.slug`);
+}
+
 /** Alle Fassungen eines Pakets, neueste zuerst — ohne das Dokument selbst. */
 async function fassungenZuPaket(dbService, paketId) {
     return dbService.query(`
@@ -326,6 +343,6 @@ async function kanalSetzen(dbService, { serverId, guildId, kanal }) {
 
 module.exports = {
     KANAELE, istKontrollGuild, FASSUNG_FUER_SERVER, FASSUNG_FUER_ANLEGEN,
-    ladePaketFuerServer, ladePaketFuerAnlegen, ladePaketeZuServern, ladePaketeFuerAnlegen, ladeNeuesteFassung, ladeNeuesteFassungen,
+    ladePaketFuerServer, ladePaketFuerAnlegen, ladePaketeZuServern, ladePaketeFuerAnlegen, ladeNeuesteFassung, ladeNeuesteFassungen, ladeNeuesteFassungenMitInhalt,
     fassungenZuPaket, freigabeJePaket, serverJeKanal, freigeben, zuruecknehmen, kanalSetzen,
 };

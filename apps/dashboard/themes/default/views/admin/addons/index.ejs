@@ -101,6 +101,7 @@
                                 <th>Name</th>
                                 <th>Freigabe</th>
                                 <th>Fassungen</th>
+                                <th>Image <span class="text-secondary small fw-normal" id="imageStandKopf"></span></th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -132,6 +133,9 @@
                                             <% } %>
                                         </td>
                                         <td><%= fr ? fr.fassungen : '—' %></td>
+                                        <%# Füllt sich nach dem Laden (GET /admin/addons/imagestand) — die Abfrage
+                                            geht an einen Daemon und soll die Liste nicht aufhalten. %>
+                                        <td data-image-stand="<%= addon.id %>"><span class="text-secondary small">…</span></td>
                                         <td>
                                             <div class="btn-group btn-group-sm">
                                                 <a href="/admin/addons/<%= addon.id %>" 
@@ -150,7 +154,7 @@
                                 <% }); %>
                             <% } else { %>
                                 <tr>
-                                    <td colspan="5" class="text-center text-secondary">
+                                    <td colspan="6" class="text-center text-secondary">
                                         <i class="fa-solid fa-inbox"></i><br>
                                         Keine Spiele vorhanden — neue entstehen in der Werkbank.
                                     </td>
@@ -166,6 +170,70 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+
+    // ── Image-Stand (Baustelle 177, 2026-10-09) ─────────────────────────────
+    // Je Paket: Hängt die neueste Fassung am neuesten Bau ihres Images? Drei
+    // Auskünfte, und „unbekannt" ist eine eigene — nie „aktuell", ohne gefragt
+    // zu haben. Namen kommen aus Paketen: als Text gesetzt, nie als HTML.
+    (async () => {
+        const zellen = document.querySelectorAll('[data-image-stand]');
+        if (!zellen.length) return;
+        const kopf = document.getElementById('imageStandKopf');
+        const setze = (zelle, klasse, text, titel) => {
+            zelle.textContent = '';
+            const marke = document.createElement('span');
+            marke.className = 'badge ' + klasse;
+            marke.textContent = text;
+            if (titel) marke.title = titel;
+            zelle.appendChild(marke);
+            return marke;
+        };
+        const kurz = (d) => String(d || '').replace(/^sha256:/, '').slice(0, 12);
+        let daten;
+        try {
+            const antwort = await fetch('/admin/addons/imagestand', { headers: { Accept: 'application/json' } });
+            daten = await antwort.json();
+            if (!antwort.ok || !daten.success) throw new Error(daten.message || ('HTTP ' + antwort.status));
+        } catch (fehler) {
+            zellen.forEach((z) => setze(z, 'bg-secondary-lt', 'unbekannt', fehler.message));
+            if (kopf) kopf.textContent = '· nicht abfragbar';
+            if (window.showToast) window.showToast('error', 'Image-Stand: ' + fehler.message);
+            return;
+        }
+        const jePaket = new Map((daten.pakete || []).map((p) => [String(p.paket_id), p]));
+        zellen.forEach((zelle) => {
+            const p = jePaket.get(zelle.dataset.imageStand);
+            if (!p) { zelle.textContent = '—'; return; }   // Spiel ohne Paket
+            const worauf = (p.image || '?') + (p.tag ? ' · ' + p.tag : '');
+            if (p.stand === 'aktuell') {
+                setze(zelle, 'bg-success-lt', 'aktuell', worauf + ' — angeheftet ' + kurz(p.digest) + ', das ist der neueste Bau');
+            } else if (p.stand === 'neuer_bau') {
+                setze(zelle, 'bg-warning-lt', 'neuer Bau' + (p.neuester && p.neuester.fassung ? ' ' + p.neuester.fassung : ''),
+                    worauf + ' — angeheftet ' + kurz(p.digest) + ', neuester Bau ' + kurz(p.neuester && p.neuester.digest)
+                    + '. Umziehen: in der Werkbank öffnen, prüfen, veröffentlichen.');
+                if (daten.werkbank) {
+                    const weg = document.createElement('a');
+                    weg.href = daten.werkbank;
+                    weg.className = 'ms-2 small';
+                    weg.textContent = 'zur Werkbank';
+                    zelle.appendChild(weg);
+                }
+            } else {
+                setze(zelle, 'bg-secondary-lt', 'unbekannt', p.grund || '');
+            }
+            const unter = document.createElement('div');
+            unter.className = 'text-secondary small';
+            unter.textContent = worauf;
+            zelle.appendChild(unter);
+        });
+        const z = daten.zaehlung || {};
+        if (kopf) {
+            kopf.textContent = '· ' + (z.neuer_bau || 0) + ' hinter dem neuesten Bau'
+                + (z.unbekannt ? ', ' + z.unbekannt + ' unbekannt' : '')
+                + (daten.gefragtBei ? ' (gefragt bei ' + daten.gefragtBei + ')' : '');
+        }
+        if (daten.fehler && window.showToast) window.showToast('warning', 'Image-Stand: ' + daten.fehler);
+    })();
     
     
     // Search-Funktionalität

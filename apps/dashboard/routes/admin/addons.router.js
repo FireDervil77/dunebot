@@ -3,6 +3,7 @@
  *
  * Endpoints:
  *   GET    /admin/addons              — Übersicht
+ *   GET    /admin/addons/imagestand   — je Paket: angeheftetes Image gegen den neuesten Bau (JSON)
  *   GET    /admin/addons/:id          — Detail: Name, Beschreibung, Tags, Freigabe
  *   PUT    /admin/addons/:id          — Name, Beschreibung, Tags speichern
  *   POST   /admin/addons/:id/fassungen/:fassungId/freigeben      — Paketfassung test → stable
@@ -37,6 +38,9 @@ const { ServiceManager } = require('dunebot-core');
 // EINER Stelle; hier ist nur der Knopf. Er gehört in den Adminbereich, weil eine
 // Freigabe alle Guilds betrifft, nicht die, in der gerade jemand sitzt.
 const Paketfassung = require('../../../../plugins/gameserver/dashboard/helpers/Paketfassung');
+// Hängt ein Paket am neuesten Bau seines Images? (Baustelle 177.) Gleicher Ort,
+// gleicher Grund: Ein Image-Stand betrifft alle Guilds.
+const Imagestand = require('../../../../plugins/gameserver/dashboard/helpers/Imagestand');
 
 // Tags kommen aus der Tag-Bibliothek (helpers/Tags.js) — nicht mehr aus dem
 // Kommafeld `addon_marketplace.tags`.
@@ -79,6 +83,33 @@ router.get('/', async (req, res) => {
     } catch (err) {
         Logger.error('[Addons] Fehler Übersicht:', err);
         res.status(500).render('error', { message: 'Fehler beim Laden der Addons', error: err });
+    }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /admin/addons/imagestand — welche Pakete liegen hinter dem neuesten Bau?
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Eigene Abfrage statt Teil der Übersicht: Sie fragt einen Daemon, und der
+// zieht ein Image, das ihm fehlt — das kann dauern. Die Liste soll sofort
+// stehen; die Spalte füllt sich nach.
+//
+// MUSS vor `/:id` stehen — sonst wäre „imagestand" eine Kennung.
+//
+// Immer 200, auch ohne Daemon: `fehler` sagt, warum nichts verglichen wurde,
+// und jedes Paket steht dann auf „unbekannt". Ein 500 sähe auf der Seite aus
+// wie eine leere Spalte.
+router.get('/imagestand', async (req, res) => {
+    const Logger    = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    try {
+        const stand = await Imagestand.stand(dbService);
+        // Umgezogen wird in der Werkbank, und die gibt es in der Guild des Betreibers.
+        const werkbank = process.env.CONTROL_GUILD_ID ? `/guild/${process.env.CONTROL_GUILD_ID}/plugins/werkbank` : null;
+        return res.json({ success: true, ...stand, werkbank });
+    } catch (err) {
+        Logger.error('[Addons] Image-Stand laden fehlgeschlagen:', err);
+        return res.status(500).json({ success: false, message: `Der Image-Stand ließ sich nicht laden: ${err.message}` });
     }
 });
 
