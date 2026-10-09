@@ -838,6 +838,12 @@
             "type": "string"
           },
           "description": "Systempakete, die das Spiel zum Laufen braucht — z.B. libatomic1, libpulse-dev. Gehoert ins Paket, weil es eine Eigenschaft des SPIELS ist, keine des Images: Wer das Laufzeit-Image wechselt, muss wissen, was fehlen darf und was nicht.\n\nFuer Valheim aus dem offiziellen Wiki: libpulse-dev, libatomic1, libc6 (https://valheim.fandom.com/wiki/Dedicated_servers). Doku ist kein Nachweis — ob sie im aktuellen Image schon stecken, gehoert gemessen."
+        },
+        "display": {
+          "enum": [
+            "virtual"
+          ],
+          "description": "Braucht das Spiel einen Bildschirm, den es im Container nicht gibt? `virtual`: fb-init startet vor dem Spiel einen virtuellen (Xvfb) und setzt DISPLAY. Fehlt das Feld, gibt es keinen. Anders als os_packages ist das keine Erklaerung, sondern eine Anweisung — der Daemon reicht sie in den Startauftrag (`display`).\n\nAnlass: Core Keeper, gemessen 2026-10-09 — ohne Bildschirm Signal 11 nach 35 s (mit -nographics) oder Stillstand bei „Desktop is 0 x 0“ (ohne). Braucht im Image das Paket xvfb; fehlt es, bricht fb-init den Start mit dem Grund ab, statt das Spiel abstuerzen zu lassen. Kein `xvfb-run` als program: Der Wrapper saesse zwischen fb-init und dem Spiel, und Stoppsignal wie Rueckgabewert gingen an ihn."
         }
       }
     },

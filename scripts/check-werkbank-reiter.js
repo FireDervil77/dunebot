@@ -40,7 +40,7 @@ function pruefe(was, tun) {
 // erkannt, das es im Quelltext genau einmal gibt.
 const SOLL = {
     aufbauen:      ['<h3 class="card-title">Schritte</h3>', '<h3 class="card-title">Nächster Schritt</h3>', '<h3 class="card-title">Entwurf</h3>'],
-    starten:       ['Probestart</h3>'],
+    starten:       ['Probestart</h3>', 'id="karteVoraussetzungen"'],
     verbindung:    ['id="kartePorts"', 'id="karteFernsteuerung"'],
     einstellungen: ['id="karteEinstellungen"', 'id="karteFestzeilen"', 'id="karteHinweise"'],
     pruefen:       ['Prüfdurchlauf</h3>', 'id="formAngaben"', 'id="karteDurchgereicht"'],

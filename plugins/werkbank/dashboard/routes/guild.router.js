@@ -29,6 +29,10 @@
  *   POST /:kennung/festzeilen              eine Zeile speichern (Datei, Format, Schlüssel, Wert)
  *   POST /:kennung/festzeilen/entfernen
  *
+ * Karte „Voraussetzungen" (2026-10-09) — der Abschnitt `requirements`:
+ *   POST /:kennung/voraussetzungen         Systempakete und Bildschirm speichern, am Image nachzählen
+ *   POST /:kennung/voraussetzungen/pruefen nur nachzählen
+ *
  * Stufe 3 (Prüfdurchlauf):
  *   POST /:kennung/pruefen              ganzes Rezept auf leerem Volume, Start, Stopp
  *   POST /:kennung/pruefung/abbrechen   hängenden Durchlauf von Hand rot setzen
@@ -354,6 +358,8 @@ router.get('/:kennung', requirePermission('WERKBANK.VIEW'), async (req, res) => 
             hinweise: sitzung.entwurf?.hints || [],
             festzeilen: Sitzungen.festzeilenStand(sitzung),
             FESTZEILE: Sitzungen.FESTZEILE,
+            voraussetzungen: Sitzungen.voraussetzungenStand(sitzung),
+            VORAUSSETZUNG: Sitzungen.VORAUSSETZUNG,
             durchgereicht: Sitzungen.durchgereichtes(sitzung),
             abfrage: Sitzungen.abfrageStand(sitzung),
             abfrageKennungen: Sitzungen.abfrageKennungen(),
@@ -661,6 +667,31 @@ router.post('/:kennung/festzeilen/entfernen', requirePermission('WERKBANK.BAUEN'
         return res.json({ success: true });
     } catch (error) {
         return fehler(res, error, 'Feste Zeile nicht entfernt', 400);
+    }
+});
+
+// ── Voraussetzungen (`requirements`, 2026-10-09) ──────────────────────────────
+//
+// Speichern zählt gleich am Image nach. Antwortet der Daemon nicht, ist die
+// Liste trotzdem gespeichert — die Antwort sagt dann, dass NICHT geprüft wurde,
+// und die Karte zeigt es. Deshalb success: true mit `geprueft: false`.
+router.post('/:kennung/voraussetzungen', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        const befund = await Sitzungen.voraussetzungenSpeichern(await offeneSitzung(req, res), req.body || {});
+        return res.json({ success: true, ...befund });
+    } catch (error) {
+        return fehler(res, error, 'Voraussetzungen nicht gespeichert', 400);
+    }
+});
+
+// Nur nachzählen — etwa nach einem Image-Bau: Der Tag zeigt dann auf ein
+// anderes Image, und der gemerkte Befund ist der vom alten.
+router.post('/:kennung/voraussetzungen/pruefen', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        const befund = await Sitzungen.voraussetzungenPruefen(await offeneSitzung(req, res));
+        return res.json({ success: true, ...befund });
+    } catch (error) {
+        return fehler(res, error, 'Voraussetzungen nicht geprüft', 400);
     }
 });
 

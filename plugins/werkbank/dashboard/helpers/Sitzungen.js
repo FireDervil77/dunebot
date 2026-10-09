@@ -623,9 +623,12 @@ function mischeEinstellung(vorher, neu) {
  *   config             Karte „Feste Zeilen in Dateien" (2026-10-08) — der ganze
  *                      Teil. Im Paket eine LISTE (je Datei ein Eintrag), kein
  *                      Objekt: Sie zieht als Ganzes um, nie stückweise.
+ *   requirements       Karte „Voraussetzungen" (2026-10-09) — der ganze Teil.
+ *                      Die Karte bearbeitet `os_packages` und `display`; was ein
+ *                      Paket sonst darin trägt, bleibt stehen und wird gezeigt.
  */
 const GANZ = '*';
-const EIGENE = { management: ['query', 'rcon'], commands: GANZ, config: GANZ };
+const EIGENE = { management: ['query', 'rcon'], commands: GANZ, config: GANZ, requirements: GANZ };
 /** Die Stücke eines Teils, die eine Karte haben — bei GANZ alle, die `objekt` trägt. */
 const eigeneFelder = (teil, objekt) => (EIGENE[teil] === GANZ ? Object.keys(objekt || {}) : EIGENE[teil]);
 /** Hat dieses Stück eine Karte? */
@@ -824,10 +827,13 @@ async function oeffenbarePakete() {
 
 /**
  * Die durchgereichten Teile, die der DAEMON zum Laufen braucht — er kennt genau
- * diese vier (pkgspec.Paket). Befehle, Sperrliste und Systempakete liest nur
- * das Dashboard.
+ * diese fünf (pkgspec.Paket). Befehle und Sperrliste liest nur das Dashboard.
+ *
+ * `requirements` seit 2026-10-09: Der Daemon liest daraus `display` und lässt
+ * fb-init vor dem Spiel einen virtuellen Bildschirm aufstellen. Ein Daemon vor
+ * 1.0.115 kennt das Feld nicht und übergeht es.
  */
-const LAUFZEIT_TEILE = ['management', 'content', 'config', 'console'];
+const LAUFZEIT_TEILE = ['management', 'content', 'config', 'console', 'requirements'];
 function laufzeitTeile(paket) {
     const aus = {};
     for (const k of LAUFZEIT_TEILE) if (paket?.[k] !== undefined) aus[k] = paket[k];
@@ -2515,6 +2521,159 @@ async function festzeileEntfernen(sitzung, b) {
     });
 }
 
+// ── Voraussetzungen (`requirements`, 2026-10-09) ─────────────────────────────
+//
+// Was das SPIEL vom Image verlangt. Anlass war Core Keeper: Der Server stürzte
+// nach 35 s mit Signal 11 ab, im Panel stand „Exit 139" — dem Image fehlten
+// `xvfb` und `libxi6`, und einen Bildschirm stellte niemand auf.
+//
+// Zwei Felder, und sie sind verschiedener Art:
+//
+//   os_packages   ERKLÄRT, was im Image sein muss. Installiert wird daraus
+//                 nichts — der Container läuft als 1000. Der Daemon ZÄHLT am
+//                 Image der Sitzung nach (`werkbank.voraussetzungen`), und der
+//                 Prüfdurchlauf wird rot, bevor er installiert, wenn etwas fehlt.
+//   display       WIRKT: `virtual` lässt fb-init vor dem Spiel einen Xvfb
+//                 starten und DISPLAY setzen.
+//
+// Der Befund des Nachzählens liegt in `entwurf.werkbank.voraussetzungen` — er
+// gehört der Sitzung, nicht dem Paket, und er gilt nur für die Frage, zu der
+// er gehört (`frage`): andere Pakete, anderes Image, und er ist kein Befund
+// mehr. Ein Tag wandert allerdings: Nach einem Image-Bau steht hier der alte
+// Stand, bis jemand neu prüft. Der Prüfdurchlauf fragt deshalb immer frisch.
+
+const VORAUSSETZUNG = {
+    max: 40, bildschirm: 'virtual', bildschirmPaket: 'xvfb', frist: 120000,
+    zuAlt: 'Der Daemon dieser Maschine kennt das Nachzählen noch nicht — es kommt mit 1.0.115.',
+};
+// Dieselbe Regel wie im Daemon (werkbank_voraussetzungen.go): Die Namen gehen
+// als Argumente an dpkg-query, und was mit „-" beginnt, wäre dort ein Schalter.
+const RE_OS_PAKET = /^[a-z0-9][a-z0-9+.-]{1,99}(:[a-z0-9-]{1,20})?$/;
+const VORAUSSETZUNG_FELDER = ['os_packages', 'display'];
+
+/** Was der Daemon gefragt würde — als Text, an dem ein gemerkter Befund hängt. */
+function voraussetzungenFrage(sitzung) {
+    const r = sitzung.entwurf?.requirements || {};
+    const img = sitzungsImage(sitzung) || {};
+    return stabil({
+        image: `${img.ref || ''}:${img.tag || ''}`,
+        pakete: [...(Array.isArray(r.os_packages) ? r.os_packages : [])].sort(),
+        display: r.display || '',
+    });
+}
+
+/** Gibt es überhaupt etwas nachzuzählen? */
+function voraussetzungenGefragt(sitzung) {
+    const r = sitzung.entwurf?.requirements || {};
+    return (Array.isArray(r.os_packages) && r.os_packages.length > 0) || r.display === VORAUSSETZUNG.bildschirm;
+}
+
+/**
+ * Was die Karte zeigt. `vorhanden` ist dreiwertig: true, false — oder null,
+ * wenn es zu DIESER Liste an DIESEM Image keinen Befund gibt. „Nicht geprüft"
+ * ist eine eigene Auskunft und wird nie als „fehlt" oder „da" gezeigt.
+ */
+function voraussetzungenStand(sitzung) {
+    const r = sitzung.entwurf?.requirements || {};
+    const gemerkt = sitzung.entwurf?.werkbank?.voraussetzungen || null;
+    const gilt = !!gemerkt && gemerkt.frage === voraussetzungenFrage(sitzung);
+    const befund = gilt && !gemerkt.fehler ? gemerkt : null;
+    const je = new Map((befund?.pakete || []).map(p => [p.name, p.vorhanden === true]));
+    const namen = Array.isArray(r.os_packages) ? r.os_packages : [];
+    const bildschirm = r.display === VORAUSSETZUNG.bildschirm;
+    return {
+        pakete: namen.map(name => ({ name, vorhanden: je.has(name) ? je.get(name) : null })),
+        bildschirm,
+        // Der Bildschirm hängt am Paket xvfb — der Daemon fragt es mit.
+        bildschirmVorhanden: bildschirm && befund ? befund.display_vorhanden === true : null,
+        gefragt: voraussetzungenGefragt(sitzung),
+        geprueftAm: befund ? gemerkt.am : null,
+        geprueftAn: befund ? gemerkt.image : null,
+        fehlt: befund ? (befund.fehlt || []) : [],
+        // Warum es keinen Befund gibt, wenn es einen geben müsste.
+        ungeprueft: befund ? null
+            : !voraussetzungenGefragt(sitzung) ? null
+            : gilt && gemerkt.fehler ? gemerkt.fehler
+            : gemerkt ? 'Liste oder Image haben sich seit der letzten Prüfung geändert.'
+            : 'Noch nicht am Image nachgezählt.',
+        // Was ein geöffnetes Paket sonst noch trägt (min_ram_mb, glibc …):
+        // bleibt stehen, die Karte hat dafür kein Feld.
+        sonstiges: Object.keys(r).filter(k => !VORAUSSETZUNG_FELDER.includes(k)).map(k => ({ feld: k, wert: r[k] })),
+    };
+}
+
+function voraussetzungenAusFormular(b) {
+    const roh = typeof b?.os_packages === 'string' ? b.os_packages
+        : Array.isArray(b?.os_packages) ? b.os_packages.join('\n') : '';
+    const namen = [];
+    for (const n of roh.split(/[\s,;]+/).map(x => x.trim()).filter(Boolean)) {
+        if (!RE_OS_PAKET.test(n)) {
+            throw new Error(`„${n}" ist kein Paketname — Kleinbuchstaben, Ziffern, „+", „." und „-", wie bei apt (etwa libxi6).`);
+        }
+        if (!namen.includes(n)) namen.push(n);
+    }
+    if (namen.length > VORAUSSETZUNG.max) throw new Error(`Höchstens ${VORAUSSETZUNG.max} Systempakete.`);
+    return { os_packages: namen, display: istWahr(b?.display) ? VORAUSSETZUNG.bildschirm : '' };
+}
+
+/**
+ * Die Karte speichern. Ein leeres Feld löscht den Schlüssel — ausser er stand
+ * vorher leer da: Factorio und Minecraft tragen `os_packages: []`, und ein
+ * geöffnetes Paket soll unverändert durchs Formular dasselbe Paket ergeben.
+ */
+async function voraussetzungenSpeichern(sitzung, b) {
+    await pruefeFrei(sitzung);
+    const neu = voraussetzungenAusFormular(b);
+    await entwurfSchreiben(sitzung, (e) => {
+        const gab = e.requirements !== undefined;
+        const r = { ...(e.requirements || {}) };
+        if (neu.os_packages.length || Array.isArray(r.os_packages)) r.os_packages = neu.os_packages;
+        if (neu.display) r.display = neu.display; else delete r.display;
+        if (Object.keys(r).length || gab) e.requirements = r; else delete e.requirements;
+    });
+    return voraussetzungenPruefen(sitzung);
+}
+
+/**
+ * Am Image der Sitzung nachzählen und den Befund merken. Wirft nicht, wenn der
+ * Daemon nicht antwortet: Die Liste ist dann trotzdem gespeichert, und der
+ * Grund steht auf der Karte — als „nicht geprüft", nie als „in Ordnung".
+ */
+async function voraussetzungenPruefen(sitzung) {
+    if (!voraussetzungenGefragt(sitzung)) {
+        await entwurfSchreiben(sitzung, (e) => { if (e.werkbank) delete e.werkbank.voraussetzungen; });
+        return { geprueft: false, grund: null, fehlt: [] };
+    }
+    const frage = voraussetzungenFrage(sitzung);
+    let ergebnis = null, grund = null;
+    try {
+        const daemon = await daemonFuer(sitzung);
+        const antwort = await daemon.senden('werkbank.voraussetzungen', {
+            image: sitzungsImage(sitzung),
+            requirements: sitzung.entwurf.requirements,
+        }, VORAUSSETZUNG.frist);
+        const daten = antwort?.data?.ergebnis || null;
+        if (antwort?.success && daten && Array.isArray(daten.pakete)) ergebnis = daten;
+        // Ein Daemon vor 1.0.115 kennt den Befehl nicht, hält ihn für einen
+        // Gameserver-Befehl und antwortet „Gameserver nicht gefunden" (im
+        // Verteiler nachgelesen, 2026-10-09). Wörtlich weitergereicht suchte
+        // jemand einen Server, den es nie gab.
+        else if (antwort?.error === 'Gameserver nicht gefunden') grund = VORAUSSETZUNG.zuAlt;
+        else grund = antwort?.error || 'Der Daemon hat keinen Befund geliefert — kennt er den Befehl schon (ab 1.0.115)?';
+    } catch (fehler) {
+        grund = fehler.message;
+    }
+    const am = new Date().toISOString();
+    await entwurfSchreiben(sitzung, (e) => {
+        e.werkbank = e.werkbank || {};
+        e.werkbank.voraussetzungen = ergebnis
+            ? { frage, am, image: ergebnis.image, pakete: ergebnis.pakete, fehlt: ergebnis.fehlt || [],
+                display_verlangt: !!ergebnis.display_verlangt, display_vorhanden: !!ergebnis.display_vorhanden }
+            : { frage, am, fehler: grund };
+    });
+    return { geprueft: !!ergebnis, grund, fehlt: ergebnis ? (ergebnis.fehlt || []) : [] };
+}
+
 /** Die Stufe, mit der der Durchlauf grün wurde — so, wie sie im Paket stehen soll. */
 function bereitUeber(stufe) {
     if (stufe === 'query') return 'bereit über die Abfrage (das Spiel hat geantwortet)';
@@ -2912,6 +3071,7 @@ module.exports = {
     uebernommeneAusfuehren, ketteFortsetzen, offeneUebernommene,
     angabenTags, tagsUebergeben, portBild, konsolenZeileZu, laufPortsMerken,
     FESTZEILE, festzeilenStand, festzeileSpeichern, festzeileEntfernen,
+    VORAUSSETZUNG, voraussetzungenStand, voraussetzungenSpeichern, voraussetzungenPruefen,
     RCON, BEFEHL, GANZ, rconStand, rconSpeichern, rconEntfernen, rconVermerk, rconPruefbefehl, befehlSpeichern, befehlEntfernen,
     sitzungsImage,
     RE_KENNUNG, RE_ZWECK, SCHRITTTYPEN, MAX_AUSGABE, GRENZEN, VORGABE, ERKUNDUNG, hatBereitschaft,

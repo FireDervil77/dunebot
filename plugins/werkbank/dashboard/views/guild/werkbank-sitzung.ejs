@@ -594,6 +594,109 @@
     </div>
   </div>
 
+  <!-- ── Voraussetzungen (`requirements`, 2026-10-09) ──────────────────── -->
+  <%
+    // Was das Spiel vom Image verlangt. `vorhanden` ist dreiwertig: true, false
+    // oder null = zu dieser Liste an diesem Image nicht nachgezählt.
+    const vor = locals.voraussetzungen || { pakete: [], bildschirm: false, bildschirmVorhanden: null, gefragt: false, geprueftAm: null, geprueftAn: null, fehlt: [], ungeprueft: null, sonstiges: [] };
+    const VOR = locals.VORAUSSETZUNG || { max: 40 };
+    const vorMarke = function (v) {
+      return v === true ? '<span class="badge bg-success-lt">im Image</span>'
+           : v === false ? '<span class="badge bg-danger-lt">fehlt im Image</span>'
+           : '<span class="badge bg-secondary-lt">nicht geprüft</span>';
+    };
+  %>
+  <div class="col-12">
+    <div class="card" id="karteVoraussetzungen">
+      <div class="card-header">
+        <h3 class="card-title">Voraussetzungen</h3>
+        <div class="card-actions">
+          <% if (vor.fehlt.length) { %><span class="badge bg-danger-lt"><%= vor.fehlt.length %> fehlt im Image</span>
+          <% } else if (vor.geprueftAm) { %><span class="text-secondary small">am Image nachgezählt</span><% } %>
+        </div>
+      </div>
+      <div class="card-body">
+        <p class="text-secondary small">
+          Was das Spiel vom Image braucht, um überhaupt zu starten — Systempakete und, wenn es ohne Anzeige nicht läuft, ein virtueller Bildschirm.<%- include('werkbank-hilfe', { text:
+            'Systempakete werden hier erklärt, nicht installiert: Der Server läuft ohne Verwalterrechte und kann nichts nachladen. Das Image muss sie mitbringen. '
+            + 'Die Werkbank zählt am Image dieser Sitzung nach, und der Prüfdurchlauf wird rot, bevor er installiert, wenn etwas fehlt. '
+            + 'Fehlt ein Paket, gehört es ins Image (ein Image-Bau) — das Spiel stürzt sonst ab oder hängt, und in der Konsole steht nur ein Rückgabewert.' }) %>
+        </p>
+
+        <% if (vor.fehlt.length) { %>
+          <div class="alert alert-danger py-2 mb-3" role="alert">
+            <strong>Fehlt im Image:</strong> <span class="font-monospace"><%= vor.fehlt.join(', ') %></span>.
+            Ein Prüfdurchlauf wird damit rot. Das Paket gehört ins Image; danach hier „Am Image nachzählen".
+          </div>
+        <% } else if (vor.ungeprueft) { %>
+          <div class="alert alert-warning py-2 mb-3" role="alert">
+            <strong>Nicht geprüft:</strong> <%= vor.ungeprueft %>
+          </div>
+        <% } %>
+
+        <% if (vor.pakete.length || vor.bildschirm) { %>
+          <div class="table-responsive mb-3">
+            <table class="table table-sm table-vcenter">
+              <thead><tr><th>Verlangt</th><th class="w-1 text-nowrap">Stand</th></tr></thead>
+              <tbody>
+                <% vor.pakete.forEach(function (p) { %>
+                  <tr><td class="font-monospace"><%= p.name %></td><td class="text-nowrap"><%- vorMarke(p.vorhanden) %></td></tr>
+                <% }) %>
+                <% if (vor.bildschirm) { %>
+                  <tr>
+                    <td>Virtueller Bildschirm <span class="text-secondary small">(Paket <span class="font-monospace">xvfb</span>)</span></td>
+                    <td class="text-nowrap"><%- vorMarke(vor.bildschirmVorhanden) %></td>
+                  </tr>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
+          <% if (vor.geprueftAm) { %>
+            <p class="text-secondary small mb-3">
+              Nachgezählt am <%= new Date(vor.geprueftAm).toLocaleString('de-DE') %> an
+              <span class="font-monospace" style="word-break:break-all"><%= vor.geprueftAn %></span>.
+              Nach einem Image-Bau zeigt der Tag auf ein anderes Image — dann neu nachzählen.
+            </p>
+          <% } %>
+        <% } %>
+
+        <form id="formVoraussetzungen" class="row g-3" autocomplete="off">
+          <div class="col-md-7">
+            <div class="form-label"><label for="vorPakete">Systempakete</label><%- include('werkbank-hilfe', { text:
+              'Die Namen wie bei apt, je Zeile oder durch Leerzeichen getrennt — etwa libxi6 oder libpulse0. '
+              + 'Woher man sie weiß: aus der Anleitung des Spiels, aus seinem Startskript, oder aus der Konsole („cannot open shared object file"). '
+              + 'Eine Anleitung ist kein Nachweis — ob das Image das Paket trägt, zählt die Werkbank nach.' }) %></div>
+            <textarea class="form-control font-monospace" id="vorPakete" name="os_packages" rows="4" spellcheck="false"
+                      placeholder="libxi6"><%= vor.pakete.map(function (p) { return p.name; }).join('\n') %></textarea>
+          </div>
+          <div class="col-md-5">
+            <div class="form-label">Anzeige</div>
+            <div class="d-flex align-items-start">
+              <label class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" name="display" value="1" <%= vor.bildschirm ? 'checked' : '' %>>
+                <span class="form-check-label">Virtueller Bildschirm</span>
+              </label><%- include('werkbank-hilfe', { text:
+                'Für Spiele, die ohne Anzeige nicht starten — viele Server auf Unity-Basis, auch mit -batchmode. '
+                + 'Der Server stellt vor dem Spiel einen unsichtbaren Bildschirm auf und sagt dem Spiel, wo er ist (DISPLAY). '
+                + 'Woran man es merkt: Das Spiel endet kurz nach dem Start mit Signal 11, oder es bleibt bei „Desktop is 0 x 0" stehen. '
+                + 'Mit dem Schalter gehört -nographics aus der Startzeile. Braucht das Image-Paket xvfb.' }) %>
+            </div>
+            <% if (vor.sonstiges.length) { %>
+              <div class="text-secondary small mt-3">
+                Das Paket trägt außerdem — bleibt unverändert:
+                <span class="font-monospace"><%= vor.sonstiges.map(function (x) { return x.feld + ' = ' + JSON.stringify(x.wert); }).join(', ') %></span>
+              </div>
+            <% } %>
+          </div>
+          <div class="col-12 d-flex flex-wrap gap-2">
+            <button class="btn btn-primary" type="submit" <%= beschaeftigt ? 'disabled' : '' %>><i class="fa-solid fa-floppy-disk me-1"></i>Speichern und nachzählen</button>
+            <button class="btn btn-outline-secondary" type="button" id="knopfVoraussetzungenPruefen" <%= vor.gefragt ? '' : 'disabled' %>><i class="fa-solid fa-magnifying-glass me-1"></i>Am Image nachzählen</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   </div></div>
 
   <div class="col-12" data-reiter="verbindung" role="tabpanel" aria-labelledby="reiter-verbindung"><div class="row row-cards">
@@ -2764,6 +2867,45 @@
           melde('error', fehler.message);
         }
       });
+    });
+  }
+
+  // ── Voraussetzungen (`requirements`, 2026-10-09) ──────────────────────
+  // Speichern zählt am Image nach. Die Antwort unterscheidet drei Fälle, und
+  // jeder wird gesagt: alles da, etwas fehlt, oder gar nicht geprüft.
+  var formVor = document.getElementById('formVoraussetzungen');
+  if (formVor) {
+    function vorMelden(daten, gespeichert) {
+      if (daten.geprueft && daten.fehlt && daten.fehlt.length) {
+        melde('error', 'Fehlt im Image: ' + daten.fehlt.join(', '));
+      } else if (daten.geprueft) {
+        melde('success', (gespeichert ? 'Gespeichert. ' : '') + 'Das Image trägt alles, was verlangt ist.');
+      } else if (daten.grund) {
+        melde('warning', (gespeichert ? 'Gespeichert, aber nicht geprüft: ' : 'Nicht geprüft: ') + daten.grund);
+      } else if (gespeichert) {
+        melde('success', 'Gespeichert.');
+      }
+      setTimeout(function () { window.location.reload(); }, 900);
+    }
+    formVor.addEventListener('submit', async function (ev) {
+      ev.preventDefault();
+      var knopf = formVor.querySelector('button[type=submit]');
+      knopf.disabled = true;
+      try {
+        vorMelden(await schicke(hier + '/voraussetzungen', {
+          os_packages: formVor.os_packages.value,
+          display: formVor.display.checked ? '1' : ''
+        }), true);
+      } catch (fehler) {
+        knopf.disabled = false;
+        melde('error', fehler.message);
+      }
+    });
+    var knopfVor = document.getElementById('knopfVoraussetzungenPruefen');
+    knopfVor.addEventListener('click', async function () {
+      knopfVor.disabled = true;
+      try { vorMelden(await schicke(hier + '/voraussetzungen/pruefen'), false); }
+      catch (fehler) { knopfVor.disabled = false; melde('error', fehler.message); }
     });
   }
 
