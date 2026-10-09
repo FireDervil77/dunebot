@@ -1785,6 +1785,73 @@
     return daten;
   }
 
+  // ── Ausgabe in Schüben (2026-10-09) ───────────────────────────────────
+  //
+  // Ein Spiel kann schneller schreiben, als ein Browser zeichnet. Core Keeper
+  // mit `-nographics` schrieb rund 400 Zeilen je Sekunde und hörte nie auf —
+  // der Tab fror ein, bei jedem Öffnen wieder, und der Knopf „Stoppen" war
+  // damit unerreichbar.
+  //
+  // Bis dahin wurde JEDE Zeile einzeln gezeichnet: Höhe messen, ein Element
+  // anhängen, nach unten rollen — 400-mal je Sekunde an einer Liste, die
+  // dabei immer länger wurde. Die beiden Textkästen hängten per
+  // `textContent +=` an, was den ganzen bisherigen Text jedes Mal neu setzt.
+  //
+  // Jetzt: sammeln, und höchstens alle AUSGABE.takt Millisekunden EINMAL
+  // messen, EINMAL anhängen, EINMAL rollen. Kommt in einem Takt mehr, als
+  // sich lesen lässt, wird das Ältere davon übersprungen — und die Stelle
+  // sagt, wie viele Zeilen fehlen. Der Kasten behält die letzten
+  // AUSGABE.behalten Zeilen; gespeichert ist die Ausgabe ohnehin beim Server.
+  var AUSGABE = { takt: 150, jeSchub: 300, behalten: 3000, zeichen: 400000 };
+  function sammler(kasten, alsZeilen) {
+    var wartend = [], geplant = false;
+    function hinweis(text) {
+      var h = document.createElement('div');
+      h.dataset.hinweis = '1';
+      h.className = 'text-warning';
+      h.textContent = text;
+      return h;
+    }
+    function schub() {
+      geplant = false;
+      var neu = wartend;
+      wartend = [];
+      var weg = 0;
+      if (neu.length > AUSGABE.jeSchub) { weg = neu.length - AUSGABE.jeSchub; neu = neu.slice(-AUSGABE.jeSchub); }
+      var unten = kasten.scrollTop + kasten.clientHeight >= kasten.scrollHeight - 4;
+      var uebersprungen = weg ? '… ' + weg.toLocaleString('de-DE') + ' Zeilen übersprungen — die Ausgabe kommt schneller, als sie sich zeigen lässt' : '';
+      if (alsZeilen) {
+        var stueck = document.createDocumentFragment();
+        if (weg) stueck.appendChild(hinweis(uebersprungen));
+        neu.forEach(function (text) {
+          var z = document.createElement('div');
+          z.textContent = text;
+          stueck.appendChild(z);
+        });
+        kasten.appendChild(stueck);
+        // Vorn wegnehmen, was über die Grenze geht — je Schub höchstens so
+        // viele, wie eben dazukamen. Die Zeile ganz oben sagt, dass etwas fehlt.
+        var zuViel = kasten.childElementCount - AUSGABE.behalten;
+        if (zuViel > 0) {
+          if (kasten.firstElementChild.dataset.hinweis === 'oben') zuViel++;
+          while (zuViel-- > 0 && kasten.firstElementChild) kasten.removeChild(kasten.firstElementChild);
+          var oben = hinweis('… ältere Zeilen ausgeblendet — die gespeicherte Ausgabe zeigt die Seite nach dem Neuladen');
+          oben.dataset.hinweis = 'oben';
+          kasten.insertBefore(oben, kasten.firstElementChild);
+        }
+      } else {
+        // Ein Textknoten je Schub statt `textContent +=`.
+        kasten.appendChild(document.createTextNode((weg ? uebersprungen + '\n' : '') + neu.join('\n') + '\n'));
+        if (kasten.textContent.length > AUSGABE.zeichen) kasten.textContent = '… älterer Text ausgeblendet\n' + kasten.textContent.slice(-Math.floor(AUSGABE.zeichen * 0.75));
+      }
+      if (unten) kasten.scrollTop = kasten.scrollHeight;
+    }
+    return function (text) {
+      wartend.push(text);
+      if (!geplant) { geplant = true; setTimeout(schub, AUSGABE.takt); }
+    };
+  }
+
   // ── Felder je Typ ──────────────────────────────────────────────────────
   var typ = document.getElementById('schrittTyp');
   function zeigeTyp() {
@@ -2362,8 +2429,9 @@
   // Konsolenzeile → Bereitschaftszeile
   var konsole = document.getElementById('laufKonsole');
   konsole.scrollTop = konsole.scrollHeight;
+  var inKonsole = sammler(konsole, true);
   konsole.addEventListener('click', async function (ev) {
-    var zeile = ev.target.closest('#laufKonsole > div');
+    var zeile = ev.target.closest('#laufKonsole > div:not([data-hinweis])');
     if (!zeile || window.getSelection().toString()) return;
     // Zeitstempel vorn (Factorio: "   2.150 ") ändern sich bei jedem Start — weg damit.
     var text = zeile.textContent.replace(/^\s*\d+\.\d+\s+/, '').trim();
@@ -2427,6 +2495,18 @@
   // ── Live-Ausgabe ──────────────────────────────────────────────────────
   if (wurzel.dataset.werkbankLaeuft === '1' || wurzel.dataset.werkbankSpiel === '1' || wurzel.dataset.werkbankPruefung === '1') {
     var live = document.getElementById('liveAusgabe');
+    var inLive = live ? sammler(live, false) : function () {};
+    // Das Protokoll gibt es erst, wenn ein Durchlauf läuft — der Sammler
+    // entsteht mit der ersten Zeile.
+    var protokollSammler = null;
+    function insProtokoll(text) {
+      if (!protokollSammler) {
+        var kasten = document.getElementById('pruefProtokoll');
+        if (!kasten) return;
+        protokollSammler = sammler(kasten, false);
+      }
+      protokollSammler(text);
+    }
     var strom = new EventSource(basis + '/events?sitzung=' + encodeURIComponent(kennung));
     // Sobald der Kanal steht, einmal nachfragen, was WIRKLICH noch läuft.
     // Nach „Starten" lädt die Seite neu und verbindet sich erst danach — ein
@@ -2454,10 +2534,7 @@
       try { d = JSON.parse(e.data); } catch (x) { return; }
       if (d.sitzung_id !== kennung) return;
       if (d.action === 'pruefung_zeile') {
-        var pp = document.getElementById('pruefProtokoll');
-        var untenP = pp.scrollTop + pp.clientHeight >= pp.scrollHeight - 4;
-        pp.textContent += lesbar(d.line) + '\n';
-        if (untenP) pp.scrollTop = pp.scrollHeight;
+        insProtokoll(lesbar(d.line));
         return;
       }
       if (d.action === 'pruefung') {
@@ -2466,11 +2543,7 @@
         return;
       }
       if (d.action === 'konsole') {
-        var unten = konsole.scrollTop + konsole.clientHeight >= konsole.scrollHeight - 4;
-        var z = document.createElement('div');
-        z.textContent = lesbar(d.line);
-        konsole.appendChild(z);
-        if (unten) konsole.scrollTop = konsole.scrollHeight;
+        inKonsole(lesbar(d.line));
       } else if (d.action === 'ports') {
         // Mit Bild: das eingeordnete zeichnen. Ohne (das Einordnen scheiterte
         // beim Server): wenigstens die Nummern, mit dem Entwurf von vorhin.
@@ -2481,12 +2554,7 @@
           })
         });
       } else if (d.action === 'einstellungen') {
-        (d.zeilen || []).forEach(function (text) {
-          var z = document.createElement('div');
-          z.textContent = text;
-          konsole.appendChild(z);
-        });
-        konsole.scrollTop = konsole.scrollHeight;
+        (d.zeilen || []).forEach(function (text) { inKonsole(text); });
       } else if (d.action === 'bereitschaft') {
         var kasten = document.getElementById('laufBereitschaft');
         kasten.textContent = 'Bereitschaft: ' + (d.type || '') + (d.stage ? ' · ' + d.stage : '') + ((d.hinweis || d.note) ? ' — ' + (d.hinweis || d.note) : '');
@@ -2496,11 +2564,9 @@
         strom.close();
         window.location.reload();
       } else if (d.action === 'output' && live) {
-        var unten = live.scrollTop + live.clientHeight >= live.scrollHeight - 4;
-        live.textContent += (d.finding ? '⚑ ' : '') + lesbar(d.line) + '\n';
-        if (unten) live.scrollTop = live.scrollHeight;
+        inLive((d.finding ? '⚑ ' : '') + lesbar(d.line));
       } else if (d.action === 'status' && live && d.message) {
-        live.textContent += '── ' + d.message + '\n';
+        inLive('── ' + d.message);
       } else if (d.action === 'fertig' || d.action === 'fehlgeschlagen') {
         strom.close();
         window.location.reload();

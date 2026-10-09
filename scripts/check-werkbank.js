@@ -1355,10 +1355,16 @@ async function pruefe(name, fn) {
         assert.strictEqual((view.match(/function lesbar\(t\)/g) || []).length, 2, 'Server-Teil UND Skript');
         // Jede Stelle, die Spielausgabe zeigt, geht durch lesbar().
         for (const muster of [/lesbar\(x\.ausgabe\)/, /lesbar\(lauf && lauf\.konsole\)/, /lesbar\(pruefung && pruefung\.protokoll\)/,
-            /pp\.textContent \+= lesbar\(d\.line\)/, /z\.textContent = lesbar\(d\.line\)/, /\+ lesbar\(d\.line\) \+ '\\n'/]) {
+            // Die drei Live-Wege gehen seit 2026-10-09 über Sammler (Zeichnen in
+            // Schüben, scripts/check-werkbank-konsole.js) — bereinigt wird beim
+            // Hineingeben, an jeder der drei Stellen.
+            /insProtokoll\(lesbar\(d\.line\)\)/, /inKonsole\(lesbar\(d\.line\)\)/, /inLive\(\(d\.finding \? '⚑ ' : ''\) \+ lesbar\(d\.line\)\)/]) {
             assert.match(view, muster);
         }
-        assert.ok(!/textContent \+?= ?[^;]*\bd\.line\b(?![^;]*lesbar)/.test(view.replace(/lesbar\(d\.line\)/g, '')),
+        // Keine Live-Zeile geht an lesbar() vorbei — weder in einen Sammler
+        // noch direkt in die Seite.
+        const ohneBereinigte = view.replace(/lesbar\(d\.line\)/g, '');
+        assert.ok(!/\bd\.line\b/.test(ohneBereinigte.slice(ohneBereinigte.indexOf("strom.addEventListener('werkbank'"))),
             'eine Live-Zeile geht roh in die Seite');
     });
 
