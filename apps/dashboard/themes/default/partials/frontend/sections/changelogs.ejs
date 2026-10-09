@@ -37,8 +37,9 @@
                 </small>
               </div>
               <h3><%= changelog.title %></h3>
-              <% if (changelog.description) { %>
-                <p class="changelog-description"><%- changelog.description %></p>
+              <%# Ein kurzer Textauszug, kein HTML: Der Rest steht auf der Detailseite. %>
+              <% if (changelog.excerpt) { %>
+                <p class="changelog-description"><%= changelog.excerpt %></p>
               <% } %>
             </div>
             
@@ -62,7 +63,9 @@
       <% } %>
     </div>
     
-    <% if (locals.changelogsList && changelogsList.length > 3) { %>
+    <%# Der Weg zu allen — immer, sobald es einen gibt. Die Bedingung „mehr als
+        drei" konnte nie zutreffen: Geladen werden genau drei. %>
+    <% if (locals.changelogsList && changelogsList.length > 0) { %>
       <div class="text-center mt-5" data-aos="fade-up">
         <a href="/changelogs" class="btn btn-primary btn-lg">
           <%= tr('CHANGELOGS.VIEW_ALL') %>

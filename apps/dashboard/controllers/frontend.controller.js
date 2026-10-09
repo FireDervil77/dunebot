@@ -68,7 +68,7 @@ module.exports.getIndex = async (req, res) => {
         if (sectionTypes.has('changelogs')) {
             try {
                 const rawChangelogs = await dbService.query(
-                    "SELECT * FROM changelogs WHERE is_public = 1 ORDER BY release_date DESC LIMIT 3"
+                    "SELECT * FROM changelogs WHERE is_public = 1 AND status = 'published' ORDER BY release_date DESC, id DESC LIMIT 3"
                 );
                 const { ChangelogHelper } = require('dunebot-sdk/utils');
                 changelogsList = ChangelogHelper.getLocalizedChangelogList(rawChangelogs, userLocale);
@@ -90,6 +90,10 @@ module.exports.getIndex = async (req, res) => {
 
         const localizedChangelogsList = changelogsList.map(changelog => ({
             ...changelog,
+            // Die Karte zeigt einen kurzen Textauszug. Bis zum 2026-10-09 gab
+            // sie die ganze Beschreibung als HTML aus — bei 2.3.0 waren das
+            // 2600 Zeichen in einer Kachel der Startseite.
+            excerpt: require('dunebot-sdk/utils').ChangelogHelper.zuTextauszug(changelog.description),
             formattedDate: changelog.release_date 
                 ? new Date(changelog.release_date).toLocaleString(userLocale, {
                     year: 'numeric', month: 'long', day: 'numeric'

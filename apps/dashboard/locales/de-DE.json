@@ -209,7 +209,9 @@
     "DESCRIPTION": "Bleibe auf dem Laufenden mit den neuesten Entwicklungen, Updates und Ankündigungen rund um FireBot.",
     "NO_NEWS": "Keine Neuigkeiten verfügbar",
     "READ_MORE": "Mehr lesen",
-    "BACK_TO_NEWS": "Zurück zu den Neuigkeiten"
+    "BACK_TO_NEWS": "Zurück zu den Neuigkeiten",
+    "VIEW_ALL": "Alle Neuigkeiten anzeigen",
+    "ALL_NEWS": "Alle Neuigkeiten"
   },
   "NAV": {
     "ADMIN": "Admin",
@@ -591,7 +593,6 @@
     "ERROR_HELP_DISCORD": "Dich von Discord abzumelden und erneut anzumelden",
     "ERROR_HELP_ADMIN": "Den Bot-Administrator zu kontaktieren"
   },
-
   "WILLKOMMEN": {
     "TITEL": "Willkommen",
     "BEGRUESSUNG": "{{server}} ist eingerichtet",
@@ -616,5 +617,11 @@
     "FERTIG_TITEL": "Und dann?",
     "FERTIG_TEXT": "Alles Weitere findest du im Dashboard des Servers. Diese Seite kannst du jederzeit wieder aufrufen.",
     "FERTIG_KNOPF": "Zum Dashboard"
+  },
+  "PAGING": {
+    "LABEL": "Seiten",
+    "NEWER": "Neuere",
+    "OLDER": "Ältere",
+    "PAGE_OF": "Seite {{seite}} von {{seiten}}"
   }
 }

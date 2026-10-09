@@ -39,5 +39,14 @@
       <% } %>
       <% }); %>
     </div>
+
+    <% if ((newsList || []).length > 0) { %>
+      <div class="text-center mt-5" data-aos="fade-up">
+        <a href="/news" class="btn btn-primary btn-lg">
+          <%= tr('NEWS.VIEW_ALL') %>
+          <i class="bi bi-arrow-right ms-2"></i>
+        </a>
+      </div>
+    <% } %>
   </div>
 </section>

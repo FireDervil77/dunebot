@@ -68,6 +68,8 @@
             </div>
           <% }); %>
         </div>
+
+        <%- include('../../partials/frontend/blaettern', { b: locals.blaettern, pfad: '/changelogs' }) %>
       <% } else { %>
         <div class="text-center py-5" data-aos="fade-up">
           <i class="bi bi-code-slash display-1 text-muted"></i>

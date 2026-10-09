@@ -85,6 +85,60 @@ async function ladeConsentKontext(req) {
 }
 
 // News-Details Handler
+/**
+ * Blaettern in den Uebersichten (2026-10-09).
+ *
+ * Betreiber: Die Startseite zeigt sechs News und drei Changelogs — und von
+ * dort fuehrte kein Weg zu den uebrigen. Fuer die News gab es gar keine
+ * Uebersicht; die der Changelogs gab es, aber ihr Knopf erschien nur bei mehr
+ * als drei Eintraegen, waehrend genau drei geladen wurden.
+ *
+ * `?seite=` ist 1-basiert. Was keine ganze Zahl ab 1 ist, gilt als 1; eine
+ * Seite hinter dem Ende zeigt die letzte, statt einer leeren Liste.
+ */
+const JE_SEITE = 12;
+
+function blaettern(req, gesamt) {
+    const seiten = Math.max(1, Math.ceil(gesamt / JE_SEITE));
+    // Nur eine schlichte Zahl zaehlt. `parseInt` laese aus „2; DROP …" oder aus
+    // einer doppelt angegebenen Seite („2,3") stillschweigend eine 2 heraus.
+    const roh = req.query.seite;
+    const gewuenscht = typeof roh === 'string' && /^[0-9]{1,6}$/.test(roh) ? Number(roh) : 1;
+    const seite = gewuenscht >= 1 ? Math.min(gewuenscht, seiten) : 1;
+    return { seite, seiten, gesamt, versatz: (seite - 1) * JE_SEITE, jeSeite: JE_SEITE };
+}
+
+const getNewsList = async (req, res) => {
+    const dbService = ServiceManager.get('dbService');
+    const Logger = ServiceManager.get('Logger');
+    const themeManager = ServiceManager.get('themeManager');
+
+    try {
+        const [{ n }] = await dbService.query("SELECT COUNT(*) AS n FROM news WHERE status = 'published'");
+        const b = blaettern(req, Number(n) || 0);
+        // Dieselbe Reihenfolge wie auf der Startseite: Die ersten sechs hier
+        // sind die sechs dort. Grenze und Versatz sind Zahlen aus `blaettern`,
+        // nie Eingaben.
+        const roh = await dbService.query(
+            `SELECT * FROM news WHERE status = 'published' ORDER BY created_at DESC, _id DESC LIMIT ${b.jeSeite} OFFSET ${b.versatz}`);
+
+        const userLocale = res.locals.locale || 'de-DE';
+        const news = NewsHelper.getLocalizedNewsList(roh, userLocale).map(eintrag => ({
+            ...eintrag,
+            // Der Anriss kommt als HTML aus dem Editor; die Karte zeigt Text.
+            excerptText: htmlZuVorschautext(eintrag.excerpt, 200),
+            formattedDate: eintrag.date
+                ? new Date(eintrag.date).toLocaleString(userLocale, { year: 'numeric', month: 'long', day: 'numeric' })
+                : ''
+        }));
+
+        await themeManager.renderView(res, 'frontend/news', { news, blaettern: b, currentLocale: userLocale });
+    } catch (err) {
+        Logger.error('Fehler beim Laden der News-Uebersicht:', err);
+        res.status(500).render('frontend/500');
+    }
+};
+
 const getNewsDetails = async (req, res) => {
     const dbService = ServiceManager.get('dbService');
     const Logger = ServiceManager.get('Logger');
@@ -130,10 +184,16 @@ const getChangelogsList = async (req, res) => {
     const themeManager = ServiceManager.get("themeManager");
 
     try {
+        // Oeffentlich UND veroeffentlicht: Bis zum 2026-10-09 genuegte
+        // `is_public` — ein Entwurf mit gesetztem Haken stand in der Liste.
+        const [{ n }] = await dbService.query(
+            "SELECT COUNT(*) AS n FROM changelogs WHERE is_public = 1 AND status = 'published'");
+        const b = blaettern(req, Number(n) || 0);
         const rawChangelogs = await dbService.query(`
-            SELECT * FROM changelogs 
-            WHERE is_public = 1
-            ORDER BY release_date DESC
+            SELECT * FROM changelogs
+            WHERE is_public = 1 AND status = 'published'
+            ORDER BY release_date DESC, id DESC
+            LIMIT ${b.jeSeite} OFFSET ${b.versatz}
         `);
 
         // Changelogs lokalisieren (nutze res.locals.locale statt Session-Zugriff)
@@ -148,6 +208,7 @@ const getChangelogsList = async (req, res) => {
 
         await themeManager.renderView(res, 'frontend/changelogs', {
             changelogs: localizedChangelogs,
+            blaettern: b,
             currentLocale: userLocale
         });
     } catch (err) {
@@ -166,9 +227,12 @@ const getChangelogDetails = async (req, res) => {
         // "v" Prefix entfernen falls vorhanden (URL: /changelogs/v1.0.0 → DB: 1.0.0)
         const version = req.params.version.replace(/^v/i, '');
 
+        // Wie die Liste: nur, was oeffentlich und veroeffentlicht ist. Bis zum
+        // 2026-10-09 fragte diese Seite nur nach der Fassung — ein ENTWURF war
+        // fuer jeden lesbar, der die Nummer in die Adresse tippte.
         const rawChangelog = await dbService.query(`
-            SELECT * FROM changelogs 
-            WHERE version = ?
+            SELECT * FROM changelogs
+            WHERE version = ? AND is_public = 1 AND status = 'published'
         `, [version]);
 
         if (!rawChangelog?.length) {
@@ -245,6 +309,7 @@ const routeConfig = {
 
 // Routen auf dem Router registrieren
 router.get('/', frontendController.getIndex);
+router.get('/news', getNewsList);
 router.get('/news-details/:slug', getNewsDetails);
 router.get('/changelogs', getChangelogsList);
 router.get('/changelogs/:version', getChangelogDetails);

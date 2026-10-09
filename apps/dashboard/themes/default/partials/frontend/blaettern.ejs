@@ -1,0 +1,39 @@
+<%#
+  Blättern in einer Übersicht (News, Changelogs) — 2026-10-09.
+
+  Erwartet: b = { seite, seiten }, pfad (z. B. '/news').
+  Zeigt nichts, wenn alles auf eine Seite passt. Die Seitenzahlen sind Zahlen
+  aus dem Router, der Pfad steht fest im Aufruf — hier kommt keine Eingabe an.
+%>
+<% if (b && b.seiten > 1) {
+     const adresse = function (n) { return n <= 1 ? pfad : pfad + '?seite=' + n; };
+     // Erste, letzte und die Nachbarn der aktuellen Seite; dazwischen eine Lücke.
+     const zeigen = [];
+     for (let n = 1; n <= b.seiten; n++) {
+       if (n === 1 || n === b.seiten || Math.abs(n - b.seite) <= 1) zeigen.push(n);
+     }
+%>
+  <nav class="mt-5" aria-label="<%= tr('PAGING.LABEL') %>" data-aos="fade-up">
+    <ul class="pagination justify-content-center flex-wrap">
+      <li class="page-item <%= b.seite <= 1 ? 'disabled' : '' %>">
+        <a class="page-link" href="<%= adresse(b.seite - 1) %>" <%= b.seite <= 1 ? 'tabindex="-1" aria-disabled="true"' : '' %>>
+          <i class="bi bi-arrow-left me-1"></i><%= tr('PAGING.NEWER') %>
+        </a>
+      </li>
+      <% zeigen.forEach(function (n, i) { %>
+        <% if (i > 0 && n - zeigen[i - 1] > 1) { %>
+          <li class="page-item disabled"><span class="page-link">…</span></li>
+        <% } %>
+        <li class="page-item <%= n === b.seite ? 'active' : '' %>">
+          <a class="page-link" href="<%= adresse(n) %>" <%= n === b.seite ? 'aria-current="page"' : '' %>><%= n %></a>
+        </li>
+      <% }) %>
+      <li class="page-item <%= b.seite >= b.seiten ? 'disabled' : '' %>">
+        <a class="page-link" href="<%= adresse(b.seite + 1) %>" <%= b.seite >= b.seiten ? 'tabindex="-1" aria-disabled="true"' : '' %>>
+          <%= tr('PAGING.OLDER') %><i class="bi bi-arrow-right ms-1"></i>
+        </a>
+      </li>
+    </ul>
+    <p class="text-center text-muted small mb-0"><%= tr('PAGING.PAGE_OF', { seite: b.seite, seiten: b.seiten }) %></p>
+  </nav>
+<% } %>

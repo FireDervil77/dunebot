@@ -1,0 +1,66 @@
+<%#
+  Alle Neuigkeiten — die Übersicht hinter „Alle Neuigkeiten anzeigen" (2026-10-09).
+
+  Die Startseite zeigt die sechs neuesten; hier stehen alle, zwölf je Seite, in
+  derselben Reihenfolge. Die Karten sind die der Startseite (`news-item`), nur
+  mit einem Textauszug statt des HTML-Anrisses: 26 Karten mit freiem HTML
+  wären unterschiedlich hoch und unterschiedlich laut.
+
+  @context {Array}  news       lokalisierte Einträge mit excerptText, formattedDate
+  @context {Object} blaettern  { seite, seiten, gesamt }
+%>
+<main id="main">
+  <section id="news" class="news section light-background">
+    <div class="container section-title" data-aos="fade-up">
+      <h2><%= tr('NEWS.ALL_NEWS') %></h2>
+      <p><%= tr('NEWS.DESCRIPTION') %></p>
+    </div>
+
+    <div class="container">
+      <% if (news && news.length > 0) { %>
+        <div class="row g-4">
+          <% news.forEach(function (eintrag) { %>
+            <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="100">
+              <div class="news-item h-100">
+                <% if (eintrag.image_url) { %>
+                  <div class="news-img">
+                    <img src="<%= theme.asset(eintrag.image_url) %>" class="img-fluid" alt="<%= eintrag.title %>" loading="lazy">
+                  </div>
+                <% } %>
+                <div class="news-content">
+                  <h3><%= eintrag.title %></h3>
+                  <div class="news-meta d-flex align-items-center">
+                    <div class="d-flex align-items-center">
+                      <i class="bi bi-calendar me-1"></i>
+                      <span><%= eintrag.formattedDate %></span>
+                    </div>
+                    <% if (eintrag.author) { %>
+                      <div class="d-flex align-items-center ms-3">
+                        <i class="bi bi-person me-1"></i>
+                        <span><%= eintrag.author %></span>
+                      </div>
+                    <% } %>
+                  </div>
+                  <% if (eintrag.excerptText) { %>
+                    <p class="news-excerpt"><%= eintrag.excerptText %></p>
+                  <% } %>
+                  <a href="/news-details/<%= eintrag.slug %>" class="readmore stretched-link">
+                    <span><%= tr('NEWS.READ_MORE') %></span>
+                    <i class="bi bi-arrow-right"></i>
+                  </a>
+                </div>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+
+        <%- include('../../partials/frontend/blaettern', { b: blaettern, pfad: '/news' }) %>
+      <% } else { %>
+        <div class="text-center py-5" data-aos="fade-up">
+          <i class="bi bi-newspaper display-1 text-muted"></i>
+          <p class="mt-3 text-muted"><%= tr('NEWS.NO_NEWS') %></p>
+        </div>
+      <% } %>
+    </div>
+  </section>
+</main>
