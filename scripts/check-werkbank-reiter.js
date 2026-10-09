@@ -39,8 +39,8 @@ function pruefe(was, tun) {
 // Was wohin gehört — die Absprache vom 2026-10-08. Eine Karte wird an etwas
 // erkannt, das es im Quelltext genau einmal gibt.
 const SOLL = {
-    aufbauen:      ['<h3 class="card-title">Schritte</h3>', '<h3 class="card-title">Nächster Schritt</h3>', '<h3 class="card-title">Entwurf</h3>'],
-    starten:       ['Probestart</h3>', 'id="karteVoraussetzungen"', 'id="karteSpielstand"'],
+    aufbauen:      ['<h3 class="card-title">Schritte</h3>', '<h3 class="card-title">Nächster Schritt</h3>', '<h3 class="card-title">Entwurf</h3>', 'id="karteNachInstallation"'],
+    starten:       ['Probestart</h3>', 'id="karteVoraussetzungen"', 'id="karteSpielstand"', 'id="karteKonsolenfilter"'],
     verbindung:    ['id="kartePorts"', 'id="karteFernsteuerung"'],
     einstellungen: ['id="karteEinstellungen"', 'id="karteFestzeilen"', 'id="karteHinweise"'],
     pruefen:       ['Prüfdurchlauf</h3>', 'id="formAngaben"', 'id="karteDurchgereicht"'],

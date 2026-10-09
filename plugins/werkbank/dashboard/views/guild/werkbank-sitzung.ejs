@@ -402,6 +402,49 @@
     </div>
   </div>
 
+
+  <!-- ── Nach der Installation (`install.entfernen`, `install.cache`, 2026-10-09) ── -->
+  <%
+    const ni = locals.nachInstallation || { entfernen: [], depotCache: true };
+  %>
+  <div class="col-12">
+    <div class="card" id="karteNachInstallation">
+      <div class="card-header">
+        <h3 class="card-title">Nach der Installation</h3>
+        <div class="card-actions"><span class="text-secondary small">
+          <%= ni.entfernen.length ? ni.entfernen.length + (ni.entfernen.length === 1 ? ' Eintrag wird entfernt' : ' Einträge werden entfernt') : 'nichts wird entfernt' %>
+        </span></div>
+      </div>
+      <div class="card-body">
+        <form id="formNachInstallation" class="row g-3" autocomplete="off">
+          <div class="col-md-7">
+            <div class="form-label"><label for="nachInstallEntfernen">Aufräumen</label><%- include('werkbank-hilfe', { text:
+              'Was das Spiel mitbringt und der Server nie braucht — Beispielordner, Handbücher, Startskripte, die nicht laufen. Je Zeile ein Name. '
+              + 'Entfernt wird nach allen Schritten und nach jeder Aktualisierung wieder, denn die holt alles zurück. '
+              + 'Erlaubt sind nur Namen direkt in game/, mit höchstens einem * (start_server*.sh). Kein Schrägstrich, kein „..", kein * allein — data/ mit den Spielständen ist so nicht erreichbar.' }) %></div>
+            <textarea class="form-control font-monospace" id="nachInstallEntfernen" name="entfernen" rows="4" spellcheck="false"
+                      placeholder="changelog.txt"><%= ni.entfernen.join('\n') %></textarea>
+            <div class="form-hint">Namen direkt in <span class="font-monospace">game/</span>, die nach der Installation gelöscht werden.</div>
+          </div>
+          <div class="col-md-5">
+            <div class="form-label">SteamCMD</div>
+            <div class="d-flex align-items-start">
+              <label class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" name="steam_depot" value="1" <%= ni.depotCache ? 'checked' : '' %>>
+                <span class="form-check-label">Zwischenspeicher des Rootservers benutzen</span>
+              </label><%- include('werkbank-hilfe', { text:
+                'Gilt nur für Schritte vom Typ SteamCMD. Eingeschaltet legt SteamCMD seine eigenen Daten in einen Ordner, den sich alle Server der Maschine teilen. '
+                + 'Geteilt werden dort Verzeichnisse der Dateien (Manifeste), nicht die Spieldateien selbst — die lädt jeder Server in sein eigenes Volume. '
+                + 'Ausschalten ist nur nötig, wenn sich ein Spiel mit dem geteilten Ordner nicht verträgt.' }) %>
+            </div>
+          </div>
+          <div class="col-12">
+            <button class="btn btn-primary" type="submit" <%= beschaeftigt ? 'disabled' : '' %>><i class="fa-solid fa-floppy-disk me-1"></i>Speichern</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
   </div></div>
 
   <div class="col-12" data-reiter="starten" role="tabpanel" aria-labelledby="reiter-starten"><div class="row row-cards">
@@ -782,6 +825,59 @@
             </div>
           </div>
 
+          <div class="mt-3">
+            <button class="btn btn-primary" type="submit" <%= beschaeftigt ? 'disabled' : '' %>><i class="fa-solid fa-floppy-disk me-1"></i>Speichern</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Konsolenfilter (`console.noise`, 2026-10-09) ─────────────────── -->
+  <%
+    // `treffer` ist null, wenn nicht gezählt wurde — das ist nicht „0".
+    const kf = locals.konsolenfilter || { zeilen: null, muster: [] };
+  %>
+  <div class="col-12">
+    <div class="card" id="karteKonsolenfilter">
+      <div class="card-header">
+        <h3 class="card-title">Konsolenfilter</h3>
+        <div class="card-actions"><span class="text-secondary small"><%= kf.muster.length %> Muster</span></div>
+      </div>
+      <div class="card-body">
+        <p class="text-secondary small">
+          Zeilen, die das Spiel ständig schreibt und die niemandem etwas sagen. Sie werden in der Konsole eingeklappt, nicht gelöscht.<%- include('werkbank-hilfe', { text:
+            'Je Zeile ein regulärer Ausdruck. Passt er irgendwo auf eine Konsolenzeile, gilt sie als Rauschen; mit ^ und $ lässt er sich auf die ganze Zeile festlegen. '
+            + 'Der Server liest die Muster in der Schreibweise von Go (RE2): keine Vor- und Rückschau, keine Rückverweise; (?i) am Anfang macht Groß- und Kleinschreibung egal. '
+            + 'Ein Muster, das jede Zeile träfe, wird abgewiesen — dann sähe niemand mehr einen Fehler.' }) %>
+        </p>
+        <% if (kf.muster.length) { %>
+          <div class="table-responsive mb-3">
+            <table class="table table-sm table-vcenter">
+              <thead><tr><th>Muster</th><th class="w-1 text-nowrap">Im letzten Probestart</th></tr></thead>
+              <tbody>
+                <% kf.muster.forEach(function (m) { %>
+                  <tr>
+                    <td class="font-monospace" style="word-break:break-all"><%= m.muster %></td>
+                    <td class="text-nowrap">
+                      <% if (m.treffer === null) { %><span class="badge bg-secondary-lt">nicht gezählt</span>
+                      <% } else if (m.treffer === 0) { %><span class="badge bg-yellow-lt">trifft keine Zeile</span>
+                      <% } else { %><span class="badge bg-green-lt"><%= m.treffer %> von <%= kf.zeilen %> Zeilen</span><% } %>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+        <form id="formKonsolenfilter" autocomplete="off">
+          <label class="form-label" for="konsolenfilterMuster">Muster</label>
+          <textarea class="form-control font-monospace" id="konsolenfilterMuster" name="noise" rows="3" spellcheck="false"
+                    placeholder="^\(Filename:.*Line:\s+\d+\)$"><%= kf.muster.map(function (m) { return m.muster; }).join('\n') %></textarea>
+          <div class="form-hint">
+            <% if (kf.zeilen === null) { %>Gezählt wird an der Konsole des letzten Probestarts — den gibt es in dieser Sitzung noch nicht.
+            <% } else { %>Gezählt wird an den <%= kf.zeilen %> Zeilen des letzten Probestarts, hier im Panel — der Spielserver kann in Randfällen anders zählen.<% } %>
+          </div>
           <div class="mt-3">
             <button class="btn btn-primary" type="submit" <%= beschaeftigt ? 'disabled' : '' %>><i class="fa-solid fa-floppy-disk me-1"></i>Speichern</button>
           </div>
@@ -3148,6 +3244,31 @@
       }
     });
   }
+
+  // ── Nach der Installation und Konsolenfilter (2026-10-09) ─────────────
+  function einfachesFormular(id, weg, lies) {
+    var form = document.getElementById(id);
+    if (!form) return;
+    form.addEventListener('submit', async function (ev) {
+      ev.preventDefault();
+      var knopf = form.querySelector('button[type=submit]');
+      knopf.disabled = true;
+      try {
+        await schicke(hier + weg, lies(form));
+        melde('success', 'Gespeichert.');
+        setTimeout(function () { window.location.reload(); }, 600);
+      } catch (fehler) {
+        knopf.disabled = false;
+        melde('error', fehler.message);
+      }
+    });
+  }
+  einfachesFormular('formNachInstallation', '/nachinstallation', function (form) {
+    return { entfernen: form.entfernen.value, steam_depot: form.steam_depot.checked ? '1' : '' };
+  });
+  einfachesFormular('formKonsolenfilter', '/konsolenfilter', function (form) {
+    return { noise: form.noise.value };
+  });
 
   // ── Hinweise für Betreiber (2026-10-06) ───────────────────────────────
   var formH = document.getElementById('formHinweis');

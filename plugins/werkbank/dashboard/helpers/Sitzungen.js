@@ -720,9 +720,16 @@ function mischeEinstellung(vorher, neu) {
  *                      Karte „Dateien und Spielstand" (2026-10-09). Was dann
  *                      noch mitreist — `management.update`, `files.patch` —
  *                      liest niemand (siehe dort).
+ *   install.cache, install.entfernen
+ *                      Karte „Nach der Installation" (2026-10-09). `install`
+ *                      steht nicht in DURCHGEREICHT — seine Schritte trägt die
+ *                      Werkbank seit jeher selbst; die beiden Zusätze ziehen
+ *                      aus `durchgereicht.install` in `entwurf.install` um.
+ *   console            Karte „Konsolenfilter" (2026-10-09) — der ganze Teil.
  */
 const GANZ = '*';
-const EIGENE = { management: ['query', 'rcon', 'saves', 'persist'], files: ['denylist'], commands: GANZ, config: GANZ, requirements: GANZ };
+const EIGENE = { management: ['query', 'rcon', 'saves', 'persist'], files: ['denylist'], install: ['cache', 'entfernen'],
+    commands: GANZ, config: GANZ, requirements: GANZ, console: GANZ };
 /** Die Stücke eines Teils, die eine Karte haben — bei GANZ alle, die `objekt` trägt. */
 const eigeneFelder = (teil, objekt) => (EIGENE[teil] === GANZ ? Object.keys(objekt || {}) : EIGENE[teil]);
 /** Hat dieses Stück eine Karte? */
@@ -2957,6 +2964,134 @@ async function dateiteilSpeichern(sitzung, b) {
     });
 }
 
+// ── Nach der Installation und Konsolenfilter (Karten, 2026-10-09) ────────────
+//
+// Betreiber, 2026-10-09, mit Valheim als Beleg: Auch `console` und die Zusätze
+// von `install` standen noch unter „Unverändert übernommen". Wer sie liest,
+// nachgesehen am selben Tag:
+//
+//   install.entfernen   WIRKT: Der Daemon löscht die genannten Namen direkt in
+//                       game/, nach allen Schritten und nach jedem Update
+//                       (rezept.raeumeAuf). Die Regel dafür steht dort, wo
+//                       gelöscht wird (pkgspec.PruefeEntfernen), und hier
+//                       noch einmal — damit der Fehler beim Tippen kommt und
+//                       nicht erst als roter Durchlauf.
+//   install.cache       WIRKT: `steam_depot: false` nimmt SteamCMD den
+//                       geteilten Ordner des Rootservers (rezept/steamcmd.go).
+//                       Geteilt werden dort Manifeste, keine Spieldateien —
+//                       gemessen am 2026-09-21.
+//   console.noise       WIRKT: fb-init kennzeichnet jede Zeile, auf die ein
+//                       Muster passt, als Rauschen; die Anzeige klappt sie ein.
+//                       Nichts wird gelöscht. Die Muster sind reguläre
+//                       Ausdrücke in Gos Schreibweise (RE2).
+
+const NACHINSTALL = { max: { eintraege: 40, zeichen: 120 } };
+
+function nachInstallationAusFormular(b) {
+    const namen = zeilenListe(b?.entfernen);
+    if (namen.length > NACHINSTALL.max.eintraege) throw new Error(`Aufräumen: höchstens ${NACHINSTALL.max.eintraege} Einträge.`);
+    for (const n of namen) {
+        const wo = `Aufräumen: „${n}"`;
+        if (n.length > NACHINSTALL.max.zeichen) throw new Error(`${wo.slice(0, 60)}… — höchstens ${NACHINSTALL.max.zeichen} Zeichen.`);
+        // Dieselben vier Regeln wie pkgspec.PruefeEntfernen im Daemon.
+        if (/[/\\]/.test(n)) throw new Error(`${wo} — nur Namen direkt in game/, ohne Schrägstrich. Was tiefer liegt, räumt ein Schritt der Installation auf.`);
+        if (n.includes('..')) throw new Error(`${wo} — „.." führt aus game/ heraus.`);
+        if (n === '*') throw new Error(`${wo} — „*" allein würde die ganze Installation löschen.`);
+        if ((n.match(/\*/g) || []).length > 1) throw new Error(`${wo} — höchstens ein „*" je Eintrag.`);
+    }
+    return { entfernen: namen, depotCache: istWahr(b?.steam_depot) };
+}
+
+/** Was die Karte „Nach der Installation" zeigt. */
+function nachInstallationStand(sitzung) {
+    const i = sitzung.entwurf?.install || {};
+    return {
+        entfernen: Array.isArray(i.entfernen) ? i.entfernen : [],
+        // Fehlt die Angabe, gilt sie als eingeschaltet — wie im Schema und im Daemon.
+        depotCache: i.cache?.steam_depot !== false,
+    };
+}
+
+/**
+ * Speichern. Wie bei jeder Karte: Was vorher nicht dastand und leer bleibt,
+ * entsteht nicht — ein geöffnetes Paket ergibt unverändert dasselbe Paket.
+ */
+async function nachInstallationSpeichern(sitzung, b) {
+    await pruefeFrei(sitzung);
+    const neu = nachInstallationAusFormular(b);
+    return entwurfSchreiben(sitzung, (e) => {
+        const i = { ...(e.install || {}) };
+        if (neu.entfernen.length || Array.isArray(i.entfernen)) i.entfernen = neu.entfernen; else delete i.entfernen;
+        // Eingeschaltet ist die Vorgabe: geschrieben wird sie nur, wo die
+        // Angabe schon stand (Valheim, Astro Colony) oder ausgeschaltet wird.
+        if (!neu.depotCache) i.cache = { ...(i.cache || {}), steam_depot: false };
+        else if (i.cache && i.cache.steam_depot !== undefined) i.cache = { ...i.cache, steam_depot: true };
+        if (Object.keys(i).length) e.install = i; else delete e.install;
+    });
+}
+
+const KONSOLENFILTER = { max: { muster: 30, zeichen: 300 }, marke: '\x01fb:noise\x02' };
+
+/**
+ * Ein Muster prüfen und für die Trefferzählung übersetzen. fb-init übersetzt
+ * mit Go (RE2); hier steht nur JavaScript zur Verfügung. Abgewiesen wird
+ * deshalb, was RE2 sicher nicht kann (Vor- und Rückschau, Rückverweise) und
+ * was auch JavaScript nicht versteht — ausser dem Vorsatz `(?i)`, den nur RE2
+ * kennt und der bei Konsolenzeilen naheliegt.
+ */
+function rauschMuster(muster) {
+    if (muster.length > KONSOLENFILTER.max.zeichen) throw new Error(`Konsolenfilter: höchstens ${KONSOLENFILTER.max.zeichen} Zeichen je Muster.`);
+    if (/\(\?<?[=!]/.test(muster)) throw new Error(`Konsolenfilter: „${muster}" benutzt Vor- oder Rückschau — die kennt der Server nicht (Go, RE2).`);
+    if (/(^|[^\\])(\\\\)*\\[1-9]/.test(muster)) throw new Error(`Konsolenfilter: „${muster}" benutzt einen Rückverweis (\\1) — den kennt der Server nicht (Go, RE2).`);
+    const ohneGross = /^\(\?i\)/.test(muster);
+    let re;
+    try { re = new RegExp(ohneGross ? muster.slice(4) : muster, ohneGross ? 'i' : ''); }
+    catch (err) { throw new Error(`Konsolenfilter: „${muster}" ist kein gültiger regulärer Ausdruck (${err.message.replace(/^Invalid regular expression: /, '')}).`); }
+    // Passt es auf die leere Zeile, passt es auf jede — die ganze Konsole
+    // gälte als Rauschen, und niemand sähe mehr einen Fehler.
+    if (re.test('')) throw new Error(`Konsolenfilter: „${muster}" träfe jede Zeile — die ganze Konsole gälte als Rauschen.`);
+    return re;
+}
+
+function konsolenfilterAusFormular(b) {
+    const muster = zeilenListe(b?.noise);
+    if (muster.length > KONSOLENFILTER.max.muster) throw new Error(`Konsolenfilter: höchstens ${KONSOLENFILTER.max.muster} Muster.`);
+    for (const m of muster) rauschMuster(m);
+    return muster;
+}
+
+/**
+ * Was die Karte „Konsolenfilter" zeigt: die Muster, und wie viele Zeilen des
+ * letzten Probestarts jedes trifft. `treffer` ist null, wenn es keinen
+ * Probestart gibt oder das Muster sich hier nicht übersetzen lässt — „nicht
+ * gezählt" ist nicht „null Treffer".
+ */
+function konsolenfilterStand(sitzung, laeufe = []) {
+    const muster = Array.isArray(sitzung.entwurf?.console?.noise) ? sitzung.entwurf.console.noise : [];
+    const text = typeof laeufe?.[0]?.konsole === 'string' ? laeufe[0].konsole : null;
+    const zeilen = text === null ? null
+        : text.split(/\r?\n/).map(z => (z.startsWith(KONSOLENFILTER.marke) ? z.slice(KONSOLENFILTER.marke.length) : z)).filter(z => z.trim() !== '');
+    return {
+        zeilen: zeilen ? zeilen.length : null,
+        muster: muster.map((m) => {
+            let re = null;
+            try { re = rauschMuster(String(m)); } catch { /* ein Muster aus einem Paket, das hier nicht zählbar ist */ }
+            return { muster: m, treffer: zeilen && re ? zeilen.filter(z => re.test(z)).length : null };
+        }),
+    };
+}
+
+async function konsolenfilterSpeichern(sitzung, b) {
+    await pruefeFrei(sitzung);
+    const neu = konsolenfilterAusFormular(b);
+    return entwurfSchreiben(sitzung, (e) => {
+        const gab = e.console !== undefined;
+        const k = { ...(e.console || {}) };
+        if (neu.length || Array.isArray(k.noise)) k.noise = neu; else delete k.noise;
+        if (Object.keys(k).length || gab) e.console = k; else delete e.console;
+    });
+}
+
 /** Die Stufe, mit der der Durchlauf grün wurde — so, wie sie im Paket stehen soll. */
 function bereitUeber(stufe) {
     if (stufe === 'query') return 'bereit über die Abfrage (das Spiel hat geantwortet)';
@@ -3379,6 +3514,7 @@ module.exports = {
     FESTZEILE, festzeilenStand, festzeileSpeichern, festzeileEntfernen,
     VORAUSSETZUNG, voraussetzungenStand, voraussetzungenSpeichern, voraussetzungenPruefen,
     DATEITEIL, dateiteilStand, dateiteilSpeichern, dateiteilAusFormular, umleitungsVorschlaege,
+    NACHINSTALL, nachInstallationStand, nachInstallationSpeichern, KONSOLENFILTER, konsolenfilterStand, konsolenfilterSpeichern,
     zuPaket, entfernbar, sitzungEntfernen,
     RCON, BEFEHL, GANZ, rconStand, rconSpeichern, rconEntfernen, rconVermerk, rconPruefbefehl, befehlSpeichern, befehlEntfernen,
     sitzungsImage, imageVariante, neuesterTag, istKalendertag, paketTag, imageName,

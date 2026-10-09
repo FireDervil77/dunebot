@@ -36,6 +36,10 @@
  * Karte „Dateien und Spielstand" (2026-10-09) — `files.denylist`, `management.saves`, `management.persist`:
  *   POST /:kennung/spielstand              Sperrliste, Welten und Umleitungen speichern
  *
+ * Karten „Nach der Installation" und „Konsolenfilter" (2026-10-09) — `install.entfernen`/`cache`, `console.noise`:
+ *   POST /:kennung/nachinstallation        Aufräumliste und Steam-Zwischenspeicher speichern
+ *   POST /:kennung/konsolenfilter          Rauschmuster speichern
+ *
  * Stufe 3 (Prüfdurchlauf):
  *   POST /:kennung/pruefen              ganzes Rezept auf leerem Volume, Start, Stopp
  *   POST /:kennung/pruefung/abbrechen   hängenden Durchlauf von Hand rot setzen
@@ -366,6 +370,8 @@ router.get('/:kennung', requirePermission('WERKBANK.VIEW'), async (req, res) => 
             VORAUSSETZUNG: Sitzungen.VORAUSSETZUNG,
             dateiteil: Sitzungen.dateiteilStand(sitzung, laeufe),
             DATEITEIL: Sitzungen.DATEITEIL,
+            nachInstallation: Sitzungen.nachInstallationStand(sitzung),
+            konsolenfilter: Sitzungen.konsolenfilterStand(sitzung, laeufe),
             durchgereicht: Sitzungen.durchgereichtes(sitzung),
             abfrage: Sitzungen.abfrageStand(sitzung),
             abfrageKennungen: Sitzungen.abfrageKennungen(),
@@ -711,6 +717,25 @@ router.post('/:kennung/spielstand', requirePermission('WERKBANK.BAUEN'), async (
         return res.json({ success: true });
     } catch (error) {
         return fehler(res, error, 'Dateien und Spielstand nicht gespeichert', 400);
+    }
+});
+
+// ── Nach der Installation (`install.entfernen`, `install.cache`) und Konsolenfilter (`console.noise`), 2026-10-09 ──
+router.post('/:kennung/nachinstallation', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.nachInstallationSpeichern(await offeneSitzung(req, res), req.body || {});
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Nicht gespeichert', 400);
+    }
+});
+
+router.post('/:kennung/konsolenfilter', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.konsolenfilterSpeichern(await offeneSitzung(req, res), req.body || {});
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Konsolenfilter nicht gespeichert', 400);
     }
 });
 
