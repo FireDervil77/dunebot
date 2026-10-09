@@ -2,16 +2,32 @@
   Dateivergleich — was in game/ und data/ neu, geändert, weg ist.
   Ein Baustein für Probestart (seit 2026-09-24) UND Installationsschritt (W1,
   2026-10-01). Erwartet: d (Vergleich vom Daemon), gruppiere, groesse.
+
+  Rollbar und aufklappbar seit 2026-10-09 (Betreiber: „ich kann die Liste nicht
+  scrollen … so muss ich Startdateien in anderen Ordnern raten"). Ein Ordner mit
+  vielen Dateien steht weiter als EINE Zeile da — aber sie lässt sich öffnen.
+  Der Daemon listet je Sorte höchstens die ersten 300 nach Name; was darüber
+  liegt, steht in keiner Liste, und das sagt die Zeile dazu.
 %>
+<div data-dateiliste style="max-height:24rem;overflow:auto">
 <% [['neu', 'bg-green-lt', 'neu'], ['geaendert', 'bg-yellow-lt', 'geändert'], ['weg', 'bg-red-lt', 'weg']].forEach(function (art) {
      const gruppen = gruppiere(d[art[0]]);
      const anzahl = d['anzahl_' + art[0]] || 0;
      if (!anzahl) return; %>
-  <div class="mb-1"><span class="badge <%= art[1] %>"><%= art[2] %> · <%= anzahl %></span><% if (anzahl > (d[art[0]] || []).length) { %> <span class="text-secondary">(die ersten <%= d[art[0]].length %>)</span><% } %></div>
+  <div class="mb-1"><span class="badge <%= art[1] %>"><%= art[2] %> · <%= anzahl %></span><% if (anzahl > (d[art[0]] || []).length) { %> <span class="text-warning">gelistet sind nur die ersten <%= d[art[0]].length %> nach Name — <%= anzahl - d[art[0]].length %> weitere fehlen in dieser Liste</span><% } %></div>
   <ul class="list-unstyled mb-2 ms-2 font-monospace">
     <% gruppen.forEach(function (g) { %>
       <% if (g.ordner) { %>
-        <li class="text-secondary"><%= g.ordner %> — <%= g.anzahl %> Dateien, <%= groesse(g.groesse) %></li>
+        <li>
+          <details>
+            <summary class="text-secondary"><%= g.ordner %> — <%= g.anzahl %> Dateien, <%= groesse(g.groesse) %></summary>
+            <ul class="list-unstyled mb-1 ms-3">
+              <% (g.dateien || []).forEach(function (x) { %>
+                <li><%= x.pfad.slice(g.ordner.length) %> <span class="text-secondary">(<%= x.vorher !== undefined && x.vorher !== x.groesse ? groesse(x.vorher) + ' → ' : '' %><%= groesse(x.groesse) %>)</span></li>
+              <% }) %>
+            </ul>
+          </details>
+        </li>
       <% } else { %>
         <li><%= g.pfad %> <span class="text-secondary">(<%= g.vorher !== undefined && g.vorher !== g.groesse ? groesse(g.vorher) + ' → ' : '' %><%= groesse(g.groesse) %>)</span></li>
       <% } %>
@@ -20,3 +36,4 @@
 <% }) %>
 <% if (!d.anzahl_neu && !d.anzahl_geaendert && !d.anzahl_weg) { %><span class="text-secondary">Nichts angelegt, nichts geändert.</span><% } %>
 <% if (d.unvollstaendig) { %><div class="text-warning">Unvollständig — zu viele Dateien für einen Vergleich.</div><% } %>
+</div>

@@ -2762,6 +2762,12 @@
         var daten = await schicke(hier + '/dateien');
         var kasten = document.getElementById('laufDateien');
         kasten.innerHTML = '';
+        // Dieselbe rollbare Hülle wie im Baustein werkbank-dateien.
+        var rolle = document.createElement('div');
+        rolle.setAttribute('data-dateiliste', '');
+        rolle.style.maxHeight = '24rem';
+        rolle.style.overflow = 'auto';
+        kasten.appendChild(rolle);
         var d = daten.dateien || {};
         var leer = true;
         [['neu', 'bg-green-lt', 'neu'], ['geaendert', 'bg-yellow-lt', 'geändert'], ['weg', 'bg-red-lt', 'weg']].forEach(function (art) {
@@ -2779,14 +2785,26 @@
           (daten.gruppen[art[0]] || []).forEach(function (g) {
             var li = document.createElement('li');
             if (g.ordner) {
-              li.className = 'text-secondary';
-              li.textContent = g.ordner + ' — ' + g.anzahl + ' Dateien, ' + groesse(g.groesse);
+              // Zugeklappt, nicht weggelassen — wie im Baustein werkbank-dateien.
+              var klappe = document.createElement('details');
+              var kopfzeile = document.createElement('summary');
+              kopfzeile.className = 'text-secondary';
+              kopfzeile.textContent = g.ordner + ' — ' + g.anzahl + ' Dateien, ' + groesse(g.groesse);
+              var drin = document.createElement('ul');
+              drin.className = 'list-unstyled mb-1 ms-3';
+              (g.dateien || []).forEach(function (x) {
+                var zeile = document.createElement('li');
+                zeile.textContent = x.pfad.slice(g.ordner.length) + ' (' + (x.vorher !== undefined && x.vorher !== x.groesse ? groesse(x.vorher) + ' → ' : '') + groesse(x.groesse) + ')';
+                drin.appendChild(zeile);
+              });
+              klappe.append(kopfzeile, drin);
+              li.appendChild(klappe);
             } else {
               li.textContent = g.pfad + ' (' + (g.vorher !== undefined && g.vorher !== g.groesse ? groesse(g.vorher) + ' → ' : '') + groesse(g.groesse) + ')';
             }
             ul.appendChild(li);
           });
-          kasten.append(kopf, ul);
+          rolle.append(kopf, ul);
         });
         if (leer) kasten.textContent = 'Nichts angelegt, nichts geändert.';
       } catch (fehler) { melde('error', fehler.message); }

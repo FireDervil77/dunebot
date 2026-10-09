@@ -517,6 +517,16 @@ async function pruefe(name, fn) {
         assert.deepStrictEqual(g.map(x => x.pfad || x.ordner), ['game/.lock', 'game/factorio-previous.log', 'game/temp/']);
         assert.strictEqual(g[2].anzahl, 7);
         assert.strictEqual(g[2].groesse, 700);
+        // Zugeklappt, nicht weggelassen (2026-10-09): Der Ordner trägt seine Dateien mit,
+        // sonst sucht man die Startdatei darin mit einem fremden Werkzeug.
+        assert.strictEqual(g[2].dateien.length, 7);
+        assert.deepStrictEqual(g[2].dateien[0], { pfad: 'game/temp/currently-playing/locale/af/freeplay.cfg', groesse: 100, vorher: undefined });
+        const baustein = ohneKommentareEjs(fs.readFileSync(path.join(__dirname, '../plugins/werkbank/dashboard/views/guild/werkbank-dateien.ejs'), 'utf8'));
+        assert.ok(/data-dateiliste style="max-height:[0-9]+rem;overflow:auto"/.test(baustein), 'die Dateiliste rollt nicht — bei vielen Dateien ist ihr Ende nicht zu erreichen');
+        assert.ok(baustein.includes('<details>') && baustein.includes('(g.dateien || []).forEach'), 'ein Ordner mit vielen Dateien lässt sich nicht aufklappen');
+        assert.ok(baustein.includes('weitere fehlen in dieser Liste'), 'die Liste sagt nicht, dass der Daemon sie gekürzt hat');
+        const seite = ohneKommentareEjs(fs.readFileSync(path.join(__dirname, '../plugins/werkbank/dashboard/views/guild/werkbank-sitzung.ejs'), 'utf8'));
+        assert.ok(seite.includes("rolle.style.overflow = 'auto'") && seite.includes('(g.dateien || []).forEach'), '„Jetzt nachsehen" zeichnet die Liste ohne Rollen oder ohne aufklappbare Ordner');
         // Fünf in einem Ordner bleiben einzeln — erst ab sechs lohnt die Zeile.
         const wenige = ['a', 'b', 'c', 'd', 'e'].map(x => ({ pfad: `game/config/${x}.ini`, groesse: 1 }));
         assert.strictEqual(Sitzungen.gruppiere(wenige).length, 5);

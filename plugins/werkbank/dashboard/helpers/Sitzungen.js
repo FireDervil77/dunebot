@@ -3827,7 +3827,8 @@ async function vorschlaegeUebernehmen(sitzung, { datei, parser, auswahl }) {
  * Gemessen an Factorio: 52 von 53 neuen Dateien während des Laufs lagen unter
  * temp/currently-playing/, 49 davon Übersetzungen. Einzeln aufgelistet
  * verdecken sie die eine Datei, um die es geht. Ab `ab` Einträgen in einem
- * Ordner (samt Unterordnern) steht der Ordner mit Anzahl und Summe da.
+ * Ordner (samt Unterordnern) steht der Ordner mit Anzahl und Summe da —
+ * zugeklappt, nicht weggelassen: Was der Daemon gelistet hat, ist erreichbar.
  */
 function gruppiere(liste, ab = 6) {
     const eintraege = (liste || []).map(d => ({ ...d, teile: d.pfad.split('/') }));
@@ -3846,7 +3847,11 @@ function gruppiere(liste, ab = 6) {
         if (gruppe) {
             gruppe.drin.forEach(x => erledigt.add(x.pfad));
             aus.push({ ordner: gruppe.ordner, anzahl: gruppe.drin.length,
-                groesse: gruppe.drin.reduce((n, x) => n + (Number(x.groesse) || 0), 0) });
+                groesse: gruppe.drin.reduce((n, x) => n + (Number(x.groesse) || 0), 0),
+                // Die Dateien selbst reisen mit: Die Zeile lässt sich aufklappen.
+                // Betreiber, 2026-10-09: Die Startdatei lag in einem solchen
+                // Ordner, und er musste sie per WinSCP suchen.
+                dateien: gruppe.drin.map(x => ({ pfad: x.pfad, groesse: x.groesse, vorher: x.vorher })) });
         } else {
             erledigt.add(d.pfad);
             aus.push({ pfad: d.pfad, groesse: d.groesse, vorher: d.vorher });
