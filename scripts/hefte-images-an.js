@@ -14,6 +14,21 @@
  *
  *   node scripts/hefte-images-an.js             Probelauf: was wäre neu anzuheften
  *   node scripts/hefte-images-an.js --wirklich  Dateien ändern (danach liefere-pakete.js)
+ *   node scripts/hefte-images-an.js --fassung 2026.10 [--wirklich]
+ *                                               auf eine andere Kalenderfassung umziehen
+ *
+ * ── Der Monatswechsel (2026-10-09) ──────────────────────────────────────────
+ *
+ * `images/bauen.sh` vergibt die Kalenderfassung nach dem Datum: Ein Bau im
+ * Oktober heisst 2026.10. Die Pakete nennen aber `"tag": "2026.09"` — und ohne
+ * `--fassung` fragt dieses Skript genau diesen Tag und meldet zu Recht
+ * „aktuell". Der neue Bau erreichte so nie ein Paket, und weil die Werkbank
+ * nur anbietet, was ein eingeliefertes Paket benutzt, auch keine neue Sitzung.
+ *
+ * Aufgefallen ist es vor dem ersten Bau im neuen Monat (Xvfb für Core Keeper),
+ * nicht danach. Mit `--fassung` zieht der Tag mit um; eine Ausprägung bleibt
+ * stehen (2026.09-GE-Proton10-32 → 2026.10-GE-Proton10-32). Gibt es die neue
+ * Fassung für ein Image nicht, wird das gesagt und die Datei nicht angefasst.
  *
  * Quelle sind die Paketdateien in packages/fbpkg/beispiele. Pakete, die es nur
  * in der Datenbank gibt (aus der Werkbank veröffentlicht), werden genannt, aber
@@ -28,6 +43,24 @@ const { execFileSync } = require('child_process');
 
 const ORDNER = path.join(__dirname, '../packages/fbpkg/beispiele');
 const wirklich = process.argv.includes('--wirklich');
+const RE_FASSUNG = /^\d{4}\.\d{2}/;
+const fassung = (() => {
+    const i = process.argv.indexOf('--fassung');
+    if (i < 0) return null;
+    const wert = process.argv[i + 1] || '';
+    if (!/^\d{4}\.\d{2}$/.test(wert)) {
+        console.error(`--fassung erwartet eine Kalenderfassung wie 2026.10, bekommen: „${wert}"`);
+        process.exit(2);
+    }
+    return wert;
+})();
+
+/** Der Tag, auf den ein Paket zeigen soll — der eigene, oder der in der neuen Fassung. */
+function zielTag(tag) {
+    if (!fassung) return tag;
+    // Ein Tag ohne Kalenderfassung (latest, eine Handnummer) zieht nicht um.
+    return RE_FASSUNG.test(tag) ? tag.replace(RE_FASSUNG, fassung) : tag;
+}
 const heute = new Date().toISOString().slice(0, 10);
 
 /** Aktueller Digest eines Tags — aus der Registry, ohne das Image zu ziehen. */
@@ -67,7 +100,7 @@ function vermerk(text, satz) {
 (async () => {
     let zuAendern = 0, fehler = 0;
     const slugsAusDateien = new Set();
-    console.log(`\nPakete neu anheften${wirklich ? '' : '  (PROBELAUF — es wird nichts geschrieben)'}\n`);
+    console.log(`\nPakete neu anheften${fassung ? ` — Umzug auf ${fassung}` : ''}${wirklich ? '' : '  (PROBELAUF — es wird nichts geschrieben)'}\n`);
 
     for (const name of fs.readdirSync(ORDNER).filter(n => n.endsWith('.json')).sort()) {
         const datei = path.join(ORDNER, name);
@@ -79,28 +112,33 @@ function vermerk(text, satz) {
             console.log(`? ${name.padEnd(28)} kein ref/tag/digest — übersprungen`);
             continue;
         }
+        const tag = zielTag(img.tag);
         let neu;
         try {
-            neu = aktuellerDigest(img.ref, img.tag);
+            neu = aktuellerDigest(img.ref, tag);
         } catch (e) {
             fehler++;
-            console.log(`! ${name.padEnd(28)} ${img.ref}:${img.tag} nicht abfragbar: ${e.message.split('\n')[0]}`);
+            console.log(`! ${name.padEnd(28)} ${img.ref}:${tag} nicht abfragbar: ${e.message.split('\n')[0]}`);
             continue;
         }
-        if (neu === img.digest) {
+        if (neu === img.digest && tag === img.tag) {
             console.log(`= ${name.padEnd(28)} ${img.tag.padEnd(26)} aktuell`);
             continue;
         }
         zuAendern++;
         const alt = p.identity.version;
         const nv = naechsteFassung(alt);
-        console.log(`+ ${name.padEnd(28)} ${img.tag.padEnd(26)} ${img.digest.slice(7, 19)} → ${neu.slice(7, 19)}  ${alt} → ${nv}`);
+        const tagText = tag === img.tag ? img.tag : `${img.tag} → ${tag}`;
+        console.log(`+ ${name.padEnd(28)} ${tagText.padEnd(26)} ${img.digest.slice(7, 19)} → ${neu.slice(7, 19)}  ${alt} → ${nv}`);
         if (!wirklich) continue;
 
-        text = einmal(text, `"digest": "${img.digest}"`, `"digest": "${neu}"`, `${name}: digest`);
+        // Derselbe Digest unter neuem Tag kommt vor (ein Image, das sich im
+        // neuen Monat nicht geändert hat) — dann zieht nur der Tag um.
+        if (neu !== img.digest) text = einmal(text, `"digest": "${img.digest}"`, `"digest": "${neu}"`, `${name}: digest`);
+        if (tag !== img.tag) text = einmal(text, `"tag": "${img.tag}"`, `"tag": "${tag}"`, `${name}: tag`);
         text = text.replace(/("pinned_at": ")[^"]*(")/, `$1${heute}$2`);
         text = einmal(text, `"version": "${alt}",`, `"version": "${nv}",`, `${name}: version`);
-        text = vermerk(text, `IMAGE NEU ANGEHEFTET (${nv}, ${heute}): ${img.ref.replace(/^.*\//, '')}:${img.tag} `
+        text = vermerk(text, `IMAGE NEU ANGEHEFTET (${nv}, ${heute}): ${img.ref.replace(/^.*\//, '')}:${tagText} `
             + `${img.digest.slice(0, 19)}… → ${neu.slice(0, 19)}… (scripts/hefte-images-an.js). `
             + 'Der Daemon nimmt den Digest vor dem Tag — ohne diese Zeile liefen die Server weiter mit dem alten Image.');
         JSON.parse(text); // lieber hier scheitern als mit kaputter Datei weitermachen
