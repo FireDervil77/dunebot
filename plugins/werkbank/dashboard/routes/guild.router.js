@@ -33,6 +33,9 @@
  *   POST /:kennung/voraussetzungen         Systempakete und Bildschirm speichern, am Image nachzählen
  *   POST /:kennung/voraussetzungen/pruefen nur nachzählen
  *
+ * Karte „Dateien und Spielstand" (2026-10-09) — `files.denylist`, `management.saves`, `management.persist`:
+ *   POST /:kennung/spielstand              Sperrliste, Welten und Umleitungen speichern
+ *
  * Stufe 3 (Prüfdurchlauf):
  *   POST /:kennung/pruefen              ganzes Rezept auf leerem Volume, Start, Stopp
  *   POST /:kennung/pruefung/abbrechen   hängenden Durchlauf von Hand rot setzen
@@ -361,6 +364,8 @@ router.get('/:kennung', requirePermission('WERKBANK.VIEW'), async (req, res) => 
             voraussetzungen: Sitzungen.voraussetzungenStand(sitzung),
             imageName: Sitzungen.imageName,
             VORAUSSETZUNG: Sitzungen.VORAUSSETZUNG,
+            dateiteil: Sitzungen.dateiteilStand(sitzung, laeufe),
+            DATEITEIL: Sitzungen.DATEITEIL,
             durchgereicht: Sitzungen.durchgereichtes(sitzung),
             abfrage: Sitzungen.abfrageStand(sitzung),
             abfrageKennungen: Sitzungen.abfrageKennungen(),
@@ -693,6 +698,19 @@ router.post('/:kennung/voraussetzungen/pruefen', requirePermission('WERKBANK.BAU
         return res.json({ success: true, ...befund });
     } catch (error) {
         return fehler(res, error, 'Voraussetzungen nicht geprüft', 400);
+    }
+});
+
+// ── Dateien und Spielstand (`files.denylist`, `management.saves`/`persist`, 2026-10-09) ──
+//
+// Ein Formular, ein Speichern: Die drei Listen sind klein und gehören zusammen
+// (was der Betreiber nicht anfassen soll, wo die Welt liegt, was bleiben muss).
+router.post('/:kennung/spielstand', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.dateiteilSpeichern(await offeneSitzung(req, res), req.body || {});
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Dateien und Spielstand nicht gespeichert', 400);
     }
 });
 

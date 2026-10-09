@@ -328,7 +328,9 @@ const UDP = (purpose, mehr = {}) => ({ purpose, protocol: 'udp', assign: 'pool',
         assert.deepStrictEqual(zeile(mit('port', ohneAbfrage)), []);
         // „Unverändert übernommen" nennt von der Verwaltung nur noch, was keine Karte hat.
         const uebernommen = mit('query').find(z => /^Unverändert übernommen/.test(z));
-        const rest = Object.keys(valheim.management).filter(k => k !== 'query');
+        // Seit der Karte „Dateien und Spielstand" (2026-10-09) sind das auch `saves` und `persist`.
+        const rest = Object.keys(valheim.management).filter(k => !S.EIGENE.management.includes(k));
+        assert.ok(rest.length > 0, 'Valheim trägt nichts mehr ohne Karte — die Probe mässe nichts');
         assert.ok(uebernommen.includes(`management (${rest.join(', ')})`), uebernommen);
         assert.ok(!/management \([^)]*query/.test(uebernommen), 'die Abfrage steht noch unter „unverändert übernommen"');
         // Trägt die Verwaltung NUR die Abfrage, ist von ihr nichts unverändert übernommen.

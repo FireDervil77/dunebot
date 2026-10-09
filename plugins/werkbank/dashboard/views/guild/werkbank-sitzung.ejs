@@ -698,6 +698,97 @@
     </div>
   </div>
 
+
+  <!-- ── Dateien und Spielstand (`files.denylist`, `management.saves`/`persist`, 2026-10-09) ── -->
+  <%
+    // Drei kleine Listen, die bis hierher nur mitreisten. Was sie bewirken,
+    // steht in Sitzungen.js bei DATEITEIL — und auf der Karte.
+    const dt = locals.dateiteil || { sperrliste: [], welten: [], umleitungen: [], vorschlaege: [] };
+    const DT = locals.DATEITEIL || { max: { sperren: 60, welten: 10, umleitungen: 10, zeichen: 200 } };
+  %>
+  <div class="col-12">
+    <div class="card" id="karteSpielstand">
+      <div class="card-header">
+        <h3 class="card-title">Dateien und Spielstand</h3>
+        <div class="card-actions"><span class="text-secondary small">
+          <%= dt.umleitungen.length %> <%= dt.umleitungen.length === 1 ? 'Umleitung' : 'Umleitungen' %> · <%= dt.sperrliste.length %> gesperrt
+        </span></div>
+      </div>
+      <div class="card-body">
+        <form id="formSpielstand" autocomplete="off">
+
+          <div class="form-label">Umleitungen<%- include('werkbank-hilfe', { text:
+            'Der Ordner game/ gehört dem Spiel und darf ersetzt werden — bei einer Neuinstallation ist er weg. '
+            + 'Legt das Spiel seinen Spielstand dort ab (jedes Unreal-Spiel unter <Spiel>/Saved/), geht er dabei verloren. '
+            + 'Eine Umleitung macht aus dem Ordner einen Verweis nach data/: Das Spiel schreibt wie gewohnt, die Dateien liegen aber im bleibenden Bereich. '
+            + 'Steht dort schon ein Spielstand, zieht er beim Anlegen mit um. '
+            + 'Angelegt wird die Umleitung bei der Installation — also im Prüfdurchlauf und auf jedem Server, nicht im Probestart dieser Sitzung.' }) %></div>
+          <p class="text-secondary small">
+            Was das Spiel unter <span class="font-monospace">game/</span> schreibt, aber niemand verlieren will. Umgeleitet wird ein ganzer Ordner.
+          </p>
+          <div class="table-responsive">
+            <table class="table table-sm table-vcenter mb-2">
+              <thead><tr>
+                <th>Das Spiel schreibt nach</th><th>Es liegt dann in</th><th class="w-1"></th>
+              </tr></thead>
+              <tbody id="spielstandUmleitungen">
+                <% dt.umleitungen.forEach(function (u) { %>
+                  <tr data-umleitung>
+                    <td><input class="form-control form-control-sm font-monospace" name="from" value="<%= u.from %>" maxlength="<%= DT.max.zeichen %>" spellcheck="false" placeholder="game/Spiel/Saved/SaveGames" aria-label="Das Spiel schreibt nach"></td>
+                    <td><input class="form-control form-control-sm font-monospace" name="to" value="<%= u.to %>" maxlength="<%= DT.max.zeichen %>" spellcheck="false" placeholder="data/saves" aria-label="Es liegt dann in"></td>
+                    <td><button class="btn btn-sm btn-ghost-danger" type="button" data-umleitung-weg title="Umleitung entfernen" aria-label="Umleitung entfernen"><i class="fa-solid fa-xmark"></i></button></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+          <p class="text-secondary small mb-2" id="spielstandKeineUmleitung" <%= dt.umleitungen.length ? 'hidden' : '' %>>Keine Umleitung — das Spiel schreibt nichts Erhaltenswertes nach game/, oder es ist noch nicht eingetragen.</p>
+          <button class="btn btn-sm btn-outline-secondary mb-3" type="button" id="knopfUmleitungNeu"><i class="fa-solid fa-plus me-1"></i>Umleitung hinzufügen</button>
+
+          <% if (dt.vorschlaege.length) { %>
+            <div class="mb-3">
+              <div class="text-secondary small mb-1">
+                In diesen Ordnern unter <span class="font-monospace">game/</span> haben die letzten Probestarts neue Dateien angelegt — auch Logs und Zwischenspeicher zählen dazu:
+              </div>
+              <div class="d-flex flex-wrap gap-2">
+                <% dt.vorschlaege.forEach(function (v) { %>
+                  <button class="btn btn-sm btn-outline-secondary font-monospace" type="button" data-umleitung-vorschlag
+                          data-from="<%= v.from %>" data-to="<%= v.to %>" title="Als Umleitung eintragen — das Ziel lässt sich danach ändern">
+                    <%= v.from %> <span class="text-secondary">(<%= v.dateien %>)</span>
+                  </button>
+                <% }) %>
+              </div>
+            </div>
+          <% } %>
+
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="form-label"><label for="spielstandWelten">Welten</label><%- include('werkbank-hilfe', { text:
+                'Wo der Spielstand liegt, je Zeile ein Ort — so, wie er in der Serverübersicht unter „Welten" stehen soll. '
+                + 'Das ist eine Auskunft für den Betreiber und sonst nichts: Die Sicherung nimmt ohnehin das ganze Verzeichnis, und umgeleitet wird hierdurch nichts. '
+                + 'Mit einer Umleitung steht hier ihr Ziel (data/saves).' }) %></div>
+              <textarea class="form-control font-monospace" id="spielstandWelten" name="saves" rows="3" spellcheck="false"
+                        placeholder="data/saves"><%= dt.welten.join('\n') %></textarea>
+              <div class="form-hint">Wird in der Serverübersicht angezeigt.</div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-label"><label for="spielstandSperren">Sperrliste im Dateimanager</label><%- include('werkbank-hilfe', { text:
+                'Was der Betreiber im Dateimanager seines Servers weder sehen noch ändern soll, je Zeile ein Eintrag — das Programm selbst, Sperrdateien, vom Paket geschriebene Startdateien. '
+                + 'Ohne Schrägstrich trifft ein Eintrag diesen Namen in jeder Tiefe (bin, *.lock). Mit Schrägstrich gilt er ab der Wurzel des Volumes (game/bin). '
+                + 'Gesperrt ist dann auch alles darunter. Die Liste gilt nur für den Dateimanager im Panel — über SFTP bleibt alles erreichbar.' }) %></div>
+              <textarea class="form-control font-monospace" id="spielstandSperren" name="denylist" rows="3" spellcheck="false"
+                        placeholder="bin"><%= dt.sperrliste.join('\n') %></textarea>
+              <div class="form-hint">Gilt nur im Dateimanager des Panels, nicht über SFTP.</div>
+            </div>
+          </div>
+
+          <div class="mt-3">
+            <button class="btn btn-primary" type="submit" <%= beschaeftigt ? 'disabled' : '' %>><i class="fa-solid fa-floppy-disk me-1"></i>Speichern</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
   </div></div>
 
   <div class="col-12" data-reiter="verbindung" role="tabpanel" aria-labelledby="reiter-verbindung"><div class="row row-cards">
@@ -1714,10 +1805,10 @@
     // Teile eines geöffneten Pakets, für die die Werkbank noch keine Karte hat.
     // Sie reisen unverändert mit und stehen hier, damit man sieht, WAS mitreist.
     const TEIL_NAME = {
-      management:   'Spielstände, Umleitungen, Aktualisieren',
+      management:   'Aktualisieren — eine Angabe aus dem ersten Konzept; aktualisiert wird über die SteamCMD-Schritte der Installation',
       content:      'Mod-Verwaltung',
       commands:     'Befehle im Panel (Spieler listen, kicken, bannen, speichern, Durchsage)',
-      files:        'Sperrliste im Dateimanager',
+      files:        'Dateien vor dem Start setzen (patch)',
       config:       'feste Zeilen in Dateien',
       console:      'Konsolenfilter',
       requirements: 'Systempakete',
@@ -2973,6 +3064,88 @@
       knopfVor.disabled = true;
       try { vorMelden(await schicke(hier + '/voraussetzungen/pruefen'), false); }
       catch (fehler) { knopfVor.disabled = false; melde('error', fehler.message); }
+    });
+  }
+
+  // ── Dateien und Spielstand (2026-10-09) ───────────────────────────────
+  // Die Zeilen der Umleitungen entstehen als Elemente, nie als HTML-Text:
+  // Ein Vorschlag trägt einen Ordnernamen, den das Spiel gewählt hat.
+  var formSp = document.getElementById('formSpielstand');
+  if (formSp) {
+    var spZeilen = document.getElementById('spielstandUmleitungen');
+    var spLeer = document.getElementById('spielstandKeineUmleitung');
+    function spFeld(name, wert, platzhalter, titel) {
+      var zelle = document.createElement('td');
+      var feld = document.createElement('input');
+      feld.className = 'form-control form-control-sm font-monospace';
+      feld.name = name;
+      feld.value = wert || '';
+      feld.maxLength = <%= (locals.DATEITEIL || { max: { zeichen: 200 } }).max.zeichen %>;
+      feld.spellcheck = false;
+      feld.placeholder = platzhalter;
+      feld.setAttribute('aria-label', titel);
+      zelle.appendChild(feld);
+      return zelle;
+    }
+    function spZeile(von, nach) {
+      var zeile = document.createElement('tr');
+      zeile.setAttribute('data-umleitung', '');
+      zeile.appendChild(spFeld('from', von, 'game/Spiel/Saved/SaveGames', 'Das Spiel schreibt nach'));
+      zeile.appendChild(spFeld('to', nach, 'data/saves', 'Es liegt dann in'));
+      var zelle = document.createElement('td');
+      var weg = document.createElement('button');
+      weg.type = 'button';
+      weg.className = 'btn btn-sm btn-ghost-danger';
+      weg.setAttribute('data-umleitung-weg', '');
+      weg.title = 'Umleitung entfernen';
+      weg.setAttribute('aria-label', 'Umleitung entfernen');
+      var kreuz = document.createElement('i');
+      kreuz.className = 'fa-solid fa-xmark';
+      weg.appendChild(kreuz);
+      zelle.appendChild(weg);
+      zeile.appendChild(zelle);
+      spZeilen.appendChild(zeile);
+      spLeer.hidden = true;
+      return zeile;
+    }
+    document.getElementById('knopfUmleitungNeu').addEventListener('click', function () {
+      spZeile('', '').querySelector('input').focus();
+    });
+    spZeilen.addEventListener('click', function (ev) {
+      var knopf = ev.target.closest('[data-umleitung-weg]');
+      if (!knopf) return;
+      knopf.closest('tr').remove();
+      spLeer.hidden = spZeilen.querySelector('[data-umleitung]') !== null;
+    });
+    formSp.querySelectorAll('[data-umleitung-vorschlag]').forEach(function (knopf) {
+      knopf.addEventListener('click', function () {
+        spZeile(knopf.dataset.from, knopf.dataset.to).querySelector('input[name=to]').focus();
+        knopf.disabled = true;
+      });
+    });
+    formSp.addEventListener('submit', async function (ev) {
+      ev.preventDefault();
+      var knopf = formSp.querySelector('button[type=submit]');
+      knopf.disabled = true;
+      var umleitungen = [];
+      spZeilen.querySelectorAll('[data-umleitung]').forEach(function (zeile) {
+        umleitungen.push({
+          from: zeile.querySelector('input[name=from]').value,
+          to: zeile.querySelector('input[name=to]').value
+        });
+      });
+      try {
+        await schicke(hier + '/spielstand', {
+          denylist: document.getElementById('spielstandSperren').value,
+          saves: document.getElementById('spielstandWelten').value,
+          persist: umleitungen
+        });
+        melde('success', 'Gespeichert.');
+        setTimeout(function () { window.location.reload(); }, 600);
+      } catch (fehler) {
+        knopf.disabled = false;
+        melde('error', fehler.message);
+      }
     });
   }
 

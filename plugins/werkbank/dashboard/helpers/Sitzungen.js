@@ -716,9 +716,13 @@ function mischeEinstellung(vorher, neu) {
  *   requirements       Karte „Voraussetzungen" (2026-10-09) — der ganze Teil.
  *                      Die Karte bearbeitet `os_packages` und `display`; was ein
  *                      Paket sonst darin trägt, bleibt stehen und wird gezeigt.
+ *   management.saves, management.persist, files.denylist
+ *                      Karte „Dateien und Spielstand" (2026-10-09). Was dann
+ *                      noch mitreist — `management.update`, `files.patch` —
+ *                      liest niemand (siehe dort).
  */
 const GANZ = '*';
-const EIGENE = { management: ['query', 'rcon'], commands: GANZ, config: GANZ, requirements: GANZ };
+const EIGENE = { management: ['query', 'rcon', 'saves', 'persist'], files: ['denylist'], commands: GANZ, config: GANZ, requirements: GANZ };
 /** Die Stücke eines Teils, die eine Karte haben — bei GANZ alle, die `objekt` trägt. */
 const eigeneFelder = (teil, objekt) => (EIGENE[teil] === GANZ ? Object.keys(objekt || {}) : EIGENE[teil]);
 /** Hat dieses Stück eine Karte? */
@@ -2804,6 +2808,155 @@ async function voraussetzungenPruefen(sitzung) {
     return { geprueft: !!ergebnis, grund, fehlt: ergebnis ? (ergebnis.fehlt || []) : [] };
 }
 
+// ── Dateien und Spielstand (Karte, 2026-10-09) ───────────────────────────────
+//
+// Drei Stücke, die bei einem geöffneten Paket bis hierher nur mitreisten — und
+// die ein in der Werkbank gebautes Spiel gar nicht bekommen konnte. Betreiber,
+// 2026-10-09: „offen ist in factorio unverändert übernommen files und
+// management". Wer sie liest, nachgesehen am selben Tag:
+//
+//   files.denylist       WIRKT im Dateimanager jedes Servers
+//                        (gameserver/helpers/Sperrliste.js). Auslegung wie
+//                        gitignore: ohne „/" jeder Pfadteil in jeder Tiefe, mit
+//                        „/" verankert ab der Wurzel des Volumes. SFTP kennt
+//                        die Liste nicht.
+//   management.saves     Wird nur ANGEZEIGT: die Zeile „Welten" in der
+//                        Serverübersicht (Serverseite.js). Die Sicherung nimmt
+//                        ohnehin das ganze Verzeichnis.
+//   management.persist   WIRKT bei der Installation (Daemon, volumes.go
+//                        `Umleitungen`): ein relativer Link von game/… nach
+//                        data/…, ein vorhandener Ordner zieht mit um. Einziger
+//                        Aufrufer ist die Paket-Installation — also jeder Server
+//                        und der Prüfdurchlauf, NICHT der Probestart im Volume
+//                        der Sitzung. Deshalb schlägt die Karte vor, was der
+//                        Probestart unter game/ neu angelegt hat: Dort steht
+//                        der Spielstand, solange nichts umleitet.
+//
+// `management.update` bekommt keine Karte und reist weiter mit: Es stammt aus
+// dem ersten Konzept (August), und niemand liest es — der Daemon aktualisiert
+// über die SteamCMD-Schritte der Installation (`AktualisiereAusPaket`).
+// Dasselbe gilt für `files.patch`, `management.logs` und `management.mods`,
+// die kein eingeliefertes Paket trägt.
+
+const DATEITEIL = { max: { sperren: 60, welten: 10, umleitungen: 10, zeichen: 200 }, vorschlaege: 8 };
+
+/** Ein Textfeld mit einer Angabe je Zeile → Liste ohne Leeres und ohne Doppelte. */
+function zeilenListe(roh) {
+    const text = Array.isArray(roh) ? roh.join('\n') : (typeof roh === 'string' ? roh : '');
+    const aus = [];
+    for (const z of text.split(/\r?\n/).map(x => x.trim()).filter(Boolean)) if (!aus.includes(z)) aus.push(z);
+    return aus;
+}
+
+/** Ein Pfad im Volume: relativ, ohne „..", eine Zeile. */
+function pruefeVolumePfad(pfad, was) {
+    if (pfad.length > DATEITEIL.max.zeichen) throw new Error(`${was}: höchstens ${DATEITEIL.max.zeichen} Zeichen.`);
+    if (pfad.startsWith('/')) throw new Error(`${was}: „${pfad}" beginnt mit „/" — gemeint ist ein Ort im Volume, ohne führenden Schrägstrich.`);
+    if (pfad.includes('\\')) throw new Error(`${was}: „${pfad}" — Ordner werden mit „/" getrennt.`);
+    if (pfad.split('/').includes('..')) throw new Error(`${was}: „${pfad}" führt mit „.." aus dem Volume heraus.`);
+}
+
+function dateiteilAusFormular(b) {
+    const sperren = zeilenListe(b?.denylist);
+    if (sperren.length > DATEITEIL.max.sperren) throw new Error(`Sperrliste: höchstens ${DATEITEIL.max.sperren} Einträge.`);
+    for (const s of sperren) {
+        pruefeVolumePfad(s, 'Sperrliste');
+        // Ein Eintrag nur aus Platzhaltern trifft jeden Pfadteil — der
+        // Dateimanager wäre für diesen Server ganz zu.
+        if (!/[^*?/]/.test(s)) throw new Error(`Sperrliste: „${s}" träfe jede Datei — der Dateimanager wäre damit ganz gesperrt.`);
+    }
+
+    const welten = zeilenListe(b?.saves);
+    if (welten.length > DATEITEIL.max.welten) throw new Error(`Welten: höchstens ${DATEITEIL.max.welten} Einträge.`);
+    for (const w of welten) pruefeVolumePfad(w, 'Welten');
+
+    const roh = Array.isArray(b?.persist) ? b.persist : [];
+    const umleitungen = [];
+    for (const [i, u] of roh.entries()) {
+        const von = (typeof u?.from === 'string' ? u.from : '').trim().replace(/\/+$/, '');
+        const nach = (typeof u?.to === 'string' ? u.to : '').trim().replace(/\/+$/, '');
+        if (!von && !nach) continue; // eine leere Zeile im Formular
+        const nr = `Umleitung ${i + 1}`;
+        if (!von || !nach) throw new Error(`${nr}: „von" und „nach" gehören beide dazu.`);
+        pruefeVolumePfad(von, nr);
+        pruefeVolumePfad(nach, nr);
+        // Dieselben beiden Bedingungen wie im Schema (`^game/`, `^data/`).
+        if (!/^game\/[^/]/.test(von)) throw new Error(`${nr}: „von" ist ein Ordner unter game/ — dort schreibt das Spiel, und nur dort gibt es etwas umzuleiten.`);
+        if (!/^data\/[^/]/.test(nach)) throw new Error(`${nr}: „nach" ist ein Ordner unter data/ — nur der bleibt bei Neuinstallation und Aktualisierung stehen.`);
+        for (const x of umleitungen) {
+            if (x.from === von) throw new Error(`${nr}: „${von}" wird schon umgeleitet.`);
+            if (x.to === nach) throw new Error(`${nr}: nach „${nach}" zeigt schon eine andere Umleitung — zwei Ordner in einem Ziel mischen ihre Dateien.`);
+            // Ein Link in einem Ordner, der selbst ein Link ist, läge im Ziel
+            // des ersten — die Reihenfolge entschiede, was dabei herauskommt.
+            if (von.startsWith(x.from + '/') || x.from.startsWith(von + '/')) {
+                throw new Error(`${nr}: „${von}" und „${x.from}" liegen ineinander — umgeleitet wird der äußere Ordner, der innere geht damit mit.`);
+            }
+        }
+        umleitungen.push({ from: von, to: nach });
+    }
+    if (umleitungen.length > DATEITEIL.max.umleitungen) throw new Error(`Höchstens ${DATEITEIL.max.umleitungen} Umleitungen.`);
+    return { sperren, welten, umleitungen };
+}
+
+/**
+ * Ordner unter game/, in denen die letzten Probestarts NEUE Dateien angelegt
+ * haben — die Kandidaten für eine Umleitung. Ohne die, die schon umgeleitet
+ * sind. Es ist ein Vorschlag aus einer Beobachtung: Auch Logs und
+ * Zwischenspeicher sind neu, und was davon der Spielstand ist, weiß der Mensch.
+ */
+function umleitungsVorschlaege(laeufe, umleitungen = []) {
+    const zahl = new Map();
+    for (const lauf of laeufe || []) {
+        const d = json(lauf.dateien, null);
+        for (const x of d?.neu || []) {
+            const teile = String(x.pfad || '').split('/');
+            if (teile[0] !== 'game' || teile.length < 3) continue; // direkt in game/: kein Ordner zum Umleiten
+            const ordner = teile.slice(0, -1).join('/');
+            zahl.set(ordner, (zahl.get(ordner) || 0) + 1);
+        }
+    }
+    const schon = (umleitungen || []).map(u => u.from);
+    return [...zahl.entries()]
+        .filter(([ordner]) => !schon.some(v => ordner === v || ordner.startsWith(v + '/')))
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .slice(0, DATEITEIL.vorschlaege)
+        .map(([ordner, dateien]) => ({ from: ordner, to: 'data/' + ordner.split('/').pop().toLowerCase(), dateien }));
+}
+
+/** Was die Karte zeigt. */
+function dateiteilStand(sitzung, laeufe = []) {
+    const e = sitzung.entwurf || {};
+    const liste = (v) => (Array.isArray(v) ? v : []);
+    const umleitungen = liste(e.management?.persist);
+    return {
+        sperrliste: liste(e.files?.denylist),
+        welten: liste(e.management?.saves),
+        umleitungen,
+        vorschlaege: umleitungsVorschlaege(laeufe, umleitungen),
+    };
+}
+
+/**
+ * Die Karte speichern. Eine leere Liste löscht ihr Stück — ausser es stand
+ * vorher schon leer da: Ein geöffnetes Paket soll unverändert durchs Formular
+ * dasselbe Paket ergeben (wie bei den Voraussetzungen).
+ */
+async function dateiteilSpeichern(sitzung, b) {
+    await pruefeFrei(sitzung);
+    const neu = dateiteilAusFormular(b);
+    return entwurfSchreiben(sitzung, (e) => {
+        const setze = (teil, feld, wert) => {
+            const gabTeil = e[teil] !== undefined;
+            const t = { ...(e[teil] || {}) };
+            if (wert.length || Array.isArray(t[feld])) t[feld] = wert; else delete t[feld];
+            if (Object.keys(t).length || gabTeil) e[teil] = t; else delete e[teil];
+        };
+        setze('files', 'denylist', neu.sperren);
+        setze('management', 'saves', neu.welten);
+        setze('management', 'persist', neu.umleitungen);
+    });
+}
+
 /** Die Stufe, mit der der Durchlauf grün wurde — so, wie sie im Paket stehen soll. */
 function bereitUeber(stufe) {
     if (stufe === 'query') return 'bereit über die Abfrage (das Spiel hat geantwortet)';
@@ -3225,6 +3378,7 @@ module.exports = {
     angabenTags, tagsUebergeben, portBild, konsolenZeileZu, laufPortsMerken,
     FESTZEILE, festzeilenStand, festzeileSpeichern, festzeileEntfernen,
     VORAUSSETZUNG, voraussetzungenStand, voraussetzungenSpeichern, voraussetzungenPruefen,
+    DATEITEIL, dateiteilStand, dateiteilSpeichern, dateiteilAusFormular, umleitungsVorschlaege,
     zuPaket, entfernbar, sitzungEntfernen,
     RCON, BEFEHL, GANZ, rconStand, rconSpeichern, rconEntfernen, rconVermerk, rconPruefbefehl, befehlSpeichern, befehlEntfernen,
     sitzungsImage, imageVariante, neuesterTag, istKalendertag, paketTag, imageName,
