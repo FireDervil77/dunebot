@@ -2293,20 +2293,49 @@ function rconPruefbefehl(sitzung) {
 }
 
 /** Was die Karte über die Fernsteuerung zeigt. */
+/**
+ * Welche Einstellung füllt eine Umgebungsvariable des Spiels?
+ *
+ * Gelesen wird die Umgebung, wie sie ins PAKET geht — das Wurzelfeld `env`
+ * samt dem, was die Werkbank für `apply: env` dazuschreibt. Das ist die Stelle,
+ * die der Daemon liest (auftrag/baue.go); ein `apply: env` allein bewirkt
+ * nichts (Baustelle 169).
+ *
+ * Bis 2026-10-09 suchte die Karte „Fernsteuerung" nur nach einem Ziel
+ * `apply: env`. Factorio 1.1.1 führte das Kennwort über das Wurzelfeld
+ * (`RCON_PASSWORD: {{setting:rcon_password}}`), die Einstellung selbst schrieb
+ * in eine Datei — die Karte meldete „das Kennwort käme nie an", während der
+ * Prüfdurchlauf sich mit genau diesem Kennwort anmeldete.
+ *
+ * @returns {{key: string}|{fest: true}|null}  null: nichts füllt die Variable
+ */
+function quelleDerVariable(sitzung, variable) {
+    const e = sitzung.entwurf || {};
+    const settings = Array.isArray(e.settings) ? e.settings : [];
+    const env = { ...(e.env || {}), ...umgebungAusEinstellungen(settings, e.env || {}, uebernommeneZiele(sitzung)) };
+    if (!variable || env[variable] === undefined) return null;
+    const verweis = /^\{\{setting:([a-z][a-z0-9_]*)\}\}$/.exec(String(env[variable]).trim());
+    if (!verweis) return { fest: true };                       // ein fester Wert kommt an
+    // Ein Verweis auf eine Einstellung, die es nicht gibt, löst der Daemon nicht auf.
+    return settings.some(x => x.key === verweis[1]) ? { key: verweis[1] } : null;
+}
+
 function rconStand(sitzung) {
     const e = sitzung.entwurf || {};
     const r = e.management?.rcon || null;
     const kandidaten = umgebungsEinstellungen(e);
     const port = r ? (e.ports || []).find(p => p.purpose === r.port) : null;
-    const quelle = r ? kandidaten.find(k => k.variable === r.password_variable) : null;
+    const gefuellt = r ? quelleDerVariable(sitzung, r.password_variable) : null;
+    // Für die Karte zählt die Einstellung dahinter; ein fester Wert hat keine.
+    const quelle = gefuellt && gefuellt.key ? { key: gefuellt.key } : null;
     const warnungen = [];
     if (r) {
         if (!RCON.gebaut.includes(r.protocol)) warnungen.push(`Das Protokoll „${r.protocol}" spricht der Daemon nicht — bekannt sind ${RCON.gebaut.join(', ')}.`);
         if (!port) warnungen.push(`Den Port „${r.port}" gibt es im Entwurf nicht.`);
         else if (port.protocol === 'udp') warnungen.push(`Der Port „${r.port}" ist udp — die Fernsteuerung läuft über tcp.`);
         if (!r.password_variable) warnungen.push('Es ist keine Variable für das Kennwort genannt.');
-        else if (!quelle) warnungen.push(`Keine Einstellung schreibt „${r.password_variable}" in die Umgebung — das Kennwort käme nie an.`);
-        else if (probewerte(sitzung)[quelle.key] === '') {
+        else if (!gefuellt) warnungen.push(`Keine Einstellung schreibt „${r.password_variable}" in die Umgebung — das Kennwort käme nie an.`);
+        else if (quelle && probewerte(sitzung)[quelle.key] === '') {
             warnungen.push(`„${quelle.key}" hat keinen Probewert — ohne Kennwort scheitert die Anmeldung im Durchlauf. Unter „Einstellungen" einen setzen.`);
         }
     }
