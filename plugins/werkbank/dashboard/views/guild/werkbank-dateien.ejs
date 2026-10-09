@@ -9,7 +9,29 @@
   Der Daemon listet je Sorte höchstens die ersten 300 nach Name; was darüber
   liegt, steht in keiner Liste, und das sagt die Zeile dazu.
 %>
+<%
+  // Was sich starten lässt (Daemon ab 1.0.119): Programme und Skripte unter den
+  // neuen und geänderten Dateien, erkannt am Dateikopf — unabhängig von der
+  // Grenze der Listen darunter. Das Feld FEHLT bei älteren Vergleichen; das
+  // ist „nicht gezählt" und nicht „keine".
+  const startbar = Array.isArray(d.startbar) ? d.startbar : null;
+  const startbarAnzahl = startbar ? (d.anzahl_startbar || startbar.length) : 0;
+%>
 <div data-dateiliste style="max-height:24rem;overflow:auto">
+<% if (startbar && startbar.length) { %>
+  <div class="mb-1"><span class="badge bg-blue-lt">startbar · <%= startbarAnzahl %></span>
+    <span class="text-secondary">Programme und Skripte unter den neuen Dateien — im Startteil ohne <span class="font-monospace">game/</span> davor</span><% if (startbarAnzahl > startbar.length) { %>
+    <span class="text-warning">gelistet sind die <%= startbar.length %> mit dem kürzesten Pfad</span><% } %></div>
+  <ul class="list-unstyled mb-2 ms-2 font-monospace" data-startbar>
+    <% startbar.forEach(function (x) { %>
+      <li><%= x.pfad %> <span class="text-secondary">(<%= groesse(x.groesse) %>)</span></li>
+    <% }) %>
+  </ul>
+<% } else if (startbar && (d.anzahl_neu || d.anzahl_geaendert)) { %>
+  <div class="mb-2"><span class="badge bg-secondary-lt">startbar · 0</span> <span class="text-secondary">Unter den neuen und geänderten Dateien ist kein Programm und kein Skript.</span></div>
+<% } else if (!startbar && (d.anzahl_neu || d.anzahl_geaendert)) { %>
+  <div class="mb-2 text-secondary">Was sich starten lässt, ist bei diesem Vergleich nicht gezählt — das kann der Daemon ab 1.0.119. Den Schritt erneut ausführen zählt nach.</div>
+<% } %>
 <% [['neu', 'bg-green-lt', 'neu'], ['geaendert', 'bg-yellow-lt', 'geändert'], ['weg', 'bg-red-lt', 'weg']].forEach(function (art) {
      const gruppen = gruppiere(d[art[0]]);
      const anzahl = d['anzahl_' + art[0]] || 0;

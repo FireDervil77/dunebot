@@ -527,6 +527,23 @@ async function pruefe(name, fn) {
         assert.ok(baustein.includes('weitere fehlen in dieser Liste'), 'die Liste sagt nicht, dass der Daemon sie gekürzt hat');
         const seite = ohneKommentareEjs(fs.readFileSync(path.join(__dirname, '../plugins/werkbank/dashboard/views/guild/werkbank-sitzung.ejs'), 'utf8'));
         assert.ok(seite.includes("rolle.style.overflow = 'auto'") && seite.includes('(g.dateien || []).forEach'), '„Jetzt nachsehen" zeichnet die Liste ohne Rollen oder ohne aufklappbare Ordner');
+        // Was sich starten lässt (2026-10-09): eine eigene Liste vom Daemon, unabhängig
+        // von der 300er-Grenze. Drei Auskünfte, drei Texte — „nicht gezählt" ist nicht „keine".
+        const go = ohneKommentare(fs.readFileSync(path.join(DAEMON, 'internal/gameserver/werkbank_dateien.go'), 'utf8'));
+        assert.match(go, /Startbar\s+\[\]DateiAenderung `json:"startbar"`/, 'der Daemon nennt die Liste anders — oder lässt sie leer weg, dann sähe „keine" aus wie „nicht gezählt"');
+        assert.match(go, /AnzahlStartbar\s+int\s+`json:"anzahl_startbar"`/);
+        assert.ok(baustein.includes('Array.isArray(d.startbar) ? d.startbar : null'), 'der Baustein unterscheidet ein fehlendes Feld nicht von einer leeren Liste');
+        for (const wort of ['startbar · <%= startbarAnzahl %>', 'startbar · 0', 'nicht gezählt', '<%= x.pfad %>']) assert.ok(baustein.includes(wort), `der Baustein zeigt „${wort}" nicht`);
+        assert.ok(baustein.indexOf('data-startbar') < baustein.indexOf("['neu', 'bg-green-lt', 'neu']"), 'die startbaren Dateien stehen nicht oben in der Box');
+        assert.ok(seite.includes('Array.isArray(x.dateien.startbar)') && seite.includes('Array.isArray(d.startbar) && d.startbar.length'), 'Schrittzeile oder „Jetzt nachsehen" kennen die startbaren Dateien nicht');
+        // Wirklich gezeichnet, in allen drei Fällen.
+        const zeichne = (d) => require('ejs').render(fs.readFileSync(path.join(__dirname, '../plugins/werkbank/dashboard/views/guild/werkbank-dateien.ejs'), 'utf8'), { d, gruppiere: Sitzungen.gruppiere, groesse: (n) => n + ' B' });
+        const basis = { neu: [{ pfad: 'game/a.txt', groesse: 1 }], geaendert: [], weg: [], anzahl_neu: 1, anzahl_geaendert: 0, anzahl_weg: 0 };
+        const mit = zeichne({ ...basis, startbar: [{ pfad: 'game/<b>Server</b>.x86_64', groesse: 5 }], anzahl_startbar: 1 });
+        assert.ok(mit.includes('startbar · 1') && mit.includes('game/&lt;b&gt;Server&lt;/b&gt;.x86_64'), 'die startbare Datei wird nicht oder unescaped gezeigt');
+        assert.ok(zeichne({ ...basis, startbar: [], anzahl_startbar: 0 }).includes('startbar · 0'));
+        const alt = zeichne(basis);
+        assert.ok(alt.includes('nicht gezählt') && !alt.includes('startbar · 0'), 'ein Vergleich ohne das Feld sieht aus wie „keine startbare Datei"');
         // Fünf in einem Ordner bleiben einzeln — erst ab sechs lohnt die Zeile.
         const wenige = ['a', 'b', 'c', 'd', 'e'].map(x => ({ pfad: `game/config/${x}.ini`, groesse: 1 }));
         assert.strictEqual(Sitzungen.gruppiere(wenige).length, 5);

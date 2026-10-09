@@ -257,7 +257,7 @@
               <% } %>
               <% if (x.dateien) { %>
                 <details class="mt-2">
-                  <summary class="text-secondary small">Dateien: <%= x.dateien.anzahl_neu || 0 %> neu · <%= x.dateien.anzahl_geaendert || 0 %> geändert · <%= x.dateien.anzahl_weg || 0 %> weg</summary>
+                  <summary class="text-secondary small">Dateien: <%= x.dateien.anzahl_neu || 0 %> neu · <%= x.dateien.anzahl_geaendert || 0 %> geändert · <%= x.dateien.anzahl_weg || 0 %> weg<% if (Array.isArray(x.dateien.startbar)) { %> · <strong><%= x.dateien.anzahl_startbar || 0 %> startbar</strong><% } %></summary>
                   <div class="small mt-2"><%- include('werkbank-dateien', { d: x.dateien, gruppiere, groesse }) %></div>
                 </details>
               <% } %>
@@ -2770,6 +2770,24 @@
         kasten.appendChild(rolle);
         var d = daten.dateien || {};
         var leer = true;
+        // Was sich starten lässt — dieselbe Auskunft wie im Baustein werkbank-dateien.
+        if (Array.isArray(d.startbar) && d.startbar.length) {
+          var sKopf = document.createElement('div');
+          sKopf.className = 'mb-1';
+          var sMarke = document.createElement('span');
+          sMarke.className = 'badge bg-blue-lt';
+          sMarke.textContent = 'startbar · ' + (d.anzahl_startbar || d.startbar.length);
+          sKopf.appendChild(sMarke);
+          var sListe = document.createElement('ul');
+          sListe.className = 'list-unstyled mb-2 ms-2 font-monospace';
+          sListe.setAttribute('data-startbar', '');
+          d.startbar.forEach(function (x) {
+            var zeile = document.createElement('li');
+            zeile.textContent = x.pfad + ' (' + groesse(x.groesse) + ')';
+            sListe.appendChild(zeile);
+          });
+          rolle.append(sKopf, sListe);
+        }
         [['neu', 'bg-green-lt', 'neu'], ['geaendert', 'bg-yellow-lt', 'geändert'], ['weg', 'bg-red-lt', 'weg']].forEach(function (art) {
           var anzahl = d['anzahl_' + art[0]] || 0;
           if (!anzahl) return;
