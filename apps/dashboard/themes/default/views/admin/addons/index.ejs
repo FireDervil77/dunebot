@@ -168,6 +168,48 @@
         </div>
     </div>
 
+<%#
+  Rückfrage vor dem Entfernen eines Spielpakets (Baustelle 178).
+
+  Erst stand hier die Eingabezeile des Browsers (prompt). Betreiber, 2026-10-09,
+  nach dem ersten echten Entfernen: „die Bestätigung könnte etwas roter und fett
+  sein. ist ja wichtig!!!" — eine Eingabezeile des Browsers lässt sich nicht
+  färben, und sie sieht aus wie jede andere Frage.
+
+  Der Knopf bleibt gesperrt, bis der Name des Pakets genau dasteht.
+%>
+<div class="modal modal-blur fade" id="paketEntfernenModal" tabindex="-1" aria-labelledby="paketEntfernenTitel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content border border-danger border-2">
+            <div class="modal-status bg-danger"></div>
+            <div class="modal-header bg-danger-lt">
+                <h5 class="modal-title text-danger fw-bold" id="paketEntfernenTitel">
+                    <i class="fa-solid fa-triangle-exclamation me-2"></i>Spielpaket ENDGÜLTIG entfernen
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-danger fw-bold fs-3 mb-2">
+                    „<span id="paketEntfernenName"></span>" wird ganz entfernt.
+                </p>
+                <p class="text-danger fw-bold mb-3">Das lässt sich nicht zurücknehmen.</p>
+                <div class="fw-bold mb-1">Es gehen mit:</div>
+                <ul class="mb-3" id="paketEntfernenListe"></ul>
+                <label class="form-label fw-bold" for="paketEntfernenEingabe">
+                    Zum Bestätigen den Namen eintippen: <span class="font-monospace text-danger" id="paketEntfernenSoll"></span>
+                </label>
+                <input type="text" class="form-control font-monospace" id="paketEntfernenEingabe" autocomplete="off" spellcheck="false">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-danger fw-bold" id="paketEntfernenKnopf" disabled>
+                    <i class="fa-solid fa-trash me-1"></i>Endgültig entfernen
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -273,36 +315,52 @@ document.addEventListener('DOMContentLoaded', () => {
                     melde('error', vorschau.server + ' Server ' + (vorschau.server === 1 ? 'läuft' : 'laufen') + ' mit „' + slug + '" — erst die Server löschen.');
                     return;
                 }
-                const zeilen = [
-                    'Das Spielpaket „' + slug + '" wird GANZ entfernt. Das lässt sich nicht zurücknehmen.',
-                    '',
-                    '• ' + vorschau.fassungen.length + ' Fassung(en): ' + vorschau.fassungen.map((f) => f.version + (f.channel === 'stable' ? ' (freigegeben)' : '')).join(', '),
-                    '• ' + vorschau.tags.length + ' Tag-Zuordnung(en) — die Tags selbst bleiben',
-                    '• der Eintrag im Spiele-Marktplatz',
+                // Namen und Texte kommen aus Paketen und Sitzungen: als Text
+                // gesetzt, nie als HTML.
+                const punkte = [
+                    vorschau.fassungen.length + ' Fassung(en): ' + vorschau.fassungen.map((f) => f.version + (f.channel === 'stable' ? ' (freigegeben)' : '')).join(', '),
+                    vorschau.tags.length + ' Tag-Zuordnung(en) — die Tags selbst bleiben',
+                    'der Eintrag im Spiele-Marktplatz',
                 ];
                 if (vorschau.sitzungen.length) {
-                    zeilen.push('• ' + vorschau.sitzungen.length + ' Werkbank-Sitzung(en), samt Volume, Schritten und Durchläufen:');
-                    vorschau.sitzungen.forEach((z) => zeilen.push('     – ' + z.name + ' (' + z.kennung + ', ' + z.status + '): ' + z.gruende.join(', ')));
+                    vorschau.sitzungen.forEach((z) => punkte.push('Werkbank-Sitzung „' + z.name + '" (' + z.kennung + ', ' + z.status + ') samt Volume, Schritten und Durchläufen — ' + z.gruende.join(', ')));
                 } else {
-                    zeilen.push('• keine Werkbank-Sitzung');
+                    punkte.push('keine Werkbank-Sitzung');
                 }
-                zeilen.push('', 'Zum Bestätigen den Namen eintippen: ' + slug);
-                const eingabe = prompt(zeilen.join('\n'));
-                if (eingabe === null) return;
-                if (eingabe.trim() !== slug) { melde('error', 'Der Name stimmt nicht — nichts entfernt.'); return; }
-                this.disabled = true;
-                try {
-                    const antwort = await fetch(`/admin/addons/${addonId}/entfernen`, {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slug }),
-                    });
-                    const ergebnis = await antwort.json();
-                    if (!antwort.ok || !ergebnis.success) throw new Error(ergebnis.message || ('HTTP ' + antwort.status));
-                    melde('success', ergebnis.message);
-                    setTimeout(() => location.reload(), 1500);
-                } catch (fehler) {
-                    this.disabled = false;
-                    melde('error', fehler.message);
-                }
+                const dialog = document.getElementById('paketEntfernenModal');
+                const liste = document.getElementById('paketEntfernenListe');
+                const eingabe = document.getElementById('paketEntfernenEingabe');
+                const knopf = document.getElementById('paketEntfernenKnopf');
+                document.getElementById('paketEntfernenName').textContent = slug;
+                document.getElementById('paketEntfernenSoll').textContent = slug;
+                liste.textContent = '';
+                punkte.forEach((text) => { const li = document.createElement('li'); li.textContent = text; liste.appendChild(li); });
+                eingabe.value = '';
+                knopf.disabled = true;
+                // Gesperrt, bis der Name GENAU dasteht — ein Klick aus Versehen entfernt nichts.
+                eingabe.oninput = () => { knopf.disabled = eingabe.value.trim() !== slug; };
+                const fenster = bootstrap.Modal.getOrCreateInstance(dialog);
+                knopf.onclick = async () => {
+                    if (eingabe.value.trim() !== slug) return;
+                    knopf.disabled = true;
+                    try {
+                        const antwort = await fetch(`/admin/addons/${addonId}/entfernen`, {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slug }),
+                        });
+                        const ergebnis = await antwort.json();
+                        if (!antwort.ok || !ergebnis.success) throw new Error(ergebnis.message || ('HTTP ' + antwort.status));
+                        fenster.hide();
+                        melde('success', ergebnis.message);
+                        setTimeout(() => location.reload(), 1500);
+                    } catch (fehler) {
+                        // Der Dialog bleibt offen: Die Meldung sagt, was noch steht
+                        // und was schon weg ist — das gehört neben die Liste.
+                        knopf.disabled = false;
+                        melde('error', fehler.message);
+                    }
+                };
+                fenster.show();
+                dialog.addEventListener('shown.bs.modal', () => eingabe.focus(), { once: true });
                 return;
             }
 

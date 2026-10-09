@@ -320,16 +320,29 @@ const zugang = () => ({
         const app = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'apps/dashboard/app.js'), 'utf8'));
         assert.match(app, /this\.app\.use\('\/admin', CheckAuth, CheckAdmin, adminRouter\)/);
     });
-    await pruefe('die Seite zeigt erst, was mitgeht, verlangt den Namen und meldet per Toast', async () => {
+    await pruefe('die Seite zeigt erst, was mitgeht, verlangt den Namen in einem roten Dialog und meldet per Toast', async () => {
         const ansicht = ohneKommentareEjs(fs.readFileSync(path.join(WURZEL, 'apps/dashboard/themes/default/views/admin/addons/index.ejs'), 'utf8'));
         const von = ansicht.indexOf('fetch(`/admin/addons/${addonId}/entfernen`'), bis = ansicht.indexOf("if (!confirm(`Addon");
         assert.ok(von > 0 && bis > von, 'die Vorschau kommt nicht VOR dem alten Löschweg');
         const block = ansicht.slice(von, bis);
         for (const s of ['vorschau.fassungen', 'vorschau.tags', 'vorschau.sitzungen', 'vorschau.server > 0']) assert.ok(block.includes(s), `die Rückfrage nennt „${s}" nicht`);
-        assert.match(block, /prompt\(/, 'der Name wird nicht verlangt');
-        assert.match(block, /eingabe\.trim\(\) !== slug/, 'ein falscher Name geht durch');
+        // Der Name wird in einem eigenen Dialog verlangt — nicht in der
+        // Eingabezeile des Browsers: Die lässt sich nicht färben (Betreiber,
+        // 2026-10-09: „roter und fett. ist ja wichtig!!!").
+        assert.ok(!/\b(prompt|confirm|alert)\(/.test(block), 'das Entfernen eines Pakets fragt über einen Browser-Dialog');
+        assert.match(block, /knopf\.disabled = true;[\s\S]{0,260}eingabe\.oninput = \(\) => \{ knopf\.disabled = eingabe\.value\.trim\(\) !== slug; \};/, 'der Knopf ist nicht gesperrt, bis der Name dasteht');
+        assert.match(block, /knopf\.onclick = async \(\) => \{\s*if \(eingabe\.value\.trim\(\) !== slug\) return;/, 'ein falscher Name geht durch');
         assert.match(block, /method: 'POST'[\s\S]{0,120}JSON\.stringify\(\{ slug \}\)/);
-        assert.ok(!/\balert\(/.test(block), 'gemeldet wird per alert()');
+        assert.ok(!/innerHTML/.test(block), 'Namen aus Paketen werden als HTML gesetzt');
+        // Der Dialog selbst: rot, fett, Knopf von Anfang an gesperrt.
+        const dialog = /<div class="modal[^"]*" id="paketEntfernenModal"[\s\S]*?\n<\/div>\n/.exec(ansicht);
+        assert.ok(dialog, 'den Dialog gibt es nicht');
+        assert.match(dialog[0], /class="modal-status bg-danger"/);
+        assert.match(dialog[0], /class="modal-title text-danger fw-bold"/);
+        assert.match(dialog[0], /class="text-danger fw-bold[^"]*"[^>]*>\s*„<span id="paketEntfernenName">/, 'der Name des Pakets steht nicht rot und fett da');
+        assert.match(dialog[0], /Das lässt sich nicht zurücknehmen\./);
+        assert.match(dialog[0], /<button type="button" class="btn btn-danger fw-bold" id="paketEntfernenKnopf" disabled>/, 'der Knopf ist beim Öffnen nicht gesperrt');
+        for (const id of ['paketEntfernenListe', 'paketEntfernenSoll', 'paketEntfernenEingabe']) assert.ok(dialog[0].includes(`id="${id}"`), `dem Dialog fehlt „${id}"`);
     });
 
     console.log(fehler === 0 ? '\n✅ Paket entfernen: alles oder nichts, nie mit Server, nie ohne Namen — und nichts Fremdes\n' : `\n❌ ${fehler} Abweichung(en)\n`);
