@@ -20,6 +20,7 @@
 const crypto = require('crypto');
 const { ServiceManager } = require('dunebot-core');
 const Paketfassung = require('../../../gameserver/dashboard/helpers/Paketfassung');
+const Quellen = require('../../../gameserver/dashboard/helpers/Quellen');
 // Die Tags eines Spiels gehören dem Spiel im Panel, nicht dem Paket (2026-10-08) —
 // die Werkbank reicht sie beim Veröffentlichen weiter, wie Symbol und Banner.
 const Tags = require('../../../../apps/dashboard/helpers/Tags');
@@ -726,10 +727,14 @@ function mischeEinstellung(vorher, neu) {
  *                      Werkbank seit jeher selbst; die beiden Zusätze ziehen
  *                      aus `durchgereicht.install` in `entwurf.install` um.
  *   console            Karte „Konsolenfilter" (2026-10-09) — der ganze Teil.
+ *   content            Karte „Mods", Stufe 1 (2026-10-09) — der flache Teil.
+ *                      `loader`, `by_setting` und `variants` reisen weiter mit
+ *                      (Stufe 2).
  */
 const GANZ = '*';
 const EIGENE = { management: ['query', 'rcon', 'saves', 'persist'], files: ['denylist'], install: ['cache', 'entfernen'],
-    commands: GANZ, config: GANZ, requirements: GANZ, console: GANZ };
+    commands: GANZ, config: GANZ, requirements: GANZ, console: GANZ,
+    content: ['supported', 'sources', 'source_ids', 'path', 'activation', 'order_matters', 'needs_restart', 'client_side'] };
 /** Die Stücke eines Teils, die eine Karte haben — bei GANZ alle, die `objekt` trägt. */
 const eigeneFelder = (teil, objekt) => (EIGENE[teil] === GANZ ? Object.keys(objekt || {}) : EIGENE[teil]);
 /** Hat dieses Stück eine Karte? */
@@ -3092,6 +3097,135 @@ async function konsolenfilterSpeichern(sitzung, b) {
     });
 }
 
+// ── Mods (Karte, Stufe 1, 2026-10-09) ────────────────────────────────────────
+//
+// `content` — der letzte Teil, der bei geöffneten Paketen nur mitreiste. Mit
+// dem Betreiber am 2026-10-09 in zwei Stufen geteilt:
+//
+//   Stufe 1 (diese Karte)   der flache Teil: Mods ja/nein, Quellen mit ihren
+//                           Kennungen, Ablageort, vier Angaben zum Verhalten.
+//   Stufe 2 (offen)         `loader` (Valheims BepInEx mit `adds.env`) und
+//                           `by_setting` + `variants` (Minecrafts fünf Lader).
+//                           Bis dahin reisen diese drei Stücke unverändert mit.
+//
+// Wer die Felder liest, nachgesehen am selben Tag (gameserver-Plugin):
+//
+//   supported       die Mod-Verwaltung des Servers gibt es nur damit
+//   sources         welche Wege der Reiter „Inhalte" anbietet; angebunden sind
+//                   Upload, Thunderstore und Modrinth (helpers/Quellen.js) —
+//                   CurseForge und Workshop nennt das Schema, es gibt sie nicht
+//   source_ids      der „Raum" des Spiels beim Anbieter; ohne ihn gibt es dort
+//                   keine Suche
+//   path            wohin Mods gelegt werden, ab der Wurzel des Volumes — ohne
+//                   ihn weist der Reiter jede Installation ab
+//   needs_restart, client_side, order_matters   Hinweise im Reiter „Inhalte"
+//   activation      liest niemand; es beschreibt nur. `start` gehört zum Lader.
+
+const MODS = {
+    quellen: ['upload', 'thunderstore', 'modrinth', 'curseforge', 'steam-workshop'],
+    aktivierung: ['file_present', 'list', 'setting', 'start'],
+    // Was in Stufe 1 eine Karte hat — der Rest von `content` reist mit.
+    felder: EIGENE.content,
+    max: { pfad: 200, kennung: 80 },
+};
+const RE_MOD_KENNUNG = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+/** Hat das Panel diesen Weg? `upload` ist kein Anbieter — da bringt der Betreiber die Datei. */
+const modQuelleAngebunden = (q) => q === 'upload' || Quellen.gibtEs(q);
+
+function modsAusFormular(b, hatVarianten) {
+    const text = (v) => (typeof v === 'string' ? v.trim() : '');
+    const supported = istWahr(b?.supported);
+    const roh = Array.isArray(b?.sources) ? b.sources.map(text).filter(Boolean) : zeilenListe(b?.sources);
+    const sources = [];
+    for (const q of roh) {
+        if (!MODS.quellen.includes(q)) throw new Error(`Quelle „${q}" gibt es nicht — ${MODS.quellen.join(', ')}.`);
+        if (!sources.includes(q)) sources.push(q);
+    }
+    const source_ids = {};
+    for (const [q, v] of Object.entries(b?.source_ids && typeof b.source_ids === 'object' ? b.source_ids : {})) {
+        const id = text(v);
+        if (!id) continue;
+        if (q === 'upload' || !MODS.quellen.includes(q)) throw new Error(`Kennung für „${q}": Diese Quelle kennt keine Kennung.`);
+        if (!sources.includes(q)) throw new Error(`Kennung für „${q}", aber die Quelle ist nicht eingeschaltet.`);
+        if (id.length > MODS.max.kennung || !RE_MOD_KENNUNG.test(id)) throw new Error(`Kennung für „${q}": Buchstaben, Ziffern, „.", „_" und „-" — so, wie sie beim Anbieter in der Adresse steht.`);
+        if (q === 'steam-workshop' && !/^[0-9]+$/.test(id)) throw new Error('Kennung für „steam-workshop": die AppID des Spiels, nur Ziffern.');
+        source_ids[q] = id;
+    }
+    // Ohne den Raum gibt es beim Anbieter keine Suche (Quellen.raumAus) — die
+    // Quelle stünde im Reiter und fände nichts.
+    for (const q of sources) {
+        if (q !== 'upload' && !source_ids[q]) throw new Error(`Die Quelle „${q}" braucht ihre Kennung — ohne sie weiß die Suche nicht, wo das Spiel dort liegt.`);
+    }
+    const path = text(b?.path).replace(/\/+$/, '');
+    if (path) {
+        if (path.length > MODS.max.pfad) throw new Error(`Ablageort: höchstens ${MODS.max.pfad} Zeichen.`);
+        pruefeVolumePfad(path, 'Ablageort');
+        // Gemessen am 2026-09-12 an Server 188: ohne „game/" landen die Mods in
+        // der Wurzel des Volumes, das Spiel läuft in game/ — und nichts lädt.
+        if (!/^(game|data)\/[^/]/.test(path)) throw new Error('Ablageort: ab der Wurzel des Volumes, also mit „game/" davor (game/BepInEx/plugins) — sonst liegen die Mods neben dem Spiel statt darin.');
+    }
+    const activation = text(b?.activation);
+    if (activation && !MODS.aktivierung.includes(activation)) throw new Error(`Aktivierung: ${MODS.aktivierung.join(', ')}.`);
+    // Die Varianten bringen Quellen und Ablageort selbst mit (Minecraft).
+    if (supported && !hatVarianten) {
+        if (!sources.length) throw new Error('Mods sind eingeschaltet, aber keine Quelle — wenigstens „upload", sonst kommt kein Mod auf den Server.');
+        if (!path) throw new Error('Mods sind eingeschaltet, aber ohne Ablageort — der Server wüsste nicht, wohin damit.');
+    }
+    return { supported, sources, source_ids, path, activation,
+        order_matters: istWahr(b?.order_matters), needs_restart: istWahr(b?.needs_restart), client_side: istWahr(b?.client_side) };
+}
+
+/** Was die Karte „Mods" zeigt — samt dem, was aus `content` noch mitreist. */
+function modsStand(sitzung) {
+    const c = sitzung.entwurf?.content;
+    const rest = sitzung.entwurf?.durchgereicht?.content || {};
+    const quellen = Array.isArray(c?.sources) ? c.sources : [];
+    return {
+        vorhanden: c !== undefined,
+        supported: c?.supported === true,
+        quellen: MODS.quellen.map(q => ({ kennung: q, an: quellen.includes(q), id: c?.source_ids?.[q] || '', angebunden: modQuelleAngebunden(q) })),
+        path: c?.path || '',
+        activation: c?.activation || '',
+        order_matters: c?.order_matters === true,
+        // Fehlt die Angabe, gilt sie als eingeschaltet — wie im Schema und im Daemon.
+        needs_restart: c?.needs_restart !== false,
+        client_side: c?.client_side === true,
+        // Stufe 2: reist mit, wird genannt.
+        lader: rest.loader ? (rest.loader.key || 'ohne Namen') : null,
+        jeEinstellung: rest.by_setting || null,
+        varianten: rest.variants && typeof rest.variants === 'object' ? Object.keys(rest.variants) : [],
+    };
+}
+
+/**
+ * Speichern. Wie bei jeder Karte: Was vorher nicht dastand und leer oder auf
+ * seiner Vorgabe bleibt, entsteht nicht — ein geöffnetes Paket ergibt
+ * unverändert dasselbe Paket. Die Reihenfolge der Quellen bleibt die des
+ * Pakets (der Reiter „Inhalte" zeigt sie in dieser Folge); neue kommen hinten an.
+ */
+async function modsSpeichern(sitzung, b) {
+    await pruefeFrei(sitzung);
+    const rest = sitzung.entwurf?.durchgereicht?.content;
+    const neu = modsAusFormular(b, Boolean(rest?.variants));
+    return entwurfSchreiben(sitzung, (e) => {
+        const c = { ...(e.content || {}) };
+        const leer = !neu.supported && !neu.sources.length && !neu.path && !neu.activation
+            && !neu.order_matters && neu.needs_restart && !neu.client_side;
+        if (e.content === undefined && rest === undefined && leer) return; // ein Spiel ohne Mods: kein Teil
+        c.supported = neu.supported;
+        const vorher = Array.isArray(c.sources) ? c.sources : null;
+        const folge = [...(vorher || []).filter(q => neu.sources.includes(q)), ...neu.sources.filter(q => !(vorher || []).includes(q))];
+        if (folge.length || vorher) c.sources = folge; else delete c.sources;
+        if (Object.keys(neu.source_ids).length || c.source_ids !== undefined) c.source_ids = neu.source_ids; else delete c.source_ids;
+        if (neu.path) c.path = neu.path; else delete c.path;
+        if (neu.activation) c.activation = neu.activation; else delete c.activation;
+        if (neu.order_matters || 'order_matters' in c) c.order_matters = neu.order_matters;
+        if (!neu.needs_restart || 'needs_restart' in c) c.needs_restart = neu.needs_restart;
+        if (neu.client_side || 'client_side' in c) c.client_side = neu.client_side;
+        e.content = c;
+    });
+}
+
 /** Die Stufe, mit der der Durchlauf grün wurde — so, wie sie im Paket stehen soll. */
 function bereitUeber(stufe) {
     if (stufe === 'query') return 'bereit über die Abfrage (das Spiel hat geantwortet)';
@@ -3514,6 +3648,7 @@ module.exports = {
     FESTZEILE, festzeilenStand, festzeileSpeichern, festzeileEntfernen,
     VORAUSSETZUNG, voraussetzungenStand, voraussetzungenSpeichern, voraussetzungenPruefen,
     DATEITEIL, dateiteilStand, dateiteilSpeichern, dateiteilAusFormular, umleitungsVorschlaege,
+    MODS, modsStand, modsSpeichern, modsAusFormular,
     NACHINSTALL, nachInstallationStand, nachInstallationSpeichern, KONSOLENFILTER, konsolenfilterStand, konsolenfilterSpeichern,
     zuPaket, entfernbar, sitzungEntfernen,
     RCON, BEFEHL, GANZ, rconStand, rconSpeichern, rconEntfernen, rconVermerk, rconPruefbefehl, befehlSpeichern, befehlEntfernen,

@@ -334,7 +334,9 @@ const UDP = (purpose, mehr = {}) => ({ purpose, protocol: 'udp', assign: 'pool',
         assert.ok(uebernommen.includes(`management (${rest.join(', ')})`), uebernommen);
         assert.ok(!/management \([^)]*query/.test(uebernommen), 'die Abfrage steht noch unter „unverändert übernommen"');
         // Trägt die Verwaltung NUR die Abfrage, ist von ihr nichts unverändert übernommen.
-        assert.deepStrictEqual(S.durchgereichteTeile({ management: { query: {} }, content: {} }), ['content']);
+        // Seit der Karte „Mods" (2026-10-09) reist auch von `content` nur noch mit, was keine Karte hat.
+        assert.deepStrictEqual(S.durchgereichteTeile({ management: { query: {} }, content: { supported: true, loader: {} } }), ['content (loader)']);
+        assert.deepStrictEqual(S.durchgereichteTeile({ management: { query: {} }, content: { supported: false } }), []);
     });
 
     await pruefe('Sperre beim Neubau: zählt stückweise — eine eigene Abfrage ersetzt die Fernsteuerung des Bestands nicht', async () => {

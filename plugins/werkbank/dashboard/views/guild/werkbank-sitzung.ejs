@@ -1665,6 +1665,126 @@
     </div>
   </div>
 
+  <!-- ── Mods (`content`, Stufe 1, 2026-10-09) ──────────────────────────── -->
+  <%
+    // Der flache Teil von `content`. Lader und Varianten (Stufe 2) reisen mit
+    // und werden hier genannt, damit man sieht, was die Karte NICHT zeigt.
+    const mo = locals.mods || { vorhanden: false, supported: false, quellen: [], path: '', activation: '', order_matters: false, needs_restart: true, client_side: false, lader: null, jeEinstellung: null, varianten: [] };
+    const MO = locals.MODS || { aktivierung: [], max: { pfad: 200, kennung: 80 } };
+    const QUELLE_NAME = { upload: 'Hochladen', thunderstore: 'Thunderstore', modrinth: 'Modrinth', curseforge: 'CurseForge', 'steam-workshop': 'Steam Workshop' };
+    const QUELLE_PLATZ = { thunderstore: 'valheim', modrinth: 'fabric', curseforge: '', 'steam-workshop': '892970' };
+    const AKTIV_NAME = { file_present: 'die Datei liegt im Ordner', list: 'eine Liste nennt sie', setting: 'eine Einstellung nennt sie', start: 'der Lader verändert den Start' };
+  %>
+  <div class="col-12">
+    <div class="card" id="karteMods">
+      <div class="card-header">
+        <h3 class="card-title">Mods</h3>
+        <div class="card-actions">
+          <% if (mo.supported) { %><span class="badge bg-green-lt">mit Mods</span>
+          <% } else { %><span class="text-secondary small">ohne Mods</span><% } %>
+        </div>
+      </div>
+      <div class="card-body">
+        <p class="text-secondary small">
+          Ob der Betreiber auf seinem Server Mods verwalten kann, woher sie kommen und wohin sie gelegt werden.<%- include('werkbank-hilfe', { text:
+            'Mit dem Schalter bekommt jeder Server dieses Spiels den Reiter „Inhalte". Dort lädt der Betreiber Mods hoch oder sucht sie bei den Quellen, die hier eingeschaltet sind. '
+            + 'Die Karte legt nur fest, was das Spiel kann — welche Mods ein Server trägt, entscheidet sein Betreiber. '
+            + 'Braucht das Spiel einen Mod-Lader, der den Start verändert (BepInEx), oder mehrere Lader zur Auswahl (Minecraft), gehört das in einen eigenen Teil, den die Werkbank noch nicht bearbeitet.' }) %>
+        </p>
+
+        <% if (mo.lader || mo.varianten.length) { %>
+          <div class="alert alert-info py-2 mb-3" role="alert">
+            Dieses Paket trägt außerdem
+            <% if (mo.lader) { %>einen Mod-Lader (<span class="font-monospace"><%= mo.lader %></span>)<% } %><% if (mo.lader && mo.varianten.length) { %> und <% } %><% if (mo.varianten.length) { %>je Wert der Einstellung <span class="font-monospace"><%= mo.jeEinstellung || '?' %></span> einen eigenen Vertrag
+              (<span class="font-monospace"><%= mo.varianten.join(', ') %></span>)<% } %>.
+            Das bleibt unverändert und steht unter „Unverändert übernommen".
+            <% if (mo.varianten.length) { %>Quellen und Ablageort stehen dort je Variante — hier bleiben sie leer.<% } %>
+          </div>
+        <% } %>
+
+        <form id="formMods" autocomplete="off">
+          <div class="d-flex align-items-start mb-3">
+            <label class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" name="supported" value="1" <%= mo.supported ? 'checked' : '' %>>
+              <span class="form-check-label">Dieses Spiel kann Mods</span>
+            </label>
+          </div>
+
+          <div class="form-label">Quellen<%- include('werkbank-hilfe', { text:
+            'Woher Mods kommen dürfen. „Hochladen" heißt: Der Betreiber bringt die Datei selbst. '
+            + 'Bei einem Anbieter gehört die Kennung dazu, unter der das Spiel dort geführt wird — bei Thunderstore die Gemeinschaft aus der Adresse (thunderstore.io/c/valheim/), bei Modrinth der Lader (fabric, paper). '
+            + 'Ohne Kennung wüsste die Suche nicht, wo sie suchen soll. Angebunden sind heute Hochladen, Thunderstore und Modrinth; die anderen stehen im Paket, bieten im Panel aber noch nichts an.' }) %></div>
+          <div class="table-responsive">
+            <table class="table table-sm table-vcenter mb-3">
+              <thead><tr><th>Quelle</th><th>Kennung des Spiels dort</th></tr></thead>
+              <tbody>
+                <% mo.quellen.forEach(function (q) { %>
+                  <tr data-mod-quelle="<%= q.kennung %>">
+                    <td class="text-nowrap">
+                      <label class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" name="quelle" value="<%= q.kennung %>" <%= q.an ? 'checked' : '' %>>
+                        <span class="form-check-label"><%= QUELLE_NAME[q.kennung] || q.kennung %></span>
+                      </label>
+                      <% if (!q.angebunden) { %><span class="badge bg-secondary-lt ms-1">im Panel noch nicht angebunden</span><% } %>
+                    </td>
+                    <td>
+                      <% if (q.kennung === 'upload') { %><span class="text-secondary small">braucht keine</span>
+                      <% } else { %>
+                        <input class="form-control form-control-sm font-monospace" name="kennung" value="<%= q.id %>" maxlength="<%= MO.max.kennung %>"
+                               spellcheck="false" placeholder="<%= QUELLE_PLATZ[q.kennung] || '' %>" aria-label="Kennung bei <%= QUELLE_NAME[q.kennung] || q.kennung %>">
+                      <% } %>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="row g-3">
+            <div class="col-md-7">
+              <div class="form-label"><label for="modsPfad">Ablageort</label><%- include('werkbank-hilfe', { text:
+                'Der Ordner, in den Mods gelegt werden — ab der Wurzel des Volumes, also mit game/ davor: game/BepInEx/plugins, game/mods. '
+                + 'Ohne game/ landen die Dateien neben dem Spiel statt darin: Sie liegen da, und nichts lädt sie.' }) %></div>
+              <input class="form-control font-monospace" id="modsPfad" name="path" value="<%= mo.path %>" maxlength="<%= MO.max.pfad %>" spellcheck="false" placeholder="game/mods">
+            </div>
+            <div class="col-md-5">
+              <div class="form-label"><label for="modsAktivierung">Wie ein Mod scharf wird</label><%- include('werkbank-hilfe', { text:
+                'Eine Beschreibung fürs Paket — das Panel wertet sie heute nicht aus. „Der Lader verändert den Start" gehört zu einem Mod-Lader wie BepInEx.' }) %></div>
+              <select class="form-select" id="modsAktivierung" name="activation">
+                <option value="">keine Angabe</option>
+                <% MO.aktivierung.forEach(function (a) { %>
+                  <option value="<%= a %>" <%= mo.activation === a ? 'selected' : '' %>><%= AKTIV_NAME[a] || a %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" name="needs_restart" value="1" <%= mo.needs_restart ? 'checked' : '' %>>
+                <span class="form-check-label">Wirkt erst nach einem Neustart</span>
+              </label>
+            </div>
+            <div class="col-md-4">
+              <label class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" name="client_side" value="1" <%= mo.client_side ? 'checked' : '' %>>
+                <span class="form-check-label">Mitspieler brauchen dieselben Mods</span>
+              </label>
+            </div>
+            <div class="col-md-4">
+              <label class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" name="order_matters" value="1" <%= mo.order_matters ? 'checked' : '' %>>
+                <span class="form-check-label">Die Reihenfolge der Mods zählt</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="mt-3">
+            <button class="btn btn-primary" type="submit" <%= beschaeftigt ? 'disabled' : '' %>><i class="fa-solid fa-floppy-disk me-1"></i>Speichern</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <!-- ── Hinweise für Betreiber (2026-10-06) ───────────────────────────── -->
   <%
     // Was sich nicht einstellen lässt und was man trotzdem wissen muss. Fester
@@ -1902,7 +2022,7 @@
     // Sie reisen unverändert mit und stehen hier, damit man sieht, WAS mitreist.
     const TEIL_NAME = {
       management:   'Aktualisieren — eine Angabe aus dem ersten Konzept; aktualisiert wird über die SteamCMD-Schritte der Installation',
-      content:      'Mod-Verwaltung',
+      content:      'Mod-Lader und Varianten je Einstellung — der flache Teil steht in der Karte „Mods"',
       commands:     'Befehle im Panel (Spieler listen, kicken, bannen, speichern, Durchsage)',
       files:        'Dateien vor dem Start setzen (patch)',
       config:       'feste Zeilen in Dateien',
@@ -3268,6 +3388,27 @@
   });
   einfachesFormular('formKonsolenfilter', '/konsolenfilter', function (form) {
     return { noise: form.noise.value };
+  });
+
+  // ── Mods (Stufe 1, 2026-10-09) ────────────────────────────────────────
+  einfachesFormular('formMods', '/mods', function (form) {
+    var quellen = [], kennungen = {};
+    form.querySelectorAll('[data-mod-quelle]').forEach(function (zeile) {
+      var name = zeile.dataset.modQuelle;
+      if (zeile.querySelector('input[name=quelle]').checked) quellen.push(name);
+      var feld = zeile.querySelector('input[name=kennung]');
+      if (feld) kennungen[name] = feld.value;
+    });
+    return {
+      supported: form.supported.checked ? '1' : '',
+      sources: quellen,
+      source_ids: kennungen,
+      path: form.path.value,
+      activation: form.activation.value,
+      needs_restart: form.needs_restart.checked ? '1' : '',
+      client_side: form.client_side.checked ? '1' : '',
+      order_matters: form.order_matters.checked ? '1' : ''
+    };
   });
 
   // ── Hinweise für Betreiber (2026-10-06) ───────────────────────────────

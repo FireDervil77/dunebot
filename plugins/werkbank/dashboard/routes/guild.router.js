@@ -40,6 +40,9 @@
  *   POST /:kennung/nachinstallation        Aufräumliste und Steam-Zwischenspeicher speichern
  *   POST /:kennung/konsolenfilter          Rauschmuster speichern
  *
+ * Karte „Mods", Stufe 1 (2026-10-09) — der flache Teil von `content`:
+ *   POST /:kennung/mods                    Mods ja/nein, Quellen, Ablageort, Verhalten
+ *
  * Stufe 3 (Prüfdurchlauf):
  *   POST /:kennung/pruefen              ganzes Rezept auf leerem Volume, Start, Stopp
  *   POST /:kennung/pruefung/abbrechen   hängenden Durchlauf von Hand rot setzen
@@ -371,6 +374,8 @@ router.get('/:kennung', requirePermission('WERKBANK.VIEW'), async (req, res) => 
             dateiteil: Sitzungen.dateiteilStand(sitzung, laeufe),
             DATEITEIL: Sitzungen.DATEITEIL,
             nachInstallation: Sitzungen.nachInstallationStand(sitzung),
+            mods: Sitzungen.modsStand(sitzung),
+            MODS: Sitzungen.MODS,
             konsolenfilter: Sitzungen.konsolenfilterStand(sitzung, laeufe),
             durchgereicht: Sitzungen.durchgereichtes(sitzung),
             abfrage: Sitzungen.abfrageStand(sitzung),
@@ -736,6 +741,16 @@ router.post('/:kennung/konsolenfilter', requirePermission('WERKBANK.BAUEN'), asy
         return res.json({ success: true });
     } catch (error) {
         return fehler(res, error, 'Konsolenfilter nicht gespeichert', 400);
+    }
+});
+
+// ── Mods (`content`, Stufe 1, 2026-10-09) ─────────────────────────────────────
+router.post('/:kennung/mods', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.modsSpeichern(await offeneSitzung(req, res), req.body || {});
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Mods nicht gespeichert', 400);
     }
 });
 
