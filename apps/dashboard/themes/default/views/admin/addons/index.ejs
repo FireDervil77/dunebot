@@ -252,8 +252,61 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.addEventListener('click', async function() {
             const addonId = this.dataset.addonId;
             const addonName = this.dataset.addonName || 'dieses Addon';
-            
-            // ✅ Erste Bestätigung bleibt
+
+            // ── Trägt das Spiel ein Paket? Dann ist es mehr als eine Zeile ──────
+            // (Baustelle 178, 2026-10-09.) Der einfache Weg unten weist den Anker
+            // eines Spielpakets ab. Hier wird erst GEZEIGT, was mitgeht —
+            // Fassungen, Tags, Werkbank-Sitzungen — und dann der Name verlangt.
+            const melde = (art, text) => (window.showToast ? window.showToast(art, text) : toastr[art === 'error' ? 'error' : 'success'](text));
+            let vorschau;
+            try {
+                const antwort = await fetch(`/admin/addons/${addonId}/entfernen`, { headers: { Accept: 'application/json' } });
+                vorschau = await antwort.json();
+                if (!antwort.ok || !vorschau.success) throw new Error(vorschau.message || ('HTTP ' + antwort.status));
+            } catch (fehler) {
+                melde('error', 'Was an diesem Spiel hängt, ließ sich nicht ermitteln: ' + fehler.message);
+                return;
+            }
+            if (vorschau.paket) {
+                const slug = vorschau.paket.slug;
+                if (vorschau.server > 0) {
+                    melde('error', vorschau.server + ' Server ' + (vorschau.server === 1 ? 'läuft' : 'laufen') + ' mit „' + slug + '" — erst die Server löschen.');
+                    return;
+                }
+                const zeilen = [
+                    'Das Spielpaket „' + slug + '" wird GANZ entfernt. Das lässt sich nicht zurücknehmen.',
+                    '',
+                    '• ' + vorschau.fassungen.length + ' Fassung(en): ' + vorschau.fassungen.map((f) => f.version + (f.channel === 'stable' ? ' (freigegeben)' : '')).join(', '),
+                    '• ' + vorschau.tags.length + ' Tag-Zuordnung(en) — die Tags selbst bleiben',
+                    '• der Eintrag im Spiele-Marktplatz',
+                ];
+                if (vorschau.sitzungen.length) {
+                    zeilen.push('• ' + vorschau.sitzungen.length + ' Werkbank-Sitzung(en), samt Volume, Schritten und Durchläufen:');
+                    vorschau.sitzungen.forEach((z) => zeilen.push('     – ' + z.name + ' (' + z.kennung + ', ' + z.status + '): ' + z.gruende.join(', ')));
+                } else {
+                    zeilen.push('• keine Werkbank-Sitzung');
+                }
+                zeilen.push('', 'Zum Bestätigen den Namen eintippen: ' + slug);
+                const eingabe = prompt(zeilen.join('\n'));
+                if (eingabe === null) return;
+                if (eingabe.trim() !== slug) { melde('error', 'Der Name stimmt nicht — nichts entfernt.'); return; }
+                this.disabled = true;
+                try {
+                    const antwort = await fetch(`/admin/addons/${addonId}/entfernen`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slug }),
+                    });
+                    const ergebnis = await antwort.json();
+                    if (!antwort.ok || !ergebnis.success) throw new Error(ergebnis.message || ('HTTP ' + antwort.status));
+                    melde('success', ergebnis.message);
+                    setTimeout(() => location.reload(), 1500);
+                } catch (fehler) {
+                    this.disabled = false;
+                    melde('error', fehler.message);
+                }
+                return;
+            }
+
+            // Ein Spiel OHNE Paket: nur der Eintrag im Marktplatz.
             if (!confirm(`Addon "${addonName}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden!`)) return;
             
             try {

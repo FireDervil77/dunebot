@@ -47,6 +47,9 @@
 
 const KANAELE = ['stable', 'test'];
 
+// Für das Entfernen eines Pakets: Die Tags eines Spiels löst nur die Bibliothek.
+const Tags = require('../../../../apps/dashboard/helpers/Tags');
+
 /** Die Guild des Betreibers — nur dort gibt es Entwürfe und den Kanal `test`. */
 function istKontrollGuild(guildId) {
     const k = process.env.CONTROL_GUILD_ID;
@@ -341,8 +344,92 @@ async function kanalSetzen(dbService, { serverId, guildId, kanal }) {
     return { kanal, geaendert: true };
 }
 
+// ── Ein Paket entfernen (Baustelle 178, 2026-10-09) ─────────────────────────
+//
+// Bis hierhin liess sich ein Paket nicht entfernen: `DELETE /admin/addons/:id`
+// weist den Anker eines Spielpakets immer ab — zu Recht, denn ohne ihn wäre das
+// Paket wählbar, aber nicht mehr anlegbar. Es gab nur keinen Weg, das Paket
+// SAMT Anker loszuwerden. Anlass: `factorio-werkbank`, am 2026-09-24 neben dem
+// von Hand geschriebenen `factorio` entstanden, um zu zeigen, dass die Werkbank
+// ein Paket hervorbringt — danach standen zwei Factorios in jeder Auswahl.
+//
+// Die Regel:
+//
+//   Nie mit Server. Ein Server ohne Paket startet nicht, und `gameservers`
+//   zeigt per Fremdschlüssel (RESTRICT) auf den Anker. Geprüft wird trotzdem
+//   hier, damit der Grund ein Satz ist und kein Datenbankfehler.
+//
+//   Alles oder nichts. Fassungen, Paket, Tags, Bewertungen und Anker gehen in
+//   EINER Transaktion — ein Paket ohne Fassungen oder ein Anker ohne Paket wäre
+//   schlimmer als beides zusammen.
+//
+//   Der Name muss mitkommen. Die Kennung allein steht in einer Adresse; wer
+//   sich dort um eine Stelle vertut, entfernt ein anderes Spiel.
+//
+// Gelöscht wird ausdrücklich je Tabelle, nicht über ON DELETE CASCADE: Die
+// Fremdschlüssel stehen heute so (gemessen 2026-10-09), aber eine Tabelle, die
+// irgendwann ohne ihren angelegt wurde, behielte still ihre Zeilen.
+//
+// Werkbank-Sitzungen gehören NICHT hierher — die räumt, wer diese Funktion
+// ruft, vorher über die Werkbank ab (ihr Volume liegt beim Daemon).
+
+const ANKER_ANHANG = ['addon_ratings', 'addon_comments', 'addon_favorites', 'addon_versions'];
+
+/** Was am Entfernen eines Pakets hängt — zum Zeigen VOR der Rückfrage. null: kein Paket. */
+async function entfernenVorschau(dbService, paketId) {
+    const [paket] = await dbService.query('SELECT id, slug, name FROM packages WHERE id = ?', [paketId]);
+    if (!paket) return null;
+    const fassungen = await dbService.query(
+        'SELECT version, channel FROM package_versions WHERE package_id = ? ORDER BY published_at, id', [paketId]);
+    const [s] = await dbService.query('SELECT COUNT(*) AS n FROM gameservers WHERE addon_marketplace_id = ?', [paketId]);
+    const tags = await Tags.fuer(dbService, 'spiel', paketId);
+    return {
+        paket, fassungen, tags,
+        freigegeben: fassungen.filter(f => f.channel === 'stable').map(f => f.version),
+        server: Number(s.n),
+    };
+}
+
+/**
+ * Das Paket samt allem, was nur zu ihm gehört.
+ *
+ * @param {object} dbService
+ * @param {{paketId: number|string, slug: string}} o  `slug` ist die Gegenprobe
+ * @returns {Promise<{paket: object, weg: object}>} was entfernt wurde, je Tabelle gezählt
+ */
+async function entfernen(dbService, { paketId, slug }) {
+    return dbService.transaction(async (verbindung) => {
+        // Dieselbe Gestalt wie dbService.query: Zeilen, nicht [Zeilen, Felder].
+        const q = async (sql, werte) => (await verbindung.query(sql, werte))[0];
+
+        const [paket] = await q('SELECT id, slug, name FROM packages WHERE id = ? FOR UPDATE', [paketId]);
+        if (!paket) throw new Error('Dieses Paket gibt es nicht (mehr).');
+        if (String(slug || '') !== paket.slug) {
+            throw new Error(`Zur Bestätigung gehört der Name des Pakets („${paket.slug}") — bekommen: „${slug || ''}". Nichts entfernt.`);
+        }
+        const [s] = await q('SELECT COUNT(*) AS n FROM gameservers WHERE addon_marketplace_id = ?', [paketId]);
+        if (Number(s.n) > 0) {
+            throw new Error(`${s.n} Server ${Number(s.n) === 1 ? 'läuft' : 'laufen'} mit „${paket.slug}" — ein Server ohne Paket startet nicht. Erst die Server löschen.`);
+        }
+
+        const weg = {};
+        weg.fassungen = (await q('DELETE FROM package_versions WHERE package_id = ?', [paketId])).affectedRows;
+        // Über die Tag-Bibliothek, nicht an ihr vorbei: Sie löst die
+        // Verknüpfungen, die Tags selbst bleiben für andere Spiele stehen.
+        weg.tags = (await Tags.fuer({ query: q }, 'spiel', paketId)).length;
+        await Tags.setze({ query: q }, 'spiel', paketId, []);
+        for (const tabelle of ANKER_ANHANG) {
+            weg[tabelle] = (await q(`DELETE FROM ${tabelle} WHERE addon_id = ?`, [paketId])).affectedRows;
+        }
+        weg.paket = (await q('DELETE FROM packages WHERE id = ?', [paketId])).affectedRows;
+        weg.anker = (await q('DELETE FROM addon_marketplace WHERE id = ?', [paketId])).affectedRows;
+        return { paket, weg };
+    });
+}
+
 module.exports = {
     KANAELE, istKontrollGuild, FASSUNG_FUER_SERVER, FASSUNG_FUER_ANLEGEN,
     ladePaketFuerServer, ladePaketFuerAnlegen, ladePaketeZuServern, ladePaketeFuerAnlegen, ladeNeuesteFassung, ladeNeuesteFassungen, ladeNeuesteFassungenMitInhalt,
     fassungenZuPaket, freigabeJePaket, serverJeKanal, freigeben, zuruecknehmen, kanalSetzen,
+    entfernenVorschau, entfernen,
 };

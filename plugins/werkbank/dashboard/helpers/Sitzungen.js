@@ -457,6 +457,72 @@ async function verwerfen(sitzung) {
     await db().query("UPDATE werkbank_sitzungen SET status = 'verworfen' WHERE id = ?", [sitzung.id]);
 }
 
+// ── Sitzungen eines Pakets entfernen (Baustelle 178, 2026-10-09) ─────────────
+//
+// Wird ein Paket im Adminbereich ganz entfernt, gehen seine Sitzungen mit
+// (Betreiber: „inklusive der dazugehörigen Werkbank-Fassungen"). Sonst bliebe
+// der Entwurf eines Pakets liegen, das es nicht mehr gibt — und der nächste
+// Klick auf „Veröffentlichen" brächte es zurück.
+//
+// „Verwerfen" genügt dafür nicht: Es löscht das Volume, die Zeile bleibt als
+// `verworfen` stehen, samt Entwurf. Entfernen heisst hier: Volume weg UND
+// Zeile weg, mit Schritten, Läufen und Durchläufen.
+//
+// Was zu einem Paket gehört — drei Spuren, jede für sich genügt:
+//   - der Entwurf trägt seinen Slug (die Sitzung würde dorthin veröffentlichen)
+//   - sie wurde aus ihm geöffnet (`werkbank.geoeffnet.paket_id`)
+//   - sie hat schon dorthin veröffentlicht (`werkbank.veroeffentlicht[].slug`)
+
+/** Alle Sitzungen — offene wie verworfene — die zu einem Paket gehören. */
+async function zuPaket({ paketId, slug }) {
+    const zeilen = await db().query(
+        'SELECT id, kennung, guild_id, name, status, rootserver_id, entwurf, updated_at FROM werkbank_sitzungen ORDER BY id');
+    const aus = [];
+    for (const z of zeilen) {
+        const e = json(z.entwurf, {}) || {};
+        const gruende = [];
+        if (slug && e.identity?.slug === slug) gruende.push('Entwurf trägt den Slug');
+        if (paketId && String(e.werkbank?.geoeffnet?.paket_id ?? '') === String(paketId)) gruende.push(`geöffnet aus ${e.werkbank.geoeffnet.version || 'dem Paket'}`);
+        if (slug && (e.werkbank?.veroeffentlicht || []).some(v => v.slug === slug)) gruende.push('hat dorthin veröffentlicht');
+        if (!gruende.length) continue;
+        aus.push({ id: z.id, kennung: z.kennung, guild_id: z.guild_id, name: z.name, status: z.status,
+            rootserver_id: z.rootserver_id, updated_at: z.updated_at, gruende });
+    }
+    return aus;
+}
+
+/**
+ * Darf diese Sitzung jetzt entfernt werden? Wirft mit dem Grund, wenn nicht —
+ * VOR dem ersten Löschen gefragt, für alle, damit nicht die erste weg ist und
+ * die zweite sich sperrt.
+ */
+async function entfernbar(z) {
+    if (z.status !== 'offen') return;
+    const sitzung = await laden(z.guild_id, z.kennung);
+    if (!sitzung) throw new Error(`Die Sitzung „${z.name}" (${z.kennung}) lässt sich nicht laden.`);
+    try { await pruefeFrei(sitzung); }
+    catch (e) { throw new Error(`Sitzung „${z.name}" (${z.kennung}): ${e.message}`); }
+    // Das Volume liegt beim Daemon. Ohne ihn bliebe es liegen, und niemand
+    // wüsste mehr, wozu es gehört.
+    await daemonFuer(sitzung, ` — das Volume der Sitzung „${z.name}" bliebe liegen`);
+}
+
+/** Eine Sitzung ganz entfernen: Volume beim Daemon, dann alle ihre Zeilen. */
+async function sitzungEntfernen(z) {
+    if (z.status === 'offen') {
+        const sitzung = await laden(z.guild_id, z.kennung);
+        if (!sitzung) throw new Error(`Die Sitzung „${z.name}" (${z.kennung}) lässt sich nicht laden.`);
+        // Derselbe Weg wie der Knopf „Verwerfen" — er löscht das Volume und
+        // weist ab, wenn noch etwas läuft.
+        await verwerfen(sitzung);
+    }
+    // Ausdrücklich je Tabelle, nicht über ON DELETE CASCADE (siehe Paketfassung.entfernen).
+    for (const tabelle of ['werkbank_schritte', 'werkbank_laeufe', 'werkbank_pruefungen']) {
+        await db().query(`DELETE FROM ${tabelle} WHERE sitzung_id = ?`, [z.id]);
+    }
+    await db().query('DELETE FROM werkbank_sitzungen WHERE id = ?', [z.id]);
+}
+
 /**
  * Der Paket-Entwurf, wie er gerade steht: der gespeicherte Teil plus die
  * erfolgreichen Schritte in ihrer Reihenfolge. `werkbank` bleibt draußen —
@@ -3130,6 +3196,7 @@ module.exports = {
     angabenTags, tagsUebergeben, portBild, konsolenZeileZu, laufPortsMerken,
     FESTZEILE, festzeilenStand, festzeileSpeichern, festzeileEntfernen,
     VORAUSSETZUNG, voraussetzungenStand, voraussetzungenSpeichern, voraussetzungenPruefen,
+    zuPaket, entfernbar, sitzungEntfernen,
     RCON, BEFEHL, GANZ, rconStand, rconSpeichern, rconEntfernen, rconVermerk, rconPruefbefehl, befehlSpeichern, befehlEntfernen,
     sitzungsImage, imageVariante, neuesterTag, istKalendertag, paketTag, imageName,
     RE_KENNUNG, RE_ZWECK, SCHRITTTYPEN, MAX_AUSGABE, GRENZEN, VORGABE, ERKUNDUNG, hatBereitschaft,

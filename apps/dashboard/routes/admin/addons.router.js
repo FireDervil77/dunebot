@@ -9,6 +9,8 @@
  *   POST   /admin/addons/:id/fassungen/:fassungId/freigeben      — Paketfassung test → stable
  *   POST   /admin/addons/:id/fassungen/:fassungId/zuruecknehmen  — Paketfassung stable → test
  *   DELETE /admin/addons/:id          — Löschen (nie den Anker eines Pakets)
+ *   GET    /admin/addons/:id/entfernen — was am Entfernen eines Spielpakets hängt (JSON)
+ *   POST   /admin/addons/:id/entfernen — das Paket samt Fassungen, Anker, Tags und Werkbank-Sitzungen entfernen
  *
  * Bis zum 2026-09-26 standen hier auch Egg-Import (Pelican-Repositories),
  * Anlegen, JSON-Einfügen, ein game_data-Editor und ein Test-Knopf, der nur
@@ -41,6 +43,8 @@ const Paketfassung = require('../../../../plugins/gameserver/dashboard/helpers/P
 // Hängt ein Paket am neuesten Bau seines Images? (Baustelle 177.) Gleicher Ort,
 // gleicher Grund: Ein Image-Stand betrifft alle Guilds.
 const Imagestand = require('../../../../plugins/gameserver/dashboard/helpers/Imagestand');
+// Ein Paket ganz entfernen (Baustelle 178) — samt seiner Werkbank-Sitzungen.
+const PaketEntfernen = require('../../../../plugins/gameserver/dashboard/helpers/PaketEntfernen');
 
 // Tags kommen aus der Tag-Bibliothek (helpers/Tags.js) — nicht mehr aus dem
 // Kommafeld `addon_marketplace.tags`.
@@ -255,7 +259,44 @@ router.post('/:id/fassungen/:fassungId/zuruecknehmen', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DELETE /admin/addons/:id — Addon löschen
+// ───────────────────────────────────────────────────────────────────
+// GET/POST /admin/addons/:id/entfernen — ein Spielpaket ganz entfernen
+// ───────────────────────────────────────────────────────────────────
+//
+// Baustelle 178 (2026-10-09). `DELETE /:id` weist den Anker eines Pakets ab;
+// hier geht das Paket SAMT Anker — mit seinen Fassungen, Tags und den
+// Werkbank-Sitzungen, die zu ihm gehören. Im Adminbereich, weil ein Paket
+// allen Guilds gehört.
+//
+// Regel und Reihenfolge stehen im Gameserver-Plugin (helpers/PaketEntfernen.js,
+// Paketfassung.entfernen); hier sind nur die beiden Adressen. GET zeigt, was
+// mitginge; POST verlangt den Namen des Pakets als Gegenprobe.
+
+router.get('/:id/entfernen', async (req, res) => {
+    const Logger    = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    try {
+        return res.json({ success: true, ...(await PaketEntfernen.vorschau(dbService, req.params.id)) });
+    } catch (err) {
+        Logger.error('[Addons] Vorschau zum Entfernen fehlgeschlagen:', err);
+        return res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+router.post('/:id/entfernen', async (req, res) => {
+    const Logger    = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    try {
+        const e = await PaketEntfernen.entfernen(dbService, { paketId: req.params.id, slug: req.body?.slug });
+        Logger.info(`[Addons] Paket entfernt: ${e.slug} (ID ${req.params.id}) — ${e.weg.fassungen} Fassung(en), `
+            + `${e.sitzungen.length} Werkbank-Sitzung(en)${e.sitzungen.length ? ': ' + e.sitzungen.join(', ') : ''}`);
+        return res.json({ success: true, message: `„${e.slug}" ist entfernt: ${e.weg.fassungen} Fassung(en), ${e.sitzungen.length} Werkbank-Sitzung(en).`, ...e });
+    } catch (err) {
+        Logger.error('[Addons] Paket entfernen fehlgeschlagen:', err);
+        return res.status(400).json({ success: false, message: err.message, sitzungen: err.sitzungen || [] });
+    }
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 router.delete('/:id', async (req, res) => {
     const Logger    = ServiceManager.get('Logger');
@@ -280,7 +321,7 @@ router.delete('/:id', async (req, res) => {
         if (paket.length) {
             return res.status(400).json({
                 success: false,
-                message: `Das ist der Anker des Spielpakets „${paket[0].slug}" — ohne ihn lässt sich kein Server mehr anlegen.`,
+                message: `Das ist der Anker des Spielpakets „${paket[0].slug}" — ohne ihn lässt sich kein Server mehr anlegen. Das ganze Paket entfernt „Paket entfernen" (POST /admin/addons/${req.params.id}/entfernen).`,
             });
         }
 
