@@ -727,14 +727,17 @@ function mischeEinstellung(vorher, neu) {
  *                      Werkbank seit jeher selbst; die beiden Zusätze ziehen
  *                      aus `durchgereicht.install` in `entwurf.install` um.
  *   console            Karte „Konsolenfilter" (2026-10-09) — der ganze Teil.
- *   content            Karte „Mods", Stufe 1 (2026-10-09) — der flache Teil.
- *                      `loader`, `by_setting` und `variants` reisen weiter mit
- *                      (Stufe 2).
+ *   content            drei Karten (2026-10-09): „Mods" (der flache Teil),
+ *                      „Mod-Lader" (`loader`) und „Mods je Einstellung"
+ *                      (`by_setting`, `variants`). Die Stücke stehen einzeln
+ *                      hier, nicht als GANZ: Ein Feld, das eine spätere Fassung
+ *                      des Schemas bringt, reist dann mit, statt zu verschwinden.
  */
 const GANZ = '*';
 const EIGENE = { management: ['query', 'rcon', 'saves', 'persist'], files: ['denylist'], install: ['cache', 'entfernen'],
     commands: GANZ, config: GANZ, requirements: GANZ, console: GANZ,
-    content: ['supported', 'sources', 'source_ids', 'path', 'activation', 'order_matters', 'needs_restart', 'client_side'] };
+    content: ['supported', 'sources', 'source_ids', 'path', 'activation', 'order_matters', 'needs_restart', 'client_side',
+        'loader', 'by_setting', 'variants'] };
 /** Die Stücke eines Teils, die eine Karte haben — bei GANZ alle, die `objekt` trägt. */
 const eigeneFelder = (teil, objekt) => (EIGENE[teil] === GANZ ? Object.keys(objekt || {}) : EIGENE[teil]);
 /** Hat dieses Stück eine Karte? */
@@ -3124,8 +3127,8 @@ async function konsolenfilterSpeichern(sitzung, b) {
 const MODS = {
     quellen: ['upload', 'thunderstore', 'modrinth', 'curseforge', 'steam-workshop'],
     aktivierung: ['file_present', 'list', 'setting', 'start'],
-    // Was in Stufe 1 eine Karte hat — der Rest von `content` reist mit.
-    felder: EIGENE.content,
+    // Der flache Teil — Lader und Varianten haben ihre eigenen Karten (LADER, variantenStand).
+    felder: ['supported', 'sources', 'source_ids', 'path', 'activation', 'order_matters', 'needs_restart', 'client_side'],
     max: { pfad: 200, kennung: 80 },
 };
 const RE_MOD_KENNUNG = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
@@ -3175,10 +3178,9 @@ function modsAusFormular(b, hatVarianten) {
         order_matters: istWahr(b?.order_matters), needs_restart: istWahr(b?.needs_restart), client_side: istWahr(b?.client_side) };
 }
 
-/** Was die Karte „Mods" zeigt — samt dem, was aus `content` noch mitreist. */
+/** Was die Karte „Mods" zeigt. */
 function modsStand(sitzung) {
     const c = sitzung.entwurf?.content;
-    const rest = sitzung.entwurf?.durchgereicht?.content || {};
     const quellen = Array.isArray(c?.sources) ? c.sources : [];
     return {
         vorhanden: c !== undefined,
@@ -3190,11 +3192,26 @@ function modsStand(sitzung) {
         // Fehlt die Angabe, gilt sie als eingeschaltet — wie im Schema und im Daemon.
         needs_restart: c?.needs_restart !== false,
         client_side: c?.client_side === true,
-        // Stufe 2: reist mit, wird genannt.
-        lader: rest.loader ? (rest.loader.key || 'ohne Namen') : null,
-        jeEinstellung: rest.by_setting || null,
-        varianten: rest.variants && typeof rest.variants === 'object' ? Object.keys(rest.variants) : [],
+        // Was die beiden Nachbarkarten tragen — die Karte verweist darauf.
+        lader: c?.loader ? (c.loader.key || 'ohne Namen') : null,
+        jeEinstellung: c?.by_setting || null,
+        varianten: c?.variants && typeof c.variants === 'object' ? Object.keys(c.variants) : [],
     };
+}
+
+/**
+ * Mods ja/nein, Quellen samt Kennungen und Ablageort in einen Vertrag schreiben
+ * — den des Spiels oder den einer Variante. Die Reihenfolge der Quellen bleibt
+ * die vorhandene (der Reiter „Inhalte" zeigt sie in dieser Folge); neue kommen
+ * hinten an. Eine leere Liste entsteht nicht, wo vorher keine stand.
+ */
+function setzeQuellenUndOrt(c, neu) {
+    c.supported = neu.supported;
+    const vorher = Array.isArray(c.sources) ? c.sources : null;
+    const folge = [...(vorher || []).filter(q => neu.sources.includes(q)), ...neu.sources.filter(q => !(vorher || []).includes(q))];
+    if (folge.length || vorher) c.sources = folge; else delete c.sources;
+    if (Object.keys(neu.source_ids).length || c.source_ids !== undefined) c.source_ids = neu.source_ids; else delete c.source_ids;
+    if (neu.path) c.path = neu.path; else delete c.path;
 }
 
 /**
@@ -3205,23 +3222,219 @@ function modsStand(sitzung) {
  */
 async function modsSpeichern(sitzung, b) {
     await pruefeFrei(sitzung);
+    // Was von `content` (noch) keine Karte hat, läge hier — heute nichts.
     const rest = sitzung.entwurf?.durchgereicht?.content;
-    const neu = modsAusFormular(b, Boolean(rest?.variants));
+    const neu = modsAusFormular(b, Boolean(sitzung.entwurf?.content?.variants));
     return entwurfSchreiben(sitzung, (e) => {
         const c = { ...(e.content || {}) };
         const leer = !neu.supported && !neu.sources.length && !neu.path && !neu.activation
             && !neu.order_matters && neu.needs_restart && !neu.client_side;
         if (e.content === undefined && rest === undefined && leer) return; // ein Spiel ohne Mods: kein Teil
-        c.supported = neu.supported;
-        const vorher = Array.isArray(c.sources) ? c.sources : null;
-        const folge = [...(vorher || []).filter(q => neu.sources.includes(q)), ...neu.sources.filter(q => !(vorher || []).includes(q))];
-        if (folge.length || vorher) c.sources = folge; else delete c.sources;
-        if (Object.keys(neu.source_ids).length || c.source_ids !== undefined) c.source_ids = neu.source_ids; else delete c.source_ids;
-        if (neu.path) c.path = neu.path; else delete c.path;
+        setzeQuellenUndOrt(c, neu);
         if (neu.activation) c.activation = neu.activation; else delete c.activation;
         if (neu.order_matters || 'order_matters' in c) c.order_matters = neu.order_matters;
         if (!neu.needs_restart || 'needs_restart' in c) c.needs_restart = neu.needs_restart;
         if (neu.client_side || 'client_side' in c) c.client_side = neu.client_side;
+        e.content = c;
+    });
+}
+
+// ── Mods, Stufe 2: Lader und Varianten (Karten, 2026-10-09) ──────────────────
+//
+//   content.loader       Ein Mod-Lader, der neben dem Spiel liegt und den Start
+//                        verändert (Valheim: BepInEx). Das Dashboard erkennt an
+//                        `packages`, welche aufgelöste Abhängigkeit der LADER
+//                        ist, und liest aus `log`, welcher Mod geladen wurde;
+//                        der Daemon setzt `adds.env` in den Startauftrag.
+//   content.by_setting   Welche Einstellung entscheidet, WELCHER Vertrag gilt,
+//   content.variants     und je Wert einer (Minecraft: fünf Lader). Aufgelöst
+//                        wird im Dashboard (gameserver/helpers/InhaltJeLader.js),
+//                        bevor irgendwer liest: Ein Wert ohne Eintrag bekommt
+//                        keine Inhalte, die Variante gewinnt gegen das Gemeinsame.
+//
+// `adds.args` (Startzusätze) trägt kein eingeliefertes Paket. Die Karte zeigt
+// sie und lässt sie stehen; bearbeitbar werden sie, wenn ein Spiel sie braucht.
+
+const LADER = {
+    quellen: ['thunderstore', 'modrinth', 'curseforge'],
+    felder: ['key', 'installable_as_content', 'packages', 'path', 'log', 'adds'],
+    max: { name: 60, paket: 120, pfad: 200, variablen: 30, wert: 400 },
+};
+
+function laderAusFormular(b) {
+    const text = (v) => (typeof v === 'string' ? v.trim() : '');
+    if (!istWahr(b?.an)) return null;
+    const key = text(b?.key);
+    if (!key) throw new Error('Mod-Lader: Er braucht einen Namen, etwa „bepinex".');
+    if (key.length > LADER.max.name || !RE_MOD_KENNUNG.test(key)) throw new Error('Mod-Lader: der Name aus Buchstaben, Ziffern, „.", „_" und „-".');
+    const packages = {};
+    for (const [q, v] of Object.entries(b?.packages && typeof b.packages === 'object' ? b.packages : {})) {
+        const name = text(v);
+        if (!name) continue;
+        if (!LADER.quellen.includes(q)) throw new Error(`Mod-Lader: Bei „${q}" gibt es keine Laderpakete.`);
+        if (name.length > LADER.max.paket || !RE_MOD_KENNUNG.test(name)) throw new Error(`Mod-Lader: der Paketname bei „${q}" ohne Fassung und ohne Schrägstrich — etwa denikson-BepInExPack_Valheim.`);
+        packages[q] = name;
+    }
+    const path = text(b?.path).replace(/\/+$/, '');
+    if (path) {
+        if (path.length > LADER.max.pfad) throw new Error(`Mod-Lader, Ordner: höchstens ${LADER.max.pfad} Zeichen.`);
+        pruefeVolumePfad(path, 'Mod-Lader, Ordner');
+        if (!/^(game|data)(\/|$)/.test(path)) throw new Error('Mod-Lader, Ordner: ab der Wurzel des Volumes — für ein Spiel, das aus game/ startet, also „game".');
+    }
+    const log = text(b?.log);
+    if (log) {
+        if (log.length > LADER.max.pfad) throw new Error(`Mod-Lader, Logdatei: höchstens ${LADER.max.pfad} Zeichen.`);
+        pruefeVolumePfad(log, 'Mod-Lader, Logdatei');
+        if (!/^(game|data)\/[^/]/.test(log)) throw new Error('Mod-Lader, Logdatei: ab der Wurzel des Volumes, etwa game/BepInEx/LogOutput.log.');
+    }
+    const env = [];
+    for (const [i, z] of (Array.isArray(b?.env) ? b.env : []).entries()) {
+        const name = text(z?.name);
+        const wert = typeof z?.wert === 'string' ? z.wert : '';
+        if (!name && !wert.trim()) continue; // eine leere Zeile im Formular
+        const nr = `Mod-Lader, Variable ${i + 1}`;
+        if (!RE_VARIABLE.test(name)) throw new Error(`${nr}: der Name aus Buchstaben, Ziffern und _, nicht mit einer Ziffer beginnend (LD_PRELOAD).`);
+        if (env.some(x => x.name === name)) throw new Error(`${nr}: „${name}" steht schon da.`);
+        if (wert.length > LADER.max.wert || /[\r\n]/.test(wert)) throw new Error(`${nr}: der Wert in einer Zeile, höchstens ${LADER.max.wert} Zeichen.`);
+        env.push({ name, wert });
+    }
+    if (env.length > LADER.max.variablen) throw new Error(`Mod-Lader: höchstens ${LADER.max.variablen} Variablen.`);
+    return { key, alsInhalt: istWahr(b?.installable_as_content), packages, path, log, env };
+}
+
+/** Was die Karte „Mod-Lader" zeigt. */
+function laderStand(sitzung) {
+    const l = sitzung.entwurf?.content?.loader;
+    return {
+        vorhanden: l !== undefined,
+        key: l?.key || '',
+        // Fehlt die Angabe, gilt sie als eingeschaltet — wie im Schema und im Daemon.
+        alsInhalt: l?.installable_as_content !== false,
+        pakete: LADER.quellen.map(q => ({ kennung: q, name: l?.packages?.[q] || '' })),
+        path: l?.path || '',
+        log: l?.log || '',
+        env: Object.entries(l?.adds?.env || {}).map(([name, wert]) => ({ name, wert: String(wert) })),
+        // Startzusätze: gezeigt, nicht bearbeitet.
+        args: Array.isArray(l?.adds?.args) ? l.adds.args : [],
+        sonstiges: Object.keys(l || {}).filter(k => !LADER.felder.includes(k)),
+    };
+}
+
+/**
+ * Den Lader speichern — oder entfernen (Schalter aus). Wie bei jeder Karte:
+ * Vorgaben entstehen nicht, wo sie nicht standen; was die Karte nicht kennt
+ * (`adds.args`, künftige Felder), bleibt stehen.
+ */
+async function laderSpeichern(sitzung, b) {
+    await pruefeFrei(sitzung);
+    const neu = laderAusFormular(b);
+    return entwurfSchreiben(sitzung, (e) => {
+        if (!neu) {
+            if (e.content && e.content.loader !== undefined) { e.content = { ...e.content }; delete e.content.loader; }
+            return;
+        }
+        if (e.content?.supported !== true) throw new Error('Mods sind ausgeschaltet — erst in der Karte „Mods" einschalten. Ein Lader ohne Mods lädt nichts.');
+        const vorher = e.content.loader || {};
+        const l = { ...vorher, key: neu.key };
+        if (!neu.alsInhalt || 'installable_as_content' in vorher) l.installable_as_content = neu.alsInhalt;
+        if (Object.keys(neu.packages).length || vorher.packages !== undefined) l.packages = neu.packages; else delete l.packages;
+        if (neu.path) l.path = neu.path; else delete l.path;
+        if (neu.log) l.log = neu.log; else delete l.log;
+        // Das Schema erlaubt Zahl und Ja/Nein als Wert. Ein Wert, der im Formular
+        // so aussieht wie vorher, bleibt, was er war — sonst würde aus `1` „1".
+        const alt = vorher.adds?.env || {};
+        const env = {};
+        for (const { name, wert } of neu.env) env[name] = (alt[name] !== undefined && String(alt[name]) === wert) ? alt[name] : wert;
+        const adds = { ...(vorher.adds || {}) };
+        if (Object.keys(env).length || vorher.adds?.env !== undefined) adds.env = env; else delete adds.env;
+        if (Object.keys(adds).length || vorher.adds !== undefined) l.adds = adds; else delete l.adds;
+        e.content = { ...e.content, loader: l };
+    });
+}
+
+/** Die Werte einer Auswahl — `choices` trägt Texte oder `{ value, name }`. */
+function auswahlWerte(einstellung) {
+    return (Array.isArray(einstellung?.choices) ? einstellung.choices : [])
+        .map(c => (c && typeof c === 'object' ? { wert: String(c.value), name: c.name?.de || c.name?.en || '' } : { wert: String(c), name: '' }));
+}
+
+const VARIANTE_FELDER = ['supported', 'sources', 'source_ids', 'path'];
+
+/** Was die Karte „Mods je Einstellung" zeigt. */
+function variantenStand(sitzung) {
+    const c = sitzung.entwurf?.content || {};
+    const auswahlen = (sitzung.entwurf?.settings || []).filter(s => s.type === 'choice');
+    const gewaehlt = c.by_setting || '';
+    const einstellung = auswahlen.find(s => s.key === gewaehlt) || null;
+    const werte = auswahlWerte(einstellung);
+    const vorhanden = c.variants && typeof c.variants === 'object' ? c.variants : {};
+    const alle = [...werte, ...Object.keys(vorhanden).filter(w => !werte.some(x => x.wert === w)).map(w => ({ wert: w, name: '', verwaist: true }))];
+    return {
+        auswahlen: auswahlen.map(s => ({ key: s.key, name: s.name?.de || s.name?.en || s.key })),
+        jeEinstellung: gewaehlt,
+        // Die Einstellung, an der die Varianten hängen, gibt es nicht (mehr) als Auswahl.
+        einstellungFehlt: Boolean(gewaehlt) && !einstellung,
+        varianten: alle.map(({ wert, name, verwaist }) => {
+            const v = vorhanden[wert];
+            const quellen = Array.isArray(v?.sources) ? v.sources : [];
+            return {
+                wert, name, verwaist: Boolean(verwaist), vorhanden: v !== undefined, supported: v?.supported === true,
+                quellen: MODS.quellen.map(q => ({ kennung: q, an: quellen.includes(q), id: v?.source_ids?.[q] || '', angebunden: modQuelleAngebunden(q) })),
+                path: v?.path || '',
+                sonstiges: Object.keys(v || {}).filter(k => !VARIANTE_FELDER.includes(k)),
+            };
+        }),
+    };
+}
+
+/**
+ * Die Varianten speichern — oder abschalten (keine Einstellung gewählt). Eine
+ * Variante ohne Mods, ohne Quelle und ohne Ort, die es vorher nicht gab,
+ * bekommt keinen Eintrag: Ein Wert ohne Eintrag bekommt keine Inhalte.
+ */
+async function variantenSpeichern(sitzung, b) {
+    await pruefeFrei(sitzung);
+    const key = typeof b?.by_setting === 'string' ? b.by_setting.trim() : '';
+    const geschickt = b?.variants && typeof b.variants === 'object' ? b.variants : {};
+    return entwurfSchreiben(sitzung, (e) => {
+        const c = { ...(e.content || {}) };
+        if (!key) {
+            if (c.variants === undefined && c.by_setting === undefined) return;
+            // Ohne Varianten gilt die Regel der Karte „Mods" wieder für sie selbst.
+            if (c.supported === true && (!Array.isArray(c.sources) || !c.sources.length || !c.path)) {
+                throw new Error('Ohne Varianten braucht die Karte „Mods" selbst Quellen und Ablageort — erst dort eintragen, dann hier abschalten.');
+            }
+            delete c.by_setting;
+            delete c.variants;
+            e.content = c;
+            return;
+        }
+        if (c.supported !== true) throw new Error('Mods sind ausgeschaltet — erst in der Karte „Mods" einschalten.');
+        const einstellung = (e.settings || []).find(s => s.key === key);
+        if (!einstellung) throw new Error(`Die Einstellung „${key}" gibt es im Entwurf nicht.`);
+        if (einstellung.type !== 'choice') throw new Error(`„${key}" ist keine Auswahl — Varianten hängen an den Werten einer Auswahl.`);
+        const werte = auswahlWerte(einstellung).map(x => x.wert);
+        const vorher = c.variants && typeof c.variants === 'object' ? c.variants : {};
+        const neu = {};
+        for (const [wert, roh] of Object.entries(geschickt)) {
+            if (!werte.includes(wert) && vorher[wert] === undefined) throw new Error(`„${wert}" ist kein Wert der Einstellung „${key}".`);
+            if (istWahr(roh?.entfernen)) continue;
+            let f;
+            // Dieselben Regeln wie in der Karte „Mods": Eine Variante mit Mods
+            // braucht Quelle und Ablageort — sie hat niemanden, der sie ihr gibt.
+            try { f = modsAusFormular({ ...roh, needs_restart: '1' }, false); }
+            catch (err) { throw new Error(`Variante „${wert}": ${err.message}`); }
+            const leer = !f.supported && !f.sources.length && !f.path;
+            if (leer && vorher[wert] === undefined) continue;
+            const v = { ...(vorher[wert] || {}) };
+            setzeQuellenUndOrt(v, f);
+            neu[wert] = v;
+        }
+        // Was das Formular nicht geschickt hat, fasst es nicht an.
+        for (const [wert, v] of Object.entries(vorher)) if (!(wert in geschickt)) neu[wert] = v;
+        if (!Object.keys(neu).length) throw new Error('Keine Variante trägt etwas — dann braucht es die Einstellung hier nicht.');
+        c.by_setting = key;
+        c.variants = neu;
         e.content = c;
     });
 }
@@ -3649,6 +3862,7 @@ module.exports = {
     VORAUSSETZUNG, voraussetzungenStand, voraussetzungenSpeichern, voraussetzungenPruefen,
     DATEITEIL, dateiteilStand, dateiteilSpeichern, dateiteilAusFormular, umleitungsVorschlaege,
     MODS, modsStand, modsSpeichern, modsAusFormular,
+    LADER, laderStand, laderSpeichern, variantenStand, variantenSpeichern,
     NACHINSTALL, nachInstallationStand, nachInstallationSpeichern, KONSOLENFILTER, konsolenfilterStand, konsolenfilterSpeichern,
     zuPaket, entfernbar, sitzungEntfernen,
     RCON, BEFEHL, GANZ, rconStand, rconSpeichern, rconEntfernen, rconVermerk, rconPruefbefehl, befehlSpeichern, befehlEntfernen,

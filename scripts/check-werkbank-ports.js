@@ -334,8 +334,9 @@ const UDP = (purpose, mehr = {}) => ({ purpose, protocol: 'udp', assign: 'pool',
         assert.ok(uebernommen.includes(`management (${rest.join(', ')})`), uebernommen);
         assert.ok(!/management \([^)]*query/.test(uebernommen), 'die Abfrage steht noch unter „unverändert übernommen"');
         // Trägt die Verwaltung NUR die Abfrage, ist von ihr nichts unverändert übernommen.
-        // Seit der Karte „Mods" (2026-10-09) reist auch von `content` nur noch mit, was keine Karte hat.
-        assert.deepStrictEqual(S.durchgereichteTeile({ management: { query: {} }, content: { supported: true, loader: {} } }), ['content (loader)']);
+        // Seit den Karten zu Mods (2026-10-09) reist auch von `content` nur noch mit, was keine Karte hat.
+        assert.deepStrictEqual(S.durchgereichteTeile({ management: { query: {} }, content: { supported: true, zukunft: {} } }), ['content (zukunft)']);
+        assert.deepStrictEqual(S.durchgereichteTeile({ management: { query: {} }, content: { supported: true, loader: {} } }), []);
         assert.deepStrictEqual(S.durchgereichteTeile({ management: { query: {} }, content: { supported: false } }), []);
     });
 

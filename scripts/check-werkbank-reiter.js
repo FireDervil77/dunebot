@@ -42,7 +42,7 @@ const SOLL = {
     aufbauen:      ['<h3 class="card-title">Schritte</h3>', '<h3 class="card-title">Nächster Schritt</h3>', '<h3 class="card-title">Entwurf</h3>', 'id="karteNachInstallation"'],
     starten:       ['Probestart</h3>', 'id="karteVoraussetzungen"', 'id="karteSpielstand"', 'id="karteKonsolenfilter"'],
     verbindung:    ['id="kartePorts"', 'id="karteFernsteuerung"'],
-    einstellungen: ['id="karteEinstellungen"', 'id="karteFestzeilen"', 'id="karteMods"', 'id="karteHinweise"'],
+    einstellungen: ['id="karteEinstellungen"', 'id="karteFestzeilen"', 'id="karteMods"', 'id="karteModLader"', 'id="karteModVarianten"', 'id="karteHinweise"'],
     pruefen:       ['Prüfdurchlauf</h3>', 'id="formAngaben"', 'id="karteDurchgereicht"'],
 };
 const huellen = [...ansicht.matchAll(/<div class="col-12" data-reiter="([a-z]+)" role="tabpanel"/g)].map(m => ({ id: m[1], ab: m.index }));

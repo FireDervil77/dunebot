@@ -43,6 +43,10 @@
  * Karte „Mods", Stufe 1 (2026-10-09) — der flache Teil von `content`:
  *   POST /:kennung/mods                    Mods ja/nein, Quellen, Ablageort, Verhalten
  *
+ * Karten „Mod-Lader" und „Mods je Einstellung" (2026-10-09) — `content.loader`, `content.by_setting`/`variants`:
+ *   POST /:kennung/modlader                Lader speichern oder entfernen
+ *   POST /:kennung/modvarianten            Varianten speichern oder abschalten
+ *
  * Stufe 3 (Prüfdurchlauf):
  *   POST /:kennung/pruefen              ganzes Rezept auf leerem Volume, Start, Stopp
  *   POST /:kennung/pruefung/abbrechen   hängenden Durchlauf von Hand rot setzen
@@ -376,6 +380,9 @@ router.get('/:kennung', requirePermission('WERKBANK.VIEW'), async (req, res) => 
             nachInstallation: Sitzungen.nachInstallationStand(sitzung),
             mods: Sitzungen.modsStand(sitzung),
             MODS: Sitzungen.MODS,
+            lader: Sitzungen.laderStand(sitzung),
+            LADER: Sitzungen.LADER,
+            varianten: Sitzungen.variantenStand(sitzung),
             konsolenfilter: Sitzungen.konsolenfilterStand(sitzung, laeufe),
             durchgereicht: Sitzungen.durchgereichtes(sitzung),
             abfrage: Sitzungen.abfrageStand(sitzung),
@@ -751,6 +758,25 @@ router.post('/:kennung/mods', requirePermission('WERKBANK.BAUEN'), async (req, r
         return res.json({ success: true });
     } catch (error) {
         return fehler(res, error, 'Mods nicht gespeichert', 400);
+    }
+});
+
+// ── Mod-Lader und Mods je Einstellung (`content.loader`, `by_setting`/`variants`, 2026-10-09) ──
+router.post('/:kennung/modlader', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.laderSpeichern(await offeneSitzung(req, res), req.body || {});
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Mod-Lader nicht gespeichert', 400);
+    }
+});
+
+router.post('/:kennung/modvarianten', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.variantenSpeichern(await offeneSitzung(req, res), req.body || {});
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Varianten nicht gespeichert', 400);
     }
 });
 

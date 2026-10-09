@@ -1689,16 +1689,16 @@
           Ob der Betreiber auf seinem Server Mods verwalten kann, woher sie kommen und wohin sie gelegt werden.<%- include('werkbank-hilfe', { text:
             'Mit dem Schalter bekommt jeder Server dieses Spiels den Reiter „Inhalte". Dort lädt der Betreiber Mods hoch oder sucht sie bei den Quellen, die hier eingeschaltet sind. '
             + 'Die Karte legt nur fest, was das Spiel kann — welche Mods ein Server trägt, entscheidet sein Betreiber. '
-            + 'Braucht das Spiel einen Mod-Lader, der den Start verändert (BepInEx), oder mehrere Lader zur Auswahl (Minecraft), gehört das in einen eigenen Teil, den die Werkbank noch nicht bearbeitet.' }) %>
+            + 'Braucht das Spiel einen Mod-Lader, der den Start verändert (BepInEx), oder mehrere Lader zur Auswahl (Minecraft), gehört das in die beiden Karten darunter.' }) %>
         </p>
 
         <% if (mo.lader || mo.varianten.length) { %>
           <div class="alert alert-info py-2 mb-3" role="alert">
             Dieses Paket trägt außerdem
             <% if (mo.lader) { %>einen Mod-Lader (<span class="font-monospace"><%= mo.lader %></span>)<% } %><% if (mo.lader && mo.varianten.length) { %> und <% } %><% if (mo.varianten.length) { %>je Wert der Einstellung <span class="font-monospace"><%= mo.jeEinstellung || '?' %></span> einen eigenen Vertrag
-              (<span class="font-monospace"><%= mo.varianten.join(', ') %></span>)<% } %>.
-            Das bleibt unverändert und steht unter „Unverändert übernommen".
-            <% if (mo.varianten.length) { %>Quellen und Ablageort stehen dort je Variante — hier bleiben sie leer.<% } %>
+              (<span class="font-monospace"><%= mo.varianten.join(', ') %></span>)<% } %>
+            — siehe die Karten „Mod-Lader" und „Mods je Einstellung" darunter.
+            <% if (mo.varianten.length) { %>Quellen und Ablageort stehen dort je Variante; hier dürfen sie leer bleiben.<% } %>
           </div>
         <% } %>
 
@@ -1776,6 +1776,205 @@
               </label>
             </div>
           </div>
+
+          <div class="mt-3">
+            <button class="btn btn-primary" type="submit" <%= beschaeftigt ? 'disabled' : '' %>><i class="fa-solid fa-floppy-disk me-1"></i>Speichern</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Mod-Lader (`content.loader`, 2026-10-09) ─────────────────────── -->
+  <%
+    const la = locals.lader || { vorhanden: false, key: '', alsInhalt: true, pakete: [], path: '', log: '', env: [], args: [], sonstiges: [] };
+    const LA = locals.LADER || { max: { name: 60, paket: 120, pfad: 200, wert: 400 } };
+  %>
+  <div class="col-12">
+    <div class="card" id="karteModLader">
+      <div class="card-header">
+        <h3 class="card-title">Mod-Lader</h3>
+        <div class="card-actions">
+          <% if (la.vorhanden) { %><span class="badge bg-green-lt font-monospace"><%= la.key || 'ohne Namen' %></span>
+          <% } else { %><span class="text-secondary small">keiner</span><% } %>
+        </div>
+      </div>
+      <div class="card-body">
+        <p class="text-secondary small">
+          Für Spiele, deren Mods ein eigenes Programm lädt, das neben dem Spiel liegt und dessen Start verändert — etwa BepInEx.<%- include('werkbank-hilfe', { text:
+            'Der Lader ist selbst ein Paket bei der Mod-Quelle. Damit das Panel ihn als Lader erkennt und neben das Spiel legt statt zu den Mods, braucht es seinen Paketnamen dort. '
+            + 'Was der Lader zum Start braucht — meist Umgebungsvariablen wie LD_PRELOAD —, setzt der Server nur dann, wenn der Lader installiert ist. '
+            + 'Ein Spiel, das Mods einfach aus einem Ordner liest, braucht keinen Lader.' }) %>
+        </p>
+        <form id="formModLader" autocomplete="off">
+          <div class="d-flex align-items-start mb-3">
+            <label class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" name="an" value="1" <%= la.vorhanden ? 'checked' : '' %>>
+              <span class="form-check-label">Dieses Spiel braucht einen Mod-Lader</span>
+            </label>
+          </div>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label" for="laderName">Name</label>
+              <input class="form-control font-monospace" id="laderName" name="key" value="<%= la.key %>" maxlength="<%= LA.max.name %>" spellcheck="false" placeholder="bepinex">
+            </div>
+            <div class="col-md-4">
+              <div class="form-label"><label for="laderOrdner">Ordner</label><%- include('werkbank-hilfe', { text:
+                'Wohin das Laderpaket entpackt wird, ab der Wurzel des Volumes. Ein Lader wie BepInEx muss neben der Spieldatei liegen — für ein Spiel, das aus game/ startet, also „game". Leer heißt: die Wurzel des Volumes.' }) %></div>
+              <input class="form-control font-monospace" id="laderOrdner" name="path" value="<%= la.path %>" maxlength="<%= LA.max.pfad %>" spellcheck="false" placeholder="game">
+            </div>
+            <div class="col-md-4">
+              <div class="form-label"><label for="laderLog">Logdatei</label><%- include('werkbank-hilfe', { text:
+                'Die Datei, in die der Lader bei jedem Start schreibt — ab der Wurzel des Volumes, etwa game/BepInEx/LogOutput.log. Aus ihr liest das Panel, welcher Mod geladen wurde und welcher nicht. Ohne die Angabe zeigt der Reiter „Inhalte" keinen Ladestand.' }) %></div>
+              <input class="form-control font-monospace" id="laderLog" name="log" value="<%= la.log %>" maxlength="<%= LA.max.pfad %>" spellcheck="false" placeholder="game/BepInEx/LogOutput.log">
+            </div>
+          </div>
+
+          <div class="form-label mt-3">Paketname des Laders bei der Quelle<%- include('werkbank-hilfe', { text:
+            'Ohne Fassung, so wie das Paket dort heißt — bei Thunderstore etwa denikson-BepInExPack_Valheim. Nur daran erkennt das Panel den Lader unter den Abhängigkeiten eines Mods. Am Namen zu raten wäre falsch: „enthält BepInEx" trifft auch Mods.' }) %></div>
+          <div class="row g-2 mb-3">
+            <% la.pakete.forEach(function (p) { %>
+              <div class="col-md-4" data-lader-paket="<%= p.kennung %>">
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text"><%= QUELLE_NAME[p.kennung] || p.kennung %></span>
+                  <input class="form-control font-monospace" name="paket" value="<%= p.name %>" maxlength="<%= LA.max.paket %>" spellcheck="false" aria-label="Paketname bei <%= QUELLE_NAME[p.kennung] || p.kennung %>">
+                </div>
+              </div>
+            <% }) %>
+          </div>
+
+          <div class="form-label">Was der Lader dem Start hinzufügt<%- include('werkbank-hilfe', { text:
+            'Umgebungsvariablen, die das Spiel nur bekommt, wenn der Lader installiert ist. Der Wert darf auf eine vorhandene Variable verweisen: ./doorstop_libs:{{env:LD_LIBRARY_PATH}}.' }) %></div>
+          <div class="table-responsive">
+            <table class="table table-sm table-vcenter mb-2">
+              <thead><tr><th>Variable</th><th>Wert</th><th class="w-1"></th></tr></thead>
+              <tbody id="laderVariablen">
+                <% la.env.forEach(function (z) { %>
+                  <tr data-lader-variable>
+                    <td><input class="form-control form-control-sm font-monospace" name="name" value="<%= z.name %>" spellcheck="false" placeholder="LD_PRELOAD" aria-label="Variable"></td>
+                    <td><input class="form-control form-control-sm font-monospace" name="wert" value="<%= z.wert %>" maxlength="<%= LA.max.wert %>" spellcheck="false" aria-label="Wert"></td>
+                    <td><button class="btn btn-sm btn-ghost-danger" type="button" data-lader-variable-weg title="Variable entfernen" aria-label="Variable entfernen"><i class="fa-solid fa-xmark"></i></button></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+          <button class="btn btn-sm btn-outline-secondary mb-3" type="button" id="knopfLaderVariableNeu"><i class="fa-solid fa-plus me-1"></i>Variable hinzufügen</button>
+
+          <% if (la.args.length || la.sonstiges.length) { %>
+            <div class="text-secondary small mb-3">
+              Das Paket trägt außerdem — bleibt unverändert:
+              <% if (la.args.length) { %>Startzusätze <span class="font-monospace"><%= JSON.stringify(la.args) %></span><% } %>
+              <% if (la.sonstiges.length) { %><span class="font-monospace"><%= la.sonstiges.join(', ') %></span><% } %>
+            </div>
+          <% } %>
+
+          <div class="d-flex align-items-start mb-3">
+            <label class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" name="installable_as_content" value="1" <%= la.alsInhalt ? 'checked' : '' %>>
+              <span class="form-check-label">Der Lader lässt sich wie ein Mod nachinstallieren</span>
+            </label><%- include('werkbank-hilfe', { text:
+              'Eingeschaltet ist die Vorgabe: Der Lader kommt über die Quelle auf den Server, wie ein Mod. Ausschalten sagt, dass er ins Image oder in die Installation gehört. Es ist eine Beschreibung fürs Paket — Panel und Server werten sie heute nicht aus.' }) %>
+          </div>
+
+          <button class="btn btn-primary" type="submit" <%= beschaeftigt ? 'disabled' : '' %>><i class="fa-solid fa-floppy-disk me-1"></i>Speichern</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Mods je Einstellung (`content.by_setting`, `content.variants`, 2026-10-09) ── -->
+  <%
+    const va = locals.varianten || { auswahlen: [], jeEinstellung: '', einstellungFehlt: false, varianten: [] };
+  %>
+  <div class="col-12">
+    <div class="card" id="karteModVarianten">
+      <div class="card-header">
+        <h3 class="card-title">Mods je Einstellung</h3>
+        <div class="card-actions"><span class="text-secondary small">
+          <%= va.jeEinstellung ? 'hängt an „' + va.jeEinstellung + '"' : 'nicht benutzt' %>
+        </span></div>
+      </div>
+      <div class="card-body">
+        <p class="text-secondary small">
+          Für Spiele mit mehreren Mod-Ladern zur Auswahl: Je Wert einer Einstellung gelten eigene Quellen und ein eigener Ablageort.<%- include('werkbank-hilfe', { text:
+            'Beispiel Minecraft: Die Einstellung „loader" entscheidet — Paper nimmt Plugins nach game/plugins, Fabric Mods nach game/mods, Vanilla gar nichts. '
+            + 'Was in der Karte „Mods" steht, gilt für alle; die Variante gewinnt, wo sie etwas anderes sagt. Ein Wert ohne Eintrag bekommt keine Mods. '
+            + 'Die Einstellung muss eine Auswahl sein und im Entwurf stehen.' }) %>
+        </p>
+        <% if (va.einstellungFehlt) { %>
+          <div class="alert alert-warning py-2 mb-3" role="alert">
+            Die Varianten hängen an der Einstellung <span class="font-monospace"><%= va.jeEinstellung %></span> — die gibt es im Entwurf nicht (mehr) als Auswahl. Kein Server bekäme damit Mods.
+          </div>
+        <% } %>
+        <form id="formModVarianten" autocomplete="off">
+          <div class="row g-3 mb-3">
+            <div class="col-md-5">
+              <label class="form-label" for="variantenEinstellung">Welche Einstellung entscheidet</label>
+              <select class="form-select" id="variantenEinstellung" name="by_setting">
+                <option value="">keine — für alle gilt die Karte „Mods"</option>
+                <% va.auswahlen.forEach(function (s) { %>
+                  <option value="<%= s.key %>" <%= va.jeEinstellung === s.key ? 'selected' : '' %>><%= s.name %> (<%= s.key %>)</option>
+                <% }) %>
+                <% if (va.einstellungFehlt) { %><option value="<%= va.jeEinstellung %>" selected><%= va.jeEinstellung %> (fehlt im Entwurf)</option><% } %>
+              </select>
+              <% if (!va.auswahlen.length) { %><div class="form-hint">Der Entwurf hat keine Einstellung vom Typ Auswahl.</div><% } %>
+              <% if (va.jeEinstellung && !va.varianten.length) { %><div class="form-hint">Nach dem Speichern erscheinen hier die Werte der Einstellung.</div><% } %>
+            </div>
+          </div>
+
+          <% va.varianten.forEach(function (v) { %>
+            <details class="mb-2" data-variante="<%= v.wert %>" <%= v.verwaist ? 'open' : '' %>>
+              <summary>
+                <span class="font-monospace"><%= v.wert %></span>
+                <% if (v.name) { %><span class="text-secondary">— <%= v.name %></span><% } %>
+                <% if (v.verwaist) { %><span class="badge bg-yellow-lt ms-1">kein Wert der Einstellung mehr</span>
+                <% } else if (!v.vorhanden) { %><span class="badge bg-secondary-lt ms-1">kein Eintrag — keine Mods</span>
+                <% } else if (v.supported) { %><span class="badge bg-green-lt ms-1"><%= v.path || 'mit Mods' %></span>
+                <% } else { %><span class="badge bg-secondary-lt ms-1">keine Mods</span><% } %>
+              </summary>
+              <div class="mt-2 ps-3">
+                <div class="row g-3 mb-2">
+                  <div class="col-md-4">
+                    <label class="form-check form-switch mb-0">
+                      <input class="form-check-input" type="checkbox" name="supported" value="1" <%= v.supported ? 'checked' : '' %>>
+                      <span class="form-check-label">Mit diesem Wert gibt es Mods</span>
+                    </label>
+                  </div>
+                  <div class="col-md-8">
+                    <div class="input-group input-group-sm">
+                      <span class="input-group-text">Ablageort</span>
+                      <input class="form-control font-monospace" name="path" value="<%= v.path %>" spellcheck="false" placeholder="game/mods" aria-label="Ablageort für <%= v.wert %>">
+                    </div>
+                  </div>
+                </div>
+                <div class="row g-2 mb-2">
+                  <% v.quellen.forEach(function (q) { %>
+                    <div class="col-md-6" data-mod-quelle="<%= q.kennung %>">
+                      <div class="d-flex align-items-center gap-2">
+                        <label class="form-check form-switch mb-0 text-nowrap">
+                          <input class="form-check-input" type="checkbox" name="quelle" value="<%= q.kennung %>" <%= q.an ? 'checked' : '' %>>
+                          <span class="form-check-label"><%= QUELLE_NAME[q.kennung] || q.kennung %></span>
+                        </label>
+                        <% if (q.kennung !== 'upload') { %>
+                          <input class="form-control form-control-sm font-monospace" name="kennung" value="<%= q.id %>" spellcheck="false" placeholder="Kennung" aria-label="Kennung bei <%= QUELLE_NAME[q.kennung] || q.kennung %> für <%= v.wert %>">
+                        <% } %>
+                      </div>
+                    </div>
+                  <% }) %>
+                </div>
+                <% if (v.sonstiges.length) { %>
+                  <div class="text-secondary small mb-2">Trägt außerdem — bleibt unverändert: <span class="font-monospace"><%= v.sonstiges.join(', ') %></span></div>
+                <% } %>
+                <% if (v.verwaist) { %>
+                  <label class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" name="entfernen" value="1">
+                    <span class="form-check-label">Diesen Eintrag entfernen</span>
+                  </label>
+                <% } %>
+              </div>
+            </details>
+          <% }) %>
 
           <div class="mt-3">
             <button class="btn btn-primary" type="submit" <%= beschaeftigt ? 'disabled' : '' %>><i class="fa-solid fa-floppy-disk me-1"></i>Speichern</button>
@@ -2022,7 +2221,7 @@
     // Sie reisen unverändert mit und stehen hier, damit man sieht, WAS mitreist.
     const TEIL_NAME = {
       management:   'Aktualisieren — eine Angabe aus dem ersten Konzept; aktualisiert wird über die SteamCMD-Schritte der Installation',
-      content:      'Mod-Lader und Varianten je Einstellung — der flache Teil steht in der Karte „Mods"',
+      content:      'Angaben zu Mods, die die Werkbank noch nicht kennt',
       commands:     'Befehle im Panel (Spieler listen, kicken, bannen, speichern, Durchsage)',
       files:        'Dateien vor dem Start setzen (patch)',
       config:       'feste Zeilen in Dateien',
@@ -3392,23 +3591,103 @@
 
   // ── Mods (Stufe 1, 2026-10-09) ────────────────────────────────────────
   einfachesFormular('formMods', '/mods', function (form) {
-    var quellen = [], kennungen = {};
-    form.querySelectorAll('[data-mod-quelle]').forEach(function (zeile) {
-      var name = zeile.dataset.modQuelle;
-      if (zeile.querySelector('input[name=quelle]').checked) quellen.push(name);
-      var feld = zeile.querySelector('input[name=kennung]');
-      if (feld) kennungen[name] = feld.value;
-    });
+    var q = quellenAus(form);
     return {
       supported: form.supported.checked ? '1' : '',
-      sources: quellen,
-      source_ids: kennungen,
+      sources: q.sources,
+      source_ids: q.source_ids,
       path: form.path.value,
       activation: form.activation.value,
       needs_restart: form.needs_restart.checked ? '1' : '',
       client_side: form.client_side.checked ? '1' : '',
       order_matters: form.order_matters.checked ? '1' : ''
     };
+  });
+
+  // ── Mod-Lader und Mods je Einstellung (2026-10-09) ────────────────────
+  // Die Zeilen der Variablen entstehen als Elemente, nie als HTML-Text.
+  var laderZeilen = document.getElementById('laderVariablen');
+  if (laderZeilen) {
+    function laderZeile() {
+      var zeile = document.createElement('tr');
+      zeile.setAttribute('data-lader-variable', '');
+      [['name', 'LD_PRELOAD', 'Variable'], ['wert', '', 'Wert']].forEach(function (f) {
+        var zelle = document.createElement('td');
+        var feld = document.createElement('input');
+        feld.className = 'form-control form-control-sm font-monospace';
+        feld.name = f[0];
+        feld.placeholder = f[1];
+        feld.spellcheck = false;
+        feld.setAttribute('aria-label', f[2]);
+        zelle.appendChild(feld);
+        zeile.appendChild(zelle);
+      });
+      var zelle = document.createElement('td');
+      var weg = document.createElement('button');
+      weg.type = 'button';
+      weg.className = 'btn btn-sm btn-ghost-danger';
+      weg.setAttribute('data-lader-variable-weg', '');
+      weg.title = 'Variable entfernen';
+      weg.setAttribute('aria-label', 'Variable entfernen');
+      var kreuz = document.createElement('i');
+      kreuz.className = 'fa-solid fa-xmark';
+      weg.appendChild(kreuz);
+      zelle.appendChild(weg);
+      zeile.appendChild(zelle);
+      laderZeilen.appendChild(zeile);
+      return zeile;
+    }
+    document.getElementById('knopfLaderVariableNeu').addEventListener('click', function () {
+      laderZeile().querySelector('input').focus();
+    });
+    laderZeilen.addEventListener('click', function (ev) {
+      var knopf = ev.target.closest('[data-lader-variable-weg]');
+      if (knopf) knopf.closest('tr').remove();
+    });
+  }
+  /** Quellen und Kennungen aus einem Abschnitt lesen — Karte „Mods" und jede Variante. */
+  function quellenAus(abschnitt) {
+    var quellen = [], kennungen = {};
+    abschnitt.querySelectorAll('[data-mod-quelle]').forEach(function (zeile) {
+      var name = zeile.dataset.modQuelle;
+      if (zeile.querySelector('input[name=quelle]').checked) quellen.push(name);
+      var feld = zeile.querySelector('input[name=kennung]');
+      if (feld) kennungen[name] = feld.value;
+    });
+    return { sources: quellen, source_ids: kennungen };
+  }
+  einfachesFormular('formModLader', '/modlader', function (form) {
+    var pakete = {}, variablen = [];
+    form.querySelectorAll('[data-lader-paket]').forEach(function (p) {
+      pakete[p.dataset.laderPaket] = p.querySelector('input[name=paket]').value;
+    });
+    form.querySelectorAll('[data-lader-variable]').forEach(function (zeile) {
+      variablen.push({ name: zeile.querySelector('input[name=name]').value, wert: zeile.querySelector('input[name=wert]').value });
+    });
+    return {
+      an: form.an.checked ? '1' : '',
+      key: form.key.value,
+      path: form.path.value,
+      log: form.log.value,
+      packages: pakete,
+      env: variablen,
+      installable_as_content: form.installable_as_content.checked ? '1' : ''
+    };
+  });
+  einfachesFormular('formModVarianten', '/modvarianten', function (form) {
+    var varianten = {};
+    form.querySelectorAll('[data-variante]').forEach(function (v) {
+      var q = quellenAus(v);
+      var weg = v.querySelector('input[name=entfernen]');
+      varianten[v.dataset.variante] = {
+        supported: v.querySelector('input[name=supported]').checked ? '1' : '',
+        path: v.querySelector('input[name=path]').value,
+        sources: q.sources,
+        source_ids: q.source_ids,
+        entfernen: weg && weg.checked ? '1' : ''
+      };
+    });
+    return { by_setting: form.by_setting.value, variants: varianten };
   });
 
   // ── Hinweise für Betreiber (2026-10-06) ───────────────────────────────
