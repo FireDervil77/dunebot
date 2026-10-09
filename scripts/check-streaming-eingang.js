@@ -158,8 +158,43 @@ console.log('\nUebersetzung ins Hausvokabular');
     pruefe('ohne Kanal -> null', twitch.uebersetzen({}, { event: {} }), null);
 }
 
-console.log(gescheitert === 0
-    ? `\nErgebnis: ${geprueft} Faelle, 0 Abweichungen.\n`
-    : `\nErgebnis: ${geprueft} Faelle, ${gescheitert} Abweichung(en).\n`);
+// ── Der Router selbst: Eine Ablehnung nennt die Nachricht (2026-10-09) ──────
+//
+// Am 09.10. standen 341 Zeilen „Signatur ungueltig (Abo 15)" im Protokoll. Es
+// war die Abnahme-Probe (`check-streaming-abnahme.js`, 31 falsch signierte
+// Zustellungen je Lauf) — nur stand das nirgends. Jetzt traegt die Zeile die
+// Nachrichtenkennung, und die der Probe beginnt mit „abnahme-". Die Kennung
+// kommt aus einer ungeprueften Kopfzeile und wird deshalb entschaerft.
+{
+    console.log('\nRouter: die Ablehnung nennt die Nachricht');
+    const { ServiceManager } = require('dunebot-core');
+    const zeilen = [];
+    const still = () => {};
+    ServiceManager.register('Logger', { warn: (m) => zeilen.push(String(m)), info: still, debug: still, error: still, success: still });
+    ServiceManager.register('dbService', { query: async () => { throw new Error('bei einer Ablehnung vor dem Abo wird nichts gefragt'); } });
+    const router = require('../plugins/streaming/dashboard/routes/webhook.router');
+    const eingang = router.stack.find(s => s.route && s.route.path === '/' && s.route.methods.post).route.stack[0].handle;
+    const antworte = async (headers) => {
+        let status = null;
+        const res = { status(c) { status = c; return this; }, end() { return this; }, type() { return this; }, send() { return this; } };
+        // Ohne Zeitstempel: Der Eingang lehnt ab, bevor er ein Abo sucht.
+        await eingang({ headers: { 'twitch-eventsub-message-type': 'notification', ...headers }, rawBody: Buffer.from('{}'), body: {}, ip: '203.0.113.7' }, res);
+        return status;
+    };
+    (async () => {
+        pruefe('abgelehnt wird mit 403', await antworte({ 'twitch-eventsub-message-id': 'abnahme-1234' }), 403);
+        pruefe('die Zeile nennt Grund, Absender und Nachricht', zeilen[0],
+            '[Streaming/Eingang] abgelehnt (403): Zeitstempel zu alt oder fehlt — von 203.0.113.7, Nachricht abnahme-1234');
+        await antworte({});
+        pruefe('ohne Kennung steht das da', /Nachricht ohne Kennung$/.test(zeilen[1]), true);
+        // Die Kopfzeile ist ungeprueft: kein Zeilenumbruch, keine Steuerzeichen, keine beliebige Laenge im Protokoll.
+        await antworte({ 'twitch-eventsub-message-id': 'x\n[Security] gefaelscht \u001b[31m' + 'y'.repeat(500) });
+        pruefe('eine praeparierte Kennung bleibt eine Zeile aus harmlosen Zeichen',
+            !/[\n\r\u001b\[\] ]/.test(zeilen[2].split('Nachricht ')[1]) && zeilen[2].split('Nachricht ')[1].length === 80, true);
 
-process.exit(gescheitert === 0 ? 0 : 1);
+        console.log(gescheitert === 0
+            ? `\nErgebnis: ${geprueft} Faelle, 0 Abweichungen.\n`
+            : `\nErgebnis: ${geprueft} Faelle, ${gescheitert} Abweichung(en).\n`);
+        process.exit(gescheitert === 0 ? 0 : 1);
+    })().catch((e) => { console.error('FEHLER:', e.message); process.exit(1); });
+}

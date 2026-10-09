@@ -83,7 +83,19 @@ router.post('/', async (req, res) => {
      * @returns {*} Antwort
      */
     const ablehnen = (code, grund) => {
-        Logger.warn(`[Streaming/Eingang] abgelehnt (${code}): ${grund} — von ${req.ip}`);
+        // Die Nachrichtenkennung steht dabei (2026-10-09): Am 09.10. standen 341
+        // Zeilen „Signatur ungueltig (Abo 15)" im Protokoll, alle von der
+        // eigenen Adresse — es war `scripts/check-streaming-abnahme.js`, das
+        // bei jedem Lauf 31 Zustellungen absichtlich falsch signiert (Faelle 8
+        // und 18). Seine Kennungen beginnen mit „abnahme-"; ohne sie in der
+        // Zeile sah die Probe aus wie ein Abo, das Twitch falsch unterschreibt.
+        // Die Kennung kommt aus einer UNGEPRUEFTEN Kopfzeile: gekuerzt und auf
+        // harmlose Zeichen beschraenkt, bevor sie ins Protokoll geht.
+        const roh = twitch.nachrichtId(req.headers);
+        const kennung = typeof roh === 'string' && roh
+            ? roh.slice(0, 80).replace(/[^A-Za-z0-9._-]/g, '?')
+            : 'ohne Kennung';
+        Logger.warn(`[Streaming/Eingang] abgelehnt (${code}): ${grund} — von ${req.ip}, Nachricht ${kennung}`);
         return res.status(code).end();
     };
 
