@@ -682,7 +682,7 @@ async function hinweisEntfernen(sitzung, key) {
 const START_FELDER = ['program', 'workdir', 'args', 'stop', 'ready_when'];
 const BEREIT_FELDER = ['port', 'log_line', 'without_port', 'timeout_sec'];
 const EINSTELLUNG_FELDER = ['key', 'group', 'name', 'description', 'type', 'default', 'min', 'max',
-    'choices', 'apply', 'takes_effect', 'risk', 'role', 'required'];
+    'choices', 'apply', 'takes_effect', 'risk', 'role', 'ask_on_create', 'required'];
 
 /**
  * `neu` ersetzt in `vorher` genau die Felder, die das Formular kennt — ein
@@ -1040,6 +1040,10 @@ function durchgereichtes(sitzung) {
 const EINSTELLUNG = {
     typen:   ['text', 'number', 'boolean', 'choice', 'password'],
     rollen:  ['player', 'owner', 'expert'],
+    // Was die Auswahl „Rolle" der Werkbank anbietet. `player_spaeter` gibt es
+    // nur im Formular: Im Paket ist es `role: player` + `ask_on_create: false`
+    // (einfache Ansicht, aber nicht im Anlegeformular) — siehe rolleAusFormular.
+    rollenFormular: ['player', 'player_spaeter', 'owner', 'expert'],
     wirkung: ['instant', 'restart', 'new_world', 'reinstall'],
     risiko:  ['none', 'progress', 'world_reset'],
     ziele:   ['file', 'env', 'arg', 'rcon'],
@@ -1075,6 +1079,44 @@ function umgebungAusEinstellungen(settings, env, uebernommen = {}) {
  * Formular → Einstellung im Format des Pakets. Wirft mit einem Satz, der sagt,
  * was fehlt — geprüft wird hier, wo getippt wird, nicht erst im Durchlauf.
  */
+// ── Rolle und Anlegefrage (2026-10-10) ───────────────────────────────────────
+//
+// Betreiber: „falls es einstellungen gibt die ich gern in der einfachen karte
+// hätte, die aber für die erstellung des servers nicht wirklich notwendig
+// sind." Die Rolle sagt, WER eine Einstellung sieht; wann sie gefragt wird,
+// ist eine zweite Frage. Im Paket sind es deshalb zwei Felder (`role`,
+// `ask_on_create`), in der Werkbank EINE Auswahl mit vier Einträgen.
+
+const ROLLE_SPAETER = 'player_spaeter';
+
+/** Auswahl der Werkbank → Felder des Pakets. */
+function rolleAusFormular(wert) {
+    return wert === ROLLE_SPAETER ? { role: 'player', ask_on_create: false } : { role: wert };
+}
+
+/** Felder des Pakets → Auswahl der Werkbank. */
+function rolleAlsFormular(e) {
+    const rolle = e?.role || 'expert';
+    return rolle === 'player' && e.ask_on_create === false ? ROLLE_SPAETER : rolle;
+}
+
+/**
+ * „Nicht beim Anlegen" darf nur behaupten, was das Panel auch hält. Zwei Fälle
+ * fragt es trotzdem (Serverseite.beimAnlegenGefragt) — die werden hier
+ * abgewiesen, statt eine Auswahl zu speichern, die nichts bewirkt.
+ */
+function pruefeAnlegefrage(e) {
+    if (e.ask_on_create !== false) return;
+    if (e.takes_effect === 'reinstall') {
+        throw new Error(`„${e.key}" wirkt nur mit einer Neuinstallation — das wird immer beim Anlegen gefragt, `
+            + 'sonst legte das Panel still etwas fest, das sich nur mit Datenverlust ändern lässt. Rolle „einfache Ansicht + Anlegen" wählen.');
+    }
+    if (e.required === true && (e.default === undefined || e.default === null || e.default === '')) {
+        throw new Error(`„${e.key}" ist Pflicht und hat keine Vorgabe — ohne Frage beim Anlegen entstünde ein Server, der nicht startet. `
+            + 'Eine Vorgabe eintragen oder die Rolle „einfache Ansicht + Anlegen" wählen.');
+    }
+}
+
 function einstellungAusFormular(b) {
     const text = (k) => (typeof b[k] === 'string' ? b[k].trim() : typeof b[k] === 'number' ? String(b[k]) : '');
     const key = text('key');
@@ -1098,7 +1140,7 @@ function einstellungAusFormular(b) {
         return v;
     };
     e.type = aus('type', EINSTELLUNG.typen, 'Typ');
-    e.role = aus('role', EINSTELLUNG.rollen, 'Rolle');
+    Object.assign(e, rolleAusFormular(aus('role', EINSTELLUNG.rollenFormular, 'Rolle')));
     e.takes_effect = aus('takes_effect', EINSTELLUNG.wirkung, 'Wirkung');
     const risiko = text('risk') || 'none';
     if (!EINSTELLUNG.risiko.includes(risiko)) throw new Error(`Risiko: „${risiko}" gibt es nicht — erlaubt: ${EINSTELLUNG.risiko.join(', ')}.`);
@@ -1170,6 +1212,7 @@ function einstellungAusFormular(b) {
         return ziel;
     });
     if (!e.apply.length) throw new Error('Mindestens ein Ziel — sonst landet der Wert nirgends.');
+    pruefeAnlegefrage(e);
     return e;
 }
 
@@ -1217,15 +1260,24 @@ async function einstellungEntfernen(sitzung, key) {
  * Nur die Rolle umstellen — direkt aus der Tabelle, ohne das ganze Formular.
  * Die Rolle entscheidet, wo die Einstellung später steht (Serverseite.js,
  * HOEHE): `player` im Anlegeformular und in der einfachen Ansicht, `owner`
- * und `expert` nur in der fachlichen.
+ * und `expert` nur in der fachlichen. `player_spaeter` (nur hier, siehe
+ * rolleAusFormular): einfache Ansicht, aber nicht im Anlegeformular.
  */
 async function einstellungRolleSetzen(sitzung, key, rolle) {
     await pruefeFrei(sitzung);
-    if (!EINSTELLUNG.rollen.includes(rolle)) throw new Error(`Rolle: ${EINSTELLUNG.rollen.join(', ')}.`);
-    if (!(sitzung.entwurf?.settings || []).some(x => x.key === key)) throw new Error(`Keine Einstellung „${key}".`);
+    if (!EINSTELLUNG.rollenFormular.includes(rolle)) throw new Error(`Rolle: ${EINSTELLUNG.rollenFormular.join(', ')}.`);
+    const vorher = (sitzung.entwurf?.settings || []).find(x => x.key === key);
+    if (!vorher) throw new Error(`Keine Einstellung „${key}".`);
+    // Erst prüfen, dann schreiben — gegen die Einstellung, wie sie danach wäre.
+    const felder = rolleAusFormular(rolle);
+    pruefeAnlegefrage({ ...vorher, ask_on_create: undefined, ...felder });
     return entwurfSchreiben(sitzung, (e) => {
         const s = (e.settings || []).find(x => x.key === key);
-        if (s) s.role = rolle;
+        if (!s) return;
+        s.role = felder.role;
+        // Das Feld steht nur da, wenn es etwas sagt — sonst sähe jedes Paket
+        // nach dem ersten Rollenwechsel anders aus.
+        if (felder.ask_on_create === false) s.ask_on_create = false; else delete s.ask_on_create;
     });
 }
 
@@ -3941,6 +3993,7 @@ module.exports = {
     pruefeBildAdresse, angaben, angabenSpeichern, veroeffentlichungsStand, veroeffentlichungsPaket, veroeffentlichen, laufendePruefung, pruefungen, durchlaufMaengel, pruefen,
     pruefungAbbrechen, pruefProtokoll, pruefungBeenden, entwurfSchreiben,
     EINSTELLUNG, einstellungAusFormular, einstellungSpeichern, einstellungEntfernen, einstellungRolleSetzen, probewerteSetzen, probewerte,
+    rolleAusFormular, rolleAlsFormular,
     umgebungAusEinstellungen, belegteEinstellungen,
     HINWEIS, hinweisAusFormular, hinweisSpeichern, hinweisEntfernen,
     DURCHGEREICHT, IM_ENTWURF, imEntwurf, entwurfAusPaket, paketOeffnen, durchgereichtes, naechsteFassung, behalteUnbekanntes, mischeStart, mischeEinstellung, zieleAusPaket, uebernommeneZiele, vorlaeufigePortnummern, oeffenbarePakete, LAUFZEIT_TEILE,

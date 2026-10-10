@@ -887,6 +887,82 @@ async function pruefe(name, fn) {
         assert.match(nw, /json:"wo,omitempty"/);
     });
 
+    // 2026-10-10, Betreiber: „falls es einstellungen gibt die ich gern in der
+    // einfachen karte hätte, die aber für die erstellung des servers nicht
+    // wirklich notwendig sind." — ET: Legacy bringt 141 Werte mit.
+    await pruefe('Rolle: „einfache Ansicht, nicht beim Anlegen" — eine Auswahl in der Werkbank, zwei Felder im Paket, eine Regel im Panel', async () => {
+        const Serverseite = require('../plugins/gameserver/dashboard/helpers/Serverseite');
+        const Ajv = require('ajv');
+        const schema = require('../packages/fbpkg/schema/fbpkg-v1.schema.json');
+        const ajv = new Ajv({ allErrors: true, strict: false });
+        ajv.addSchema(schema, 'fbpkg');
+        const pruef = ajv.compile({ $ref: 'fbpkg#/properties/settings/items' });
+
+        // Werkbank → Paket
+        const spaeter = Sitzungen.einstellungAusFormular(formular({ key: 'xp_save', name_de: 'XP speichern', role: 'player_spaeter' }));
+        assert.deepStrictEqual([spaeter.role, spaeter.ask_on_create], ['player', false]);
+        assert.ok(pruef(spaeter), 'nach Schema ungültig: ' + JSON.stringify(pruef.errors));
+        assert.ok(!pruef({ ...spaeter, role: 'player_spaeter' }), 'der Formularwert käme als Rolle ins Paket');
+        const sofort = Sitzungen.einstellungAusFormular(formular());
+        assert.ok(!('ask_on_create' in sofort), 'das Feld steht auch da, wo es nichts sagt — jedes Paket sähe geändert aus');
+        // Paket → Werkbank
+        assert.deepStrictEqual([spaeter, sofort, { role: 'owner', ask_on_create: false }, {}].map(Sitzungen.rolleAlsFormular),
+            ['player_spaeter', 'player', 'owner', 'expert']);
+        assert.deepStrictEqual(Sitzungen.EINSTELLUNG.rollenFormular.map(r => Sitzungen.rolleAusFormular(r).role), ['player', 'player', 'owner', 'expert']);
+
+        // Panel: gefragt wird beim Anlegen …
+        const g = Serverseite.beimAnlegenGefragt;
+        assert.strictEqual(g(sofort), true);
+        assert.strictEqual(g(spaeter), false, 'trotz ask_on_create: false gefragt');
+        assert.strictEqual(g({ role: 'owner' }), false);
+        // … immer, was nur mit Neuinstallation änderbar ist, und Pflicht ohne Vorgabe.
+        assert.strictEqual(g({ role: 'owner', takes_effect: 'reinstall' }), true);
+        assert.strictEqual(g({ role: 'player', ask_on_create: false, takes_effect: 'reinstall' }), true);
+        assert.strictEqual(g({ role: 'player', ask_on_create: false, required: true }), true, 'ein Server ohne Pflichtwert startete nicht');
+        assert.strictEqual(g({ role: 'player', ask_on_create: false, required: true, default: 'x' }), false);
+        // Der Werteschritt benutzt genau diese Regel …
+        const paket = { settings: [sofort, spaeter, { ...spaeter, key: 'lader', takes_effect: 'reinstall', ask_on_create: undefined, role: 'owner' }] };
+        const felder = Serverseite.baueWerteSchritt(paket, null, false).felder.map(f => f.schluessel).filter(Boolean);
+        assert.ok(felder.includes('max_players') && felder.includes('lader') && !felder.includes('xp_save'), 'gefragt: ' + felder);
+        // … und die einfache Ansicht zeigt die Einstellung weiter: Dort zählt nur die Rolle.
+        assert.ok(Serverseite.HOEHE.einfach.has(spaeter.role));
+        const seite = ohneKommentare(fs.readFileSync(path.join(__dirname, '../plugins/gameserver/dashboard/helpers/Serverseite.js'), 'utf8'));
+        const karte = seite.slice(seite.indexOf('function baueEinstellungen('), seite.indexOf('\nfunction ', seite.indexOf('function baueEinstellungen(') + 10));
+        assert.ok(karte.length > 500 && !karte.includes('ask_on_create'), 'die Werte-Karte liest ask_on_create — die einfache Ansicht hinge an der Anlegefrage');
+
+        // Die Werkbank speichert nicht, was das Panel nicht hält.
+        assert.throws(() => Sitzungen.einstellungAusFormular(formular({ role: 'player_spaeter', takes_effect: 'reinstall' })), /wird immer beim Anlegen gefragt/);
+        assert.throws(() => Sitzungen.einstellungAusFormular(formular({ role: 'player_spaeter', required: true, default: '' })), /Pflicht und hat keine Vorgabe/);
+        assert.ok(Sitzungen.einstellungAusFormular(formular({ role: 'player_spaeter', required: true })).required, 'Pflicht MIT Vorgabe wurde abgewiesen');
+
+        // Die Schnellauswahl in der Tabelle: setzt, nimmt zurück, prüft vorher.
+        const s = mitEinstellungen();
+        await Sitzungen.einstellungRolleSetzen(s, 'max_players', 'player_spaeter');
+        const nach = () => s.entwurf.settings.find(x => x.key === 'max_players');
+        assert.deepStrictEqual([nach().role, nach().ask_on_create], ['player', false]);
+        await Sitzungen.einstellungRolleSetzen(s, 'max_players', 'player');
+        assert.ok(!('ask_on_create' in nach()), 'zurück auf „+ Anlegen" liess das Feld stehen');
+        await Sitzungen.einstellungRolleSetzen(s, 'max_players', 'player_spaeter');
+        await Sitzungen.einstellungRolleSetzen(s, 'max_players', 'owner');
+        assert.deepStrictEqual([nach().role, 'ask_on_create' in nach()], ['owner', false]);
+        nach().takes_effect = 'reinstall';
+        await assert.rejects(Sitzungen.einstellungRolleSetzen(s, 'max_players', 'player_spaeter'), /wird immer beim Anlegen gefragt/);
+        assert.strictEqual(nach().role, 'owner', 'abgewiesen, aber trotzdem geschrieben');
+        await assert.rejects(Sitzungen.einstellungRolleSetzen(s, 'max_players', 'admin'), /Rolle/);
+        // Über das ganze Formular: bearbeiten und wieder „+ Anlegen" wählen nimmt das Feld weg.
+        nach().takes_effect = 'restart';
+        await Sitzungen.einstellungSpeichern(s, formular({ alt: 'max_players', role: 'player_spaeter' }));
+        assert.strictEqual(nach().ask_on_create, false);
+        await Sitzungen.einstellungSpeichern(s, formular({ alt: 'max_players', role: 'player' }));
+        assert.ok(!('ask_on_create' in nach()), 'das Formular liess das Feld stehen');
+
+        // Die Seite bietet alle vier an, an beiden Stellen, und füllt das Formular richtig.
+        const ejs = ohneKommentareEjs(fs.readFileSync(path.join(__dirname, '../plugins/werkbank/dashboard/views/guild/werkbank-sitzung.ejs'), 'utf8'));
+        assert.match(ejs, /<option value="player_spaeter">einfache Ansicht, nicht beim Anlegen<\/option>/);
+        assert.match(ejs, /EINSTELLUNG\.rollenFormular\.forEach[\s\S]{0,120}rolleGewaehlt\(e\) === r/);
+        assert.match(ejs, /formE\.role\.value = \(e\.role === 'player' && e\.ask_on_create === false\) \? 'player_spaeter' : e\.role/);
+    });
+
     await pruefe('Formular → Einstellung: gültig nach Schema, Fehler dort gesagt, wo getippt wird', async () => {
         const e = Sitzungen.einstellungAusFormular(formular({ type: 'choice', default: 'hard', choices: 'normal=Normal\nhard=Schwer' }));
         assert.deepStrictEqual(e.choices, [{ value: 'normal', name: { de: 'Normal' } }, { value: 'hard', name: { de: 'Schwer' } }]);

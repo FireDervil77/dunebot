@@ -621,6 +621,11 @@
           ],
           "default": "player"
         },
+        "ask_on_create": {
+          "type": "boolean",
+          "default": true,
+          "description": "Wird die Einstellung beim Anlegen eines Servers gefragt? Nur bei `role: player` von Bedeutung — dort heisst `false`: Sie steht in der einfachen Ansicht, das Anlegeformular fragt sie aber nicht, und der Server beginnt mit der Vorgabe. Fehlt das Feld, gilt `true` (wie vor 2026-10-10).\n\nZwei Regeln stehen darueber, im Panel (Serverseite.beimAnlegenGefragt): Was sich nur mit einer Neuinstallation aendern laesst (`takes_effect: reinstall`), wird IMMER gefragt, ebenso eine Pflicht-Einstellung ohne Vorgabe — sonst entstuende ein Server, der nicht startet.\n\nWarum es das gibt: ET: Legacy bringt 141 Werte mit. Viele davon gehoeren in die einfache Ansicht (XP speichern, Abstimmungen), aber nicht in ein Anlegeformular. Die Rolle sagt, WER eine Einstellung sieht; wann sie gefragt wird, ist eine zweite Frage."
+        },
         "visible": {
           "type": "boolean",
           "default": true

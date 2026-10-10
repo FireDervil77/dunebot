@@ -1617,6 +1617,26 @@ module.exports.baueMaschinenAuswahl = baueMaschinenAuswahl;
  * schon auf der Maschine liegt. Das steht alles im Paket und war nie zu sehen;
  * bisher klickte man „Erstellen" und wartete auf etwas Unbenanntes.
  */
+/**
+ * Wird diese Einstellung beim ANLEGEN eines Servers gefragt?
+ *
+ * Die eine Stelle für diese Regel. In dieser Reihenfolge:
+ *
+ *   1. Was sich später nur mit einer NEUINSTALLATION ändern lässt, wird immer
+ *      gefragt (2026-09-22: Minecrafts Lader stand als `owner` da, wurde nicht
+ *      gefragt, und jeder Server wurde Vanilla).
+ *   2. Sonst nur, was in der einfachen Ansicht steht (`role: player`).
+ *   3. Davon nicht, was das Paket ausnimmt (`ask_on_create: false`, seit
+ *      2026-10-10) — es sei denn, es ist Pflicht und hat keine Vorgabe: Dann
+ *      startete das Spiel ohne den Wert nicht, und gefragt wird trotzdem.
+ */
+function beimAnlegenGefragt(e) {
+    if (e.takes_effect === 'reinstall') return true;
+    if ((e.role || 'expert') !== 'player') return false;
+    if (e.ask_on_create !== false) return true;
+    return e.required === true && (e.default === undefined || e.default === null || e.default === '');
+}
+
 function baueWerteSchritt(paket, maschine, imageLiegtDa) {
     const alle = Array.isArray(paket?.settings) ? paket.settings : [];
 
@@ -1643,8 +1663,11 @@ function baueWerteSchritt(paket, maschine, imageLiegtDa) {
     //
     // Die Reihenfolge bleibt die des Pakets: Der Lader steht dort an erster
     // Stelle, weil er bestimmt, was die anderen Werte ueberhaupt bedeuten.
-    const gefragt = alle.filter(e =>
-        (e.role || 'expert') === 'player' || e.takes_effect === 'reinstall');
+    //
+    // Seit dem 2026-10-10 kann ein Paket eine Einstellung der einfachen Ansicht
+    // vom Anlegen ausnehmen (`ask_on_create: false`) — die Regel steht in
+    // `beimAnlegenGefragt`.
+    const gefragt = alle.filter(beimAnlegenGefragt);
 
     // ── Der Servername gehoert dem PANEL, nicht dem Spiel ───────────────────
     //
@@ -1794,6 +1817,7 @@ function baueWerteSchritt(paket, maschine, imageLiegtDa) {
 }
 
 module.exports.baueWerteSchritt = baueWerteSchritt;
+module.exports.beimAnlegenGefragt = beimAnlegenGefragt;
 module.exports.baueHinweise = baueHinweise;
 
 
