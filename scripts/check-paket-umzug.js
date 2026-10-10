@@ -180,6 +180,9 @@ const attrappeDb = {
         if (q === 'SELECT guild_id FROM werkbank_sitzungen WHERE kennung = ?') {
             const s = sitzungNach(p[0]); return s ? [{ guild_id: s.guild_id }] : [];
         }
+        if (q === 'SELECT entwurf FROM werkbank_sitzungen WHERE kennung = ?') {
+            const s = sitzungNach(p[0]); return s ? [{ entwurf: JSON.stringify(s.entwurf) }] : [];
+        }
         if (q === 'UPDATE werkbank_sitzungen SET name = ? WHERE id = ?') {
             welt.sitzungen.find(s => s.id === p[1]).name = p[0]; return {};
         }
@@ -304,6 +307,39 @@ const AUFTRAG = { guildId: '1', userId: '42', autor: 'Betreiber', rootserverId: 
         const ohne = echte.find(p => !p.management?.rcon);
         neueWelt([[1, ohne]]);
         await Umzug.anstossen({ ...AUFTRAG, paketIds: [1] });
+        assert.strictEqual(zaehle('probewerte'), 0);
+    });
+
+    // Erster echter Lauf (2026-10-10): Minecraft rot nach 0,3 Minuten — „You
+    // need to agree to the EULA". `eula: 1` ist ein Probewert und lag nur in
+    // der Sitzung, die 1.5.6 veröffentlicht hatte.
+    await pruefe('Probewerte: der Durchlauf prüft mit denen der Sitzung, aus der die Fassung stammt — und sie wandern mit', async () => {
+        const paket = kopie(echte.find(p => (p.settings || []).length >= 2 && !p.management?.rcon) || A);
+        const [erste, zweite] = paket.settings.map(s => s.key);
+        paket.identity.origin = { type: 'installer', source: 'werkbank:wbherkunft01', imported_at: '2026-10-01' };
+        neueWelt([[1, paket]]);
+        welt.sitzungen.push({ id: 900, kennung: 'wbherkunft01', guild_id: '1', name: 'alt', status: 'verworfen', rootserver_id: 54, image: {},
+            entwurf: { werkbank: { werte: { [erste]: 'vom-letzten-lauf', gibt_es_nicht_mehr: 'x', [zweite]: '' } } }, schritte: [] });
+        const r = await Umzug.anstossen({ ...AUFTRAG, paketIds: [1] });
+        assert.deepStrictEqual(r.abgelehnt, [], 'ein Probewert für eine Einstellung, die es nicht mehr gibt, hielt den Umzug auf');
+        const k = r.vorgemerkt[0].kennung;
+        const bekommen = welt.aufrufe.find(a => a[0] === 'pruefen')[2];
+        assert.strictEqual(bekommen[erste], 'vom-letzten-lauf');
+        assert.ok(!('gibt_es_nicht_mehr' in bekommen));
+        assert.deepStrictEqual([vermerk(k).probewerte_aus, vermerk(k).probewerte], ['wbherkunft01', [erste]], 'woher die Werte kamen, steht nicht im Vermerk');
+        await urteil(k, true);
+        assert.strictEqual(vermerk(k).stand, 'gruen', vermerk(k).grund);
+        assert.ok(!JSON.stringify(neuesteVon(1).fbpkg).includes('vom-letzten-lauf'), 'ein Probewert steht im eingelieferten Paket');
+        // Der nächste Umzug: Herkunft ist jetzt die Hilfssitzung — die Werte sind noch da.
+        assert.strictEqual(neuesteVon(1).fbpkg.identity.origin.source, 'werkbank:' + k);
+        welt.aufrufe.length = 0;
+        const r2 = await Umzug.anstossen({ ...AUFTRAG, paketIds: [1] });
+        assert.strictEqual(welt.aufrufe.find(a => a[0] === 'pruefen')[2][erste], 'vom-letzten-lauf', 'nach einem Umzug waren die Probewerte verloren');
+        assert.strictEqual(vermerk(r2.vorgemerkt[0].kennung).probewerte_aus, k);
+        // Ohne Herkunftssitzung: Vorgaben, kein Fehler.
+        const fremd = kopie(paket); fremd.identity.origin = { type: 'installer', source: 'cli:liefere-pakete' };
+        neueWelt([[1, fremd]]);
+        assert.strictEqual((await Umzug.anstossen({ ...AUFTRAG, paketIds: [1] })).vorgemerkt.length, 1);
         assert.strictEqual(zaehle('probewerte'), 0);
     });
 

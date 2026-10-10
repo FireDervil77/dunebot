@@ -186,6 +186,8 @@ async function anstossen({ paketIds, guildId, userId, autor, rootserverId }) {
             });
             await dienste.db().query('UPDATE werkbank_sitzungen SET name = ? WHERE id = ?',
                 [`Umzug · ${sitzung.name}`.slice(0, 100), sitzung.id]);
+            const geerbt = await erbeProbewerte(sitzung, json(zeile.fbpkg, null));
+            if (geerbt.schluessel.length) await vermerke(sitzung, { probewerte_aus: geerbt.aus, probewerte: geerbt.schluessel });
             await kennwortDerFernsteuerung(sitzung);
             vorgemerkt.push({ paket_id: paketId, slug: zeile.slug, von: zeile.version, nach, kennung: offen.kennung });
         } catch (fehler) {
@@ -194,6 +196,35 @@ async function anstossen({ paketIds, guildId, userId, autor, rootserverId }) {
     }
     if (vorgemerkt.length) await weiter();
     return { vorgemerkt, abgelehnt };
+}
+
+/**
+ * Die Probewerte der Sitzung übernehmen, aus der die Fassung stammt.
+ *
+ * Erster echter Lauf, 2026-10-10: Minecraft wurde nach 0,3 Minuten rot — „You
+ * need to agree to the EULA". Die Zustimmung ist ein PROBEWERT (`eula: 1`),
+ * kein Teil des Pakets, und lag nur in der Sitzung, die 1.5.6 veröffentlicht
+ * hatte. Genauso Factorio (Kennwörter) und Valheim (`crossplay: 0` — mit
+ * Crossplay antwortet die Abfrage nie, und der Server wird nicht „bereit").
+ *
+ * Ein Umzug soll prüfen wie der letzte grüne Durchlauf, nur auf dem neuen
+ * Bau. Welche Sitzung das war, steht im Paket (`identity.origin.source`,
+ * `werkbank:<kennung>`); ihre Zeile bleibt auch verworfen stehen. Nach einem
+ * Umzug ist die Hilfssitzung selbst diese Herkunft — die Werte wandern mit.
+ *
+ * Übernommen wird nur, was es als Einstellung noch gibt. Fehlt die Sitzung
+ * (Paket von der Kommandozeile, Sitzungen entfernt), gilt die Vorgabe.
+ */
+async function erbeProbewerte(sitzung, paket) {
+    const S = dienste.S();
+    const kennung = String(paket?.identity?.origin?.source || '').replace(/^werkbank:/, '');
+    if (!kennung || kennung === paket?.identity?.origin?.source || !S.RE_KENNUNG.test(kennung)) return { aus: null, schluessel: [] };
+    const [z] = await dienste.db().query('SELECT entwurf FROM werkbank_sitzungen WHERE kennung = ?', [kennung]);
+    const werte = (json(z?.entwurf, {}) || {}).werkbank?.werte || {};
+    const bekannt = new Set((sitzung.entwurf?.settings || []).map(x => x.key));
+    const erben = Object.fromEntries(Object.entries(werte).filter(([k, v]) => bekannt.has(k) && v !== '' && v !== null && v !== undefined));
+    if (Object.keys(erben).length) await S.probewerteSetzen(sitzung, erben);
+    return { aus: kennung, schluessel: Object.keys(erben).sort() };
 }
 
 /**
