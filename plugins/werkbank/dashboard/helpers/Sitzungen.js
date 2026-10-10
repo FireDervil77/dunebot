@@ -1043,7 +1043,7 @@ const EINSTELLUNG = {
     wirkung: ['instant', 'restart', 'new_world', 'reinstall'],
     risiko:  ['none', 'progress', 'world_reset'],
     ziele:   ['file', 'env', 'arg', 'rcon'],
-    parser:  ['ini', 'json', 'yaml', 'properties', 'xml', 'text'],
+    parser:  ['ini', 'json', 'yaml', 'properties', 'xml', 'cfg', 'text'],
     als:     ['true_false', 'True_False', 'TRUE_FALSE', 'one_zero', 'yes_no', 'Yes_No', 'on_off', 'enabled_disabled'],
 };
 const RE_SCHLUESSEL = /^[a-z][a-z0-9_]*$/;
@@ -3753,7 +3753,7 @@ async function dateienJetzt(sitzung) {
 // Leser in JavaScript wäre eine zweite Auslegung von „ServerSettings.Name".
 
 /** Format aus der Endung — nur ein Vorschlag, im Formular änderbar. */
-const FORMAT_NACH_ENDUNG = { json: 'json', ini: 'ini', yml: 'yaml', yaml: 'yaml', properties: 'properties', xml: 'xml' };
+const FORMAT_NACH_ENDUNG = { json: 'json', ini: 'ini', yml: 'yaml', yaml: 'yaml', properties: 'properties', xml: 'xml', cfg: 'cfg' };
 function formatVermuten(datei) {
     const endung = String(datei).split('.').pop().toLowerCase();
     return FORMAT_NACH_ENDUNG[endung] || '';
@@ -3803,7 +3803,7 @@ async function schluesselLesen(sitzung, { datei, parser }) {
     datei = String(datei || '').trim().replace(/^game\//, '');
     if (!RE_DATEI.test(datei)) throw new Error('Datei relativ zu game/ angeben, ohne „..".');
     if (!EINSTELLUNG.parser.includes(parser) || parser === 'text') {
-        throw new Error('Format: ini, json, yaml, properties oder xml.');
+        throw new Error('Format: ini, json, yaml, properties, xml oder cfg.');
     }
     const daemon = await daemonFuer(sitzung);
     const antwort = await daemon.senden('werkbank.schluessel', { datei, parser });

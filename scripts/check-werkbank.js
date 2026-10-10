@@ -1081,15 +1081,62 @@ async function pruefe(name, fn) {
         const go = ohneKommentare(fs.readFileSync(path.join(DAEMON, 'internal/parser/lesen.go'), 'utf8'));
         const block = go.slice(go.indexOf('switch schreiber {'), go.indexOf('default:', go.indexOf('switch schreiber {')));
         const liest = [...block.matchAll(/case "([a-z]+)":\s*\n\s*(?:err = )?lese/g)].map(x => x[1]).sort();
-        assert.deepStrictEqual(liest, ['ini', 'json', 'properties', 'xml', 'yaml'], 'der Daemon liest: ' + liest);
+        assert.deepStrictEqual(liest, ['cfg', 'ini', 'json', 'properties', 'xml', 'yaml'], 'der Daemon liest: ' + liest);
         // text liest der Daemon ausdrücklich NICHT (Schreiber ersetzt ganze Zeilen).
         assert.match(block, /case "text", "file":\s*\n[\s\S]*?return Lesung\{\}, fmt\.Errorf/);
         const ejs = ohneKommentare(fs.readFileSync(path.join(__dirname, '../plugins/werkbank/dashboard/views/guild/werkbank-sitzung.ejs'), 'utf8'));
-        const m = ejs.match(/\['json', 'ini', 'yaml', 'properties', 'xml'\]\.forEach/);
+        const m = ejs.match(/\['json', 'ini', 'yaml', 'properties', 'xml', 'cfg'\]\.forEach/);
         assert.ok(m, 'die Formatauswahl der Seite hat sich geändert — hier nachziehen');
-        for (const f of ['json', 'ini', 'yaml', 'properties', 'xml']) assert.ok(Sitzungen.EINSTELLUNG.parser.includes(f));
+        for (const f of ['json', 'ini', 'yaml', 'properties', 'xml', 'cfg']) assert.ok(Sitzungen.EINSTELLUNG.parser.includes(f));
         await assert.rejects(Sitzungen.schluesselLesen(mitEinstellungen(), { datei: 'server.cfg', parser: 'text' }), /Format/);
         assert.strictEqual(daemon.befehle.length, 0, 'text darf gar nicht erst beim Daemon ankommen');
+    });
+
+    // cfg kam am 2026-10-10 dazu (ET: Legacy, `set name "wert"`). Ein Format,
+    // das nur an EINER der vier Stellen steht, scheitert spät: Die Werkbank
+    // bietet es an, das Schema weist das Paket ab — oder fb-init den Auftrag.
+    await pruefe('Vertrag: Auftrag des Daemons, Paketschema und Werkbank kennen dieselben Formate — cfg eingeschlossen', async () => {
+        const validate = ohneKommentare(fs.readFileSync(path.join(DAEMON, 'pkg/protocol/job_validate.go'), 'utf8'));
+        const karte = validate.slice(validate.indexOf('var bekannteParser'), validate.indexOf('}', validate.indexOf('var bekannteParser')));
+        const auftrag = [...karte.matchAll(/"([a-z]+)": true/g)].map(x => x[1]).sort();
+        assert.ok(auftrag.includes('cfg'), 'der Auftrag kennt cfg nicht: ' + auftrag);
+
+        const schema = require('../packages/fbpkg/schema/fbpkg-v1.schema.json');
+        const listen = [];
+        (function suche(k) {
+            if (!k || typeof k !== 'object') return;
+            if (k.parser && Array.isArray(k.parser.enum)) listen.push([...k.parser.enum].sort());
+            for (const v of Object.values(k)) suche(v);
+        })(schema);
+        assert.strictEqual(listen.length, 3, 'das Schema nennt die Formate an ' + listen.length + ' Stellen — erwartet 3 (apply, config, files.patch)');
+        for (const l of listen) assert.deepStrictEqual(l, auftrag, 'Schema und Auftrag weichen ab');
+        assert.deepStrictEqual([...Sitzungen.EINSTELLUNG.parser].sort(), auftrag, 'Werkbank und Auftrag weichen ab');
+
+        const schreibt = ohneKommentare(fs.readFileSync(path.join(DAEMON, 'internal/parser/bericht.go'), 'utf8'));
+        assert.match(schreibt, /schreiber == "cfg"[\s\S]{0,80}parseCfgFile/, 'der Schreiber für cfg ist nicht eingehängt');
+
+        // Lesen kommt beim Daemon an, die Endung schlägt das Format vor, und
+        // was übernommen wird, ist nach dem Schema ein gültiges Ziel.
+        daemon.antwort = { success: true, data: { funde: [{ pfad: 'g_xpSave', wert: '0', art: 'zahl' }], ausgelassen: [{ pfad: 'exec', grund: 'ist ein Befehl, keine Variable' }], anzahl_funde: 1 } };
+        const l = await Sitzungen.schluesselLesen(mitEinstellungen(), { datei: 'game/etmain/legacy.cfg', parser: 'cfg' });
+        assert.strictEqual(daemon.befehle[0].nutzlast.datei, 'etmain/legacy.cfg');
+        assert.strictEqual(daemon.befehle[0].nutzlast.parser, 'cfg');
+        assert.strictEqual(l.funde[0].vorschlag.key, 'g_xp_save');
+        assert.deepStrictEqual(Sitzungen.vorschlagsDateien([{ dateien: { neu: [{ pfad: 'game/etmain/legacy.cfg' }] } }]).map(v => v.datei + ':' + v.format),
+            ['etmain/legacy.cfg:cfg']);
+
+        const s = mitEinstellungen();
+        await Sitzungen.vorschlaegeUebernehmen(s, { datei: 'etmain/legacy.cfg', parser: 'cfg', auswahl: [{ pfad: 'g_xpSave' }] });
+        const neu = s.entwurf.settings.find(x => x.key === 'g_xp_save');
+        assert.deepStrictEqual(neu.apply[0], { target: 'file', file: 'etmain/legacy.cfg', parser: 'cfg', path: 'g_xpSave' });
+        const Ajv = require('ajv');
+        const ajv = new Ajv({ allErrors: true, strict: false });
+        ajv.addSchema(schema, 'fbpkg');
+        const pruef = ajv.compile({ $ref: 'fbpkg#/properties/settings/items' });
+        assert.ok(pruef(neu), 'nach Schema ungültig: ' + JSON.stringify(pruef.errors));
+        // Gegenprobe: ein erfundenes Format geht durch keine der Stellen.
+        assert.ok(!pruef({ ...neu, apply: [{ ...neu.apply[0], parser: 'conf' }] }), 'das Schema nimmt ein unbekanntes Format an');
+        await assert.rejects(Sitzungen.schluesselLesen(mitEinstellungen(), { datei: 'a.cfg', parser: 'conf' }), /Format/);
     });
 
     await pruefe('Kandidaten: nur game/, nur bekannte Endungen, relativ zu game/', async () => {

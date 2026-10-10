@@ -558,6 +558,7 @@
                   "yaml",
                   "properties",
                   "xml",
+                  "cfg",
                   "text"
                 ]
               },
@@ -1065,9 +1066,10 @@
               "yaml",
               "properties",
               "xml",
+              "cfg",
               "text"
             ],
-            "description": "Wie die Datei aufgebaut ist — dieselben Namen wie bei `settings[].apply`. Nur die strukturierten Schreiber legen eine fehlende Datei an; `text` findet und ersetzt und braucht deshalb etwas zum Finden."
+            "description": "Wie die Datei aufgebaut ist — dieselben Namen wie bei `settings[].apply`. Nur die strukturierten Schreiber legen eine fehlende Datei an; `text` findet und ersetzt und braucht deshalb etwas zum Finden. `cfg` ist die Konsolen-Konfiguration der Quake- und Source-Familie (`set name \"wert\"`, `name \"wert\"`): Der Schlüssel ist der Name der Variable, gesetzt wird nur der Wert; eine fehlende Datei legt auch `cfg` nicht an."
           },
           "set": {
             "type": "object",
@@ -1372,6 +1374,7 @@
                   "yaml",
                   "properties",
                   "xml",
+                  "cfg",
                   "text"
                 ]
               },

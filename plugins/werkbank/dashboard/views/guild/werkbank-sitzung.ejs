@@ -1429,7 +1429,7 @@
             <div class="col-md-3">
               <label class="form-label" for="sParser">Format</label>
               <select class="form-select" id="sParser" name="parser">
-                <% ['json', 'ini', 'yaml', 'properties', 'xml'].forEach(function (x) { %><option value="<%= x %>"><%= x %></option><% }) %>
+                <% ['json', 'ini', 'yaml', 'properties', 'xml', 'cfg'].forEach(function (x) { %><option value="<%= x %>"><%= x %></option><% }) %>
               </select>
             </div>
             <div class="col-md-3">
@@ -2860,7 +2860,7 @@
 
   // ── Vorschläge aus einer Datei (B2-1) ─────────────────────────────────
   var formSchluessel = document.getElementById('formSchluessel');
-  var FORMAT = { json: 'json', ini: 'ini', yml: 'yaml', yaml: 'yaml', properties: 'properties', xml: 'xml' };
+  var FORMAT = { json: 'json', ini: 'ini', yml: 'yaml', yaml: 'yaml', properties: 'properties', xml: 'xml', cfg: 'cfg' };
   var TYPNAME = { text: 'Text', number: 'Zahl', boolean: 'Ja/Nein', password: 'Kennwort' };
   var sDatei = document.getElementById('sDatei');
   var sParser = document.getElementById('sParser');
