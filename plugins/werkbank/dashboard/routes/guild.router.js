@@ -377,6 +377,9 @@ router.get('/:kennung', requirePermission('WERKBANK.VIEW'), async (req, res) => 
             imageName: Sitzungen.imageName,
             VORAUSSETZUNG: Sitzungen.VORAUSSETZUNG,
             dateiteil: Sitzungen.dateiteilStand(sitzung, laeufe),
+            // Unter welcher Adresse die Freigabe DIESER Sitzung im Probestart
+            // erreichbar ist — null, wenn die Maschine nichts ausliefert.
+            downloadAdresse: await Sitzungen.downloadAdresse(sitzung),
             DATEITEIL: Sitzungen.DATEITEIL,
             nachInstallation: Sitzungen.nachInstallationStand(sitzung),
             mods: Sitzungen.modsStand(sitzung),

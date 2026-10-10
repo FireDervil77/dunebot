@@ -271,7 +271,7 @@ const lies = (...teile) => fs.readFileSync(path.join(...teile), 'utf8');
     });
     await pruefe('veröffentlichen: das Stück, das ein gebautes Spiel nicht trägt, wird beim Namen genannt', async () => {
         // Der Satz steht in veroeffentlichungsStand; hier nur, dass die Zuordnung stimmt.
-        assert.deepStrictEqual(S.EIGENE.files, ['denylist']);
+        assert.deepStrictEqual(S.EIGENE.files, ['denylist', 'public']);
         for (const f of ['saves', 'persist', 'query', 'rcon']) assert.ok(S.EIGENE.management.includes(f), `management.${f} hat keine Karte mehr`);
         assert.ok(!S.EIGENE.management.includes('update'), 'management.update hat eine Karte bekommen — dann stimmt ihr Hinweistext nicht mehr');
     });

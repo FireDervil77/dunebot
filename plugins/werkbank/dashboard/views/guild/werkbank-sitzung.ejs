@@ -754,15 +754,16 @@
   <%
     // Drei kleine Listen, die bis hierher nur mitreisten. Was sie bewirken,
     // steht in Sitzungen.js bei DATEITEIL — und auf der Karte.
-    const dt = locals.dateiteil || { sperrliste: [], welten: [], umleitungen: [], vorschlaege: [] };
-    const DT = locals.DATEITEIL || { max: { sperren: 60, welten: 10, umleitungen: 10, zeichen: 200 } };
+    const dt = locals.dateiteil || { sperrliste: [], oeffentlich: [], welten: [], umleitungen: [], vorschlaege: [] };
+    const DT = locals.DATEITEIL || { max: { sperren: 60, welten: 10, umleitungen: 10, zeichen: 200 }, verweis: '{{env:FB_DOWNLOAD_URL}}' };
+    const dtAdresse = locals.downloadAdresse || null;
   %>
   <div class="col-12">
     <div class="card" id="karteSpielstand">
       <div class="card-header">
         <h3 class="card-title">Dateien und Spielstand</h3>
         <div class="card-actions"><span class="text-secondary small">
-          <%= dt.umleitungen.length %> <%= dt.umleitungen.length === 1 ? 'Umleitung' : 'Umleitungen' %> · <%= dt.sperrliste.length %> gesperrt
+          <%= dt.umleitungen.length %> <%= dt.umleitungen.length === 1 ? 'Umleitung' : 'Umleitungen' %> · <%= dt.sperrliste.length %> gesperrt<%= (dt.oeffentlich || []).length ? ' · ' + dt.oeffentlich.length + ' für Spieler frei' : '' %>
         </span></div>
       </div>
       <div class="card-body">
@@ -830,6 +831,26 @@
               <textarea class="form-control font-monospace" id="spielstandSperren" name="denylist" rows="3" spellcheck="false"
                         placeholder="bin"><%= dt.sperrliste.join('\n') %></textarea>
               <div class="form-hint">Gilt nur im Dateimanager des Panels, nicht über SFTP.</div>
+            </div>
+            <div class="col-12">
+              <div class="form-label"><label for="spielstandOeffentlich">Für Spieler abrufbar</label><%- include('werkbank-hilfe', { text:
+                'Dateien, die sich Spieler per HTTP direkt bei der Maschine holen dürfen — der schnelle Kartendownload der Quake- und der Source-Familie (sv_wwwBaseURL, sv_downloadurl). '
+                + 'Je Zeile ein Muster ab game/, etwa etmain/*.pk3. Der Stern steht für ein Stück Name und überschreitet keinen Ordner. '
+                + 'Ausgeliefert wird OHNE Anmeldung, an jeden, der die Adresse kennt — deshalb muss ein Muster eine Endung nennen, und Konfiguration, Datenbanken und Programme (cfg, ini, json, db, so …) sind gesperrt: '
+                + 'Neben den Karten liegt meist die Konfiguration des Servers mit seinen Kennwörtern. '
+                + 'Die Adresse dazu erfährt das Spiel über den Verweis ' + DT.verweis + ' — als feste Zeile (Reiter „Einstellungen") in seine Konfiguration schreiben, bei ET: Legacy unter sv_wwwBaseURL.' }) %></div>
+              <textarea class="form-control font-monospace" id="spielstandOeffentlich" name="public" rows="2" spellcheck="false"
+                        placeholder="etmain/*.pk3"><%= (dt.oeffentlich || []).join('\n') %></textarea>
+              <div class="form-hint">
+                Ohne Anmeldung, für jeden. Nur nach Dateiart — nie Konfiguration.
+                <% if ((dt.oeffentlich || []).length) { %>
+                  <% if (dtAdresse) { %>
+                    Im Probestart dieser Sitzung erreichbar unter <span class="font-monospace user-select-all"><%= dtAdresse %>/…</span>
+                  <% } else { %>
+                    <span class="text-warning">Diese Maschine meldet keinen Abruf-Dienst — die Adresse bliebe leer.</span>
+                  <% } %>
+                <% } %>
+              </div>
             </div>
           </div>
 
@@ -1664,6 +1685,7 @@
                 <option value="">— wählen —</option>
                 <% entwurfPorts.forEach(function (po) { %><option value="{{port:<%= po.purpose %>}}">Port: <%= po.purpose %></option><% }) %>
                 <% einstellungen.forEach(function (e) { %><option value="{{setting:<%= e.key %>}}">Einstellung: <%= e.key %></option><% }) %>
+                <% if (((locals.dateiteil || {}).oeffentlich || []).length) { %><option value="<%= (locals.DATEITEIL || {}).verweis %>">Download-Adresse für Spieler</option><% } %>
               </select>
             </div>
             <div class="col-12 d-flex gap-2">
@@ -3619,6 +3641,7 @@
       try {
         await schicke(hier + '/spielstand', {
           denylist: document.getElementById('spielstandSperren').value,
+          'public': document.getElementById('spielstandOeffentlich').value,
           saves: document.getElementById('spielstandWelten').value,
           persist: umleitungen
         });

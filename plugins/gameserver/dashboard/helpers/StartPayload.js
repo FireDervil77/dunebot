@@ -29,6 +29,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const Abruf = require('./Abruf');
 const { loeseInhaltAuf } = require('./InhaltJeLader');
 const { FASSUNG_FUER_SERVER, ladePaketFuerServer, ladePaketFuerAnlegen } = require('./Paketfassung');
 
@@ -291,6 +292,22 @@ async function buildStartPayload(server, guildId, Logger = null) {
         resource_limits: grenzenAus(server),
     };
 
+    // ── Abruf für Spieler (2026-10-10) ───────────────────────────────────────
+    //
+    // Gibt das Paket Dateien frei (`files.public`), nennt das Dashboard dem
+    // Daemon, wie die Maschine von aussen heisst — er kennt seinen Namen im
+    // Netz nicht. Er macht daraus FB_DOWNLOAD_URL (`…/dl/<server>`), und das
+    // Paket verweist darauf (`{{env:FB_DOWNLOAD_URL}}`, etwa `sv_wwwBaseURL`).
+    // Nur mit Freigabe und nur, wenn die Maschine ausliefert — ein Feld, das
+    // immer mitgeht, sähe aus wie eine Zusage.
+    if (Abruf.gibtFrei(paket)) {
+        const basis = Abruf.basis({ host: server.maschine_host, fqdn: server.maschine_fqdn,
+            fqdn_gilt: server.maschine_fqdn_gilt, abruf_port: server.maschine_abruf_port });
+        if (basis) payload.download_basis = basis;
+        else Logger?.warn?.(`[StartPayload] Server ${serverId}: Das Paket gibt Dateien für Spieler frei, `
+            + 'die Maschine meldet aber keinen Abruf-Dienst — die Adresse bleibt leer.');
+    }
+
     // Absichtlich info und nicht debug: Diese Zeile ist der Beleg, womit ein
     // Server gestartet wurde.
     const melde = (msg) => (Logger?.info ? Logger.info(msg) : Logger?.debug?.(msg));
@@ -449,6 +466,8 @@ async function loadServerForStart(dbService, serverId, guildId = null) {
     const [row] = await dbService.query(`
         SELECT gs.*,
                r.daemon_id, r.id AS rootserver_id, r.system_user,
+               r.host AS maschine_host, r.fqdn AS maschine_fqdn,
+               r.fqdn_gilt AS maschine_fqdn_gilt, r.abruf_port AS maschine_abruf_port,
                am.slug AS addon_slug,
                pk.slug AS paket_slug,
                pv.fbpkg AS paket_json, pv.version AS paket_version,

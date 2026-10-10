@@ -190,7 +190,30 @@ function pruefeInvarianten(paket) {
         for (const f of [].concat(a.form || [])) sammle(`content.loader.adds.args["${a.key}"]`, f);
     }
 
+    // ── Abruf für Spieler (`files.public`, 2026-10-10) ───────────────────────
+    //
+    // Die Muster nach derselben Regel wie Werkbank und Daemon — und der
+    // Verweis auf die Adresse dazu: FB_DOWNLOAD_URL setzt der Daemon, aber
+    // NUR, wenn das Paket etwas freigibt. Feste Zeilen (`config`) gehören
+    // hier mitgelesen; dort steht der Verweis üblicherweise (`sv_wwwBaseURL`).
+    const freigegeben = Array.isArray(paket.files?.public) ? paket.files.public : [];
+    for (const m of require('../packages/fbpkg/lib/oeffentlich').pruefe(freigegeben)) {
+        verstoesse.push(`files.public: ${m}`);
+    }
+    for (const datei of Array.isArray(paket.config) ? paket.config : []) {
+        for (const [k, v] of Object.entries(datei.set || {})) {
+            if (String(v).includes('{{env:FB_DOWNLOAD_URL}}')) envVerweise.push({ wo: `config ${datei.file} → ${k}`, name: 'FB_DOWNLOAD_URL' });
+        }
+    }
+
     for (const { wo, name } of envVerweise) {
+        if (name === 'FB_DOWNLOAD_URL') {
+            if (!freigegeben.length) {
+                verstoesse.push(`Verweis: ${wo} nennt {{env:FB_DOWNLOAD_URL}}, aber files.public gibt nichts frei — `
+                    + 'die Adresse gäbe es nie, und der Daemon ließe die Zeile aus.');
+            }
+            continue;
+        }
         if (gesetzt.has(name) || ausDerUmgebung.has(name)) continue;
         verstoesse.push(`Verweis: ${wo} ergänzt {{env:${name}}} — diese Variable setzt niemand. `
             + `Sie gehört in das Wurzelfeld "env" des Pakets; sonst bleibt der Verweis im Wert `

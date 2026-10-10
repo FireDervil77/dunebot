@@ -21,6 +21,8 @@ const crypto = require('crypto');
 const { ServiceManager } = require('dunebot-core');
 const Paketfassung = require('../../../gameserver/dashboard/helpers/Paketfassung');
 const Quellen = require('../../../gameserver/dashboard/helpers/Quellen');
+const Abruf = require('../../../gameserver/dashboard/helpers/Abruf');
+const Oeffentlich = require('../../../../packages/fbpkg/lib/oeffentlich');
 // Die Tags eines Spiels gehören dem Spiel im Panel, nicht dem Paket (2026-10-08) —
 // die Werkbank reicht sie beim Veröffentlichen weiter, wie Symbol und Banner.
 const Tags = require('../../../../apps/dashboard/helpers/Tags');
@@ -795,7 +797,7 @@ function mischeEinstellung(vorher, neu) {
  *                      des Schemas bringt, reist dann mit, statt zu verschwinden.
  */
 const GANZ = '*';
-const EIGENE = { management: ['query', 'rcon', 'saves', 'persist'], files: ['denylist'], install: ['cache', 'entfernen'],
+const EIGENE = { management: ['query', 'rcon', 'saves', 'persist'], files: ['denylist', 'public'], install: ['cache', 'entfernen'],
     commands: GANZ, config: GANZ, requirements: GANZ, console: GANZ,
     content: ['supported', 'sources', 'source_ids', 'path', 'activation', 'order_matters', 'needs_restart', 'client_side',
         'loader', 'by_setting', 'variants'] };
@@ -1005,8 +1007,12 @@ async function oeffenbarePakete() {
  * `requirements` seit 2026-10-09: Der Daemon liest daraus `display` und lässt
  * fb-init vor dem Spiel einen virtuellen Bildschirm aufstellen. Ein Daemon vor
  * 1.0.115 kennt das Feld nicht und übergeht es.
+ *
+ * `files` seit 2026-10-10: Der Daemon liest daraus `public` — was Spieler per
+ * HTTP abrufen dürfen. Sperrliste und alte `patch`-Einträge gehen mit und
+ * werden dort übergangen.
  */
-const LAUFZEIT_TEILE = ['management', 'content', 'config', 'console', 'requirements'];
+const LAUFZEIT_TEILE = ['management', 'content', 'config', 'console', 'requirements', 'files'];
 function laufzeitTeile(paket) {
     const aus = {};
     for (const k of LAUFZEIT_TEILE) if (paket?.[k] !== undefined) aus[k] = paket[k];
@@ -1486,6 +1492,8 @@ async function starten(sitzung, liste) {
         install: { steps: liste.filter(imEntwurf).map(s => s.schritt) },
         memory_mb: w.memory_mb,
         cpu_prozent: w.cpu_prozent,
+        // Gibt der Entwurf Dateien für Spieler frei: wie die Maschine von aussen heisst.
+        ...(await downloadNutzlast(sitzung, ganz)),
     });
     if (!antwort?.success) {
         const grund = antwort?.error || 'Der Daemon hat nicht geantwortet';
@@ -2045,6 +2053,7 @@ async function pruefen(sitzung, liste) {
         portnummern: w.portnummern, install: paket.install,
         settings: probewerte(sitzung), einstellungen: paket.settings || [],
         memory_mb: w.memory_mb, cpu_prozent: w.cpu_prozent,
+        ...(await downloadNutzlast(sitzung, paket)),
         // Belegt die Fernsteuerung (2026-10-08): anmelden, diesen Befehl senden,
         // Antwort lesen. Nur mit Fernsteuerung im Entwurf — der Daemon weist
         // einen Befehl ohne sie ab.
@@ -2728,6 +2737,11 @@ function festzeileAusFormular(b, e) {
         if (m[1] === 'setting' && !(e.settings || []).some(x => x.key === m[2])) {
             throw new Error(`${p}: Die Einstellung „${m[2]}" gibt es im Entwurf nicht — der Daemon ließe die Zeile dann aus.`);
         }
+        // Die Download-Adresse gibt es nur, wenn das Paket etwas freigibt.
+        if (p === DATEITEIL.verweis && !(Array.isArray(e.files?.public) && e.files.public.length)) {
+            throw new Error(`${p}: Die Download-Adresse gibt es erst, wenn unter „Dateien und Spielstand" ein Muster `
+                + 'bei „Für Spieler abrufbar" steht — der Daemon ließe die Zeile sonst aus.');
+        }
     }
     return { file, parser, key, value };
 }
@@ -2966,7 +2980,10 @@ async function voraussetzungenPruefen(sitzung) {
 // Dasselbe gilt für `files.patch`, `management.logs` und `management.mods`,
 // die kein eingeliefertes Paket trägt.
 
-const DATEITEIL = { max: { sperren: 60, welten: 10, umleitungen: 10, zeichen: 200 }, vorschlaege: 8 };
+const DATEITEIL = { max: { sperren: 60, welten: 10, umleitungen: 10, zeichen: 200, oeffentlich: Oeffentlich.MAX_MUSTER }, vorschlaege: 8,
+    // Der Verweis, unter dem ein Spiel die Adresse für seine freigegebenen
+    // Dateien findet (Daemon: protocol.EnvDownloadURL).
+    verweis: '{{env:FB_DOWNLOAD_URL}}' };
 
 /** Ein Textfeld mit einer Angabe je Zeile → Liste ohne Leeres und ohne Doppelte. */
 function zeilenListe(roh) {
@@ -3023,7 +3040,17 @@ function dateiteilAusFormular(b) {
         umleitungen.push({ from: von, to: nach });
     }
     if (umleitungen.length > DATEITEIL.max.umleitungen) throw new Error(`Höchstens ${DATEITEIL.max.umleitungen} Umleitungen.`);
-    return { sperren, welten, umleitungen };
+
+    // Für Spieler abrufbar (`files.public`, 2026-10-10): Muster relativ zu
+    // game/. Ein vorangestelltes „game/" ist ein naheliegender Tippfehler —
+    // die Sperrliste daneben rechnet ab der Wurzel des Volumes.
+    const oeffentlich = zeilenListe(b?.public).map(m => m.replace(/^game\//, ''));
+    if (oeffentlich.length > DATEITEIL.max.oeffentlich) throw new Error(`Für Spieler abrufbar: höchstens ${DATEITEIL.max.oeffentlich} Muster.`);
+    for (const m of oeffentlich) {
+        const grund = Oeffentlich.pruefeMuster(m);
+        if (grund) throw new Error(`Für Spieler abrufbar: „${m}" — ${grund}.`);
+    }
+    return { sperren, welten, umleitungen, oeffentlich };
 }
 
 /**
@@ -3058,10 +3085,39 @@ function dateiteilStand(sitzung, laeufe = []) {
     const umleitungen = liste(e.management?.persist);
     return {
         sperrliste: liste(e.files?.denylist),
+        oeffentlich: liste(e.files?.public),
         welten: liste(e.management?.saves),
         umleitungen,
         vorschlaege: umleitungsVorschlaege(laeufe, umleitungen),
     };
+}
+
+/** Feste Zeilen, die auf die Download-Adresse verweisen — „datei → schlüssel". */
+function downloadVerweise(entwurf) {
+    return festzeilenFlach(entwurf).filter(z => String(z.value).includes(DATEITEIL.verweis)).map(z => `${z.file} → ${z.key}`);
+}
+
+/**
+ * Die öffentliche Basis der Maschine einer Sitzung (`http://wirt:port`) — oder
+ * null. Der Daemon macht daraus die Adresse für `{{env:FB_DOWNLOAD_URL}}`;
+ * dieselbe Rechnung wie beim echten Start (gameserver/helpers/Abruf.js).
+ */
+async function downloadBasis(sitzung) {
+    const [maschine] = await db().query('SELECT host, fqdn, fqdn_gilt, abruf_port FROM rootserver WHERE id = ?', [sitzung.rootserver_id]);
+    return Abruf.basis(maschine);
+}
+
+/** Was die Sitzung dem Daemon für den Abruf mitgibt — nur mit Freigabe. */
+async function downloadNutzlast(sitzung, paket) {
+    if (!Abruf.gibtFrei(paket)) return {};
+    const basis = await downloadBasis(sitzung);
+    return basis ? { download_basis: basis } : {};
+}
+
+/** Die Adresse, unter der die Freigabe DIESER Sitzung im Probestart erreichbar ist. */
+async function downloadAdresse(sitzung) {
+    const basis = await downloadBasis(sitzung);
+    return basis ? `${basis}/dl/werkbank-${sitzung.kennung}` : null;
 }
 
 /**
@@ -3080,6 +3136,14 @@ async function dateiteilSpeichern(sitzung, b) {
             if (Object.keys(t).length || gabTeil) e[teil] = t; else delete e[teil];
         };
         setze('files', 'denylist', neu.sperren);
+        // Eine feste Zeile, die auf die Adresse verweist, hinge ohne Freigabe
+        // in der Luft: Der Daemon ließe sie aus, und `sv_wwwBaseURL` bliebe leer.
+        const haengt = neu.oeffentlich.length ? [] : downloadVerweise(e);
+        if (haengt.length) {
+            throw new Error(`Die feste Zeile ${haengt.join(', ')} verweist auf die Download-Adresse — `
+                + 'ohne ein Muster unter „Für Spieler abrufbar" gäbe es die nicht. Erst dort ändern oder entfernen.');
+        }
+        setze('files', 'public', neu.oeffentlich);
         setze('management', 'saves', neu.welten);
         setze('management', 'persist', neu.umleitungen);
     });
@@ -3979,6 +4043,7 @@ module.exports = {
     FESTZEILE, festzeilenStand, festzeileSpeichern, festzeileEntfernen,
     VORAUSSETZUNG, voraussetzungenStand, voraussetzungenSpeichern, voraussetzungenPruefen,
     DATEITEIL, dateiteilStand, dateiteilSpeichern, dateiteilAusFormular, umleitungsVorschlaege,
+    downloadVerweise, downloadBasis, downloadNutzlast, downloadAdresse,
     MODS, modsStand, modsSpeichern, modsAusFormular,
     LADER, laderStand, laderSpeichern, variantenStand, variantenSpeichern,
     NACHINSTALL, nachInstallationStand, nachInstallationSpeichern, KONSOLENFILTER, konsolenfilterStand, konsolenfilterSpeichern,

@@ -4011,9 +4011,10 @@ router.get('/:serverId/backups/:backupId/download',
             .update(`${serverId}\n${datei}\n${bis}`)
             .digest('hex');
 
-        // Der geprüfte Name, wenn es einen gibt - sonst die IP. `fqdn_gilt`
-        // setzt ausschliesslich eine Messung beim Verbinden des Daemons.
-        const wirt = (zeile.fqdn_gilt && zeile.fqdn) ? zeile.fqdn : zeile.host;
+        // Der geprüfte Name, wenn es einen gibt - sonst die IP. Die Regel
+        // steht in helpers/Abruf.js, zusammen mit der für freigegebene
+        // Spieldateien.
+        const wirt = require('../helpers/Abruf').wirt(zeile);
 
         const adresse = `http://${wirt}:${zeile.abruf_port}/sicherung`
             + `?server=${encodeURIComponent(serverId)}`

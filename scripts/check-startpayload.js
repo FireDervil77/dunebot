@@ -189,6 +189,46 @@ function ohneEgg(payload) {
         });
     });
 
+    console.log('\nAbruf für Spieler: die Adresse der Maschine geht nur mit, wenn das Paket etwas freigibt');
+
+    // 2026-10-10 (ET: Legacy, sv_wwwBaseURL): Der Daemon liefert aus, was ein
+    // Paket freigibt (`files.public`), kennt aber seinen Namen im Netz nicht —
+    // den nennt das Dashboard mit jedem Start.
+    {
+        const maschine = { maschine_host: '91.200.102.182', maschine_fqdn: 'node1.firenetworks.de', maschine_fqdn_gilt: 1, maschine_abruf_port: 8081 };
+        const mitFreigabe = (x = {}) => server({ ...maschine, paket_json: JSON.stringify(paket(p => { p.files = { public: ['etmain/*.pk3'] }; })), ...x });
+
+        await check('mit Freigabe: download_basis ist http://<geprüfter Name>:<gemeldeter Port>', async () => {
+            const { payload, error } = await buildStartPayload(mitFreigabe(), 'g1');
+            assert.ifError(error);
+            assert.strictEqual(payload.download_basis, 'http://node1.firenetworks.de:8081');
+        });
+        await check('ohne geprüften Namen die IP — nie ein Name, den niemand gemessen hat', async () => {
+            const { payload } = await buildStartPayload(mitFreigabe({ maschine_fqdn_gilt: 0 }), 'g1');
+            assert.strictEqual(payload.download_basis, 'http://91.200.102.182:8081');
+        });
+        await check('ohne Freigabe geht nichts mit — ein Feld, das immer mitgeht, sähe aus wie eine Zusage', async () => {
+            const { payload } = await buildStartPayload(server(maschine), 'g1');
+            assert.ok(!('download_basis' in payload), `download_basis = ${payload.download_basis}`);
+            const leer = await buildStartPayload(server({ ...maschine, paket_json: JSON.stringify(paket(p => { p.files = { public: [], denylist: ['bin'] }; })) }), 'g1');
+            assert.ok(!('download_basis' in leer.payload));
+        });
+        await check('die Maschine liefert nicht aus (kein Abruf-Port): keine Adresse, der Server startet trotzdem', async () => {
+            for (const port of [0, null, undefined, 70000]) {
+                const { payload, error } = await buildStartPayload(mitFreigabe({ maschine_abruf_port: port }), 'g1');
+                assert.ifError(error);
+                assert.ok(!('download_basis' in payload), `Port ${port}: ${payload.download_basis}`);
+            }
+        });
+        await check('loadServerForStart holt genau die vier Angaben der Maschine dazu', async () => {
+            const { ohneKommentare } = require('./lib/quelltext');
+            const quelle = ohneKommentare(require('fs').readFileSync(require('path').join(HELPERS, 'StartPayload.js'), 'utf8'));
+            for (const spalte of ['r.host AS maschine_host', 'r.fqdn AS maschine_fqdn', 'r.fqdn_gilt AS maschine_fqdn_gilt', 'r.abruf_port AS maschine_abruf_port']) {
+                assert.ok(quelle.includes(spalte), `fehlt in der Abfrage: ${spalte}`);
+            }
+        });
+    }
+
     console.log('\nDas Kennwort der Fernsteuerung wird erzeugt, nicht gefragt');
 
     // ── Der Fall, der das gekostet hat (2026-09-22) ─────────────────────────

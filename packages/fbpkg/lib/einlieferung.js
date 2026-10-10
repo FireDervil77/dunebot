@@ -90,7 +90,11 @@ function grundZeilen(text) {
     const zeilen = text.split('\n');
     // `Befund:` seit 2026-09-24 — die Regel zum Notausgang meldet sich so, und
     // ohne das Wort stand bei der Werkbank nur „✘ datei" ohne Grund da.
-    const treffer = zeilen.filter(z => /Schema:|Befund:|✘|Fehler|fehlt|ungültig|ungueltig/i.test(z));
+    // `Verweis:`, `files.public:`, `I2:`, `I7:` seit 2026-10-10 — so beginnen
+    // die Verstöße der Invarianten (scripts/check-pakete.js). Ohne sie stand
+    // bei einem Verweis ins Leere wieder nur „✘ datei" da, und dahinter die
+    // offenen Punkte des Pakets statt des Grundes.
+    const treffer = zeilen.filter(z => /Schema:|Befund:|Verweis:|files\.public:|\bI[27]:|✘|Fehler|fehlt|ungültig|ungueltig/i.test(z));
     return treffer.length ? treffer.slice(0, 8) : zeilen.slice(0, 8);
 }
 

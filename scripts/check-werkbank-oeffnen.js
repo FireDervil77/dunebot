@@ -100,7 +100,11 @@ function alsFormular(e) {
         min: e.min === undefined ? '' : String(e.min), max: e.max === undefined ? '' : String(e.max),
         required: Boolean(e.required),
         choices: (e.choices || []).map(c => c.value + (c.name && c.name.de ? '=' + c.name.de : '')).join('\n'),
-        role: e.role, takes_effect: e.takes_effect, risk: e.risk || 'none',
+        // Die Rolle, wie die Seite sie ins Formular legt (2026-10-10): „einfache
+        // Ansicht, nicht beim Anlegen" ist dort EINE Auswahl, im Paket sind es
+        // zwei Felder. Mit `e.role` allein verlor ET: Legacy 1.0.3 hier sechsmal
+        // sein `ask_on_create: false` — in diesem Nachbau, nicht auf der Seite.
+        role: S.rolleAlsFormular(e), takes_effect: e.takes_effect, risk: e.risk || 'none',
         apply: (e.apply || []).map(z => Object.fromEntries(Object.entries(z).map(([k, v]) => [k, String(v)]))),
     };
 }
