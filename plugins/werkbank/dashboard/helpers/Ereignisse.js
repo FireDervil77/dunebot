@@ -329,6 +329,19 @@ async function beiPruefung(payload) {
     vergissPruefung(kennung);
     sende(pr.guildId, { action: 'pruefung', sitzung_id: kennung, gruen: Boolean(ergebnis.gruen) });
     Logger.info(`[Werkbank] Sitzung ${kennung}: Prüfdurchlauf ${pr.pruefId} ${ergebnis.gruen ? 'GRÜN' : 'rot'}`);
+    umzugWeiter(kennung);
+}
+
+/**
+ * Gehört der Durchlauf zu einem Umzug (helpers/Umzug.js), geht dessen Kette
+ * weiter: veröffentlichen, Sitzung verwerfen, nächstes Paket. Nicht abgewartet
+ * — das Urteil ist gespeichert und gemeldet, und der nächste Durchlauf soll
+ * die Meldungen des Daemons nicht aufhalten. Ein Fehler steht im Protokoll;
+ * der Umzug zeigt dann weiter „läuft" und lässt sich dort abbrechen.
+ */
+function umzugWeiter(kennung) {
+    require('./Umzug').beiUrteil(kennung).catch(fehler =>
+        ServiceManager.get('Logger').error(`[Werkbank] Umzug nach dem Urteil für ${kennung} nicht fortgesetzt:`, fehler));
 }
 
 /** Zwischenmeldungen eines Durchlaufs abfangen, alles andere zum Handler. */
@@ -361,7 +374,7 @@ function anmelden() {
 
 module.exports = {
     anmelden, merke, vergiss, merkeLauf, vergissLauf, merkePruefung, vergissPruefung, verteile,
-    beiAusgabe, beiEnde, beiStatus, beiGestartet, beiKonsole, beiBereitschaft, beiPorts, beiBeendet, beiPruefung,
+    beiAusgabe, beiEnde, beiStatus, beiGestartet, beiKonsole, beiBereitschaft, beiPorts, beiBeendet, beiPruefung, umzugWeiter,
     _laufend: laufend, _puffer: puffer, _laeufe: laeufe, _konsolenPuffer: konsolenPuffer,
     _pruefungen: pruefungen, _pruefPuffer: pruefPuffer,
 };

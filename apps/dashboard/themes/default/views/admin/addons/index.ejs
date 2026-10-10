@@ -93,6 +93,27 @@
                         </div>
                     </div>
                 </div>
+                <%#
+                  Umzug auf den neuesten Bau (2026-10-10). Erscheint erst, wenn
+                  ein Paket zurückliegt oder ein Umzug läuft bzw. auf seine
+                  Freigabe wartet — sonst gibt es hier nichts zu tun.
+                %>
+                <div class="card-body border-bottom py-2 d-none" id="umzugLeiste">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <span class="fw-medium"><i class="fa-solid fa-truck-ramp-box me-1"></i>Umzug auf den neuesten Bau</span>
+                        <span class="text-secondary small" id="umzugLage"></span>
+                        <span class="ms-auto d-flex flex-wrap align-items-center gap-2">
+                            <select class="form-select form-select-sm w-auto d-none" id="umzugMaschine" aria-label="Maschine für die Prüfdurchläufe"></select>
+                            <button type="button" class="btn btn-sm btn-primary d-none" id="umzugAlle">
+                                <i class="fa-solid fa-play me-1"></i>Alle umziehen <span id="umzugAlleZahl"></span>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-success d-none" id="umzugFreigeben">
+                                <i class="fa-solid fa-check me-1"></i>Umgezogene freigeben <span id="umzugFreigebenZahl"></span>
+                            </button>
+                        </span>
+                    </div>
+                    <div class="form-hint mt-1">Je Paket ein Prüfdurchlauf auf leerem Volume, einer nach dem anderen. Bei Grün entsteht eine neue Fassung in „test", die sich nur im Image unterscheidet — freigegeben wird sie erst mit deinem Klick.</div>
+                </div>
                 <div class="card-body table-responsive p-0">
                     <table class="table table-hover text-nowrap" id="addonsTable">
                         <thead>
@@ -135,7 +156,10 @@
                                         <td><%= fr ? fr.fassungen : '—' %></td>
                                         <%# Füllt sich nach dem Laden (GET /admin/addons/imagestand) — die Abfrage
                                             geht an einen Daemon und soll die Liste nicht aufhalten. %>
-                                        <td data-image-stand="<%= addon.id %>"><span class="text-secondary small">…</span></td>
+                                        <td>
+                                            <div data-image-stand="<%= addon.id %>"><span class="text-secondary small">…</span></div>
+                                            <div data-umzug="<%= addon.id %>" data-umzug-name="<%= addon.name %>" class="mt-1"></div>
+                                        </td>
                                         <td>
                                             <div class="btn-group btn-group-sm">
                                                 <a href="/admin/addons/<%= addon.id %>" 
@@ -178,6 +202,27 @@
 
   Der Knopf bleibt gesperrt, bis der Name des Pakets genau dasteht.
 %>
+<%# Rückfrage vor der Sammelfreigabe: Sie nennt, WAS freigegeben wird. %>
+<div class="modal modal-blur fade" id="umzugFreigebenModal" tabindex="-1" aria-labelledby="umzugFreigebenTitel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="umzugFreigebenTitel"><i class="fa-solid fa-check me-2"></i>Umgezogene Fassungen freigeben</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2">Diese Fassungen gehen von „test" nach „stable":</p>
+                <ul class="mb-3" id="umzugFreigebenListe"></ul>
+                <p class="mb-0 text-secondary">Alle Server auf „stable" starten ab dem nächsten Start mit ihnen. Eine Freigabe lässt sich auf der Seite des Spiels zurücknehmen.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-success" id="umzugFreigebenKnopf"><i class="fa-solid fa-check me-1"></i>Freigeben</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal modal-blur fade" id="paketEntfernenModal" tabindex="-1" aria-labelledby="paketEntfernenTitel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content border border-danger border-2">
@@ -217,7 +262,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Je Paket: Hängt die neueste Fassung am neuesten Bau ihres Images? Drei
     // Auskünfte, und „unbekannt" ist eine eigene — nie „aktuell", ohne gefragt
     // zu haben. Namen kommen aus Paketen: als Text gesetzt, nie als HTML.
-    (async () => {
+    let imageDaten = null;
+    async function ladeImageStand() {
         const zellen = document.querySelectorAll('[data-image-stand]');
         if (!zellen.length) return;
         const kopf = document.getElementById('imageStandKopf');
@@ -252,14 +298,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (p.stand === 'neuer_bau') {
                 setze(zelle, 'bg-warning-lt', 'neuer Bau' + (p.neuester && p.neuester.fassung ? ' ' + p.neuester.fassung : ''),
                     worauf + ' — angeheftet ' + kurz(p.digest) + ', neuester Bau ' + kurz(p.neuester && p.neuester.digest)
-                    + '. Umziehen: in der Werkbank öffnen, prüfen, veröffentlichen.');
-                if (daten.werkbank) {
-                    const weg = document.createElement('a');
-                    weg.href = daten.werkbank;
-                    weg.className = 'ms-2 small';
-                    weg.textContent = 'zur Werkbank';
-                    zelle.appendChild(weg);
-                }
+                    + '. Umziehen: der Knopf darunter — Prüfdurchlauf, bei Grün neue Fassung in test.');
             } else {
                 setze(zelle, 'bg-secondary-lt', 'unbekannt', p.grund || '');
             }
@@ -275,7 +314,182 @@ document.addEventListener('DOMContentLoaded', () => {
                 + (daten.gefragtBei ? ' (gefragt bei ' + daten.gefragtBei + ')' : '');
         }
         if (daten.fehler && window.showToast) window.showToast('warning', 'Image-Stand: ' + daten.fehler);
-    })();
+        imageDaten = daten;
+    }
+
+    // ── Umzug auf den neuesten Bau (2026-10-10) ─────────────────────────────
+    // Ein Knopf je Paket, einer für alle. Der Server entscheidet, was wirklich
+    // zurückliegt; hier wird nur angestoßen und der Stand gezeichnet. Solange
+    // etwas wartet oder läuft, wird alle fünf Sekunden nachgefragt.
+    const melde = (art, text) => { if (window.showToast) window.showToast(art, text); };
+    const leiste = document.getElementById('umzugLeiste');
+    const lage = document.getElementById('umzugLage');
+    const maschinenWahl = document.getElementById('umzugMaschine');
+    const knopfAlle = document.getElementById('umzugAlle');
+    const knopfFreigeben = document.getElementById('umzugFreigeben');
+    let umzugDaten = null, umzugTakt = null, warBeschaeftigt = false;
+
+    const el = (tag, klasse, text) => {
+        const e = document.createElement(tag);
+        if (klasse) e.className = klasse;
+        if (text !== undefined) e.textContent = text;
+        return e;
+    };
+    const dauer = (seit) => {
+        const s = Math.max(0, Math.round((Date.now() - new Date(seit).getTime()) / 1000));
+        return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') + ' min';
+    };
+
+    async function sende(weg, nutzlast) {
+        const antwort = await fetch(weg, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify(nutzlast || {}) });
+        const daten = await antwort.json().catch(() => ({}));
+        if (!antwort.ok || !daten.success) throw new Error(daten.message || ('HTTP ' + antwort.status));
+        return daten;
+    }
+
+    async function umziehen(pakete, knopf) {
+        if (knopf) knopf.disabled = true;
+        try {
+            const daten = await sende('/admin/addons/umzug', { pakete, rootserver_id: maschinenWahl.value || undefined });
+            melde(daten.abgelehnt && daten.abgelehnt.length ? 'warning' : 'success', daten.message);
+        } catch (fehler) {
+            melde('error', 'Umzug nicht angestoßen: ' + fehler.message);
+        }
+        if (knopf) knopf.disabled = false;
+        await ladeUmzug();
+    }
+
+    function zeichneUmzug() {
+        const zurueck = new Map(((imageDaten && imageDaten.pakete) || []).filter((p) => p.stand === 'neuer_bau').map((p) => [String(p.paket_id), p]));
+        const jePaket = new Map(((umzugDaten && umzugDaten.umzuege) || []).map((u) => [String(u.paket_id), u]));
+        let umziehbar = 0;
+        document.querySelectorAll('[data-umzug]').forEach((zelle) => {
+            const id = zelle.dataset.umzug;
+            const u = jePaket.get(id);
+            const liegtZurueck = zurueck.has(id);
+            zelle.textContent = '';
+            const beschaeftigt = u && (u.stand === 'wartet' || u.stand === 'laeuft');
+            if (u && u.stand === 'wartet') {
+                zelle.appendChild(el('span', 'badge bg-secondary-lt', 'Umzug wartet · ' + u.von + ' → ' + u.nach));
+            } else if (u && u.stand === 'laeuft') {
+                const m = el('span', 'badge bg-primary-lt', 'Prüfdurchlauf läuft · ' + (u.begonnen ? dauer(u.begonnen) : ''));
+                m.title = u.von + ' → ' + u.nach;
+                zelle.appendChild(m);
+            } else if (u && u.stand === 'gruen' && !liegtZurueck) {
+                // Nur solange das Paket NICHT wieder zurückliegt: Nach dem
+                // nächsten Bau ist der grüne Umzug von gestern keine Auskunft mehr.
+                zelle.appendChild(el('span', 'badge ' + (u.kanal === 'stable' ? 'bg-success-lt' : 'bg-warning-lt'),
+                    'umgezogen · ' + u.nach + (u.kanal === 'stable' ? ' freigegeben' : ' in test')));
+                if (u.kanal === 'test' && !u.freigebbar) {
+                    const h = el('div', 'text-secondary small', 'Freigabe auf der Seite des Spiels');
+                    h.title = 'Die Fassung, aus der umgezogen wurde, war selbst nicht freigegeben — der Sammelknopf gibt sie deshalb nicht frei.';
+                    zelle.appendChild(h);
+                }
+            } else if (u && u.stand === 'rot') {
+                const m = el('span', 'badge bg-danger-lt', 'Umzug rot');
+                m.title = u.grund || '';
+                zelle.appendChild(m);
+                const grund = el('div', 'text-danger small text-wrap', u.grund || 'ohne Grund');
+                grund.style.maxWidth = '28rem';
+                zelle.appendChild(grund);
+                if (u.sitzung_offen && umzugDaten.werkbank) {
+                    const weg = el('a', 'small', 'Sitzung in der Werkbank ansehen');
+                    weg.href = umzugDaten.werkbank + '/' + encodeURIComponent(u.kennung);
+                    zelle.appendChild(weg);
+                }
+            }
+            if (beschaeftigt) {
+                const ab = el('button', 'btn btn-sm btn-ghost-secondary ms-1 py-0', 'abbrechen');
+                ab.type = 'button';
+                ab.addEventListener('click', async () => {
+                    ab.disabled = true;
+                    try { melde('success', (await sende('/admin/addons/umzug/' + encodeURIComponent(u.kennung) + '/abbrechen')).message); }
+                    catch (fehler) { melde('error', 'Nicht abgebrochen: ' + fehler.message); }
+                    await ladeUmzug();
+                });
+                zelle.appendChild(ab);
+            } else if (liegtZurueck) {
+                umziehbar++;
+                const k = el('button', 'btn btn-sm btn-outline-primary py-0' + (zelle.childNodes.length ? ' d-block mt-1' : ''), u && u.stand === 'rot' ? 'Noch einmal umziehen' : 'Umziehen');
+                k.type = 'button';
+                k.title = 'Prüfdurchlauf auf dem neuesten Bau, bei Grün neue Fassung in test';
+                k.addEventListener('click', () => umziehen([Number(id)], k));
+                zelle.appendChild(k);
+            }
+        });
+
+        const z = (umzugDaten && umzugDaten.zaehlung) || {};
+        const beschaeftigt = (z.wartet || 0) + (z.laeuft || 0);
+        leiste.classList.toggle('d-none', !(umziehbar || beschaeftigt || z.freigebbar || z.rot));
+        lage.textContent = [
+            umziehbar ? umziehbar + ' zurück' : '',
+            z.laeuft ? z.laeuft + ' läuft' : '', z.wartet ? z.wartet + ' wartet' : '',
+            z.freigebbar ? z.freigebbar + ' warten auf die Freigabe' : '',
+        ].filter(Boolean).join(' · ');
+        knopfAlle.classList.toggle('d-none', umziehbar < 1);
+        document.getElementById('umzugAlleZahl').textContent = '(' + umziehbar + ')';
+        knopfFreigeben.classList.toggle('d-none', !z.freigebbar);
+        document.getElementById('umzugFreigebenZahl').textContent = '(' + (z.freigebbar || 0) + ')';
+
+        // Maschinen: nur zur Wahl, wenn es mehr als eine erreichbare gibt.
+        const maschinen = ((umzugDaten && umzugDaten.maschinen) || []).filter((m) => m.online);
+        if (maschinenWahl.options.length !== maschinen.length) {
+            const vorher = maschinenWahl.value;
+            maschinenWahl.textContent = '';
+            maschinen.forEach((m) => { const o = el('option', '', m.name); o.value = m.id; maschinenWahl.appendChild(o); });
+            if (vorher) maschinenWahl.value = vorher;
+        }
+        maschinenWahl.classList.toggle('d-none', maschinen.length < 2 || umziehbar < 1);
+
+        // Fertig geworden: Der Image-Stand hat sich geändert — neu fragen.
+        if (warBeschaeftigt && !beschaeftigt) ladeImageStand().then(zeichneUmzug);
+        warBeschaeftigt = beschaeftigt > 0;
+        clearTimeout(umzugTakt);
+        if (beschaeftigt) umzugTakt = setTimeout(ladeUmzug, 5000);
+    }
+
+    async function ladeUmzug() {
+        try {
+            const antwort = await fetch('/admin/addons/umzug', { headers: { Accept: 'application/json' } });
+            const daten = await antwort.json();
+            if (!antwort.ok || !daten.success) throw new Error(daten.message || ('HTTP ' + antwort.status));
+            umzugDaten = daten;
+        } catch (fehler) {
+            melde('error', 'Umzüge: ' + fehler.message);
+            // Weiterfragen, wenn gerade etwas lief — eine Störung ist kein Ende.
+            clearTimeout(umzugTakt);
+            if (warBeschaeftigt) umzugTakt = setTimeout(ladeUmzug, 5000);
+            return;
+        }
+        zeichneUmzug();
+    }
+
+    knopfAlle.addEventListener('click', () => umziehen('alle', knopfAlle));
+    knopfFreigeben.addEventListener('click', () => {
+        const liste = document.getElementById('umzugFreigebenListe');
+        liste.textContent = '';
+        ((umzugDaten && umzugDaten.umzuege) || []).filter((u) => u.freigebbar).forEach((u) => {
+            const name = document.querySelector('[data-umzug="' + u.paket_id + '"]');
+            liste.appendChild(el('li', '', ((name && name.dataset.umzugName) || u.slug) + ' — ' + u.von + ' → ' + u.nach));
+        });
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('umzugFreigebenModal')).show();
+    });
+    document.getElementById('umzugFreigebenKnopf').addEventListener('click', async (ereignis) => {
+        const knopf = ereignis.currentTarget;
+        knopf.disabled = true;
+        try {
+            const daten = await sende('/admin/addons/umzug/freigeben');
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('umzugFreigebenModal')).hide();
+            melde(daten.nicht && daten.nicht.length ? 'warning' : 'success', daten.message);
+            setTimeout(() => location.reload(), 1500);   // die Spalte „Freigabe" zeichnet der Server
+        } catch (fehler) {
+            melde('error', 'Nicht freigegeben: ' + fehler.message);
+        }
+        knopf.disabled = false;
+    });
+
+    ladeImageStand().then(ladeUmzug, ladeUmzug);
     
     
     // Search-Funktionalität

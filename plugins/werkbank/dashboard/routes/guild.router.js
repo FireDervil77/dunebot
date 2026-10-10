@@ -649,7 +649,11 @@ router.post('/:kennung/pruefen', requirePermission('WERKBANK.BAUEN'), async (req
 
 router.post('/:kennung/pruefung/abbrechen', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
     try {
-        await Sitzungen.pruefungAbbrechen(await offeneSitzung(req, res));
+        const sitzung = await offeneSitzung(req, res);
+        await Sitzungen.pruefungAbbrechen(sitzung);
+        // Gehörte der Durchlauf zu einem Umzug, endet der damit rot, und das
+        // nächste Paket kommt dran.
+        require('../helpers/Ereignisse').umzugWeiter(sitzung.kennung);
         return res.json({ success: true });
     } catch (error) {
         return fehler(res, error, 'Nicht abgebrochen', 400);

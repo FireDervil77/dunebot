@@ -3939,7 +3939,7 @@ module.exports = {
     herausnehmen, schrittWiederholen, verwerfen, entwurfAlsPaket,
     PRUEF_SUFFIX, fingerabdruck, technisch,
     pruefeBildAdresse, angaben, angabenSpeichern, veroeffentlichungsStand, veroeffentlichungsPaket, veroeffentlichen, laufendePruefung, pruefungen, durchlaufMaengel, pruefen,
-    pruefungAbbrechen, pruefProtokoll, pruefungBeenden,
+    pruefungAbbrechen, pruefProtokoll, pruefungBeenden, entwurfSchreiben,
     EINSTELLUNG, einstellungAusFormular, einstellungSpeichern, einstellungEntfernen, einstellungRolleSetzen, probewerteSetzen, probewerte,
     umgebungAusEinstellungen, belegteEinstellungen,
     HINWEIS, hinweisAusFormular, hinweisSpeichern, hinweisEntfernen,

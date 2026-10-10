@@ -4,6 +4,10 @@
  * Endpoints:
  *   GET    /admin/addons              — Übersicht
  *   GET    /admin/addons/imagestand   — je Paket: angeheftetes Image gegen den neuesten Bau (JSON)
+ *   GET    /admin/addons/umzug        — je Paket: der jüngste Umzug auf einen neuen Bau (JSON)
+ *   POST   /admin/addons/umzug        — Pakete umziehen: prüfen und als neue Fassung in `test` einliefern
+ *   POST   /admin/addons/umzug/freigeben          — alle umgezogenen Fassungen freigeben
+ *   POST   /admin/addons/umzug/:kennung/abbrechen — einen wartenden oder hängenden Umzug beenden
  *   GET    /admin/addons/:id          — Detail: Name, Beschreibung, Tags, Freigabe
  *   PUT    /admin/addons/:id          — Name, Beschreibung, Tags speichern
  *   POST   /admin/addons/:id/fassungen/:fassungId/freigeben      — Paketfassung test → stable
@@ -43,6 +47,11 @@ const Paketfassung = require('../../../../plugins/gameserver/dashboard/helpers/P
 // Hängt ein Paket am neuesten Bau seines Images? (Baustelle 177.) Gleicher Ort,
 // gleicher Grund: Ein Image-Stand betrifft alle Guilds.
 const Imagestand = require('../../../../plugins/gameserver/dashboard/helpers/Imagestand');
+// Ein Paket auf den neuesten Bau umziehen, ohne die Handgriffe in der Werkbank.
+// Die Kette selbst gehört der Werkbank (ihre Sitzungen, ihr Prüfdurchlauf);
+// hier sind die Knöpfe — aus demselben Grund wie die Freigabe: alle Guilds.
+const Umzug = require('../../../../plugins/werkbank/dashboard/helpers/Umzug');
+const WerkbankSitzungen = require('../../../../plugins/werkbank/dashboard/helpers/Sitzungen');
 // Ein Paket ganz entfernen (Baustelle 178) — samt seiner Werkbank-Sitzungen.
 const PaketEntfernen = require('../../../../plugins/gameserver/dashboard/helpers/PaketEntfernen');
 
@@ -114,6 +123,110 @@ router.get('/imagestand', async (req, res) => {
     } catch (err) {
         Logger.error('[Addons] Image-Stand laden fehlgeschlagen:', err);
         return res.status(500).json({ success: false, message: `Der Image-Stand ließ sich nicht laden: ${err.message}` });
+    }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Umzug auf den neuesten Bau (2026-10-10) — MUSS ebenfalls vor `/:id` stehen.
+//
+// Umgezogen wird in der Guild des Betreibers: Dort gibt es die Werkbank, ihre
+// Sitzungen und die Maschinen, auf denen ein Prüfdurchlauf laufen darf.
+// ─────────────────────────────────────────────────────────────────────────────
+function umzugsGuild() {
+    const guildId = process.env.CONTROL_GUILD_ID;
+    if (!guildId) throw new Error('CONTROL_GUILD_ID ist nicht gesetzt — ohne die Guild des Betreibers gibt es keine Werkbank, in der umgezogen wird.');
+    return guildId;
+}
+
+router.get('/umzug', async (req, res) => {
+    try {
+        const guildId = umzugsGuild();
+        const [stand, maschinen] = await Promise.all([Umzug.stand(), WerkbankSitzungen.maschinen(guildId)]);
+        return res.json({ success: true, ...stand,
+            maschinen: maschinen.map(m => ({ id: m.id, name: m.name, online: m.online })),
+            werkbank: `/guild/${guildId}/plugins/werkbank` });
+    } catch (err) {
+        ServiceManager.get('Logger').error('[Addons] Umzugsstand laden fehlgeschlagen:', err);
+        return res.status(500).json({ success: false, message: `Der Stand der Umzüge ließ sich nicht laden: ${err.message}` });
+    }
+});
+
+router.post('/umzug', async (req, res) => {
+    const Logger    = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    try {
+        const guildId = umzugsGuild();
+        // Umgezogen wird nur, was wirklich zurückliegt — das entscheidet der
+        // Image-Stand hier, nicht die Liste aus dem Browser. Ein „Umzug" auf
+        // den Bau, an dem das Paket schon hängt, wäre eine Fassung ohne Inhalt.
+        const image = await Imagestand.stand(dbService);
+        if (image.fehler) throw new Error(image.fehler);
+        const zurueck = new Set(image.pakete.filter(p => p.stand === Imagestand.STAND.neuerBau).map(p => Number(p.paket_id)));
+        const gewuenscht = req.body?.pakete === 'alle'
+            ? [...zurueck]
+            : (Array.isArray(req.body?.pakete) ? req.body.pakete.map(Number) : []);
+        const paketIds = gewuenscht.filter(id => zurueck.has(id));
+        if (!paketIds.length) {
+            throw new Error(gewuenscht.length
+                ? 'Keines der gewählten Pakete liegt hinter dem neuesten Bau.'
+                : 'Kein Paket liegt hinter dem neuesten Bau — es gibt nichts umzuziehen.');
+        }
+        const maschinen = await WerkbankSitzungen.maschinen(guildId);
+        const maschine = req.body?.rootserver_id
+            ? maschinen.find(m => String(m.id) === String(req.body.rootserver_id))
+            : maschinen.find(m => m.online);
+        if (!maschine) throw new Error('Keine Maschine der Betreiber-Guild ist erreichbar — der Prüfdurchlauf braucht eine.');
+        if (!maschine.online) throw new Error(`Der Daemon von „${maschine.name}" ist nicht erreichbar.`);
+
+        const nutzer = res.locals.user || {};
+        const ergebnis = await Umzug.anstossen({
+            paketIds, guildId, rootserverId: maschine.id,
+            userId: nutzer.id || null,
+            autor: nutzer.username || nutzer.global_name || null,
+        });
+        Logger.info(`[Addons] Umzug angestoßen auf „${maschine.name}": ${ergebnis.vorgemerkt.map(v => `${v.slug} ${v.von}→${v.nach}`).join(', ') || 'nichts'}`
+            + (ergebnis.abgelehnt.length ? ` — abgelehnt: ${ergebnis.abgelehnt.map(a => `${a.slug} (${a.grund})`).join('; ')}` : ''));
+        const n = ergebnis.vorgemerkt.length;
+        return res.status(n ? 200 : 400).json({
+            success: n > 0, ...ergebnis, maschine: maschine.name,
+            message: n
+                ? `${n} Paket${n === 1 ? ' zieht' : 'e ziehen'} um — ein Prüfdurchlauf nach dem anderen auf „${maschine.name}".`
+                    + (ergebnis.abgelehnt.length ? ` Nicht vorgemerkt: ${ergebnis.abgelehnt.map(a => `${a.slug} (${a.grund})`).join('; ')}` : '')
+                : `Nichts vorgemerkt: ${ergebnis.abgelehnt.map(a => `${a.slug} (${a.grund})`).join('; ')}`,
+        });
+    } catch (err) {
+        return res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+// Der Freigabe-Klick für alle umgezogenen Fassungen auf einmal. Er bleibt ein
+// Klick (Betreiber, 2026-10-09: „unsere Handschranke") — was freigebbar ist,
+// entscheidet Umzug.stand(), und jede einzelne Freigabe geht durch dieselbe
+// Regel wie der Knopf auf der Detailseite (Paketfassung.freigeben).
+router.post('/umzug/freigeben', async (req, res) => {
+    try {
+        const r = await Umzug.freigeben({ userId: res.locals.user?.id || null });
+        ServiceManager.get('Logger').info(`[Addons] Umgezogene Fassungen freigegeben: ${r.freigegeben.map(f => `${f.slug} ${f.version}`).join(', ') || 'keine'}`);
+        if (!r.freigegeben.length && !r.nicht.length) {
+            return res.status(400).json({ success: false, message: 'Es gibt keine umgezogene Fassung, die auf ihre Freigabe wartet.' });
+        }
+        return res.json({
+            success: r.freigegeben.length > 0, ...r,
+            message: (r.freigegeben.length ? `Freigegeben: ${r.freigegeben.map(f => `${f.slug} ${f.version}`).join(', ')}. Server auf „stable" nehmen sie beim nächsten Start.` : 'Nichts freigegeben.')
+                + (r.nicht.length ? ` Nicht freigegeben: ${r.nicht.map(f => `${f.slug} ${f.version} (${f.grund})`).join('; ')}` : ''),
+        });
+    } catch (err) {
+        return res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+router.post('/umzug/:kennung/abbrechen', async (req, res) => {
+    try {
+        if (!WerkbankSitzungen.RE_KENNUNG.test(String(req.params.kennung || ''))) throw new Error('Diese Kennung gibt es nicht.');
+        await Umzug.abbrechen(req.params.kennung);
+        return res.json({ success: true, message: 'Der Umzug ist abgebrochen.' });
+    } catch (err) {
+        return res.status(400).json({ success: false, message: err.message });
     }
 });
 
@@ -230,7 +343,10 @@ router.post('/:id/fassungen/:fassungId/freigeben', async (req, res) => {
     try {
         const f = await Paketfassung.freigeben(dbService, {
             paketId: req.params.id, fassungId: req.params.fassungId,
-            userId: res.locals.user?.info?.id || null,
+            // `res.locals.user` IST schon `session.user.info` (auth.middleware).
+            // Bis zum 2026-10-10 stand hier `.info.id` — immer leer; alle 20
+            // Freigaben bis dahin tragen deshalb kein `released_by`.
+            userId: res.locals.user?.id || null,
         });
         Logger.info(`[Addons] Paketfassung freigegeben: Paket ${req.params.id}, Fassung ${f.version}`);
         res.json({ success: true, message: `Fassung ${f.version} ist freigegeben. Server auf „stable" nehmen sie beim nächsten Start.` });
