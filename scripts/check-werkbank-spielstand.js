@@ -75,8 +75,13 @@ const gleich = (a, b, was) => assert.deepStrictEqual(sortiert(a), sortiert(b), w
 const wirft = (tun, muster) => assert.rejects(tun, (e) => { assert.match(e.message, muster); return true; });
 
 /** Die Karte so im Formular, wie die Seite sie vorbelegt. */
+// Dieselben Felder, die das Formular der Karte schickt. `public` fehlte hier bis
+// zum 2026-10-10: Solange kein Paket etwas für Spieler freigab, fiel es nicht
+// auf — beim ersten (etlegacy) nahm der Nachbau die Freigabe weg, und die Regel
+// zur Download-Adresse hielt zu Recht dagegen.
 const formular = (stand) => ({
     denylist: stand.sperrliste.join('\n'), saves: stand.welten.join('\n'),
+    'public': stand.oeffentlich.join('\n'),
     persist: stand.umleitungen.map(u => ({ from: u.from, to: u.to })),
 });
 
@@ -148,6 +153,7 @@ const lies = (...teile) => fs.readFileSync(path.join(...teile), 'utf8');
             gleich(stand.sperrliste, f.denylist || []);
             gleich(stand.welten, m.saves || []);
             gleich(stand.umleitungen, m.persist || []);
+            gleich(stand.oeffentlich, f.public || [], 'die Karte zeigt nicht, was das Paket für Spieler freigibt');
 
             const davor = kopie(S.entwurfAlsPaket(sitzung, liste));
             gleich(davor.files, paket.files, 'schon das Zusammensetzen ändert files');
