@@ -210,11 +210,89 @@ function quelldateien() {
         assert.deepStrictEqual([z.channel, z.released_at, z.released_by], ['test', null, null]);
     });
 
+    // Die Übersicht unter /admin/addons sagt, ob hinter der freigegebenen Fassung
+    // schon eine weitere liegt (2026-10-10). Stand hier: Paket 1 hat drei
+    // Fassungen in `test` (11, 12 geprüft; 13 ungeprüft und die neueste), Paket 2
+    // eine ungeprüfte.
+    await pruefe('Übersicht: „neuer" ist die neueste Fassung, solange sie nicht freigegeben ist', async () => {
+        await c.query("INSERT INTO packages VALUES (3,'leer')");
+        let s = await P.freigabeJePaket(db);
+        assert.deepStrictEqual(s[1], { fassungen: 3, freigegeben: null, neuer: { id: 13, version: '1.0.2', geprueft: false } });
+        assert.deepStrictEqual(s[2], { fassungen: 1, freigegeben: null, neuer: { id: 21, version: '2.0.0', geprueft: false } });
+        assert.deepStrictEqual(s[3], { fassungen: 0, freigegeben: null, neuer: null }, 'ein Paket ohne Fassung wartet auf nichts');
+
+        // Eine ältere Freigabe ändert nichts daran, dass die neueste wartet.
+        await P.freigeben(db, { paketId: 1, fassungId: 12, userId: '1' });
+        s = await P.freigabeJePaket(db);
+        assert.deepStrictEqual(s[1], { fassungen: 3, freigegeben: '1.0.1', neuer: { id: 13, version: '1.0.2', geprueft: false } });
+
+        // Eine geprüfte kommt dazu: Sie ist jetzt die neueste, und sie ist freigebbar.
+        await c.query(`INSERT INTO package_versions (id, package_id, version, fbpkg, checksum, channel, published_at, test_passed_at)
+                       VALUES (14, 1, '1.0.3', ?, 'sha256:e', 'test', '2026-01-04 10:00:00', '2026-01-04 09:00:00')`, [doc('geprueft', '1.0.3')]);
+        s = await P.freigabeJePaket(db);
+        assert.deepStrictEqual(s[1], { fassungen: 4, freigegeben: '1.0.1', neuer: { id: 14, version: '1.0.3', geprueft: true } });
+
+        // Freigegeben: Es wartet nichts mehr — die älteren test-Fassungen (11, 13) zählen nicht.
+        await P.freigeben(db, { paketId: 1, fassungId: 14, userId: '1' });
+        s = await P.freigabeJePaket(db);
+        assert.deepStrictEqual(s[1], { fassungen: 4, freigegeben: '1.0.3', neuer: null });
+
+        // Zurückgenommen: Die neueste wartet wieder, freigegeben ist die davor.
+        await P.zuruecknehmen(db, { paketId: 1, fassungId: 14 });
+        s = await P.freigabeJePaket(db);
+        assert.deepStrictEqual(s[1], { fassungen: 4, freigegeben: '1.0.1', neuer: { id: 14, version: '1.0.3', geprueft: true } });
+    });
+
     await c.query('DROP TEMPORARY TABLE gameservers, packages, package_versions');
     if (altKontroll === undefined) delete process.env.CONTROL_GUILD_ID; else process.env.CONTROL_GUILD_ID = altKontroll;
 
     await pruefe('die echten Tabellen sind unberührt', async () => {
         assert.strictEqual(await zaehle(), vorher);
+    });
+
+    // Die Seite wirklich zeichnen, nicht nach Wörtern suchen: Eine Spalte, deren
+    // Kopf dasteht und deren Zelle ein anderes Feld liest, sähe im Quelltext
+    // genauso aus.
+    console.log('\nÜbersicht: die Spalte „Neuere Fassung"');
+    await pruefe('je Lage steht in der Zelle, was zu tun ist — und der Zähler zählt dieselben Zeilen', async () => {
+        const ejs = require('ejs');
+        const datei = path.join(WURZEL, 'apps/dashboard/themes/default/views/admin/addons/index.ejs');
+        const addons = [
+            { id: 1, name: 'Wartet',    slug: 'wartet',    freigabe: { fassungen: 4, freigegeben: '1.0.1', neuer: { id: 14, version: '1.0.3', geprueft: true } } },
+            { id: 2, name: 'Ungeprüft', slug: 'ungeprueft', freigabe: { fassungen: 2, freigegeben: '2.0.0', neuer: { id: 22, version: '2.0.1', geprueft: false } } },
+            { id: 3, name: 'Aktuell',   slug: 'aktuell',   freigabe: { fassungen: 3, freigegeben: '3.0.2', neuer: null } },
+            { id: 4, name: 'Erstling',  slug: 'erstling',  freigabe: { fassungen: 1, freigegeben: null, neuer: { id: 41, version: '1.0.0', geprueft: true } } },
+            { id: 5, name: 'Ohne',      slug: 'ohne',      freigabe: { fassungen: 0, freigegeben: null } },
+        ];
+        const html = await ejs.renderFile(datei, {
+            addons, freigabeFehler: null,
+            stats: { total: 5, freigegeben: 3, entwuerfe: 2, wartend: addons.filter(a => a.freigabe.neuer).length },
+        });
+        const zelle = (id) => {
+            const m = html.match(new RegExp(`<td data-neuere-fassung="${id}">([\\s\\S]*?)</td>`));
+            assert.ok(m, `Paket ${id} hat keine Zelle „Neuere Fassung"`);
+            return m[1].replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        };
+        assert.strictEqual(zelle(1), '1.0.3 · wartet auf Freigabe');
+        assert.strictEqual(zelle(2), '2.0.1 · ohne Prüfdurchlauf');
+        assert.strictEqual(zelle(3), 'aktuell');
+        assert.strictEqual(zelle(4), '1.0.0 · wartet auf Freigabe', 'auch ein Spiel ohne Freigabe zeigt, was freigegeben werden könnte');
+        assert.strictEqual(zelle(5), '—');
+        assert.match(html, /<td data-neuere-fassung="1">\s*<a href="\/admin\/addons\/1"/, 'die Marke führt zur Seite des Spiels — dort ist der Freigabe-Knopf');
+        assert.match(html, />3<\/div>\s*<div class="text-secondary">Mit neuerer Fassung</, 'der Zähler nennt drei');
+        const koepfe = (html.match(/<thead>[\s\S]*?<\/thead>/)[0].match(/<th[\s>]/g) || []).length;
+        const zellen = (html.match(/<tbody>\s*<tr>([\s\S]*?)<\/tr>/)[1].match(/<td[\s>]/g) || []).length;
+        assert.strictEqual(zellen, koepfe, 'so viele Zellen wie Spaltenköpfe');
+    });
+
+    await pruefe('ohne Freigabestand bleibt die Spalte leer statt „aktuell" zu behaupten', async () => {
+        const ejs = require('ejs');
+        const html = await ejs.renderFile(path.join(WURZEL, 'apps/dashboard/themes/default/views/admin/addons/index.ejs'), {
+            addons: [{ id: 1, name: 'X', slug: 'x' }], freigabeFehler: 'Datenbank weg',
+            stats: { total: 1, freigegeben: null, entwuerfe: null, wartend: null },
+        });
+        assert.match(html, /<td data-neuere-fassung="1">\s*<span class="text-secondary">—<\/span>/);
+        assert.doesNotMatch(html, />aktuell</);
     });
 
     console.log('\nBestand');

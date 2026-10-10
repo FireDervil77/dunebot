@@ -246,7 +246,17 @@ async function fassungenZuPaket(dbService, paketId) {
  * Übersichten `addon_marketplace.status`/`trust_level` — Felder, die bei jedem
  * Spiel gleich standen und über das Anlegen nichts sagten.
  *
- * @returns {Promise<Object<number, {fassungen: number, freigegeben: string|null}>>}
+ * `neuer` (2026-10-10) sagt, ob hinter der freigegebenen Fassung schon eine
+ * weitere liegt: die neueste überhaupt, wenn sie NICHT freigegeben ist — also
+ * genau die, die ein Server im Kanal `test` bekommt und einer in `stable`
+ * nicht. Betreiber: „dann brauche ich die editierten Spiele nicht immer mit
+ * der Werkbank-Liste abgleichen". Dieselbe Reihenfolge wie FASSUNG_FUER_SERVER
+ * (Veröffentlichungszeitpunkt, nicht Versionsnummer): Eine zurückgenommene
+ * neueste Fassung zählt damit wieder als wartend, eine alte test-Fassung
+ * hinter einer jüngeren Freigabe nicht.
+ *
+ * @returns {Promise<Object<number, {fassungen: number, freigegeben: string|null,
+ *          neuer: {id: number, version: string, geprueft: boolean}|null}>>}
  *          Paket-Kennung → Stand; ein Spiel ohne Paket fehlt
  */
 async function freigabeJePaket(dbService) {
@@ -255,10 +265,23 @@ async function freigabeJePaket(dbService) {
                (SELECT COUNT(*) FROM package_versions n WHERE n.package_id = pk.id) AS fassungen,
                (SELECT s.version FROM package_versions s
                  WHERE s.package_id = pk.id AND s.channel = 'stable'
-                 ORDER BY s.published_at DESC, s.id DESC LIMIT 1) AS freigegeben
-          FROM packages pk`);
+                 ORDER BY s.published_at DESC, s.id DESC LIMIT 1) AS freigegeben,
+               j.id AS neueste_id, j.version AS neueste, j.channel AS neueste_kanal,
+               (j.test_passed_at IS NOT NULL) AS neueste_geprueft
+          FROM packages pk
+          LEFT JOIN package_versions j ON j.id = (
+              SELECT x.id FROM package_versions x
+               WHERE x.package_id = pk.id
+               ORDER BY x.published_at DESC, x.id DESC LIMIT 1)`);
     const aus = {};
-    for (const z of zeilen) aus[z.id] = { fassungen: Number(z.fassungen), freigegeben: z.freigegeben || null };
+    for (const z of zeilen) {
+        const wartet = z.neueste_id && z.neueste_kanal !== 'stable';
+        aus[z.id] = {
+            fassungen: Number(z.fassungen),
+            freigegeben: z.freigegeben || null,
+            neuer: wartet ? { id: Number(z.neueste_id), version: z.neueste, geprueft: Boolean(Number(z.neueste_geprueft)) } : null,
+        };
+    }
     return aus;
 }
 

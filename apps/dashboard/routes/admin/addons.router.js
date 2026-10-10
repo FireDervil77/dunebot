@@ -89,6 +89,9 @@ router.get('/', async (req, res) => {
             total:       addons.length,
             freigegeben: freigabeFehler ? null : addons.filter(a => a.freigabe.freigegeben).length,
             entwuerfe:   freigabeFehler ? null : addons.filter(a => !a.freigabe.freigegeben).length,
+            // Hinter der freigegebenen Fassung liegt schon eine weitere — oder es
+            // gibt noch gar keine freigegebene, aber eine, die es werden könnte.
+            wartend:     freigabeFehler ? null : addons.filter(a => a.freigabe.neuer).length,
         };
 
         await themeManager.renderView(res, 'admin/addons/index', { addons, stats, freigabeFehler, pageTitle: 'Spiele-Marktplatz' });
