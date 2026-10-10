@@ -82,6 +82,15 @@ const sitzungNach = (kennung) => welt.sitzungen.find(s => s.kennung === kennung)
 const attrappeS = {
     // Alles Rechnende ist echt.
     naechsteFassung: S.naechsteFassung, veroeffentlichungsPaket: S.veroeffentlichungsPaket, RE_KENNUNG: S.RE_KENNUNG,
+    rconStand: S.rconStand, probewerte: S.probewerte,
+    // Wie die echte: Probewerte liegen in der Sitzung (werkbank.werte), nie im Paket.
+    async probewerteSetzen(sitzung, werte) {
+        welt.aufrufe.push(['probewerte', sitzung.kennung, Object.keys(werte)]);
+        return attrappeS.entwurfSchreiben(sitzung, (e) => {
+            e.werkbank = e.werkbank || {};
+            e.werkbank.werte = { ...(e.werkbank.werte || {}), ...werte };
+        });
+    },
 
     async paketOeffnen({ guildId, userId, paketId, rootserverId }) {
         welt.aufrufe.push(['oeffnen', Number(paketId)]);
@@ -110,7 +119,7 @@ const attrappeS = {
     },
     async schritte(id) { return kopie(welt.sitzungen.find(s => s.id === id).schritte); },
     async pruefen(sitzung, liste) {
-        welt.aufrufe.push(['pruefen', sitzung.kennung]);
+        welt.aufrufe.push(['pruefen', sitzung.kennung, S.probewerte(sitzung)]);
         if (welt.stoerung.pruefen === sitzung.entwurf.identity.slug) throw new Error('Der Daemon der Maschine ist nicht erreichbar.');
         // Wie die echte Werkbank: geprüft wird der Entwurf, wie er JETZT ist.
         const pruefId = welt.naechsteId++;
@@ -265,6 +274,37 @@ const AUFTRAG = { guildId: '1', userId: '42', autor: 'Betreiber', rootserverId: 
         // Der Kern des Wunsches: In der Sitzung wird NICHTS installiert.
         assert.ok(sitzungNach(erste).schritte.every(s => s.status === 'uebernommen'), 'ein Schritt lief im Volume der Sitzung');
         assert.strictEqual(typeof attrappeS.uebernommeneAusfuehren, 'undefined', 'die Attrappe böte die Installation an — die Probe mässe nichts');
+    });
+
+    // Erster echter Lauf (2026-10-10): Factorio rot nach 1,1 Minuten —
+    // „RCON_PASSWORD ist leer oder fehlt". Die Einstellung dahinter hat keine
+    // Vorgabe, die frische Sitzung keinen Probewert.
+    const mitFernsteuerung = echte.filter(p => p.management?.rcon?.password_variable);
+    await pruefe(`Fernsteuerung: der Durchlauf bekommt ein erzeugtes Kennwort — und im Paket steht es nicht (${mitFernsteuerung.map(p => p.identity.slug).join(', ') || 'kein Paket'})`, async () => {
+        assert.ok(mitFernsteuerung.length > 0, 'kein Paket mit Fernsteuerung in der Datenbank — die Probe mässe nichts');
+        for (const paket of mitFernsteuerung) {
+            neueWelt([[1, paket]]);
+            const r = await Umzug.anstossen({ ...AUFTRAG, paketIds: [1] });
+            const k = r.vorgemerkt[0].kennung;
+            const sitzung = await attrappeS.laden('1', k);
+            const key = S.rconStand(sitzung).quelle;
+            assert.ok(key, `${paket.identity.slug}: keine Einstellung füllt ${paket.management.rcon.password_variable}`);
+            const lauf = welt.aufrufe.find(a => a[0] === 'pruefen');
+            const kennwort = lauf[2][key];
+            assert.ok(kennwort && kennwort.length >= 16, `${paket.identity.slug}: der Durchlauf bekam „${kennwort}" für ${key}`);
+            await urteil(k, true);
+            assert.strictEqual(vermerk(k).stand, 'gruen', vermerk(k).grund);
+            assert.ok(!JSON.stringify(neuesteVon(1).fbpkg).includes(kennwort), 'das Wegwerf-Kennwort steht im eingelieferten Paket');
+            // Erzeugt, nicht fest.
+            neueWelt([[1, paket]]);
+            await Umzug.anstossen({ ...AUFTRAG, paketIds: [1] });
+            assert.notStrictEqual(welt.aufrufe.find(a => a[0] === 'pruefen')[2][key], kennwort, 'zweimal dasselbe Kennwort heisst: es steht im Code');
+        }
+        // Ein Paket ohne Fernsteuerung bekommt keinen Probewert untergeschoben.
+        const ohne = echte.find(p => !p.management?.rcon);
+        neueWelt([[1, ohne]]);
+        await Umzug.anstossen({ ...AUFTRAG, paketIds: [1] });
+        assert.strictEqual(zaehle('probewerte'), 0);
     });
 
     await pruefe('Grün: eingeliefert in test, Sitzung verworfen, das nächste Paket beginnt', async () => {

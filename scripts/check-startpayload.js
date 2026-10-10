@@ -245,6 +245,33 @@ function ohneEgg(payload) {
         }
     }
 
+    // ── Der zweite Weg in die Variable (2026-10-10) ─────────────────────────
+    //
+    // Factorio aus der Werkbank führt das Kennwort über das Wurzelfeld `env`
+    // (`RCON_PASSWORD: {{setting:rcon_password}}`); die Einstellung selbst
+    // schreibt in `server-settings.json`. Die Regel oben fand sie nicht — ein
+    // Factorio-Server hätte ein leeres Kennwort bekommen. Die Schleife darüber
+    // misst nur die Handpakete, und die tragen alle `apply: env`.
+    await check('Auch über das Wurzelfeld env: die Einstellung hinter dem Verweis bekommt ein Kennwort', async () => {
+        const pk = {
+            management: { rcon: { protocol: 'source', port: 'rcon', password_variable: 'RCON_PASSWORD' } },
+            env: { RCON_PASSWORD: '{{setting:rcon_password}}' },
+            settings: [
+                { key: 'rcon_password', type: 'password', default: null, role: 'owner',
+                  apply: [{ target: 'file', file: 'server-settings.json', parser: 'json', path: 'rcon_password' }] },
+                { key: 'game_password', type: 'password', default: null, role: 'owner',
+                  apply: [{ target: 'file', file: 'server-settings.json', parser: 'json', path: 'game_password' }] },
+            ],
+        };
+        const w = paketWerteAnlegen(pk, {}, 'x');
+        assert.ok(w.rcon_password && w.rcon_password.length >= 16, `rcon_password = ${JSON.stringify(w.rcon_password)}`);
+        assert.ok(!('game_password' in w), 'ein Kennwort, das nicht die Fernsteuerung füllt, wurde miterzeugt');
+        assert.strictEqual(paketWerteAnlegen(pk, { rcon_password: 'von-hand' }, 'x').rcon_password, 'von-hand');
+        // Ein fester Wert im Wurzelfeld ist kein Verweis — dann wird nichts erzeugt.
+        const fest = { ...pk, env: { RCON_PASSWORD: 'fest' } };
+        assert.ok(!('rcon_password' in paketWerteAnlegen(fest, {}, 'x')));
+    });
+
     console.log('\nEine Einstellung, die dem Server fehlt (Baustelle Weltmodifikatoren)');
 
     // ── Der Fall, der das gekostet hat ──────────────────────────────────────

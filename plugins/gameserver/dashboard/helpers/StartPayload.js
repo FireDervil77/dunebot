@@ -405,8 +405,17 @@ function paketWerteAnlegen(paket, eingaben = {}, serverName = null) {
     // verzeiht und die Datei zeilenweise gelesen wird.
     const rconVariable = paket?.management?.rcon?.password_variable;
     if (rconVariable) {
+        // Zwei Wege führen eine Einstellung in die Variable, und beide zählen:
+        // das Ziel `apply: env` (Minecraft) — und das Wurzelfeld `env` mit
+        // einem Verweis, während die Einstellung selbst in eine Datei schreibt
+        // (Factorio: `RCON_PASSWORD: {{setting:rcon_password}}`). Bis zum
+        // 2026-10-10 galt nur der erste; ein Factorio-Server hätte ein leeres
+        // Kennwort bekommen. Aufgefallen ist es am Umzug, dessen Prüfdurchlauf
+        // genau daran rot wurde — einen Factorio-Server gab es noch nicht.
+        const verweis = /^\{\{setting:([a-z][a-z0-9_]*)\}\}$/.exec(String(paket.env?.[rconVariable] ?? '').trim());
         const eintrag = (paket.settings || []).find(e =>
-            Array.isArray(e.apply) && e.apply.some(a => a.target === 'env' && a.variable === rconVariable));
+            Array.isArray(e.apply) && e.apply.some(a => a.target === 'env' && a.variable === rconVariable))
+            || (verweis ? (paket.settings || []).find(e => e.key === verweis[1]) : null);
         if (eintrag && !werte[eintrag.key]) {
             werte[eintrag.key] = crypto.randomBytes(18).toString('base64url');
         }

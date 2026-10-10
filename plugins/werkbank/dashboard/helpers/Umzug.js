@@ -51,6 +51,7 @@
  * Immer nur EIN Durchlauf zugleich: Jeder installiert ein ganzes Spiel.
  */
 
+const crypto = require('crypto');
 const { ServiceManager } = require('dunebot-core');
 
 const STAND = { wartet: 'wartet', laeuft: 'laeuft', gruen: 'gruen', rot: 'rot' };
@@ -185,6 +186,7 @@ async function anstossen({ paketIds, guildId, userId, autor, rootserverId }) {
             });
             await dienste.db().query('UPDATE werkbank_sitzungen SET name = ? WHERE id = ?',
                 [`Umzug · ${sitzung.name}`.slice(0, 100), sitzung.id]);
+            await kennwortDerFernsteuerung(sitzung);
             vorgemerkt.push({ paket_id: paketId, slug: zeile.slug, von: zeile.version, nach, kennung: offen.kennung });
         } catch (fehler) {
             abgelehnt.push({ paket_id: paketId, slug, grund: fehler.message });
@@ -192,6 +194,28 @@ async function anstossen({ paketIds, guildId, userId, autor, rootserverId }) {
     }
     if (vorgemerkt.length) await weiter();
     return { vorgemerkt, abgelehnt };
+}
+
+/**
+ * Das Kennwort der Fernsteuerung für den Durchlauf erzeugen.
+ *
+ * Erster echter Lauf, 2026-10-10: Factorio wurde nach 1,1 Minuten rot —
+ * „RCON_PASSWORD ist leer oder fehlt". Die Einstellung dahinter hat keine
+ * Vorgabe (ein Kennwort gehört in kein Paket), und die frisch geöffnete
+ * Sitzung hat keinen Probewert. Von Hand trägt man in der Werkbank einen ein;
+ * ein echter Server bekommt ein erzeugtes (StartPayload.paketWerteAnlegen).
+ * Der Umzug tut dasselbe: ein Wegwerf-Kennwort als PROBEWERT. Probewerte
+ * gehören der Sitzung — sie stehen nicht im Paket und nicht im Fingerabdruck.
+ *
+ * Welche Einstellung es ist, sagt die Werkbank (`rconStand`), nicht ein
+ * Feldname. Hat sie schon einen Wert, bleibt er stehen.
+ */
+async function kennwortDerFernsteuerung(sitzung) {
+    const S = dienste.S();
+    if (!sitzung.entwurf?.management?.rcon?.password_variable) return;
+    const key = S.rconStand(sitzung).quelle;
+    if (!key || S.probewerte(sitzung)[key] !== '') return;
+    await S.probewerteSetzen(sitzung, { [key]: crypto.randomBytes(18).toString('base64url') });
 }
 
 // ── Die Kette ────────────────────────────────────────────────────────────────
