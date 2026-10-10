@@ -105,10 +105,10 @@
                         <span class="ms-auto d-flex flex-wrap align-items-center gap-2">
                             <select class="form-select form-select-sm w-auto d-none" id="umzugMaschine" aria-label="Maschine für die Prüfdurchläufe"></select>
                             <button type="button" class="btn btn-sm btn-primary d-none" id="umzugAlle">
-                                <i class="fa-solid fa-play me-1"></i>Alle umziehen <span id="umzugAlleZahl"></span>
+                                <i class="fa-solid fa-play me-1"></i>Alle umziehen<span class="ms-1" id="umzugAlleZahl"></span>
                             </button>
                             <button type="button" class="btn btn-sm btn-success d-none" id="umzugFreigeben">
-                                <i class="fa-solid fa-check me-1"></i>Umgezogene freigeben <span id="umzugFreigebenZahl"></span>
+                                <i class="fa-solid fa-check me-1"></i>Umgezogene freigeben<span class="ms-1" id="umzugFreigebenZahl"></span>
                             </button>
                         </span>
                     </div>
@@ -327,7 +327,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const maschinenWahl = document.getElementById('umzugMaschine');
     const knopfAlle = document.getElementById('umzugAlle');
     const knopfFreigeben = document.getElementById('umzugFreigeben');
-    let umzugDaten = null, umzugTakt = null, warBeschaeftigt = false;
+    let umzugDaten = null, umzugTakt = null, warBeschaeftigt = false, fertigZuletzt = null;
 
     const el = (tag, klasse, text) => {
         const e = document.createElement(tag);
@@ -363,6 +363,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function zeichneUmzug() {
         const zurueck = new Map(((imageDaten && imageDaten.pakete) || []).filter((p) => p.stand === 'neuer_bau').map((p) => [String(p.paket_id), p]));
         const jePaket = new Map(((umzugDaten && umzugDaten.umzuege) || []).map((u) => [String(u.paket_id), u]));
+        // Der Image-Stand ist so alt wie das Laden der Seite. Ein Paket, das
+        // seither GRÜN auf genau den neuesten Bau umgezogen ist, liegt nicht
+        // mehr zurück — sonst stünde neben dem fertigen Umzug wieder „Umziehen"
+        // (erster echter Lauf, 2026-10-10: Astro Colony).
+        jePaket.forEach((u, id) => {
+            const p = zurueck.get(id);
+            if (p && u.stand === 'gruen' && u.image_digest && p.neuester && p.neuester.digest === u.image_digest) zurueck.delete(id);
+        });
         let umziehbar = 0;
         document.querySelectorAll('[data-umzug]').forEach((zelle) => {
             const id = zelle.dataset.umzug;
@@ -442,9 +450,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         maschinenWahl.classList.toggle('d-none', maschinen.length < 2 || umziehbar < 1);
 
-        // Fertig geworden: Der Image-Stand hat sich geändert — neu fragen.
-        if (warBeschaeftigt && !beschaeftigt) ladeImageStand().then(zeichneUmzug);
+        // Ein Umzug ist fertig geworden: Der Image-Stand hat sich geändert —
+        // neu fragen, nach JEDEM Paket, nicht erst am Ende der Reihe.
+        const fertig = (z.gruen || 0) + (z.rot || 0);
+        const neuFertig = fertigZuletzt !== null && fertig !== fertigZuletzt;
+        fertigZuletzt = fertig;
         warBeschaeftigt = beschaeftigt > 0;
+        if (neuFertig) ladeImageStand().then(zeichneUmzug);
         clearTimeout(umzugTakt);
         if (beschaeftigt) umzugTakt = setTimeout(ladeUmzug, 5000);
     }

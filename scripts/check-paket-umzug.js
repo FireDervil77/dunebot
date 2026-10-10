@@ -278,6 +278,10 @@ const AUFTRAG = { guildId: '1', userId: '42', autor: 'Betreiber', rootserverId: 
         assert.strictEqual(f.fbpkg.identity.author, 'Betreiber');
         assert.strictEqual(sitzungNach(erste).status, 'verworfen');
         assert.deepStrictEqual([vermerk(erste).stand, vermerk(erste).nach, vermerk(erste).image_tag], ['gruen', f.version, '2026.10']);
+        // Daran erkennt die Seite, dass das Paket nicht mehr zurückliegt, ohne
+        // den Image-Stand neu zu fragen (Astro Colony, 2026-10-10: neben dem
+        // fertigen Umzug stand wieder „Umziehen").
+        assert.strictEqual((await Umzug.stand()).umzuege.find(u => u.paket_id === 1).image_digest, DIGEST);
         assert.strictEqual(vermerk(zweite).stand, 'laeuft');
         assert.strictEqual(zaehle('pruefen'), 2);
         assert.strictEqual(zaehle('freigeben'), 0, 'der Umzug hat freigegeben — das ist der Klick des Betreibers');
@@ -524,6 +528,9 @@ const AUFTRAG = { guildId: '1', userId: '42', autor: 'Betreiber', rootserverId: 
         assert.doesNotMatch(skript, /innerHTML/, 'Namen und Gründe kommen aus Paketen und vom Daemon — als Text setzen');
         assert.match(skript, /'\/admin\/addons\/umzug\/freigeben'/);
         assert.match(skript, /pakete, rootserver_id/);
+        assert.match(skript, /u\.stand === 'gruen' && u\.image_digest && p\.neuester && p\.neuester\.digest === u\.image_digest\) zurueck\.delete\(id\)/,
+            'ein grün umgezogenes Paket gälte bis zum Neuladen weiter als „zurück"');
+        assert.match(skript, /if \(neuFertig\) ladeImageStand\(\)/, 'der Image-Stand würde erst am Ende der ganzen Reihe neu gefragt');
     });
 
     console.log(fehler ? `\n❌ ${fehler} Prüfung(en) fehlgeschlagen` : '\n✅ Umzug: eine Kette aus den Bausteinen der Werkbank, außer dem Image ändert sich nichts, und freigegeben wird mit einem Klick');

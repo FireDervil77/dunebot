@@ -331,7 +331,8 @@ async function stand() {
         const zeile = { paket_id: paketId, slug: u.slug, von: u.von, nach: u.nach, stand: u.stand, grund: u.grund || null,
             kennung: s.kennung, sitzung_offen: s.status === 'offen', guild_id: s.guild_id,
             am: u.am || null, begonnen: u.begonnen || null, beendet: u.beendet || null,
-            image_tag: u.image_tag || null, freigebbar: false, fassung_id: null, kanal: null };
+            image_tag: u.image_tag || null, image_digest: u.image_digest || null,
+            freigebbar: false, fassung_id: null, kanal: null };
         if (u.stand === STAND.gruen) {
             const fassungen = await dienste.Paketfassung().fassungenZuPaket(dienste.db(), paketId);
             const f = fassungen.find(x => x.version === u.nach);
