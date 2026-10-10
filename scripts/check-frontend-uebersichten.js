@@ -180,6 +180,73 @@ async function pruefe(was, tun) {
         assert.strictEqual(offen.ansicht, 'frontend/changelog-details');
     });
 
+    console.log('\nFehlerseiten und Ankündigung');
+    await pruefe('eine Fehlerseite läuft über den Zeichner des Themes — sonst kommt sie ohne Gestaltung an', async () => {
+        // Bis zum 2026-10-10 rief der Router `res.status(404).render(…)` direkt:
+        // Die Stylesheets reiht erst der Zeichner ein, die Seite stand nackt da.
+        const r = await rufe('/changelogs/:version', { params: { version: '9.9.9' } });
+        assert.strictEqual(r.status, 404);
+        assert.strictEqual(r.ansicht, 'frontend/404');
+        assert.ok(r.daten !== null, 'die 404-Seite wurde am Zeichner vorbei ausgegeben (res.render)');
+        const n = await rufe('/news-details/:slug', { params: { slug: 'news-21' } });
+        assert.strictEqual(n.status, 404, 'eine News im Entwurf ist öffentlich lesbar');
+        assert.ok(n.daten !== null);
+        const quelle = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'apps/dashboard/routes/frontend.router.js'), 'utf8'));
+        assert.ok(!/\.render\(\s*['"]frontend\/(404|500)['"]/.test(quelle), 'im Router gibt es wieder eine Fehlerseite am Zeichner vorbei');
+        // Scheitert auch das Zeichnen, hängt die Anfrage nicht.
+        const tm = ServiceManager.get('themeManager');
+        const echt = tm.renderView;
+        tm.renderView = async () => { throw new Error('Zeichner kaputt'); };
+        try {
+            let gesendet = null, status = 0;
+            const res = { locals: { locale: 'de-DE' }, headersSent: false, status(s) { status = s; return this; }, type() { return this; }, send(x) { gesendet = x; return this; } };
+            await handler('/changelogs/:version')({ query: {}, params: { version: '9.9.9' }, session: {}, cookies: {} }, res);
+            assert.strictEqual(status, 404);
+            assert.strictEqual(gesendet, 'Seite nicht gefunden');
+        } finally { tm.renderView = echt; protokoll.length = 0; }
+    });
+    await pruefe('eine News im Entwurf wird gespeichert, aber NICHT angekündigt — der Verweis führte auf eine 404', async () => {
+        // Am 2026-10-09 ging die News zu 2.4.0 als Entwurf nach Discord.
+        const geschrieben = [], gesendet = [];
+        const echteDb = ServiceManager.get('dbService');
+        ServiceManager.register('dbService', { query: async (sql, p) => { geschrieben.push(sql.replace(/\s+/g, ' ').trim().slice(0, 40)); return /INSERT INTO notifications/.test(sql) ? { insertId: 77 } : /admin_settings/.test(sql) ? [{ value: '{"channel_id":"1"}' }] : { insertId: 5 }; } });
+        ServiceManager.register('ipcServer', { broadcastOne: async (name, daten) => { gesendet.push({ name, url: daten.action_url }); } });
+        try {
+            const inhalt = require('../apps/dashboard/routes/admin/content.router.js');
+            const speichern = inhalt.stack.find(s => s.route && s.route.path === '/news/save' && s.route.methods.post).route.stack.slice(-1)[0].handle;
+            const sende = async (status, mehr = {}) => {
+                geschrieben.length = 0; gesendet.length = 0;
+                let antwort = null;
+                await speichern({ body: { newsId: '29', title_de: 'Update', slug: 'update-v2-4-0', status, send_discord_post: '1', send_dashboard_badge: '1', ...mehr } },
+                    { status() { return this; }, json(x) { antwort = x; return this; } });
+                return antwort;
+            };
+            const entwurf = await sende('draft');
+            assert.strictEqual(entwurf.success, true, 'der Entwurf wurde nicht gespeichert');
+            assert.ok(geschrieben.some(s => s.startsWith('UPDATE news SET')), 'der Entwurf wurde nicht gespeichert');
+            assert.ok(!geschrieben.some(s => s.startsWith('INSERT INTO notifications')), 'für einen Entwurf wurde eine Meldung angelegt');
+            assert.deepStrictEqual(gesendet, [], 'ein Entwurf ging nach Discord');
+            assert.strictEqual(entwurf.angekuendigt, false);
+            assert.match(entwurf.warnung, /NICHT angekündigt.*Entwurf/);
+            assert.match(entwurf.message, /NICHT angekündigt/);
+            // Ohne Status gilt dasselbe — „leer" ist nicht „veröffentlicht".
+            assert.deepStrictEqual([(await sende(undefined)).angekuendigt, gesendet.length], [false, 0]);
+            // Veröffentlicht: Meldung, Discord, und der Verweis zeigt auf die Seite, die es gibt.
+            const offen = await sende('published');
+            assert.strictEqual(offen.angekuendigt, true);
+            assert.strictEqual(offen.warnung, null);
+            assert.ok(geschrieben.some(s => s.startsWith('INSERT INTO notifications')));
+            assert.strictEqual(gesendet.length, 1);
+            assert.match(gesendet[0].url, /\/news-details\/update-v2-4-0$/);
+            // Ohne Haken wird nie angekündigt, und es gibt dann auch keine Warnung.
+            const still2 = await sende('draft', { send_discord_post: '', send_dashboard_badge: '' });
+            assert.deepStrictEqual([still2.warnung, gesendet.length], [null, 0]);
+            // Die Oberfläche lässt die Warnung stehen, statt weiterzuleiten.
+            const skript = ohneKommentare(fs.readFileSync(path.join(THEMA, 'assets/js/guild.js'), 'utf8'));
+            assert.match(skript, /if \(result\.success && result\.warnung\) \{\s*this\.showToast\('warning', result\.message\);\s*\} else if \(result\.success\)/);
+        } finally { ServiceManager.register('dbService', echteDb); protokoll.length = 0; }
+    });
+
     console.log('\nStartseite');
     const abschnitt = (name, daten) => zeichne(path.join(THEMA, 'partials/frontend/sections', name + '.ejs'), daten);
     await pruefe('der Controller lädt drei veröffentlichte Changelogs und gibt jedem einen Textauszug', async () => {

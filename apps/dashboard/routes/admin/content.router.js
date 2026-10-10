@@ -548,7 +548,21 @@ router.post('/news/save', async (req, res) => {
         const wantBadge = send_dashboard_badge === '1';
         const newsActions = [];
 
-        if (wantDiscord || wantBadge) {
+        // Angekuendigt wird nur, was Besucher auch lesen koennen.
+        //
+        // Am 2026-10-09 ging die News zu 2.4.0 nach Discord, waehrend sie noch
+        // auf „Entwurf" stand (so legt die Changelog-Veroeffentlichung sie an).
+        // Die oeffentliche Seite zeigt Entwuerfe nicht — der Knopf unter der
+        // Ankuendigung fuehrte auf eine 404. Gespeichert wird trotzdem; nur die
+        // Ankuendigung unterbleibt, und die Antwort sagt, warum.
+        const istOeffentlich = newsData.status === 'published';
+        let nichtAngekuendigt = null;
+        if ((wantDiscord || wantBadge) && !istOeffentlich) {
+            nichtAngekuendigt = 'NICHT angekündigt: Die News steht noch auf „Entwurf" — der Verweis in der Ankündigung führte auf eine Seite, die Besucher nicht sehen. Erst auf „Veröffentlicht" stellen, dann mit dem Haken speichern.';
+            Logger.warn(`[Content] News "${title_de}" nicht angekuendigt: Status ${newsData.status || '(leer)'}`);
+        }
+
+        if ((wantDiscord || wantBadge) && istOeffentlich) {
             try {
                 const baseUrl = process.env.DASHBOARD_BASE_URL || '';
                 // Die oeffentliche Route heisst /news-details/:slug, nicht
@@ -627,7 +641,8 @@ router.post('/news/save', async (req, res) => {
         if (newsActions.length > 0) {
             message += ' | ' + newsActions.join(' | ');
         }
-        res.json({ success: true, message });
+        if (nichtAngekuendigt) message = (newsId ? 'News gespeichert' : 'News angelegt') + ' — ' + nichtAngekuendigt;
+        res.json({ success: true, message, angekuendigt: !nichtAngekuendigt && (wantDiscord || wantBadge), warnung: nichtAngekuendigt });
     } catch (error) {
         Logger.error('[Content] Fehler beim Speichern der News:', error);
         res.status(500).json({ success: false, message: error.message });

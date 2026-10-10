@@ -670,7 +670,12 @@ class GuildAjaxHandler {
     }
 
     static async handleNewsResponse(form, result) {
-        if (result.success) {
+        if (result.success && result.warnung) {
+            // Gespeichert, aber NICHT angekündigt (die News steht auf „Entwurf").
+            // Die Seite bleibt offen: Wer hier weitergeleitet würde, läse die
+            // Warnung eine Sekunde lang und hielte die News für angekündigt.
+            this.showToast('warning', result.message);
+        } else if (result.success) {
             this.showToast('success', result.message || (window.i18n?.TOAST_MESSAGES?.NEWS_UPDATED || 'News erfolgreich gespeichert'));
             const successUrl = form.dataset.successUrl || '/admin/content?tab=news';
             setTimeout(() => {

@@ -86,6 +86,28 @@ async function ladeConsentKontext(req) {
 
 // News-Details Handler
 /**
+ * Eine Fehlerseite des Frontends — ueber den Zeichner des Themes (2026-10-10).
+ *
+ * Bis dahin stand an fuenfzehn Stellen `res.status(404).render('frontend/404')`.
+ * Das zeichnet die Seite am Theme vorbei: Die Stylesheets reiht erst
+ * `themeManager.renderView` fuer die Anfrage ein. Die Seite kam deshalb ganz
+ * ohne Gestaltung an — das Menue als Punkteliste, darunter die Meldung
+ * (Betreiber, mit Bildschirmfoto: „sieht zugegeben falsch gerendert aus").
+ *
+ * Scheitert auch das Zeichnen, bleibt ein Satz in Reintext — nie eine Seite,
+ * die haengt.
+ */
+async function fehlerseite(res, status) {
+    res.status(status);
+    try {
+        await ServiceManager.get('themeManager').renderView(res, status >= 500 ? 'frontend/500' : 'frontend/404');
+    } catch (err) {
+        ServiceManager.get('Logger').error(`[Frontend] Fehlerseite ${status} liess sich nicht zeichnen:`, err);
+        if (!res.headersSent) res.type('text/plain').send(status >= 500 ? 'Serverfehler' : 'Seite nicht gefunden');
+    }
+}
+
+/**
  * Blaettern in den Uebersichten (2026-10-09).
  *
  * Betreiber: Die Startseite zeigt sechs News und drei Changelogs — und von
@@ -135,7 +157,7 @@ const getNewsList = async (req, res) => {
         await themeManager.renderView(res, 'frontend/news', { news, blaettern: b, currentLocale: userLocale });
     } catch (err) {
         Logger.error('Fehler beim Laden der News-Uebersicht:', err);
-        res.status(500).render('frontend/500');
+        await fehlerseite(res, 500);
     }
 };
 
@@ -151,7 +173,7 @@ const getNewsDetails = async (req, res) => {
         `, [req.params.slug]);
 
         if (!rawNews?.length) {
-            return res.status(404).render('frontend/404');
+            return fehlerseite(res, 404);
         }
 
         // News lokalisieren (nutze res.locals.locale statt Session-Zugriff)
@@ -173,7 +195,7 @@ const getNewsDetails = async (req, res) => {
         });
     } catch (err) {
         Logger.error('Fehler beim Laden der News-Details:', err);
-        res.status(500).render('frontend/500');
+        await fehlerseite(res, 500);
     }
 };
 
@@ -213,7 +235,7 @@ const getChangelogsList = async (req, res) => {
         });
     } catch (err) {
         Logger.error('Fehler beim Laden der Changelogs:', err);
-        res.status(500).render('frontend/500');
+        await fehlerseite(res, 500);
     }
 };
 
@@ -236,7 +258,7 @@ const getChangelogDetails = async (req, res) => {
         `, [version]);
 
         if (!rawChangelog?.length) {
-            return res.status(404).render('frontend/404');
+            return fehlerseite(res, 404);
         }
 
         // Changelog lokalisieren (nutze res.locals.locale statt Session-Zugriff)
@@ -253,7 +275,7 @@ const getChangelogDetails = async (req, res) => {
         });
     } catch (err) {
         Logger.error('Fehler beim Laden der Changelog-Details:', err);
-        res.status(500).render('frontend/500');
+        await fehlerseite(res, 500);
     }
 };
 
@@ -361,7 +383,7 @@ router.get('/blog', async (req, res) => {
         });
     } catch (err) {
         Logger.error('[Frontend/Blog] Fehler:', err);
-        res.status(500).render('frontend/500');
+        await fehlerseite(res, 500);
     }
 });
 
@@ -377,7 +399,7 @@ router.get('/blog/:slug', async (req, res) => {
         );
 
         if (!rawPost) {
-            return res.status(404).render('frontend/404');
+            return fehlerseite(res, 404);
         }
 
         const userLocale = res.locals.locale || 'de-DE';
@@ -403,7 +425,7 @@ router.get('/blog/:slug', async (req, res) => {
         });
     } catch (err) {
         Logger.error('[Frontend/Blog] Fehler:', err);
-        res.status(500).render('frontend/500');
+        await fehlerseite(res, 500);
     }
 });
 
@@ -441,7 +463,7 @@ router.get('/page/:slug', async (req, res) => {
             if (ziel) {
                 return res.redirect(301, ziel);
             }
-            return res.status(404).render('frontend/404');
+            return fehlerseite(res, 404);
         }
 
         await themeManager.renderView(res, 'frontend/page', {
@@ -451,7 +473,7 @@ router.get('/page/:slug', async (req, res) => {
         });
     } catch (err) {
         Logger.error('[Frontend/Page] Fehler beim Laden:', err);
-        res.status(500).render('frontend/500');
+        await fehlerseite(res, 500);
     }
 });
 
@@ -526,7 +548,7 @@ router.get('/docs', async (req, res) => {
         });
     } catch (err) {
         Logger.error('[Frontend/Docs] Fehler:', err);
-        res.status(500).render('frontend/500');
+        await fehlerseite(res, 500);
     }
 });
 
@@ -543,7 +565,7 @@ router.get('/docs/{*docPath}', async (req, res) => {
 
     const absolute = safeDocsPath(mdPath);
     if (!absolute) {
-        return res.status(400).render('frontend/404');
+        return fehlerseite(res, 400);
     }
 
     try {
@@ -560,7 +582,7 @@ router.get('/docs/{*docPath}', async (req, res) => {
                     } catch { /* ignore */ }
                 }
             }
-            if (!content) return res.status(404).render('frontend/404');
+            if (!content) return fehlerseite(res, 404);
         }
 
         const htmlContent = marked(content);
@@ -580,7 +602,7 @@ router.get('/docs/{*docPath}', async (req, res) => {
         });
     } catch (err) {
         Logger.error('[Frontend/Docs] Fehler:', err);
-        res.status(500).render('frontend/500');
+        await fehlerseite(res, 500);
     }
 });
 
