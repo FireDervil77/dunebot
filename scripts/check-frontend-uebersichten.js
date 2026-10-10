@@ -247,6 +247,22 @@ async function pruefe(was, tun) {
         } finally { ServiceManager.register('dbService', echteDb); protokoll.length = 0; }
     });
 
+    await pruefe('eine neue News fängt mit dem Standardbild an — im Editor und im Entwurf, den ein Changelog anlegt', async () => {
+        // Betreiber, 2026-10-10: Er setzte bei jeder News dasselbe Bild von Hand.
+        const router = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'apps/dashboard/routes/admin/content.router.js'), 'utf8'));
+        const bild = /const NEWS_STANDARDBILD = '([^']+)';/.exec(router);
+        assert.ok(bild, 'die Vorgabe steht nicht mehr an einer Stelle');
+        // Eine Datei des Themes — kein Verweis in die Medienablage, die sich ändern kann.
+        assert.ok(/^\/images\/[a-z0-9._-]+\.(png|jpg|webp|gif)$/.test(bild[1]), `„${bild[1]}" ist keine Datei des Themes`);
+        const datei = path.join(THEMA, 'assets', bild[1]);
+        assert.ok(fs.existsSync(datei) && fs.statSync(datei).size > 1000, `die Datei ${bild[1]} gibt es im Theme nicht — jede neue News finge mit einem toten Bild an`);
+        assert.strictEqual((router.match(/standardBild: NEWS_STANDARDBILD/g) || []).length, 2, 'Anlegen oder Bearbeiten gibt dem Editor die Vorgabe nicht mit');
+        assert.match(router, /image_url: NEWS_STANDARDBILD,\s*status: 'draft'/, 'der Entwurf aus einem Changelog hat kein Bild');
+        const editor = ohneKommentareEjs(fs.readFileSync(path.join(THEMA, 'views/admin/news-edit.ejs'), 'utf8'));
+        assert.ok(editor.includes("news && news.image_url ? news.image_url : (locals.standardBild || '')"), 'der Editor schlägt die Vorgabe nicht vor, oder überschreibt ein gesetztes Bild');
+        assert.ok(!editor.includes('dunebot-news.gif'), 'der Editor nennt noch das Bild aus der Zeit vor der Umbenennung');
+    });
+
     console.log('\nStartseite');
     const abschnitt = (name, daten) => zeichne(path.join(THEMA, 'partials/frontend/sections', name + '.ejs'), daten);
     await pruefe('der Controller lädt drei veröffentlichte Changelogs und gibt jedem einen Textauszug', async () => {

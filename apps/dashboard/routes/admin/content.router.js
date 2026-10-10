@@ -303,13 +303,28 @@ router.get('/', async (req, res) => {
 // NEWS: Create / Edit direkt rendern (bleiben im Content-Hub)
 // ================================================================
 
+/**
+ * Das Bild, mit dem eine neue News anfaengt (Betreiber, 2026-10-10).
+ *
+ * Bis dahin schlug der Editor `/images/dunebot-news.gif` vor — das Bild aus der
+ * Zeit vor der Umbenennung —, und der News-Entwurf, den die Veroeffentlichung
+ * eines Changelogs anlegt, hatte gar keins. Der Betreiber setzte deshalb bei
+ * jeder News dasselbe Bild von Hand.
+ *
+ * Es liegt als Datei des Themes vor, nicht als Verweis auf die Medienablage:
+ * Dort koennte es jemand loeschen oder verschieben, und jede neue News finge
+ * mit einem toten Bild an. Bestehende News bleiben, wie sie sind.
+ */
+const NEWS_STANDARDBILD = '/images/firebot-news.png';
+
 router.get('/news/new', async (req, res) => {
     const themeManager = ServiceManager.get('themeManager');
     await themeManager.renderView(res, 'admin/news-edit', {
         title: 'Neue News erstellen',
         activeMenu: '/admin/content',
         backUrl: '/admin/content?tab=news',
-        news: null
+        news: null,
+        standardBild: NEWS_STANDARDBILD
     });
 });
 
@@ -334,7 +349,8 @@ router.get('/news/edit/:id', async (req, res) => {
         title: 'News bearbeiten',
         activeMenu: '/admin/content',
         backUrl: '/admin/content?tab=news',
-        news
+        news,
+        standardBild: NEWS_STANDARDBILD
     });
 });
 
@@ -924,7 +940,7 @@ router.post('/changelogs/save', async (req, res) => {
                 const newsMetadata = {
                     slug: `update-v${version?.replace(/\./g, '-')}`,
                     author: metadata.author,
-                    image_url: null,
+                    image_url: NEWS_STANDARDBILD,
                     status: 'draft',
                     date: new Date()
                 };

@@ -193,8 +193,8 @@
                                                class="form-control" 
                                                id="image_url" 
                                                name="image_url" 
-                                               value="<%= news && news.image_url ? news.image_url : '/images/dunebot-news.gif' %>"
-                                               placeholder="/images/dunebot-news.gif oder https://example.com/image.jpg">
+                                               value="<%= news && news.image_url ? news.image_url : (locals.standardBild || '') %>"
+                                               placeholder="<%= locals.standardBild || '/images/…' %> oder https://example.com/image.jpg">
                                         <small class="form-text text-secondary">
                                             Optional: URL oder relativer Pfad zu einem Bild
                                         </small>
