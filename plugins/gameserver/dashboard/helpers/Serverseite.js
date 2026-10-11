@@ -71,8 +71,8 @@ const GRUPPE = {
     bots:      'Bots',
     mods:      'Mods',
     downloads: 'Downloads',
-    votes:     'Votes',
-    players:   'Player',
+    votes:     'Abstimmungen',
+    players:   'Spieler',
 };
 
 /**
