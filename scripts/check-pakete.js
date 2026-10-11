@@ -40,6 +40,7 @@ const path = require('path');
 const Ajv  = require('ajv');
 // GameDigs Katalog — dieselbe Tabelle, aus der fb-probe seine A2S-Liste erzeugt.
 const GAMEDIG_KENNUNGEN = new Set(Object.keys(require('gamedig').games));
+const Bitmaske = require('../plugins/gameserver/dashboard/helpers/Bitmaske');
 
 const SCHEMA_PFAD    = path.join(__dirname, '../packages/fbpkg/schema/fbpkg-v1.schema.json');
 const BEISPIEL_PFAD  = path.join(__dirname, '../packages/fbpkg/beispiele');
@@ -267,6 +268,18 @@ function pruefeInvarianten(paket) {
         }
         if (s.type === 'choice' && !(s.choices || []).length) {
             verstoesse.push(`Einstellung "${s.key}": type "choice" ohne choices.`);
+        }
+        // Bitmaske (2026-10-11): Jede Möglichkeit ist EIN Bit, die Vorgabe eine
+        // Summe daraus. Das Schema sieht nur „choices ist eine Liste" — dass 3
+        // kein einzelnes Bit ist, weiß es nicht. Die Regel steht in Bitmaske.js.
+        if (Bitmaske.istBitmaske(s)) {
+            const fehler = Bitmaske.fehlerDerBits(s);
+            if (fehler) {
+                verstoesse.push(`Einstellung "${s.key}": type "flags" — ${fehler}`);
+            } else if (s.default !== undefined && s.default !== null) {
+                const vorgabe = Bitmaske.fehlerDesWerts(s, s.default);
+                if (vorgabe) verstoesse.push(`Einstellung "${s.key}": Vorgabe — ${vorgabe}`);
+            }
         }
         if (s.risk === 'world_reset' && s.role === 'player') {
             hinweise.push(`Einstellung "${s.key}" kann die Welt zurücksetzen, ist aber für die Rolle "player" freigegeben.`);

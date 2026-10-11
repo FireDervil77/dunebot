@@ -608,6 +608,11 @@ class IPCServer {
                         if (bekannt.has(key)) eingaben[key] = String(val);
                     }
                     const paketWerte = paketWerteAnlegen(paket, eingaben, server_name);
+                    // Aus Discord kommt Freitext — eine Bitmaske, die nicht aufgeht,
+                    // wird abgewiesen, wie im Dashboard (servers.js).
+                    const maskenFehler = require('../../../plugins/gameserver/dashboard/helpers/Bitmaske')
+                        .fehlerInWerten(paket, paketWerte);
+                    if (maskenFehler) return message.reply({ success: false, error: maskenFehler });
 
                     // Ports nach dem Paket — dieselbe Vergabe wie im Dashboard.
                     let vergabe;

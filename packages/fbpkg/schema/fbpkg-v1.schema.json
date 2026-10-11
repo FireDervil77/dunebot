@@ -480,11 +480,13 @@
           "$ref": "#/definitions/text"
         },
         "type": {
+          "description": "`flags` seit 2026-10-11: eine Bitmaske. `choices` sind dann die Bits (jedes `value` eine Zweierpotenz: 1, 2, 4 …), der Wert der Einstellung ist ihre Summe als Dezimalzahl. Der Spieler kreuzt an, in Datei oder Startzeile steht die Zahl.",
           "enum": [
             "text",
             "number",
             "boolean",
             "choice",
+            "flags",
             "password"
           ]
         },

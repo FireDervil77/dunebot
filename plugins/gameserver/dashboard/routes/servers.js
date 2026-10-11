@@ -20,6 +20,7 @@ const { FASSUNG_FUER_SERVER, ladePaketFuerServer, ladePaketFuerAnlegen, ladePake
         ladePaketeFuerAnlegen, kanalSetzen, istKontrollGuild } = require('../helpers/Paketfassung');
 const { vergibPortsAusPaket } = require('../helpers/Portvergabe');
 const Inhalte = require('../helpers/Inhalte');
+const Bitmaske = require('../helpers/Bitmaske');
 const Quellen = require('../helpers/Quellen');
 const ServerStopp = require('../helpers/ServerStopp');
 const { baueUebersicht, baueServerListe, bauePaketAuswahl,
@@ -1002,6 +1003,10 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
         }
 
         const paketWerte = paketWerteAnlegen(paket, eingaben, server_name);
+        // Eine Bitmaske, die nicht aufgeht, wird hier abgewiesen — nicht still
+        // auf die Vorgabe gesetzt und nicht ungeprüft in die Datei geschrieben.
+        const maskenFehler = Bitmaske.fehlerInWerten(paket, paketWerte);
+        if (maskenFehler) return res.status(400).json({ success: false, message: maskenFehler });
         const autoAktualisieren = autoUpdateAus(paket, paketWerte);
         Logger.info(`[Gameserver] Paketwerte festgehalten: ${Object.keys(paketWerte).length} von `
             + `${(paket.settings || []).length} Einstellungen, Auto-Update ${autoAktualisieren ? 'an' : 'aus'}`);
@@ -3467,7 +3472,12 @@ router.put('/:serverId/variables', requirePermission('GAMESERVER.EDIT'), async (
         for (const [key, roh] of Object.entries(updates)) {
             const eintrag = nachSchluessel.get(key);
             const wert = String(roh ?? '');
-            if (Array.isArray(eintrag.choices) && !eintrag.choices.some(c => String(c.value) === wert)) {
+            // Bitmaske: Der Wert ist eine SUMME aus den Möglichkeiten, keine
+            // einzelne davon — die Prüfung „ist einer der Werte" wiese 5 ab.
+            if (Bitmaske.istBitmaske(eintrag)) {
+                const fehler = Bitmaske.fehlerDesWerts(eintrag, wert);
+                if (fehler) return res.status(400).json({ success: false, message: `„${key}": ${fehler}` });
+            } else if (Array.isArray(eintrag.choices) && !eintrag.choices.some(c => String(c.value) === wert)) {
                 return res.status(400).json({ success: false, message: `„${key}": ${wert} ist keine der Möglichkeiten` });
             }
             if (eintrag.type === 'number' && wert !== '' && !Number.isFinite(Number(wert))) {

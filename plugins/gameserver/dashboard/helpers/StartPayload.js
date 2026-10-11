@@ -392,6 +392,10 @@ function paketWerteAnlegen(paket, eingaben = {}, serverName = null) {
     for (const eintrag of paket?.settings || []) {
         let wert = eingaben[eintrag.key];
         if (eintrag.key === 'name' && serverName) wert = serverName;
+        // Eine Bitmaske ohne Eingabe ist nicht „nichts angekreuzt", sondern
+        // „nicht gefragt" — ein leeres Feld aus Discord gilt wie ein fehlendes.
+        // Wer wirklich nichts ankreuzt, schickt 0.
+        if (eintrag.type === 'flags' && typeof wert === 'string' && wert.trim() === '') wert = undefined;
         if (wert === undefined || wert === null) wert = eintrag.default;
         if (wert === undefined || wert === null) continue;
         // Ja/Nein immer als 1/0, wie die Werte-Karte es schickt. Aus dem
