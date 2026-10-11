@@ -1151,7 +1151,10 @@ class FileManager {
             'sql': 'sql',
             'ini': 'ini',
             'cfg': 'ini',
-            'conf': 'ini'
+            'conf': 'ini',
+            // Monaco kennt kein toml — ini färbt Abschnitte, `name = wert`
+            // und #-Kommentare genauso.
+            'toml': 'ini'
         };
         
         return map[ext] || 'plaintext';

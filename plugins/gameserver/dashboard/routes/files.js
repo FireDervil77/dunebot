@@ -19,7 +19,10 @@ const { gesperrt, ladeSperrliste } = require('../helpers/Sperrliste');
 function isEditable(filename, size) {
     const ext = path.extname(filename).toLowerCase();
     if (size > 10 * 1024 * 1024) return false;
-    const editableExts = ['.cfg', '.ini', '.json', '.yaml', '.txt', '.log', '.conf', '.sh', '.lua', '.py', '.js', '.xml', '.html', '.css', '.md'];
+    // `.toml` und `.yml` seit dem 2026-10-11: WolfAdmin (ET: Legacy) legt seine
+    // Einstellungen als toml ab, und der Betreiber konnte sie im Dateimanager
+    // nicht öffnen. `.yml` ist dasselbe Format wie das längst erlaubte `.yaml`.
+    const editableExts = ['.cfg', '.ini', '.json', '.yaml', '.yml', '.toml', '.txt', '.log', '.conf', '.sh', '.lua', '.py', '.js', '.xml', '.html', '.css', '.md'];
     return editableExts.includes(ext);
 }
 
