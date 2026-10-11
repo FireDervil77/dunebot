@@ -41,8 +41,13 @@ exports.login = async (req, res) => {
                 redirectURL
             });
         } else {
-            // Wenn der Nutzer bereits angemeldet ist, weiterleiten
-            res.redirect(req.query.redirect || "/auth/server-selector");
+            // Wenn der Nutzer bereits angemeldet ist, weiterleiten — aber nur
+            // auf die eigene Seite. Bis zum 2026-10-11 ging `redirect` ungeprüft
+            // in die Weiterleitung: `/auth/login?redirect=https://fremd…` führte
+            // einen Angemeldeten von unserer Adresse aus auf eine fremde.
+            const ziel = typeof req.query.redirect === 'string' && /^\/(?![\/\\])/.test(req.query.redirect)
+                ? req.query.redirect : null;
+            res.redirect(ziel || "/auth/server-selector");
         }
     } catch (error) {
         Logger.error("Fehler beim Anzeigen der Login-Seite:", error);
@@ -237,8 +242,16 @@ exports.callback = async (req, res) => {
         
         // WICHTIG: IMMER zum Server-Selector weiterleiten nach Login
         // Dies stellt sicher, dass der Benutzer zunächst einen Server auswählt
-        const redirectURL = "/auth/server-selector";
-        Logger.debug("Redirect nach Login fest eingestellt auf:", redirectURL);
+        //
+        // Eine Ausnahme seit dem 2026-10-11: Wer von einem Artikel der
+        // Wissensdatenbank mit Schloss kam, landet nach dem Login wieder dort.
+        // Der Artikel braucht keine Guild. `rueckkehrZiel` lässt nur Adressen
+        // unter /kb durch — alles andere wäre eine offene Weiterleitung. Die
+        // gemerkte Adresse (`login` oben) wurde bis dahin nie benutzt.
+        const kbZiel = require('../helpers/Wissen').rueckkehrZiel(req.session.redirectURL);
+        delete req.session.redirectURL;
+        const redirectURL = kbZiel || "/auth/server-selector";
+        Logger.debug("Redirect nach Login:", redirectURL);
         
         // Daten in Session speichern
         req.session.user = {

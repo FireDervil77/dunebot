@@ -868,7 +868,7 @@ module.exports = class App {
             res.status(404).send({
                 success: false,
                 code: 404,
-                message: "404 Not Found. Visit /docs for more information"
+                message: "404 Not Found. Visit /kb for more information"
             });
         });
         

@@ -1,71 +1,37 @@
-<%# Documentation Section Partial %>
+<%#
+  Startseiten-Abschnitt „Dokumentation": die Bereiche der Wissensdatenbank als
+  Kacheln (Betreiber, 2026-10-11 — per Auswahl: „Bereiche als Kacheln", kein
+  eigenes Feld am Artikel).
+
+  Bis dahin standen hier vier feste Zeilen: zwei auf /docs, und „Github" sowie
+  „Plugins" mit dem Ziel `https://#` — also ohne Ziel.
+
+  @context {Array} wissensBereiche  Wissen.bereiche(locale); fehlt oder leer →
+                                    nur Überschrift und der Verweis auf /kb
+%>
+<% const kbBereiche = (typeof wissensBereiche !== 'undefined' && Array.isArray(wissensBereiche)) ? wissensBereiche : []; %>
 
 <section id="documentation" class="documentation section dark-background">
   <div class="container section-title" data-aos="fade-up">
-    <h2>Dokumentation & Service</h2>
-    <p>
-      Hier findest du alle wichtigen Links rund um FireBot.<br>
-      Die Dokumentation hilft dir beim Einstieg und bei der Nutzung des Bots und Dashboards.<br>
-      Die Statistiken zeigen dir, wie aktiv FireBot in der Community ist!
-    </p>
+    <h2><%= tr('KB.TITLE') %></h2>
+    <p><%= tr('KB.HOME_SUBTITLE') %></p>
   </div>
 
   <div class="container">
-    <div class="row gy-3">
-      <div class="col-lg-12 d-flex flex-column justify-content-center" data-aos="fade-up" data-aos-delay="200">
-        <div class="documentation-content ps-0 ps-lg-3">
-         <ul class="documentation-list">
-           <li>
-              <div class="doc-row">
-                <i class="bi bi-journal-text"></i>
-                <h4>FireBot Dashboard Dokumentation</h4>
-              </div>
-              <p>
-                <a href="/docs/" target="_self" rel="noopener">
-                  Zur Dokumentation
-                </a>
-              </p>
-            </li>
-            <li>
-              <div class="doc-row">
-                <i class="bi bi-journal-text"></i>
-                <h4>FireBot Bot Dokumentation</h4>
-              </div>
-              <p>
-                <a href="/docs/bot" target="_self" rel="noopener">
-                  Zur Dokumentation
-                </a>
-              </p>
-            </li>
-             <li>
-              <div class="doc-row">
-                <i class="bi bi-github"></i>
-                <h4>FireBot Github</h4>
-              </div>
-              <p>
-                <a href="https://#" target="_blank" rel="noopener">
-                  Zum Repository
-                </a>
-              </p>
-            </li>
-            <li>
-              <div class="doc-row">
-                <i class="bi bi-puzzle"></i>
-                <h4>FireBot Plugins</h4>
-              </div>
-              <p>
-                <a href="https://#" target="_blank" rel="noopener">
-                  Zu den Plugins
-                </a>
-              </p>
-            </li>
-          </ul>
-          <p>
-            Die FireBot Plattform wächst stetig weiter. <br />Die untenstehenden Statistiken zeigen dir, wie aktiv der Bot bereits genutzt wird.<br>
-          </p>
+    <div class="row g-3" data-aos="fade-up" data-aos-delay="200">
+      <% kbBereiche.forEach(function (b) { %>
+        <div class="col-sm-6 col-lg-4">
+          <a class="kb-kachel" href="/kb/<%= b.kuerzel %>">
+            <i class="bi <%= b.symbol %>"></i>
+            <span class="kb-kachel-titel"><%= b.titel %></span>
+            <% if (b.beschreibung) { %><span class="kb-kachel-text"><%= b.beschreibung %></span><% } %>
+            <span class="kb-kachel-zahl"><%= b.artikel === 1 ? tr('KB.ARTICLES_ONE') : tr('KB.ARTICLES_MANY', { n: b.artikel }) %></span>
+          </a>
         </div>
-      </div>
+      <% }); %>
     </div>
-    </div>
+    <p class="text-center mt-4 mb-0">
+      <a class="btn btn-outline-light" href="/kb"><i class="bi bi-book me-1"></i><%= tr('KB.HOME_LINK') %></a>
+    </p>
   </div>
 </section>

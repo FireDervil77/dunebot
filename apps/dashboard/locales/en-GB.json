@@ -604,5 +604,24 @@
     "NEWER": "Newer",
     "OLDER": "Older",
     "PAGE_OF": "Page {{seite}} of {{seiten}}"
+  },
+  "KB": {
+    "TITLE": "Knowledge base",
+    "OVERVIEW": "Overview",
+    "AREAS": "Sections",
+    "SEARCH_PLACEHOLDER": "Search the knowledge base …",
+    "SEARCH_BUTTON": "Search",
+    "SEARCH_RESULTS": "Search for “{{q}}”",
+    "SEARCH_NONE": "Nothing was found.",
+    "SEARCH_SHORT": "Enter at least two characters.",
+    "ARTICLES_ONE": "1 article",
+    "ARTICLES_MANY": "{{n}} articles",
+    "EMPTY_AREA": "There are no articles in this section yet.",
+    "LOCKED": "For signed-in users only",
+    "LOCKED_TEXT": "You can read this article once you are signed in with Discord.",
+    "LOGIN": "Sign in with Discord",
+    "BACK": "Back to {{bereich}}",
+    "HOME_SUBTITLE": "Guides and answers about the bot, the dashboard, game servers and plugins.",
+    "HOME_LINK": "Open the knowledge base"
   }
 }

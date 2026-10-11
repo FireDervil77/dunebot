@@ -623,5 +623,24 @@
     "NEWER": "Neuere",
     "OLDER": "Ältere",
     "PAGE_OF": "Seite {{seite}} von {{seiten}}"
+  },
+  "KB": {
+    "TITLE": "Wissensdatenbank",
+    "OVERVIEW": "Übersicht",
+    "AREAS": "Bereiche",
+    "SEARCH_PLACEHOLDER": "Wissensdatenbank durchsuchen …",
+    "SEARCH_BUTTON": "Suchen",
+    "SEARCH_RESULTS": "Suche nach „{{q}}“",
+    "SEARCH_NONE": "Dazu wurde nichts gefunden.",
+    "SEARCH_SHORT": "Gib mindestens zwei Zeichen ein.",
+    "ARTICLES_ONE": "1 Artikel",
+    "ARTICLES_MANY": "{{n}} Artikel",
+    "EMPTY_AREA": "In diesem Bereich gibt es noch keine Artikel.",
+    "LOCKED": "Nur für angemeldete Nutzer",
+    "LOCKED_TEXT": "Diesen Artikel kannst du lesen, sobald du mit Discord angemeldet bist.",
+    "LOGIN": "Mit Discord anmelden",
+    "BACK": "Zurück zu {{bereich}}",
+    "HOME_SUBTITLE": "Anleitungen und Antworten zu Bot, Dashboard, Gameservern und Plugins.",
+    "HOME_LINK": "Zur Wissensdatenbank"
   }
 }

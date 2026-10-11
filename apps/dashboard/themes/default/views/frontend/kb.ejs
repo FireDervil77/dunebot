@@ -1,0 +1,165 @@
+<%#
+  Wissensdatenbank — die öffentliche Seite unter /kb (2026-10-11).
+  Ersetzt `frontend/documentation.ejs`, das aus dem Ordner `documentation/` las.
+
+  Eine Ansicht für vier Lagen, damit Seitenleiste und Suche an EINER Stelle
+  stehen:
+
+    ansicht 'start'    Text der Startseite, Suche, die Bereiche als Kacheln
+            'bereich'  die Artikel eines Bereichs
+            'artikel'  ein Artikel — oder Titel und Kurztext mit Schloss
+            'suche'    Treffer
+
+  @context {string}  ansicht
+  @context {Array}   bereiche      alle Bereiche (Wissen.bereiche)
+  @context {object}  bereich       der gewählte Bereich, sonst null
+  @context {Array}   artikelListe  Artikel des Bereichs, je mit `sichtbar`
+  @context {object}  artikel       der Artikel (bei 'start': der Startseiten-Artikel)
+  @context {string}  inhaltHtml    gerendertes Markdown — leer, wenn der Artikel ein Schloss trägt
+  @context {boolean} angemeldet
+  @context {string}  suchbegriff, {Array} treffer
+
+  `inhaltHtml` ist die einzige Stelle, die unescapt ausgegeben wird:
+  Wissen.rendere gibt rohes HTML aus Artikeln als Text aus. Alles andere
+  wird escapt.
+%>
+<%
+  const adresse = (b, a) => '/kb/' + b + (a ? '/' + a : '');
+  const artikelZahl = (n) => n === 1 ? tr('KB.ARTICLES_ONE') : tr('KB.ARTICLES_MANY', { n: n });
+%>
+
+<main id="main">
+  <section class="kb-page section">
+    <div class="container" data-aos="fade-up">
+
+      <div class="row">
+        <%# ── Seitenleiste: Suche, Bereiche, die Artikel des gewählten Bereichs ── %>
+        <div class="col-lg-3 col-md-4 mb-4">
+          <div class="kb-sidebar">
+            <h5 class="kb-sidebar-title">
+              <a href="/kb"><i class="bi bi-book me-2"></i><%= tr('KB.TITLE') %></a>
+            </h5>
+
+            <form action="/kb/suche" method="get" class="kb-suche" role="search">
+              <input type="search" name="q" value="<%= suchbegriff %>" maxlength="80"
+                     placeholder="<%= tr('KB.SEARCH_PLACEHOLDER') %>" aria-label="<%= tr('KB.SEARCH_BUTTON') %>">
+              <button type="submit" aria-label="<%= tr('KB.SEARCH_BUTTON') %>"><i class="bi bi-search"></i></button>
+            </form>
+
+            <nav class="kb-nav" aria-label="<%= tr('KB.AREAS') %>">
+              <a href="/kb" class="kb-nav-link <%= ansicht === 'start' ? 'active' : '' %>">
+                <i class="bi bi-house me-1"></i> <%= tr('KB.OVERVIEW') %>
+              </a>
+              <% bereiche.forEach(function (b) { %>
+                <% const offen = bereich && bereich.kuerzel === b.kuerzel; %>
+                <a href="<%= adresse(b.kuerzel) %>"
+                   class="kb-nav-link kb-nav-bereich <%= offen && ansicht === 'bereich' ? 'active' : '' %>">
+                  <i class="bi <%= b.symbol %> me-1"></i> <%= b.titel %>
+                </a>
+                <% if (offen) { %>
+                  <% artikelListe.forEach(function (a) { %>
+                    <a href="<%= adresse(b.kuerzel, a.kuerzel) %>"
+                       class="kb-nav-link kb-nav-artikel <%= artikel && artikel.kuerzel === a.kuerzel ? 'active' : '' %>">
+                      <%= a.titel %><% if (a.sichtbar === 'schloss') { %> <i class="bi bi-lock-fill" title="<%= tr('KB.LOCKED') %>"></i><% } %>
+                    </a>
+                  <% }); %>
+                <% } %>
+              <% }); %>
+            </nav>
+          </div>
+        </div>
+
+        <%# ── Inhalt ── %>
+        <div class="col-lg-9 col-md-8">
+
+          <% if (ansicht === 'start') { %>
+            <h1 class="kb-titel"><%= artikel ? artikel.titel : tr('KB.TITLE') %></h1>
+            <div class="row g-3 kb-kacheln">
+              <% bereiche.forEach(function (b) { %>
+                <div class="col-sm-6 col-xl-4">
+                  <a class="kb-kachel" href="<%= adresse(b.kuerzel) %>">
+                    <i class="bi <%= b.symbol %>"></i>
+                    <span class="kb-kachel-titel"><%= b.titel %></span>
+                    <% if (b.beschreibung) { %><span class="kb-kachel-text"><%= b.beschreibung %></span><% } %>
+                    <span class="kb-kachel-zahl"><%= artikelZahl(b.artikel) %></span>
+                  </a>
+                </div>
+              <% }); %>
+            </div>
+            <% if (inhaltHtml) { %>
+              <article class="kb-content kb-article mt-5"><%- inhaltHtml %></article>
+            <% } %>
+
+          <% } else if (ansicht === 'bereich') { %>
+            <h1 class="kb-titel"><i class="bi <%= bereich.symbol %> me-2"></i><%= bereich.titel %></h1>
+            <% if (bereich.beschreibung) { %><p class="kb-untertitel"><%= bereich.beschreibung %></p><% } %>
+            <% if (!artikelListe.length) { %>
+              <p class="text-muted"><%= tr('KB.EMPTY_AREA') %></p>
+            <% } %>
+            <div class="kb-liste">
+              <% artikelListe.forEach(function (a) { %>
+                <a class="kb-eintrag" href="<%= adresse(bereich.kuerzel, a.kuerzel) %>">
+                  <span class="kb-eintrag-titel">
+                    <%= a.titel %><% if (a.sichtbar === 'schloss') { %> <i class="bi bi-lock-fill" title="<%= tr('KB.LOCKED') %>"></i><% } %>
+                  </span>
+                  <% if (a.kurztext) { %><span class="kb-eintrag-text"><%= a.kurztext %></span><% } %>
+                </a>
+              <% }); %>
+            </div>
+
+          <% } else if (ansicht === 'artikel') { %>
+            <nav class="kb-pfad" aria-label="breadcrumb">
+              <a href="/kb"><%= tr('KB.TITLE') %></a> <span>/</span>
+              <a href="<%= adresse(bereich.kuerzel) %>"><%= bereich.titel %></a>
+            </nav>
+            <h1 class="kb-titel"><%= artikel.titel %></h1>
+
+            <% if (artikel.sichtbar === 'schloss') { %>
+              <%# Titel und Kurztext — der Inhalt ist gar nicht erst hier angekommen. %>
+              <% if (artikel.kurztext) { %><p class="kb-untertitel"><%= artikel.kurztext %></p><% } %>
+              <div class="kb-schloss">
+                <i class="bi bi-lock-fill"></i>
+                <div>
+                  <strong><%= tr('KB.LOCKED') %></strong>
+                  <p><%= tr('KB.LOCKED_TEXT') %></p>
+                  <a class="btn btn-primary btn-sm"
+                     href="/auth/login?redirect=<%= encodeURIComponent(adresse(bereich.kuerzel, artikel.kuerzel)) %>">
+                    <i class="bi bi-discord me-1"></i><%= tr('KB.LOGIN') %>
+                  </a>
+                </div>
+              </div>
+            <% } else { %>
+              <article class="kb-content kb-article"><%- inhaltHtml %></article>
+            <% } %>
+
+            <div class="kb-footer-nav mt-5 pt-4 border-top">
+              <a href="<%= adresse(bereich.kuerzel) %>" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i> <%= tr('KB.BACK', { bereich: bereich.titel }) %>
+              </a>
+            </div>
+
+          <% } else if (ansicht === 'suche') { %>
+            <h1 class="kb-titel"><%= tr('KB.SEARCH_RESULTS', { q: suchbegriff }) %></h1>
+            <% if (suchbegriff.length < 2) { %>
+              <p class="text-muted"><%= tr('KB.SEARCH_SHORT') %></p>
+            <% } else if (!treffer.length) { %>
+              <p class="text-muted"><%= tr('KB.SEARCH_NONE') %></p>
+            <% } %>
+            <div class="kb-liste">
+              <% treffer.forEach(function (a) { %>
+                <a class="kb-eintrag" href="<%= adresse(a.bereich, a.kuerzel) %>">
+                  <span class="kb-eintrag-titel">
+                    <%= a.titel %><% if (a.sichtbar === 'schloss') { %> <i class="bi bi-lock-fill" title="<%= tr('KB.LOCKED') %>"></i><% } %>
+                  </span>
+                  <% if (a.kurztext) { %><span class="kb-eintrag-text"><%= a.kurztext %></span><% } %>
+                </a>
+              <% }); %>
+            </div>
+          <% } %>
+
+        </div>
+      </div>
+
+    </div>
+  </section>
+</main>

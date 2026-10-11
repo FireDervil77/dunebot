@@ -93,7 +93,7 @@ function linksBauen(basis, guildId) {
         sprache: `${sauber}/guild/${guildId}/settings/general`,
         plugins: `${sauber}/guild/${guildId}/plugins`,
         rechte: `${sauber}/guild/${guildId}/permissions`,
-        hilfe: `${sauber}/docs`,
+        hilfe: `${sauber}/kb`,
     };
 }
 

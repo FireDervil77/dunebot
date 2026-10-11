@@ -38,8 +38,10 @@ const WURZEL = path.join(__dirname, '..');
  * erklaerbar.** Ein positiver Wert heisst immer: hier bleibt etwas offen.
  */
 const GEWOLLT = {
-    'apps/dashboard/themes/default/views/guild/plugins.ejs': -1,
-    'apps/dashboard/themes/default/partials/frontend/sections/documentation.ejs': -1
+    // `partials/frontend/sections/documentation.ejs` stand hier bis zum
+    // 2026-10-11 mit -1: ein `</div>` zu viel, als „gewollt" eingetragen. Der
+    // Abschnitt ist mit der Wissensdatenbank neu geschrieben und ausgeglichen.
+    'apps/dashboard/themes/default/views/guild/plugins.ejs': -1
 };
 
 const ORDNER = ['plugins', 'apps/dashboard/themes'];

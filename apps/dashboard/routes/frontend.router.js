@@ -477,134 +477,16 @@ router.get('/page/:slug', async (req, res) => {
     }
 });
 
-// ── Dokumentation: /docs und /docs/:path(*) ──
-const docsPath = require('path');
-const docsFs = require('fs').promises;
-const { marked } = require('marked');
-
-const DOCS_ROOT = docsPath.resolve(__dirname, '..', '..', '..', 'documentation');
-
-/**
- * Sicherer Pfad-Check (verhindert Path-Traversal)
- */
-function safeDocsPath(relativePath) {
-    if (!relativePath) return null;
-    const cleaned = docsPath.normalize(relativePath).replace(/^(\.\.(\/|\\|$))+/, '');
-    const absolute = docsPath.resolve(DOCS_ROOT, cleaned);
-    if (!absolute.startsWith(DOCS_ROOT)) return null;
-    return absolute;
-}
-
-/**
- * Rekursiver Dateibaum für Sidebar-Navigation
- */
-async function buildDocsNav(dirPath, basePath = '') {
-    try {
-        const entries = await docsFs.readdir(dirPath, { withFileTypes: true });
-        const items = [];
-        for (const entry of entries) {
-            const rel = docsPath.join(basePath, entry.name);
-            if (entry.isDirectory()) {
-                const children = await buildDocsNav(docsPath.join(dirPath, entry.name), rel);
-                if (children.length > 0) {
-                    items.push({ name: entry.name, path: rel, type: 'folder', children });
-                }
-            } else if (entry.name.endsWith('.md')) {
-                items.push({
-                    name: entry.name.replace(/\.md$/, ''),
-                    path: rel.replace(/\.md$/, ''),
-                    type: 'file'
-                });
-            }
-        }
-        items.sort((a, b) => {
-            if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
-            return a.name.localeCompare(b.name);
-        });
-        return items;
-    } catch {
-        return [];
-    }
-}
-
-router.get('/docs', async (req, res) => {
-    const Logger = ServiceManager.get('Logger');
-    const themeManager = ServiceManager.get('themeManager');
-
-    try {
-        const indexPath = docsPath.join(DOCS_ROOT, 'index.md');
-        let content = '';
-        try { content = await docsFs.readFile(indexPath, 'utf-8'); } catch {}
-        const htmlContent = marked(content);
-        const nav = await buildDocsNav(DOCS_ROOT);
-
-        res.locals.layout = themeManager.getLayout('frontend');
-        await themeManager.renderView(res, 'frontend/documentation', {
-            title: 'Dokumentation',
-            docTitle: 'Dokumentation',
-            htmlContent,
-            nav,
-            currentPath: ''
-        });
-    } catch (err) {
-        Logger.error('[Frontend/Docs] Fehler:', err);
-        await fehlerseite(res, 500);
-    }
-});
-
-router.get('/docs/{*docPath}', async (req, res) => {
-    const Logger = ServiceManager.get('Logger');
-    const themeManager = ServiceManager.get('themeManager');
-    const requestedPath = Array.isArray(req.params.docPath)
-        ? req.params.docPath.join('/')
-        : req.params.docPath;
-
-    // .md-Endung an angefragten Pfad
-    let mdPath = requestedPath;
-    if (!mdPath.endsWith('.md')) mdPath += '.md';
-
-    const absolute = safeDocsPath(mdPath);
-    if (!absolute) {
-        return fehlerseite(res, 400);
-    }
-
-    try {
-        let content;
-        try {
-            content = await docsFs.readFile(absolute, 'utf-8');
-        } catch (e) {
-            if (e.code === 'ENOENT') {
-                // Versuche als Ordner → index.md
-                const folderIndex = safeDocsPath(docsPath.join(requestedPath, 'index.md'));
-                if (folderIndex) {
-                    try {
-                        content = await docsFs.readFile(folderIndex, 'utf-8');
-                    } catch { /* ignore */ }
-                }
-            }
-            if (!content) return fehlerseite(res, 404);
-        }
-
-        const htmlContent = marked(content);
-        const nav = await buildDocsNav(DOCS_ROOT);
-
-        // Titel aus erstem H1 extrahieren oder Dateiname
-        const titleMatch = content.match(/^#\s+(.+)$/m);
-        const docTitle = titleMatch ? titleMatch[1] : requestedPath.split('/').pop();
-
-        res.locals.layout = themeManager.getLayout('frontend');
-        await themeManager.renderView(res, 'frontend/documentation', {
-            title: docTitle + ' — Dokumentation',
-            docTitle,
-            htmlContent,
-            nav,
-            currentPath: requestedPath
-        });
-    } catch (err) {
-        Logger.error('[Frontend/Docs] Fehler:', err);
-        await fehlerseite(res, 500);
-    }
-});
+// ── Wissensdatenbank: /kb — und die alten Adressen unter /docs ──
+//
+// Bis zum 2026-10-11 las diese Stelle Markdown-Dateien aus `documentation/`
+// und führte dafür eine eigene Pfadprüfung und einen eigenen Baumaufbau —
+// beides stand ein zweites Mal im Datei-Editor unter /admin/docs. Jetzt liegt
+// der Inhalt in der Datenbank; Regeln in `helpers/Wissen.js`, Seiten in
+// `routes/kb.router.js`. /docs leitet dauerhaft weiter.
+const wissen = require('./kb.router')({ fehlerseite });
+router.use('/kb', wissen.kb);
+router.use('/docs', wissen.alt);
 
 /**
  * Spracheinstellung für Gäste (ohne Authentifizierung)

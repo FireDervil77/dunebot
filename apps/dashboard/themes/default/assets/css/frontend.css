@@ -1894,3 +1894,111 @@ section,
   border-color: rgba(255,255,255,0.3);
   color: #fff;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * Wissensdatenbank (/kb) — 2026-10-11
+ *
+ * Die Maße der Artikelansicht stammen aus `frontend/documentation.ejs`, wo sie
+ * als <style>-Block in der Ansicht standen. Dazu Kacheln, Listen, Suche und
+ * das Schloss an Artikeln für Angemeldete.
+ * ══════════════════════════════════════════════════════════════════════════ */
+.kb-page { padding: 80px 0 60px; min-height: 70vh; }
+
+.kb-sidebar { position: sticky; top: 100px; }
+.kb-sidebar-title {
+  font-weight: 700; margin-bottom: 1rem; padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--accent-color, #4154f1);
+}
+.kb-sidebar-title a { color: inherit; text-decoration: none; }
+
+.kb-suche { display: flex; margin-bottom: 1rem; }
+.kb-suche input {
+  flex: 1; min-width: 0; padding: 6px 10px; font-size: 0.9rem;
+  border: 1px solid #dee2e6; border-right: 0; border-radius: 4px 0 0 4px;
+}
+.kb-suche button {
+  padding: 6px 12px; border: 1px solid var(--accent-color, #4154f1);
+  background: var(--accent-color, #4154f1); color: #fff; border-radius: 0 4px 4px 0;
+}
+
+.kb-nav { display: flex; flex-direction: column; gap: 2px; }
+.kb-nav-link {
+  display: block; padding: 6px 12px; color: var(--default-color, #444);
+  text-decoration: none; border-radius: 4px; font-size: 0.9rem; transition: all 0.2s;
+}
+.kb-nav-link:hover { background: rgba(65, 84, 241, 0.08); color: var(--accent-color, #4154f1); }
+.kb-nav-link.active { background: var(--accent-color, #4154f1); color: #fff; font-weight: 600; }
+.kb-nav-bereich { font-weight: 600; margin-top: 4px; }
+.kb-nav-artikel { padding-left: 32px; font-size: 0.85rem; }
+.kb-nav-link .bi-lock-fill { font-size: 0.75em; opacity: 0.6; }
+
+.kb-titel { font-size: 2rem; font-weight: 700; margin-bottom: 1rem; }
+.kb-untertitel { font-size: 1.1rem; color: #6c757d; margin-bottom: 1.5rem; text-wrap: pretty; }
+.kb-pfad { font-size: 0.85rem; margin-bottom: 0.5rem; color: #6c757d; }
+.kb-pfad a { color: inherit; }
+.kb-pfad span { margin: 0 4px; }
+
+/* Bereiche als Kacheln */
+.kb-kachel {
+  display: flex; flex-direction: column; gap: 4px; height: 100%;
+  padding: 1.25rem; border: 1px solid #dee2e6; border-radius: 8px;
+  text-decoration: none; color: var(--default-color, #444); background: #fff;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+.kb-kachel:hover {
+  border-color: var(--accent-color, #4154f1); color: var(--default-color, #444);
+  box-shadow: 0 4px 16px rgba(65, 84, 241, 0.12); transform: translateY(-2px);
+}
+.kb-kachel > .bi { font-size: 1.75rem; color: var(--accent-color, #4154f1); }
+.kb-kachel-titel { font-weight: 600; font-size: 1.1rem; color: var(--heading-color, #2a2c39); }
+.kb-kachel-text { font-size: 0.9rem; flex: 1; text-wrap: pretty; }
+.kb-kachel-zahl { font-size: 0.8rem; color: #6c757d; margin-top: 6px; }
+
+/* Artikelliste eines Bereichs und Suchtreffer */
+.kb-liste { display: flex; flex-direction: column; }
+.kb-eintrag {
+  display: block; padding: 0.9rem 0; border-bottom: 1px solid #eee;
+  text-decoration: none; color: var(--default-color, #444);
+}
+.kb-eintrag:hover .kb-eintrag-titel { color: var(--accent-color, #4154f1); }
+.kb-eintrag-titel { display: block; font-weight: 600; font-size: 1.05rem; color: var(--heading-color, #2a2c39); }
+.kb-eintrag-titel .bi-lock-fill { font-size: 0.8em; color: #6c757d; }
+.kb-eintrag-text { display: block; font-size: 0.9rem; color: #6c757d; margin-top: 2px; text-wrap: pretty; }
+
+/* Artikel für Angemeldete: Titel und Kurztext, dann das Schloss */
+.kb-schloss {
+  display: flex; gap: 1rem; align-items: flex-start; padding: 1.25rem;
+  border: 1px solid #dee2e6; border-left: 4px solid var(--accent-color, #4154f1);
+  border-radius: 0 8px 8px 0; background: rgba(65, 84, 241, 0.04);
+}
+.kb-schloss > .bi { font-size: 1.5rem; color: var(--accent-color, #4154f1); }
+.kb-schloss p { margin: 4px 0 12px; }
+
+/* Der gerenderte Artikel */
+.kb-content { line-height: 1.8; font-size: 1.05rem; }
+.kb-article h1 { font-size: 1.75rem; font-weight: 700; margin: 2rem 0 1rem; }
+.kb-article h2 { font-size: 1.5rem; font-weight: 600; margin-top: 2rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid #eee; }
+.kb-article h3 { font-size: 1.25rem; font-weight: 600; margin-top: 1.5rem; margin-bottom: 0.75rem; }
+.kb-article h2, .kb-article h3 { scroll-margin-top: 100px; }
+.kb-article code { background: #f4f5f7; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; color: #d63384; }
+.kb-article pre { background: #1e1e2e; color: #cdd6f4; padding: 1rem 1.25rem; border-radius: 8px; overflow-x: auto; margin: 1rem 0; }
+.kb-article pre code { background: none; color: inherit; padding: 0; }
+.kb-article table { width: 100%; border-collapse: collapse; margin: 1rem 0; display: block; overflow-x: auto; }
+.kb-article th, .kb-article td { border: 1px solid #dee2e6; padding: 8px 12px; text-align: left; }
+.kb-article th { background: #f8f9fa; font-weight: 600; }
+.kb-article img { max-width: 100%; height: auto; border-radius: 0.5rem; }
+.kb-article blockquote {
+  border-left: 4px solid var(--accent-color, #4154f1); padding: 0.5rem 1rem; margin: 1rem 0;
+  background: rgba(65, 84, 241, 0.05); border-radius: 0 4px 4px 0;
+}
+.kb-article blockquote p:last-child { margin-bottom: 0; }
+
+@media (max-width: 768px) {
+  .kb-sidebar { position: static; margin-bottom: 2rem; }
+}
+
+/* Startseiten-Abschnitt „Dokumentation": die Bereiche als Kacheln (dunkler Grund) */
+.documentation .kb-kachel { background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.18); color: rgba(255, 255, 255, 0.85); }
+.documentation .kb-kachel:hover { border-color: #fff; color: #fff; box-shadow: none; }
+.documentation .kb-kachel > .bi, .documentation .kb-kachel-titel { color: #fff; }
+.documentation .kb-kachel-zahl { color: rgba(255, 255, 255, 0.6); }

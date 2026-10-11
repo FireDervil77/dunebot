@@ -77,6 +77,17 @@ module.exports.getIndex = async (req, res) => {
             }
         }
 
+        // Bereiche der Wissensdatenbank — der Abschnitt „Dokumentation" zeigt
+        // je Bereich eine Kachel (2026-10-11).
+        let wissensBereiche = [];
+        if (sectionTypes.has('documentation')) {
+            try {
+                wissensBereiche = await require('../helpers/Wissen').bereiche(userLocale);
+            } catch (err) {
+                Logger.error("Fehler beim Laden der Wissensdatenbank-Bereiche:", err);
+            }
+        }
+
         // Datumsformat lokalisieren
         const localizedNewsList = newsList.map(news => ({
             ...news,
@@ -181,7 +192,8 @@ module.exports.getIndex = async (req, res) => {
             changelogsList: localizedChangelogsList,
             pluginsList,
             addonsList,
-            addonTags
+            addonTags,
+            wissensBereiche
         });
     } catch (error) {
         Logger.error("Fehler beim Rendern der Landing Page:", error);

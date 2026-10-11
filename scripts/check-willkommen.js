@@ -125,7 +125,9 @@ pruefe('Schraegstrich am Ende faellt weg', links.willkommen, 'https://beispiel.d
 pruefe('Sprache zeigt auf die Einstellungen', links.sprache, 'https://beispiel.de/guild/42/settings/general');
 pruefe('Plugins', links.plugins, 'https://beispiel.de/guild/42/plugins');
 pruefe('Rechte', links.rechte, 'https://beispiel.de/guild/42/permissions');
-pruefe('Hilfe zeigt auf die Doku', links.hilfe, 'https://beispiel.de/docs');
+// Seit dem 2026-10-11 liegt die Hilfe unter /kb (Wissensdatenbank); /docs leitet
+// nur noch weiter, und ein Knopf soll nicht dauerhaft über eine Weiterleitung führen.
+pruefe('Hilfe zeigt auf die Wissensdatenbank', links.hilfe, 'https://beispiel.de/kb');
 pruefe('ohne Basisadresse gibt es keine Links', e.linksBauen('', '42'), null);
 pruefe('ohne Guild gibt es keine Links', e.linksBauen('https://beispiel.de', ''), null);
 
