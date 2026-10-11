@@ -323,8 +323,12 @@ router.use('/addons', addonsRouter);
 const themesRouter = require('./admin/themes.router');
 router.use('/themes', themesRouter);
 
-const docsRouter = require('./admin/docs.router');
-router.use('/docs', docsRouter);
+// Wissensdatenbank (2026-10-11) — ersetzt den Datei-Editor /admin/docs, der
+// Markdown in `documentation/` schrieb. Die alte Adresse führt in die neue
+// Verwaltung, damit ein Lesezeichen nicht auf einer 404 endet.
+const kbRouter = require('./admin/kb.router');
+router.use('/kb', kbRouter);
+router.use('/docs', (req, res) => res.redirect(301, '/admin/kb'));
 
 const contentRouter = require('./admin/content.router');
 router.use('/content', contentRouter);

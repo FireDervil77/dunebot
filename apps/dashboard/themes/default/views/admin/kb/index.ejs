@@ -1,0 +1,202 @@
+<%#
+  Wissensdatenbank — Übersicht der Verwaltung (2026-10-11).
+  Ersetzt den Dateibaum unter /admin/docs.
+
+  @context {Array}  bereiche  Wissen.allesFuerVerwaltung(): Bereiche, je mit `artikelListe`
+  @context {object} start     Wissen.START — der Artikel, der die Startseite von /kb ist
+%>
+<%
+  const alleArtikel = bereiche.reduce(function (n, b) { return n + b.artikelListe.length; }, 0);
+  const entwuerfe = bereiche.reduce(function (n, b) { return n + b.artikelListe.filter(function (a) { return a.stand !== 'published'; }).length; }, 0);
+%>
+
+<div class="app-content">
+    <div class="container-fluid">
+
+        <div class="row mb-4">
+            <div class="col-12 d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <div>
+                    <h2 class="mb-0"><i class="fa-solid fa-book me-2"></i>Wissensdatenbank</h2>
+                    <p class="text-secondary mb-0">
+                        <%= bereiche.length %> Bereiche, <%= alleArtikel %> Artikel<%= entwuerfe ? ', davon ' + entwuerfe + ' Entwurf' + (entwuerfe === 1 ? '' : 'e') : '' %>
+                        · öffentlich unter <a href="/kb" target="_blank" rel="noopener">/kb</a>
+                    </p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a class="btn btn-success btn-sm" href="/admin/kb/artikel/neu"><i class="fa-solid fa-file-circle-plus me-1"></i>Neuer Artikel</a>
+                    <a class="btn btn-outline-primary btn-sm" href="/admin/kb/bereich/neu"><i class="fa-solid fa-folder-plus me-1"></i>Neuer Bereich</a>
+                </div>
+            </div>
+        </div>
+
+        <% if (!bereiche.length) { %>
+            <div class="card"><div class="card-body text-center text-secondary">
+                Noch kein Bereich. Lege zuerst einen Bereich an — Artikel gehören immer in einen.
+            </div></div>
+        <% } %>
+
+        <% bereiche.forEach(function (b) { %>
+            <div class="card mb-4">
+                <div class="card-header d-flex align-items-center flex-wrap gap-2">
+                    <h3 class="card-title mb-0">
+                        <%= b.titel %>
+                        <span class="text-secondary small fw-normal font-monospace ms-2">/kb/<%= b.kuerzel %></span>
+                        <% if (b.plugin) { %><span class="badge bg-secondary-lt ms-1" title="Dieser Bereich ist die Hilfe des Plugins <%= b.plugin %>">Plugin: <%= b.plugin %></span><% } %>
+                    </h3>
+                    <div class="ms-auto btn-group btn-group-sm">
+                        <a class="btn btn-outline-success" href="/admin/kb/artikel/neu?bereich=<%= b.id %>" title="Neuer Artikel in diesem Bereich"><i class="fa-solid fa-plus"></i></a>
+                        <a class="btn btn-outline-primary" href="/admin/kb/bereich/<%= b.id %>" title="Bereich bearbeiten"><i class="fa-solid fa-pen"></i></a>
+                        <a class="btn btn-outline-info" href="/kb/<%= b.kuerzel %>" target="_blank" rel="noopener" title="Öffentliche Seite"><i class="fa-solid fa-eye"></i></a>
+                        <%# Entfernen geht nur leer — der Knopf steht nur da, wenn er etwas bewirken kann. %>
+                        <% if (!b.artikelListe.length) { %>
+                            <button type="button" class="btn btn-outline-danger" title="Bereich entfernen"
+                                    data-kb-entfernen="bereich" data-id="<%= b.id %>" data-soll="<%= b.kuerzel %>" data-name="<%= b.titel %>">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        <% } %>
+                    </div>
+                </div>
+                <div class="card-body table-responsive p-0">
+                    <table class="table table-hover table-vcenter mb-0">
+                        <thead>
+                            <tr class="text-nowrap">
+                                <th>Artikel</th>
+                                <th>Stand</th>
+                                <th>Wer liest</th>
+                                <th>Englisch</th>
+                                <th>Reihenfolge</th>
+                                <th class="text-end">Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% if (!b.artikelListe.length) { %>
+                                <tr><td colspan="6" class="text-center text-secondary">Noch kein Artikel in diesem Bereich.</td></tr>
+                            <% } %>
+                            <% b.artikelListe.forEach(function (a) { %>
+                                <tr>
+                                    <td>
+                                        <a href="/admin/kb/artikel/<%= a.id %>"><strong><%= a.titel %></strong></a>
+                                        <% if (a.istStartseite) { %><span class="badge bg-primary-lt ms-1" title="Dieser Artikel ist der Text der Startseite von /kb und steht in keiner Liste.">Startseite von /kb</span><% } %>
+                                        <br><small class="text-secondary font-monospace"><%= a.istStartseite ? '/kb' : '/kb/' + b.kuerzel + '/' + a.kuerzel %></small>
+                                    </td>
+                                    <td>
+                                        <% if (a.stand === 'published') { %>
+                                            <span class="badge bg-success-lt">veröffentlicht</span>
+                                        <% } else { %>
+                                            <span class="badge bg-warning-lt" title="Ein Entwurf ist außen nicht zu sehen.">Entwurf</span>
+                                        <% } %>
+                                    </td>
+                                    <td>
+                                        <% if (a.stand !== 'published') { %>
+                                            <span class="text-secondary">—</span>
+                                        <% } else if (a.oeffentlich) { %>
+                                            <span class="badge bg-success-lt"><i class="fa-solid fa-globe me-1"></i>alle</span>
+                                        <% } else { %>
+                                            <span class="badge bg-secondary-lt" title="Ohne Anmeldung sind nur Titel und Kurztext zu sehen."><i class="fa-solid fa-lock me-1"></i>nur angemeldet</span>
+                                        <% } %>
+                                    </td>
+                                    <td><%= a.hatEnglisch ? 'ja' : '—' %></td>
+                                    <td><%= a.reihenfolge %></td>
+                                    <td class="text-end">
+                                        <div class="btn-group btn-group-sm">
+                                            <a class="btn btn-outline-primary" href="/admin/kb/artikel/<%= a.id %>" title="Bearbeiten"><i class="fa-solid fa-pen"></i></a>
+                                            <% if (a.stand === 'published') { %>
+                                                <a class="btn btn-outline-info" href="<%= a.istStartseite ? '/kb' : '/kb/' + b.kuerzel + '/' + a.kuerzel %>" target="_blank" rel="noopener" title="Öffentliche Seite"><i class="fa-solid fa-eye"></i></a>
+                                            <% } %>
+                                            <% if (!a.istStartseite) { %>
+                                                <button type="button" class="btn btn-outline-danger" title="Artikel entfernen"
+                                                        data-kb-entfernen="artikel" data-id="<%= a.id %>" data-soll="<%= a.kuerzel %>" data-name="<%= a.titel %>">
+                                                    <i class="fa-solid fa-trash"></i>
+                                                </button>
+                                            <% } %>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <% }); %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        <% }); %>
+
+    </div>
+</div>
+
+<%#
+  Rückfrage vor dem Entfernen — rot, fett, mit dem Satz „lässt sich nicht
+  zurücknehmen", und der Knopf bleibt gesperrt, bis das Kürzel dasteht
+  (dieselbe Form wie beim Entfernen eines Spielpakets, Baustelle 178).
+%>
+<div class="modal modal-blur fade" id="kbEntfernenModal" tabindex="-1" aria-labelledby="kbEntfernenTitel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content border border-danger border-2">
+            <div class="modal-status bg-danger"></div>
+            <div class="modal-header bg-danger-lt">
+                <h5 class="modal-title text-danger fw-bold" id="kbEntfernenTitel">
+                    <i class="fa-solid fa-triangle-exclamation me-2"></i><span id="kbEntfernenArt"></span> ENDGÜLTIG entfernen
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-danger fw-bold fs-3 mb-2">„<span id="kbEntfernenName"></span>" wird entfernt.</p>
+                <p class="text-danger fw-bold mb-3">Das lässt sich nicht zurücknehmen.</p>
+                <p class="mb-3" id="kbEntfernenFolge"></p>
+                <label class="form-label fw-bold" for="kbEntfernenEingabe">
+                    Zum Bestätigen das Kürzel eintippen: <span class="font-monospace text-danger" id="kbEntfernenSoll"></span>
+                </label>
+                <input type="text" class="form-control font-monospace" id="kbEntfernenEingabe" autocomplete="off" spellcheck="false">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-danger fw-bold" id="kbEntfernenKnopf" disabled>
+                    <i class="fa-solid fa-trash me-1"></i>Endgültig entfernen
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var melde = function (art, text) { if (window.showToast) window.showToast(art, text); };
+    var modalEl = document.getElementById('kbEntfernenModal');
+    var eingabe = document.getElementById('kbEntfernenEingabe');
+    var knopf = document.getElementById('kbEntfernenKnopf');
+    var ziel = null;
+
+    document.querySelectorAll('[data-kb-entfernen]').forEach(function (b) {
+        b.addEventListener('click', function () {
+            ziel = { art: b.dataset.kbEntfernen, id: b.dataset.id, soll: b.dataset.soll };
+            // Namen kommen aus der Datenbank: als Text gesetzt, nie als HTML.
+            document.getElementById('kbEntfernenArt').textContent = ziel.art === 'bereich' ? 'Bereich' : 'Artikel';
+            document.getElementById('kbEntfernenName').textContent = b.dataset.name;
+            document.getElementById('kbEntfernenSoll').textContent = ziel.soll;
+            document.getElementById('kbEntfernenFolge').textContent = ziel.art === 'bereich'
+                ? 'Die Adresse /kb/' + ziel.soll + ' gibt es danach nicht mehr.'
+                : 'Der Text geht in beiden Sprachen verloren, und Verweise auf den Artikel laufen ins Leere. Soll er nur verschwinden, stell ihn auf „Entwurf".';
+            eingabe.value = '';
+            knopf.disabled = true;
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        });
+    });
+    modalEl.addEventListener('shown.bs.modal', function () { eingabe.focus(); });
+    eingabe.addEventListener('input', function () { knopf.disabled = !ziel || eingabe.value.trim() !== ziel.soll; });
+
+    knopf.addEventListener('click', async function () {
+        if (!ziel || eingabe.value.trim() !== ziel.soll) return;
+        knopf.disabled = true;
+        try {
+            var antwort = await fetch('/admin/kb/' + ziel.art + '/' + encodeURIComponent(ziel.id) + '/entfernen', {
+                method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: '{}'
+            });
+            var daten = await antwort.json().catch(function () { return {}; });
+            if (!antwort.ok || !daten.success) throw new Error(daten.message || ('HTTP ' + antwort.status));
+            melde('success', daten.message);
+            setTimeout(function () { location.reload(); }, 600);
+        } catch (fehler) {
+            melde('error', 'Nicht entfernt: ' + fehler.message);
+            knopf.disabled = false;
+        }
+    });
+});
+</script>

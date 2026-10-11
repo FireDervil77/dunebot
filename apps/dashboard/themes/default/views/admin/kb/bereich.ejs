@@ -1,0 +1,112 @@
+<%#
+  Wissensdatenbank — Formular „Bereich" (2026-10-11).
+
+  @context {object|null} bereich  Wissen.bereichRoh(id) oder null (neu)
+  @context {object}      start    Wissen.START
+%>
+<%
+  const t = (bereich && bereich.title_translations) || {};
+  const d = (bereich && bereich.description_translations) || {};
+  const traegtStart = bereich && bereich.slug === start.bereich;
+%>
+
+<div class="app-content">
+    <div class="container-fluid">
+
+        <div class="row mb-4">
+            <div class="col-12 d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <h2 class="mb-0"><i class="fa-solid fa-folder me-2"></i><%= bereich ? 'Bereich bearbeiten' : 'Neuer Bereich' %></h2>
+                <a class="btn btn-outline-secondary btn-sm" href="/admin/kb"><i class="fa-solid fa-arrow-left me-1"></i>Zur Übersicht</a>
+            </div>
+        </div>
+
+        <form class="card" id="kbBereichForm" autocomplete="off">
+            <input type="hidden" name="id" value="<%= bereich ? bereich.id : '' %>">
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="bTitelDe">Titel (deutsch)</label>
+                        <input class="form-control" id="bTitelDe" name="title_de" maxlength="120" required value="<%= t['de-DE'] || '' %>">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="bTitelEn">Titel (englisch)</label>
+                        <input class="form-control" id="bTitelEn" name="title_en" maxlength="120" value="<%= t['en-GB'] || '' %>">
+                        <div class="form-hint">Leer heißt: Auch englische Besucher sehen den deutschen Titel.</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="bTextDe">Beschreibung (deutsch)</label>
+                        <input class="form-control" id="bTextDe" name="description_de" maxlength="240" value="<%= d['de-DE'] || '' %>" placeholder="Ein Satz — steht auf der Kachel">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="bTextEn">Beschreibung (englisch)</label>
+                        <input class="form-control" id="bTextEn" name="description_en" maxlength="240" value="<%= d['en-GB'] || '' %>">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="bKuerzel">Kürzel für die Adresse</label>
+                        <div class="input-group">
+                            <span class="input-group-text font-monospace">/kb/</span>
+                            <input class="form-control font-monospace" id="bKuerzel" name="slug" maxlength="80"
+                                   pattern="[a-z0-9][a-z0-9-]*" value="<%= bereich ? bereich.slug : '' %>"
+                                   placeholder="aus dem Titel" <%= traegtStart ? 'readonly' : '' %>>
+                        </div>
+                        <div class="form-hint">
+                            <% if (traegtStart) { %>
+                                Dieser Bereich trägt den Text der Startseite von /kb — sein Kürzel bleibt.
+                            <% } else if (bereich) { %>
+                                Ändern heißt: Die bisherigen Adressen aller Artikel dieses Bereichs gelten nicht mehr.
+                            <% } else { %>
+                                Leer lassen, dann entsteht es aus dem Titel.
+                            <% } %>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="bSymbol">Symbol</label>
+                        <input class="form-control font-monospace" id="bSymbol" name="icon" maxlength="60" value="<%= bereich ? (bereich.icon || '') : '' %>" placeholder="bi-journal-text">
+                        <div class="form-hint">Name aus <a href="https://icons.getbootstrap.com/" target="_blank" rel="noopener">Bootstrap Icons</a>, mit „bi-" davor.</div>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label" for="bReihe">Reihenfolge</label>
+                        <input class="form-control" id="bReihe" name="sort_order" type="number" value="<%= bereich ? bereich.sort_order : 100 %>">
+                        <div class="form-hint">Kleinere Zahl steht weiter vorn.</div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="bPlugin">Hilfe des Plugins</label>
+                        <input class="form-control font-monospace" id="bPlugin" name="plugin" maxlength="60" value="<%= bereich ? (bereich.plugin || '') : '' %>" placeholder="leer = keines">
+                        <div class="form-hint">Name des Plugins, etwa „gameserver" — für spätere Hilfe-Verweise im Dashboard.</div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer d-flex gap-2">
+                <button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk me-1"></i>Speichern</button>
+                <a class="btn btn-link link-secondary" href="/admin/kb">Abbrechen</a>
+            </div>
+        </form>
+
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var melde = function (art, text) { if (window.showToast) window.showToast(art, text); };
+    var form = document.getElementById('kbBereichForm');
+    form.addEventListener('submit', async function (ev) {
+        ev.preventDefault();
+        var knopf = form.querySelector('button[type=submit]');
+        knopf.disabled = true;
+        var daten = {};
+        new FormData(form).forEach(function (wert, name) { daten[name] = wert; });
+        try {
+            var antwort = await fetch('/admin/kb/bereich/speichern', {
+                method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(daten)
+            });
+            var a = await antwort.json().catch(function () { return {}; });
+            if (!antwort.ok || !a.success) throw new Error(a.message || ('HTTP ' + antwort.status));
+            melde('success', a.message);
+            setTimeout(function () { location.href = '/admin/kb'; }, 600);
+        } catch (fehler) {
+            melde('error', 'Nicht gespeichert: ' + fehler.message);
+            knopf.disabled = false;
+        }
+    });
+});
+</script>

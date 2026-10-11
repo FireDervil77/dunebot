@@ -1,0 +1,204 @@
+<%#
+  Wissensdatenbank — Formular „Artikel" (2026-10-11).
+  Ersetzt den Datei-Editor /admin/docs/edit.
+
+  Der Inhalt ist Markdown in einem schlichten Textfeld. Die Vorschau fragt den
+  Server (`POST /admin/kb/vorschau`) — sie zeigt genau das, was die öffentliche
+  Seite aus dem Text macht, nicht die Auslegung eines Editors im Browser.
+
+  @context {object|null} artikel         Wissen.artikelRoh(id) oder null (neu)
+  @context {Array}       bereiche        [{ id, kuerzel, titel }]
+  @context {number}      vorgabeBereich
+%>
+<%
+  const t = (artikel && artikel.title_translations) || {};
+  const k = (artikel && artikel.excerpt_translations) || {};
+  const c = (artikel && artikel.content_translations) || {};
+  const istStart = Boolean(artikel && artikel.istStartseite);
+  const oeffentlich = artikel ? Number(artikel.is_public) === 1 : false;
+  const stand = artikel ? artikel.status : 'draft';
+%>
+
+<div class="app-content">
+    <div class="container-fluid">
+
+        <div class="row mb-4">
+            <div class="col-12 d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <div>
+                    <h2 class="mb-0"><i class="fa-solid fa-file-lines me-2"></i><%= artikel ? 'Artikel bearbeiten' : 'Neuer Artikel' %></h2>
+                    <% if (istStart) { %>
+                        <p class="text-secondary mb-0">Das ist der Text der Startseite von /kb. Bereich, Kürzel, Stand und Sichtbarkeit sind fest — den Text kannst du ändern.</p>
+                    <% } %>
+                </div>
+                <div class="d-flex gap-2">
+                    <a class="btn btn-outline-info btn-sm <%= artikel && stand === 'published' ? '' : 'd-none' %>" id="kbAnsehen" target="_blank" rel="noopener"
+                       href="<%= artikel ? (istStart ? '/kb' : '/kb/' + artikel.bereich_slug + '/' + artikel.slug) : '#' %>">
+                        <i class="fa-solid fa-eye me-1"></i>Öffentliche Seite
+                    </a>
+                    <a class="btn btn-outline-secondary btn-sm" href="/admin/kb"><i class="fa-solid fa-arrow-left me-1"></i>Zur Übersicht</a>
+                </div>
+            </div>
+        </div>
+
+        <form id="kbArtikelForm" autocomplete="off">
+            <input type="hidden" name="id" value="<%= artikel ? artikel.id : '' %>">
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label" for="aBereich">Bereich</label>
+                            <%# Ein gesperrtes Feld wird nicht mitgeschickt — der Wert reist deshalb versteckt mit. %>
+                            <% if (istStart) { %><input type="hidden" name="category_id" value="<%= artikel.category_id %>"><% } %>
+                            <select class="form-select" id="aBereich" <%= istStart ? 'disabled' : 'name=category_id' %>>
+                                <% bereiche.forEach(function (b) { %>
+                                    <option value="<%= b.id %>" <%= Number(vorgabeBereich) === Number(b.id) ? 'selected' : '' %>><%= b.titel %> (/kb/<%= b.kuerzel %>)</option>
+                                <% }); %>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label" for="aKuerzel">Kürzel für die Adresse</label>
+                            <input class="form-control font-monospace" id="aKuerzel" name="slug" maxlength="80" pattern="[a-z0-9][a-z0-9-]*"
+                                   value="<%= artikel ? artikel.slug : '' %>" placeholder="aus dem Titel" <%= istStart ? 'readonly' : '' %>>
+                            <div class="form-hint"><%= artikel ? 'Ändern heißt: Die bisherige Adresse gilt nicht mehr.' : 'Leer lassen, dann entsteht es aus dem Titel.' %></div>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label" for="aStand">Stand</label>
+                            <% if (istStart) { %><input type="hidden" name="status" value="published"><% } %>
+                            <select class="form-select" id="aStand" <%= istStart ? 'disabled' : 'name=status' %>>
+                                <option value="draft" <%= stand === 'draft' ? 'selected' : '' %>>Entwurf</option>
+                                <option value="published" <%= stand === 'published' ? 'selected' : '' %>>veröffentlicht</option>
+                            </select>
+                            <div class="form-hint">Ein Entwurf ist außen nicht zu sehen.</div>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label" for="aReihe">Reihenfolge</label>
+                            <input class="form-control" id="aReihe" name="sort_order" type="number" value="<%= artikel ? artikel.sort_order : 100 %>">
+                            <div class="form-hint">Kleinere Zahl steht weiter vorn.</div>
+                        </div>
+                        <div class="col-md-2 d-flex align-items-center">
+                            <% if (istStart) { %><input type="hidden" name="is_public" value="1"><% } %>
+                            <label class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" <%= istStart ? 'disabled' : 'name=is_public' %> value="1" <%= oeffentlich ? 'checked' : '' %>>
+                                <span class="form-check-label">Öffentlich</span>
+                            </label>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-hint">
+                                „Öffentlich" aus heißt: Ohne Anmeldung sind nur Titel und Kurztext zu sehen, mit Schloss. Wer mit Discord angemeldet ist, liest jeden veröffentlichten Artikel.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <ul class="nav nav-tabs card-header-tabs" role="tablist">
+                        <li class="nav-item"><button class="nav-link active" type="button" data-bs-toggle="tab" data-bs-target="#kbDe" role="tab">Deutsch</button></li>
+                        <li class="nav-item"><button class="nav-link" type="button" data-bs-toggle="tab" data-bs-target="#kbEn" role="tab">Englisch<%= c['en-GB'] ? '' : ' (leer)' %></button></li>
+                    </ul>
+                </div>
+                <div class="card-body tab-content">
+                    <% [['de', 'de-DE', 'kbDe', true], ['en', 'en-GB', 'kbEn', false]].forEach(function (s) { %>
+                        <div class="tab-pane <%= s[3] ? 'active show' : '' %>" id="<%= s[2] %>" role="tabpanel">
+                            <% if (!s[3]) { %>
+                                <div class="form-hint mb-3">Was hier leer bleibt, zeigt die englische Seite auf Deutsch.</div>
+                            <% } %>
+                            <div class="mb-3">
+                                <label class="form-label" for="aTitel_<%= s[0] %>">Titel</label>
+                                <input class="form-control" id="aTitel_<%= s[0] %>" name="title_<%= s[0] %>" maxlength="200" <%= s[3] ? 'required' : '' %> value="<%= t[s[1]] || '' %>">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" for="aKurz_<%= s[0] %>">Kurztext</label>
+                                <textarea class="form-control" id="aKurz_<%= s[0] %>" name="excerpt_<%= s[0] %>" rows="2" maxlength="400"><%= k[s[1]] || '' %></textarea>
+                                <div class="form-hint">Steht in der Liste des Bereichs — und an Artikeln mit Schloss als Einziges neben dem Titel.</div>
+                            </div>
+                            <div class="mb-2 d-flex align-items-center justify-content-between">
+                                <label class="form-label mb-0" for="aInhalt_<%= s[0] %>">Inhalt (Markdown)</label>
+                                <button class="btn btn-sm btn-outline-secondary" type="button" data-kb-vorschau="<%= s[0] %>"><i class="fa-solid fa-eye me-1"></i>Vorschau</button>
+                            </div>
+                            <textarea class="form-control font-monospace" id="aInhalt_<%= s[0] %>" name="content_<%= s[0] %>" rows="24" spellcheck="true"><%= c[s[1]] || '' %></textarea>
+                            <div class="form-hint">Überschriften mit ##, Listen mit -, Befehle in `Rückstrichen`. HTML im Text wird als Text gezeigt, nicht ausgeführt. Der Titel steht schon über dem Artikel — fang mit dem Text an.</div>
+                            <div class="card mt-3 d-none" data-kb-vorschau-kasten="<%= s[0] %>">
+                                <div class="card-header py-2"><span class="card-title mb-0 small">Vorschau — so rendert die öffentliche Seite</span></div>
+                                <div class="card-body kb-vorschau" data-kb-vorschau-inhalt="<%= s[0] %>"></div>
+                            </div>
+                        </div>
+                    <% }); %>
+                </div>
+                <div class="card-footer d-flex gap-2">
+                    <button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk me-1"></i>Speichern</button>
+                    <a class="btn btn-link link-secondary" href="/admin/kb">Abbrechen</a>
+                </div>
+            </div>
+        </form>
+
+    </div>
+</div>
+
+<style>
+  .kb-vorschau h1, .kb-vorschau h2, .kb-vorschau h3 { margin-top: 1.25rem; }
+  .kb-vorschau table { border-collapse: collapse; margin: 1rem 0; }
+  .kb-vorschau th, .kb-vorschau td { border: 1px solid var(--tblr-border-color, #dee2e6); padding: 6px 10px; }
+  .kb-vorschau pre { padding: 0.75rem 1rem; border-radius: 6px; overflow-x: auto; }
+  .kb-vorschau img { max-width: 100%; height: auto; }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var melde = function (art, text) { if (window.showToast) window.showToast(art, text); };
+    var form = document.getElementById('kbArtikelForm');
+
+    async function schicke(weg, nutzlast) {
+        var antwort = await fetch(weg, {
+            method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(nutzlast)
+        });
+        var a = await antwort.json().catch(function () { return {}; });
+        if (!antwort.ok || !a.success) throw new Error(a.message || ('HTTP ' + antwort.status));
+        return a;
+    }
+
+    // Vorschau: Der Server rendert — das Ergebnis ist bereits entschärftes HTML
+    // aus Wissen.rendere und die einzige Stelle, die hier als HTML gesetzt wird.
+    document.querySelectorAll('[data-kb-vorschau]').forEach(function (b) {
+        b.addEventListener('click', async function () {
+            var s = b.dataset.kbVorschau;
+            var kasten = document.querySelector('[data-kb-vorschau-kasten="' + s + '"]');
+            var ziel = document.querySelector('[data-kb-vorschau-inhalt="' + s + '"]');
+            b.disabled = true;
+            try {
+                var a = await schicke('/admin/kb/vorschau', { inhalt: form.elements['content_' + s].value });
+                ziel.innerHTML = a.html || '<p class="text-secondary">Noch kein Text.</p>';
+                kasten.classList.remove('d-none');
+                kasten.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            } catch (fehler) {
+                melde('error', 'Keine Vorschau: ' + fehler.message);
+            }
+            b.disabled = false;
+        });
+    });
+
+    form.addEventListener('submit', async function (ev) {
+        ev.preventDefault();
+        var knopf = form.querySelector('button[type=submit]');
+        knopf.disabled = true;
+        var daten = {};
+        new FormData(form).forEach(function (wert, name) { daten[name] = wert; });
+        // Ein Schalter, der aus ist, steht nicht im Formular — „aus" muss ausdrücklich mit.
+        if (!('is_public' in daten)) daten.is_public = '0';
+        try {
+            var a = await schicke('/admin/kb/artikel/speichern', daten);
+            melde('success', a.message);
+            if (!daten.id) { location.href = '/admin/kb/artikel/' + a.id; return; }
+            // Die Adresse kann sich geändert haben (Kürzel, Bereich) — der Knopf folgt.
+            var ansehen = document.getElementById('kbAnsehen');
+            ansehen.href = a.adresse;
+            ansehen.classList.toggle('d-none', daten.status !== 'published');
+        } catch (fehler) {
+            melde('error', 'Nicht gespeichert: ' + fehler.message);
+        }
+        knopf.disabled = false;
+    });
+});
+</script>
