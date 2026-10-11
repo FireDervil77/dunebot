@@ -71,7 +71,13 @@
                   </div>
                 </div>
                 <div>
-                  <% if (f.auswahl) { %>
+                  <% if (f.typ === 'flags' && f.maske) { %>
+                    <%# Bitmaske VOR der Auswahl prüfen: Auch sie trägt `auswahl`,
+                        und als Aufklappliste ließe sich nur EIN Bit wählen. %>
+                    <%- include('partials/bitmaske', {
+                          maske: f.maske, maskeName: 'setting_' + f.schluessel, maskeFeld: '',
+                          maskeZahl: false, maskeHinweis: '' }) %>
+                  <% } else if (f.auswahl) { %>
                     <select class="fb-feld" style="width:100%" name="<%= f.istServerName ? 'server_name' : 'setting_' + f.schluessel %>">
                       <% f.auswahl.forEach(function (c) { %>
                         <option value="<%= c.wert %>" <%= String(f.vorgabe) === c.wert ? 'selected' : '' %>><%= c.name %></option>

@@ -282,6 +282,14 @@
                       bewirkt, waere schlimmer als ein festes. %>
                   <div class="fb-feld fb-feld-leer"><%= e.hatWert ? String(e.wert) : 'kein Wert hinterlegt' %></div>
                   <div class="fb-muted" style="font-size:12px;margin-top:4px">nur lesbar — das Paket kennt hier keine Zuordnung</div>
+                <% } else if (e.typ === 'flags' && e.maske) { %>
+                  <%# Bitmaske: mehrere Kästchen, gespeichert wird die Summe.
+                      Die Zahl selbst steht nur in der fachlichen Höhe da —
+                      zum Vergleich mit der Doku des Spiels. %>
+                  <%- include('bitmaske', {
+                        maske: e.maske, maskeName: '', maskeFeld: e.variable,
+                        maskeZahl: u.hoehe === 'fachlich',
+                        maskeHinweis: e.hatWert ? '' : 'Noch nichts gespeichert — es gilt die Vorgabe des Pakets.' }) %>
                 <% } else if (e.typ === 'choice' && e.auswahl) { %>
                   <div style="display:flex;gap:6px;flex-wrap:wrap">
                     <% e.auswahl.forEach(function (c) { %>

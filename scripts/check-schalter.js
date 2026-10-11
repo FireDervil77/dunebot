@@ -51,6 +51,7 @@ const GEWOLLTE_KAESTCHEN = [
     ['permissions/matrix.ejs', 'Rechtematrix — Mehrfachauswahl'],
     ['permissions/users.ejs', 'Rechtekatalog je Nutzer — Mehrfachauswahl'],
     ['server-detail-files.ejs', 'Dateiauswahl — Mehrfachauswahl'],
+    ['partials/bitmaske.ejs', 'Bitmaske einer Spieleinstellung — mehrere Bits aus einer Liste, gespeichert wird die Summe'],
     ['moderation-settings.ejs', 'modlog_events — mehrere Ereignisarten'],
     ['moderation.ejs', 'modlog_events — mehrere Ereignisarten'],
     // Beide standen bis zum 2026-08-29 in `streaming-ziele.ejs`; ein Eintrag

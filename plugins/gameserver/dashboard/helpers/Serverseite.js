@@ -34,6 +34,7 @@
 
 const { lesePortzwecke } = require('./Portvergabe');
 const { istKontrollGuild } = require('./Paketfassung');
+const Bitmaske = require('./Bitmaske');
 
 /** Höhenstufen (B.7): wer welche Einstellungen zu sehen bekommt. */
 const HOEHE = {
@@ -441,6 +442,10 @@ function baueEinstellungen(server, paket, hoehe) {
                 wert: String(c.value),
                 name: c.name?.de || c.name?.en || String(c.value),
             })) : null,
+            // Bitmaske: je Bit ein Kästchen. Ohne gespeicherten Wert gilt die
+            // Vorgabe — die schickt der Start ohnehin mit, also zeigt die
+            // Karte sie auch an, statt „nichts angekreuzt" zu behaupten.
+            maske:       Bitmaske.fuerAnzeige(e, roh !== undefined ? roh : e.default),
             min:         Number.isFinite(e.min) ? e.min : null,
             max:         Number.isFinite(e.max) ? e.max : null,
         });
@@ -1726,6 +1731,7 @@ function baueWerteSchritt(paket, maschine, imageLiegtDa) {
         wirkung: null,
         hinweis: null,
         auswahl: null,
+        maske: null,
         min: null,
         max: null,
     };
@@ -1793,6 +1799,8 @@ function baueWerteSchritt(paket, maschine, imageLiegtDa) {
             auswahl: Array.isArray(e.choices) ? e.choices.map(c => ({
                 wert: String(c.value), name: c.name?.de || c.name?.en || String(c.value),
             })) : null,
+            // Bitmaske: beim Anlegen vorbelegt mit der Vorgabe des Pakets.
+            maske: Bitmaske.fuerAnzeige(e, e.default),
             min: Number.isFinite(e.min) ? e.min : null,
             max: Number.isFinite(e.max) ? e.max : null,
         }))),

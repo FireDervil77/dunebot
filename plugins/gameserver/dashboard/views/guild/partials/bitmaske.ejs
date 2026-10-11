@@ -1,0 +1,85 @@
+<%#
+  Bitmaske: je Bit ein Kästchen, dahinter ein verstecktes Feld mit der Summe
+  (2026-10-11). Eine Vorlage für Serverseite UND Anlegeformular — die Summe
+  wird an einer Stelle gebildet, nicht in jeder Ansicht neu.
+
+  Aufruf — immer alle fünf angeben, damit kein gleichnamiger Wert der
+  umgebenden Seite hineinrutscht:
+
+    include('bitmaske', {
+      maske:        Bitmaske.fuerAnzeige(...)   was zu zeichnen ist
+      maskeName:    'setting_x' | ''            Formularname (Anlegen)
+      maskeFeld:    'x' | ''                    data-fb-feld (Einstellungskarte)
+      maskeZahl:    true | false                die Summe als Zahl zeigen
+      maskeHinweis: '…' | ''                    eine Zeile darunter
+    })
+
+  Kästchen, kein Schalter: mehreres aus einer Liste (check-schalter.js).
+  `autocomplete="off"`, weil Firefox Kästchen nach dem Neuladen so stehen
+  lässt, wie man sie verlassen hat — das versteckte Feld aber nicht.
+
+  Ab Bitmaske.ZUGEKLAPPT_AB Möglichkeiten steht die Liste zugeklappt da.
+%>
+<% const maskeAlt = !maske.lesbar ? '' : String(maske.summe + maske.fremd); %>
+<div data-fb-maske>
+  <input type="hidden" data-fb-summe autocomplete="off" value="<%= maske.summe %>"
+         <% if (maskeName) { %>name="<%= maskeName %>"<% } %>
+         <% if (maskeFeld) { %>data-fb-feld="<%= maskeFeld %>" data-fb-alt="<%= maskeAlt %>"<% } %>>
+  <% if (maske.zugeklappt) { %>
+    <details>
+      <summary class="fb-bits-kopf"><span data-fb-aktiv><%= maske.aktiv %></span> von <%= maske.gesamt %> aktiv</summary>
+  <% } %>
+  <div class="fb-bits">
+    <% maske.bits.forEach(function (b) { %>
+      <label class="fb-bit"<% if (b.hinweis) { %> title="<%= b.hinweis %>"<% } %>>
+        <input type="checkbox" autocomplete="off" data-fb-bit="<%= b.wert %>" <%= b.an ? 'checked' : '' %>>
+        <span><%= b.name %></span>
+      </label>
+    <% }); %>
+  </div>
+  <% if (maske.zugeklappt) { %>
+    </details>
+  <% } %>
+  <% if (maskeZahl) { %>
+    <div class="fb-bits-summe">Summe: <span class="fb-mono" data-fb-summe-text><%= maske.summe %></span></div>
+  <% } %>
+  <% if (!maske.lesbar) { %>
+    <div style="font-size:12px;margin-top:6px;color:var(--fb-warning);text-wrap:pretty">
+      Der gespeicherte Wert ist keine Zahl. Angekreuzt ist deshalb nichts — mit dem nächsten Speichern steht die Summe da.
+    </div>
+  <% } else if (maske.fremd) { %>
+    <div style="font-size:12px;margin-top:6px;color:var(--fb-warning);text-wrap:pretty">
+      Gespeichert ist zusätzlich <span class="fb-mono"><%= maske.fremd %></span> — das bietet das Paket nicht an. Mit dem nächsten Speichern entfällt es.
+    </div>
+  <% } %>
+  <% if (maskeHinweis) { %>
+    <div class="fb-muted" style="font-size:12px;margin-top:6px"><%= maskeHinweis %></div>
+  <% } %>
+</div>
+<script>
+/* Bitmaske: Kästchen → Summe. Einmal je Seite, auch wenn mehrere Masken
+ * dastehen — deshalb am Dokument und nicht je Kasten. */
+(function () {
+  if (window.fbMaskeBereit) return;
+  window.fbMaskeBereit = true;
+  document.addEventListener('change', function (ev) {
+    var k = ev.target;
+    if (!k || !k.hasAttribute || !k.hasAttribute('data-fb-bit')) return;
+    var kasten = k.closest('[data-fb-maske]');
+    if (!kasten) return;
+    var summe = 0, aktiv = 0;
+    kasten.querySelectorAll('[data-fb-bit]').forEach(function (b) {
+      if (b.checked) { summe += Number(b.getAttribute('data-fb-bit')); aktiv++; }
+    });
+    var feld = kasten.querySelector('[data-fb-summe]');
+    feld.value = String(summe);
+    var zahl = kasten.querySelector('[data-fb-summe-text]');
+    if (zahl) zahl.textContent = String(summe);
+    var zaehler = kasten.querySelector('[data-fb-aktiv]');
+    if (zaehler) zaehler.textContent = String(aktiv);
+    // Die Einstellungskarte hört an ihren Feldern auf `input` und zählt
+    // daraus die Änderungen — das versteckte Feld meldet sich wie ein getipptes.
+    feld.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+})();
+</script>

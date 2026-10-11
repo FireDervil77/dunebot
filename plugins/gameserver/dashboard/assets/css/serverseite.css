@@ -232,6 +232,25 @@
   color: var(--fb-primary); font-weight: 500;
 }
 
+/* ── Bitmaske: Kästchenliste (2026-10-11) ───────────────────────────────── */
+/*
+ * Mehreres aus einer Liste — also Kästchen, kein Schalter. Die Namen der Bits
+ * sind Sätze („Bots dürfen Fahrzeuge nutzen"); als Pillenreihe wie die Auswahl
+ * brächen sie in der 240-px-Spalte nach jedem zweiten Wort um.
+ */
+.fb-bits { display: grid; gap: 8px; }
+.fb-bit {
+  display: flex; gap: 8px; align-items: flex-start;
+  font-size: 13px; line-height: 1.35; cursor: pointer; text-wrap: pretty;
+}
+.fb-bit input { margin: 2px 0 0; flex: none; accent-color: var(--fb-primary); cursor: pointer; }
+.fb-bits-kopf {
+  font-size: 13px; cursor: pointer; padding: 8px 12px;
+  border: 1px solid var(--fb-border); border-radius: var(--fb-radius); background: #fff;
+}
+details[open] > .fb-bits-kopf { margin-bottom: 10px; }
+.fb-bits-summe { font-size: 12px; margin-top: 8px; color: var(--fb-text-muted); }
+
 /* ── Fussleiste der Einstellungskarte ───────────────────────────────────── */
 /*
    **Sie klebt unten** (2026-09-04). Der Knopf erscheint erst, wenn sich etwas
