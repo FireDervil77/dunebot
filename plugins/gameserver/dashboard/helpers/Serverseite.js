@@ -63,11 +63,16 @@ const WIRKUNG = {
  * niemand ausgedacht hat.
  */
 const GRUPPE = {
-    identity: 'Name und Auftritt',
-    access:   'Zugang',
-    world:    'Welt',
-    comfort:  'Bequemlichkeit',
-    upkeep:   'Pflege',
+    identity:  'Name und Auftritt',
+    access:    'Zugang',
+    world:     'Welt',
+    comfort:   'Bequemlichkeit',
+    upkeep:    'Pflege',
+    bots:      'Bots',
+    mods:      'Mods',
+    downloads: 'Downloads',
+    votes:     'Votes',
+    players:   'Player',
 };
 
 /**
