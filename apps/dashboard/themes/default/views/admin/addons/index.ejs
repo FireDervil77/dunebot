@@ -131,16 +131,29 @@
                     </div>
                     <div class="form-hint mt-1">Je Paket ein Prüfdurchlauf auf leerem Volume, einer nach dem anderen. Bei Grün entsteht eine neue Fassung in „test", die sich nur im Image unterscheidet — freigegeben wird sie erst mit deinem Klick.</div>
                 </div>
+                <%#
+                  Die Tabelle passt in die Karte (2026-10-11). Betreiber: „muss ich
+                  nun nach links scrollen, um alles sehen zu können."
+
+                  Zwei Dinge hielten sie breit: `text-nowrap` an der ganzen Tabelle
+                  und der Satz im Kopf der Spalte „Image" („· 0 hinter dem neuesten
+                  Bau (gefragt bei …)"), der als EINE Zeile die Spalte auf seine
+                  Länge zog. Mit der Spalte „Neuere Fassung" lief sie dann über.
+
+                  Jetzt bricht nur um, was Text ist (Name, Image-Zeile, der Satz im
+                  Kopf). Marken und Knöpfe bleiben einzeilig — das bringen sie mit.
+                  `table-responsive` bleibt für schmale Fenster.
+                %>
                 <div class="card-body table-responsive p-0">
-                    <table class="table table-hover text-nowrap" id="addonsTable">
+                    <table class="table table-hover" id="addonsTable">
                         <thead>
-                            <tr>
+                            <tr class="text-nowrap">
                                 <th>ID</th>
                                 <th>Name</th>
                                 <th>Freigabe</th>
                                 <th>Neuere Fassung</th>
                                 <th>Fassungen</th>
-                                <th>Image <span class="text-secondary small fw-normal" id="imageStandKopf"></span></th>
+                                <th>Image <span class="d-block text-wrap text-secondary small fw-normal" id="imageStandKopf"></span></th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -327,7 +340,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!antwort.ok || !daten.success) throw new Error(daten.message || ('HTTP ' + antwort.status));
         } catch (fehler) {
             zellen.forEach((z) => setze(z, 'bg-secondary-lt', 'unbekannt', fehler.message));
-            if (kopf) kopf.textContent = '· nicht abfragbar';
+            if (kopf) kopf.textContent = 'nicht abfragbar';
             if (window.showToast) window.showToast('error', 'Image-Stand: ' + fehler.message);
             return;
         }
@@ -352,7 +365,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         const z = daten.zaehlung || {};
         if (kopf) {
-            kopf.textContent = '· ' + (z.neuer_bau || 0) + ' hinter dem neuesten Bau'
+            kopf.textContent = (z.neuer_bau || 0) + ' hinter dem neuesten Bau'
                 + (z.unbekannt ? ', ' + z.unbekannt + ' unbekannt' : '')
                 + (daten.gefragtBei ? ' (gefragt bei ' + daten.gefragtBei + ')' : '');
         }
