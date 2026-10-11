@@ -22,6 +22,7 @@ const { ServiceManager } = require('dunebot-core');
 const Paketfassung = require('../../../gameserver/dashboard/helpers/Paketfassung');
 const Quellen = require('../../../gameserver/dashboard/helpers/Quellen');
 const Abruf = require('../../../gameserver/dashboard/helpers/Abruf');
+const Bitmaske = require('../../../gameserver/dashboard/helpers/Bitmaske');
 const Oeffentlich = require('../../../../packages/fbpkg/lib/oeffentlich');
 // Die Tags eines Spiels gehören dem Spiel im Panel, nicht dem Paket (2026-10-08) —
 // die Werkbank reicht sie beim Veröffentlichen weiter, wie Symbol und Banner.
@@ -1044,7 +1045,7 @@ function durchgereichtes(sitzung) {
 // (Absprache 2026-09-26) — der Rest bleibt als Entwurf in der Sitzung.
 
 const EINSTELLUNG = {
-    typen:   ['text', 'number', 'boolean', 'choice', 'password'],
+    typen:   ['text', 'number', 'boolean', 'choice', 'flags', 'password'],
     rollen:  ['player', 'owner', 'expert'],
     // Was die Auswahl „Rolle" der Werkbank anbietet. `player_spaeter` gibt es
     // nur im Formular: Im Paket ist es `role: player` + `ask_on_create: false`
@@ -1162,6 +1163,23 @@ function einstellungAusFormular(b) {
         if (moeglich.length < 2) throw new Error('Auswahl: mindestens zwei Möglichkeiten, je Zeile „wert" oder „wert=Anzeigename".');
         e.choices = moeglich;
     }
+    // Bitmaske (2026-10-11): dasselbe Feld, aber jede Zeile ist EIN Bit und der
+    // Wert der Einstellung ihre Summe. Die Bits stehen als ZAHL im Paket. Was
+    // ein Bit ist, entscheidet Bitmaske.js — dieselbe Regel wie beim Speichern
+    // auf der Serverseite.
+    if (e.type === 'flags') {
+        const moeglich = text('choices').split(/\r?\n/).map(z => z.trim()).filter(Boolean).map((z) => {
+            const [wert, ...rest] = z.split('=');
+            const c = { value: /^\d+$/.test(wert.trim()) ? Number(wert.trim()) : wert.trim() };
+            if (rest.length && rest.join('=').trim()) c.name = { de: rest.join('=').trim() };
+            return c;
+        });
+        e.choices = moeglich;
+        const fehler = Bitmaske.fehlerDerBits(e);
+        if (fehler) throw new Error(`Bitmaske: ${fehler} Je Zeile „bit=Anzeigename", etwa „4=Bots dürfen Fahrzeuge nutzen".`);
+        const ohneName = moeglich.find(c => !c.name);
+        if (ohneName) throw new Error(`Bitmaske: das Bit ${ohneName.value} hat keinen Anzeigenamen — ohne ihn stünde im Panel nur die Zahl.`);
+    }
     if (e.type === 'number') {
         for (const [feld, ziel] of [['min', 'min'], ['max', 'max']]) {
             if (text(feld) === '') continue;
@@ -1174,9 +1192,17 @@ function einstellungAusFormular(b) {
     if (vorgabe !== '') {
         if (e.type === 'number' && !Number.isFinite(Number(vorgabe))) throw new Error('Vorgabe: keine Zahl.');
         if (e.type === 'choice' && !e.choices.some(c => c.value === vorgabe)) throw new Error('Vorgabe: keine der Möglichkeiten.');
-        e.default = e.type === 'number' ? Number(vorgabe) : e.type === 'boolean' ? istWahr(vorgabe) : vorgabe;
+        if (e.type === 'flags') {
+            const fehler = Bitmaske.fehlerDesWerts(e, vorgabe);
+            if (fehler) throw new Error(`Vorgabe: ${fehler}`);
+        }
+        e.default = e.type === 'number' || e.type === 'flags' ? Number(vorgabe) : e.type === 'boolean' ? istWahr(vorgabe) : vorgabe;
     } else if (e.type === 'boolean') {
         e.default = false;
+    } else if (e.type === 'flags') {
+        // Keine stille 0: Wo das Spiel mit 7 ausgeliefert wird, schaltete eine
+        // angenommene 0 beim ersten Start alles ab, ohne dass es jemand wählte.
+        throw new Error('Vorgabe: die Summe, mit der das Spiel startet — 0, wenn nichts angekreuzt sein soll.');
     }
     if (b.required === true || b.required === 'on' || b.required === '1') e.required = true;
 
@@ -1314,6 +1340,14 @@ async function probewerteSetzen(sitzung, werte) {
     const eintraege = Object.entries(werte);
     if (!eintraege.length) throw new Error('Probewerte: nichts zu speichern.');
     for (const [key] of eintraege) if (!bekannt.has(key)) throw new Error(`Keine Einstellung „${key}".`);
+    // Eine Bitmaske wird hier als Zahl getippt — eine, die nicht aufgeht, ginge
+    // sonst so in den Probestart und stünde danach als „angekommen" im Nachweis.
+    for (const [key, wert] of eintraege) {
+        const einstellung = (sitzung.entwurf?.settings || []).find(x => x.key === key);
+        if (!Bitmaske.istBitmaske(einstellung) || wert === '' || wert === null || wert === undefined) continue;
+        const fehler = Bitmaske.fehlerDesWerts(einstellung, wert);
+        if (fehler) throw new Error(`„${key}": ${fehler}`);
+    }
     let gesetzt = 0, entfernt = 0;
     await entwurfSchreiben(sitzung, (e) => {
         e.werkbank = e.werkbank || {};

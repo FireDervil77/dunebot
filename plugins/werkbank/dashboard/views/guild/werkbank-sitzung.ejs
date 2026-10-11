@@ -1398,7 +1398,9 @@
                             <% (e.choices || []).forEach(function (c) { %><option value="<%= c.value %>" <%= probewerte[e.key] === String(c.value) ? 'selected' : '' %>><%= (c.name && c.name.de) || c.value %></option><% }) %>
                           </select>
                         <% } else { %>
+                          <%# Bitmaske: hier als Summe getippt — die Bits stehen im Hinweis am Feld. %>
                           <input class="form-control" data-probewert="<%= e.key %>" type="<%= e.type === 'password' ? 'password' : 'text' %>"
+                                 <% if (e.type === 'flags') { %>title="Summe aus: <%= (e.choices || []).map(function (c) { return c.value + ' = ' + ((c.name && c.name.de) || c.value); }).join(', ') %>"<% } %>
                                  value="<%= e.key in probewerte ? probewerte[e.key] : '' %>" placeholder="<%= e.default !== undefined && e.type !== 'password' ? 'Vorgabe: ' + e.default : 'Vorgabe' %>" autocomplete="off">
                         <% } %>
                       </div>
@@ -1497,13 +1499,14 @@
               <label class="form-label" for="eTyp">Typ</label>
               <select class="form-select" id="eTyp" name="type">
                 <option value="text">Text</option><option value="number">Zahl</option><option value="boolean">An/Aus</option>
-                <option value="choice">Auswahl</option><option value="password">Passwort</option>
+                <option value="choice">Auswahl</option><option value="flags">Bitmaske</option><option value="password">Passwort</option>
               </select>
             </div>
             <div class="col-md-3">
               <label class="form-label" for="eVorgabe">Vorgabe</label>
               <input class="form-control" id="eVorgabe" name="default" placeholder="leer = keine">
               <div class="form-hint" data-nur-typ="boolean">1 = an, 0 = aus. Wie es in der Datei steht, wählst du unten am Ziel.</div>
+              <div class="form-hint" data-nur-typ="flags">Die Summe der vorbelegten Bits — 0, wenn nichts angekreuzt sein soll.</div>
             </div>
             <div class="col-md-3" data-nur-typ="number">
               <label class="form-label">Grenzen</label>
@@ -1515,10 +1518,16 @@
                 <span class="form-check-label">Pflicht — ohne Wert startet das Spiel nicht</span>
               </label>
             </div>
-            <div class="col-12" data-nur-typ="choice">
-              <label class="form-label" for="eAuswahl">Möglichkeiten</label>
-              <textarea class="form-control font-monospace" id="eAuswahl" name="choices" rows="3" placeholder="normal=Normal&#10;hard=Schwer"></textarea>
-              <div class="form-hint">Je Zeile „wert" oder „wert=Anzeigename".</div>
+            <div class="col-12" data-nur-typ="choice flags">
+              <div class="form-label"><label for="eAuswahl">Möglichkeiten</label><span data-nur-typ="flags"><%- include('werkbank-hilfe', { text:
+                'Für Werte, die das Spiel als Summe liest — in der Doku steht dann „1 = …, 2 = …, 4 = …, addieren". '
+                + 'Jede Zeile ist ein Bit: 1, 2, 4, 8, 16 und so weiter, keines doppelt, keine zusammengesetzten Werte wie 3. '
+                + 'Im Panel steht je Bit ein Kästchen mit dem Anzeigenamen; gespeichert und geschrieben wird die Summe als Zahl, '
+                + 'in eine Datei genauso wie in die Startzeile.' }) %></span></div>
+              <textarea class="form-control font-monospace" id="eAuswahl" name="choices" rows="3" placeholder="normal=Normal&#10;hard=Schwer"
+                        data-platzhalter-choice="normal=Normal&#10;hard=Schwer" data-platzhalter-flags="1=Bots dürfen Fahrzeuge nutzen&#10;2=Bots dürfen Minen legen&#10;4=Bots zählen als Spieler"></textarea>
+              <div class="form-hint" data-nur-typ="choice">Je Zeile „wert" oder „wert=Anzeigename".</div>
+              <div class="form-hint" data-nur-typ="flags">Je Zeile „bit=Anzeigename" — der Spieler kreuzt an, geschrieben wird die Summe.</div>
             </div>
             <div class="col-md-4">
               <label class="form-label" for="eRolle">Rolle</label>
@@ -3277,7 +3286,12 @@
     var typE = formE.querySelector('[name=type]');
 
     function zeigeTypFelder() {
-      formE.querySelectorAll('[data-nur-typ]').forEach(function (el) { el.hidden = el.dataset.nurTyp !== typE.value; });
+      // Ein Feld kann mehreren Typen gehören („choice flags") — Auswahl und
+      // Bitmaske teilen sich die Möglichkeiten.
+      formE.querySelectorAll('[data-nur-typ]').forEach(function (el) { el.hidden = el.dataset.nurTyp.split(' ').indexOf(typE.value) === -1; });
+      var moeglich = formE.querySelector('[name=choices]');
+      var beispiel = moeglich.getAttribute('data-platzhalter-' + typE.value);
+      if (beispiel) moeglich.placeholder = beispiel;
       zieleBox.querySelectorAll('[data-nur-typ-ziel]').forEach(function (el) { el.hidden = el.dataset.nurTypZiel !== typE.value; });
     }
     function zeigeZielFelder(zeile) {
