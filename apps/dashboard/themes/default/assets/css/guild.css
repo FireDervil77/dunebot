@@ -74,6 +74,21 @@ h1, h2, h3, h4, h5, h6,
   font-family: var(--fb-font-mono);
 }
 
+/*
+ * In Eingabefeldern keine Ligaturen (2026-10-11).
+ *
+ * JetBrains Mono zieht Zeichenfolgen wie ###, **, --, -> und != zu EINEM Bild
+ * zusammen. Im Markdown-Feld der Wissensdatenbank sah es deshalb so aus, als
+ * verschöbe die dritte Raute die erste (Betreiber: „wenn ich den dritten mache,
+ * dann rückt er den ersten # um"). Der Inhalt war richtig, nur die Darstellung
+ * sprang. Wo getippt wird, soll dastehen, was getippt wurde — gerade bei
+ * Startparametern (`--port`) und Vergleichen.
+ */
+input.font-monospace, textarea.font-monospace, select.font-monospace,
+.font-monospace input, .font-monospace textarea {
+  font-variant-ligatures: none;
+}
+
 /* ==========================================================================
    Plugin-Kacheln (Plugin-Übersicht, Marktplatz)
    ========================================================================== */
