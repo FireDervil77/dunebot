@@ -190,6 +190,21 @@ const Modrinth = require(path.join(WURZEL, 'plugins/gameserver/dashboard/helpers
     pruefe(roh2.gefiltert === false,
         'und die Antwort sagt auch das');
 
+    // ── Reine Client-Pakete werden gar nicht erst angeboten (2026-10-12) ────
+    //
+    // Mit und ohne Lader: Jede Suche traegt die Gruppe „laeuft auf dem Server".
+    // Eine ODER-Gruppe (beide Werte in EINER Liste) — als zwei Gruppen waere es
+    // ein UND und faende nichts.
+    const facetten = abrufe.filter(a => a.includes('/v2/search'))
+        .map(a => JSON.parse(new URL(a).searchParams.get('facets') || '[]'));
+    pruefe(facetten.length >= 2 && facetten.every(f => f.some(g =>
+            g.length === 2 && g.includes('server_side:required') && g.includes('server_side:optional'))),
+        'jede Suche fragt nur nach Paketen, die fuer den Server gedacht sind',
+        'Gemessen am 2026-10-12: 5796 von 18798 Modpacks bei Modrinth sind reine Client-Pakete '
+      + '(`server_side: unsupported`). Ein Server daraus startet nie.');
+    pruefe(facetten.every(f => f.some(g => g.length === 1 && g[0] === 'project_type:modpack')),
+        'und weiterhin nur nach Modpacks');
+
     // ════════════════════════════════════════════════════════════════════════
     console.log('\nDie Zusicherung haengt nicht an der Suche');
     // ════════════════════════════════════════════════════════════════════════

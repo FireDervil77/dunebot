@@ -239,6 +239,9 @@ async function suche(raum, begriff, optionen = {}) {
  * Funktion filtert deshalb nur, wenn jemand einen Lader nennt — der Mods-Tab
  * eines bestehenden Servers tut das, der Anlege-Assistent nicht.
  */
+/** „Supported environments": das Paket ist fuer den Server gedacht (noetig oder moeglich). */
+const SERVERTAUGLICH = ['server_side:required', 'server_side:optional'];
+
 async function sucheModpacks(begriff, optionen = {}) {
     const seite = Math.max(1, parseInt(optionen.seite, 10) || 1);
     const text = String(begriff || '').trim();
@@ -247,6 +250,19 @@ async function sucheModpacks(begriff, optionen = {}) {
 
     const roheSeite = async (nr) => {
         const gruppen = [alsListe(['project_type:modpack'])];
+        // ── Nur Pakete, die auf einem Server laufen sollen (2026-10-12) ─────
+        //
+        // Modrinth fuehrt je Projekt, wo es laeuft; auf der Webseite heisst das
+        // „Supported environments". Reine Client-Pakete (Bildrate, Shader,
+        // Lunar-Client) tragen `server_side: unsupported` — gemessen 5796 von
+        // 18798 Modpacks, darunter das meistgeladene ueberhaupt („Fabulously
+        // Optimized"). Ein Server daraus startet nie; hier werden sie deshalb
+        // gar nicht erst angeboten. `unknown` (138) faellt mit weg.
+        //
+        // Die Angabe macht der Autor. Sie sortiert die reinen Client-Pakete
+        // aus, NICHT ein Paket, das „Client and server" sagt und trotzdem
+        // Client-Mods mitbringt („One block horror", Baustelle 182).
+        gruppen.push(alsListe(SERVERTAUGLICH));
         // Die Facette heisst `versions`, nicht `game_versions` — derselbe
         // Unterschied wie bei den Mods (siehe `suche`).
         if (spielfassung) gruppen.push(alsListe([`versions:${spielfassung}`]));
