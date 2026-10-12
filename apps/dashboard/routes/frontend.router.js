@@ -1,5 +1,5 @@
 const express = require("express");
-const { ServiceManager } = require("dunebot-core");
+const { ServiceManager, Spielemeldungen } = require("dunebot-core");
 const frontendController = require("../controllers/frontend.controller");
 const apiController = require("../controllers/api.controller");
 const { NewsHelper } = require("dunebot-sdk/utils");
@@ -339,7 +339,20 @@ router.get('/changelogs/:version', getChangelogDetails);
 router.get('/privacy', frontendController.privacy);
 router.get('/tos', frontendController.tos);
 
-// ── Blog: /blog und /blog/:slug ──
+// ── Blog: /blog, /blog/spiele-updates und /blog/:slug ──
+//
+// Seit 2026-10-12 stehen zwei Sorten in `blog_posts`: die eigenen Artikel
+// (`source = 'own'`) und die Ankündigungen der Spielehersteller, die der Bot aus
+// dem Discord-Kanal mit den Spiele-Updates einliest (`source = 'discord'`,
+// Regel in `dunebot-core/lib/Spielemeldungen.js`). Die Blogseite zeigt sie
+// nebeneinander und getrennt — links die Artikel, rechts die neuesten
+// Meldungen; die ganze Rubrik liegt unter /blog/spiele-updates.
+
+const blogAbfrage = (sql, werte) => ServiceManager.get('dbService').query(sql, werte);
+const blogDatum = (zeit, sprache) => zeit
+    ? new Date(zeit).toLocaleString(sprache, { year: 'numeric', month: 'long', day: 'numeric' })
+    : '—';
+
 router.get('/blog', async (req, res) => {
     const dbService = ServiceManager.get('dbService');
     const Logger = ServiceManager.get('Logger');
@@ -347,43 +360,80 @@ router.get('/blog', async (req, res) => {
 
     try {
         const userLocale = res.locals.locale || 'de-DE';
-        const category = req.query.category || null;
+        const category = typeof req.query.category === 'string' ? req.query.category : null;
 
-        let query = "SELECT * FROM blog_posts WHERE status = 'published' ORDER BY published_at DESC";
+        let query = "SELECT * FROM blog_posts WHERE status = 'published' AND source = 'own' ORDER BY published_at DESC";
         let params = [];
         if (category) {
-            query = "SELECT * FROM blog_posts WHERE status = 'published' AND category = ? ORDER BY published_at DESC";
+            query = "SELECT * FROM blog_posts WHERE status = 'published' AND source = 'own' AND category = ? ORDER BY published_at DESC";
             params = [category];
         }
 
         const rawPosts = await dbService.query(query, params);
         const blogPosts = rawPosts.map(p => {
-            const titles = typeof p.title_translations === 'string' ? JSON.parse(p.title_translations) : (p.title_translations || {});
-            const excerpts = typeof p.excerpt_translations === 'string' ? JSON.parse(p.excerpt_translations) : (p.excerpt_translations || {});
-            const excerpt = excerpts[userLocale] || excerpts['de-DE'] || '';
+            const excerpt = Spielemeldungen.text(p.excerpt_translations, userLocale);
             return {
                 ...p,
-                title: titles[userLocale] || titles['de-DE'] || '',
+                title: Spielemeldungen.text(p.title_translations, userLocale),
                 excerpt,
                 // Der Anriss kommt als HTML aus dem Editor. Die Karte zeigt ihn
                 // als reinen Text, und das heisst: Tags weg UND Entities
                 // aufloesen. Ohne das Zweite stand `&nbsp;` sichtbar auf der Seite.
                 excerptText: htmlZuVorschautext(excerpt, 150),
-                formattedDate: p.published_at
-                    ? new Date(p.published_at).toLocaleString(userLocale, { year: 'numeric', month: 'long', day: 'numeric' })
-                    : '—'
+                formattedDate: blogDatum(p.published_at, userLocale)
             };
         });
+
+        // Die Filterknöpfe zeigen alle Rubriken der eigenen Artikel — auch wenn
+        // gerade nach einer gefiltert ist.
+        const rubriken = (await dbService.query(
+            "SELECT DISTINCT category FROM blog_posts WHERE status = 'published' AND source = 'own' AND category IS NOT NULL ORDER BY category"
+        )).map(z => z.category);
+
+        const spieleUpdates = (await Spielemeldungen.fuerSpalte(blogAbfrage, userLocale))
+            .map(m => ({ ...m, datum: blogDatum(m.zeit, userLocale) }));
 
         res.locals.layout = themeManager.getLayout('frontend');
         await themeManager.renderView(res, 'frontend/blog', {
             blogPosts,
+            rubriken,
+            spieleUpdates,
             currentCategory: category,
             currentLocale: userLocale,
             title: 'Blog'
         });
     } catch (err) {
         Logger.error('[Frontend/Blog] Fehler:', err);
+        await fehlerseite(res, 500);
+    }
+});
+
+// Steht VOR /blog/:slug — sonst würde „spiele-updates" als Beitrag gesucht.
+router.get('/blog/' + Spielemeldungen.RUBRIK, async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const themeManager = ServiceManager.get('themeManager');
+
+    try {
+        const userLocale = res.locals.locale || 'de-DE';
+        const spiel = typeof req.query.spiel === 'string' && req.query.spiel.trim() ? req.query.spiel.trim().slice(0, 120) : null;
+        const [spiele, ergebnis] = await Promise.all([
+            Spielemeldungen.spiele(blogAbfrage),
+            Spielemeldungen.liste(blogAbfrage, { spiel, seite: req.query.seite, sprache: userLocale })
+        ]);
+
+        res.locals.layout = themeManager.getLayout('frontend');
+        await themeManager.renderView(res, 'frontend/blog-updates', {
+            spiele,
+            spiel,
+            eintraege: ergebnis.eintraege.map(m => ({ ...m, datum: blogDatum(m.zeit, userLocale) })),
+            zahl: ergebnis.zahl,
+            seite: ergebnis.seite,
+            seiten: ergebnis.seiten,
+            currentLocale: userLocale,
+            title: 'Spiele-Updates'
+        });
+    } catch (err) {
+        Logger.error('[Frontend/Blog] Fehler in den Spiele-Updates:', err);
         await fehlerseite(res, 500);
     }
 });
@@ -404,18 +454,12 @@ router.get('/blog/:slug', async (req, res) => {
         }
 
         const userLocale = res.locals.locale || 'de-DE';
-        const titles = typeof rawPost.title_translations === 'string' ? JSON.parse(rawPost.title_translations) : (rawPost.title_translations || {});
-        const contents = typeof rawPost.content_translations === 'string' ? JSON.parse(rawPost.content_translations) : (rawPost.content_translations || {});
-        const excerpts = typeof rawPost.excerpt_translations === 'string' ? JSON.parse(rawPost.excerpt_translations) : (rawPost.excerpt_translations || {});
-
         const post = {
             ...rawPost,
-            title: titles[userLocale] || titles['de-DE'] || '',
-            content: contents[userLocale] || contents['de-DE'] || '',
-            excerpt: excerpts[userLocale] || excerpts['de-DE'] || '',
-            formattedDate: rawPost.published_at
-                ? new Date(rawPost.published_at).toLocaleString(userLocale, { year: 'numeric', month: 'long', day: 'numeric' })
-                : '—'
+            title: Spielemeldungen.text(rawPost.title_translations, userLocale),
+            content: Spielemeldungen.text(rawPost.content_translations, userLocale),
+            excerpt: Spielemeldungen.text(rawPost.excerpt_translations, userLocale),
+            formattedDate: blogDatum(rawPost.published_at, userLocale)
         };
 
         res.locals.layout = themeManager.getLayout('frontend');

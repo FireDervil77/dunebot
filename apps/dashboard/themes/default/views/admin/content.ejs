@@ -201,6 +201,83 @@
                             </a>
                         </div>
                         <% } %>
+
+                        <%# Meldungen aus dem Kanal mit den Spiele-Updates (2026-10-12).
+                            Sie werden nicht bearbeitet und nicht gelöscht, nur
+                            ausgeblendet. `locals.…`: Der laufende Prozess liest
+                            diese Datei von der Platte, auch wenn seine Route
+                            den Wert noch nicht mitgibt. %>
+                        <% const meldungen = locals.spieleMeldungen || { zahl: 0, eintraege: [], kanal: null }; %>
+                        <div class="d-flex justify-content-between align-items-center mt-5 mb-2">
+                            <h4 class="mb-0">Spiele-Updates aus Discord</h4>
+                            <span class="text-secondary small">
+                                <% if (meldungen.kanal) { %>
+                                    liest aus <strong>#<%= meldungen.kanal.channel_name || meldungen.kanal.channel_id %></strong>
+                                <% } else { %>
+                                    kein Kanal eingestellt —
+                                <% } %>
+                                <a href="/admin/content?tab=settings">Einstellungen</a>
+                            </span>
+                        </div>
+                        <p class="text-secondary">
+                            Ankündigungen der Spielehersteller, die der Bot aus dem Kanal übernimmt. Sie erscheinen von selbst
+                            in der rechten Spalte der Blogseite und unter <a href="/blog/spiele-updates" target="_blank">/blog/spiele-updates</a>.
+                            Eine einzelne Meldung nimmst du hier von der Seite.
+                        </p>
+                        <% if (meldungen.eintraege.length) { %>
+                        <table class="table table-striped table-hover table-sm" id="meldungen-tabelle">
+                            <thead>
+                                <tr>
+                                    <th>Spiel</th>
+                                    <th>Meldung</th>
+                                    <th>Datum</th>
+                                    <th>Stand</th>
+                                    <th style="width:120px">Aktion</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            <% meldungen.eintraege.forEach(m => { %>
+                                <tr>
+                                    <td><span class="badge bg-secondary-lt"><%= m.spiel %></span></td>
+                                    <td>
+                                        <% if (m.status === 'published') { %>
+                                            <a href="/blog/<%= m.slug %>" target="_blank"><%= m.titel %></a>
+                                        <% } else { %>
+                                            <span class="text-secondary"><%= m.titel %></span>
+                                        <% } %>
+                                        <br><small class="text-secondary"><%= m.quelle %></small>
+                                    </td>
+                                    <td class="text-nowrap"><%= m.datum %></td>
+                                    <td>
+                                        <% if (m.status === 'published') { %>
+                                            <span class="badge bg-success-lt">sichtbar</span>
+                                        <% } else if (m.status === 'hidden') { %>
+                                            <span class="badge bg-warning-lt">ausgeblendet</span>
+                                        <% } else { %>
+                                            <span class="badge bg-secondary-lt" title="Der Hersteller hat das Original gelöscht, oder die Nachricht wurde aus dem Kanal entfernt.">Original gelöscht</span>
+                                        <% } %>
+                                    </td>
+                                    <td>
+                                        <% if (m.status === 'published') { %>
+                                            <button type="button" class="btn btn-sm btn-outline-warning" data-meldung="<%= m.id %>" data-sichtbar="0">
+                                                <i class="fas fa-eye-slash me-1"></i>Ausblenden
+                                            </button>
+                                        <% } else if (m.status === 'hidden') { %>
+                                            <button type="button" class="btn btn-sm btn-outline-success" data-meldung="<%= m.id %>" data-sichtbar="1">
+                                                <i class="fas fa-eye me-1"></i>Zeigen
+                                            </button>
+                                        <% } %>
+                                    </td>
+                                </tr>
+                            <% }); %>
+                            </tbody>
+                        </table>
+                        <% if (meldungen.zahl > meldungen.eintraege.length) { %>
+                            <p class="text-secondary small">Gezeigt werden die neuesten <%= meldungen.eintraege.length %> von <%= meldungen.zahl %>.</p>
+                        <% } %>
+                        <% } else { %>
+                        <p class="text-secondary"><em>Noch keine Meldungen eingelesen.</em></p>
+                        <% } %>
                     </div>
 
                     <%# ====== CHANGELOGS TAB ====== %>
@@ -540,6 +617,42 @@
                                 </div>
                             </div>
                         </form>
+
+                        <%# Die Gegenrichtung: aus diesem Kanal LIEST der Bot (2026-10-12). %>
+                        <% const leseKanal = (locals.spieleMeldungen || {}).kanal || null; %>
+                        <div class="card mt-4" id="spiele-updates-karte"
+                             data-guild="<%= controlGuildId %>" data-kanal="<%= leseKanal ? leseKanal.channel_id : '' %>">
+                            <div class="card-header">
+                                <h3 class="card-title"><i class="fas fa-satellite-dish me-2"></i>Spiele-Updates in den Blog holen</h3>
+                            </div>
+                            <div class="card-body">
+                                <p class="text-secondary">
+                                    Aus diesem Kanal übernimmt der Bot die Ankündigungen der Spielehersteller in den Blog —
+                                    nur Nachrichten, die über „Folgen" aus einem fremden Server kommen, nie was sonst im Kanal steht.
+                                    Beim ersten Mal holt er alles seit dem <strong><%= (locals.spieleMeldungen || {}).stichtag || '' %></strong> nach.
+                                </p>
+                                <div class="mb-3 row">
+                                    <label class="col-sm-3 col-form-label" for="spiele-updates-kanal">📡 Kanal</label>
+                                    <div class="col-sm-7">
+                                        <select class="form-control" id="spiele-updates-kanal" disabled>
+                                            <option value="">— Kein Kanal (nichts einlesen) —</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-sm-2">
+                                        <% if (leseKanal) { %>
+                                            <span class="badge bg-success-lt mt-2 d-inline-block"><i class="fas fa-check"></i> Konfiguriert</span>
+                                        <% } else { %>
+                                            <span class="badge bg-warning-lt mt-2 d-inline-block"><i class="fas fa-exclamation-triangle"></i> Nicht gesetzt</span>
+                                        <% } %>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-footer">
+                                <button type="button" class="btn btn-primary" id="spiele-updates-speichern" disabled>
+                                    <i class="fas fa-save me-2"></i>Speichern und nachholen
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                 </div><%# /tab-content %>
@@ -830,4 +943,98 @@ document.querySelectorAll('#link-targets [data-action]').forEach(el => {
         }
     });
 });
+</script>
+
+
+<%# Spiele-Updates: Kanal wählen, Meldungen ausblenden. Ein eigener Block —
+    ein Fehler hier darf die übrigen Skripte der Seite nicht mitreißen. %>
+<script>
+(function () {
+    const melde = (art, text) => {
+        if (window.showToast) return window.showToast(art, text);
+        if (typeof toastr !== 'undefined') return toastr[art === 'error' ? 'error' : (art === 'warning' ? 'warning' : 'success')](text);
+    };
+    const sende = async (adresse, daten) => {
+        const antwort = await fetch(adresse, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''
+            },
+            body: JSON.stringify(daten)
+        });
+        const ergebnis = await antwort.json().catch(() => ({ success: false, message: 'HTTP ' + antwort.status }));
+        if (!ergebnis.success) throw new Error(ergebnis.message || 'HTTP ' + antwort.status);
+        return ergebnis;
+    };
+
+    // ── Meldungen ausblenden / wieder zeigen ──
+    document.querySelectorAll('[data-meldung]').forEach((knopf) => {
+        knopf.addEventListener('click', async () => {
+            knopf.disabled = true;
+            try {
+                const ergebnis = await sende('/admin/content/blog/meldung/' + knopf.dataset.meldung + '/sichtbar',
+                    { sichtbar: knopf.dataset.sichtbar === '1' });
+                melde('success', ergebnis.message);
+                setTimeout(() => { window.location.href = '/admin/content?tab=blog'; }, 600);
+            } catch (fehler) {
+                melde('error', fehler.message);
+                knopf.disabled = false;
+            }
+        });
+    });
+
+    // ── Kanal, aus dem gelesen wird ──
+    const karte = document.getElementById('spiele-updates-karte');
+    const auswahl = document.getElementById('spiele-updates-kanal');
+    const knopf = document.getElementById('spiele-updates-speichern');
+    if (!karte || !auswahl || !knopf) return;
+
+    let geladen = false;
+    async function ladeKanaele() {
+        if (geladen) return;
+        geladen = true;
+        try {
+            if (!karte.dataset.guild) throw new Error('CONTROL_GUILD_ID nicht gesetzt.');
+            const daten = await (await fetch('/api/guild-channels/' + karte.dataset.guild)).json();
+            if (!daten.success || !daten.channels) throw new Error(daten.error || 'Keine Kanäle');
+            daten.channels
+                .filter((k) => k.type === 0 || k.type === 5)
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .forEach((k) => {
+                    const eintrag = document.createElement('option');
+                    eintrag.value = k.id;
+                    eintrag.textContent = '#' + k.name;
+                    eintrag.dataset.name = k.name;
+                    if (k.id === karte.dataset.kanal) eintrag.selected = true;
+                    auswahl.appendChild(eintrag);
+                });
+            auswahl.disabled = false;
+            knopf.disabled = false;
+        } catch (fehler) {
+            geladen = false;
+            melde('error', 'Kanäle nicht geladen: ' + fehler.message);
+        }
+    }
+    if ('<%= activeTab %>' === 'settings') ladeKanaele();
+    document.querySelectorAll('[data-tab="settings"]').forEach((el) => el.addEventListener('click', () => setTimeout(ladeKanaele, 100)));
+
+    knopf.addEventListener('click', async () => {
+        const eintrag = auswahl.options[auswahl.selectedIndex];
+        knopf.disabled = true;
+        const vorher = knopf.innerHTML;
+        knopf.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Der Bot liest den Kanal …';
+        try {
+            const ergebnis = await sende('/admin/content/settings/spiele-updates/save',
+                { channel_id: eintrag.value, channel_name: eintrag.dataset.name || '' });
+            melde(ergebnis.warnung ? 'warning' : 'success', ergebnis.message);
+        } catch (fehler) {
+            melde('error', 'Nicht gespeichert: ' + fehler.message);
+        } finally {
+            knopf.innerHTML = vorher;
+            knopf.disabled = false;
+        }
+    });
+})();
 </script>

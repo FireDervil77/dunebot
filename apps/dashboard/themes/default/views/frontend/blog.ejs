@@ -8,25 +8,44 @@
         <p>Neuigkeiten rund um Gaming, Tutorials und mehr</p>
       </div>
 
-      <% if (blogPosts && blogPosts.length > 0) { %>
+      <%#
+        Zwei Spalten (Betreiber, 2026-10-12: „eine Seite nehmen wir für unsere
+        Artikel und die zweite Spalte für die anderen"): links die eigenen
+        Artikel als Karten, rechts die neuesten Ankündigungen der
+        Spielehersteller als schmale Liste — die kommen aus dem Discord-Kanal
+        mit den Spiele-Updates (dunebot-core/lib/Spielemeldungen.js). Gibt es
+        keine Meldungen, bleibt die Seite einspaltig wie vorher.
 
-        <%# Category Filter %>
-        <% const allCategories = [...new Set(blogPosts.map(p => p.category).filter(Boolean))]; %>
-        <% if (allCategories.length > 1) { %>
-        <div class="text-center mb-4">
-          <a href="/blog" class="btn btn-sm <%= !currentCategory ? 'btn-primary' : 'btn-outline-primary' %> me-1 mb-1">Alle</a>
-          <% allCategories.forEach(cat => { %>
-            <a href="/blog?category=<%= cat %>" 
-               class="btn btn-sm <%= currentCategory === cat ? 'btn-primary' : 'btn-outline-primary' %> me-1 mb-1">
-              <%= cat.charAt(0).toUpperCase() + cat.slice(1) %>
-            </a>
-          <% }); %>
-        </div>
-        <% } %>
+        `locals.…`: Der laufende Prozess liest diese Datei von der Platte, auch
+        wenn seine Route die neuen Werte noch nicht mitgibt.
+      %>
+      <%
+        const meldungen = locals.spieleUpdates || [];
+        const zweispaltig = meldungen.length > 0;
+        const rubriken = locals.rubriken || [...new Set((blogPosts || []).map(p => p.category).filter(Boolean))];
+      %>
 
-        <div class="row gy-4">
-          <% blogPosts.forEach(post => { %>
-          <div class="col-lg-4 col-md-6">
+      <div class="row gy-5">
+        <div class="<%= zweispaltig ? 'col-lg-8' : 'col-12' %>">
+          <% if (zweispaltig) { %><h3 class="blog-spalte-titel"><i class="bi bi-pencil-square me-2"></i>Unsere Artikel</h3><% } %>
+
+          <%# Category Filter %>
+          <% if (rubriken.length > 1) { %>
+          <div class="<%= zweispaltig ? '' : 'text-center' %> mb-4">
+            <a href="/blog" class="btn btn-sm <%= !currentCategory ? 'btn-primary' : 'btn-outline-primary' %> me-1 mb-1">Alle</a>
+            <% rubriken.forEach(cat => { %>
+              <a href="/blog?category=<%= encodeURIComponent(cat) %>"
+                 class="btn btn-sm <%= currentCategory === cat ? 'btn-primary' : 'btn-outline-primary' %> me-1 mb-1">
+                <%= cat.charAt(0).toUpperCase() + cat.slice(1) %>
+              </a>
+            <% }); %>
+          </div>
+          <% } %>
+
+          <% if (blogPosts && blogPosts.length > 0) { %>
+            <div class="row gy-4">
+              <% blogPosts.forEach(post => { %>
+              <div class="<%= zweispaltig ? 'col-md-6' : 'col-lg-4 col-md-6' %>">
             <article class="blog-card card h-100 shadow-sm border-0">
               <% if (post.image_url) { %>
                 <a href="/blog/<%= post.slug %>">
@@ -70,16 +89,38 @@
                 </div>
               </div>
             </article>
-          </div>
-          <% }); %>
+              </div>
+              <% }); %>
+            </div>
+          <% } else { %>
+            <div class="text-center py-5">
+              <i class="bi bi-journal-text" style="font-size: 4rem; color: #ccc;"></i>
+              <p class="mt-3 text-muted">Noch keine Blog-Posts vorhanden.</p>
+            </div>
+          <% } %>
         </div>
 
-      <% } else { %>
-        <div class="text-center py-5">
-          <i class="bi bi-journal-text" style="font-size: 4rem; color: #ccc;"></i>
-          <p class="mt-3 text-muted">Noch keine Blog-Posts vorhanden.</p>
-        </div>
-      <% } %>
+        <% if (zweispaltig) { %>
+        <aside class="col-lg-4">
+          <h3 class="blog-spalte-titel"><i class="bi bi-broadcast me-2"></i>Spiele-Updates</h3>
+          <p class="text-muted small mb-3">Ankündigungen der Hersteller, wie sie in unserem Discord eingehen.</p>
+          <div class="blog-meldungen">
+            <% meldungen.forEach(m => { %>
+              <a class="blog-meldung" href="/blog/<%= m.slug %>">
+                <span class="blog-meldung-kopf">
+                  <span class="badge bg-primary bg-opacity-10 text-primary"><%= m.spiel %></span>
+                  <small class="text-muted"><%= m.datum %></small>
+                </span>
+                <span class="blog-meldung-titel"><%= m.titel %></span>
+              </a>
+            <% }); %>
+          </div>
+          <a href="/blog/spiele-updates" class="btn btn-sm btn-outline-primary mt-3">
+            Alle Spiele-Updates <i class="bi bi-arrow-right ms-1"></i>
+          </a>
+        </aside>
+        <% } %>
+      </div>
 
     </div>
   </section>
@@ -98,4 +139,38 @@
 .blog-overview .card-title a:hover {
   color: var(--accent-color) !important;
 }
+.blog-overview .blog-spalte-titel {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+.blog-overview .blog-meldungen {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 .125rem .25rem rgba(0,0,0,.075);
+}
+.blog-overview .blog-meldung {
+  display: block;
+  padding: .75rem 1rem;
+  text-decoration: none;
+  color: inherit;
+  background: var(--surface-color, #fff);
+  border-bottom: 1px solid rgba(0,0,0,.06);
+  transition: background .15s ease;
+}
+.blog-overview .blog-meldung:last-child { border-bottom: 0; }
+.blog-overview .blog-meldung:hover { background: rgba(0,0,0,.03); }
+.blog-overview .blog-meldung-kopf {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .5rem;
+  margin-bottom: .25rem;
+}
+.blog-overview .blog-meldung-titel {
+  display: block;
+  font-weight: 500;
+  line-height: 1.35;
+}
+.blog-overview .blog-meldung:hover .blog-meldung-titel { color: var(--accent-color); }
 </style>

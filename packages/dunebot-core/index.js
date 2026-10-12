@@ -9,6 +9,7 @@ const MigrationRunner = require("./lib/MigrationRunner");
 const { parsePlaceholders, buildEmbed } = require("./lib/PlaceholderParser");
 const KanalTypen = require("./lib/KanalTypen");
 const Sprachwahl = require("./lib/Sprachwahl");
+const Spielemeldungen = require("./lib/Spielemeldungen");
 const languagesMeta = require("./languages-meta.json");
 
 module.exports = {
@@ -25,4 +26,5 @@ module.exports = {
     languagesMeta,
     KanalTypen,
     Sprachwahl,
+    Spielemeldungen,
 };

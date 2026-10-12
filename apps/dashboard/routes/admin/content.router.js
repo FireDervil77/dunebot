@@ -11,7 +11,7 @@
 'use strict';
 
 const { Router } = require('express');
-const { ServiceManager } = require('dunebot-core');
+const { ServiceManager, Spielemeldungen } = require('dunebot-core');
 const { NewsHelper, ChangelogHelper, NotificationHelper } = require('dunebot-sdk/utils');
 const { entitiesAufloesen } = require('../../helpers/text');
 
@@ -205,20 +205,29 @@ async function loadHubData(dbService, userLocale) {
         })
     }));
 
-    // Blog Posts
-    const rawBlogPosts = await dbService.query('SELECT * FROM blog_posts ORDER BY published_at DESC, created_at DESC');
-    const blogPosts = rawBlogPosts.map(p => {
-        const titles = typeof p.title_translations === 'string' ? JSON.parse(p.title_translations) : (p.title_translations || {});
-        const excerpts = typeof p.excerpt_translations === 'string' ? JSON.parse(p.excerpt_translations) : (p.excerpt_translations || {});
-        return {
-            ...p,
-            title: titles[userLocale] || titles['de-DE'] || '',
-            excerpt: excerpts[userLocale] || excerpts['de-DE'] || '',
-            formattedDate: p.published_at
-                ? new Date(p.published_at).toLocaleString(userLocale, { year: 'numeric', month: 'long', day: 'numeric' })
-                : '—'
-        };
-    });
+    // Blog Posts — die eigenen. Die Meldungen aus dem Kanal mit den
+    // Spiele-Updates stehen in derselben Tabelle (`source = 'discord'`) und
+    // bekommen darunter ihre eigene Liste: Sie werden nicht bearbeitet, nur
+    // ausgeblendet.
+    const blogDatum = (zeit) => zeit
+        ? new Date(zeit).toLocaleString(userLocale, { year: 'numeric', month: 'long', day: 'numeric' })
+        : '—';
+    const rawBlogPosts = await dbService.query("SELECT * FROM blog_posts WHERE source = 'own' ORDER BY published_at DESC, created_at DESC");
+    const blogPosts = rawBlogPosts.map(p => ({
+        ...p,
+        title: Spielemeldungen.text(p.title_translations, userLocale),
+        excerpt: Spielemeldungen.text(p.excerpt_translations, userLocale),
+        formattedDate: blogDatum(p.published_at)
+    }));
+
+    const abfrage = (sql, werte) => dbService.query(sql, werte);
+    const verwaltung = await Spielemeldungen.fuerVerwaltung(abfrage, userLocale, 100);
+    const spieleMeldungen = {
+        zahl: verwaltung.zahl,
+        eintraege: verwaltung.eintraege.map(m => ({ ...m, datum: blogDatum(m.zeit) })),
+        kanal: await Spielemeldungen.kanal(abfrage),
+        stichtag: Spielemeldungen.STICHTAG
+    };
 
     // Changelogs
     const rawChangelogs = await dbService.query('SELECT * FROM changelogs ORDER BY release_date DESC');
@@ -245,7 +254,7 @@ async function loadHubData(dbService, userLocale) {
         channelConfig[cat] = row ? (() => { try { return JSON.parse(row.value); } catch { return {}; } })() : {};
     }
 
-    return { newsList, blogPosts, changelogsList, notifications, channelConfig };
+    return { newsList, blogPosts, spieleMeldungen, changelogsList, notifications, channelConfig };
 }
 
 // ================================================================
@@ -284,6 +293,7 @@ router.get('/', async (req, res) => {
             currentLocale: userLocale,
             newsList: data.newsList,
             blogPosts: data.blogPosts,
+            spieleMeldungen: data.spieleMeldungen,
             changelogsList: data.changelogsList,
             notifications: data.notifications,
             channelConfig: data.channelConfig,
@@ -470,6 +480,70 @@ router.post('/settings/channels/save', async (req, res) => {
         res.json({ success: true, message: 'Channel-Konfiguration gespeichert!' });
     } catch (error) {
         Logger.error('[Content] Fehler beim Speichern der Channel-Config:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// ================================================================
+// SPIELE-UPDATES: Kanal, aus dem der Bot Meldungen in den Blog holt
+// ================================================================
+//
+// Die Gegenrichtung zu den Kanälen darüber: Dorthin schreibt der Bot, aus
+// diesem liest er. Gespeichert wird nur der Kanal; was eine Meldung ist und
+// was aus ihr wird, steht in `dunebot-core/lib/Spielemeldungen.js`. Nach dem
+// Speichern wird der Bot angestoßen — er liest den Kanal neu ein und holt
+// nach, was dort seit dem Stichtag steht.
+
+router.post('/settings/spiele-updates/save', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    const abfrage = (sql, werte) => dbService.query(sql, werte);
+
+    let kanal;
+    try {
+        kanal = await Spielemeldungen.kanalSetzen(abfrage, {
+            channel_id: req.body.channel_id, channel_name: req.body.channel_name
+        });
+    } catch (error) {
+        return res.status(400).json({ success: false, message: error.message });
+    }
+    Logger.info(`[Content] Kanal für Spiele-Updates: ${kanal || 'keiner'}`);
+
+    // Der Bot merkt sich den Kanal eine Minute. Der Anstoß gilt deshalb auch
+    // beim Abschalten — sonst läse er bis dahin weiter.
+    const antwort = await ServiceManager.get('ipcServer')
+        .broadcastOne('dashboard:SPIELE_UPDATES_NACHHOLEN', {}, true, { timeout: 60_000 });
+
+    if (!kanal) {
+        return res.json({ success: true, message: 'Es werden keine Spiele-Updates mehr eingelesen. Was schon im Blog steht, bleibt.' });
+    }
+    if (!antwort?.success) {
+        // Gespeichert ist es. Der Bot holt beim nächsten Start von selbst nach.
+        return res.json({
+            success: true, warnung: true,
+            message: `Kanal gespeichert, aber der Bot hat nicht nachgeholt: ${antwort?.error || 'keine Antwort'}. Er holt es bei seinem nächsten Start nach.`
+        });
+    }
+    res.json({
+        success: true,
+        message: `Kanal gespeichert. ${antwort.gelesen} Nachrichten gelesen, ${antwort.neu} neue Meldungen im Blog${antwort.geaendert ? `, ${antwort.geaendert} geändert` : ''}.`
+    });
+});
+
+// Eine Meldung ausblenden oder wieder zeigen. Gilt nur für Meldungen — eigene
+// Beiträge haben „Entwurf" und „Veröffentlicht" im Editor.
+router.post('/blog/meldung/:id/sichtbar', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    try {
+        const an = req.body.sichtbar === true || req.body.sichtbar === '1' || req.body.sichtbar === 1;
+        const geaendert = await Spielemeldungen.sichtbar((sql, werte) => dbService.query(sql, werte), req.params.id, an);
+        if (!geaendert) {
+            return res.status(409).json({ success: false, message: 'Die Meldung steht nicht mehr so da — bitte die Seite neu laden.' });
+        }
+        res.json({ success: true, message: an ? 'Die Meldung ist wieder sichtbar.' : 'Die Meldung ist ausgeblendet.' });
+    } catch (error) {
+        Logger.error('[Content] Fehler beim Ausblenden einer Meldung:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 });
@@ -1137,7 +1211,7 @@ router.get('/blog/edit/:id', async (req, res) => {
     const themeManager = ServiceManager.get('themeManager');
     const dbService = ServiceManager.get('dbService');
 
-    const [post] = await dbService.query('SELECT * FROM blog_posts WHERE id = ?', [req.params.id]);
+    const [post] = await dbService.query("SELECT * FROM blog_posts WHERE id = ? AND source = 'own'", [req.params.id]);
     if (!post) {
         return res.status(404).render('error', { message: 'Blog-Post nicht gefunden', error: { status: 404 } });
     }
@@ -1181,11 +1255,16 @@ router.post('/blog/save', async (req, res) => {
             .replace(/[äÄ]/g, 'ae').replace(/[öÖ]/g, 'oe').replace(/[üÜ]/g, 'ue').replace(/ß/g, 'ss')
             .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
+        // Unter dieser Adresse liegt die Rubrik mit den Spiele-Updates.
+        if (finalSlug === Spielemeldungen.RUBRIK) {
+            return res.status(400).json({ success: false, message: `Das Kürzel „${finalSlug}" ist vergeben — dort liegt die Rubrik der Spiele-Updates.` });
+        }
+
         if (postId) {
             await dbService.query(`
                 UPDATE blog_posts SET title_translations=?, content_translations=?, excerpt_translations=?,
                 slug=?, author=?, image_url=?, category=?, tags=?, status=?, published_at=?, updated_at=NOW()
-                WHERE id=?
+                WHERE id=? AND source='own'
             `, [titleTranslations, contentTranslations, excerptTranslations,
                 finalSlug, author || 'Admin', image_url || null, category || 'gaming',
                 tags || null, status || 'draft', published_at || null, postId]);
@@ -1214,7 +1293,7 @@ router.post('/blog/delete/:id', async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     try {
-        await dbService.query('DELETE FROM blog_posts WHERE id = ?', [req.params.id]);
+        await dbService.query("DELETE FROM blog_posts WHERE id = ? AND source = 'own'", [req.params.id]);
         res.json({ success: true, message: 'Blog-Post erfolgreich gelöscht' });
     } catch (error) {
         Logger.error('[Content] Fehler beim Löschen des Blog-Posts:', error);

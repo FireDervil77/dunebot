@@ -1,5 +1,6 @@
 const { ServiceManager } = require("dunebot-core");
 const { ActivityType } = require("discord.js");
+const SpieleUpdates = require("../helpers/SpieleUpdates");
 
 /**
  * Kern-Event: ready
@@ -65,4 +66,14 @@ module.exports = async (client) => {
     }
 
     Logger.success("Bot ist bereit!");
+
+    // Spiele-Updates: nachholen, was während der Pause im Kanal einging.
+    // Nicht abgewartet — der Bot ist bereit, auch wenn Discord hier trödelt.
+    SpieleUpdates.nachholen(client)
+        .then((e) => {
+            if (!e.aktiv) return;
+            if (e.fehler) Logger.warn(`[SpieleUpdates] Nachholen aus „${e.kanal}": ${e.fehler}`);
+            else Logger.info(`[SpieleUpdates] Nachgeholt aus „${e.kanal}": ${e.gelesen} gelesen, ${e.neu} neu, ${e.geaendert} geändert`);
+        })
+        .catch((fehler) => Logger.error(`[SpieleUpdates] Nachholen gescheitert: ${fehler.message}`, fehler));
 };

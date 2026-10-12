@@ -1,0 +1,124 @@
+<%#
+  Blog — die Rubrik „Spiele-Updates" (2026-10-12).
+
+  Alle Ankündigungen der Spielehersteller, die der Bot aus dem Discord-Kanal
+  mit den Spiele-Updates eingelesen hat (dunebot-core/lib/Spielemeldungen.js),
+  seitenweise und nach Spiel filterbar. Die Blogseite selbst zeigt in ihrer
+  rechten Spalte nur die neuesten.
+
+  @context {Array}  spiele     je { spiel, zahl } — nur Spiele mit sichtbaren Meldungen
+  @context {string} spiel      das gewählte Spiel, sonst null
+  @context {Array}  eintraege  je { slug, titel, kurztext, spiel, quelle, datum }
+  @context {number} zahl, seite, seiten
+%>
+<%
+  const adresse = (s, nr) => '/blog/spiele-updates'
+    + (s || nr > 1 ? '?' : '')
+    + [s ? 'spiel=' + encodeURIComponent(s) : '', nr > 1 ? 'seite=' + nr : ''].filter(Boolean).join('&');
+  const alle = spiele.reduce((summe, s) => summe + s.zahl, 0);
+%>
+<main id="main">
+  <section class="blog-overview blog-updates section">
+    <div class="container" data-aos="fade-up">
+
+      <div class="section-header text-center mb-4">
+        <h2>Spiele-Updates</h2>
+        <p>Ankündigungen der Hersteller, wie sie in unserem Discord eingehen</p>
+      </div>
+
+      <% if (spiele.length > 1) { %>
+      <div class="text-center mb-4">
+        <a href="<%= adresse(null, 1) %>" class="btn btn-sm <%= !spiel ? 'btn-primary' : 'btn-outline-primary' %> me-1 mb-1">
+          Alle <span class="opacity-75">(<%= alle %>)</span>
+        </a>
+        <% spiele.forEach(s => { %>
+          <a href="<%= adresse(s.spiel, 1) %>" class="btn btn-sm <%= spiel === s.spiel ? 'btn-primary' : 'btn-outline-primary' %> me-1 mb-1">
+            <%= s.spiel %> <span class="opacity-75">(<%= s.zahl %>)</span>
+          </a>
+        <% }); %>
+      </div>
+      <% } %>
+
+      <% if (eintraege.length) { %>
+        <div class="row justify-content-center">
+          <div class="col-lg-9">
+            <div class="blog-meldungen">
+              <% eintraege.forEach(m => { %>
+                <a class="blog-meldung blog-meldung-gross" href="/blog/<%= m.slug %>">
+                  <span class="blog-meldung-kopf">
+                    <span class="badge bg-primary bg-opacity-10 text-primary"><%= m.spiel %></span>
+                    <small class="text-muted"><i class="bi bi-calendar me-1"></i><%= m.datum %></small>
+                  </span>
+                  <span class="blog-meldung-titel"><%= m.titel %></span>
+                  <% if (m.kurztext && m.kurztext !== m.titel) { %>
+                    <span class="blog-meldung-text text-muted"><%= m.kurztext %></span>
+                  <% } %>
+                </a>
+              <% }); %>
+            </div>
+
+            <% if (seiten > 1) { %>
+            <nav class="d-flex justify-content-between align-items-center mt-4" aria-label="Seiten">
+              <% if (seite > 1) { %>
+                <a class="btn btn-sm btn-outline-primary" href="<%= adresse(spiel, seite - 1) %>"><i class="bi bi-arrow-left me-1"></i>Neuere</a>
+              <% } else { %><span></span><% } %>
+              <small class="text-muted">Seite <%= seite %> von <%= seiten %></small>
+              <% if (seite < seiten) { %>
+                <a class="btn btn-sm btn-outline-primary" href="<%= adresse(spiel, seite + 1) %>">Ältere<i class="bi bi-arrow-right ms-1"></i></a>
+              <% } else { %><span></span><% } %>
+            </nav>
+            <% } %>
+          </div>
+        </div>
+      <% } else { %>
+        <div class="text-center py-5">
+          <i class="bi bi-broadcast" style="font-size: 4rem; color: #ccc;"></i>
+          <p class="mt-3 text-muted"><%= spiel ? 'Zu diesem Spiel gibt es keine Meldungen.' : 'Noch keine Meldungen vorhanden.' %></p>
+        </div>
+      <% } %>
+
+      <div class="text-center mt-5">
+        <a href="/blog" class="btn btn-primary"><i class="bi bi-arrow-left me-2"></i>Zurück zum Blog</a>
+      </div>
+
+    </div>
+  </section>
+</main>
+
+<style>
+.blog-updates .blog-meldungen {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 .125rem .25rem rgba(0,0,0,.075);
+}
+.blog-updates .blog-meldung {
+  display: block;
+  padding: 1rem 1.25rem;
+  text-decoration: none;
+  color: inherit;
+  background: var(--surface-color, #fff);
+  border-bottom: 1px solid rgba(0,0,0,.06);
+  transition: background .15s ease;
+}
+.blog-updates .blog-meldung:last-child { border-bottom: 0; }
+.blog-updates .blog-meldung:hover { background: rgba(0,0,0,.03); }
+.blog-updates .blog-meldung-kopf {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .5rem;
+  margin-bottom: .35rem;
+}
+.blog-updates .blog-meldung-titel {
+  display: block;
+  font-weight: 600;
+  font-size: 1.05rem;
+  line-height: 1.35;
+}
+.blog-updates .blog-meldung-text {
+  display: block;
+  margin-top: .25rem;
+  font-size: .9rem;
+}
+.blog-updates .blog-meldung:hover .blog-meldung-titel { color: var(--accent-color); }
+</style>
