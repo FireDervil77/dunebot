@@ -1172,7 +1172,9 @@ class GameserverPlugin extends DashboardPlugin {
                     server, guildId: server.guild_id });
                 if (mp && mp.success) {
                     Logger.info(`[Gameserver] Server ${serverId}: Modpack „${mp.name}" mit `
-                        + `${mp.dateien} Datei(en) installiert, ${mp.ausgelassen} ausgelassen`);
+                        + `${mp.dateien} Datei(en) installiert, ${mp.ausgelassen} ausgelassen`
+                        + (mp.abgleich?.fehler ? ' — Abgleich mit Modrinth ausgefallen'
+                            : (mp.abgleich?.ausgelassen ? ` (davon ${mp.abgleich.ausgelassen} nach dem Abgleich mit Modrinth)` : '')));
                 } else if (mp) {
                     Logger.warn(`[Gameserver] Server ${serverId}: Modpack fehlgeschlagen: ${mp.fehler}`);
                 }

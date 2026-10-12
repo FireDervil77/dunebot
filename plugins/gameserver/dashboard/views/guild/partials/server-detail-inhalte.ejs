@@ -1122,9 +1122,25 @@
         // Das Weggelassene wird GENANNT. Sonst hält jemand das Paket für halb
         // installiert: Bei „Create+" fehlen 49 von 155 Dateien — alles reine
         // Client-Mods, die einen Server nicht starten ließen.
+        // Seit 2026-10-12 kommt ein zweiter Grund dazu: Mods, die das Paket
+        // als nötig führt, Modrinth aber als reine Client-Mods („One block
+        // horror" brachte so Oculus auf den Server). Auch die werden genannt.
+        const ab = d.abgleich || {};
         melde('success', `„${d.name}“ ist installiert: ${d.dateien} Datei(en)`
-          + (d.ausgelassen ? `, ${d.ausgelassen} reine Client-Datei(en) ausgelassen.` : '.'),
+          + (d.ausgelassen ? `, ${d.ausgelassen} reine Client-Datei(en) ausgelassen` : '')
+          + (ab.ausgelassen ? ` (davon ${ab.ausgelassen}, die nur Modrinth als Client-Mods führt)` : '') + '.',
           12000);
+        if (ab.fehler) {
+          melde('warning', 'Der Abgleich mit Modrinth war nicht möglich — ausgelassen wurde nur, was das Paket '
+            + 'selbst als Client-Datei ausweist. Startet der Server nicht, liegt es vermutlich daran.', 15000);
+        } else if (ab.ausgelassen === null && ab.namen && ab.namen.length) {
+          melde('warning', `Modrinth führt ${ab.namen.length} enthaltene Mod(s) als reine Client-Mods — `
+            + 'der Daemon dieser Maschine kann sie noch nicht auslassen (Daemon-Update nötig).', 15000);
+        }
+        if (ab.ohneAuskunft) {
+          melde('info', `${ab.ohneAuskunft} Datei(en) legt das Paket lose bei — zu ihnen gibt es bei Modrinth `
+            + 'keine Auskunft, sie wurden ungeprüft übernommen.', 12000);
+        }
         if (d.aufgeraeumt && d.aufgeraeumt.blieb && d.aufgeraeumt.blieb.length) {
           melde('warning', `${d.aufgeraeumt.blieb.length} Datei(en) des alten Pakets `
             + 'blieben liegen — sie stehen im Dateimanager.', 12000);

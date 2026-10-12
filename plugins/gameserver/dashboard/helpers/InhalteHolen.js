@@ -576,12 +576,31 @@ async function installiereModpack({ server, guildId, paket, laderDesServers }) {
 
     await Inhalte.eintragen({ ...grundzeile, status: 'geplant' });
 
+    // ── Reine Client-Mods, die das Paket nicht als solche ausweist ──────────
+    //
+    // Modrinth wird gefragt, der Daemon bekommt die Pruefsummen (siehe
+    // `Modrinth.clientDateien`). Scheitert die Nachfrage, wird trotzdem
+    // installiert — wie vor dem Abgleich, nur mit dem, was das Paket selbst
+    // sagt. Das steht dann im Protokoll UND im Ergebnis: Ein Abgleich, der
+    // still ausfaellt, saehe aus wie einer, der nichts gefunden hat.
+    let abgleich = { sha1: [], namen: [], geprueft: 0, ohneAuskunft: 0 };
+    let abgleichFehler = null;
+    try {
+        // Erst hier geladen, wie weiter unten: Modrinth.js und diese Datei kennen einander.
+        abgleich = await require('./Modrinth').clientDateien(paket.kennung, paket.fassung);
+    } catch (fehler) {
+        abgleichFehler = fehler.message;
+        Logger.warn(`[Gameserver/Modpack] ${paket.kennung} ${paket.fassung}: Abgleich mit Modrinth nicht möglich `
+            + `(${fehler.message}) — installiert wird nach den Angaben des Pakets allein`);
+    }
+
     const antwort = await ipmServer.sendCommand(daemonId, 'gameserver.content.modpack', {
         server_id:     String(server.id),
         rootserver_id: String(server.rootserver_id),
         install_path:  server.install_path,
         adresse:       paket.url,
         sha1:          paket.sha1 || '',
+        auslassen:     abgleich.sha1,
     }, MODPACK_FRIST_MS).catch(fehler => ({ success: false, error: fehler.message }));
 
     if (!antwort?.success) {
@@ -600,8 +619,17 @@ async function installiereModpack({ server, guildId, paket, laderDesServers }) {
         dateien,
     });
 
+    // `ausgelassen_abgleich` kennt erst ein Daemon mit dem Abgleich. Fehlt das
+    // Feld, obwohl Pruefsummen mitgingen, hat ein aelterer Daemon sie ueberhoert
+    // — das wird gesagt, sonst saehe es aus, als haette der Abgleich gegriffen.
+    const daemonKenntAbgleich = daten.ausgelassen_abgleich !== undefined;
+    const nachAbgleich = daemonKenntAbgleich ? Number(daten.ausgelassen_abgleich) || 0 : null;
     Logger.info(`[Gameserver/Modpack] ${paket.kennung} ${paket.fassung} auf Server ${server.id}: `
-        + `${dateien.length} Datei(en), ${daten.ausgelassen || 0} ausgelassen`);
+        + `${dateien.length} Datei(en), ${daten.ausgelassen || 0} ausgelassen`
+        + (abgleichFehler ? ' — Abgleich mit Modrinth ausgefallen'
+            : (abgleich.sha1.length && !daemonKenntAbgleich
+                ? ` — ${abgleich.sha1.length} Client-Datei(en) laut Modrinth gemeldet, der Daemon kennt den Abgleich noch nicht`
+                : ` (davon ${nachAbgleich || 0} nach dem Abgleich mit Modrinth: ${abgleich.namen.join(', ') || '—'})`)));
 
     return {
         success: true,
@@ -614,6 +642,16 @@ async function installiereModpack({ server, guildId, paket, laderDesServers }) {
         spielfassung: daten.spielfassung || null,
         dateien: dateien.length,
         ausgelassen: daten.ausgelassen || 0,
+        // Der Abgleich mit Modrinth: wie viele Dateien DESHALB wegblieben
+        // (null: der Daemon kennt ihn noch nicht), welche Mods es sind, und ob
+        // die Nachfrage ueberhaupt gelang.
+        abgleich: {
+            ausgelassen: nachAbgleich,
+            namen: abgleich.namen,
+            geprueft: abgleich.geprueft,
+            ohneAuskunft: abgleich.ohneAuskunft,
+            fehler: abgleichFehler,
+        },
         bytes: daten.bytes || 0,
         aufgeraeumt,
     };

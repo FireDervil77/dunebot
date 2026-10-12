@@ -101,6 +101,31 @@ const FASSUNGEN = {
     v3: { project_id: 'p3', version_number: '3.0', loaders: ['neoforge'], game_versions: ['26.3'] },
 };
 
+// Der Fall vom 2026-10-12, verkleinert: Das Paket fuehrt alles als „required",
+// Modrinth fuehrt zwei der Mods an ihrem Projekt als reine Client-Mods.
+const SHA = (z) => z.repeat(40);
+const ABGLEICH = {
+    fassungen: [{
+        version_number: '1.0.4',
+        dependencies: [
+            { project_id: 'oculus', version_id: 'vo', dependency_type: 'embedded' },
+            { project_id: 'jei', version_id: 'vj', dependency_type: 'embedded' },
+            { project_id: 'zoom', version_id: 'vz', dependency_type: 'embedded' },
+            { project_id: null, version_id: null, file_name: 'lose-beigelegt.jar', dependency_type: 'embedded' },
+        ],
+    }, { version_number: '1.0.3', dependencies: [] }],
+    projekte: {
+        oculus: { id: 'oculus', title: 'Oculus', server_side: 'unsupported', client_side: 'required' },
+        jei: { id: 'jei', title: 'Just Enough Items', server_side: 'optional', client_side: 'required' },
+        zoom: { id: 'zoom', title: 'Just Zoom', server_side: 'unsupported', client_side: 'required' },
+    },
+    modfassungen: {
+        vo: { project_id: 'oculus', files: [{ hashes: { sha1: SHA('a') }, primary: true }, { hashes: { sha1: SHA('B') } }] },
+        vz: { project_id: 'zoom', files: [{ hashes: { sha1: SHA('c') } }, { hashes: { sha1: 'keine-pruefsumme' } }] },
+        vj: { project_id: 'jei', files: [{ hashes: { sha1: SHA('d') } }] },
+    },
+};
+
 const abrufe = [];
 global.fetch = async (adresse) => {
     abrufe.push(String(adresse));
@@ -109,10 +134,17 @@ global.fetch = async (adresse) => {
 
     if (u.pathname === '/v2/search') return antwort({ hits: TREFFER, total_hits: TREFFER.length });
 
+    // ── Abgleich je Mod (2026-10-12): was ein Paket enthält und wie Modrinth es einstuft ──
+    if (u.pathname === '/v2/project/horror-paket/version') return antwort(ABGLEICH.fassungen);
+    if (u.pathname === '/v2/projects') {
+        const ids = JSON.parse(u.searchParams.get('ids') || '[]');
+        return antwort(ids.map(i => ABGLEICH.projekte[i]).filter(Boolean));
+    }
+
     // Der Sammelabruf — eine Anfrage für die ganze Seite.
     if (u.pathname === '/v2/versions') {
         const ids = JSON.parse(u.searchParams.get('ids') || '[]');
-        return antwort(ids.map(i => FASSUNGEN[i]).filter(Boolean));
+        return antwort(ids.map(i => FASSUNGEN[i] || ABGLEICH.modfassungen[i]).filter(Boolean));
     }
 
     // Die zweite Stufe: einzeln, serverseitig gefiltert.
@@ -204,6 +236,47 @@ const Modrinth = require(path.join(WURZEL, 'plugins/gameserver/dashboard/helpers
       + '(`server_side: unsupported`). Ein Server daraus startet nie.');
     pruefe(facetten.every(f => f.some(g => g.length === 1 && g[0] === 'project_type:modpack')),
         'und weiterhin nur nach Modpacks');
+
+    // ════════════════════════════════════════════════════════════════
+    console.log('\nReine Client-Mods, die das Paket nicht als solche ausweist');
+    // ════════════════════════════════════════════════════════════════
+    //
+    // „One block horror" fuehrt alle Dateien als `required`; der Server brach
+    // an Oculus ab. Modrinth weiss es am Projekt der Mod besser.
+    abrufe.length = 0;
+    const cl = await Modrinth.clientDateien('horror-paket', '1.0.4');
+    pruefe(JSON.stringify(cl.namen) === JSON.stringify(['Just Zoom', 'Oculus']),
+        'gemeldet werden die Mods, die Modrinth als reine Client-Mods fuehrt — und nur die',
+        `gemeldet: ${cl.namen.join(', ')}`);
+    pruefe(JSON.stringify([...cl.sha1].sort()) === JSON.stringify([SHA('a'), SHA('b'), SHA('c')]),
+        'als Pruefsummen ALLER ihrer Dateien, klein geschrieben, ohne das, was keine Pruefsumme ist',
+        `Pruefsummen: ${cl.sha1.join(', ')}`);
+    pruefe(cl.geprueft === 3 && cl.ohneAuskunft === 1,
+        'und die Antwort sagt, wie viele Eintraege keine Auskunft haben (lose beigelegte Mods)',
+        `geprueft ${cl.geprueft}, ohne Auskunft ${cl.ohneAuskunft}`);
+    pruefe(abrufe.length === 3,
+        'drei Abrufe: die Fassung, die Projekte, die Fassungen der Client-Mods — das Archiv wird nicht geladen',
+        `${abrufe.length} Abrufe: ${abrufe.map(a => new URL(a).pathname).join(', ')}`);
+    pruefe(!abrufe.some(a => a.includes('vj')),
+        'nach den Dateien einer servertauglichen Mod wird gar nicht erst gefragt');
+
+    const leer = await Modrinth.clientDateien('horror-paket', '1.0.3');
+    pruefe(leer.sha1.length === 0 && leer.geprueft === 0, 'ein Paket ohne Liste ergibt keine Pruefsummen — und keinen Fehler');
+    let geworfen = null;
+    try { await Modrinth.clientDateien('horror-paket', '9.9.9'); } catch (e) { geworfen = e.message; }
+    pruefe(/gibt es nicht/.test(geworfen || ''), 'eine Fassung, die es nicht gibt, wird gemeldet statt als „nichts gefunden" durchzugehen');
+
+    // Der Auftrag an den Daemon traegt die Liste — und ein ausgefallener
+    // Abgleich wird gesagt, nicht verschluckt.
+    const holenAbgleich = ohneKommentare(roh(path.join(WURZEL, 'plugins/gameserver/dashboard/helpers/InhalteHolen.js')) || '');
+    pruefe(/auslassen:\s+abgleich\.sha1/.test(holenAbgleich) && holenAbgleich.includes("require('./Modrinth').clientDateien(paket.kennung, paket.fassung)"),
+        'der Auftrag „Modpaket einspielen" schickt die Pruefsummen mit');
+    pruefe(/abgleichFehler = fehler\.message/.test(holenAbgleich) && /Abgleich mit Modrinth nicht möglich/.test(holenAbgleich) && /fehler: abgleichFehler/.test(holenAbgleich),
+        'faellt die Nachfrage aus, steht das im Protokoll und im Ergebnis',
+        'Ein Abgleich, der still ausfaellt, sieht aus wie einer, der nichts gefunden hat.');
+    pruefe(/daten\.ausgelassen_abgleich !== undefined/.test(holenAbgleich),
+        'und ein Daemon, der den Abgleich noch nicht kennt, wird erkannt',
+        'Sonst liest sich „94 Client-Dateien gemeldet" wie „94 ausgelassen".');
 
     // ════════════════════════════════════════════════════════════════════════
     console.log('\nDie Zusicherung haengt nicht an der Suche');

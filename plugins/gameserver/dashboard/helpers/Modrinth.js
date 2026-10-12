@@ -496,6 +496,85 @@ async function modpackFassung(kennung, fassung = null) {
     };
 }
 
+/**
+ * Welche Dateien eines Modpacks sind reine Client-Mods — nach Modrinths
+ * EIGENER Auskunft, nicht nach der des Pakets?
+ *
+ * ── Warum das Paket allein nicht reicht (2026-10-12) ────────────────────────
+ *
+ * Jede Zeile im Verzeichnis eines Pakets traegt `env.server`, und der Daemon
+ * laesst weg, was dort `unsupported` sagt. Die Angabe macht aber der Autor des
+ * PAKETS. „One block horror" 1.0.4 markiert alle 42 Dateien als `required`,
+ * darunter Oculus, Rubidium, Just Zoom und Essential — der Server brach beim
+ * Start ab („… for invalid dist DEDICATED_SERVER"), und ausgelassen hatten wir
+ * nichts. Modrinth fuehrt dieselben Mods an ihrem PROJEKT als
+ * `server_side: unsupported`: Das sagt der Autor der Mod, und der weiss es.
+ *
+ * ── Ohne das Archiv zu laden ────────────────────────────────────────────────
+ *
+ * Die Fassung eines Pakets nennt, was sie enthaelt (`dependencies`, je mit
+ * `project_id` und `version_id`). Drei Sorten Abrufe: die Fassung, die
+ * Projekte (in Stuecken), die Fassungen der Client-Mods fuer ihre Pruefsummen.
+ * Gemessen: „One block horror" 42 Eintraege → 10 Client-Sachen; „ATM: All Tech
+ * Mods" 241 → 81.
+ *
+ * Der Daemon bekommt die PRUEFSUMMEN (sha1) und vergleicht sie mit denen aus
+ * dem Verzeichnis des Pakets — ein Dateiname liesse sich verwechseln.
+ *
+ * ── Was es nicht kann ───────────────────────────────────────────────────────
+ *
+ * - Mods, die ein Paket lose beilegt (`overrides/mods`), stehen nicht in der
+ *   Liste und haben keine Auskunft (bei „One block horror" 19 Eintraege).
+ * - Eine Mod, deren Autor sie als servertauglich fuehrt und die trotzdem
+ *   abbricht (Palladium in „ATM", 2026-10-12: `server: optional`).
+ *
+ * @param {string} kennung  Kennung des Pakets
+ * @param {string} fassung  Fassungsnummer
+ * @returns {Promise<{sha1: string[], namen: string[], geprueft: number, ohneAuskunft: number}>}
+ */
+async function clientDateien(kennung, fassung) {
+    const slug = String(kennung || '').trim();
+    if (!slug) throw new Error('Keine Kennung');
+
+    const liste = await hole(`/project/${encodeURIComponent(slug)}/version`);
+    const gewaehlt = (Array.isArray(liste) ? liste : []).find(v => v.version_number === fassung);
+    if (!gewaehlt) throw new Error(`${slug}: Fassung ${fassung} gibt es nicht (mehr)`);
+
+    const alle = gewaehlt.dependencies || [];
+    const enthalten = alle.filter(d => d.project_id && d.version_id);
+    const leer = { sha1: [], namen: [], geprueft: enthalten.length, ohneAuskunft: alle.length - enthalten.length };
+    if (!enthalten.length) return leer;
+
+    const stuecke = (werte) => {
+        const aus = [];
+        for (let i = 0; i < werte.length; i += ABGLEICH_STUECK) aus.push(werte.slice(i, i + ABGLEICH_STUECK));
+        return aus;
+    };
+
+    const projekte = new Map();
+    for (const teil of stuecke([...new Set(enthalten.map(d => d.project_id))])) {
+        for (const p of await hole(`/projects?ids=${encodeURIComponent(alsListe(teil))}`)) projekte.set(p.id, p);
+    }
+    const nurClient = enthalten.filter(d => projekte.get(d.project_id)?.server_side === 'unsupported');
+    if (!nurClient.length) return leer;
+
+    const sha1 = new Set();
+    const namen = new Set();
+    for (const teil of stuecke(nurClient.map(d => d.version_id))) {
+        for (const f of await hole(`/versions?ids=${encodeURIComponent(alsListe(teil))}`)) {
+            for (const datei of f.files || []) {
+                const summe = String(datei.hashes?.sha1 || '').toLowerCase();
+                if (/^[0-9a-f]{40}$/.test(summe)) sha1.add(summe);
+            }
+            namen.add(projekte.get(f.project_id)?.title || f.project_id);
+        }
+    }
+    return { ...leer, sha1: [...sha1], namen: [...namen].sort() };
+}
+
+/** So viele Kennungen je Sammelabruf — die Adresse bleibt damit weit unter jeder Grenze. */
+const ABGLEICH_STUECK = 80;
+
 /** Die Seite zum Stoebern — Plugins und Mods liegen bei Modrinth getrennt. */
 function verzeichnis(raum) {
     if (!raum) return null;
@@ -826,7 +905,7 @@ async function aktualisierungen(raum, zeilen) {
 }
 
 module.exports = {
-    sucheModpacks, modpackFassung, laderBeiUns, laderBeiModrinth,
+    sucheModpacks, modpackFassung, clientDateien, laderBeiUns, laderBeiModrinth,
     KENNUNG, TITEL, RAUM_NAME, HERKUNFT, PRO_SEITE,
     istErlaubt, suche, verzeichnis, adresse, paket, aufloesen, aktualisierungen, fassungen,
     hoeher, neuerAls,
