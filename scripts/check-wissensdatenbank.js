@@ -472,6 +472,51 @@ function uebersetzer(locale) {
         assert.deepStrictEqual(eigen.content_translations, { 'de-DE': 'Meine eigene Fassung.', 'en-GB': 'Mine.' }, 'eine vom Betreiber geänderte Fassung wurde überschrieben');
     });
 
+    await pruefe('Folgemigration: dashboard.dunebot.de wird zu /guild, die Serverauswahl stimmt — nur diese Sätze ändern sich', async () => {
+        const adresse = require(path.join(WURZEL, 'migrations/kern/20261012_120000_dashboard_adresse_in_artikeln.js'));
+        const roh = (id) => db.query('SELECT content_translations AS c FROM kb_articles WHERE id = ?', [id]).then(z => JSON.parse(z[0].c));
+        // Ein Artikel, in dem der Betreiber den Satz um den Verweis schon umgeschrieben hat: Dort greift nur das Netz.
+        const eigen = await Wissen.artikelSpeichern({ category_id: neuerBereich, title_de: 'Eigener Satz',
+            content_de: 'Mein Text.\n\nSchau ins **[dashboard.dunebot.de](https://dashboard.dunebot.de)**, lohnt sich.\n\nEnde.' });
+        const fremd = await Wissen.artikelSpeichern({ category_id: neuerBereich, title_de: 'Ohne Bezug', content_de: 'Hier steht nichts davon. [Dashboard](/guild)' });
+        const fremdVorher = JSON.stringify(await roh(fremd));
+        await adresse.up(db);
+        assert.strictEqual((await roh(eigen))['de-DE'], 'Mein Text.\n\nSchau ins **[firenetworks.de/guild](/guild)**, lohnt sich.\n\nEnde.');
+        assert.strictEqual(JSON.stringify(await roh(fremd)), fremdVorher, 'ein Artikel ohne den Verweis wurde angefasst');
+
+        // Die Beschriftungen im neuen Text sind die der Seiten, die er beschreibt.
+        const de = JSON.parse(lies('apps/dashboard/locales/de-DE.json'));
+        const neuerText = adresse.ERSETZUNGEN.map(e => e[1]).join('\n');
+        for (const wort of [de.AUTH.LOGIN_BUTTON, de.SELECTOR.BTN_MANAGE, de.SELECTOR.BTN_INVITE, de.SELECTOR.BOT_NOT_IN_GUILD]) {
+            assert.ok(neuerText.includes(`**${wort}**`), `„${wort}" steht nicht im neuen Text — heißt der Knopf inzwischen anders?`);
+        }
+        // Und /guild ist wirklich die Adresse, hinter der Anmeldung und Serverauswahl liegen.
+        assert.match(ohneKommentare(lies('apps/dashboard/app.js')), /\.register\('\/guild', this\.routers\.guild/);
+
+        if (ordnerDa) {
+            const erste = await Wissen.artikel('getting-started', 'erste-schritte', 'de');
+            assert.ok(erste.inhalt.includes('**[firenetworks.de/guild](/guild)**\n2. Klicke auf **Mit Discord fortfahren**'), 'Schritt 1 und 2 unter „Dashboard öffnen" stehen nicht da');
+            assert.ok(erste.inhalt.includes('Steht dort **Bot nicht in Guild**') && !erste.inhalt.includes('eine Übersicht aller Server, auf denen FireBot aktiv ist'));
+            // Der Sprung aus „Bot einladen" trifft diese Überschrift.
+            assert.ok(Wissen.rendere(erste.inhalt).includes('<h2 id="dashboard-oeffnen">Dashboard öffnen</h2>'));
+            const zweiWege = require(path.join(WURZEL, 'migrations/kern/20261012_110000_bot_einladen_zwei_wege.js'));
+            assert.ok(zweiWege.NEU.includes('(/kb/getting-started/erste-schritte#dashboard-oeffnen)'));
+            const uebersicht = await Wissen.artikel('dashboard', 'uebersicht', 'de');
+            assert.ok(uebersicht.inhalt.includes('direkt über **[firenetworks.de/guild](/guild)**'));
+            // Der Rest der Artikel ist unberührt: genau so lang wie vorher plus der Unterschied der getauschten Sätze.
+            const bestandErste = bestand.artikel.find(a => a.bereich === 'getting-started' && a.kuerzel === 'erste-schritte').inhalt;
+            assert.strictEqual(erste.inhalt, adresse.ersetze(bestandErste));
+        }
+        // Nach allen drei Folgemigrationen nennt kein Artikel mehr die alte Domain.
+        assert.strictEqual(await zahl(`SELECT COUNT(*) AS n FROM kb_articles WHERE LOWER(CONVERT(content_translations USING utf8mb4)) LIKE '%dunebot%'`), 0);
+        // Zweiter Lauf: nichts mehr zu tun.
+        const vorDemZweiten = JSON.stringify(await roh(eigen));
+        await adresse.up(db);
+        assert.strictEqual(JSON.stringify(await roh(eigen)), vorDemZweiten);
+        await Wissen.artikelEntfernen(eigen);
+        await Wissen.artikelEntfernen(fremd);
+    });
+
     // ════════════════════════════════════════════════════════════════════════
     console.log('\nSeiten: der echte Router, die echte Ansicht');
 

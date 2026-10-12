@@ -45,7 +45,7 @@ const NEU = `So fügst du FireBot zu deinem Discord-Server hinzu. Es gibt zwei W
 
 Der bequemere Weg, wenn du den Server danach gleich einrichten willst.
 
-1. Klicke auf der Webseite auf **Dashboard** und melde dich mit Discord an
+1. Klicke auf der Webseite auf **Dashboard** (direkt: [firenetworks.de/guild](/guild)) und melde dich mit Discord an — Schritt für Schritt steht das unter [Erste Schritte](/kb/getting-started/erste-schritte#dashboard-oeffnen)
 2. Du kommst zur Serverauswahl. Aufgeführt sind die Server, auf denen du Besitzer oder Administrator bist oder die Berechtigung **Server verwalten** hast
 3. Bei einem Server ohne FireBot steht **Bot nicht in Guild**. Klicke dort auf **Bot hinzufügen**
 4. Discord öffnet sich, dein Server ist schon ausgewählt — weiter bei [Bei Discord bestätigen](#bei-discord-bestaetigen)
