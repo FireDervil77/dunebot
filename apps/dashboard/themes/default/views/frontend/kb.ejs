@@ -96,14 +96,21 @@
             <% if (!artikelListe.length) { %>
               <p class="text-muted"><%= tr('KB.EMPTY_AREA') %></p>
             <% } %>
-            <div class="kb-liste">
+            <%# Die Artikel eines Bereichs als Kacheln, wie die Bereiche auf der
+                Startseite (Betreiber, 2026-10-12: „eine Karte würde viel besser
+                aussehen als nur der Link-Eintrag" — im Bereich „Allgemein" stand
+                eine einzelne Zeile). Die Suchtreffer weiter unten bleiben eine
+                Liste: Dort zählt die Reihenfolge, nicht das Stöbern. %>
+            <div class="row g-3 kb-kacheln">
               <% artikelListe.forEach(function (a) { %>
-                <a class="kb-eintrag" href="<%= adresse(bereich.kuerzel, a.kuerzel) %>">
-                  <span class="kb-eintrag-titel">
-                    <%= a.titel %><% if (a.sichtbar === 'schloss') { %> <i class="bi bi-lock-fill" title="<%= tr('KB.LOCKED') %>"></i><% } %>
-                  </span>
-                  <% if (a.kurztext) { %><span class="kb-eintrag-text"><%= a.kurztext %></span><% } %>
-                </a>
+                <div class="col-sm-6 col-xl-4">
+                  <a class="kb-kachel kb-kachel-artikel" href="<%= adresse(bereich.kuerzel, a.kuerzel) %>">
+                    <i class="bi <%= a.sichtbar === 'schloss' ? 'bi-lock-fill' : 'bi-file-earmark-text' %>"></i>
+                    <span class="kb-kachel-titel"><%= a.titel %></span>
+                    <% if (a.kurztext) { %><span class="kb-kachel-text"><%= a.kurztext %></span><% } %>
+                    <% if (a.sichtbar === 'schloss') { %><span class="kb-kachel-zahl"><%= tr('KB.LOCKED') %></span><% } %>
+                  </a>
+                </div>
               <% }); %>
             </div>
 

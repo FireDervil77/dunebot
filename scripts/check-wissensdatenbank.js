@@ -620,7 +620,9 @@ function uebersetzer(locale) {
         assert.match(start.text, /<form action="\/kb\/suche" method="get"/);
         const bereich = await hole('/kb/gameserver');
         assert.strictEqual(bereich.status, 200);
-        assert.strictEqual((bereich.text.match(/class="kb-eintrag"/g) || []).length, 8);
+        // Die Artikel eines Bereichs stehen als Kacheln da, wie die Bereiche auf der Startseite (2026-10-12).
+        assert.strictEqual((bereich.text.match(/class="kb-kachel kb-kachel-artikel"/g) || []).length, 8);
+        assert.ok(!bereich.text.includes('class="kb-eintrag"'), 'der Bereich zeigt seine Artikel noch als Zeilen');
         assert.match(bereich.text, /href="\/kb\/gameserver\/daemon-setup"/);
         const artikel = await hole('/kb/gameserver/daemon-setup');
         assert.strictEqual(artikel.status, 200);
@@ -646,7 +648,11 @@ function uebersetzer(locale) {
         // In der Liste des Bereichs und in der Suche: mit Schloss, ohne Inhalt.
         const liste = await hole('/kb/pruef-bereich');
         assert.ok(liste.text.includes('bi-lock-fill') && !liste.text.includes('GEHEIMTEXT'));
+        // Die Kachel eines Artikels mit Schloss sagt es in Worten, nicht nur mit dem Symbol.
+        assert.match(liste.text, /class="kb-kachel kb-kachel-artikel" href="\/kb\/pruef-bereich\/geheimer-trick">[\s\S]{0,400}Nur für angemeldete Nutzer/);
+        // Suchtreffer bleiben eine Liste.
         const suche = await hole('/kb/suche?q=geheimtext');
+        assert.ok((await hole('/kb/suche?q=geheimtext')).text.includes('class="kb-eintrag"'));
         assert.ok(suche.text.includes('Geheimer Trick') && !suche.text.includes('Der eigentliche'), 'die Suche verrät den Inhalt');
         // Angemeldet: ganz, ohne Schloss.
         const an = await hole('/kb/pruef-bereich/geheimer-trick', AN);
