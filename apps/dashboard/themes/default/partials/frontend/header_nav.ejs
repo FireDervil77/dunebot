@@ -8,19 +8,23 @@
 
       <nav id="navmenu" class="navmenu">
         <ul>
+          <%# „Neu" am Menüpunkt Blog, solange ein eigener Artikel ganz neu ist
+              (helpers/Blog.js, sieben Tage). Das Menü kommt aus der Datenbank —
+              erkannt wird der Punkt an seiner Adresse. %>
+          <% const neuAm = (adresse) => (locals.blogNeu > 0 && adresse === '/blog'); %>
           <% (locals.menuItems || []).forEach(item => { %>
             <% if (item.children && item.children.length > 0) { %>
               <li class="dropdown<%= item.css_class ? ' ' + item.css_class : '' %>">
                 <a href="<%= item.url %>"><span><%= item.label %></span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
                 <ul>
                   <% item.children.forEach(child => { %>
-                    <li><a href="<%= child.url %>"<%= child.target === '_blank' ? ' target="_blank"' : '' %>><%= child.label %></a></li>
+                    <li><a href="<%= child.url %>"<%= child.target === '_blank' ? ' target="_blank"' : '' %>><%= child.label %><% if (neuAm(child.url)) { %> <span class="menue-neu"><%= tr('LANDING.BADGE_NEW') %></span><% } %></a></li>
                   <% }); %>
                 </ul>
               </li>
             <% } else { %>
               <li class="<%= item.css_class || '' %>">
-                <a href="<%= item.url %>"<%= item.target === '_blank' ? ' target="_blank"' : '' %>><%= item.label %></a>
+                <a href="<%= item.url %>"<%= item.target === '_blank' ? ' target="_blank"' : '' %>><%= item.label %><% if (neuAm(item.url)) { %> <span class="menue-neu"><%= tr('LANDING.BADGE_NEW') %></span><% } %></a>
               </li>
             <% } %>
           <% }); %>

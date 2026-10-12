@@ -1,4 +1,10 @@
-<%# Hero Section Partial — Carousel mit Standard-Slides + News-Slides %>
+<%# Hero Section Partial — Carousel mit Standard-Slides + News-Slides.
+    Seit 2026-10-12 steht davor der neueste eigene Blogartikel als Aufmacher
+    (Betreiber: „immer den neuesten Blog als Aufmacher für die Seite"). Gibt es
+    keinen, beginnt das Karussell wie vorher mit der ersten Standard-Folie.
+    `locals.heroBlog`: Der laufende Prozess liest diese Datei von der Platte,
+    auch wenn sein Controller den Wert noch nicht mitgibt. %>
+<% const aufmacher = locals.heroBlog || null; %>
 
 <section id="hero" class="hero section dark-background">
 
@@ -10,18 +16,36 @@
       <div class="carousel-indicators">
         <%
           const newsCount = (carouselNews && carouselNews.length > 0) ? carouselNews.length : 0;
-          const totalSlides = 3 + newsCount;
+          const totalSlides = 3 + newsCount + (aufmacher ? 1 : 0);
         %>
         <% for (let i = 0; i < totalSlides; i++) { %>
-          <button type="button" data-target="#heroCarousel" data-slide-to="<%= i %>" <%= i === 0 ? 'class="active"' : '' %>></button>
+          <button type="button" data-target="#heroCarousel" data-slide-to="<%= i %>" class="<%= i === 0 ? 'active' : '' %>"></button>
         <% } %>
       </div>
 
       <div class="carousel-inner">
         <% let slideIndex = 0; %>
         
+        <% if (aufmacher) { %>
+          <!-- Slide: der neueste Blogartikel -->
+          <div class="carousel-item active">
+            <div class="text-center">
+              <p class="hero-rubrik"><i class="fa-solid fa-pen-nib"></i> <%= tr('LANDING.HERO_BLOG_LABEL') %></p>
+              <h2><%= aufmacher.titel %></h2>
+              <% if (aufmacher.kurztext) { %><p><%= aufmacher.kurztext %></p><% } %>
+              <p class="text-muted"><small><i class="fa-solid fa-calendar"></i> <%= new Date(aufmacher.zeit).toLocaleDateString(locale || 'de-DE', { year: 'numeric', month: 'long', day: 'numeric' }) %></small></p>
+              <a href="/blog/<%= aufmacher.slug %>" class="btn-hero btn-get-started">
+                <i class="fa-solid fa-arrow-right"></i> <%= tr('LANDING.READ_MORE') || 'Weiterlesen' %>
+              </a>
+              <a href="/blog" class="btn-hero btn-get-github">
+                <i class="fa-solid fa-book-open"></i> <%= tr('LANDING.HERO_BLOG_ALL') %>
+              </a>
+            </div>
+          </div>
+        <% } %>
+
         <!-- Slide: Standard 1 -->
-        <div class="carousel-item active">
+        <div class="carousel-item<%= aufmacher ? '' : ' active' %>">
           <div class="text-center">
             <h2><%= tr('LANDING.HERO') %></h2>
             <p><%= tr('LANDING.SUBTITLE') %></p>

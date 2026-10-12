@@ -48,7 +48,10 @@
     "HERO_SLIDE3_BTN1": "Jetzt starten",
     "HERO_SLIDE3_BTN2": "Dokumentation",
     "CAROUSEL_PREV": "Zurück",
-    "CAROUSEL_NEXT": "Weiter"
+    "CAROUSEL_NEXT": "Weiter",
+    "HERO_BLOG_LABEL": "Neu im Blog",
+    "HERO_BLOG_ALL": "Zum Blog",
+    "BADGE_NEW": "Neu"
   },
   "FEATURES": {
     "TITLE": "Warum Communities FireBot wählen",

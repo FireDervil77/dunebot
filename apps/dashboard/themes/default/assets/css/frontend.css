@@ -1025,6 +1025,20 @@ section,
   text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.7);
 }
 
+/* Die Zeile über dem Titel des Aufmachers („Neu im Blog"). */
+.hero .hero-rubrik {
+  display: inline-block;
+  margin-bottom: 14px;
+  padding: 4px 16px;
+  border-radius: 50px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  background: var(--accent-color);
+  text-shadow: none;
+}
+
 .btn-hero {
   font-size: 16px;
   padding: 12px 40px;
@@ -2002,3 +2016,18 @@ section,
 .documentation .kb-kachel:hover { border-color: #fff; color: #fff; box-shadow: none; }
 .documentation .kb-kachel > .bi, .documentation .kb-kachel-titel { color: #fff; }
 .documentation .kb-kachel-zahl { color: rgba(255, 255, 255, 0.6); }
+
+/* „Neu" am Menüpunkt Blog, solange ein eigener Artikel ganz neu ist. */
+.navmenu .menue-neu {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 50px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--accent-color);
+}

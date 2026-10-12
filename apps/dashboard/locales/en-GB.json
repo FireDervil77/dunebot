@@ -51,7 +51,10 @@
     "HERO_SLIDE3_BTN1": "Get Started",
     "HERO_SLIDE3_BTN2": "Documentation",
     "CAROUSEL_PREV": "Previous",
-    "CAROUSEL_NEXT": "Next"
+    "CAROUSEL_NEXT": "Next",
+    "HERO_BLOG_LABEL": "New on the blog",
+    "HERO_BLOG_ALL": "To the blog",
+    "BADGE_NEW": "New"
   },
   "FEATURES": {
     "TITLE": "Why Communities Choose FireBots",

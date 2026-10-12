@@ -63,6 +63,17 @@ module.exports.getIndex = async (req, res) => {
             }
         }
 
+        // Der neueste eigene Blogartikel — der Aufmacher im Hero (2026-10-12).
+        // Die Spiele-Updates aus Discord zählen nicht, siehe helpers/Blog.js.
+        let heroBlog = null;
+        if (sectionTypes.has('hero')) {
+            try {
+                heroBlog = await require('../helpers/Blog').neuester(userLocale);
+            } catch (err) {
+                Logger.error("Fehler beim Laden des neuesten Blogartikels:", err);
+            }
+        }
+
         // Changelogs laden
         let changelogsList = [];
         if (sectionTypes.has('changelogs')) {
@@ -189,6 +200,7 @@ module.exports.getIndex = async (req, res) => {
             sections,
             newsList: localizedNewsList,
             carouselNews,
+            heroBlog,
             changelogsList: localizedChangelogsList,
             pluginsList,
             addonsList,

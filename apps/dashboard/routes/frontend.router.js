@@ -30,6 +30,14 @@ router.use(async (req, res, next) => {
         res.locals.footerColumns = [];
     }
 
+    // „Neu" am Menüpunkt Blog, solange ein eigener Artikel ganz neu ist.
+    // Eigenes try: Ohne die Zahl fehlt nur das Zeichen, nicht die Seite.
+    try {
+        res.locals.blogNeu = await require('../helpers/Blog').zahlNeu();
+    } catch (_) {
+        res.locals.blogNeu = 0;
+    }
+
     // Einwilligung + Tag Manager für das Layout bereitstellen.
     // Eigenes try: Ein Fehler hier darf die Seite nicht kosten – er führt dann
     // dazu, dass nichts eingebunden wird, und das ist die sichere Richtung.
