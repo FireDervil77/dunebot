@@ -4,7 +4,7 @@ const frontendController = require("../controllers/frontend.controller");
 const apiController = require("../controllers/api.controller");
 const { NewsHelper } = require("dunebot-sdk/utils");
 const { ChangelogHelper } = require("dunebot-sdk/utils");
-const { htmlZuVorschautext } = require("../helpers/text");
+const { htmlZuVorschautext, langfassung } = require("../helpers/text");
 const { baueEinladungsUrl } = require("../helpers/Einladung");
 
 // Router erstellen
@@ -192,6 +192,9 @@ const getNewsDetails = async (req, res) => {
         await themeManager.renderView(res, 'frontend/news-details', {
             news: {
                 ...localizedNews,
+                // Ohne Inhalt zeigt die Seite die Kurzfassung — sonst stünde
+                // unter dem Titel nichts (helpers/text.js, `langfassung`).
+                content: langfassung(rawNews[0].content_translations, rawNews[0].excerpt_translations, userLocale),
                 formattedDate: new Date(localizedNews.date).toLocaleString(
                     userLocale,
                     {
@@ -465,7 +468,7 @@ router.get('/blog/:slug', async (req, res) => {
         const post = {
             ...rawPost,
             title: Spielemeldungen.text(rawPost.title_translations, userLocale),
-            content: Spielemeldungen.text(rawPost.content_translations, userLocale),
+            content: langfassung(rawPost.content_translations, rawPost.excerpt_translations, userLocale),
             excerpt: Spielemeldungen.text(rawPost.excerpt_translations, userLocale),
             formattedDate: blogDatum(rawPost.published_at, userLocale)
         };

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Der Blog außerhalb der Blogseite: Aufmacher im Hero, „Neu" am Menüpunkt.
+ * Der Blog außerhalb der Blogseite: Aufmacher im Hero, „Neu" am Menüpunkt —
+ * und die ausführliche Seite, wenn nur eine Kurzfassung da ist.
  *
  * ── Was hier gehalten wird (2026-10-12) ─────────────────────────────────────
  *
@@ -199,6 +200,29 @@ function uebersetzer(locale) {
         const css = lies('apps/dashboard/themes/default/assets/css/frontend.css');
         // Rohtext gewollt: Gesucht wird, ob es die Klassen in der Stildatei gibt.
         assert.ok(css.includes('.navmenu .menue-neu') && css.includes('.hero .hero-rubrik'));
+    });
+
+    // ═════════════════════════════════════════════════════════════
+    console.log('\nAusführliche Seite: ohne Inhalt die Kurzfassung');
+
+    await pruefe('News und Blogartikel, die nur eine Kurzfassung tragen, zeigen sie — in der Sprache des Lesers zuerst', () => {
+        const { langfassung, istLeererInhalt } = require(path.join(WURZEL, 'apps/dashboard/helpers/text.js'));
+        // Der Editor speichert „nichts" nicht als leere Zeichenkette.
+        for (const leer of ['', null, undefined, '<p>&nbsp;</p>', '<p><br></p>\n', '  <div> </div> ']) assert.strictEqual(istLeererInhalt(leer), true, JSON.stringify(leer));
+        for (const voll of ['<p>a</p>', '<p><img src="/x.png"></p>', '<iframe src="x"></iframe>']) assert.strictEqual(istLeererInhalt(voll), false, voll);
+
+        assert.strictEqual(langfassung({ 'de-DE': '<p>Lang</p>' }, { 'de-DE': '<p>Kurz</p>' }, 'de-DE'), '<p>Lang</p>');
+        assert.strictEqual(langfassung({ 'de-DE': '<p>&nbsp;</p>' }, { 'de-DE': '<p>Kurz</p>' }, 'de-DE'), '<p>Kurz</p>');
+        // Der Fall vom 2026-10-12 (News „Content Update"): englisch gibt es nur die Kurzfassung.
+        assert.strictEqual(langfassung(JSON.stringify({ 'de-DE': '<p>Lang</p>', 'en-GB': '' }), JSON.stringify({ 'de-DE': '<p>Kurz</p>', 'en-GB': '<p>Short</p>' }), 'en-GB'), '<p>Short</p>');
+        assert.strictEqual(langfassung({ 'de-DE': '<p>Lang</p>' }, {}, 'en-GB'), '<p>Lang</p>');
+        // Spielemeldungen tragen nur die englische Fassung.
+        assert.strictEqual(langfassung({ 'en-GB': '<p>Only</p>' }, null, 'de-DE'), '<p>Only</p>');
+        assert.strictEqual(langfassung(null, undefined, 'de-DE'), '');
+
+        const router = ohneKommentare(lies('apps/dashboard/routes/frontend.router.js'));
+        assert.ok(router.includes('content: langfassung(rawNews[0].content_translations, rawNews[0].excerpt_translations, userLocale)'), 'die News-Seite gibt nur den Inhalt aus');
+        assert.ok(router.includes('content: langfassung(rawPost.content_translations, rawPost.excerpt_translations, userLocale)'), 'die Blogseite gibt nur den Inhalt aus');
     });
 
     console.log(`\n${fehler ? '❌' : '✅'} ${bestanden} bestanden, ${fehler} gescheitert`);

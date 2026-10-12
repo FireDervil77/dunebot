@@ -110,4 +110,45 @@ function htmlZuVorschautext(html, maxLaenge = 150) {
     return (letzteLuecke > 0 ? abschnitt.slice(0, letzteLuecke) : abschnitt).replace(/[.,;:!?–—-]+$/, '') + '…';
 }
 
-module.exports = { entitiesAufloesen, htmlZuVorschautext };
+/**
+ * Ist dieses Feld aus dem Editor leer? Der Editor speichert für „nichts" nicht
+ * die leere Zeichenkette, sondern `<p>&nbsp;</p>` oder `<p><br></p>`. Ein Bild
+ * oder ein eingebettetes Video ohne ein Wort Text ist dagegen Inhalt.
+ *
+ * @param {string} html
+ * @returns {boolean}
+ */
+function istLeererInhalt(html) {
+    if (!html || typeof html !== 'string') return true;
+    if (/<(img|video|audio|iframe|table|hr)\b/i.test(html)) return false;
+    return htmlZuVorschautext(html, 20) === '';
+}
+
+/**
+ * Was die ausführliche Seite einer News oder eines Blogartikels zeigt.
+ *
+ * Betreiber, 2026-10-12: „Wenn ich eine News eintrage, die nur die Kurzfassung
+ * trägt, wird es auf der ausführlichen Seite nicht angezeigt." Die Seite gab
+ * nur den Inhalt aus — war der leer, stand unter dem Titel nichts.
+ *
+ * Reihenfolge: der Inhalt in der Sprache des Lesers, sonst die Kurzfassung in
+ * seiner Sprache, erst dann die Ersatzsprache. Eine englische Kurzfassung ist
+ * dem englischen Leser näher als der deutsche Volltext.
+ *
+ * @param {object} inhalte        `{ "de-DE": "…", "en-GB": "…" }`
+ * @param {object} kurzfassungen  ebenso
+ * @param {string} sprache
+ * @param {string} [ersatz='de-DE']
+ * @returns {string} HTML aus dem Editor
+ */
+function langfassung(inhalte, kurzfassungen, sprache, ersatz = 'de-DE') {
+    const lies = (feld) => { try { return typeof feld === 'string' ? JSON.parse(feld) : (feld || {}); } catch { return {}; } };
+    const i = lies(inhalte), k = lies(kurzfassungen);
+    for (const s of [...new Set([sprache, ersatz, ...Object.keys(i), ...Object.keys(k)])]) {
+        if (!istLeererInhalt(i[s])) return i[s];
+        if (!istLeererInhalt(k[s])) return k[s];
+    }
+    return '';
+}
+
+module.exports = { entitiesAufloesen, htmlZuVorschautext, istLeererInhalt, langfassung };
