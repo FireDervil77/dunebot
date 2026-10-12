@@ -517,6 +517,67 @@ function uebersetzer(locale) {
         await Wissen.artikelEntfernen(fremd);
     });
 
+    await pruefe('Verweise ziehen mit: Artikel umbenannt, Artikel verschoben, Bereich umbenannt', async () => {
+        const roh = (id) => db.query('SELECT content_translations AS c FROM kb_articles WHERE id = ?', [id]).then(z => JSON.parse(z[0].c));
+        const zweiter = await Wissen.bereichSpeichern({ title_de: 'Zweiter Prüfbereich', slug: 'pruef-zwei' });
+        const ziel = await Wissen.artikelSpeichern({ category_id: neuerBereich, title_de: 'Ziel', slug: 'ziel', content_de: 'Ich bin das Ziel. Siehe auch [mich selbst](/kb/pruef-bereich/ziel#oben).' });
+        const aehnlich = await Wissen.artikelSpeichern({ category_id: neuerBereich, title_de: 'Ziel neu', slug: 'ziel-neu', content_de: 'Ein anderer Artikel.' });
+        const quelle = await Wissen.artikelSpeichern({ category_id: zweiter, title_de: 'Quelle', slug: 'quelle',
+            content_de: 'Geh zu [Ziel](/kb/pruef-bereich/ziel), zum [Abschnitt](/kb/pruef-bereich/ziel#abschnitt), zum [ähnlichen](/kb/pruef-bereich/ziel-neu) und in den [Bereich](/kb/pruef-bereich). Kein Verweis: /kb/pruef-bereich/ziel',
+            content_en: 'See [target](/kb/pruef-bereich/ziel).' });
+        const speichern = (id, f, bericht) => Wissen.artikelRoh(id).then(a => Wissen.artikelSpeichern({
+            id, category_id: a.category_id, slug: a.slug, title_de: a.title_translations['de-DE'],
+            content_de: a.content_translations['de-DE'], content_en: a.content_translations['en-GB'] || '', status: a.status, ...f }, null, bericht));
+
+        // Speichern ohne Adresswechsel fasst nichts an und meldet nichts.
+        let bericht = {};
+        await speichern(ziel, {}, bericht);
+        assert.strictEqual(bericht.verweise, undefined);
+
+        // 1. Umbenennen
+        bericht = {};
+        await speichern(ziel, { slug: 'ziel-umbenannt' }, bericht);
+        assert.deepStrictEqual(bericht.verweise, { artikel: 2, stellen: 4, von: '/kb/pruef-bereich/ziel', nach: '/kb/pruef-bereich/ziel-umbenannt' });
+        let q = await roh(quelle);
+        assert.strictEqual(q['de-DE'], 'Geh zu [Ziel](/kb/pruef-bereich/ziel-umbenannt), zum [Abschnitt](/kb/pruef-bereich/ziel-umbenannt#abschnitt), zum [ähnlichen](/kb/pruef-bereich/ziel-neu) und in den [Bereich](/kb/pruef-bereich). Kein Verweis: /kb/pruef-bereich/ziel');
+        assert.strictEqual(q['en-GB'], 'See [target](/kb/pruef-bereich/ziel-umbenannt).', 'die englische Fassung wurde nicht mitgezogen');
+        assert.ok((await roh(ziel))['de-DE'].includes('(/kb/pruef-bereich/ziel-umbenannt#oben)'), 'der Verweis des Artikels auf sich selbst zeigt noch auf die alte Adresse');
+        assert.strictEqual((await roh(aehnlich))['de-DE'], 'Ein anderer Artikel.');
+
+        // 2. In einen anderen Bereich verschieben — der Fall des Betreibers.
+        bericht = {};
+        await speichern(ziel, { category_id: zweiter }, bericht);
+        assert.strictEqual(bericht.verweise.nach, '/kb/pruef-zwei/ziel-umbenannt');
+        q = await roh(quelle);
+        assert.ok(q['de-DE'].includes('[Ziel](/kb/pruef-zwei/ziel-umbenannt), zum [Abschnitt](/kb/pruef-zwei/ziel-umbenannt#abschnitt)'));
+        assert.ok(q['de-DE'].includes('[Bereich](/kb/pruef-bereich)'), 'der Verweis auf den alten BEREICH wurde mitgerissen');
+        // Und der Verweis trifft wirklich: Unter der neuen Adresse liegt der Artikel.
+        assert.strictEqual((await Wissen.artikel('pruef-zwei', 'ziel-umbenannt', 'de')).id, ziel);
+
+        // 3. Bereich umbenennen: alle Adressen darunter und der Bereich selbst.
+        bericht = {};
+        await Wissen.bereichSpeichern({ id: zweiter, title_de: 'Zweiter Prüfbereich', slug: 'pruef-drei' }, bericht);
+        assert.ok(bericht.verweise.stellen >= 4, JSON.stringify(bericht));
+        q = await roh(quelle);
+        assert.ok(q['de-DE'].includes('(/kb/pruef-drei/ziel-umbenannt)') && q['en-GB'] === 'See [target](/kb/pruef-drei/ziel-umbenannt).');
+        assert.strictEqual(await zahl(`SELECT COUNT(*) AS n FROM kb_articles WHERE content_translations LIKE '%](/kb/pruef-zwei%'`), 0);
+
+        // 4. Scheitert das Mitziehen, ist auch der Artikel nicht verschoben.
+        stoere = (sql) => /UPDATE kb_articles SET content_translations = \?/.test(sql);
+        await assert.rejects(speichern(ziel, { slug: 'ziel-halb' }), /vom Wächter gestört/);
+        stoere = null;
+        assert.strictEqual((await Wissen.artikelRoh(ziel)).slug, 'ziel-umbenannt', 'der Artikel ist umbenannt, obwohl das Mitziehen scheiterte');
+        assert.ok((await roh(quelle))['de-DE'].includes('(/kb/pruef-drei/ziel-umbenannt)'));
+
+        // Der Satz für den Menschen.
+        const router = ohneKommentare(lies('apps/dashboard/routes/admin/kb.router.js'));
+        assert.match(router, /artikelSpeichern\(req\.body \|\| \{\}, autor, bericht\)[\s\S]{0,260}zuVerweisen\(bericht\)/);
+        assert.match(router, /bereichSpeichern\(req\.body \|\| \{\}, bericht\)[\s\S]{0,120}zuVerweisen\(bericht\)/);
+
+        for (const id of [quelle, ziel, aehnlich]) await Wissen.artikelEntfernen(id);
+        await Wissen.bereichEntfernen(zweiter);
+    });
+
     // ════════════════════════════════════════════════════════════════════════
     console.log('\nSeiten: der echte Router, die echte Ansicht');
 

@@ -352,6 +352,67 @@ async function artikelRoh(id) {
         istStartseite: zeile.bereich_slug === START.bereich && zeile.slug === START.artikel };
 }
 
+// ── Verweise ziehen mit, wenn eine Adresse sich ändert (2026-10-12) ─────────
+//
+// Betreiber-Befund vom selben Tag: Er verschob „Daemon installieren" und
+// „Masterserver Übersicht" in einen neuen Bereich — acht Verweise aus anderen
+// Artikeln zeigten danach ins Leere. Die Verwaltung warnte nur im Hilfstext.
+//
+// Jetzt gehört beides zusammen: Ändert sich die Adresse eines Artikels
+// (Kürzel oder Bereich) oder das Kürzel eines Bereichs, werden die Verweise
+// darauf in ALLEN Artikeln und Sprachen im selben Zug umgeschrieben — in
+// einer Transaktion, damit es nie einen verschobenen Artikel mit alten
+// Verweisen gibt.
+
+/**
+ * In einem Markdown-Text die Verweise auf `alt` durch `neu` ersetzen.
+ *
+ * Getroffen wird nur ein Verweisziel (`](/kb/…`), und nur die ganze Adresse:
+ * `/kb/a/b` trifft `/kb/a/b`, `/kb/a/b#anker` und `/kb/a/b/`, aber nicht
+ * `/kb/a/b-neu`. Für einen Bereich (`/kb/a`) heißt das: auch alles darunter.
+ *
+ * @returns {{ text: string, stellen: number }}
+ */
+function ersetzeAdresse(text, alt, neu) {
+    const muster = new RegExp('(?<=\\]\\()' + alt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?=[)#?/\\s"]|$)', 'g');
+    let stellen = 0;
+    const aus = String(text ?? '').replace(muster, () => { stellen++; return neu; });
+    return { text: aus, stellen };
+}
+
+/**
+ * Die Verweise auf eine Adresse in allen Artikeln umschreiben.
+ *
+ * @param {string} alt  bisherige Adresse, etwa `/kb/gameserver/daemon-setup`
+ * @param {string} neu  neue Adresse
+ * @param {(sql: string, p?: any[]) => Promise<any>} q  Abfrage der laufenden Transaktion
+ * @returns {Promise<{ artikel: number, stellen: number }>}
+ */
+async function verweiseUmschreiben(alt, neu, q) {
+    const bericht = { artikel: 0, stellen: 0 };
+    if (alt === neu) return bericht;
+    const zeilen = await q('SELECT id, content_translations FROM kb_articles WHERE content_translations LIKE ?', [`%](${alt}%`]);
+    for (const z of zeilen) {
+        const inhalt = alsObjekt(z.content_translations);
+        let hier = 0;
+        for (const s of Object.keys(inhalt)) {
+            const e = ersetzeAdresse(inhalt[s], alt, neu);
+            inhalt[s] = e.text;
+            hier += e.stellen;
+        }
+        if (!hier) continue;
+        await q('UPDATE kb_articles SET content_translations = ? WHERE id = ?', [JSON.stringify(inhalt), z.id]);
+        bericht.artikel++;
+        bericht.stellen += hier;
+    }
+    return bericht;
+}
+
+/** Mehrere Schreibvorgänge als einer: `fn` bekommt die Abfrage der Transaktion. */
+function inTransaktion(fn) {
+    return db().transaction(verbindung => fn(async (sql, p) => (await verbindung.query(sql, p))[0]));
+}
+
 /** `/kb/suche` ist die Suche — ein Bereich dieses Namens wäre unter seiner Adresse nie zu sehen. */
 const VERGEBEN = ['suche'];
 
@@ -370,9 +431,10 @@ function pruefeKuerzel(wert, was) {
  * Bereich anlegen oder ändern. Wirft mit einem Satz, der sagt, was fehlt.
  *
  * @param {object} f  Formular: id?, slug, title_de, title_en, description_de, description_en, icon, sort_order, plugin
+ * @param {object} [bericht]  bekommt `verweise` ({ artikel, stellen }), wenn das Kürzel sich geändert hat
  * @returns {Promise<number>} id des Bereichs
  */
-async function bereichSpeichern(f) {
+async function bereichSpeichern(f, bericht = {}) {
     const titel = String(f.title_de || '').trim();
     if (!titel) throw new Eingabefehler('Bereich: Der deutsche Titel fehlt.');
     const slug = pruefeKuerzel(f.slug || kuerzelAus(titel), 'Bereich');
@@ -381,6 +443,7 @@ async function bereichSpeichern(f) {
     const doppelt = await db().query('SELECT id FROM kb_categories WHERE slug = ? AND id <> ?', [slug, id || 0]);
     if (doppelt.length) throw new Eingabefehler(`Bereich: Das Kürzel „${slug}" gibt es schon.`);
 
+    let altesKuerzel = null;
     if (id) {
         const [alt] = await db().query('SELECT slug FROM kb_categories WHERE id = ?', [id]);
         if (!alt) throw new Eingabefehler('Bereich: Diesen Bereich gibt es nicht mehr.');
@@ -388,14 +451,23 @@ async function bereichSpeichern(f) {
         if (alt.slug === START.bereich && slug !== START.bereich) {
             throw new Eingabefehler(`Bereich: „${START.bereich}" trägt den Text der Startseite von /kb — sein Kürzel bleibt.`);
         }
+        altesKuerzel = alt.slug;
     }
     const werte = [slug, uebersetzungen(titel, f.title_en), uebersetzungen(f.description_de, f.description_en),
         String(f.icon || '').trim().slice(0, 60) || null, Number.parseInt(f.sort_order, 10) || 0,
         String(f.plugin || '').trim().slice(0, 60) || null];
     if (id) {
-        await db().query(
-            `UPDATE kb_categories SET slug = ?, title_translations = ?, description_translations = ?,
-                    icon = ?, sort_order = ?, plugin = ? WHERE id = ?`, [...werte, id]);
+        const sql = `UPDATE kb_categories SET slug = ?, title_translations = ?, description_translations = ?,
+                    icon = ?, sort_order = ?, plugin = ? WHERE id = ?`;
+        if (altesKuerzel === slug) {
+            await db().query(sql, [...werte, id]);
+            return id;
+        }
+        // Neues Kürzel = neue Adresse für den Bereich und jeden Artikel darin.
+        await inTransaktion(async (q) => {
+            await q(sql, [...werte, id]);
+            bericht.verweise = await verweiseUmschreiben(`/kb/${altesKuerzel}`, `/kb/${slug}`, q);
+        });
         return id;
     }
     const ergebnis = await db().query(
@@ -421,9 +493,10 @@ async function bereichEntfernen(id) {
  * @param {object} f  Formular: id?, category_id, slug, title_de/_en, excerpt_de/_en, content_de/_en,
  *                    status, is_public, sort_order
  * @param {string|null} autor
+ * @param {object} [bericht]  bekommt `verweise` ({ artikel, stellen, von, nach }), wenn die Adresse sich geändert hat
  * @returns {Promise<number>} id des Artikels
  */
-async function artikelSpeichern(f, autor = null) {
+async function artikelSpeichern(f, autor = null, bericht = {}) {
     const titel = String(f.title_de || '').trim();
     if (!titel) throw new Eingabefehler('Artikel: Der deutsche Titel fehlt.');
     if (!String(f.content_de || '').trim()) throw new Eingabefehler('Artikel: Der deutsche Inhalt fehlt.');
@@ -439,9 +512,11 @@ async function artikelSpeichern(f, autor = null) {
         'SELECT id FROM kb_articles WHERE category_id = ? AND slug = ? AND id <> ?', [bereichId, slug, id || 0]);
     if (doppelt.length) throw new Eingabefehler(`Artikel: Im Bereich „${b.slug}" gibt es das Kürzel „${slug}" schon.`);
 
+    let alteAdresse = null;
     if (id) {
         const alt = await artikelRoh(id);
         if (!alt) throw new Eingabefehler('Artikel: Diesen Artikel gibt es nicht mehr.');
+        alteAdresse = `/kb/${alt.bereich_slug}/${alt.slug}`;
         // Die Startseite von /kb hängt an Bereich, Kürzel und Stand dieses einen Artikels.
         if (alt.istStartseite && (b.slug !== START.bereich || slug !== START.artikel || stand !== 'published' || !oeffentlich)) {
             throw new Eingabefehler('Artikel: Das ist der Text der Startseite von /kb — er bleibt in seinem Bereich, veröffentlicht und öffentlich. Den Text selbst kannst du ändern.');
@@ -450,9 +525,20 @@ async function artikelSpeichern(f, autor = null) {
     const werte = [bereichId, slug, uebersetzungen(titel, f.title_en), uebersetzungen(f.excerpt_de, f.excerpt_en),
         uebersetzungen(f.content_de, f.content_en), stand, oeffentlich, Number.parseInt(f.sort_order, 10) || 0];
     if (id) {
-        await db().query(
-            `UPDATE kb_articles SET category_id = ?, slug = ?, title_translations = ?, excerpt_translations = ?,
-                    content_translations = ?, status = ?, is_public = ?, sort_order = ? WHERE id = ?`, [...werte, id]);
+        const sql = `UPDATE kb_articles SET category_id = ?, slug = ?, title_translations = ?, excerpt_translations = ?,
+                    content_translations = ?, status = ?, is_public = ?, sort_order = ? WHERE id = ?`;
+        const neueAdresseDesArtikels = `/kb/${b.slug}/${slug}`;
+        if (alteAdresse === neueAdresseDesArtikels) {
+            await db().query(sql, [...werte, id]);
+            return id;
+        }
+        // Verschoben oder umbenannt: Die Verweise aus allen Artikeln ziehen mit —
+        // erst der Artikel, dann die Verweise, damit auch seine eigenen stimmen.
+        await inTransaktion(async (q) => {
+            await q(sql, [...werte, id]);
+            bericht.verweise = { ...(await verweiseUmschreiben(alteAdresse, neueAdresseDesArtikels, q)),
+                von: alteAdresse, nach: neueAdresseDesArtikels };
+        });
         return id;
     }
     const ergebnis = await db().query(
@@ -477,4 +563,5 @@ module.exports = {
     bereiche, bereich, artikelImBereich, artikel, suche,
     allesFuerVerwaltung, bereichRoh, artikelRoh,
     bereichSpeichern, bereichEntfernen, artikelSpeichern, artikelEntfernen,
+    ersetzeAdresse, verweiseUmschreiben, inTransaktion,
 };

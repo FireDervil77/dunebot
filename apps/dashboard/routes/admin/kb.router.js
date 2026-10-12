@@ -56,6 +56,15 @@ const schreibe = (name, fn) => async (req, res) => {
     }
 };
 
+/** Der Satz zum Mitziehen der Verweise — nur, wenn es etwas zu sagen gibt. */
+function zuVerweisen(bericht) {
+    const v = bericht.verweise;
+    if (!v) return '';
+    if (!v.stellen) return ' Die Adresse hat sich geändert; auf die alte verwies kein Artikel.';
+    return ` Die Adresse hat sich geändert: ${v.stellen} ${v.stellen === 1 ? 'Verweis' : 'Verweise'} in `
+        + `${v.artikel} ${v.artikel === 1 ? 'Artikel zeigt' : 'Artikeln zeigen'} jetzt auf die neue.`;
+}
+
 // ── Übersicht ────────────────────────────────────────────────────────────────
 router.get('/', seite('Übersicht', async (req, res) => {
     await zeige(res, 'admin/kb/index', {
@@ -77,8 +86,9 @@ router.get('/bereich/:id', seite('Bereich', async (req, res) => {
 }));
 
 router.post('/bereich/speichern', schreibe('Bereich speichern', async (req) => {
-    const id = await Wissen.bereichSpeichern(req.body || {});
-    return { id, message: 'Bereich gespeichert.' };
+    const bericht = {};
+    const id = await Wissen.bereichSpeichern(req.body || {}, bericht);
+    return { id, message: 'Bereich gespeichert.' + zuVerweisen(bericht) };
 }));
 
 router.post('/bereich/:id/entfernen', schreibe('Bereich entfernen', async (req) => {
@@ -108,9 +118,10 @@ router.get('/artikel/:id', seite('Artikel', async (req, res) => {
 
 router.post('/artikel/speichern', schreibe('Artikel speichern', async (req) => {
     const autor = req.session?.user?.info?.global_name || req.session?.user?.info?.username || null;
-    const id = await Wissen.artikelSpeichern(req.body || {}, autor);
+    const bericht = {};
+    const id = await Wissen.artikelSpeichern(req.body || {}, autor, bericht);
     const a = await Wissen.artikelRoh(id);
-    return { id, adresse: a.istStartseite ? '/kb' : `/kb/${a.bereich_slug}/${a.slug}`, message: 'Artikel gespeichert.' };
+    return { id, adresse: a.istStartseite ? '/kb' : `/kb/${a.bereich_slug}/${a.slug}`, message: 'Artikel gespeichert.' + zuVerweisen(bericht) };
 }));
 
 router.post('/artikel/:id/entfernen', schreibe('Artikel entfernen', async (req) => {

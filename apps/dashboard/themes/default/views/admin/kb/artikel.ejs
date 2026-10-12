@@ -60,7 +60,7 @@
                             <label class="form-label" for="aKuerzel">Kürzel für die Adresse</label>
                             <input class="form-control font-monospace" id="aKuerzel" name="slug" maxlength="80" pattern="[a-z0-9][a-z0-9-]*"
                                    value="<%= artikel ? artikel.slug : '' %>" placeholder="aus dem Titel" <%= istStart ? 'readonly' : '' %>>
-                            <div class="form-hint"><%= artikel ? 'Ändern heißt: Die bisherige Adresse gilt nicht mehr.' : 'Leer lassen, dann entsteht es aus dem Titel.' %></div>
+                            <div class="form-hint"><%= artikel ? 'Ändern heißt: Die bisherige Adresse gilt nicht mehr. Verweise aus anderen Artikeln ziehen mit.' : 'Leer lassen, dann entsteht es aus dem Titel.' %></div>
                         </div>
                         <div class="col-md-2">
                             <label class="form-label" for="aStand">Stand</label>
