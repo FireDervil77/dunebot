@@ -17,9 +17,11 @@
  *   Nachholen     nach einer Pause des Bots fehlt, was dazwischen einging
  *   Trennung      die Meldungen begraben die eigenen Artikel; oder ein eigener
  *                 Artikel lässt sich „ausblenden" wie eine Meldung
+ *   Bilder        etwas, das kein Bild ist, liegt unter unserer Domain; ein Bild
+ *                 wird bei jeder Änderung neu geladen; ein kaputtes kostet die Meldung
  *
- * Datenbank: Alles läuft an TEMPORÄREN Kopien von `blog_posts` und
- * `admin_settings`. Die Verbindung verweigert jedes Schreiben und jedes
+ * Datenbank: Alles läuft an TEMPORÄREN Kopien von `blog_posts`,
+ * `admin_settings` und `guild_media`; Bilder landen in einem Wegwerf-Ordner. Die Verbindung verweigert jedes Schreiben und jedes
  * `ALTER` an einer Tabelle, die keine Kopie ist; am Ende wird nachgezählt.
  * Abgefragt wird mit `execute` — wie der Datenbankdienst im Betrieb.
  *
@@ -50,16 +52,18 @@ const lies = (p) => fs.readFileSync(path.join(WURZEL, p), 'utf8');
 let fehler = 0, bestanden = 0;
 async function pruefe(was, tun) {
     try { await tun(); bestanden++; console.log(`  ✓ ${was}`); }
-    catch (e) { fehler++; console.log(`  ✗ ${was}\n      ${String(e.message).split('\n').slice(0, 3).join('\n      ')}`); }
+    catch (e) { fehler++; console.log(`  ✗ ${was}\n      ${String(e.message).split('\n').slice(0, process.env.FB_LANG ? 30 : 3).join('\n      ')}`); }
 }
 
-const ERLAUBT = ['p', 'br', 'h2', 'h3', 'h4', 'ul', 'ol', 'li', 'strong', 'em', 'u', 's', 'a', 'code', 'pre', 'blockquote', 'small'];
+const ERLAUBT = ['p', 'br', 'h2', 'h3', 'h4', 'ul', 'ol', 'li', 'strong', 'em', 'u', 's', 'a', 'code', 'pre', 'blockquote', 'small', 'img'];
 /** Jedes Tag im Ergebnis steht auf der Liste; ein `<a>` trägt genau href, target, rel — und zeigt auf http(s). */
 function nurErlaubtes(html) {
     for (const t of html.matchAll(/<\/?([a-zA-Z0-9!?-]*)([^>]*)>/g)) {
         assert.ok(ERLAUBT.includes(t[1]), `fremdes Tag <${t[1]}> in: ${html.slice(0, 120)}`);
         if (t[1] === 'a' && !t[0].startsWith('</')) {
             assert.match(t[2], /^ href="https?:\/\/[^"]*" target="_blank" rel="noopener nofollow"$/, `ein Verweis mit fremden Angaben: ${t[0]}`);
+        } else if (t[1] === 'img') {
+            assert.match(t[2], /^ src="\/uploads\/media\/\d{17,20}\/meldung-\d{17,20}-\d{17,20}\.(jpg|png|gif|webp)" alt="[^"<>]*" loading="lazy"$/, `ein Bild, das nicht aus unserer Ablage kommt: ${t[0]}`);
         } else {
             assert.strictEqual(t[2], '', `ein Tag mit Angaben: ${t[0]}`);
         }
@@ -79,6 +83,7 @@ function roh(text, mehr = {}) {
         message_reference: mehr.ohneBezug ? undefined : { guild_id: '1006265467754790943', channel_id: '1349723749858934834', message_id: '1558202236448935998' },
         timestamp: zeit.toISOString(),
         embeds: mehr.embeds || [],
+        attachments: mehr.attachments || [],
     };
 }
 const n = (text, mehr) => S.ausRoh(roh(text, mehr));
@@ -211,8 +216,48 @@ const n = (text, mehr) => S.ausRoh(roh(text, mehr));
         assert.deepStrictEqual(S.beitrag(S.ausDiscordJs(dj)), S.beitrag(S.ausRoh(r)));
     });
 
+    const anhang = (mehr = {}) => ({ id: mehr.id || '1557193051871387759', filename: 'bild.png', size: 1593243, width: 1280, height: 720,
+        content_type: 'image/png', url: 'https://cdn.discordapp.com/attachments/153236740457496577/1557193051871387759/bild.png?ex=abc&is=def&hm=123', ...mehr });
+
+    await pruefe('Bilder: nur Rasterbilder bis 5 MB von Discords Auslieferung, höchstens vier — mit einem Namen aus den Kennungen', () => {
+        const mit = (liste) => S.bildAnhaenge(n('# T\nText', { id: '1557226689023574038', attachments: liste }));
+        const [b] = mit([anhang()]);
+        assert.deepStrictEqual([b.name, b.typ, b.breite, b.hoehe], ['meldung-1557226689023574038-1557193051871387759.png', 'image/png', 1280, 720]);
+        // Die Endung kommt aus dem Typ, nie aus dem Namen der Datei.
+        assert.strictEqual(mit([anhang({ filename: 'boese.svg', content_type: 'image/jpeg' })])[0].name.slice(-4), '.jpg');
+        for (const nein of [
+            { content_type: 'image/svg+xml' }, { content_type: 'video/mp4' }, { content_type: 'text/html' }, { content_type: undefined },
+            { size: 5 * 1024 * 1024 + 1 }, { size: 0 },
+            { url: 'https://evil.example/attachments/1/2/bild.png' }, { url: 'http://cdn.discordapp.com/attachments/1/2/bild.png' },
+            { url: 'https://cdn.discordapp.com.evil.example/x.png' }, { url: 'keine adresse' }, { id: '../../etc/passwd' },
+        ]) assert.deepStrictEqual(mit([anhang(nein)]), [], JSON.stringify(nein));
+        assert.strictEqual(mit(Array.from({ length: 7 }, (_, i) => anhang({ id: String(1557193051871387759n + BigInt(i)) }))).length, S.BILDER_JE_MELDUNG);
+        assert.deepStrictEqual(S.bildAnhaenge(n('Text')), []);
+    });
+
+    await pruefe('Bilder: erkannt am Dateikopf, nicht am genannten Typ; im Beitrag nur Adressen aus unserer Ablage', () => {
+        const png = Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), Buffer.alloc(32)]);
+        const jpg = Buffer.concat([Buffer.from('ffd8ffe0', 'hex'), Buffer.alloc(32)]);
+        const webp = Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WEBP'), Buffer.alloc(16)]);
+        assert.ok(S.istBild(png, 'image/png') && S.istBild(jpg, 'image/jpeg') && S.istBild(webp, 'image/webp') && S.istBild(Buffer.from('GIF89a' + 'x'.repeat(20)), 'image/gif'));
+        assert.ok(!S.istBild(png, 'image/jpeg') && !S.istBild(Buffer.from('<svg onload=alert(1)>' + ' '.repeat(20)), 'image/png'));
+        assert.ok(!S.istBild(Buffer.from('<html><script>x</script></html>'), 'image/jpeg') && !S.istBild(Buffer.alloc(4), 'image/png') && !S.istBild(png, 'image/svg+xml'));
+        assert.ok(!S.istBild(Buffer.concat([png, Buffer.alloc(S.BILD_HOECHSTENS)]), 'image/png'), 'zu groß');
+
+        const gut = '/uploads/media/565123525795643393/meldung-1557226689023574038-1557193051871387759.png';
+        assert.strictEqual(S.bildHtml([{ adresse: gut, alt: 'Dune: "Update" <1.5>' }]),
+            `<p><img src="${gut}" alt="Dune: &quot;Update&quot; &lt;1.5&gt;" loading="lazy"></p>`);
+        for (const boese of ['https://evil.example/x.png', 'javascript:alert(1)', gut + '" onerror="x', '/uploads/media/../../etc/passwd', gut.replace('.png', '.svg'), '']) {
+            assert.strictEqual(S.bildHtml([{ adresse: boese, alt: 'x' }]), '', boese);
+        }
+        const b = S.beitrag(n('# Mit Bild\nText'), [{ adresse: gut, alt: 'x' }]);
+        assert.ok(b.inhalt.startsWith('<p>Text</p>') && b.inhalt.endsWith('loading="lazy"></p>'), 'das Bild steht unter dem Text');
+        nurErlaubtes(b.inhalt);
+        assert.strictEqual(S.beitrag(n('# Ohne Bild\nText')).inhalt, '<p>Text</p>');
+    });
+
     // ═════════════════════════════════════════════════════════════
-    console.log('\nDatenbank: an Kopien von blog_posts und admin_settings');
+    console.log('\nDatenbank: an Kopien von blog_posts, admin_settings und guild_media');
 
     const zugang = {
         host: process.env.MYSQL_HOST, port: process.env.MYSQL_PORT,
@@ -224,10 +269,11 @@ const n = (text, mehr) => S.ausRoh(roh(text, mehr));
         beitraege: (await aussen.query('SELECT COUNT(*) AS n, COALESCE(MAX(id), 0) AS m FROM blog_posts'))[0][0],
         spalten: (await aussen.query('SHOW COLUMNS FROM blog_posts'))[0].map(z => z.Field).join(','),
         kanal: (await aussen.query('SELECT `value` FROM admin_settings WHERE `key` = ?', [S.SCHLUESSEL]))[0].map(z => z.value).join('|'),
+        medien: (await aussen.query('SELECT COUNT(*) AS n, COALESCE(MAX(id), 0) AS m FROM guild_media'))[0][0],
     });
     const vorher = await echt();
 
-    for (const tab of ['blog_posts', 'admin_settings']) {
+    for (const tab of ['blog_posts', 'admin_settings', 'guild_media']) {
         await c.query(`CREATE TEMPORARY TABLE fb_k LIKE \`${tab}\``);
         await c.query(`CREATE TEMPORARY TABLE \`${tab}\` LIKE fb_k`);
         await c.query('DROP TEMPORARY TABLE fb_k');
@@ -450,6 +496,80 @@ const n = (text, mehr) => S.ausRoh(roh(text, mehr));
         assert.strictEqual(await zahl("SELECT COUNT(*) AS n FROM blog_posts WHERE title_translations LIKE '%Abgeschaltet%'"), 0);
         await S.kanalSetzen(q, { channel_id: KANAL, channel_name: '📡-game-updates' });
         Bot.vergiss();
+    });
+
+    await pruefe('Nachholen vom Dashboard aus liest ab dem Stichtag: nichts doppelt, Geändertes zieht nach', async () => {
+        const vorher3 = await zahl("SELECT COUNT(*) AS n FROM blog_posts WHERE source = 'discord'");
+        // Älter als die jüngste eingelesene Meldung (die Nachrichten der Prüfung davor reichen bis zum 11. Juli).
+        const eine = roh('# Erst so\nText', { zeit: TAG('2026-07-05'), absender: 'Hytale #patch-notes' });
+        const inhalt = [eine];
+        const client = { channels: { fetch: async () => ({ messages: { fetch: async ({ after, limit }) => {
+            const teil = inhalt.filter(m => BigInt(m.id) > BigInt(after)).slice(0, limit);
+            return { size: teil.length, values: () => teil.map(m => dj(m)) };
+        } } }) } };
+        Bot.vergiss();
+        // Ohne `vonVorn` läge diese Nachricht VOR der jüngsten eingelesenen und käme nie an.
+        assert.deepStrictEqual((({ gelesen, neu }) => [gelesen, neu])(await Bot.nachholen(client)), [0, 0]);
+        assert.deepStrictEqual((({ gelesen, neu }) => [gelesen, neu])(await Bot.nachholen(client, { vonVorn: true })), [1, 1]);
+        eine.content = '# Jetzt anders\nText';
+        assert.deepStrictEqual((({ gelesen, neu, geaendert }) => [gelesen, neu, geaendert])(await Bot.nachholen(client, { vonVorn: true })), [1, 0, 1]);
+        assert.strictEqual(await zahl("SELECT COUNT(*) AS n FROM blog_posts WHERE source = 'discord'"), vorher3 + 1);
+        await q('DELETE FROM blog_posts WHERE source_message_id = ?', [eine.id]);
+    });
+
+    await pruefe('Bilder holen: in den Ordner „spiele-updates" der Medienablage, einmal je Anhang — und ein kaputtes Bild kostet nicht die Meldung', async () => {
+        const Bilder = require(path.join(WURZEL, 'apps/bot/helpers/SpieleBilder.js'));
+        const os = require('os');
+        const ablage = fs.mkdtempSync(path.join(os.tmpdir(), 'fb-meldungsbilder-'));
+        const GUILD = '565123525795643393';
+        const png = Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), Buffer.alloc(64, 7)]);
+        const echtesFetch = global.fetch;
+        const geholt = [];
+        global.fetch = async (adresse) => {
+            geholt.push(adresse);
+            const daten = /kaputt/.test(adresse) ? Buffer.from('<html>Not an image</html>   ') : (/weg/.test(adresse) ? null : png);
+            return { ok: daten !== null, status: daten ? 200 : 404, headers: { get: () => String(daten ? daten.length : 0) },
+                arrayBuffer: async () => daten.buffer.slice(daten.byteOffset, daten.byteOffset + daten.length) };
+        };
+        try {
+            const basis = 'https://cdn.discordapp.com/attachments/1/';
+            const nachricht = n('# Update 1.5\nText', { id: '1557226689023574038', attachments: [
+                anhang({ id: '1557193051871387001', url: basis + 'gut.png' }),
+                anhang({ id: '1557193051871387002', url: basis + 'kaputt.png' }),
+                anhang({ id: '1557193051871387003', url: basis + 'weg.png' }),
+            ] });
+            let bilder = await Bilder.sichere(nachricht, GUILD, '1400171310918795334', 'Dune: Awakening: Update 1.5', ablage);
+            assert.deepStrictEqual(bilder, [{ adresse: `/uploads/media/${GUILD}/meldung-1557226689023574038-1557193051871387001.png`, alt: 'Dune: Awakening: Update 1.5' }]);
+            assert.deepStrictEqual(fs.readdirSync(path.join(ablage, GUILD)), ['meldung-1557226689023574038-1557193051871387001.png'], 'nur das echte Bild liegt auf der Platte');
+            const zeilen = await q('SELECT * FROM guild_media');
+            assert.strictEqual(zeilen.length, 1);
+            assert.deepStrictEqual(
+                [zeilen[0].guild_id, zeilen[0].folder, zeilen[0].stored_name, zeilen[0].mime_type, zeilen[0].file_size, zeilen[0].width, zeilen[0].uploaded_by, zeilen[0].title],
+                [GUILD, 'spiele-updates', 'meldung-1557226689023574038-1557193051871387001.png', 'image/png', png.length, 1280, '1400171310918795334', 'Dune: Awakening: Update 1.5']);
+
+            // Noch einmal (der Hersteller ändert den Text): nichts wird neu geladen oder doppelt eingetragen.
+            const vorher4 = geholt.filter(a => /gut/.test(a)).length;
+            bilder = await Bilder.sichere(nachricht, GUILD, '1400171310918795334', 'x', ablage);
+            assert.strictEqual(bilder.length, 1);
+            assert.strictEqual(geholt.filter(a => /gut/.test(a)).length, vorher4, 'das Bild wurde ein zweites Mal geladen');
+            assert.strictEqual(await zahl('SELECT COUNT(*) AS n FROM guild_media'), 1);
+
+            // Der Betreiber hat die Datei in der Medienablage gelöscht: Beim nächsten Durchgang ist sie wieder da.
+            await q('DELETE FROM guild_media');
+            fs.unlinkSync(path.join(ablage, GUILD, 'meldung-1557226689023574038-1557193051871387001.png'));
+            assert.strictEqual((await Bilder.sichere(nachricht, GUILD, '1', 'x', ablage)).length, 1);
+            assert.strictEqual(await zahl('SELECT COUNT(*) AS n FROM guild_media'), 1);
+
+            assert.deepStrictEqual(await Bilder.sichere(nachricht, '../../etc', '1', 'x', ablage), [], 'eine Guild-Kennung, die keine ist');
+            // Der Beitrag trägt das Bild — und die Meldung mit dem kaputten Bild ist trotzdem da.
+            assert.strictEqual(await S.uebernimm(q, nachricht, KANAL, bilder), 'neu');
+            assert.ok(S.text((await zeile(nachricht.id)).content_translations, 'en-GB').includes(bilder[0].adresse));
+            await q('DELETE FROM blog_posts WHERE source_message_id = ?', [nachricht.id]);
+            assert.ok(!Bilder.ABLAGE.startsWith(ablage) && Bilder.ABLAGE.endsWith(path.join('apps', 'dashboard', 'uploads', 'media')));
+        } finally {
+            global.fetch = echtesFetch;
+            fs.rmSync(ablage, { recursive: true, force: true });
+        }
     });
 
     // ═════════════════════════════════════════════════════════════

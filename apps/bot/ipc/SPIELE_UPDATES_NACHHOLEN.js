@@ -7,7 +7,8 @@ const SpieleUpdates = require('../helpers/SpieleUpdates');
  *
  * Das Dashboard ruft ihn, nachdem der Betreiber den Kanal mit den
  * Spiele-Updates eingestellt hat: Der Bot liest den Kanal neu aus der
- * Datenbank und holt gleich nach, was dort seit dem Stichtag steht.
+ * Datenbank und liest ihn ab dem Stichtag noch einmal durch — Neues kommt
+ * dazu, Geändertes und fehlende Bilder werden nachgezogen, nichts doppelt.
  *
  * @param {Object} payload leer
  * @param {import('discord.js').Client} client
@@ -16,7 +17,8 @@ const SpieleUpdates = require('../helpers/SpieleUpdates');
 module.exports = async (payload, client) => {
     SpieleUpdates.vergiss();
     try {
-        const ergebnis = await SpieleUpdates.nachholen(client);
+        // Vom Dashboard aus immer ab dem Stichtag: zieht Geändertes und fehlende Bilder nach.
+        const ergebnis = await SpieleUpdates.nachholen(client, { vonVorn: true });
         return ergebnis.fehler ? { success: false, error: ergebnis.fehler, ...ergebnis } : { success: true, ...ergebnis };
     } catch (fehler) {
         return { success: false, error: fehler.message };

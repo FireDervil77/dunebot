@@ -629,7 +629,9 @@
                                 <p class="text-secondary">
                                     Aus diesem Kanal übernimmt der Bot die Ankündigungen der Spielehersteller in den Blog —
                                     nur Nachrichten, die über „Folgen" aus einem fremden Server kommen, nie was sonst im Kanal steht.
-                                    Beim ersten Mal holt er alles seit dem <strong><%= (locals.spieleMeldungen || {}).stichtag || '' %></strong> nach.
+                                    „Speichern und nachholen" liest den Kanal ab dem <strong><%= (locals.spieleMeldungen || {}).stichtag || '' %></strong> noch einmal durch:
+                                    Neues kommt dazu, geänderte Texte und fehlende Bilder werden nachgezogen, nichts wird doppelt angelegt.
+                                    Die Bilder der Meldungen liegen in der Medienablage im Ordner <code>spiele-updates</code> — dort gelöschte fehlen im Beitrag, bis du hier wieder nachholst.
                                 </p>
                                 <div class="mb-3 row">
                                     <label class="col-sm-3 col-form-label" for="spiele-updates-kanal">📡 Kanal</label>

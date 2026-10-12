@@ -36,6 +36,11 @@
  *     Blogseite zeigt je Spiel höchstens drei
  *   - Bestand ab dem 1. Juli 2026, „alles andere ist Schrott"
  *   - englisch, wie die Hersteller schreiben — übersetzt wird nichts
+ *   - Bilder der Meldung kommen mit (2026-10-12, zweiter Durchgang: „dass keine
+ *     Bilder ankommen, ist ein wenig nervig"). Die Adressen von Discord laufen
+ *     ab, also kopiert der Bot sie in die Medienablage — in einen eigenen
+ *     Ordner, „damit ich weiß, dass das die Bilder sind, die zu den
+ *     Spiele-Blog-Artikeln gehören, und ich sie nicht aus Versehen entferne"
  */
 
 /** Schlüssel in `admin_settings`: `{ "channel_id": "…", "channel_name": "…" }`. */
@@ -51,6 +56,20 @@ const ORIGINAL_WEG = 1 << 3;   // SOURCE_MESSAGE_DELETED — der Hersteller hat 
 
 /** Sichtbar, vom Betreiber ausgeblendet, vom Hersteller oder aus dem Kanal gelöscht. */
 const STAENDE = ['published', 'hidden', 'removed'];
+
+/**
+ * Bilder: welche Anhänge mitkommen und wohin. Die Endung kommt aus dieser
+ * Zuordnung, nie aus dem Namen der Datei — wie in der Medienablage selbst
+ * (`routes/guild/media.router.js`), und mit derselben Grenze von 5 MB.
+ */
+const BILD_TYPEN = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/gif': '.gif', 'image/webp': '.webp' };
+const BILD_HOECHSTENS = 5 * 1024 * 1024;
+const BILDER_JE_MELDUNG = 4;
+/** Der Ordner in der Medienablage der Guild, zu der der Kanal gehört. */
+const BILD_ORDNER = 'spiele-updates';
+/** Von hier, und nur von hier, lädt der Bot einen Anhang. */
+const BILD_HERKUNFT = ['cdn.discordapp.com', 'media.discordapp.net'];
+const BILD_ADRESSE = /^\/uploads\/media\/\d{17,20}\/meldung-\d{17,20}-\d{17,20}\.(?:jpg|png|gif|webp)$/;
 
 const JE_SPIEL = 3;
 const IN_DER_SPALTE = 12;
@@ -294,6 +313,7 @@ function kuerzel(spiel, titel, kennung) {
  * @property {{guild?: string, kanal?: string, nachricht?: string}|null} bezug  das Original
  * @property {Date} zeit
  * @property {Array<{titel?: string, beschreibung?: string}>} einbettungen
+ * @property {Array<{id: string, adresse: string, name: string, typ: string, groesse: number, breite?: number, hoehe?: number}>} anhaenge
  */
 
 /** @returns {Nachricht} */
@@ -308,6 +328,9 @@ function ausDiscordJs(message) {
             : null,
         zeit: message.createdAt,
         einbettungen: (message.embeds || []).map(e => ({ art: e.data?.type, titel: e.title, beschreibung: e.description })),
+        anhaenge: [...(message.attachments?.values?.() || [])].map(a => ({
+            id: String(a.id), adresse: a.url, name: a.name, typ: a.contentType, groesse: a.size, breite: a.width, hoehe: a.height,
+        })),
     };
 }
 
@@ -323,6 +346,9 @@ function ausRoh(m) {
             : null,
         zeit: new Date(m.timestamp),
         einbettungen: (m.embeds || []).map(e => ({ art: e.type, titel: e.title, beschreibung: e.description })),
+        anhaenge: (m.attachments || []).map(a => ({
+            id: String(a.id), adresse: a.url, name: a.filename, typ: a.content_type, groesse: a.size, breite: a.width, hoehe: a.height,
+        })),
     };
 }
 
@@ -339,12 +365,69 @@ function textVon(n) {
 }
 
 /**
+ * Die Bild-Anhänge einer Nachricht, die mitkommen: ein erlaubter Typ, höchstens
+ * 5 MB, von Discords Auslieferung, höchstens vier. Jeder bekommt seinen Namen
+ * in der Medienablage — aus den Kennungen von Nachricht und Anhang, damit
+ * derselbe Anhang immer dieselbe Datei ist (nie doppelt geladen) und der Name
+ * dem Betreiber sagt, wozu die Datei gehört.
+ *
+ * @param {Nachricht} n
+ * @returns {Array<{id: string, adresse: string, typ: string, groesse: number, breite: ?number, hoehe: ?number, original: string, name: string}>}
+ */
+function bildAnhaenge(n) {
+    if (!n || !/^\d{17,20}$/.test(String(n.id))) return [];
+    const aus = [];
+    for (const a of n.anhaenge || []) {
+        const endung = BILD_TYPEN[String(a.typ || '').toLowerCase().split(';')[0].trim()];
+        if (!endung || !/^\d{17,20}$/.test(String(a.id))) continue;
+        if (!(Number(a.groesse) > 0 && Number(a.groesse) <= BILD_HOECHSTENS)) continue;
+        let host = '';
+        try { const u = new URL(a.adresse); host = u.protocol === 'https:' ? u.hostname.toLowerCase() : ''; } catch { /* keine Adresse */ }
+        if (!BILD_HERKUNFT.includes(host)) continue;
+        aus.push({
+            id: String(a.id), adresse: a.adresse, typ: String(a.typ).toLowerCase().split(';')[0].trim(), groesse: Number(a.groesse),
+            breite: Number(a.breite) || null, hoehe: Number(a.hoehe) || null,
+            original: String(a.name || 'bild' + endung).slice(0, 255),
+            name: `meldung-${n.id}-${a.id}${endung}`,
+        });
+        if (aus.length >= BILDER_JE_MELDUNG) break;
+    }
+    return aus;
+}
+
+/**
+ * Sind das wirklich die Bytes eines Bildes dieses Typs? Den Typ nennt Discord,
+ * die Datei liegt danach hinter `express.static` unter unserer Domain — was
+ * auf die Platte kommt, wird am Dateikopf erkannt, nicht geglaubt.
+ */
+function istBild(daten, typ) {
+    if (!daten || daten.length < 12 || daten.length > BILD_HOECHSTENS) return false;
+    const kopf = (hex) => daten.subarray(0, hex.length / 2).toString('hex') === hex;
+    switch (typ) {
+        case 'image/jpeg': return kopf('ffd8ff');
+        case 'image/png': return kopf('89504e470d0a1a0a');
+        case 'image/gif': return kopf('474946383761') || kopf('474946383961');
+        case 'image/webp': return kopf('52494646') && daten.subarray(8, 12).toString('latin1') === 'WEBP';
+        default: return false;
+    }
+}
+
+/** Die Bilder unter dem Text. Eine Adresse, die nicht nach unserer Ablage aussieht, fällt weg. */
+function bildHtml(bilder) {
+    return (bilder || [])
+        .filter(b => b && BILD_ADRESSE.test(String(b.adresse)))
+        .map(b => `<p><img src="${b.adresse}" alt="${escape(b.alt || '')}" loading="lazy"></p>`)
+        .join('\n');
+}
+
+/**
  * Was aus einer Nachricht im Blog wird — oder `null`, wenn sie keine gefolgte
  * Ankündigung ist (Geplauder im Kanal, „X folgt jetzt …") oder leer.
  *
  * @param {Nachricht} n
+ * @param {Array<{adresse: string, alt?: string}>} [bilder] schon in der Medienablage liegende Bilder der Nachricht
  */
-function beitrag(n) {
+function beitrag(n, bilder = []) {
     if (!n || !/^\d{17,20}$/.test(String(n.id)) || !(n.flags & GEFOLGT)) return null;
     const text = textVon(n);
     const { titel, rest } = titelUndRest(text);
@@ -359,7 +442,7 @@ function beitrag(n) {
     return {
         kennung: String(n.id),
         titel,
-        inhalt: zuHtml(rest) || `<p>${escape(titel)}</p>`,
+        inhalt: [zuHtml(rest) || `<p>${escape(titel)}</p>`, bildHtml(bilder)].filter(Boolean).join('\n'),
         kurztext: kuerze(klartext(rest) || titel, 220),
         kuerzel: kuerzel(q.spiel, titel, n.id),
         spiel: q.spiel.slice(0, 120),
@@ -401,10 +484,11 @@ async function kanalSetzen(q, { channel_id, channel_name }) {
  * Der Stand wird beim Nachziehen NIE angefasst: Was der Betreiber ausgeblendet
  * hat, bleibt ausgeblendet, auch wenn der Hersteller seinen Text ändert.
  *
+ * @param {Array<{adresse: string, alt?: string}>} [bilder] Bilder der Nachricht, die schon in der Medienablage liegen
  * @returns {Promise<'neu'|'geaendert'|'gleich'|'entfernt'|null>} `null`: keine Meldung für den Blog
  */
-async function uebernimm(q, n, kanalId) {
-    const b = beitrag(n);
+async function uebernimm(q, n, kanalId, bilder = []) {
+    const b = beitrag(n, bilder);
     if (!b) return null;
 
     const da = await q('SELECT id, status, title_translations, content_translations FROM blog_posts WHERE source_message_id = ?', [b.kennung]);
@@ -536,7 +620,9 @@ async function fuerVerwaltung(q, sprache, hoechstens = 100) {
 
 module.exports = {
     SCHLUESSEL, STICHTAG, RUBRIK, QUELLE, GEFOLGT, ORIGINAL_WEG, STAENDE, JE_SPIEL, IN_DER_SPALTE, JE_SEITE,
+    BILD_TYPEN, BILD_HOECHSTENS, BILDER_JE_MELDUNG, BILD_ORDNER, BILD_HERKUNFT,
     bereinige, zuHtml, klartext, titelUndRest, quelle, kennungAus, ausDiscordJs, ausRoh, beitrag,
+    bildAnhaenge, istBild, bildHtml,
     text, kanal, kanalSetzen, uebernimm, entfernt, sichtbar, letzteKennung,
     fuerSpalte, spiele, liste, fuerVerwaltung,
 };
