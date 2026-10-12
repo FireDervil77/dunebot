@@ -5,6 +5,7 @@ const apiController = require("../controllers/api.controller");
 const { NewsHelper } = require("dunebot-sdk/utils");
 const { ChangelogHelper } = require("dunebot-sdk/utils");
 const { htmlZuVorschautext } = require("../helpers/text");
+const { baueEinladungsUrl } = require("../helpers/Einladung");
 
 // Router erstellen
 const router = express.Router();
@@ -475,6 +476,20 @@ router.get('/page/:slug', async (req, res) => {
         Logger.error('[Frontend/Page] Fehler beim Laden:', err);
         await fehlerseite(res, 500);
     }
+});
+
+// ── Bot einladen: /invite ──
+//
+// Eine Adresse, die man weitergeben kann (Betreiber, 2026-10-12). Der Artikel
+// „Bot einladen" verwies auf https://dunebot.de/invite — die Adresse gab es
+// nie. Den Link selbst baut `helpers/Einladung.js`, dieselbe Stelle wie in der
+// Serverauswahl: gleiche Rechte, gleicher Rueckweg zur Willkommensseite. Hier
+// nur ohne vorgewaehlten Server — den waehlt der Einladende bei Discord.
+//
+// Nicht zwischenspeichern: Der Link traegt ein Kennzeichen aus der Sitzung.
+router.get('/invite', (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.redirect(302, baueEinladungsUrl(req, null));
 });
 
 // ── Wissensdatenbank: /kb — und die alten Adressen unter /docs ──

@@ -414,6 +414,64 @@ function uebersetzer(locale) {
         await wirft(Wissen.bereichEntfernen(neuerBereich), /liegen noch 1 Artikel/);
     });
 
+    await pruefe('Folgemigration: der Verweis auf dunebot.de/invite wird zu /invite — sonst ändert sich nichts', async () => {
+        const einladung = require(path.join(WURZEL, 'migrations/kern/20261012_100000_einladung_im_artikel.js'));
+        const inhalt = (id) => db.query('SELECT content_translations AS c FROM kb_articles WHERE id = ?', [id]).then(z => JSON.parse(z[0].c));
+        const mit = await Wissen.artikelSpeichern({ category_id: neuerBereich, title_de: 'Einladen',
+            content_de: 'Vorher.\n\n> **[FireBot einladen](https://dunebot.de/invite)**\n\nNachher mit [Dashboard](https://dashboard.dunebot.de).',
+            content_en: '[Invite](https://dunebot.de/invite)' });
+        const ohne = await Wissen.artikelSpeichern({ category_id: neuerBereich, title_de: 'Unbeteiligt', content_de: 'Geh auf /invite oder lies [hier](/kb).' });
+        const unbeteiligtVorher = JSON.stringify(await inhalt(ohne));
+        await einladung.up(db);
+        const nach = await inhalt(mit);
+        assert.strictEqual(nach['de-DE'], 'Vorher.\n\n> **[FireBot einladen](/invite)**\n\nNachher mit [Dashboard](https://dashboard.dunebot.de).');
+        assert.strictEqual(nach['en-GB'], '[Invite](/invite)', 'die englische Fassung wurde nicht mitgezogen');
+        assert.strictEqual(JSON.stringify(await inhalt(ohne)), unbeteiligtVorher, 'ein Artikel ohne den Verweis wurde angefasst');
+        if (ordnerDa) {
+            const echt = await Wissen.artikel('getting-started', 'bot-einladen', 'de');
+            assert.ok(echt.inhalt.includes('](/invite)') && !echt.inhalt.includes('dunebot.de/invite'), 'der Artikel aus dem Bestand trägt den alten Verweis noch');
+        }
+        // Zweiter Lauf: nichts mehr zu tun, nichts kaputt.
+        await einladung.up(db);
+        assert.strictEqual((await inhalt(mit))['de-DE'], nach['de-DE']);
+        // Der gerenderte Verweis ist ein gewöhnlicher Verweis auf die eigene Seite.
+        assert.ok(Wissen.rendere(nach['de-DE']).includes('<a href="/invite">FireBot einladen</a>'));
+        await Wissen.artikelEntfernen(mit);
+        await Wissen.artikelEntfernen(ohne);
+    });
+
+    await pruefe('Folgemigration: „Bot einladen" bekommt den Weg über das Dashboard — aber nur über den unveränderten Text', async () => {
+        if (!ordnerDa) { console.log('      (documentation/ ist entfernt — der eingespielte Artikel lässt sich hier nicht mehr nachstellen)'); return; }
+        const zweiWege = require(path.join(WURZEL, 'migrations/kern/20261012_110000_bot_einladen_zwei_wege.js'));
+        const artikelJetzt = async () => (await Wissen.artikel('getting-started', 'bot-einladen', 'de'));
+        const vorher = await artikelJetzt();
+        // Der Fingerabdruck in der Migration ist der des Textes, den das Einspielen plus die Verweis-Migration erzeugt.
+        assert.strictEqual(zweiWege.fingerabdruck(vorher.inhalt), zweiWege.VORHER, 'der Fingerabdruck passt nicht zum eingespielten Text — die Migration täte in der Produktion nichts');
+        await zweiWege.up(db);
+        const nach = await artikelJetzt();
+        assert.strictEqual(nach.inhalt, zweiWege.NEU);
+        // Was der Betreiber verlangt hat, steht drin — und jeder Verweis im neuen Text hat ein Ziel.
+        for (const stueck of ['## Weg 1: Über das Dashboard', '**Bot nicht in Guild**', '**Bot hinzufügen**', '**Server verwalten**', '[FireBot einladen](/invite)']) {
+            assert.ok(nach.inhalt.includes(stueck), 'fehlt im neuen Text: ' + stueck);
+        }
+        const html = Wissen.rendere(nach.inhalt);
+        assert.ok(html.includes('<h2 id="bei-discord-bestaetigen">') && html.includes('<a href="#bei-discord-bestaetigen">'), 'der Sprung zum Abschnitt „Bei Discord bestätigen" trifft nicht');
+        for (const ziel of ['/kb/dashboard/uebersicht', '/kb/getting-started/erste-schritte']) {
+            const [b, a] = ziel.split('/').slice(2);
+            assert.strictEqual(Wissen.sichtbarkeit(await Wissen.artikel(b, a, 'de'), false), 'ganz', ziel);
+        }
+        // Die Beschriftungen im Text sind die der Serverauswahl.
+        const texte = JSON.parse(lies('apps/dashboard/locales/de-DE.json')).SELECTOR;
+        assert.deepStrictEqual([texte.BTN_INVITE, texte.BOT_NOT_IN_GUILD], ['Bot hinzufügen', 'Bot nicht in Guild']);
+        // Zweiter Lauf ändert nichts; eine Fassung des Betreibers bleibt stehen.
+        await zweiWege.up(db);
+        assert.strictEqual((await artikelJetzt()).inhalt, zweiWege.NEU);
+        await db.query('UPDATE kb_articles SET content_translations = ? WHERE id = ?', [JSON.stringify({ 'de-DE': 'Meine eigene Fassung.', 'en-GB': 'Mine.' }), nach.id]);
+        await zweiWege.up(db);
+        const eigen = await Wissen.artikelRoh(nach.id);
+        assert.deepStrictEqual(eigen.content_translations, { 'de-DE': 'Meine eigene Fassung.', 'en-GB': 'Mine.' }, 'eine vom Betreiber geänderte Fassung wurde überschrieben');
+    });
+
     // ════════════════════════════════════════════════════════════════════════
     console.log('\nSeiten: der echte Router, die echte Ansicht');
 

@@ -73,8 +73,13 @@ function dienst(name) {
  * Rücksprung — und eine Zeile im Log. Lieber eine Einladung ohne
  * Willkommensseite als gar keine Einladung.
  *
+ * Ohne `guildId` (die oeffentliche Adresse `/invite`, seit 2026-10-12) fehlt
+ * `guild_id` am Link ganz: Discord fragt dann selbst, auf welchen Server der
+ * Bot soll, und nennt ihn beim Ruecksprung. Ein leeres `guild_id=` waere eine
+ * Angabe, die nichts sagt.
+ *
  * @param {Object} req - Express Request (braucht `req.session`)
- * @param {string} guildId
+ * @param {string|null} [guildId] - vorgewaehlter Server; ohne ihn waehlt der Einladende bei Discord
  * @returns {string} Der vollstaendige Einladungslink
  */
 function baueEinladungsUrl(req, guildId) {
@@ -84,8 +89,8 @@ function baueEinladungsUrl(req, guildId) {
         client_id: process.env.CLIENT_ID || '',
         scope: SCOPE,
         permissions: RECHTE,
-        guild_id: String(guildId || ''),
     });
+    if (guildId) parameter.set('guild_id', String(guildId));
 
     const ruecksprung = process.env.DISCORD_REDIRECT_URI;
 

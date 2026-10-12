@@ -224,6 +224,27 @@ console.log('\n   Ein Kennzeichen je Sitzung, nicht je Link');
     pruefe('… mit den bisherigen Rechten', url.searchParams.get('permissions'), '1374891929078');
     pruefe('… und den Bot-Scopes', url.searchParams.get('scope'), 'bot applications.commands');
 
+    // Die oeffentliche Adresse /invite (2026-10-12): kein vorgewaehlter Server —
+    // der Einladende waehlt bei Discord, und Discord nennt die Guild beim Ruecksprung.
+    const offenSitzung = {};
+    const offen = new URL(einladung.baueEinladungsUrl({ session: offenSitzung }, null));
+    pruefeWahr('ohne Server traegt der Link kein guild_id — auch kein leeres', !offen.searchParams.has('guild_id'), offen.search);
+    pruefe('… aber dieselben Rechte', offen.searchParams.get('permissions'), '1374891929078');
+    pruefe('… dieselben Scopes', offen.searchParams.get('scope'), 'bot applications.commands');
+    pruefe('… und den Ruecksprung', offen.searchParams.get('redirect_uri'), 'https://beispiel.de/auth/callback');
+    pruefeWahr('der Ruecksprung von dort wird angenommen, mit der Guild, die Discord nennt',
+        einladung.ruecksprungPruefen({
+            session: { einladung: { ...offenSitzung.einladung } },
+            query: { state: offen.searchParams.get('state'), guild_id: GUILD },
+        }).guildId === GUILD);
+    {
+        const vorn = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'apps/dashboard/routes/frontend.router.js'), 'utf8'));
+        pruefeWahr('/invite ist eingehaengt und baut den Link mit dem gemeinsamen Baustein',
+            /router\.get\('\/invite',[\s\S]{0,160}res\.redirect\(302, baueEinladungsUrl\(req, null\)\)/.test(vorn));
+        pruefeWahr('… und wird nicht zwischengespeichert (der Link traegt ein Kennzeichen der Sitzung)',
+            /router\.get\('\/invite',[\s\S]{0,120}'Cache-Control', 'no-store'/.test(vorn));
+    }
+
     // Ohne eingetragene Ruecksprungadresse bleibt es beim alten Link.
     delete process.env.DISCORD_REDIRECT_URI;
     const ohne = new URL(einladung.baueEinladungsUrl({ session: {} }, GUILD));
