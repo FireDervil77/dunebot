@@ -132,8 +132,72 @@ for (const fall of FAELLE) {
     for (const a of abweichungen) console.log(`       ${a}`);
 }
 
-console.log(`\n▸ ${FAELLE.length} Faelle, je 4 Zahlen, beide Rechnungen.`);
-console.log(fehler === 0
-    ? '\n✅ Server und Browser kommen auf dieselben Zahlen\n'
-    : `\n❌ ${fehler} Abweichung(en) — die Kachel springt beim ersten Live-Abruf\n`);
-process.exit(fehler === 0 ? 0 : 1);
+// ════════════════════════════════════════════════════════════════════════
+// Fremde Ereignisse zaehlen nicht mit (2026-10-12)
+// ════════════════════════════════════════════════════════════════════════
+//
+// Der Betreiber sah „Gesamte Server" von 4 auf 6 springen: Der Daemon schickte
+// Messwerte fuer zwei Server, die am selben Nachmittag geloescht worden waren,
+// und die Anzeige legte fuer jedes Ereignis einen Eintrag an. Geprueft wird die
+// echte Klasse — mit einem Empfaenger, der Ereignisse auf Zuruf ausloest.
+const { LiveAnzeige } = require(
+    path.join(WURZEL, 'plugins/gameserver/dashboard/assets/js/gameserver-live.js'));
+
+(async () => {
+    const hoerer = {};
+    const sse = { on: (name, fn) => { (hoerer[name] = hoerer[name] || []).push(fn); } };
+    const loese = (name, daten) => (hoerer[name] || []).forEach(fn => fn(daten));
+    let liste = [
+        { id: 215, status: 'online', current_players: null, max_players: 20 },
+        { id: 211, status: 'online', current_players: 0, max_players: 35 },
+        { id: 207, status: 'offline', current_players: null, max_players: 8 },
+        { id: 186, status: 'offline', current_players: null, max_players: 10 },
+    ];
+    global.document = { querySelectorAll: () => [] };
+    global.CSS = { escape: String };
+    global.fetch = async () => ({ ok: true, json: async () => ({ servers: liste }) });
+    const ruhe = () => new Promise(f => setTimeout(f, 20));
+    const zahl = (a) => summen(a.zustand.values());
+    const melde = (ok, was, warum) => {
+        if (ok) { console.log(`  ✅ ${was}`); return; }
+        fehler++;
+        console.log(`  ❌ ${was}`);
+        if (warum) console.log(`       ${warum}`);
+    };
+
+    console.log('\nFremde Ereignisse');
+    const anzeige = new LiveAnzeige(sse, '565123525795643393');
+    await ruhe();
+    melde(zahl(anzeige).alle === 4, 'nach dem ersten Abruf zaehlt die Kachel, was die Liste nennt', `gezaehlt: ${zahl(anzeige).alle}`);
+
+    // Der Fall aus dem Bild: Messwerte fuer zwei Server, die es nicht mehr gibt.
+    for (const id of ['212', '213']) loese('resource_usage', { server_id: id, messwerte: { cpu: {} }, current_players: 0, max_players: 20 });
+    loese('readiness', { server_id: 'wb1656149ff8', stufe: 'port' });
+    loese('platzstand', { server_id: 999, belegt_bytes: 1, prozent: 1 });
+    loese('install_output', { server_id: 998, percent: 40 });
+    clearTimeout(anzeige._holeGleich);
+    melde(zahl(anzeige).alle === 4, 'ein Ereignis fuer einen Server, den die Liste nicht kennt, legt keinen an',
+        `gezaehlt: ${zahl(anzeige).alle} — die Kachel spraenge von 4 auf ${zahl(anzeige).alle}`);
+
+    loese('resource_usage', { server_id: '211', messwerte: { cpu: {} }, current_players: 3, max_players: 35 });
+    melde(zahl(anzeige).spieler === 3 && zahl(anzeige).alle === 4, 'ein Ereignis fuer einen bekannten Server wird weiter uebernommen',
+        JSON.stringify(zahl(anzeige)));
+
+    // Ein neuer Server: Sein Statuswechsel holt die Liste nach, und die bringt ihn mit.
+    liste = [...liste, { id: 216, status: 'starting', current_players: null, max_players: 20 }];
+    loese('status_changed', { server_id: 216, status: 'starting' });
+    await new Promise(f => setTimeout(f, 320));
+    melde(zahl(anzeige).alle === 5, 'ein neu angelegter Server kommt ueber die Liste dazu', `gezaehlt: ${zahl(anzeige).alle}`);
+
+    // Bei offener Seite geloescht: Er faellt aus der Zaehlung.
+    liste = liste.filter(s => s.id !== 216 && s.id !== 215);
+    await anzeige.holeAlles();
+    melde(zahl(anzeige).alle === 3 && zahl(anzeige).online === 1, 'ein geloeschter Server faellt mit dem naechsten Abruf heraus',
+        JSON.stringify(zahl(anzeige)));
+
+    console.log(`\n▸ ${FAELLE.length} Faelle, je 4 Zahlen, beide Rechnungen; dazu 5 Pruefungen an der Live-Anzeige.`);
+    console.log(fehler === 0
+        ? '\n✅ Server und Browser kommen auf dieselben Zahlen\n'
+        : `\n❌ ${fehler} Abweichung(en) — die Kachel springt\n`);
+    process.exit(fehler === 0 ? 0 : 1);
+})().catch((e) => { console.error('\n❌ Der Waechter selbst ist gescheitert:', e); process.exit(1); });

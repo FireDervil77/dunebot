@@ -335,9 +335,27 @@
             this.zeichne(id);
         }
 
-        uebernimm(serverId, teil) {
+        /**
+         * ── Ein Ereignis legt keinen Server an (2026-10-12) ─────────────────
+         *
+         * Welche Server es gibt, sagt allein die Liste (`holeAlles`, mit
+         * `ausDerListe`). Ein Ereignis schreibt nur an einem Server fort, den
+         * die Liste schon kennt.
+         *
+         * Vorher legte JEDES Ereignis einen Eintrag an — und die Kachel
+         * „Gesamte Server" zaehlt die Eintraege. Der Betreiber sah sie von 4
+         * auf 6 springen: Der Daemon schickte weiter Messwerte fuer zwei
+         * Server, die am selben Nachmittag geloescht worden waren (212, 213;
+         * er fuehrte sie noch in seiner Liste). Dasselbe gaebe es bei jedem
+         * Container, der kein Gameserver dieser Seite ist.
+         *
+         * Ein NEUER Server geht dadurch nicht verloren: Sein erstes
+         * `status_changed` loest `holeBald` aus, und die Liste bringt ihn mit.
+         */
+        uebernimm(serverId, teil, ausDerListe = false) {
             if (serverId === undefined || serverId === null) return;
             const id = String(serverId);
+            if (!ausDerListe && !this.zustand.has(id)) return;
             const alt = this.zustand.get(id) || {};
             // Ein Ereignis trägt nur, was es weiss. `undefined` überschreibt nicht.
             for (const [k, v] of Object.entries(teil)) {
@@ -404,6 +422,13 @@
                     { headers: { Accept: 'application/json' } });
                 if (!r.ok) return;
                 const d = await r.json();
+                // Was die Liste nicht mehr nennt, gibt es nicht mehr — ein
+                // Server, der bei offener Seite geloescht wurde, faellt aus der
+                // Zaehlung, statt bis zum Neuladen mitzulaufen.
+                const genannt = new Set((d.servers || []).map(s => String(s.id)));
+                for (const id of [...this.zustand.keys()]) {
+                    if (!genannt.has(id)) { this.zustand.delete(id); this.summenBald(); }
+                }
                 for (const s of (d.servers || [])) {
                     // `bereitschaft` ist die BEURTEILUNG vom Server (seit
                     // Baustelle 134). Sie hier nachzurechnen waere der zweite
@@ -427,7 +452,7 @@
                         // Arbeitsspeicher, Verkehr — samt Farbe und dem GRUND,
                         // falls gerade nichts gemessen wird.
                         messwerte: s.messwerte || null,
-                    });
+                    }, true);
                 }
             } catch (_) {
                 // Nicht erreichbar ist kein Grund, die Seite zu verändern. Was
@@ -733,7 +758,7 @@
     // sich dadurch nichts; in node gibt es kein `window` und kein `document`,
     // deshalb steigt die Datei hier sauber aus, statt zu werfen.
     if (typeof module !== 'undefined' && module.exports) {
-        module.exports = { knopfZustand, pillenZustand, summen };
+        module.exports = { knopfZustand, pillenZustand, summen, LiveAnzeige };
     }
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
 
