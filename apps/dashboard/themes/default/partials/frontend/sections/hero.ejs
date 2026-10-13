@@ -1,139 +1,154 @@
-<%# Hero Section Partial — Carousel mit Standard-Slides + News-Slides.
-    Seit 2026-10-12 steht davor der neueste eigene Blogartikel als Aufmacher
-    (Betreiber: „immer den neuesten Blog als Aufmacher für die Seite"). Gibt es
-    keinen, beginnt das Karussell wie vorher mit der ersten Standard-Folie.
+<%# Hero der Startseite, aufgebaut aus dem Grafik-Kit (seit 2026-10-13).
+    Folien: der neueste eigene Blogartikel als Aufmacher (Betreiber: „immer den
+    neuesten Blog als Aufmacher für die Seite"), danach die drei Standard-Folien
+    im Wechsel mit bis zu drei News. Sie stehen als Liste oben, damit jede Art
+    nur einmal ausgeschrieben wird.
+    Hintergrund, Logo, Marken und die runden Themen-Icons kommen aus
+    `assets/images/kit/`, die Regeln aus `hero-kit.css` (Klasse `.hero-kit`).
     `locals.heroBlog`: Der laufende Prozess liest diese Datei von der Platte,
     auch wenn sein Controller den Wert noch nicht mitgibt. %>
-<% const aufmacher = locals.heroBlog || null; %>
+<%
+  const aufmacher = locals.heroBlog || null;
+  const news = (locals.carouselNews && carouselNews.length > 0) ? carouselNews : [];
+  const kit = (pfad) => theme.asset('images/kit/' + pfad);
+  const datum = (wert) => new Date(wert).toLocaleDateString(locals.locale || 'de-DE', { year: 'numeric', month: 'long', day: 'numeric' });
 
-<section id="hero" class="hero section dark-background">
+  const standard = [
+    {
+      titel: tr('LANDING.HERO'),
+      zeilen: [tr('LANDING.SUBTITLE'), tr('LANDING.SUBTITLE2')],
+      knoepfe: [
+        { href: '/guild', text: tr('LANDING.BTN_DASHBOARD'), haupt: true },
+        { href: coreConfig.githubUrl, text: tr('LANDING.BTN_GITHUB'), icon: 'fa-brands fa-github', extern: true }
+      ]
+    },
+    {
+      titel: tr('LANDING.HERO_SLIDE2_TITLE'),
+      zeilen: [tr('LANDING.HERO_SLIDE2_DESC'), tr('LANDING.HERO_SLIDE2_DESC2')],
+      knoepfe: [
+        { href: '/guild', text: tr('LANDING.HERO_SLIDE2_BTN1'), haupt: true },
+        { href: coreConfig.githubUrl, text: tr('LANDING.HERO_SLIDE2_BTN2'), icon: 'fa-solid fa-code', extern: true }
+      ]
+    },
+    {
+      titel: tr('LANDING.HERO_SLIDE3_TITLE'),
+      zeilen: [tr('LANDING.HERO_SLIDE3_DESC'), tr('LANDING.HERO_SLIDE3_DESC2')],
+      knoepfe: [
+        { href: '/guild', text: tr('LANDING.HERO_SLIDE3_BTN1'), haupt: true },
+        { href: '/documentation', text: tr('LANDING.HERO_SLIDE3_BTN2'), icon: 'fa-solid fa-book' }
+      ]
+    }
+  ];
 
-  <img src="<%= theme.asset('images/hero-bg.png') %>" alt="" data-aos="fade-in">
+  const folien = [];
+  if (aufmacher) {
+    folien.push({
+      titel: aufmacher.titel,
+      zeilen: aufmacher.kurztext ? [aufmacher.kurztext] : [],
+      marke: { bild: 'badges/gefuellt/Badge_NEU_gefuellt.png', alt: tr('LANDING.HERO_BLOG_LABEL') },
+      zeit: aufmacher.zeit,
+      knoepfe: [
+        { href: '/blog/' + aufmacher.slug, text: tr('LANDING.READ_MORE') || 'Weiterlesen', icon: 'fa-solid fa-arrow-right', haupt: true },
+        { href: '/blog', text: tr('LANDING.HERO_BLOG_ALL'), icon: 'fa-solid fa-book-open' }
+      ]
+    });
+  }
+  standard.forEach((folie, i) => {
+    folien.push(folie);
+    if (news[i]) {
+      folien.push({
+        titel: news[i].title,
+        // Der Kurztext der News ist HTML aus dem Editor und wird wie bisher
+        // unveraendert ausgegeben.
+        html: news[i].excerpt || news[i].content.substring(0, 150) + '...',
+        marke: { bild: 'badges/Kontur/Badge_UPDATE_Kontur.png', alt: 'Update' },
+        zeit: news[i].date,
+        knoepfe: [
+          { href: '/news-details/' + news[i].slug, text: tr('LANDING.READ_MORE') || 'Weiterlesen', icon: 'fa-solid fa-arrow-right', haupt: true }
+        ]
+      });
+    }
+  });
 
-  <div class="container" data-aos="fade-up" data-aos-delay="100">
-    <div id="heroCarousel" class="carousel slide carousel-fade" data-ride="carousel" data-interval="5000">
-      
-      <div class="carousel-indicators">
-        <%
-          const newsCount = (carouselNews && carouselNews.length > 0) ? carouselNews.length : 0;
-          const totalSlides = 3 + newsCount + (aufmacher ? 1 : 0);
-        %>
-        <% for (let i = 0; i < totalSlides; i++) { %>
-          <button type="button" data-target="#heroCarousel" data-slide-to="<%= i %>" class="<%= i === 0 ? 'active' : '' %>"></button>
-        <% } %>
-      </div>
+  const themen = [
+    { bild: 'icons/Badge_rund/Icon_Streaming_Badge_rund.png', name: 'Streaming' },
+    { bild: 'icons/Badge_rund/Icon_Gameserver_Badge_rund.png', name: 'Gameserver' },
+    { bild: 'icons/Badge_rund/Icon_Musik_Badge_rund.png', name: 'Musik' }
+  ];
+%>
+
+<section id="hero" class="hero-kit section dark-background">
+
+  <img class="hero-kit__bild" src="<%= kit('hero/BG_News_Blog_Header_1920x1080.png') %>" alt="" width="1920" height="1080">
+
+  <div class="container hero-kit__inhalt" data-aos="fade-up" data-aos-delay="100">
+
+    <p class="hero-kit__marke">
+      <img src="<%= kit('logo/FireBot_Logo_horizontal.png') %>" alt="FireBot – firenetworks.de" width="1221" height="512">
+    </p>
+
+    <div id="heroCarousel" class="hero-kit__folien carousel slide carousel-fade" data-ride="carousel" data-interval="7000">
 
       <div class="carousel-inner">
-        <% let slideIndex = 0; %>
-        
-        <% if (aufmacher) { %>
-          <!-- Slide: der neueste Blogartikel -->
-          <div class="carousel-item active">
-            <div class="text-center">
-              <p class="hero-rubrik"><i class="fa-solid fa-pen-nib"></i> <%= tr('LANDING.HERO_BLOG_LABEL') %></p>
-              <h2><%= aufmacher.titel %></h2>
-              <% if (aufmacher.kurztext) { %><p><%= aufmacher.kurztext %></p><% } %>
-              <p class="text-muted"><small><i class="fa-solid fa-calendar"></i> <%= new Date(aufmacher.zeit).toLocaleDateString(locale || 'de-DE', { year: 'numeric', month: 'long', day: 'numeric' }) %></small></p>
-              <a href="/blog/<%= aufmacher.slug %>" class="btn-hero btn-get-started">
-                <i class="fa-solid fa-arrow-right"></i> <%= tr('LANDING.READ_MORE') || 'Weiterlesen' %>
-              </a>
-              <a href="/blog" class="btn-hero btn-get-github">
-                <i class="fa-solid fa-book-open"></i> <%= tr('LANDING.HERO_BLOG_ALL') %>
-              </a>
+        <% folien.forEach((folie, i) => { %>
+          <div class="carousel-item<%= i === 0 ? ' active' : '' %>">
+            <div class="hero-kit__titel">
+              <h2><%= folie.titel %></h2>
+            </div>
+
+            <% if (folie.marke || folie.zeit) { %>
+              <p class="hero-kit__zeile">
+                <% if (folie.marke) { %><img src="<%= kit(folie.marke.bild) %>" alt="<%= folie.marke.alt %>"><% } %>
+                <% if (folie.zeit) { %><span><%= datum(folie.zeit) %></span><% } %>
+              </p>
+            <% } %>
+
+            <% if (folie.html) { %>
+              <div class="hero-kit__text"><%- folie.html %></div>
+            <% } else if (folie.zeilen && folie.zeilen.length) { %>
+              <div class="hero-kit__text"><%= folie.zeilen.join(' ') %></div>
+            <% } %>
+
+            <div class="hero-kit__knoepfe">
+              <% folie.knoepfe.forEach(knopf => { %>
+                <a href="<%= knopf.href %>" class="hero-kit__knopf<%= knopf.haupt ? ' hero-kit__knopf--haupt' : '' %>"<% if (knopf.extern) { %> target="_blank" rel="noopener"<% } %>>
+                  <% if (knopf.icon) { %><i class="<%= knopf.icon %>"></i><% } %>
+                  <%= knopf.text %>
+                </a>
+              <% }) %>
             </div>
           </div>
-        <% } %>
-
-        <!-- Slide: Standard 1 -->
-        <div class="carousel-item<%= aufmacher ? '' : ' active' %>">
-          <div class="text-center">
-            <h2><%= tr('LANDING.HERO') %></h2>
-            <p><%= tr('LANDING.SUBTITLE') %></p>
-            <p><%= tr('LANDING.SUBTITLE2') %></p>
-            <a href="/guild" class="btn-hero btn-get-started"><%= tr('LANDING.BTN_DASHBOARD') %></a> 
-            <a href="<%= coreConfig.githubUrl %>" class="btn-hero btn-get-github" target="_blank">
-              <i class="fa-brands fa-github"></i> <%= tr('LANDING.BTN_GITHUB') %>
-            </a>
-          </div>
-        </div>
-
-        <% if (carouselNews && carouselNews.length > 0) { %>
-          <div class="carousel-item">
-            <div class="text-center">
-              <h2><i class="fa-solid fa-newspaper"></i> <%= carouselNews[0].title %></h2>
-              <p><%- carouselNews[0].excerpt || carouselNews[0].content.substring(0, 150) + '...' %></p>
-              <p class="text-muted"><small><i class="fa-solid fa-calendar"></i> <%= new Date(carouselNews[0].date).toLocaleDateString(locale || 'de-DE', { year: 'numeric', month: 'long', day: 'numeric' }) %></small></p>
-              <a href="/news-details/<%= carouselNews[0].slug %>" class="btn-hero btn-get-started">
-                <i class="fa-solid fa-arrow-right"></i> <%= tr('LANDING.READ_MORE') || 'Weiterlesen' %>
-              </a>
-            </div>
-          </div>
-        <% } %>
-
-        <!-- Slide: Standard 2 -->
-        <div class="carousel-item">
-          <div class="text-center">
-            <h2><%= tr('LANDING.HERO_SLIDE2_TITLE') %></h2>
-            <p><%= tr('LANDING.HERO_SLIDE2_DESC') %></p>
-            <p><%= tr('LANDING.HERO_SLIDE2_DESC2') %></p>
-            <a href="/guild" class="btn-hero btn-get-started"><%= tr('LANDING.HERO_SLIDE2_BTN1') %></a> 
-            <a href="<%= coreConfig.githubUrl %>" class="btn-hero btn-get-github" target="_blank">
-              <i class="fa-brands fa-code"></i> <%= tr('LANDING.HERO_SLIDE2_BTN2') %>
-            </a>
-          </div>
-        </div>
-
-        <% if (carouselNews && carouselNews.length > 1) { %>
-          <div class="carousel-item">
-            <div class="text-center">
-              <h2><i class="fa-solid fa-newspaper"></i> <%= carouselNews[1].title %></h2>
-              <p><%- carouselNews[1].excerpt || carouselNews[1].content.substring(0, 150) + '...' %></p>
-              <p class="text-muted"><small><i class="fa-solid fa-calendar"></i> <%= new Date(carouselNews[1].date).toLocaleDateString(locale || 'de-DE', { year: 'numeric', month: 'long', day: 'numeric' }) %></small></p>
-              <a href="/news-details/<%= carouselNews[1].slug %>" class="btn-hero btn-get-started">
-                <i class="fa-solid fa-arrow-right"></i> <%= tr('LANDING.READ_MORE') || 'Weiterlesen' %>
-              </a>
-            </div>
-          </div>
-        <% } %>
-
-        <!-- Slide: Standard 3 -->
-        <div class="carousel-item">
-          <div class="text-center">
-            <h2><%= tr('LANDING.HERO_SLIDE3_TITLE') %></h2>
-            <p><%= tr('LANDING.HERO_SLIDE3_DESC') %></p>
-            <p><%= tr('LANDING.HERO_SLIDE3_DESC2') %></p>
-            <a href="/guild" class="btn-hero btn-get-started"><%= tr('LANDING.HERO_SLIDE3_BTN1') %></a> 
-            <a href="/documentation" class="btn-hero btn-get-github">
-              <i class="fa-solid fa-book"></i> <%= tr('LANDING.HERO_SLIDE3_BTN2') %>
-            </a>
-          </div>
-        </div>
-
-        <% if (carouselNews && carouselNews.length > 2) { %>
-          <div class="carousel-item">
-            <div class="text-center">
-              <h2><i class="fa-solid fa-newspaper"></i> <%= carouselNews[2].title %></h2>
-              <p><%- carouselNews[2].excerpt || carouselNews[2].content.substring(0, 150) + '...' %></p>
-              <p class="text-muted"><small><i class="fa-solid fa-calendar"></i> <%= new Date(carouselNews[2].date).toLocaleDateString(locale || 'de-DE', { year: 'numeric', month: 'long', day: 'numeric' }) %></small></p>
-              <a href="/news-details/<%= carouselNews[2].slug %>" class="btn-hero btn-get-started">
-                <i class="fa-solid fa-arrow-right"></i> <%= tr('LANDING.READ_MORE') || 'Weiterlesen' %>
-              </a>
-            </div>
-          </div>
-        <% } %>
-
+        <% }) %>
       </div>
 
-      <a class="carousel-control-prev" href="#heroCarousel" role="button" data-slide="prev">
-        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-        <span class="visually-hidden"><%= tr('LANDING.CAROUSEL_PREV') %></span>
-      </a>
-      <a class="carousel-control-next" href="#heroCarousel" role="button" data-slide="next">
-        <span class="carousel-control-next-icon" aria-hidden="true"></span>
-        <span class="visually-hidden"><%= tr('LANDING.CAROUSEL_NEXT') %></span>
-      </a>
+      <div class="hero-kit__steuerung">
+        <a class="hero-kit__pfeil" href="#heroCarousel" role="button" data-slide="prev">
+          <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+          <span class="visually-hidden"><%= tr('LANDING.CAROUSEL_PREV') %></span>
+        </a>
+        <div class="carousel-indicators">
+          <% folien.forEach((folie, i) => { %>
+            <button type="button" data-target="#heroCarousel" data-slide-to="<%= i %>" class="<%= i === 0 ? 'active' : '' %>" aria-label="<%= i + 1 %> / <%= folien.length %>"></button>
+          <% }) %>
+        </div>
+        <a class="hero-kit__pfeil" href="#heroCarousel" role="button" data-slide="next">
+          <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+          <span class="visually-hidden"><%= tr('LANDING.CAROUSEL_NEXT') %></span>
+        </a>
+      </div>
 
     </div>
+
+    <ul class="hero-kit__themen">
+      <% themen.forEach(thema => { %>
+        <li>
+          <a href="/#plugins" title="<%= thema.name %>">
+            <img src="<%= kit(thema.bild) %>" alt="<%= thema.name %>" width="512" height="512" loading="lazy">
+          </a>
+        </li>
+      <% }) %>
+    </ul>
+
   </div>
 
 </section>
