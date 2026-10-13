@@ -1,0 +1,397 @@
+/*--------------------------------------------------------------
+# Hero aus dem Grafik-Kit
+#
+# Eigene Datei und eigene Klasse (`.hero-kit`, nicht `.hero`): Die alten
+# Hero-Regeln in frontend.css greifen damit nicht hinein, und der neue Hero
+# laesst sich neben dem alten ansehen, bevor er ihn abloest.
+#
+# Jede Ueberschrift traegt ihre Zeilenhoehe selbst — auf der Startseite wird
+# Tabler nach Bootstrap geladen und gibt jeder h2 feste 1.75rem mit.
+--------------------------------------------------------------*/
+
+@font-face {
+  font-family: "Saira Condensed";
+  src: url("../images/kit/schriftzug/Schriftart_Saira_Condensed/SairaCondensed-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Saira Condensed";
+  src: url("../images/kit/schriftzug/Schriftart_Saira_Condensed/SairaCondensed-Black.ttf") format("truetype");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+.hero-kit {
+  --kit-rot: #e8290b;
+  --kit-orange: #ff7a00;
+  --kit-gelb: #ffc24d;
+  --kit-platte: rgba(45, 42, 54, 0.94);
+  --kit-nacht: #0f0d14;
+  --kit-schrift: "Saira Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  align-items: center;
+  /* Unten bleibt Platz fuer die Flammenkante des Hintergrunds. */
+  padding: 140px 0 clamp(120px, 22vh, 240px);
+  overflow: hidden;
+  background: var(--kit-nacht);
+  color: #ffffff;
+}
+
+.hero-kit__bild {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Die Flammen stehen am unteren Bildrand und sollen dort bleiben. */
+  object-position: center bottom;
+  z-index: 0;
+}
+
+.hero-kit__inhalt {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "marke  themen"
+    "folien themen";
+  column-gap: 48px;
+}
+
+/* Logo mit Schriftzug ------------------------------------------------*/
+.hero-kit__marke {
+  grid-area: marke;
+  margin: 0 0 28px;
+}
+
+.hero-kit__marke img {
+  display: block;
+  height: clamp(64px, 9vw, 118px);
+  width: auto;
+}
+
+/* Folien --------------------------------------------------------------*/
+.hero-kit__folien {
+  grid-area: folien;
+  min-width: 0;
+}
+
+/* Alle Folien liegen uebereinander in derselben Zelle. Der Hero ist dadurch
+   so hoch wie die laengste Folie und springt beim Wechsel nicht. */
+.hero-kit .carousel-inner {
+  display: grid;
+  overflow: visible;
+}
+
+.hero-kit .carousel-item {
+  grid-area: 1 / 1;
+  display: block;
+  float: none;
+  margin-right: 0;
+  transform: none !important;
+  opacity: 0;
+  visibility: hidden;
+  z-index: 0;
+  transition: opacity 0.25s ease, visibility 0s 0.25s;
+}
+
+/* Die neue Folie blendet ein, nachdem die alte verschwunden ist — sonst
+   stuenden kurz zwei Texte uebereinander. */
+.hero-kit .carousel-item.active,
+.hero-kit .carousel-item-next.carousel-item-left,
+.hero-kit .carousel-item-prev.carousel-item-right {
+  opacity: 1;
+  visibility: visible;
+  z-index: 1;
+  transition: opacity 0.35s ease 0.25s, visibility 0s 0.25s;
+}
+
+.hero-kit .carousel-item.active.carousel-item-left,
+.hero-kit .carousel-item.active.carousel-item-right {
+  opacity: 0;
+  z-index: 0;
+  transition: opacity 0.25s ease, visibility 0s 0.25s;
+}
+
+/* Titelplatte: die Platte aus dem Kit, in CSS nachgebaut, damit sie mit
+   langen Titeln mitwaechst. */
+.hero-kit__titel {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  padding: 18px 46px 24px 34px;
+  background: var(--kit-platte);
+  clip-path: polygon(22px 0, 100% 0, 100% calc(100% - 22px), calc(100% - 22px) 100%, 0 100%, 0 22px);
+}
+
+.hero-kit__titel::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 28%;
+  bottom: 28%;
+  width: 6px;
+  background: linear-gradient(180deg, var(--kit-rot), var(--kit-orange));
+}
+
+.hero-kit__titel::after {
+  content: "";
+  position: absolute;
+  left: 34px;
+  bottom: 0;
+  width: min(58%, 520px);
+  height: 5px;
+  background: linear-gradient(90deg, var(--kit-rot), var(--kit-orange) 45%, var(--kit-gelb));
+}
+
+.hero-kit__titel h2 {
+  margin: 0;
+  font-family: var(--kit-schrift);
+  font-weight: 900;
+  font-size: clamp(30px, 4.2vw, 60px);
+  line-height: 1.1;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  color: #ffffff;
+  text-shadow: none;
+  overflow-wrap: break-word;
+}
+
+/* Zeile unter dem Titel: Marke und Datum */
+.hero-kit__zeile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin: 18px 0 0;
+  font-family: var(--kit-schrift);
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 1.2;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #ffd9a0;
+}
+
+.hero-kit__zeile img {
+  display: block;
+  height: 30px;
+  width: auto;
+}
+
+.hero-kit__text {
+  max-width: 62ch;
+  margin: 18px 0 0;
+  font-size: 18px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.65);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+/* Kurztexte der News bringen eigene Absaetze und Umbrueche mit. */
+.hero-kit__text p {
+  display: inline;
+  margin: 0;
+}
+
+.hero-kit__text br {
+  display: none;
+}
+
+.hero-kit__text a {
+  color: var(--kit-gelb);
+}
+
+.hero-kit__knoepfe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 28px 0 0;
+}
+
+.hero-kit__knopf {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 28px;
+  font-family: var(--kit-schrift);
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1.2;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: #ffffff;
+  border: 2px solid var(--kit-rot);
+  background: rgba(20, 18, 26, 0.78);
+  transition: background 0.2s, color 0.2s, transform 0.2s;
+}
+
+.hero-kit__knopf:hover {
+  color: #ffffff;
+  background: var(--kit-rot);
+  text-decoration: none;
+  transform: translateY(-2px);
+}
+
+.hero-kit__knopf--haupt {
+  padding: 13px 32px;
+  border: 0;
+  color: #1a1016;
+  background: linear-gradient(90deg, var(--kit-rot), var(--kit-orange) 50%, var(--kit-gelb));
+  clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+}
+
+.hero-kit__knopf--haupt:hover {
+  color: #1a1016;
+  background: linear-gradient(90deg, var(--kit-orange), var(--kit-gelb));
+}
+
+/* Steuerung: Pfeile und Striche in einer Zeile unter der Folie */
+.hero-kit__steuerung {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 34px 0 0;
+}
+
+.hero-kit .carousel-indicators {
+  position: static;
+  display: flex;
+  justify-content: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+}
+
+.hero-kit .carousel-indicators button {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 5px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.3);
+  opacity: 1;
+  cursor: pointer;
+  transition: width 0.3s, background 0.3s;
+}
+
+.hero-kit .carousel-indicators button.active {
+  width: 54px;
+  background: linear-gradient(90deg, var(--kit-rot), var(--kit-gelb));
+}
+
+.hero-kit__pfeil {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  color: #ffffff;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  background: rgba(20, 18, 26, 0.6);
+  text-decoration: none;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.hero-kit__pfeil:hover {
+  color: var(--kit-gelb);
+  border-color: var(--kit-orange);
+  text-decoration: none;
+}
+
+/* Runde Themen-Icons rechts */
+.hero-kit__themen {
+  grid-area: themen;
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hero-kit__themen img {
+  display: block;
+  width: 76px;
+  height: 76px;
+  transition: transform 0.2s;
+}
+
+.hero-kit__themen a:hover img {
+  transform: scale(1.08);
+}
+
+@media (max-width: 991px) {
+  .hero-kit {
+    padding-top: 120px;
+  }
+
+  .hero-kit__inhalt {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "marke"
+      "folien"
+      "themen";
+  }
+
+  .hero-kit__themen {
+    flex-direction: row;
+    justify-self: start;
+    gap: 16px;
+    margin-top: 30px;
+  }
+
+  .hero-kit__themen img {
+    width: 56px;
+    height: 56px;
+  }
+}
+
+@media (max-width: 575px) {
+  .hero-kit__titel {
+    padding: 14px 30px 20px 24px;
+    clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
+  }
+
+  .hero-kit__titel::after {
+    left: 24px;
+  }
+
+  .hero-kit__text {
+    font-size: 16px;
+  }
+
+  .hero-kit__knopf {
+    font-size: 16px;
+    padding: 10px 20px;
+  }
+
+  .hero-kit__knopf--haupt {
+    padding: 12px 24px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-kit .carousel-item,
+  .hero-kit .carousel-item.active {
+    transition: none;
+  }
+}

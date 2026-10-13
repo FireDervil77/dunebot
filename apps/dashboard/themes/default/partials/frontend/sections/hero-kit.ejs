@@ -1,0 +1,152 @@
+<%# Hero aus dem Grafik-Kit — Nachfolger von `hero.ejs`.
+    Inhalt und Reihenfolge wie bisher: der neueste Blogartikel als Aufmacher,
+    danach die drei Standard-Folien im Wechsel mit bis zu drei News. Neu ist
+    nur die Gestalt: Hintergrund, Logo, Titelplatte, Marken und die runden
+    Themen-Icons kommen aus `assets/images/kit/`, die Regeln aus `hero-kit.css`.
+    Die Folien stehen als Liste oben, damit jede Art nur einmal ausgeschrieben
+    wird. %>
+<%
+  const aufmacher = locals.heroBlog || null;
+  const news = (locals.carouselNews && carouselNews.length > 0) ? carouselNews : [];
+  const kit = (pfad) => theme.asset('images/kit/' + pfad);
+  const datum = (wert) => new Date(wert).toLocaleDateString(locals.locale || 'de-DE', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  const standard = [
+    {
+      titel: tr('LANDING.HERO'),
+      zeilen: [tr('LANDING.SUBTITLE'), tr('LANDING.SUBTITLE2')],
+      knoepfe: [
+        { href: '/guild', text: tr('LANDING.BTN_DASHBOARD'), haupt: true },
+        { href: coreConfig.githubUrl, text: tr('LANDING.BTN_GITHUB'), icon: 'fa-brands fa-github', extern: true }
+      ]
+    },
+    {
+      titel: tr('LANDING.HERO_SLIDE2_TITLE'),
+      zeilen: [tr('LANDING.HERO_SLIDE2_DESC'), tr('LANDING.HERO_SLIDE2_DESC2')],
+      knoepfe: [
+        { href: '/guild', text: tr('LANDING.HERO_SLIDE2_BTN1'), haupt: true },
+        { href: coreConfig.githubUrl, text: tr('LANDING.HERO_SLIDE2_BTN2'), icon: 'fa-solid fa-code', extern: true }
+      ]
+    },
+    {
+      titel: tr('LANDING.HERO_SLIDE3_TITLE'),
+      zeilen: [tr('LANDING.HERO_SLIDE3_DESC'), tr('LANDING.HERO_SLIDE3_DESC2')],
+      knoepfe: [
+        { href: '/guild', text: tr('LANDING.HERO_SLIDE3_BTN1'), haupt: true },
+        { href: '/documentation', text: tr('LANDING.HERO_SLIDE3_BTN2'), icon: 'fa-solid fa-book' }
+      ]
+    }
+  ];
+
+  const folien = [];
+  if (aufmacher) {
+    folien.push({
+      titel: aufmacher.titel,
+      zeilen: aufmacher.kurztext ? [aufmacher.kurztext] : [],
+      marke: { bild: 'badges/gefuellt/Badge_NEU_gefuellt.png', alt: tr('LANDING.HERO_BLOG_LABEL') },
+      zeit: aufmacher.zeit,
+      knoepfe: [
+        { href: '/blog/' + aufmacher.slug, text: tr('LANDING.READ_MORE') || 'Weiterlesen', icon: 'fa-solid fa-arrow-right', haupt: true },
+        { href: '/blog', text: tr('LANDING.HERO_BLOG_ALL'), icon: 'fa-solid fa-book-open' }
+      ]
+    });
+  }
+  standard.forEach((folie, i) => {
+    folien.push(folie);
+    if (news[i]) {
+      folien.push({
+        titel: news[i].title,
+        // Der Kurztext der News ist HTML aus dem Editor und wird wie bisher
+        // unveraendert ausgegeben.
+        html: news[i].excerpt || news[i].content.substring(0, 150) + '...',
+        marke: { bild: 'badges/Kontur/Badge_UPDATE_Kontur.png', alt: 'Update' },
+        zeit: news[i].date,
+        knoepfe: [
+          { href: '/news-details/' + news[i].slug, text: tr('LANDING.READ_MORE') || 'Weiterlesen', icon: 'fa-solid fa-arrow-right', haupt: true }
+        ]
+      });
+    }
+  });
+
+  const themen = [
+    { bild: 'icons/Badge_rund/Icon_Streaming_Badge_rund.png', name: 'Streaming' },
+    { bild: 'icons/Badge_rund/Icon_Gameserver_Badge_rund.png', name: 'Gameserver' },
+    { bild: 'icons/Badge_rund/Icon_Musik_Badge_rund.png', name: 'Musik' }
+  ];
+%>
+
+<section id="hero" class="hero-kit section dark-background">
+
+  <img class="hero-kit__bild" src="<%= kit('hero/BG_News_Blog_Header_1920x1080.png') %>" alt="" width="1920" height="1080">
+
+  <div class="container hero-kit__inhalt" data-aos="fade-up" data-aos-delay="100">
+
+    <p class="hero-kit__marke">
+      <img src="<%= kit('logo/FireBot_Logo_horizontal.png') %>" alt="FireBot – firenetworks.de" width="1221" height="512">
+    </p>
+
+    <div id="heroCarousel" class="hero-kit__folien carousel slide carousel-fade" data-ride="carousel" data-interval="7000">
+
+      <div class="carousel-inner">
+        <% folien.forEach((folie, i) => { %>
+          <div class="carousel-item<%= i === 0 ? ' active' : '' %>">
+            <div class="hero-kit__titel">
+              <h2><%= folie.titel %></h2>
+            </div>
+
+            <% if (folie.marke || folie.zeit) { %>
+              <p class="hero-kit__zeile">
+                <% if (folie.marke) { %><img src="<%= kit(folie.marke.bild) %>" alt="<%= folie.marke.alt %>"><% } %>
+                <% if (folie.zeit) { %><span><%= datum(folie.zeit) %></span><% } %>
+              </p>
+            <% } %>
+
+            <% if (folie.html) { %>
+              <div class="hero-kit__text"><%- folie.html %></div>
+            <% } else if (folie.zeilen && folie.zeilen.length) { %>
+              <div class="hero-kit__text"><%= folie.zeilen.join(' ') %></div>
+            <% } %>
+
+            <div class="hero-kit__knoepfe">
+              <% folie.knoepfe.forEach(knopf => { %>
+                <a href="<%= knopf.href %>" class="hero-kit__knopf<%= knopf.haupt ? ' hero-kit__knopf--haupt' : '' %>"<% if (knopf.extern) { %> target="_blank" rel="noopener"<% } %>>
+                  <% if (knopf.icon) { %><i class="<%= knopf.icon %>"></i><% } %>
+                  <%= knopf.text %>
+                </a>
+              <% }) %>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+
+      <div class="hero-kit__steuerung">
+        <a class="hero-kit__pfeil" href="#heroCarousel" role="button" data-slide="prev">
+          <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+          <span class="visually-hidden"><%= tr('LANDING.CAROUSEL_PREV') %></span>
+        </a>
+        <div class="carousel-indicators">
+          <% folien.forEach((folie, i) => { %>
+            <button type="button" data-target="#heroCarousel" data-slide-to="<%= i %>" class="<%= i === 0 ? 'active' : '' %>" aria-label="<%= i + 1 %> / <%= folien.length %>"></button>
+          <% }) %>
+        </div>
+        <a class="hero-kit__pfeil" href="#heroCarousel" role="button" data-slide="next">
+          <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+          <span class="visually-hidden"><%= tr('LANDING.CAROUSEL_NEXT') %></span>
+        </a>
+      </div>
+
+    </div>
+
+    <ul class="hero-kit__themen">
+      <% themen.forEach(thema => { %>
+        <li>
+          <a href="/#plugins" title="<%= thema.name %>">
+            <img src="<%= kit(thema.bild) %>" alt="<%= thema.name %>" width="512" height="512" loading="lazy">
+          </a>
+        </li>
+      <% }) %>
+    </ul>
+
+  </div>
+
+</section>
