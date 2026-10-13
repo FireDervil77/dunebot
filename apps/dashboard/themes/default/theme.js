@@ -139,6 +139,10 @@ class DefaultTheme {
         am.registerVendorStyle('swiper-css', '/public/vendor/swiper/swiper-bundle.min.css', { version: '11.0.5' });
         am.registerStyle('auth-css', 'auth.css', { deps: ['tokens'], version: this.version });
         am.registerStyle('frontend-css', 'frontend.css', { deps: ['tokens'], version: this.version });
+        // Hero der Startseite aus dem Grafik-Kit (`.hero-kit`). Eigene Datei
+        // hinter frontend-css, damit ihre Regeln gegen Tabler und die alten
+        // `.hero`-Regeln gewinnen.
+        am.registerStyle('hero-kit-css', 'hero-kit.css', { deps: ['frontend-css'], version: this.version });
 
         am.registerVendorScript('bootstrap-js', '/public/vendor/bootstrap/js/bootstrap.bundle.min.js', { deps: ['jquery'], version: '4.4.1' });
         am.registerVendorScript('php-email-form', '/public/vendor/php-email-form/validate.js', { version: '3.7.0' });
@@ -242,7 +246,8 @@ class DefaultTheme {
 
         if (section !== 'guild') {
             ['fonts-frontend', 'bootstrap-icons', 'fontawesome', 'bootstrap-css',
-             'aos-css', 'glightbox-css', 'swiper-css', 'tokens', 'frontend-css']
+             'aos-css', 'glightbox-css', 'swiper-css', 'tokens', 'frontend-css',
+             'hero-kit-css']
                 .forEach(h => am.enqueueStyle(h));
             ['jquery', 'bootstrap-js', 'php-email-form', 'aos-js', 'waypoints',
              'purecounter', 'glightbox-js', 'imagesloaded', 'isotope', 'swiper-js',
