@@ -361,7 +361,7 @@ exports.getPlugins = async (req, res) => {
                     // DuneBot.png gibt es seit der Umbenennung nicht mehr — jedes
                     // Plugin ohne eigenes Icon erzeugte damit einen 404 auf der
                     // Pluginseite.
-                    let icon = "/themes/default/assets/images/firebot.png";
+                    let icon = "/themes/default/assets/images/kit/logo/web/emblem-256.png";
                     const iconCandidates = [
                         path.join(pluginPath, "dashboard", "public", "images", "icon.png"),
                         path.join(pluginPath, "dashboard", "public", "icon.png"),

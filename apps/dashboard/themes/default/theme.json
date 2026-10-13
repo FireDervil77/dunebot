@@ -21,8 +21,8 @@
     "darkMode": true,
     "primaryColor": "#6f4fd0",
     "accentColor": "#f39c12",
-    "logo": "images/firebot.png",
-    "favicon": "images/favicon.png"
+    "logo": "images/kit/logo/web/emblem-256.png",
+    "favicon": "images/kit/logo/web/avatar-64.png"
   },
   "tokens": {
     "fb-primary": "#6f4fd0",

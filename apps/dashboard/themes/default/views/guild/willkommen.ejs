@@ -11,9 +11,9 @@
  * @context {Object}  guild           - Die Guild (id, name, icon-Hash)
  * @context {string}  guildIcon       - fertige Symbol-Adresse, oder null
  *
- * Ersatzbild: `/themes/default/assets/images/firebot-logo-rund-256.png` — das
- * runde 256er-Logo, nicht das `firebot.png` daneben: Letzteres ist 865x756 und
- * 947 KB, also weder rund noch fuer einen Avatar gedacht.
+ * Ersatzbild: `/themes/default/assets/images/kit/logo/web/avatar-256.png` — der runde
+ * Avatar aus dem Grafik-Kit in 256 px. Nicht das Emblem daneben: Das ist
+ * eckig geschnitten und fuer einen Avatar nicht gedacht.
  * Ausdruecklich **nicht** `/images/DuneBot.png` — diesen Pfad gibt es auf dem
  * Server nicht (`apps/dashboard/public/images/` existiert gar nicht), er stand
  * am 2026-09-16 als weisser Kasten auf der Seite. Er steckt leider auch in
@@ -31,7 +31,7 @@
         <div class="row align-items-center">
             <div class="col-auto">
                 <span class="avatar avatar-lg"
-                      style="background-image: url(<%= guildIcon || '/themes/default/assets/images/firebot-logo-rund-256.png' %>)"></span>
+                      style="background-image: url(<%= guildIcon || '/themes/default/assets/images/kit/logo/web/avatar-256.png' %>)"></span>
             </div>
             <div class="col">
                 <h2 class="mb-1"><%= tr('WILLKOMMEN.BEGRUESSUNG', { server: guild.name }) %></h2>

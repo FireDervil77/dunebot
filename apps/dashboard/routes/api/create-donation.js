@@ -89,7 +89,7 @@ router.post('/', async (req, res) => {
                     product_data: {
                         name: 'FireBot Unterstützung',
                         description: sanitizedMessage || 'Vielen Dank für deine Spende!',
-                        images: [`${process.env.DASHBOARD_BASE_URL}/themes/default/assets/images/firebot.png`]
+                        images: [`${process.env.DASHBOARD_BASE_URL}/themes/default/assets/images/kit/logo/web/avatar-512.png`]
                     },
                     unit_amount: Math.round(numAmount * 100) // EUR zu Cent
                 },
