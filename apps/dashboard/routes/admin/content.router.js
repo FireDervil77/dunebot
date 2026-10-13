@@ -1200,13 +1200,22 @@ router.post('/changelogs/delete/:id', async (req, res) => {
 // BLOG: Create / Edit Views
 // ================================================================
 
+/**
+ * Das Titelbild, mit dem ein neuer Blog-Post anfaengt (Betreiber, 2026-10-13) —
+ * die Blog-Karte aus dem Grafik-Kit, 820 x 400. Gleiche Regel wie bei
+ * NEWS_STANDARDBILD: eine Datei des Themes, der Pfad zaehlt ab dessen
+ * assets-Ordner. Ohne Titelbild zeigt die Uebersicht nur eine Farbflaeche.
+ */
+const BLOG_STANDARDBILD = '/images/kit/blog/Blog.png';
+
 router.get('/blog/new', async (req, res) => {
     const themeManager = ServiceManager.get('themeManager');
     await themeManager.renderView(res, 'admin/blog-edit', {
         title: 'Neuen Blog-Post erstellen',
         activeMenu: '/admin/content',
         backUrl: '/admin/content?tab=blog',
-        post: null
+        post: null,
+        standardBild: BLOG_STANDARDBILD
     });
 });
 
@@ -1234,7 +1243,8 @@ router.get('/blog/edit/:id', async (req, res) => {
         title: 'Blog-Post bearbeiten',
         activeMenu: '/admin/content',
         backUrl: '/admin/content?tab=blog',
-        post
+        post,
+        standardBild: BLOG_STANDARDBILD
     });
 });
 

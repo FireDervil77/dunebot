@@ -147,8 +147,8 @@
                                     <div class="mb-3">
                                         <label for="image_url" class="form-label">Titelbild URL</label>
                                         <input type="text" class="form-control" id="image_url" name="image_url" 
-                                               value="<%= post && post.image_url ? post.image_url : '' %>"
-                                               placeholder="/images/blog/mein-bild.jpg oder https://...">
+                                               value="<%= post && post.image_url ? post.image_url : (locals.standardBild || '') %>"
+                                               placeholder="<%= locals.standardBild || '/images/…' %> oder https://...">
                                     </div>
 
                                     <div class="row">
