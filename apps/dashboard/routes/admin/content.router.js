@@ -324,8 +324,11 @@ router.get('/', async (req, res) => {
  * Es liegt als Datei des Themes vor, nicht als Verweis auf die Medienablage:
  * Dort koennte es jemand loeschen oder verschieben, und jede neue News finge
  * mit einem toten Bild an. Bestehende News bleiben, wie sie sind.
+ *
+ * Seit dem 2026-10-13 ist es die News-Karte aus dem Grafik-Kit des Betreibers
+ * (820 x 400). Der Pfad zaehlt ab dem assets-Ordner des Themes.
  */
-const NEWS_STANDARDBILD = '/images/firebot-news.png';
+const NEWS_STANDARDBILD = '/images/kit/news/News.png';
 
 router.get('/news/new', async (req, res) => {
     const themeManager = ServiceManager.get('themeManager');
