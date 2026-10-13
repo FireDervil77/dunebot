@@ -1010,9 +1010,13 @@ section,
   opacity: 1;
 }
 
+/* Die Zeilenhöhe steht hier ausdrücklich: Tabler gibt jeder h2 feste 1.75rem
+   (28px) mit — gedacht für seine eigene 20-px-Überschrift. Bei 48px Schrift
+   schieben sich die Zeilen eines umgebrochenen Titels ineinander. */
 .hero h2 {
   margin: 0 0 10px 0;
   font-size: 48px;
+  line-height: 1.2;
   font-weight: 700;
   color: #ffffff;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
