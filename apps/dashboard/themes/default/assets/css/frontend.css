@@ -166,6 +166,16 @@ h6 {
   color: var(--heading-color);
 }
 
+/* Der Schriftzug aus dem Grafik-Kit steht als Bild in der h1. Die Regel für
+   `.header .logo img` darüber ist für das Emblem bemessen. */
+.header .logo h1 img {
+  display: block;
+  height: 26px;
+  width: auto;
+  max-height: none;
+  margin: 0;
+}
+
 .header .header-social-links {
   padding-right: 15px;
 }
