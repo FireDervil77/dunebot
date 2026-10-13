@@ -75,12 +75,17 @@
           <span class="nav-link-title d-none d-lg-inline"><%= tr('SIDEBAR.HOME') %></span>
         </a>
       </div>
+      <%# Nur mit eingetragener Adresse (DISCORD_SUPPORT_SERVER_URL). Ohne sie
+          stand hier `#` mit target="_blank" — der Klick oeffnete das Dashboard
+          ein zweites Mal statt den Discord-Server. %>
+      <% if (locals.supportUrl && locals.supportUrl !== '#') { %>
       <div class="nav-item">
-        <a class="nav-link" href="<%= locals.supportUrl || '#' %>" target="_blank" rel="noopener">
+        <a class="nav-link" href="<%= locals.supportUrl %>" target="_blank" rel="noopener">
           <span class="nav-link-icon"><i class="fab fa-discord"></i></span>
           <span class="nav-link-title d-none d-lg-inline"><%= tr('SIDEBAR.SUPPORT_DISCORD') %></span>
         </a>
       </div>
+      <% } %>
     </div>
 
     <div class="navbar-nav flex-row order-md-last align-items-center">
