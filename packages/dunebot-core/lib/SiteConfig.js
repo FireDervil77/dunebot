@@ -38,12 +38,13 @@ class SiteConfig {
         // URLs
         ['DASHBOARD_URL',                  { type: 'url',     fallback: null }],         // Fallback ist dynamisch (req.protocol + host)
         ['BASE_URL',                       { type: 'url',     fallback: null }],
-        ['SUPPORT_URL',                    { type: 'url',     fallback: '#' }],
         ['DOCS_URL',                       { type: 'url',     fallback: '#documentation' }],
         ['GITHUB_URL',                     { type: 'url',     fallback: 'https://github.com/yourusername/dunebot' }],
         ['BUYMEACOFFEE_URL',               { type: 'url',     fallback: '#' }],
 
-        // Discord Support Server
+        // Discord Support Server — die eine Adresse für jeden Support-Verweis
+        // (Kopfleiste, Serverauswahl, Willkommensseite, Rechtstexte). Bis zum
+        // 2026-10-13 gab es daneben `SUPPORT_URL` für dieselbe Sache.
         ['DISCORD_SUPPORT_SERVER_URL',     { type: 'url',     fallback: '' }],
         ['DISCORD_SUPPORT_SERVER_NAME',    { type: 'string',  fallback: 'Discord Support' }],
 
@@ -172,12 +173,11 @@ class SiteConfig {
             botVersion:         this.get('BOT_VERSION'),
             environment:        this.get('NODE_ENV'),
             baseUrl,
-            supportUrl:         this.get('SUPPORT_URL'),
+            supportUrl:         this.get('DISCORD_SUPPORT_SERVER_URL'),
             docsUrl:            this.get('DOCS_URL'),
             githubUrl:          this.get('GITHUB_URL'),
             buyMeCoffeeUrl:     this.get('BUYMEACOFFEE_URL'),
             supportName:        this.get('DISCORD_SUPPORT_SERVER_NAME'),
-            supportServerUrl:   this.get('DISCORD_SUPPORT_SERVER_URL'),
             year:               new Date().getFullYear(),
         };
     }

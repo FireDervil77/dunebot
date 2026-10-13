@@ -1,3 +1,7 @@
+<%# Adresse des Support-Servers: DISCORD_SUPPORT_SERVER_URL. Ohne sie bleibt
+    der Text stehen, aber ohne Verweis — hier stand lange ein abgelaufener
+    Einladungslink fest im Quelltext. %>
+<% const _support = (locals.supportUrl && supportUrl !== '#') ? supportUrl : null; %>
 <section id="tos" class="tos-page section dark-background">
   <div class="tos-container">
     <h1 class="text-center">📜 <%= tr('TOS.PAGE_TITLE') %></h1>
@@ -64,7 +68,7 @@
         <%= tr('TOS.SECTION7_TEXT') %>
         <a href="mailto:<%= tr('TOS.SECTION7_EMAIL') %>" class="text-primary"><%= tr('TOS.SECTION7_EMAIL') %></a>
         <%= tr('TOS.SECTION7_OR') %>
-        <a href="https://discord.gg/AKZv8rqg9X" class="text-primary" target="_blank"><%= tr('TOS.SECTION7_DISCORD') %></a>.
+        <% if (_support) { %><a href="<%= _support %>" class="text-primary" target="_blank" rel="noopener"><%= tr('TOS.SECTION7_DISCORD') %></a><% } else { %><%= tr('TOS.SECTION7_DISCORD') %><% } %>.
       </p>
       <p class="text-center">
         <a href="/" class="back-link text-primary"><i class="fas fa-arrow-left"></i> <%= tr('TOS.BACK_TO_HOME') %></a>

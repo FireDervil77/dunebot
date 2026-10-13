@@ -195,7 +195,10 @@ async function getHelpMenu({ client, guild }) {
                 `**Dune Wiki:** [Here](https://duneawakeningwiki.de/)\n` +
                 `**GitHub:** [Here](later})\n` +
                 `**Documentation:** [Here](not ready jet)\n` +
-                `**Support Server:** [Join](https://discord.gg/AKZv8rqg9X)\n` +
+                // Dieselbe Einstellung wie im Dashboard; ohne sie entfällt die Zeile.
+                (process.env.DISCORD_SUPPORT_SERVER_URL
+                    ? `**Support Server:** [Join](${process.env.DISCORD_SUPPORT_SERVER_URL})\n`
+                    : '') +
                 '**Buy me a coffee:** [Here](https://buymeacoffee.com/firedervil)\n\n' +
                 `**Invite Me:** [Here](${client.getInvite()})\n`
         );

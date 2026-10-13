@@ -217,7 +217,7 @@ class ThemeManager {
             
             coreConfig: {
                 githubUrl: process.env.GITHUB_URL || 'https://github.com/yourusername/dunebot',
-                supportUrl: process.env.SUPPORT_URL || '#',
+                supportUrl: process.env.DISCORD_SUPPORT_SERVER_URL || '',
                 documentationUrl: process.env.DOCS_URL || '#documentation'
             },
             

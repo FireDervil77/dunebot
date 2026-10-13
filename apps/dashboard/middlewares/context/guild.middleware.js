@@ -139,16 +139,13 @@ try {
     
     // Globale Konfigurations-Variablen für alle Templates (aus ENV)
     try {
-        res.locals.supportUrl = process.env.DISCORD_SUPPORT_SERVER_URL || '#';
-        res.locals.supportName = process.env.DISCORD_SUPPORT_SERVER_NAME || 'Discord Support';
+        // supportUrl und supportName kommen aus SiteConfig (base.middleware).
         res.locals.dashboardVersion = process.env.DASHBOARD_VERSION || '1.0.0';
         res.locals.botVersion = process.env.BOT_VERSION || '1.0.0';
         res.locals.buyMeCoffeeUrl = process.env.BUYMEACOFFE_URL || '#';
     } catch (error) {
         Logger.warn('[Guild Middleware] Error loading SuperAdmin configs:', error.message);
         // Fallback-Werte IMMER setzen
-        res.locals.supportUrl = '#';
-        res.locals.supportName = 'Discord Support';
         res.locals.dashboardVersion = '1.0.0';
         res.locals.botVersion = '1.0.0';
         res.locals.buyMeCoffeeUrl = '#';

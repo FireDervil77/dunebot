@@ -1,3 +1,7 @@
+<%# Adresse des Support-Servers: DISCORD_SUPPORT_SERVER_URL. Ohne sie bleibt
+    der Text stehen, aber ohne Verweis — hier stand lange ein abgelaufener
+    Einladungslink fest im Quelltext. %>
+<% const _support = (locals.supportUrl && supportUrl !== '#') ? supportUrl : null; %>
 <section id="privacy" class="privacy-page section dark-background">
   <div class="privacy-container">
     <h1 class="text-center">🛡️ <%= tr('PRIVACY.PAGE_TITLE') %></h1>
@@ -9,7 +13,7 @@
       <p>
         <%= tr('PRIVACY.SECTION1_TEXT') %><br>
         <strong><%= tr('PRIVACY.SECTION1_DEV') %></strong> <%= tr('PRIVACY.SECTION1_ROLE') %><br>
-        <%= tr('PRIVACY.SECTION1_CONTACT') %> <strong><a href="https://discord.gg/AKZv8rqg9X" target="_blank"><%= tr('PRIVACY.SECTION1_DISCORD') %></a></strong>
+        <%= tr('PRIVACY.SECTION1_CONTACT') %> <strong><% if (_support) { %><a href="<%= _support %>" target="_blank" rel="noopener"><%= tr('PRIVACY.SECTION1_DISCORD') %></a><% } else { %><%= tr('PRIVACY.SECTION1_DISCORD') %><% } %></strong>
       </p>
     </div>
 
@@ -140,7 +144,7 @@
       <div class="section-title text-center"><%= tr('PRIVACY.SECTION8_TITLE') %></div>
       <p>
         <%= tr('PRIVACY.SECTION8_TEXT') %><br>
-        ✅ <strong><a href="https://discord.gg/AKZv8rqg9X" class="text-primary" target="_blank"><%= tr('PRIVACY.SECTION8_DISCORD_LINK') %></a>.</strong>
+        ✅ <strong><% if (_support) { %><a href="<%= _support %>" class="text-primary" target="_blank" rel="noopener"><%= tr('PRIVACY.SECTION8_DISCORD_LINK') %></a><% } else { %><%= tr('PRIVACY.SECTION8_DISCORD_LINK') %><% } %>.</strong>
       </p>
       <a href="/" class="btn btn-primary text-sucess"><i class="fas fa-arrow-left"></i> <%= tr('PRIVACY.BACK_TO_HOME') %></a>
     </div>
