@@ -24,7 +24,8 @@ class WerkbankPlugin extends DashboardPlugin {
             version: VersionHelper.getVersionFromContext(__dirname),
             author: 'FireBot Team',
             icon: 'fa-solid fa-screwdriver-wrench',
-            baseDir: __dirname
+            baseDir: __dirname,
+            publicAssets: true
         });
         this.app = app;
         this.guildRouter = require('express').Router();

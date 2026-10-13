@@ -25,8 +25,8 @@
           <% pluginsList.forEach((plugin, index) => { %>
             <div class="carousel-item <%= index === 0 ? 'active' : '' %>">
               <div class="plugin-card">
-                <div class="plugin-icon">
-                  <i class="<%= plugin.icon %>"></i>
+                <div class="plugin-icon plugin-icon--bild">
+                  <img src="<%= plugin.bild || '/themes/default/assets/images/kit/logo/web/avatar-256.png' %>" alt="" width="256" height="256" loading="lazy">
                 </div>
                 <div class="plugin-content">
                   <h3><%= plugin.displayName %></h3>

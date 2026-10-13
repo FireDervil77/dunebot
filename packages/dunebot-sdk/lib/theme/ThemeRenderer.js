@@ -604,6 +604,12 @@ class ThemeRenderer {
         };
 
         // ============================================================================
+        // pluginBild — das Bild, das ein Plugin selbst mitbringt (utils/PluginBild.js)
+        // ============================================================================
+        const { pluginBild } = require('../utils/PluginBild');
+        manager.app.locals.pluginBild = (name, fassung) => pluginBild(pluginsDir, name, fassung);
+
+        // ============================================================================
         // Permission Helpers
         // ============================================================================
         manager.app.locals.hasPermission = function(permissionKey) {

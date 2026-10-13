@@ -9,22 +9,20 @@
  * Knöpfe ohne Zahnrad. Das Backend läuft auf Tabler, das Frontend auf
  * Bootstrap — `bi` gehört nur dorthin.
  *
- * Die runden FireBot-Motive liegen bei den Marken-Bildern des Themes. Die
- * Zuordnung unten ist bewusst kurz und leicht zu ändern: Wer ein Plugin anders
- * einsortieren will, ergänzt eine Zeile.
+ * Das Bild bringt jedes Plugin selbst mit (`dashboard/assets/images/
+ * icon-rund.png`); `pluginBild()` liefert die Adresse und fällt ohne Datei auf
+ * den FireBot-Avatar zurück. Bis zum 2026-10-13 stand hier eine Handliste,
+ * die jedes Plugin einem von vier runden Motiven zuordnete.
  *
  * @context {Array}  enabledPlugins - [{ name, version, badge }]
  * @context {string} guildId
 %>
 <%
-/** Welches runde FireBot-Motiv passt zu diesem Plugin? */
-const _MOTIVE = {
-    gameserver: 'server', masterserver: 'server',
-    music: 'gaming', streaming: 'gaming', giveaway: 'gaming',
-    information: 'news', greeting: 'news',
-};
-const _motiv = (name) =>
-    `/themes/default/assets/images/firebot-${_MOTIVE[name] || 'logo'}-rund-256.png`;
+/* `locals.pluginBild`: Der laufende Prozess kann diese Datei von der Platte
+   lesen, bevor er nach einem Neustart die Funktion kennt. */
+const _bild = (name) => locals.pluginBild
+    ? pluginBild(name, 'rund')
+    : '/themes/default/assets/images/kit/logo/web/avatar-256.png';
 %>
 <% if (locals.enabledPlugins && enabledPlugins.length > 0) { %>
   <div class="row">
@@ -51,7 +49,7 @@ const _motiv = (name) =>
             </div>
           <% } %>
           <div class="plugin-icon mb-2">
-            <img src="<%= _motiv(plugin.name) %>" alt=""
+            <img src="<%= _bild(plugin.name) %>" alt=""
                  width="56" height="56" class="rounded-circle" loading="lazy">
           </div>
           <h5 class="plugin-name mb-1"><%= plugin.name %></h5>

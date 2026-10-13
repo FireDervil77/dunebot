@@ -12,7 +12,8 @@ class CoreDashboardPlugin extends DashboardPlugin {
             version: VersionHelper.getVersionFromContext(__dirname),
             author: 'FireBot Team',
             icon: 'fa-solid fa-cog',
-            baseDir: __dirname
+            baseDir: __dirname,
+            publicAssets: true
         });
         
         this.app = app;

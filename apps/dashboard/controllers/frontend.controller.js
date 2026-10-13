@@ -150,7 +150,7 @@ module.exports.getIndex = async (req, res) => {
                             description: packageJson.description || 'Keine Beschreibung verfügbar',
                             version: packageJson.version || '1.0.0',
                             author: packageJson.author || 'FireDervil',
-                            icon: this._getPluginIcon(folder)
+                            bild: req.app.locals.pluginBild(folder, 'rund')
                         };
                     } catch (err) {
                         Logger.warn(`Konnte package.json für Plugin ${folder} nicht laden:`, err);
@@ -323,30 +323,6 @@ exports.tos = async (req, res) => {
 };
 
 // Helper-Funktionen
-
-/**
- * Helper-Funktion: Plugin-Icon basierend auf Plugin-Namen zuweisen
- * @private
- * @param {string} pluginName - Name des Plugins
- * @returns {string} FontAwesome Icon-Klasse
- */
-module.exports._getPluginIcon = function(pluginName) {
-    const iconMap = {
-        'core': 'fa-solid fa-gear',
-        'automod': 'fa-solid fa-shield-halved',
-        'moderation': 'fa-solid fa-gavel',
-        'dunemap': 'fa-solid fa-map',
-        'greeting': 'fa-solid fa-hand-wave',
-        'information': 'fa-solid fa-circle-info',
-        'ticket': 'fa-solid fa-ticket',
-        'economy': 'fa-solid fa-coins',
-        'giveaway': 'fa-solid fa-gift',
-        'statistik': 'fa-solid fa-chart-line'
-    };
-    
-    return iconMap[pluginName] || 'fa-solid fa-puzzle-piece';
-};
-
 /**
  * News aus der Datenbank laden und lokalisieren
  * @private

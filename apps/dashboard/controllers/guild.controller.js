@@ -357,23 +357,9 @@ exports.getPlugins = async (req, res) => {
                         fs.existsSync(path.join(pluginPath, "dashboard", "views", "guild")) ||
                         fs.existsSync(path.join(pluginPath, "dashboard", "views", "admin"));
 
-                    // Icon optional suchen (Fallback auf Theme-Icon)
-                    // DuneBot.png gibt es seit der Umbenennung nicht mehr — jedes
-                    // Plugin ohne eigenes Icon erzeugte damit einen 404 auf der
-                    // Pluginseite.
-                    let icon = "/themes/default/assets/images/kit/logo/web/emblem-256.png";
-                    const iconCandidates = [
-                        path.join(pluginPath, "dashboard", "public", "images", "icon.png"),
-                        path.join(pluginPath, "dashboard", "public", "icon.png"),
-                        path.join(pluginPath, "dashboard", "public", "images", "logo.png")
-                    ];
-                    for (const candidate of iconCandidates) {
-                        if (fs.existsSync(candidate)) {
-                            // Annahme: static-Mount für Plugin-Assets existiert unter /plugins/:name
-                            icon = `/plugins/${pluginName}/images/${path.basename(candidate)}`;
-                            break;
-                        }
-                    }
+                    // Das Bild bringt das Plugin selbst mit; ohne Datei gibt es
+                    // den FireBot-Avatar. Die Karten zeigen es rund.
+                    const icon = req.app.locals.pluginBild(pluginName, 'rund');
 
                     if (!hasGuildFeatures) {
                         continue;

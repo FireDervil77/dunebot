@@ -1447,6 +1447,18 @@ section,
   color: #ffffff;
 }
 
+/* Runde Plakette aus dem Plugin statt Symbol auf Farbfläche. */
+.plugin-icon--bild {
+  background: none;
+  border-radius: 50%;
+}
+
+.plugin-icon--bild img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 .plugin-content h3 {
   font-size: 28px;
   font-weight: 700;
