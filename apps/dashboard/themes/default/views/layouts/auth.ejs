@@ -9,6 +9,12 @@
  * Vorher AdminLTEs `login-page`. Dabei stand am Ende ein `</main>`, das nirgends
  * geoeffnet wurde — der Browser hat es verschluckt, im Quelltext stand es
  * trotzdem. Jetzt ausgeglichen.
+ *
+ * `flex-shrink-0` an der Seite: `body` ist bei Tabler genau so hoch wie das
+ * Fenster und selbst ein Flex-Behaelter. Ohne die Klasse wird `.page` auf
+ * Fensterhoehe zusammengedrueckt, und was nicht hineinpasst, ragt wegen der
+ * Zentrierung zu gleichen Teilen oben und unten heraus — nach oben kann aber
+ * niemand rollen. Am Handy fehlten so die ersten Server der Auswahl.
 %>
 <!DOCTYPE html>
 <html lang="<%= locals.lang || 'de' %>">
@@ -41,7 +47,7 @@
 </head>
 <body class="d-flex flex-column">
 
-<div class="page page-center">
+<div class="page page-center flex-shrink-0">
 
     <%- hookArea('auth_before_content') %>
 
