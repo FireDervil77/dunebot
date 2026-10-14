@@ -56,14 +56,21 @@ router.post('/:serverId/attach',
             // Attach zu Server-Console
             // Fehler sind nicht fatal: Server kann offline/installing sein.
             // SSE-Stream (für Install-Output, Status-Events) läuft unabhängig davon.
+            // nur_laufend: Die Konsole fragt beim Ereignis „starting" nach. Dann
+            // zählt nur der Prozess, der gerade startet — nie die Logs des
+            // alten Containers (siehe ConsoleManager.attach).
+            const nurLaufend = req.body?.nur_laufend === true;
             let history = [];
+            let verbunden = false;
+            let grund = null;
             try {
-                history = await consoleManager.attach(
+                ({ history, verbunden, grund } = await consoleManager.attach(
                     guildId,
                     serverId,
                     clientId,
-                    systemUser
-                );
+                    systemUser,
+                    { nurLaufend }
+                ));
             } catch (attachErr) {
                 // Daemon nicht erreichbar oder Server nicht gestartet → kein Problem.
                 // Der SSE-Stream bringt Install- und Status-Events trotzdem live an.
@@ -89,8 +96,13 @@ router.post('/:serverId/attach',
 
             Logger.info(`[Console API] Attach: Server ${serverId}, Client ${clientId}, History: ${history.length} Zeilen`);
             
+            // `success` bleibt true, solange die Anfrage selbst durchging — die
+            // Konsole startet ihren SSE-Strom in jedem Fall. Ob der Daemon
+            // wirklich streamt, steht in `verbunden`.
             res.json({
                 success: true,
+                verbunden,
+                grund,
                 client_id: clientId,
                 history: history,
                 line_count: history.length

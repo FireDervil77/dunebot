@@ -188,6 +188,9 @@ class GameserverConsoleClient {
             }
 
             this.clientId = data.client_id;
+            // `verbunden` sagt, ob der Daemon wirklich streamt (seit 2026-10-14).
+            // Fehlt das Feld, gilt das Alte: erst bei „online" nachholen.
+            this._ptyAttached = data.verbunden === true;
 
             // 2. History anzeigen (falls vorhanden)
             if (data.history && data.history.length > 0) {
@@ -308,6 +311,12 @@ class GameserverConsoleClient {
                             this.terminal.writeln('\x1b[1;33m  🔄 Server wird gestartet – neuer Prozess...\x1b[0m');
                             this.terminal.writeln('\x1b[1;33m═══════════════════════════════════════════════════════════\x1b[0m');
                             this.terminal.writeln('');
+
+                            // Schon jetzt an den neuen Prozess hängen, nicht erst
+                            // bei „online": Forge mit 300 Mods braucht Minuten bis
+                            // zur Spielbereitschaft, und ein Absturz davor kam nie
+                            // in der Konsole an (Server 216, 2026-10-14).
+                            if (this.connected) this._upgradeConsoleAttach(0, { nurLaufend: true });
                         }
 
                         if (payload.status === 'stopped' || payload.status === 'offline') {
@@ -625,44 +634,57 @@ class GameserverConsoleClient {
     }
 
     /**
-     * Auto-Upgrade: PTY-Attach nachholen wenn Server in 'running' wechselt.
-     * Robust mit Retry bei Fehler.
+     * PTY-Attach nachholen — beim Ereignis „starting" (`nurLaufend`) und, falls
+     * das nicht geklappt hat, bei „running".
+     *
+     * Entscheidend ist `verbunden` aus der Antwort, nicht `success`: Die Route
+     * meldet Erfolg, sobald die Anfrage durchging. Bis zum 2026-10-14 las dieser
+     * Code nur `success` — die Wiederholungen griffen nie, und die Konsole hielt
+     * sich für verbunden, obwohl der Daemon abgelehnt hatte.
+     *
+     * `nurLaufend`: Der Daemon hängt sich nur an den Prozess, der gerade startet,
+     * nie an die Logs des alten Containers. Bei einem Daemon vor 1.0.123 fragt
+     * das Dashboard gar nicht erst (`grund: 'daemon_alt'`) — dann bleibt es beim
+     * Nachholen bei „online".
      * @private
      */
-    _upgradeConsoleAttach(retryCount = 0) {
+    _upgradeConsoleAttach(retryCount = 0, { nurLaufend = false } = {}) {
         const maxRetries = 3;
-        console.log(`[Console] Auto-Upgrade Attach (Versuch ${retryCount + 1}/${maxRetries + 1})...`);
+        if (this._ptyAttached) return;
+        console.log(`[Console] Auto-Upgrade Attach (Versuch ${retryCount + 1}/${maxRetries + 1}${nurLaufend ? ', beim Start' : ''})...`);
+
+        const nochmal = () => {
+            if (retryCount < maxRetries && !this._ptyAttached) {
+                const delay = 1000 * (retryCount + 1);
+                setTimeout(() => this._upgradeConsoleAttach(retryCount + 1, { nurLaufend }), delay);
+            } else {
+                console.warn('[Console] Auto-Upgrade Attach fehlgeschlagen nach max Retries');
+            }
+        };
 
         fetch(`${this.config.apiBase}/attach`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(nurLaufend ? { nur_laufend: true } : {})
         })
             .then(r => r.json())
             .then(d => {
-                if (d.success) {
+                const verbunden = (d.verbunden !== undefined) ? d.verbunden === true : d.success === true;
+                if (verbunden) {
                     this._ptyAttached = true;
                     this.clientId = d.client_id || this.clientId;
                     this.updateStatus('Verbunden', 'success');
                     this.terminal.writeln('\x1b[32m[Console] PTY verbunden – Live-Output aktiv\x1b[0m');
                     console.log('[Console] Auto-Upgrade Attach erfolgreich');
-                } else if (retryCount < maxRetries) {
-                    // Daemon nicht bereit → Retry nach Delay
-                    const delay = 1000 * (retryCount + 1);
-                    console.log(`[Console] Attach nicht erfolgreich, Retry in ${delay}ms...`);
-                    setTimeout(() => this._upgradeConsoleAttach(retryCount + 1), delay);
+                } else if (d.grund === 'daemon_alt') {
+                    console.log('[Console] Daemon zu alt für den Attach beim Start — warte auf „online"');
                 } else {
-                    console.warn('[Console] Auto-Upgrade Attach fehlgeschlagen nach max Retries');
-                    this._ptyAttached = false;
+                    nochmal();
                 }
             })
             .catch(err => {
                 console.error('[Console] Auto-Upgrade Attach Error:', err);
-                if (retryCount < maxRetries) {
-                    const delay = 1000 * (retryCount + 1);
-                    setTimeout(() => this._upgradeConsoleAttach(retryCount + 1), delay);
-                } else {
-                    this._ptyAttached = false;
-                }
+                nochmal();
             });
     }
 

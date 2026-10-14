@@ -18,6 +18,22 @@
 const {ServiceManager} = require('dunebot-core');
 const { NS_CONSOLE, CONSOLE_ATTACH, CONSOLE_DETACH, CONSOLE_INPUT } = require('dunebot-sdk/lib/ipm/MessageTypes');
 
+// Ab dieser Daemon-Fassung versteht `console:attach` die Angabe `nur_laufend`
+// (firebot_daemon, handleConsoleAttach).
+const NUR_LAUFEND_AB = '1.0.123';
+
+/** true, wenn `fassung` (x.y.z) mindestens `mindest` ist. Unbekannt → false. */
+function fassungMindestens(fassung, mindest) {
+    const zerlege = (v) => String(v || '').trim().split('.').map(Number);
+    const a = zerlege(fassung);
+    const b = zerlege(mindest);
+    if (a.length !== 3 || a.some(n => !Number.isInteger(n))) return false;
+    for (let i = 0; i < 3; i++) {
+        if (a[i] !== b[i]) return a[i] > b[i];
+    }
+    return true;
+}
+
 class ConsoleManager {
     constructor() {
         this.Logger = ServiceManager.get('Logger');
@@ -115,10 +131,16 @@ class ConsoleManager {
      * @param {string} serverId - Server ID
      * @param {string} clientId - Eindeutige Client-ID
      * @param {string} userId - User ID (für Permissions)
-     * @returns {Promise<Array>} History der letzten Console-Zeilen
+     * @param {object} [art]
+     * @param {boolean} [art.nurLaufend] - nur an den Prozess hängen, der gerade
+     *        startet oder läuft — nie an die Logs eines alten Containers
+     * @returns {Promise<{history: Array, verbunden: boolean, grund: string|null}>}
+     *          `verbunden` sagt, ob der Daemon wirklich streamt. Bis zum
+     *          2026-10-14 ging diese Auskunft hier verloren: Die Route meldete
+     *          immer Erfolg, und die Wiederholungen im Browser griffen nie.
      * @throws {Error} Bei Fehlern
      */
-    async attach(guildId, serverId, clientId, userId) {
+    async attach(guildId, serverId, clientId, userId, { nurLaufend = false } = {}) {
         try {
             this.Logger.info(`[ConsoleManager] Attach: Server ${serverId}, Client ${clientId}, User ${userId}`);
             
@@ -154,18 +176,31 @@ class ConsoleManager {
             // erste Client noch im Set, aber der Daemon hatte kein aktives Subscription.
             // Neue Logik: Immer senden. Der Daemon dealt mit Duplikaten.
             let attachResponse = null;
-            
-            try {
-                attachResponse = await this._sendDaemonCommand(server.daemon_id, CONSOLE_ATTACH, {
-                    server_id: serverId,
-                    client_id: clientId,
-                    attach: true
-                });
-                this.Logger.info(`[ConsoleManager] Daemon attach gesendet: Server ${serverId}`);
-            } catch (daemonErr) {
-                // Nicht fatal: Server läuft möglicherweise noch nicht / kein PTY aktiv.
-                // Console-View trotzdem laden, History bleibt leer.
-                this.Logger.warn(`[ConsoleManager] Daemon attach nicht verfügbar (Server ${serverId}): ${daemonErr?.message || daemonErr}`);
+            let grund = null;
+
+            // Ein Daemon vor 1.0.123 kennt `nur_laufend` nicht und fiele auf die
+            // Logs des ALTEN Containers zurück — dessen letzte 200 Zeilen stünden
+            // dann als Ausgabe des neuen Starts in der Konsole. Lieber nicht
+            // fragen: Die Konsole hängt sich dann wie bisher bei „online" an.
+            if (nurLaufend && !fassungMindestens(server.daemon_version, NUR_LAUFEND_AB)) {
+                grund = 'daemon_alt';
+                this.Logger.info(`[ConsoleManager] Attach beim Start übersprungen: Daemon ${server.daemon_version || '?'} `
+                    + `kennt nur_laufend erst ab ${NUR_LAUFEND_AB} (Server ${serverId})`);
+            } else {
+                try {
+                    attachResponse = await this._sendDaemonCommand(server.daemon_id, CONSOLE_ATTACH, {
+                        server_id: serverId,
+                        client_id: clientId,
+                        attach: true,
+                        ...(nurLaufend ? { nur_laufend: true } : {})
+                    });
+                    this.Logger.info(`[ConsoleManager] Daemon attach gesendet: Server ${serverId}`);
+                } catch (daemonErr) {
+                    // Nicht fatal: Server läuft möglicherweise noch nicht / kein PTY aktiv.
+                    // Console-View trotzdem laden, History bleibt leer.
+                    grund = 'daemon_lehnt_ab';
+                    this.Logger.warn(`[ConsoleManager] Daemon attach nicht verfügbar (Server ${serverId}): ${daemonErr?.message || daemonErr}`);
+                }
             }
             
             // 5. Bei Re-Attach: Alte lokale History verwerfen, Daemon-History übernehmen
@@ -195,10 +230,14 @@ class ConsoleManager {
             
             this.Logger.success(`[ConsoleManager] Attach erfolgreich: Server ${serverId}, Clients: ${this.activeClients.get(serverId).size}`);
             
-            return history.map(entry => ({
-                line: entry.line,
-                timestamp: entry.timestamp
-            }));
+            return {
+                history: history.map(entry => ({
+                    line: entry.line,
+                    timestamp: entry.timestamp
+                })),
+                verbunden: attachResponse !== null,
+                grund
+            };
             
         } catch (error) {
             this.Logger.error(`[ConsoleManager] Attach fehlgeschlagen:`, error);
@@ -395,13 +434,14 @@ class ConsoleManager {
             if (server.rootserver_id) {
                 try {
                     const rRows = await this.dbService.query(`
-                        SELECT id, daemon_id
+                        SELECT id, daemon_id, daemon_version
                         FROM rootserver
                         WHERE id = ?
                     `, [server.rootserver_id]);
 
                     if (Array.isArray(rRows) && rRows[0]) {
                         server.daemon_id = rRows[0].daemon_id;
+                        server.daemon_version = rRows[0].daemon_version;
                     }
                 } catch (innerErr) {
                     // Non-fatal: log and continue without daemon_id
@@ -568,3 +608,5 @@ class ConsoleManager {
 }
 
 module.exports = ConsoleManager;
+module.exports.fassungMindestens = fassungMindestens;
+module.exports.NUR_LAUFEND_AB = NUR_LAUFEND_AB;
