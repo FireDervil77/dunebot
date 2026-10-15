@@ -1314,6 +1314,40 @@ async function einstellungRolleSetzen(sitzung, key, rolle) {
 }
 
 /**
+ * Die Reihenfolge der Einstellungen festlegen — so stehen sie im Panel und im
+ * Anlegeformular (Serverseite.baueEinstellungen bündelt nach Gruppen, in der
+ * Reihenfolge ihres ersten Auftretens).
+ *
+ * Verlangt GENAU die Schlüssel des Entwurfs, jeden einmal: Eine Liste, in der
+ * einer fehlt, hätte ihn sonst still gestrichen, und ein fremder bliebe ohne
+ * Einstellung stehen.
+ *
+ * Ändert den Fingerabdruck nicht (`technisch` ordnet nach Schlüssel) — ein
+ * grüner Durchlauf bleibt gültig.
+ */
+async function einstellungenOrdnen(sitzung, schluessel) {
+    await pruefeFrei(sitzung);
+    if (!Array.isArray(schluessel) || schluessel.some(k => typeof k !== 'string')) {
+        throw new Error('Die Reihenfolge kommt als Liste von Schlüsseln.');
+    }
+    const vorhanden = (sitzung.entwurf?.settings || []).map(x => x.key);
+    const doppelt = schluessel.filter((k, i) => schluessel.indexOf(k) !== i);
+    const fremd = schluessel.filter(k => !vorhanden.includes(k));
+    const fehlt = vorhanden.filter(k => !schluessel.includes(k));
+    if (doppelt.length || fremd.length || fehlt.length) {
+        throw new Error('Die Reihenfolge passt nicht zum Entwurf'
+            + (fehlt.length ? ` — es fehlt: ${fehlt.join(', ')}` : '')
+            + (fremd.length ? ` — unbekannt: ${fremd.join(', ')}` : '')
+            + (doppelt.length ? ` — doppelt: ${[...new Set(doppelt)].join(', ')}` : '')
+            + '. Seite neu laden und noch einmal.');
+    }
+    return entwurfSchreiben(sitzung, (e) => {
+        const nachSchluessel = new Map((e.settings || []).map(x => [x.key, x]));
+        e.settings = schluessel.map(k => nachSchluessel.get(k));
+    });
+}
+
+/**
  * Die Werte, mit denen Probestart und Durchlauf laufen — leer heißt: die Vorgabe.
  * Mehrere auf einmal: Die Karte hat EINEN Knopf für alle geänderten Zeilen.
  *
@@ -2012,7 +2046,14 @@ function technisch(paket) {
     // `settings` zählt mit (B1): Wer nach einem grünen Durchlauf ein Ziel ändert,
     // hat einen Nachweis für etwas, das es nicht mehr gibt.
     const t = { image: p.image || null, ports: p.ports || [], install: p.install || {}, start: p.start || null, env: p.env || {} };
-    if (Array.isArray(p.settings) && p.settings.length) t.settings = p.settings;
+    // Nach Schlüssel geordnet: Die REIHENFOLGE der Einstellungen ist nur
+    // Anzeige (Panel und Anlegeformular folgen ihr). Wer nach einem grünen
+    // Durchlauf das Passwort nach oben schiebt, soll nicht neu prüfen müssen
+    // (Betreiber, 2026-10-15). Die Konfigurationsdatei hängt nicht daran — der
+    // Daemon schreibt Schlüssel an ihrer Stelle, JSON sogar alphabetisch.
+    if (Array.isArray(p.settings) && p.settings.length) {
+        t.settings = [...p.settings].sort((x, y) => (String(x.key) < String(y.key) ? -1 : String(x.key) > String(y.key) ? 1 : 0));
+    }
     // Durchgereichtes zählt mit — es bestimmt, wie der Server läuft (Abfrage,
     // feste Zeilen in Dateien). Nur wenn vorhanden: Eine Sitzung ohne diese
     // Teile behält ihren Fingerabdruck, und ihr grüner Durchlauf bleibt gültig.
@@ -4091,7 +4132,7 @@ module.exports = {
     PRUEF_SUFFIX, fingerabdruck, technisch,
     pruefeBildAdresse, angaben, angabenSpeichern, veroeffentlichungsStand, veroeffentlichungsPaket, veroeffentlichen, laufendePruefung, pruefungen, durchlaufMaengel, pruefen,
     pruefungAbbrechen, pruefProtokoll, pruefungBeenden, entwurfSchreiben,
-    EINSTELLUNG, einstellungAusFormular, einstellungSpeichern, einstellungEntfernen, einstellungRolleSetzen, probewerteSetzen, probewerte,
+    EINSTELLUNG, einstellungAusFormular, einstellungSpeichern, einstellungEntfernen, einstellungRolleSetzen, einstellungenOrdnen, probewerteSetzen, probewerte,
     rolleAusFormular, rolleAlsFormular,
     umgebungAusEinstellungen, belegteEinstellungen,
     HINWEIS, hinweisAusFormular, hinweisSpeichern, hinweisEntfernen,

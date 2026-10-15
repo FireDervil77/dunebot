@@ -963,6 +963,40 @@ async function pruefe(name, fn) {
         assert.match(ejs, /formE\.role\.value = \(e\.role === 'player' && e\.ask_on_create === false\) \? 'player_spaeter' : e\.role/);
     });
 
+    await pruefe('Reihenfolge der Einstellungen: umsortieren, Durchlauf bleibt gültig, falsche Listen abgewiesen', async () => {
+        // Betreiber, 2026-10-15: das Passwort von Enshrouded steht unten, er will es weiter oben.
+        const s = mitEinstellungen();
+        const reihe = () => s.entwurf.settings.map(x => x.key);
+        const anfang = reihe();
+        assert.strictEqual(anfang.length, 4);
+        const fingerVorher = Sitzungen.fingerabdruck(Sitzungen.entwurfAlsPaket(s, []));
+        const neu = [anfang[2], anfang[0], anfang[1], anfang[3]];
+        await Sitzungen.einstellungenOrdnen(s, neu);
+        assert.deepStrictEqual(reihe(), neu, 'die Reihenfolge kam nicht an');
+        assert.strictEqual(s.entwurf.settings.find(x => x.key === 'rcon_password').type, 'password', 'beim Umsortieren ging der Inhalt verloren');
+        assert.strictEqual(Sitzungen.fingerabdruck(Sitzungen.entwurfAlsPaket(s, [])), fingerVorher,
+            'Umsortieren machte den grünen Durchlauf ungültig — nur für die Anzeige neu prüfen');
+        // Gegenprobe: eine echte Änderung ändert den Fingerabdruck weiter.
+        s.entwurf.settings[0].default = 'anders';
+        assert.notStrictEqual(Sitzungen.fingerabdruck(Sitzungen.entwurfAlsPaket(s, [])), fingerVorher, 'der Fingerabdruck sieht die Einstellungen gar nicht mehr');
+        // Falsche Listen: nichts wird geschrieben.
+        const stand = reihe();
+        await assert.rejects(Sitzungen.einstellungenOrdnen(s, stand.slice(1)), /es fehlt: /);
+        await assert.rejects(Sitzungen.einstellungenOrdnen(s, [...stand, 'erfunden']), /unbekannt: erfunden/);
+        await assert.rejects(Sitzungen.einstellungenOrdnen(s, [stand[0], stand[0], stand[1], stand[2]]), /doppelt: /);
+        await assert.rejects(Sitzungen.einstellungenOrdnen(s, 'max_players'), /Liste von Schlüsseln/);
+        assert.deepStrictEqual(reihe(), stand, 'eine abgewiesene Liste wurde trotzdem geschrieben');
+
+        // Die Seite: Pfeile je Zeile, das Skript schickt die ganze Liste an die Route.
+        const ejs = ohneKommentareEjs(fs.readFileSync(path.join(__dirname, '../plugins/werkbank/dashboard/views/guild/werkbank-sitzung.ejs'), 'utf8'));
+        assert.match(ejs, /data-einstellung-zeile="<%= e\.key %>"/);
+        assert.match(ejs, /data-einstellung-schieben="hoch"[^\n]{0,300}platz === 0 \?/);
+        assert.match(ejs, /data-einstellung-schieben="runter"[^\n]{0,300}platz === einstellungen\.length - 1 \?/);
+        assert.match(ejs, /schicke\(hier \+ '\/einstellungen\/reihenfolge', \{ schluessel: reihe \}\)/);
+        const router = ohneKommentare(fs.readFileSync(path.join(__dirname, '../plugins/werkbank/dashboard/routes/guild.router.js'), 'utf8'));
+        assert.match(router, /router\.post\('\/:kennung\/einstellungen\/reihenfolge', requirePermission\('WERKBANK\.BAUEN'\)[\s\S]{0,200}einstellungenOrdnen\(/);
+    });
+
     await pruefe('Formular → Einstellung: gültig nach Schema, Fehler dort gesagt, wo getippt wird', async () => {
         const e = Sitzungen.einstellungAusFormular(formular({ type: 'choice', default: 'hard', choices: 'normal=Normal\nhard=Schwer' }));
         assert.deepStrictEqual(e.choices, [{ value: 'normal', name: { de: 'Normal' } }, { value: 'hard', name: { de: 'Schwer' } }]);

@@ -835,6 +835,17 @@ router.post('/:kennung/einstellungen/:key/rolle', requirePermission('WERKBANK.BA
     }
 });
 
+// Die Reihenfolge der Einstellungen — die ganze Liste, nicht „eins hoch": So
+// kann eine veraltete Seite nichts verschieben, was es nicht mehr gibt.
+router.post('/:kennung/einstellungen/reihenfolge', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.einstellungenOrdnen(await offeneSitzung(req, res), req.body?.schluessel);
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Reihenfolge nicht gespeichert', 400);
+    }
+});
+
 // Alle geänderten Probewerte der Karte in einem Zug (2026-10-08) — bis dahin je
 // Zeile ein eigener Weg (`…/:key/probewert`). Geht auch, während etwas läuft:
 // Probewerte gelten ab dem nächsten Start.
