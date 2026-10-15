@@ -76,28 +76,65 @@ function istWahr(wert) {
 }
 
 /**
- * Wird vor dem Start aktualisiert? Die Paketeinstellung `auto_update`
- * entscheidet.
+ * Der Paketschlüssel, den das Panel als Eigenschaft des SERVERS führt.
  *
- * ── Zwei Schalter, eine Wahrheit ────────────────────────────────────────────
+ * ── Auto-Update gehört dem Server, nicht dem Spiel (2026-10-15) ─────────────
  *
- * Bis zum 2026-09-10 gab es zwei: die Spalte `gameservers.auto_update` (die
- * alte Bearbeitungsseite) und die Paketeinstellung „Automatisch aktualisieren"
- * auf der Einstellungskarte. Wirksam war nur die Spalte — bei Server 186 stand
- * die Karte auf „an", die Spalte auf 0, und es wurde nie aktualisiert. Jetzt
- * gilt die Einstellung, die man sieht. Kennt ein Paket sie nicht, gibt es kein
- * Auto-Update.
+ * Bis zum 2026-09-10 gab es zwei Schalter: die Spalte `gameservers.auto_update`
+ * (Bearbeiten-Seite) und die Paketeinstellung „Automatisch aktualisieren" auf
+ * der Einstellungskarte. Wirksam war nur die Spalte — bei Server 186 stand die
+ * Karte auf „an", die Spalte auf 0. Dann wurde die PAKETEINSTELLUNG zur
+ * Wahrheit, der Schalter auf der Bearbeiten-Seite blieb stehen und schrieb ins
+ * Leere.
  *
+ * Gemessen am 2026-10-15: Die Einstellung hatte nur noch Astro Colony. Valheim
+ * verlor sie mit 1.1.2 (Werkbank), Enshrouded, Core Keeper & Co. hatten sie
+ * nie — Server 219 (Enshrouded) stand auf „an" und zog kein Update. Ob ein
+ * Server aktualisiert wird, ist eine Entscheidung des Betreibers über SEINEN
+ * Server (wie der Name), und ein Paket kann sie nicht vergessen.
+ *
+ * Seitdem gilt die Spalte, für jedes Paket mit SteamCMD-Schritt — nur die
+ * aktualisiert der Daemon (`AktualisiereAusPaket`, `nurSteam`). Trägt ein
+ * älteres Paket noch die Einstellung `auto_update`, wird sie nirgends gezeigt,
+ * gefragt oder gespeichert (`gehoertDemServer`).
+ */
+const AUTO_UPDATE = 'auto_update';
+
+/** Führt das Panel diese Einstellung als Eigenschaft des Servers? */
+function gehoertDemServer(eintrag) {
+    return eintrag?.key === AUTO_UPDATE;
+}
+
+/** Lädt das Paket seine Spieldateien über SteamCMD? Nur dann gibt es etwas zu aktualisieren. */
+function aktualisiertUeberSteam(paket) {
+    return (paket?.install?.steps || []).some(s => s?.type === 'steamcmd');
+}
+
+/**
+ * Wird vor dem Start aktualisiert? Der Schalter am Server — sofern das Paket
+ * überhaupt über SteamCMD lädt.
+ *
+ * @param {object} server  Zeile aus `gameservers` (Spalte `auto_update`)
  * @param {object} paket
- * @param {object} werte  paket_werte des Servers
  * @returns {boolean}
  */
-function autoUpdateAus(paket, werte) {
-    const eintrag = (paket?.settings || []).find(e => e.key === 'auto_update');
-    if (!eintrag) return false;
-    const wert = werte && Object.prototype.hasOwnProperty.call(werte, 'auto_update')
-        ? werte.auto_update : eintrag.default;
-    return istWahr(wert);
+function autoUpdateAus(server, paket) {
+    return istWahr(server?.auto_update) && aktualisiertUeberSteam(paket);
+}
+
+/**
+ * Der Schalter eines NEUEN Servers: was mitkam (Formularfeld `auto_update`
+ * oder, aus einem älteren Paket, `setting_auto_update`), sonst an für jedes
+ * Paket mit SteamCMD-Schritt — so stand die Vorgabe der Pakete, die die
+ * Einstellung trugen.
+ *
+ * @param {object} paket
+ * @param {*} eingabe  undefined = nichts mitgekommen
+ * @returns {boolean}
+ */
+function autoUpdateBeimAnlegen(paket, eingabe) {
+    if (eingabe !== undefined && eingabe !== null && eingabe !== '') return istWahr(eingabe);
+    return aktualisiertUeberSteam(paket);
 }
 
 /**
@@ -289,7 +326,7 @@ async function buildStartPayload(server, guildId, Logger = null) {
         package:         paket,
         settings,
         lader_aktiv:     laderAktiv,
-        auto_update:     autoUpdateAus(paket, werte),
+        auto_update:     autoUpdateAus(server, paket),
         resource_limits: grenzenAus(server),
     };
 
@@ -391,6 +428,7 @@ function baueInstallNutzlast(server, guildId, optionen = {}) {
 function paketWerteAnlegen(paket, eingaben = {}, serverName = null) {
     const werte = {};
     for (const eintrag of paket?.settings || []) {
+        if (gehoertDemServer(eintrag)) continue; // Spalte am Server, siehe AUTO_UPDATE
         let wert = eingaben[eintrag.key];
         if (eintrag.key === 'name' && serverName) wert = serverName;
         // Eine Bitmaske ohne Eingabe ist nicht „nichts angekreuzt", sondern
@@ -502,6 +540,7 @@ async function loadServerForStart(dbService, serverId, guildId = null) {
 
 module.exports = {
     buildStartPayload, baueInstallNutzlast, paketWerteAnlegen, autoUpdateAus, istWahr,
+    autoUpdateBeimAnlegen, aktualisiertUeberSteam, gehoertDemServer,
     loadServerForStart, ladePaketFuerServer, ladePaketFuerAnlegen, imageAusPaket,
     // Nur fuer scripts/check-startpayload.js: Die Regel, welcher Wert beim
     // Start gilt, ist zu teuer erkauft, um sie nur indirekt zu pruefen.

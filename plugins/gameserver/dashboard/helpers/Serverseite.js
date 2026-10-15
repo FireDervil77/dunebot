@@ -36,6 +36,7 @@ const { lesePortzwecke } = require('./Portvergabe');
 const { istKontrollGuild } = require('./Paketfassung');
 const Bitmaske = require('./Bitmaske');
 const Liste = require('./Liste');
+const { gehoertDemServer } = require('./StartPayload');
 
 /** Höhenstufen (B.7): wer welche Einstellungen zu sehen bekommt. */
 const HOEHE = {
@@ -414,6 +415,11 @@ function baueEinstellungen(server, paket, hoehe) {
         // Dort bestimmt das Modpack den Lader, und danach gibt es noch keinen
         // Reiter, in dem man es waehlen koennte.
         if (e.managed_by === 'content') { verborgen++; continue; }
+
+        // Auto-Update ist ein Schalter am SERVER (Bearbeiten-Seite), kein Wert
+        // des Spiels — ein älteres Paket, das es noch als Einstellung trägt,
+        // bekäme hier einen zweiten Schalter, der nichts bewirkt.
+        if (gehoertDemServer(e)) continue;
 
         // Der Wert steht unter dem PAKETSCHLÜSSEL — JEDE Einstellung des
         // Pakets ist änderbar, auch eine, die erst eine neuere Paketfassung
@@ -1680,7 +1686,7 @@ function baueWerteSchritt(paket, maschine, imageLiegtDa) {
     // Seit dem 2026-10-10 kann ein Paket eine Einstellung der einfachen Ansicht
     // vom Anlegen ausnehmen (`ask_on_create: false`) — die Regel steht in
     // `beimAnlegenGefragt`.
-    const gefragt = alle.filter(beimAnlegenGefragt);
+    const gefragt = alle.filter(e => !gehoertDemServer(e) && beimAnlegenGefragt(e));
 
     // ── Der Servername gehoert dem PANEL, nicht dem Spiel ───────────────────
     //
@@ -1810,7 +1816,7 @@ function baueWerteSchritt(paket, maschine, imageLiegtDa) {
         }))),
         // Wieviele Einstellungen NICHT gefragt werden. Das eigene Namensfeld
         // zaehlt hier nicht mit: Es ist keine Einstellung des Pakets.
-        aufVorgabe: alle.length - gefragt.length,
+        aufVorgabe: alle.filter(e => !gehoertDemServer(e)).length - gefragt.length,
 
         passiert: {
             quelle: (paket?.install?.steps || []).map(s =>

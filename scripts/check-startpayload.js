@@ -26,8 +26,8 @@ if (!ServiceManager.has('Logger')) {
 }
 
 const HELPERS = path.join(__dirname, '../plugins/gameserver/dashboard/helpers');
-const { buildStartPayload, baueInstallNutzlast, paketWerteAnlegen, autoUpdateAus, werteFuerDaemon } =
-    require(path.join(HELPERS, 'StartPayload'));
+const { buildStartPayload, baueInstallNutzlast, paketWerteAnlegen, autoUpdateAus, autoUpdateBeimAnlegen,
+        werteFuerDaemon } = require(path.join(HELPERS, 'StartPayload'));
 
 let passed = 0;
 async function check(name, fn) {
@@ -148,18 +148,43 @@ function ohneEgg(payload) {
         assert.ok(/query/.test(error), error);
     });
 
-    await check('Auto-Update folgt der Paketeinstellung, nicht der Spalte', async () => {
-        assert.strictEqual((await buildStartPayload(server({ auto_update: 0 }), 'g1')).payload.auto_update, true);
-        const aus = server({
+    // Seit 2026-10-15 ist Auto-Update eine Eigenschaft des SERVERS (Spalte).
+    // Vorher entschied die Paketeinstellung — und die hatte am Ende nur noch
+    // Astro Colony; Enshrouded (219) stand auf „an" und zog nie ein Update.
+    await check('Auto-Update folgt der Spalte am Server, nicht einem Paketwert', async () => {
+        // Fixture: paket_werte sagt '1', die Spalte 0 → aus.
+        assert.strictEqual((await buildStartPayload(server({ auto_update: 0 }), 'g1')).payload.auto_update, false);
+        const an = server({
             auto_update: 1,
             paket_werte: JSON.stringify({ name: 'x', world_name: 'w', auto_update: '0' }),
         });
-        assert.strictEqual((await buildStartPayload(aus, 'g1')).payload.auto_update, false);
+        assert.strictEqual((await buildStartPayload(an, 'g1')).payload.auto_update, true);
     });
 
-    await check('Ohne auto_update im Paket gibt es kein Auto-Update', async () => {
+    await check('Auch ein Paket ohne Einstellung auto_update wird aktualisiert (Enshrouded)', async () => {
         const p = paket(x => { x.settings = x.settings.filter(e => e.key !== 'auto_update'); });
-        assert.strictEqual(autoUpdateAus(p, { auto_update: '1' }), false);
+        assert.strictEqual(autoUpdateAus({ auto_update: 1 }, p), true);
+        assert.strictEqual(autoUpdateAus({ auto_update: 0 }, p), false);
+    });
+
+    await check('Ohne SteamCMD-Schritt kein Auto-Update — der Daemon aktualisiert nur das', async () => {
+        const p = paket(x => { x.install.steps = [{ type: 'download', url: 'https://example.org/x.zip' }]; });
+        assert.strictEqual(autoUpdateAus({ auto_update: 1 }, p), false);
+    });
+
+    await check('Neuer Server: Eingabe gilt, sonst an bei SteamCMD', async () => {
+        assert.strictEqual(autoUpdateBeimAnlegen(paket(), undefined), true);
+        assert.strictEqual(autoUpdateBeimAnlegen(paket(), '0'), false);
+        assert.strictEqual(autoUpdateBeimAnlegen(paket(), '1'), true);
+        const ohneSteam = paket(x => { x.install.steps = [{ type: 'download', url: 'https://example.org/x.zip' }]; });
+        assert.strictEqual(autoUpdateBeimAnlegen(ohneSteam, undefined), false);
+    });
+
+    await check('Anlegen fragt auto_update nicht als Paketeinstellung', async () => {
+        const { baueWerteSchritt } = require(path.join(HELPERS, 'Serverseite'));
+        const p = paket(x => { x.settings.find(e => e.key === 'auto_update').role = 'player'; });
+        const schritt = baueWerteSchritt(p, null, true);
+        assert.ok(!JSON.stringify(schritt).includes('"auto_update"'), 'auto_update steht im Anlegeschritt');
     });
 
     console.log('\nInstallationsauftrag');
@@ -185,7 +210,8 @@ function ohneEgg(payload) {
     await check('Jede Einstellung bekommt einen Wert — Eingabe, sonst Vorgabe', async () => {
         const werte = paketWerteAnlegen(paket(), { world_name: 'Neu' }, 'Mein Server');
         assert.deepStrictEqual(werte, {
-            name: 'Mein Server', world_name: 'Neu', password: '', auto_update: '1', beta_branch: '',
+            // Ohne auto_update: Das ist eine Spalte am Server, kein Paketwert.
+            name: 'Mein Server', world_name: 'Neu', password: '', beta_branch: '',
         });
     });
 

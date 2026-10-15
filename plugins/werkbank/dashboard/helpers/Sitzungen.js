@@ -24,6 +24,7 @@ const Quellen = require('../../../gameserver/dashboard/helpers/Quellen');
 const Abruf = require('../../../gameserver/dashboard/helpers/Abruf');
 const Bitmaske = require('../../../gameserver/dashboard/helpers/Bitmaske');
 const Liste = require('../../../gameserver/dashboard/helpers/Liste');
+const { gehoertDemServer } = require('../../../gameserver/dashboard/helpers/StartPayload');
 const Oeffentlich = require('../../../../packages/fbpkg/lib/oeffentlich');
 // Die Tags eines Spiels gehören dem Spiel im Panel, nicht dem Paket (2026-10-08) —
 // die Werkbank reicht sie beim Veröffentlichen weiter, wie Symbol und Banner.
@@ -1327,6 +1328,14 @@ async function einstellungSpeichern(sitzung, formular) {
     await pruefeFrei(sitzung);
     const neu = einstellungAusFormular(formular);
     const alt = typeof formular.alt === 'string' ? formular.alt.trim() : '';
+    // Seit 2026-10-15 ein Schalter am SERVER (StartPayload.AUTO_UPDATE) — als
+    // Paketeinstellung zeigt, fragt und liest ihn niemand mehr. Abgewiesen wird
+    // nur das NEUE Anlegen: Ein geöffnetes Paket, das ihn noch trägt, muss sich
+    // unverändert speichern lassen (check-werkbank-oeffnen).
+    if (gehoertDemServer(neu) && alt !== neu.key) {
+        throw new Error(`„${neu.key}" ist ein Schalter des Servers (Bearbeiten-Seite) und wirkt für jedes Spiel mit `
+            + 'SteamCMD-Schritt — als Einstellung des Pakets bewirkt er nichts.');
+    }
     return entwurfSchreiben(sitzung, (e) => {
         const liste = Array.isArray(e.settings) ? e.settings : [];
         const doppelt = liste.find(x => x.key === neu.key && x.key !== alt);

@@ -219,7 +219,7 @@
         "NAME_DESC": "Anzeigename des Gameservers (wird in der Liste angezeigt)",
         "GAME_READONLY": "Spiel und Template können nachträglich nicht geändert werden",
         "AUTO_RESTART_DESC": "Server automatisch neu starten, wenn er unerwartet abstürzt",
-        "AUTO_UPDATE_DESC": "Server-Dateien automatisch aktualisieren, wenn neue Version verfügbar ist",
+        "AUTO_UPDATE_DESC": "Holt vor jedem Start die neueste Fassung der Spieldateien über Steam.",
         "MAX_PLAYERS": "Maximale Spieler",
         "MAX_PLAYERS_DESC": "Maximale Anzahl gleichzeitiger Spieler (1-200)",
         "CURRENT_STATUS": "Aktueller Status",

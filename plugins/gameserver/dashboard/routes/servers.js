@@ -13,7 +13,7 @@ const bcrypt = require('bcrypt');
 const { ServiceManager } = require('dunebot-core');
 const StatusService = require('../helpers/StatusService');
 const { buildStartPayload, loadServerForStart, baueInstallNutzlast,
-        paketWerteAnlegen, autoUpdateAus, istWahr } = require('../helpers/StartPayload');
+        paketWerteAnlegen, autoUpdateBeimAnlegen, aktualisiertUeberSteam, gehoertDemServer, istWahr } = require('../helpers/StartPayload');
 // Welche Paketfassung gilt — für einen Server, beim Anlegen — steht in EINER
 // Datei (Baustelle 172). Hier wird nur noch gefragt.
 const { FASSUNG_FUER_SERVER, ladePaketFuerServer, ladePaketFuerAnlegen, ladePaketeZuServern,
@@ -976,9 +976,11 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
         for (const [feld, wert] of Object.entries(req.body)) {
             if (feld.startsWith('setting_')) eingaben[feld.slice('setting_'.length)] = wert;
         }
-        if (auto_update !== undefined && eingaben.auto_update === undefined) {
-            eingaben.auto_update = toBool(auto_update, false) ? '1' : '0';
-        }
+        // Auto-Update ist eine Spalte am Server (StartPayload.AUTO_UPDATE), kein
+        // Paketwert. Ein älteres Paket kann es noch als `setting_auto_update`
+        // gefragt haben — das gilt dann wie das Formularfeld.
+        const autoUpdateEingabe = auto_update !== undefined ? auto_update : eingaben.auto_update;
+        delete eingaben.auto_update;
         // ── Ein Modpack bestimmt Lader und Ausgabe — der Browser nicht ─────
         //
         // Die Auswahlseite zeigt beides an, sobald jemand ein Paket anklickt.
@@ -1011,7 +1013,7 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
         // Ebenso eine Liste mit einem Eintrag, der nicht zur Regel passt.
         const listenFehler = Liste.fehlerInWerten(paket, paketWerte);
         if (listenFehler) return res.status(400).json({ success: false, message: listenFehler });
-        const autoAktualisieren = autoUpdateAus(paket, paketWerte);
+        const autoAktualisieren = autoUpdateBeimAnlegen(paket, autoUpdateEingabe);
         Logger.info(`[Gameserver] Paketwerte festgehalten: ${Object.keys(paketWerte).length} von `
             + `${(paket.settings || []).length} Einstellungen, Auto-Update ${autoAktualisieren ? 'an' : 'aus'}`);
 
@@ -1059,8 +1061,7 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
             JSON.stringify(paketWerte),
             // Das Formular schickt die Strings "0"/"1" – und "0" ist in JS truthy.
             toBool(auto_restart, true) ? 1 : 0,
-            // Dieselbe Aussage wie die Paketeinstellung. Der Startweg liest die
-            // Spalte nicht mehr; die alte Bearbeitungsseite zeigt sie noch.
+            // Die Spalte IST der Schalter — der Start liest sie (autoUpdateAus).
             autoAktualisieren ? 1 : 0,
             // Geprüfte Werte, keine Rohdaten aus dem Formular: die drei Felder
             // sind Pflicht und wurden oben gegen die Kapazität des RootServers
@@ -2343,8 +2344,21 @@ router.get('/:serverId/edit', requirePermission('GAMESERVER.EDIT'), async (req, 
             Logger.warn(`[Gameserver] Kapazität für RootServer ${server.rootserver_id} nicht lesbar: ${err.message}`);
         }
 
+        // Auto-Update aktualisiert nur, was über SteamCMD kommt (Daemon,
+        // `nurSteam`). Bei einem anderen Spiel sagt die Seite das, statt einen
+        // Schalter anzubieten, der still nichts tut.
+        let autoUpdateOhneSteam = false;
+        try {
+            const pz = await ladePaketFuerServer(dbService, serverId);
+            const paket = pz ? (typeof pz.paket_json === 'string' ? JSON.parse(pz.paket_json) : pz.paket_json) : null;
+            autoUpdateOhneSteam = Boolean(paket) && !aktualisiertUeberSteam(paket);
+        } catch (err) {
+            Logger.warn(`[Gameserver] Paket von Server ${serverId} nicht lesbar: ${err.message}`);
+        }
+
         return await themeManager.renderView(res, 'guild/gameserver-edit', {
             kapazitaet,
+            autoUpdateOhneSteam,
             // "Einstellungen" ueberall gleich: der Knopf auf der Serverseite
             // heisst so, die Karte auf dieser Seite auch. Vorher stand hier
             // "Server bearbeiten" — drei Namen fuer dieselbe Sache, und der
@@ -3471,6 +3485,13 @@ router.put('/:serverId/variables', requirePermission('GAMESERVER.EDIT'), async (
         if (unbekannt.length) {
             return res.status(400).json({ success: false,
                 message: `Keine Einstellung dieses Pakets: ${unbekannt.join(', ')}` });
+        }
+        // Auto-Update trägt ein älteres Paket noch als Einstellung — gelesen wird
+        // aber die Spalte am Server. Hier gespeichert, wirkte es nicht.
+        const amServer = Object.keys(updates).filter(k => gehoertDemServer(nachSchluessel.get(k)));
+        if (amServer.length) {
+            return res.status(400).json({ success: false,
+                message: 'Auto-Update ist ein Schalter des Servers — zu finden unter „Bearbeiten".' });
         }
 
         for (const [key, roh] of Object.entries(updates)) {

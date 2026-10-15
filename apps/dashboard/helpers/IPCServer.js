@@ -583,7 +583,7 @@ class IPCServer {
                     );
                     if (!addon) return message.reply({ success: false, error: `Spiel \`${addon_slug}\` nicht gefunden` });
 
-                    const { ladePaketFuerAnlegen, paketWerteAnlegen, autoUpdateAus,
+                    const { ladePaketFuerAnlegen, paketWerteAnlegen, autoUpdateBeimAnlegen,
                             loadServerForStart, baueInstallNutzlast } =
                         require('../../../plugins/gameserver/dashboard/helpers/StartPayload');
                     const { vergibPortsAusPaket } =
@@ -638,7 +638,8 @@ class IPCServer {
                             [guildId, owner_user_id || '0', rootserverId, addon.id,
                              paket.identity?.name || addon.name, server_name,
                              JSON.stringify(vergabe.ports), JSON.stringify(paketWerte),
-                             autoUpdateAus(paket, paketWerte) ? 1 : 0,
+                             // Spalte am Server, kein Paketwert (StartPayload.AUTO_UPDATE).
+                             autoUpdateBeimAnlegen(paket, payload.env_overrides?.auto_update) ? 1 : 0,
                              paket.identity?.version || addon.version || '1.0.0',
                              pz.kanal]
                         );

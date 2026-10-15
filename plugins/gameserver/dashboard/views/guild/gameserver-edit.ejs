@@ -282,6 +282,11 @@
                                     <small class="form-text text-secondary">
                                         <%= tr('gameserver:SERVER.AUTO_UPDATE_DESC') %>
                                     </small>
+                                    <% if (locals.autoUpdateOhneSteam) { %>
+                                    <small class="form-text text-warning d-block">
+                                        Dieses Spiel lädt seine Dateien nicht über Steam — der Schalter hat hier keine Wirkung.
+                                    </small>
+                                    <% } %>
                                 </div>
 
                                 <!-- Max Players: abgeleitet, nicht eingebbar (Konzept 23.1) -->
