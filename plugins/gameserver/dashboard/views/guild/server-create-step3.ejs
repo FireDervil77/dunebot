@@ -83,6 +83,12 @@
                         <option value="<%= c.wert %>" <%= String(f.vorgabe) === c.wert ? 'selected' : '' %>><%= c.name %></option>
                       <% }); %>
                     </select>
+                  <% } else if (f.typ === 'list' && f.liste) { %>
+                    <%# Liste (2026-10-15): eine Zeile je Eintrag. %>
+                    <textarea class="fb-feld" style="width:100%;min-height:5em;font-family:var(--fb-mono, monospace)" rows="3"
+                              autocomplete="off" spellcheck="false" placeholder="eine Zeile je Eintrag — leer lassen geht"
+                              name="setting_<%= f.schluessel %>" <%= f.pflicht ? 'required' : '' %>></textarea>
+                    <div class="fb-muted" style="font-size:12px;margin-top:4px">Eine Zeile je Eintrag<%= f.liste.hoechstens ? ' · höchstens ' + f.liste.hoechstens : '' %><%= f.liste.regel ? ' · Regel: ' + f.liste.regel : '' %></div>
                   <% } else if (f.typ === 'boolean') { %>
                     <select class="fb-feld" style="width:100%" name="<%= f.istServerName ? 'server_name' : 'setting_' + f.schluessel %>">
                       <option value="1" <%= String(f.vorgabe) === '1' || f.vorgabe === true ? 'selected' : '' %>>An</option>

@@ -281,6 +281,29 @@ function pruefeInvarianten(paket) {
                 if (vorgabe) verstoesse.push(`Einstellung "${s.key}": Vorgabe — ${vorgabe}`);
             }
         }
+        // Liste (2026-10-15): geschrieben wird sie nur von den Schreibern für
+        // json und yaml — überall sonst käme sie als Text mit Zeilenumbrüchen an
+        // (der Daemon weist es ab, und die Einstellung bewirkte nichts).
+        if (s.type === 'list') {
+            for (const z of s.apply || []) {
+                if (!(z.target === 'file' && ['json', 'yaml'].includes(z.parser))) {
+                    verstoesse.push(`Einstellung "${s.key}": type "list" landet nur in json/yaml-Dateien, nicht in ${z.target === 'file' ? z.parser : z.target}.`);
+                }
+            }
+            if (s.item_pattern) {
+                try { new RegExp(`^(?:${s.item_pattern})$`); } catch (fehler) {
+                    verstoesse.push(`Einstellung "${s.key}": item_pattern ist kein gültiger Ausdruck — ${fehler.message}`);
+                }
+            }
+        } else if (s.item_pattern !== undefined || s.max_items !== undefined) {
+            hinweise.push(`Einstellung "${s.key}": item_pattern/max_items gelten nur für type "list".`);
+        }
+        // Auswahl nach Feld im Pfad (`liste[name=x].feld`) kennen nur json und yaml.
+        for (const z of s.apply || []) {
+            if (z.target === 'file' && /[[\]]/.test(z.path || '') && !['json', 'yaml'].includes(z.parser)) {
+                verstoesse.push(`Einstellung "${s.key}": eine Auswahl im Pfad (${z.path}) gibt es nur in json/yaml, nicht in ${z.parser}.`);
+            }
+        }
         if (s.risk === 'world_reset' && s.role === 'player') {
             hinweise.push(`Einstellung "${s.key}" kann die Welt zurücksetzen, ist aber für die Rolle "player" freigegeben.`);
         }

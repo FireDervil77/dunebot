@@ -1396,6 +1396,8 @@
                             <option value="1" <%= probewerte[e.key] === '1' ? 'selected' : '' %>>an</option>
                             <option value="0" <%= probewerte[e.key] === '0' ? 'selected' : '' %>>aus</option>
                           </select>
+                        <% } else if (e.type === 'list') { %>
+                          <textarea class="form-control font-monospace" data-probewert="<%= e.key %>" rows="2" placeholder="eine Zeile je Eintrag — leer: leere Liste"><%= e.key in probewerte ? probewerte[e.key] : '' %></textarea>
                         <% } else if (e.type === 'choice') { %>
                           <select class="form-select" data-probewert="<%= e.key %>">
                             <option value="" <%= !(e.key in probewerte) ? 'selected' : '' %>>Vorgabe<%= e.default !== undefined ? ' (' + e.default + ')' : '' %></option>
@@ -1509,6 +1511,7 @@
               <select class="form-select" id="eTyp" name="type">
                 <option value="text">Text</option><option value="number">Zahl</option><option value="boolean">An/Aus</option>
                 <option value="choice">Auswahl</option><option value="flags">Bitmaske</option><option value="password">Passwort</option>
+                <option value="list">Liste</option>
               </select>
             </div>
             <div class="col-md-3">
@@ -1516,6 +1519,16 @@
               <input class="form-control" id="eVorgabe" name="default" placeholder="leer = keine">
               <div class="form-hint" data-nur-typ="boolean">1 = an, 0 = aus. Wie es in der Datei steht, wählst du unten am Ziel.</div>
               <div class="form-hint" data-nur-typ="flags">Die Summe der vorbelegten Bits — 0, wenn nichts angekreuzt sein soll.</div>
+              <div class="form-hint" data-nur-typ="list">Bleibt leer — eine Liste startet leer, Einträge kommen im Panel dazu.</div>
+            </div>
+            <%# Liste (2026-10-15): eine Zeile je Eintrag, nur in json/yaml. %>
+            <div class="col-md-6" data-nur-typ="list">
+              <label class="form-label">Je Eintrag</label>
+              <div class="input-group">
+                <input class="form-control font-monospace" name="item_pattern" placeholder="Prüfregel, z. B. [0-9]{17}" autocomplete="off">
+                <input class="form-control" name="max_items" placeholder="höchstens" style="max-width:7rem" inputmode="numeric">
+              </div>
+              <div class="form-hint">Eine Zeile je Eintrag. Die Prüfregel muss jeder Eintrag ganz erfüllen. Geschrieben wird eine Liste von Texten — nur in eine json- oder yaml-Datei.</div>
             </div>
             <div class="col-md-3" data-nur-typ="number">
               <label class="form-label">Grenzen</label>
@@ -2904,7 +2917,7 @@
   // ── Vorschläge aus einer Datei (B2-1) ─────────────────────────────────
   var formSchluessel = document.getElementById('formSchluessel');
   var FORMAT = { json: 'json', ini: 'ini', yml: 'yaml', yaml: 'yaml', properties: 'properties', xml: 'xml', cfg: 'cfg' };
-  var TYPNAME = { text: 'Text', number: 'Zahl', boolean: 'Ja/Nein', password: 'Kennwort' };
+  var TYPNAME = { text: 'Text', number: 'Zahl', boolean: 'Ja/Nein', password: 'Kennwort', list: 'Liste' };
   var sDatei = document.getElementById('sDatei');
   var sParser = document.getElementById('sParser');
   sDatei.addEventListener('change', function () {
@@ -2953,7 +2966,8 @@
         tr.appendChild(z0);
         tr.appendChild(el('td', 'font-monospace small', f.pfad));
         var geheim = f.vorschlag.type === 'password';
-        var wert = geheim ? '••••' : (f.wert === '' ? '(leer)' : (f.wert.length > 60 ? f.wert.slice(0, 60) + '…' : f.wert));
+        var anzeige = f.vorschlag.type === 'list' ? f.wert.split('\n').join(', ') : f.wert;
+        var wert = geheim ? '••••' : (anzeige === '' ? (f.vorschlag.type === 'list' ? '(leere Liste)' : '(leer)') : (anzeige.length > 60 ? anzeige.slice(0, 60) + '…' : anzeige));
         tr.appendChild(el('td', 'small text-secondary', wert));
         if (f.vorhanden) {
           wahl.disabled = true;
@@ -2964,7 +2978,9 @@
         } else {
           var typ = el('select', 'form-select form-select-sm');
           typ.dataset.feld = 'type';
-          Object.keys(TYPNAME).forEach(function (t) {
+          // Liste nur bei einer Liste, sonst nie: Der Schreiber weist an einer
+          // Liste einen Einzelwert ab und umgekehrt (2026-10-15).
+          Object.keys(TYPNAME).filter(function (t) { return (t === 'list') === (f.vorschlag.type === 'list'); }).forEach(function (t) {
             var o = el('option', '', TYPNAME[t]);
             o.value = t;
             if (t === f.vorschlag.type) o.selected = true;
@@ -3348,6 +3364,8 @@
         formE['default'].value = e['default'] === undefined || e['default'] === null ? '' : (e.type === 'boolean' ? (e['default'] ? '1' : '0') : e['default']);
         formE.min.value = e.min === undefined ? '' : e.min;
         formE.max.value = e.max === undefined ? '' : e.max;
+        formE.item_pattern.value = e.item_pattern || '';
+        formE.max_items.value = e.max_items === undefined ? '' : e.max_items;
         formE.required.checked = !!e.required;
         formE.choices.value = (e.choices || []).map(function (c) { return c.value + (c.name && c.name.de ? '=' + c.name.de : ''); }).join('\n');
         formE.role.value = (e.role === 'player' && e.ask_on_create === false) ? 'player_spaeter' : e.role;

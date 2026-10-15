@@ -21,6 +21,7 @@ const { FASSUNG_FUER_SERVER, ladePaketFuerServer, ladePaketFuerAnlegen, ladePake
 const { vergibPortsAusPaket } = require('../helpers/Portvergabe');
 const Inhalte = require('../helpers/Inhalte');
 const Bitmaske = require('../helpers/Bitmaske');
+const Liste = require('../helpers/Liste');
 const Quellen = require('../helpers/Quellen');
 const ServerStopp = require('../helpers/ServerStopp');
 const { baueUebersicht, baueServerListe, bauePaketAuswahl,
@@ -1007,6 +1008,9 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
         // auf die Vorgabe gesetzt und nicht ungeprüft in die Datei geschrieben.
         const maskenFehler = Bitmaske.fehlerInWerten(paket, paketWerte);
         if (maskenFehler) return res.status(400).json({ success: false, message: maskenFehler });
+        // Ebenso eine Liste mit einem Eintrag, der nicht zur Regel passt.
+        const listenFehler = Liste.fehlerInWerten(paket, paketWerte);
+        if (listenFehler) return res.status(400).json({ success: false, message: listenFehler });
         const autoAktualisieren = autoUpdateAus(paket, paketWerte);
         Logger.info(`[Gameserver] Paketwerte festgehalten: ${Object.keys(paketWerte).length} von `
             + `${(paket.settings || []).length} Einstellungen, Auto-Update ${autoAktualisieren ? 'an' : 'aus'}`);
@@ -3483,8 +3487,14 @@ router.put('/:serverId/variables', requirePermission('GAMESERVER.EDIT'), async (
             if (eintrag.type === 'number' && wert !== '' && !Number.isFinite(Number(wert))) {
                 return res.status(400).json({ success: false, message: `„${key}" erwartet eine Zahl` });
             }
-            // Ja/Nein immer als 1/0 — wie beim Anlegen (paketWerteAnlegen).
-            werte[key] = eintrag.type === 'boolean' ? (istWahr(wert) ? '1' : '0') : wert;
+            if (Liste.istListe(eintrag)) {
+                const fehler = Liste.fehlerDesWerts(eintrag, wert);
+                if (fehler) return res.status(400).json({ success: false, message: `„${key}": ${fehler}` });
+            }
+            // Ja/Nein immer als 1/0 — wie beim Anlegen (paketWerteAnlegen);
+            // eine Liste ohne leere Zeilen, wie der Daemon sie liest.
+            werte[key] = eintrag.type === 'boolean' ? (istWahr(wert) ? '1' : '0')
+                : Liste.istListe(eintrag) ? Liste.normalisiere(wert) : wert;
         }
 
         await dbService.query(

@@ -297,6 +297,14 @@
                               data-fb-feld="<%= e.variable %>" data-fb-wert="<%= c.wert %>"><%= c.name %></button>
                     <% }); %>
                   </div>
+                <% } else if (e.typ === 'list' && e.liste) { %>
+                  <%# Liste (2026-10-15): eine Zeile je Eintrag; geschrieben wird
+                      in der Datei eine echte Liste (fb-cfg, nur json/yaml). %>
+                  <textarea class="fb-feld" style="width:100%;min-height:5.5em;font-family:var(--fb-mono, monospace)" rows="4"
+                            autocomplete="off" spellcheck="false" placeholder="eine Zeile je Eintrag"
+                            data-fb-feld="<%= e.variable %>"
+                            data-fb-alt="<%= e.hatWert ? String(e.wert) : '' %>"><%= e.hatWert ? String(e.wert) : '' %></textarea>
+                  <div class="fb-muted" style="font-size:12px;margin-top:4px">Eine Zeile je Eintrag<%= e.liste.hoechstens ? ' · höchstens ' + e.liste.hoechstens : '' %><%= e.liste.regel ? ' · Regel: ' + e.liste.regel : '' %></div>
                 <% } else if (e.typ === 'boolean') { %>
                   <% const an = String(e.wert) === '1' || e.wert === true; %>
                   <div style="display:flex;gap:6px">
@@ -646,7 +654,7 @@
     });
   });
 
-  document.querySelectorAll('input[data-fb-feld]').forEach(function (i) {
+  document.querySelectorAll('input[data-fb-feld], textarea[data-fb-feld]').forEach(function (i) {
     i.addEventListener('input', function () {
       merken(i.getAttribute('data-fb-feld'), i.value, i.getAttribute('data-fb-alt'));
     });

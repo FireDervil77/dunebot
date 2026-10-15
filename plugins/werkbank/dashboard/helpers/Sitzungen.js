@@ -23,6 +23,7 @@ const Paketfassung = require('../../../gameserver/dashboard/helpers/Paketfassung
 const Quellen = require('../../../gameserver/dashboard/helpers/Quellen');
 const Abruf = require('../../../gameserver/dashboard/helpers/Abruf');
 const Bitmaske = require('../../../gameserver/dashboard/helpers/Bitmaske');
+const Liste = require('../../../gameserver/dashboard/helpers/Liste');
 const Oeffentlich = require('../../../../packages/fbpkg/lib/oeffentlich');
 // Die Tags eines Spiels gehören dem Spiel im Panel, nicht dem Paket (2026-10-08) —
 // die Werkbank reicht sie beim Veröffentlichen weiter, wie Symbol und Banner.
@@ -685,7 +686,7 @@ async function hinweisEntfernen(sitzung, key) {
 const START_FELDER = ['program', 'workdir', 'args', 'stop', 'ready_when'];
 const BEREIT_FELDER = ['port', 'log_line', 'without_port', 'timeout_sec'];
 const EINSTELLUNG_FELDER = ['key', 'group', 'name', 'description', 'type', 'default', 'min', 'max',
-    'choices', 'apply', 'takes_effect', 'risk', 'role', 'ask_on_create', 'required'];
+    'choices', 'apply', 'takes_effect', 'risk', 'role', 'ask_on_create', 'required', 'item_pattern', 'max_items'];
 
 /**
  * `neu` ersetzt in `vorher` genau die Felder, die das Formular kennt — ein
@@ -1045,7 +1046,7 @@ function durchgereichtes(sitzung) {
 // (Absprache 2026-09-26) — der Rest bleibt als Entwurf in der Sitzung.
 
 const EINSTELLUNG = {
-    typen:   ['text', 'number', 'boolean', 'choice', 'flags', 'password'],
+    typen:   ['text', 'number', 'boolean', 'choice', 'flags', 'password', 'list'],
     rollen:  ['player', 'owner', 'expert'],
     // Was die Auswahl „Rolle" der Werkbank anbietet. `player_spaeter` gibt es
     // nur im Formular: Im Paket ist es `role: player` + `ask_on_create: false`
@@ -1059,6 +1060,46 @@ const EINSTELLUNG = {
 };
 const RE_SCHLUESSEL = /^[a-z][a-z0-9_]*$/;
 const RE_VARIABLE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/**
+ * Formate, deren Schreiber Listen und die Auswahl nach Feld kennen
+ * (Daemon `internal/parser/pfad.go`, 2026-10-15).
+ */
+const STRUKTUR_PARSER = ['json', 'yaml'];
+
+/**
+ * Prüft einen Pfad in einer Datei nach denselben Regeln wie der Daemon
+ * (`zerlegePfad`): Abschnitte durch Punkte getrennt, ein Punkt in eckigen
+ * Klammern trennt nichts, `*` oder `name[feld=wert]` als Abschnitt.
+ *
+ * @returns {string|null} der Fehler in einem Satz, oder null
+ */
+function pfadFehler(pfad) {
+    const p = String(pfad || '');
+    if (!p.trim()) return 'leerer Pfad';
+    const teile = [];
+    let tiefe = 0, anfang = 0;
+    for (let i = 0; i < p.length; i++) {
+        const z = p[i];
+        if (z === '[') tiefe++;
+        else if (z === ']') { tiefe--; if (tiefe < 0) return '„]" ohne „["'; }
+        else if (z === '.' && tiefe === 0) { teile.push(p.slice(anfang, i)); anfang = i + 1; }
+    }
+    if (tiefe !== 0) return '„[" ohne „]"';
+    teile.push(p.slice(anfang));
+    for (const t of teile) {
+        if (!t) return 'leerer Abschnitt (zwei Punkte hintereinander?)';
+        if (t === '*') continue;
+        const auf = t.indexOf('[');
+        if (auf < 0) continue;
+        if (auf === 0 || !t.endsWith(']')) return `„${t}": erwartet name[feld=wert]`;
+        const innen = t.slice(auf + 1, -1);
+        const gleich = innen.indexOf('=');
+        if (gleich <= 0 || !innen.slice(0, gleich).trim()) return `„${t}": erwartet name[feld=wert]`;
+        if (/[[\]]/.test(t.slice(0, auf)) || /[[\]]/.test(innen)) return `„${t}": verschachtelte Klammern gibt es nicht`;
+    }
+    return null;
+}
 
 /**
  * Die Verdrahtung für `apply: env` — nur, was im Wurzelfeld noch fehlt.
@@ -1188,6 +1229,23 @@ function einstellungAusFormular(b) {
             e[ziel] = n;
         }
     }
+    // Liste (2026-10-15, Enshrouded bannedAccounts): eine Zeile je Eintrag,
+    // in json/yaml als Liste von Texten geschrieben. Prüfregel und Höchstzahl
+    // prüft das Panel beim Speichern.
+    if (e.type === 'list') {
+        if (text('item_pattern')) {
+            const muster = text('item_pattern');
+            if (muster.length > 200) throw new Error('Prüfregel je Eintrag: höchstens 200 Zeichen.');
+            try { new RegExp(`^(?:${muster})$`); } catch (fehler) { throw new Error(`Prüfregel je Eintrag: kein gültiger Ausdruck — ${fehler.message}`); }
+            e.item_pattern = muster;
+        }
+        if (text('max_items')) {
+            const n = Number(text('max_items'));
+            if (!Number.isInteger(n) || n < 1) throw new Error('Höchstens: eine ganze Zahl ab 1.');
+            e.max_items = n;
+        }
+        if (text('default') !== '') throw new Error('Eine Liste startet leer — Einträge kommen im Panel dazu. Das Feld „Vorgabe" leer lassen.');
+    }
     const vorgabe = text('default');
     if (vorgabe !== '') {
         if (e.type === 'number' && !Number.isFinite(Number(vorgabe))) throw new Error('Vorgabe: keine Zahl.');
@@ -1217,7 +1275,19 @@ function einstellungAusFormular(b) {
             if (!t('file') || !t('path')) throw new Error(`${nr}: Datei und Schlüssel darin gehören beide dazu.`);
             if (t('file').split('/').includes('..') || t('file').startsWith('/')) throw new Error(`${nr}: die Datei liegt relativ zu game/, ohne „..".`);
             if (!EINSTELLUNG.parser.includes(t('parser'))) throw new Error(`${nr}: Format der Datei — ${EINSTELLUNG.parser.join(', ')}.`);
+            // Auswahl nach Feld (`liste[name=Admin].feld`) kennen nur json und
+            // yaml; der Daemon prüft dieselbe Schreibweise.
+            if (/[[\]]/.test(t('path'))) {
+                if (!STRUKTUR_PARSER.includes(t('parser'))) {
+                    throw new Error(`${nr}: eine Auswahl wie „liste[name=Admin].feld" gibt es nur in json und yaml, nicht in ${t('parser')}.`);
+                }
+                const fehler = pfadFehler(t('path'));
+                if (fehler) throw new Error(`${nr}: Schlüssel in der Datei — ${fehler}.`);
+            }
             Object.assign(ziel, { file: t('file'), parser: t('parser'), path: t('path') });
+        }
+        if (e.type === 'list' && !(ziel.target === 'file' && STRUKTUR_PARSER.includes(ziel.parser))) {
+            throw new Error(`${nr}: Eine Liste landet nur in einer json- oder yaml-Datei — in Startzeile, Umgebung oder ${ziel.parser || ziel.target} gibt es keine Liste.`);
         }
         if (ziel.target === 'env') {
             if (!RE_VARIABLE.test(t('variable'))) throw new Error(`${nr}: Name der Umgebungsvariable, etwa SERVER_NAME.`);
@@ -1380,6 +1450,14 @@ async function probewerteSetzen(sitzung, werte) {
         const einstellung = (sitzung.entwurf?.settings || []).find(x => x.key === key);
         if (!Bitmaske.istBitmaske(einstellung) || wert === '' || wert === null || wert === undefined) continue;
         const fehler = Bitmaske.fehlerDesWerts(einstellung, wert);
+        if (fehler) throw new Error(`„${key}": ${fehler}`);
+    }
+    // Eine Liste: dieselbe Regel wie im Panel (Liste.js) — sonst ginge eine
+    // Zeile, die das Panel abweist, im Probestart als „angekommen" durch.
+    for (const [key, wert] of eintraege) {
+        const einstellung = (sitzung.entwurf?.settings || []).find(x => x.key === key);
+        if (!Liste.istListe(einstellung) || wert === null || wert === undefined) continue;
+        const fehler = Liste.fehlerDesWerts(einstellung, wert);
         if (fehler) throw new Error(`„${key}": ${fehler}`);
     }
     let gesetzt = 0, entfernt = 0;
@@ -4011,10 +4089,38 @@ async function schluesselLesen(sitzung, { datei, parser }) {
     return { datei, parser, funde, ausgelassen: d.ausgelassen || [], anzahl_funde: d.anzahl_funde || funde.length };
 }
 
-/** Aus „ServerSettings.MaxPlayers" wird „max_players" — frei in dieser Sitzung. */
+/**
+ * Der letzte Abschnitt eines Pfads und — bei einer Auswahl wie
+ * `userGroups[name=Admin].password` — der Wert der letzten Auswahl („Admin").
+ * Ein Punkt in den Klammern trennt nichts (dieselbe Regel wie pfadFehler).
+ */
+function pfadEnde(pfad) {
+    const p = String(pfad);
+    let tiefe = 0, anfang = 0;
+    const teile = [];
+    for (let i = 0; i < p.length; i++) {
+        if (p[i] === '[') tiefe++;
+        else if (p[i] === ']') tiefe--;
+        else if (p[i] === '.' && tiefe === 0) { teile.push(p.slice(anfang, i)); anfang = i + 1; }
+    }
+    teile.push(p.slice(anfang));
+    let eintrag = null;
+    for (const t of teile.slice(0, -1)) {
+        const m = /\[[^=\]]+=([^\]]*)\]$/.exec(t);
+        if (m) eintrag = m[1];
+    }
+    return { letzter: teile[teile.length - 1], eintrag };
+}
+
+/**
+ * Aus „ServerSettings.MaxPlayers" wird „max_players" — frei in dieser Sitzung.
+ * Aus „userGroups[name=Admin].password" wird „admin_password": Sonst hießen
+ * die Felder aller Gruppen password, password_2, password_3 …
+ */
 function freierSchluessel(pfad, vergeben) {
-    const letzter = String(pfad).split('.').pop();
-    let basis = letzter.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    const { letzter, eintrag } = pfadEnde(pfad);
+    const roh = eintrag ? `${eintrag}_${letzter}` : letzter;
+    let basis = roh.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
     if (!/^[a-z]/.test(basis)) basis = 'wert_' + basis;
     basis = basis.slice(0, 48) || 'wert';
     let key = basis;
@@ -4026,10 +4132,13 @@ const RE_GEHEIM = /(pass(wor[dt])?|secret|token|kennwort)/i;
 
 /** Was beim Übernehmen angelegt würde — sichtbar, bevor angekreuzt wird. */
 function vorschlagAusFund(f, key) {
-    const name = String(f.pfad).split('.').pop().replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').trim();
-    let type = f.art === 'janein' ? 'boolean' : f.art === 'zahl' ? 'number' : 'text';
-    if (type === 'text' && RE_GEHEIM.test(f.pfad)) type = 'password';
-    return { key, name_de: name.charAt(0).toUpperCase() + name.slice(1), type, as: f.as || '' };
+    const { letzter, eintrag } = pfadEnde(f.pfad);
+    const name = letzter.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').trim();
+    const gross = name.charAt(0).toUpperCase() + name.slice(1);
+    // Liste von Texten (Daemon-Leser, Art "liste") → Typ list.
+    let type = f.art === 'janein' ? 'boolean' : f.art === 'zahl' ? 'number' : f.art === 'liste' ? 'list' : 'text';
+    if (type === 'text' && RE_GEHEIM.test(letzter)) type = 'password';
+    return { key, name_de: eintrag ? `${eintrag}: ${gross}` : gross, type, as: f.as || '' };
 }
 
 /**
@@ -4132,7 +4241,7 @@ module.exports = {
     PRUEF_SUFFIX, fingerabdruck, technisch,
     pruefeBildAdresse, angaben, angabenSpeichern, veroeffentlichungsStand, veroeffentlichungsPaket, veroeffentlichen, laufendePruefung, pruefungen, durchlaufMaengel, pruefen,
     pruefungAbbrechen, pruefProtokoll, pruefungBeenden, entwurfSchreiben,
-    EINSTELLUNG, einstellungAusFormular, einstellungSpeichern, einstellungEntfernen, einstellungRolleSetzen, einstellungenOrdnen, probewerteSetzen, probewerte,
+    EINSTELLUNG, pfadFehler, einstellungAusFormular, einstellungSpeichern, einstellungEntfernen, einstellungRolleSetzen, einstellungenOrdnen, probewerteSetzen, probewerte,
     rolleAusFormular, rolleAlsFormular,
     umgebungAusEinstellungen, belegteEinstellungen,
     HINWEIS, hinweisAusFormular, hinweisSpeichern, hinweisEntfernen,

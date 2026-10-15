@@ -35,6 +35,7 @@
 const { lesePortzwecke } = require('./Portvergabe');
 const { istKontrollGuild } = require('./Paketfassung');
 const Bitmaske = require('./Bitmaske');
+const Liste = require('./Liste');
 
 /** Höhenstufen (B.7): wer welche Einstellungen zu sehen bekommt. */
 const HOEHE = {
@@ -448,6 +449,8 @@ function baueEinstellungen(server, paket, hoehe) {
             maske:       Bitmaske.fuerAnzeige(e, roh !== undefined ? roh : e.default),
             min:         Number.isFinite(e.min) ? e.min : null,
             max:         Number.isFinite(e.max) ? e.max : null,
+            // Liste (2026-10-15): mehrzeiliges Feld, eine Zeile je Eintrag.
+            liste:       Liste.istListe(e) ? { regel: e.item_pattern || null, hoechstens: Number.isInteger(e.max_items) ? e.max_items : null } : null,
         });
     }
     // Nach Gruppen bündeln — in der Reihenfolge, in der sie im Paket stehen.
@@ -1803,6 +1806,7 @@ function baueWerteSchritt(paket, maschine, imageLiegtDa) {
             maske: Bitmaske.fuerAnzeige(e, e.default),
             min: Number.isFinite(e.min) ? e.min : null,
             max: Number.isFinite(e.max) ? e.max : null,
+            liste: Liste.istListe(e) ? { regel: e.item_pattern || null, hoechstens: Number.isInteger(e.max_items) ? e.max_items : null } : null,
         }))),
         // Wieviele Einstellungen NICHT gefragt werden. Das eigene Namensfeld
         // zaehlt hier nicht mit: Es ist keine Einstellung des Pakets.

@@ -30,6 +30,7 @@
 
 const crypto = require('crypto');
 const Abruf = require('./Abruf');
+const Liste = require('./Liste');
 const { loeseInhaltAuf } = require('./InhaltJeLader');
 const { FASSUNG_FUER_SERVER, ladePaketFuerServer, ladePaketFuerAnlegen } = require('./Paketfassung');
 
@@ -400,7 +401,9 @@ function paketWerteAnlegen(paket, eingaben = {}, serverName = null) {
         if (wert === undefined || wert === null) continue;
         // Ja/Nein immer als 1/0, wie die Werte-Karte es schickt. Aus dem
         // Discord-Modal kommt Freitext („true", „on").
-        werte[eintrag.key] = eintrag.type === 'boolean' ? (istWahr(wert) ? '1' : '0') : String(wert);
+        werte[eintrag.key] = eintrag.type === 'boolean' ? (istWahr(wert) ? '1' : '0')
+            // Liste: ein Eintrag je Zeile, Leeres fällt weg — wie der Daemon liest.
+            : Liste.istListe(eintrag) ? Liste.normalisiere(wert) : String(wert);
     }
 
     // ── Das Kennwort der Fernsteuerung wird ERZEUGT (2026-09-22) ────────────

@@ -963,6 +963,55 @@ async function pruefe(name, fn) {
         assert.match(ejs, /formE\.role\.value = \(e\.role === 'player' && e\.ask_on_create === false\) \? 'player_spaeter' : e\.role/);
     });
 
+    await pruefe('Liste und Auswahl nach Feld (2026-10-15): nur json/yaml, Regeln wie im Daemon, Vorschläge je Gruppe', async () => {
+        // Betreiber: Enshrouded userGroups / bannedAccounts als Einstellungen.
+        const liste = (x = {}) => formular({ key: 'banned_accounts', name_de: 'Gesperrte Konten', type: 'list', default: '',
+            apply: [{ target: 'file', file: 'enshrouded_server.json', parser: 'json', path: 'bannedAccounts' }], ...x });
+        const e = Sitzungen.einstellungAusFormular(liste({ item_pattern: '[0-9]{17}', max_items: '50' }));
+        assert.deepStrictEqual([e.type, e.item_pattern, e.max_items], ['list', '[0-9]{17}', 50]);
+        assert.ok(!('default' in e), 'eine Liste bekam eine Vorgabe');
+        Sitzungen.einstellungAusFormular(liste({ apply: [{ target: 'file', file: 'a.yml', parser: 'yaml', path: 'banned' }] }));
+        assert.throws(() => Sitzungen.einstellungAusFormular(liste({ apply: [{ target: 'file', file: 'a.ini', parser: 'ini', path: 'S.banned' }] })), /nur in einer json- oder yaml-Datei/);
+        assert.throws(() => Sitzungen.einstellungAusFormular(liste({ apply: [{ target: 'env', variable: 'BANNED' }] })), /nur in einer json- oder yaml-Datei/);
+        assert.throws(() => Sitzungen.einstellungAusFormular(liste({ default: '7656' })), /startet leer/);
+        assert.throws(() => Sitzungen.einstellungAusFormular(liste({ item_pattern: '[' })), /kein gültiger Ausdruck/);
+        assert.throws(() => Sitzungen.einstellungAusFormular(liste({ max_items: '0' })), /ganze Zahl ab 1/);
+        // Leeren geht: Die Felder gehören dem Formular (EINSTELLUNG_FELDER).
+        const s = mitEinstellungen();
+        await Sitzungen.einstellungSpeichern(s, liste({ item_pattern: '[0-9]{17}', max_items: '5' }));
+        await Sitzungen.einstellungSpeichern(s, liste({ alt: 'banned_accounts' }));
+        const gespeichert = s.entwurf.settings.find(x => x.key === 'banned_accounts');
+        assert.ok(!('item_pattern' in gespeichert) && !('max_items' in gespeichert), 'geleerte Prüfregel blieb stehen');
+
+        // Auswahl im Pfad: dieselben Fälle wie zerlegePfad im Daemon (pfad.go / listen_test.go).
+        const auswahl = (pfad, parser = 'json') => formular({ key: 'admin_password', name_de: 'Admin', type: 'password', default: '',
+            apply: [{ target: 'file', file: 'x.' + parser, parser, path: pfad }] });
+        Sitzungen.einstellungAusFormular(auswahl('userGroups[name=Admin].password'));
+        Sitzungen.einstellungAusFormular(auswahl('mods[name=v1.2].aktiv', 'yaml'));
+        assert.throws(() => Sitzungen.einstellungAusFormular(auswahl('S.liste[name=x].y', 'ini')), /nur in json und yaml/);
+        for (const schlecht of ['a[name=x', 'a]b', 'a..b[n=1].c', '[x=y].z', 'a[name].b', 'a[b[c]=d].e']) {
+            assert.ok(Sitzungen.pfadFehler(schlecht), `${schlecht} wurde angenommen`);
+        }
+        for (const gut of ['userGroups[name=Admin].password', 'mods[name=v1.2].aktiv', 'a.*.b', 'plain.path']) {
+            assert.strictEqual(Sitzungen.pfadFehler(gut), null, gut);
+        }
+
+        // Probewert einer Liste: dieselbe Regel wie im Panel.
+        const p = mitEinstellungen();
+        p.entwurf.settings.push(Sitzungen.einstellungAusFormular(liste({ item_pattern: '[0-9]{17}' })));
+        await assert.rejects(Sitzungen.probewerteSetzen(p, { banned_accounts: 'abc' }), /passt nicht zur Regel/);
+        await Sitzungen.probewerteSetzen(p, { banned_accounts: '76561198000000001\n76561198000000002' });
+
+        // Vorschläge: Art „liste" → Typ list, Gruppenfelder mit Gruppe im Schlüssel und Namen.
+        const quelle = ohneKommentare(fs.readFileSync(path.join(__dirname, '../plugins/werkbank/dashboard/helpers/Sitzungen.js'), 'utf8'));
+        assert.match(quelle, /f\.art === 'liste' \? 'list'/);
+        const ejs = ohneKommentareEjs(fs.readFileSync(path.join(__dirname, '../plugins/werkbank/dashboard/views/guild/werkbank-sitzung.ejs'), 'utf8'));
+        assert.match(ejs, /<option value="list">Liste<\/option>/);
+        assert.match(ejs, /name="item_pattern"[\s\S]{0,200}name="max_items"/);
+        assert.match(ejs, /formE\.item_pattern\.value = e\.item_pattern \|\| ''/);
+        assert.match(ejs, /\(t === 'list'\) === \(f\.vorschlag\.type === 'list'\)/, 'die Vorschlagstabelle böte Liste für Einzelwerte an');
+    });
+
     await pruefe('Reihenfolge der Einstellungen: umsortieren, Durchlauf bleibt gültig, falsche Listen abgewiesen', async () => {
         // Betreiber, 2026-10-15: das Passwort von Enshrouded steht unten, er will es weiter oben.
         const s = mitEinstellungen();
