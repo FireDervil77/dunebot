@@ -52,13 +52,17 @@ async function pruefe(was, tun) {
 }
 const lies = (...teile) => fs.readFileSync(path.join(...teile), 'utf8');
 
-// Der Daemon der Attrappe: `antwort` ist eine Funktion der gefragten Images.
-const daemon = { online: true, antwort: null, gefragt: [] };
+// Der Daemon der Attrappe: `antwort` ist eine Funktion der gefragten Images
+// (`image.stand`), `auspraegungen` eine der gefragten ref (`image.auspraegungen`,
+// 2026-10-15). Vorgabe für die zweite: keine andere Ausprägung gebaut.
+const OHNE_WECHSEL = (n) => ({ success: true, data: { ref: n.ref, auspraegungen: [] } });
+const daemon = { online: true, antwort: null, auspraegungen: OHNE_WECHSEL, gefragt: [] };
 ServiceManager.register('ipmServer', {
     isDaemonOnline: () => daemon.online,
     sendCommand: async (id, befehl, nutzlast, frist) => {
         daemon.gefragt.push({ id, befehl, nutzlast, frist });
-        const a = typeof daemon.antwort === 'function' ? daemon.antwort(nutzlast) : daemon.antwort;
+        const quelle = befehl === 'image.auspraegungen' ? daemon.auspraegungen : daemon.antwort;
+        const a = typeof quelle === 'function' ? quelle(nutzlast) : quelle;
         if (a instanceof Error) throw a;
         return a;
     },
@@ -69,6 +73,19 @@ ServiceManager.register('Logger', { debug: still, info: still, warn: still, erro
 (async () => {
     // ── 1) Die Tag-Regeln ────────────────────────────────────────────────────
     console.log('\nTag-Regeln');
+    await pruefe('Nachfolger: zuletzt GEBAUT, nur mit „nachfolge", nie dieselbe, nie ohne Ausprägung', async () => {
+        const L = [
+            { tag: 'latest-GE-Proton10-32', variante: 'GE-Proton10-32', gebaut: '2026-10-15T11:37:21Z' },
+            { tag: 'latest-GE-Proton11-5',  variante: 'GE-Proton11-5',  gebaut: '2026-08-11T09:00:00Z' },
+        ];
+        assert.strictEqual(T.nachfolger('2026.10-GE-Proton10-32', L), null, 'das alte 11-5 darf nicht gewinnen, weil seine Nummer höher ist');
+        const neu = { tag: 'latest-GE-Proton11-9', variante: 'GE-Proton11-9', gebaut: '2026-10-15T20:00:00Z', art: 'nachfolge', fassung: '2026.10-GE-Proton11-9', digest: 'sha256:x' };
+        assert.deepStrictEqual(T.nachfolger('2026.10-GE-Proton10-32', [...L, neu]),
+            { von: 'GE-Proton10-32', nach: 'GE-Proton11-9', tag: 'latest-GE-Proton11-9', fassung: '2026.10-GE-Proton11-9', digest: 'sha256:x' });
+        assert.strictEqual(T.nachfolger('2026.10-GE-Proton11-9', [...L, neu]), null);
+        assert.strictEqual(T.nachfolger('2026.10', [...L, neu]), null);
+        assert.strictEqual(T.nachfolger('2026.10-GE-Proton10-32', [...L, { ...neu, fehler: 'HTTP 404' }]), null, 'ein unlesbarer Tag löst nicht ab');
+    });
     await pruefe('Kalenderfassung, neuester Bau und Ausprägung — an den Tags, die es in der Registry gibt', async () => {
         const faelle = [
             // tag,                         variante,          neuester,                 kalender, name (ref .../fb/x)
@@ -174,8 +191,14 @@ ServiceManager.register('Logger', { debug: still, info: still, warn: still, erro
             daemon.gefragt.length = 0;
             daemon.antwort = (n) => ({ success: true, data: { images: n.images.map(i => ({ ...i, digest: pakete.find(p => p.ref === i.ref && p.frageTag === i.tag).digest, fassung: 'x' })) } });
             const s = await I.stand(db);
-            assert.strictEqual(daemon.gefragt.length, 1);
+            const standFragen = daemon.gefragt.filter(g => g.befehl === 'image.stand');
+            assert.strictEqual(standFragen.length, 1);
             assert.strictEqual(daemon.gefragt[0].befehl, 'image.stand');
+            // Nach Ausprägungen wird nur bei Images gefragt, die welche haben — je Image einmal.
+            const refsMit = new Set(pakete.filter(p => T.imageVariante(p.tag)).map(p => p.ref));
+            const ausFragen = daemon.gefragt.filter(g => g.befehl === 'image.auspraegungen').map(g => g.nutzlast.ref);
+            assert.deepStrictEqual(new Set(ausFragen), refsMit, 'nach Ausprägungen gefragt bei den falschen Images');
+            assert.strictEqual(ausFragen.length, refsMit.size, 'ein Image wurde zweimal nach Ausprägungen gefragt');
             assert.strictEqual(daemon.gefragt[0].id, 'd1', 'gefragt wird die erste erreichbare Maschine');
             const fragen = daemon.gefragt[0].nutzlast.images.map(i => `${i.ref}:${i.tag}`);
             assert.strictEqual(new Set(fragen).size, fragen.length, 'dasselbe Image wurde zweimal gefragt');
@@ -228,12 +251,68 @@ ServiceManager.register('Logger', { debug: still, info: still, warn: still, erro
             assert.strictEqual(s.zaehlung.neuer_bau, pakete.length - betroffen);
             assert.strictEqual(s.fehler, null, 'ein einzelner Ausfall gilt als Ausfall des Ganzen');
         });
+
+        // ── Wechsel der Ausprägung (2026-10-15, GE-Proton10-32 → 11-9) ──────
+        const mitAuspraegung = pakete.filter(p => T.imageVariante(p.tag));
+        const gleicherBau = (n) => ({ success: true, data: { images: n.images.map(i => ({ ...i, digest: pakete.find(p => p.ref === i.ref && p.frageTag === i.tag).digest, fassung: 'x' })) } });
+        const gebaut = (variante, gebaut, art) => ({ tag: 'latest-' + variante, variante, digest: 'sha256:' + 'a'.repeat(64),
+            fassung: '2026.10-' + variante, gebaut, ...(art ? { art } : {}) });
+        if (mitAuspraegung.length) {
+            await pruefe('eine neuere Ausprägung mit „nachfolge" → „neuer Bau" mit Wechsel, die übrigen bleiben', async () => {
+                daemon.antwort = gleicherBau;
+                daemon.auspraegungen = (n) => ({ success: true, data: { ref: n.ref, auspraegungen: [
+                    gebaut('GE-Proton11-5', '2026-08-11T09:00:00Z'), gebaut('ZZ-Neu1', '2099-01-01T00:00:00Z', 'nachfolge')] } });
+                try {
+                    const s = await I.stand(db);
+                    for (const p of s.pakete) {
+                        if (T.imageVariante(p.tag)) {
+                            assert.strictEqual(p.stand, 'neuer_bau', `${p.slug}: kein Umzug angeboten`);
+                            assert.deepStrictEqual(p.wechsel, { von: T.imageVariante(p.tag), nach: 'ZZ-Neu1' });
+                            assert.strictEqual(p.neuester.fassung, '2026.10-ZZ-Neu1');
+                        } else {
+                            assert.strictEqual(p.wechsel, null, `${p.slug}: ohne Ausprägung gibt es keinen Wechsel`);
+                        }
+                    }
+                } finally { daemon.auspraegungen = OHNE_WECHSEL; }
+            });
+            await pruefe('ein jüngerer Bau OHNE „nachfolge" (dotnet 9, altes 11-5) löst nicht ab', async () => {
+                daemon.antwort = gleicherBau;
+                daemon.auspraegungen = (n) => ({ success: true, data: { ref: n.ref, auspraegungen: [gebaut('GE-Proton11-5', '2099-01-01T00:00:00Z')] } });
+                try {
+                    const s = await I.stand(db);
+                    for (const p of s.pakete) assert.strictEqual(p.wechsel, null, `${p.slug} wechselt ohne Etikett`);
+                } finally { daemon.auspraegungen = OHNE_WECHSEL; }
+            });
+            await pruefe('kennt der Daemon die Frage nicht, steht „aktuell" mit Grund — nicht stumm', async () => {
+                daemon.antwort = gleicherBau;
+                daemon.auspraegungen = { success: false, error: 'Gameserver nicht gefunden' };
+                try {
+                    const s = await I.stand(db);
+                    for (const p of s.pakete.filter(x => T.imageVariante(x.tag) && x.stand === 'aktuell')) {
+                        assert.match(p.grund || '', /1\.0\.125/, `${p.slug}: „aktuell" ohne Hinweis, dass die Frage nach Ausprägungen offen blieb`);
+                    }
+                } finally { daemon.auspraegungen = OHNE_WECHSEL; }
+            });
+        }
     } finally {
         await c.end();
     }
 
     // ── 4) Der Vertrag ───────────────────────────────────────────────────────
     console.log('\nVertrag mit Daemon und bauen.sh');
+    await pruefe('der Daemon kennt `image.auspraegungen`; Proton trägt „nachfolge", dotnet nicht', async () => {
+        const verteiler = ohneKommentare(lies(DAEMON, 'internal/websocket/client.go'));
+        assert.match(verteiler, /case "image\.auspraegungen":\s*c\.handleImageAuspraegungen\(/);
+        const handler = ohneKommentare(lies(DAEMON, 'internal/websocket/werkbank.go'));
+        assert.ok(handler.includes('"auspraegungen": liste'), 'die Antwort steht nicht unter „auspraegungen"');
+        const go = ohneKommentare(lies(DAEMON, 'internal/gameserver/docker/auspraegungen.go'));
+        for (const feld of ['json:"tag"', 'json:"variante"', 'json:"gebaut,omitempty"', 'json:"art,omitempty"', 'json:"fehler,omitempty"']) {
+            assert.ok(go.includes(feld), `Auspraegung ohne ${feld}`);
+        }
+        assert.ok(go.includes('"de.firenetworks.auspraegung"'), 'der Daemon liest das Etikett nicht');
+        assert.match(ohneKommentareShell(lies(DAEMON, 'images/proton/Dockerfile')), /de\.firenetworks\.auspraegung="nachfolge"/);
+        assert.ok(!/de\.firenetworks\.auspraegung/.test(ohneKommentareShell(lies(DAEMON, 'images/dotnet/Dockerfile'))), 'dotnet 8/9 sind eine Wahl, keine Nachfolger');
+    });
     await pruefe('der Daemon kennt `image.stand`, antwortet unter „images" und nennt Digest und Fassung', async () => {
         const verteiler = ohneKommentare(lies(DAEMON, 'internal/websocket/client.go'));
         assert.match(verteiler, /case "image\.stand":\s*c\.handleImageStand\(/);

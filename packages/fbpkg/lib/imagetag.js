@@ -49,4 +49,31 @@ function imageName(image) {
     return v ? `${kurz} ${v}` : kurz;
 }
 
-module.exports = { imageVariante, neuesterTag, istKalendertag, imageName };
+/**
+ * Löst eine neuere Ausprägung die des Pakets ab? (2026-10-15)
+ *
+ * Anlass: Enshrouded brauchte GE-Proton11-9 statt 10-32 („No SteamUtils011").
+ * Für die Wahl sind das zwei Images — ein Umzug fragte nur `latest-GE-Proton10-32`
+ * und blieb dort. Die Regel:
+ *
+ *   Genommen wird der ZULETZT GEBAUTE `latest…`-Tag desselben Images (Daemon,
+ *   `image.auspraegungen`, nach Baudatum) — nicht die höchste Nummer: In der
+ *   Registry liegt ein `latest-GE-Proton11-5` vom August, das auf Debian 12 nie
+ *   lief. Er löst nur ab, wenn sein Bau es SAGT (`auspraegung: nachfolge`,
+ *   Etikett im Image). dotnet 8 und 9 sind eine Wahl und tragen es nicht.
+ *
+ * @param {string} tag  Tag des Pakets (2026.10-GE-Proton10-32)
+ * @param {object[]} auspraegungen  [{ tag, variante, digest, fassung, gebaut, art, fehler }]
+ * @returns {{von: string, nach: string, tag: string, fassung: string|null, digest: string|null}|null}
+ */
+function nachfolger(tag, auspraegungen) {
+    const von = imageVariante(tag);
+    if (!von) return null;   // ohne Ausprägung gibt es nichts abzulösen
+    const gebaut = (auspraegungen || []).filter(a => a && !a.fehler && a.gebaut && a.variante)
+        .sort((a, b) => String(b.gebaut).localeCompare(String(a.gebaut)));
+    const neu = gebaut[0];
+    if (!neu || neu.art !== 'nachfolge' || neu.variante === von) return null;
+    return { von, nach: neu.variante, tag: neu.tag, fassung: neu.fassung || null, digest: neu.digest || null };
+}
+
+module.exports = { imageVariante, neuesterTag, istKalendertag, imageName, nachfolger };

@@ -350,10 +350,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!p) { zelle.textContent = '—'; return; }   // Spiel ohne Paket
             const worauf = (p.image || '?') + (p.tag ? ' · ' + p.tag : '');
             if (p.stand === 'aktuell') {
-                setze(zelle, 'bg-success-lt', 'aktuell', worauf + ' — angeheftet ' + kurz(p.digest) + ', das ist der neueste Bau');
+                setze(zelle, 'bg-success-lt', 'aktuell', worauf + ' — angeheftet ' + kurz(p.digest) + ', das ist der neueste Bau'
+                    + (p.grund ? '. ' + p.grund : ''));
             } else if (p.stand === 'neuer_bau') {
                 setze(zelle, 'bg-warning-lt', 'neuer Bau' + (p.neuester && p.neuester.fassung ? ' ' + p.neuester.fassung : ''),
                     worauf + ' — angeheftet ' + kurz(p.digest) + ', neuester Bau ' + kurz(p.neuester && p.neuester.digest)
+                    + (p.wechsel ? '. Neue Ausprägung: ' + p.wechsel.von + ' → ' + p.wechsel.nach + ' — der Umzug wechselt dorthin' : '')
                     + '. Umziehen: der Knopf darunter — Prüfdurchlauf, bei Grün neue Fassung in test.');
             } else {
                 setze(zelle, 'bg-secondary-lt', 'unbekannt', p.grund || '');

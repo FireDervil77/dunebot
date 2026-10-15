@@ -61,6 +61,7 @@ const STAND = { wartet: 'wartet', laeuft: 'laeuft', gruen: 'gruen', rot: 'rot' }
 const dienste = {
     S: () => require('./Sitzungen'),
     Paketfassung: () => require('../../../gameserver/dashboard/helpers/Paketfassung'),
+    Imagestand: () => require('../../../gameserver/dashboard/helpers/Imagestand'),
     db: () => ServiceManager.get('dbService'),
     log: () => ServiceManager.get('Logger'),
 };
@@ -186,6 +187,7 @@ async function anstossen({ paketIds, guildId, userId, autor, rootserverId }) {
             });
             await dienste.db().query('UPDATE werkbank_sitzungen SET name = ? WHERE id = ?',
                 [`Umzug · ${sitzung.name}`.slice(0, 100), sitzung.id]);
+            await neueAuspraegung(sitzung, json(zeile.fbpkg, null)?.image);
             const geerbt = await erbeProbewerte(sitzung, json(zeile.fbpkg, null));
             if (geerbt.schluessel.length) await vermerke(sitzung, { probewerte_aus: geerbt.aus, probewerte: geerbt.schluessel });
             await kennwortDerFernsteuerung(sitzung);
@@ -196,6 +198,35 @@ async function anstossen({ paketIds, guildId, userId, autor, rootserverId }) {
     }
     if (vorgemerkt.length) await weiter();
     return { vorgemerkt, abgelehnt };
+}
+
+/**
+ * Löst eine neuere Ausprägung die des Pakets ab, zieht der Umzug dorthin
+ * (2026-10-15).
+ *
+ * Anlass: Enshrouded brauchte GE-Proton11-9 statt 10-32 („No SteamUtils011").
+ * Die Sitzung fragte `latest-GE-Proton10-32` und wäre dort geblieben. Welche
+ * Ausprägung ablöst, entscheidet dieselbe Regel wie in der Übersicht
+ * (Imagestand.nachfolgerFuer → imagetag.nachfolger): der zuletzt gebaute
+ * `latest…`-Tag, und nur, wenn sein Image `nachfolge` sagt.
+ *
+ * Bleibt die Frage unbeantwortet (Daemon zu alt, nicht erreichbar), zieht der
+ * Umzug auf den neuesten Bau der bisherigen Ausprägung — und der Vermerk sagt,
+ * dass der Wechsel nicht geprüft werden konnte.
+ */
+async function neueAuspraegung(sitzung, image) {
+    if (!image?.ref || !image?.tag) return;
+    const { wechsel, fehler } = await dienste.Imagestand().nachfolgerFuer(dienste.db(), image.ref, image.tag);
+    if (fehler) {
+        await vermerke(sitzung, { auspraegung_offen: fehler });
+        return;
+    }
+    if (!wechsel) return;
+    await dienste.db().query('UPDATE werkbank_sitzungen SET image = ? WHERE id = ?',
+        [JSON.stringify({ ...(sitzung.image || {}), ref: image.ref, tag: wechsel.tag }), sitzung.id]);
+    sitzung.image = { ...(sitzung.image || {}), ref: image.ref, tag: wechsel.tag };
+    await vermerke(sitzung, { auspraegung: { von: wechsel.von, nach: wechsel.nach } });
+    dienste.log().info(`[Umzug] ${sitzung.umzug?.slug || sitzung.kennung}: neue Ausprägung ${wechsel.von} → ${wechsel.nach}`);
 }
 
 /**
@@ -384,6 +415,7 @@ async function stand() {
     for (const [paketId, s] of jePaket) {
         const u = s.umzug;
         const zeile = { paket_id: paketId, slug: u.slug, von: u.von, nach: u.nach, stand: u.stand, grund: u.grund || null,
+            auspraegung: u.auspraegung || null, auspraegung_offen: u.auspraegung_offen || null,
             kennung: s.kennung, sitzung_offen: s.status === 'offen', guild_id: s.guild_id,
             am: u.am || null, begonnen: u.begonnen || null, beendet: u.beendet || null,
             image_tag: u.image_tag || null, image_digest: u.image_digest || null,

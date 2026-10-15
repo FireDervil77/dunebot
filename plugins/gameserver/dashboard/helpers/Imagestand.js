@@ -41,7 +41,7 @@
 
 const { ServiceManager } = require('dunebot-core');
 const Paketfassung = require('./Paketfassung');
-const { imageVariante, neuesterTag, imageName } = require('../../../../packages/fbpkg/lib/imagetag');
+const { imageVariante, neuesterTag, imageName, nachfolger } = require('../../../../packages/fbpkg/lib/imagetag');
 
 const FRIST_MS = 180000;
 const STAND = { aktuell: 'aktuell', neuerBau: 'neuer_bau', unbekannt: 'unbekannt' };
@@ -77,6 +77,43 @@ async function erreichbarerDaemon(dbService) {
     return m ? { ipm, id: m.id, name: m.name, daemonId: m.daemon_id } : null;
 }
 
+/**
+ * Welche Ausprägungen der genannten Images sind gebaut? (2026-10-15)
+ *
+ * Je Image eine Frage `image.auspraegungen` — die Registry wird gelesen, nicht
+ * gezogen. Antwort je ref: `{ liste }` oder `{ fehler }`. Ein Daemon vor 1.0.125
+ * kennt die Frage nicht; dann steht das als Fehler da, und kein Paket bekommt
+ * still „aktuell" wegen einer Frage, die niemand beantwortet hat.
+ */
+async function auspraegungenFuer(d, refs) {
+    const aus = new Map();
+    for (const ref of refs) {
+        const antwort = await d.ipm.sendCommand(d.daemonId, 'image.auspraegungen', { ref }, FRIST_MS)
+            .catch(e => ({ success: false, error: e.message }));
+        const liste = antwort?.data?.auspraegungen;
+        if (antwort?.success && Array.isArray(liste)) aus.set(ref, { liste });
+        else if (antwort?.error === 'Gameserver nicht gefunden') {
+            aus.set(ref, { fehler: `Der Daemon von „${d.name}" kennt die Frage nach neuen Ausprägungen noch nicht — sie kommt mit 1.0.125.` });
+        } else aus.set(ref, { fehler: antwort?.error || 'keine Auskunft zu den Ausprägungen' });
+    }
+    return aus;
+}
+
+/**
+ * Die Ausprägung, auf die ein Paket beim Umzug wechselt — oder null. Für den
+ * Umzug (Umzug.anstossen); dieselbe Regel wie in der Übersicht (imagetag.nachfolger).
+ *
+ * @returns {Promise<{wechsel: object|null, fehler: string|null}>}
+ */
+async function nachfolgerFuer(dbService, ref, tag) {
+    if (!ref || !imageVariante(tag)) return { wechsel: null, fehler: null };
+    const d = await erreichbarerDaemon(dbService);
+    if (!d) return { wechsel: null, fehler: 'Kein Daemon ist erreichbar — ob eine neue Ausprägung gebaut ist, blieb offen.' };
+    const a = (await auspraegungenFuer(d, [ref])).get(ref);
+    if (a.fehler) return { wechsel: null, fehler: a.fehler };
+    return { wechsel: nachfolger(tag, a.liste), fehler: null };
+}
+
 /** Urteil für ein Paket, wenn die Antwort des Daemons da ist. */
 function urteile(paket, bau) {
     if (!paket.ref) return { stand: STAND.unbekannt, grund: 'Das Paket nennt kein Image.' };
@@ -100,6 +137,7 @@ async function stand(dbService) {
 
     let gefragtBei = null, fehler = null;
     const antworten = new Map();
+    let auspraegungen = new Map();
     if (fragen.size) {
         const d = await erreichbarerDaemon(dbService);
         if (!d) {
@@ -118,22 +156,38 @@ async function stand(dbService) {
             } else {
                 fehler = antwort?.error || `Der Daemon von „${d.name}" hat keine Auskunft geliefert.`;
             }
+            // Nur Images mit Ausprägung: Nur dort kann eine andere ablösen.
+            const mitAuspraegung = [...new Set(pakete.filter(p => p.frageTag && imageVariante(p.tag)).map(p => p.ref))];
+            if (!fehler && mitAuspraegung.length) auspraegungen = await auspraegungenFuer(d, mitAuspraegung);
         }
     }
 
     const zaehlung = { [STAND.aktuell]: 0, [STAND.neuerBau]: 0, [STAND.unbekannt]: 0 };
     const aus = pakete.map((p) => {
         const bau = p.frageTag ? antworten.get(`${p.ref}:${p.frageTag}`) : null;
-        const u = fehler && p.frageTag && p.digest ? { stand: STAND.unbekannt, grund: fehler } : urteile(p, bau);
+        let u = fehler && p.frageTag && p.digest ? { stand: STAND.unbekannt, grund: fehler } : urteile(p, bau);
+        let neuester = bau && bau.digest ? { fassung: bau.fassung || null, digest: bau.digest, hinweis: bau.hinweis || null } : null;
+        // Eine neuere Ausprägung, die ablöst (GE-Proton10-32 → 11-9), schlägt
+        // den neuesten Bau der eigenen: Dorthin zieht der Umzug.
+        const a = auspraegungen.get(p.ref);
+        const wechsel = a?.liste && p.digest ? nachfolger(p.tag, a.liste) : null;
+        if (wechsel) {
+            u = { stand: STAND.neuerBau, grund: null };
+            neuester = { fassung: wechsel.fassung, digest: wechsel.digest, hinweis: null };
+        } else if (a?.fehler && u.stand === STAND.aktuell) {
+            // „aktuell" gilt nur für die eigene Ausprägung — ob eine neue
+            // ablöst, ist unbeantwortet. Das gehört gesagt.
+            u = { stand: STAND.aktuell, grund: a.fehler };
+        }
         zaehlung[u.stand]++;
         return {
             paket_id: p.paket_id, slug: p.slug, name: p.name, version: p.version, kanal: p.kanal,
             image: p.image, tag: p.tag, digest: p.digest,
-            neuester: bau && bau.digest ? { fassung: bau.fassung || null, digest: bau.digest, hinweis: bau.hinweis || null } : null,
+            neuester, wechsel: wechsel ? { von: wechsel.von, nach: wechsel.nach } : null,
             stand: u.stand, grund: u.grund,
         };
     });
     return { pakete: aus, gefragtBei, fehler, zaehlung };
 }
 
-module.exports = { STAND, paketImages, urteile, stand };
+module.exports = { STAND, paketImages, urteile, stand, nachfolgerFuer, auspraegungenFuer };

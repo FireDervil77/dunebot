@@ -53,6 +53,7 @@ ServiceManager.register('Logger', {
 });
 
 const S = require('../plugins/werkbank/dashboard/helpers/Sitzungen');
+const T = require('../packages/fbpkg/lib/imagetag');
 const Umzug = require('../plugins/werkbank/dashboard/helpers/Umzug');
 const Imagestand = require('../plugins/gameserver/dashboard/helpers/Imagestand');
 
@@ -186,10 +187,22 @@ const attrappeDb = {
         if (q === 'UPDATE werkbank_sitzungen SET name = ? WHERE id = ?') {
             welt.sitzungen.find(s => s.id === p[1]).name = p[0]; return {};
         }
+        if (q === 'UPDATE werkbank_sitzungen SET image = ? WHERE id = ?') {
+            welt.aufrufe.push(['image', p[1], JSON.parse(p[0])]);
+            welt.sitzungen.find(s => s.id === p[1]).image = JSON.parse(p[0]); return {};
+        }
         throw new Error(`Attrappe kennt die Abfrage nicht: ${q.slice(0, 90)}`);
     },
 };
-Umzug._setze({ S: () => attrappeS, Paketfassung: () => attrappePaketfassung, db: () => attrappeDb });
+// Der Image-Stand: Vorgabe „keine neue Ausprägung". `welt.nachfolger` stellt
+// einen Wechsel nach (2026-10-15, GE-Proton10-32 → 11-9).
+const attrappeImagestand = {
+    async nachfolgerFuer(db, ref, tag) {
+        welt.aufrufe.push(['nachfolger', ref, tag]);
+        return welt.nachfolger ? welt.nachfolger(ref, tag) : { wechsel: null, fehler: null };
+    },
+};
+Umzug._setze({ S: () => attrappeS, Paketfassung: () => attrappePaketfassung, db: () => attrappeDb, Imagestand: () => attrappeImagestand });
 
 /** Das Urteil des Daemons kommt an — wie Ereignisse.beiPruefung es weiterreicht. */
 async function urteil(kennung, gruen, gruende = []) {
@@ -257,6 +270,51 @@ const AUFTRAG = { guildId: '1', userId: '42', autor: 'Betreiber', rootserverId: 
         assert.deepStrictEqual(Umzug.unterschied(A, e), []);
         e.image.ref = 'anderes/image';
         assert.deepStrictEqual(Umzug.unterschied(A, e), ['image.ref'], 'ein anderes Image ist kein Umzug');
+    });
+
+    // ── Wechsel der Ausprägung (2026-10-15) ─────────────────────────────────
+    const proton = echte.find(p => /GE-Proton/.test(p.image?.tag || ''));
+    await pruefe(`Neue Ausprägung: der Umzug zieht ${proton ? proton.identity.slug : '(kein Proton-Paket)'} auf sie — Durchlauf, Paket und Vermerk`, async () => {
+        assert.ok(proton, 'kein Paket auf Proton in der Datenbank — die Probe mässe nichts');
+        neueWelt([[1, proton]]);
+        welt.nachfolger = (ref, tag) => ({ wechsel: { von: 'GE-Proton10-32', nach: 'GE-Proton11-9', tag: 'latest-GE-Proton11-9',
+            fassung: '2026.10-GE-Proton11-9', digest: DIGEST }, fehler: null });
+        const r = await Umzug.anstossen({ ...AUFTRAG, paketIds: [1] });
+        const k = r.vorgemerkt[0].kennung;
+        assert.deepStrictEqual(welt.aufrufe.find(a => a[0] === 'nachfolger').slice(1), [proton.image.ref, proton.image.tag],
+            'gefragt werden muss mit dem Tag des Pakets');
+        assert.strictEqual(sitzungNach(k).image.tag, 'latest-GE-Proton11-9', 'die Sitzung fragt weiter die alte Ausprägung');
+        assert.deepStrictEqual(vermerk(k).auspraegung, { von: 'GE-Proton10-32', nach: 'GE-Proton11-9' });
+        // Der Durchlauf lief auf dem Image der Sitzung …
+        const lauf = welt.pruefungen.find(x => x.kennung === k);
+        assert.strictEqual(T.imageVariante(lauf.entwurf.image.tag), 'GE-Proton11-9', 'geprüft wurde die alte Ausprägung');
+        // … und meldet seine Kalenderfassung — die kommt ins Paket.
+        Object.assign(lauf, { status: 'gruen', beendet_am: new Date().toISOString(),
+            ergebnis: { gruen: true, gruende: [], image_digest: DIGEST, image_tag: '2026.10-GE-Proton11-9', bereitschaft: 'port' } });
+        await Umzug.beiUrteil(k);
+        assert.strictEqual(vermerk(k).stand, 'gruen', vermerk(k).grund);
+        const neu = neuesteVon(1).fbpkg;
+        assert.strictEqual(neu.image.tag, '2026.10-GE-Proton11-9');
+        assert.strictEqual(neu.image.digest, DIGEST);
+        assert.deepStrictEqual(Umzug.unterschied(proton, neu), []);
+    });
+    await pruefe('Bleibt die Frage nach Ausprägungen offen, zieht der Umzug auf die bisherige — und sagt es', async () => {
+        assert.ok(proton);
+        neueWelt([[1, proton]]);
+        welt.nachfolger = () => ({ wechsel: null, fehler: 'Der Daemon kennt die Frage nach neuen Ausprägungen noch nicht — sie kommt mit 1.0.125.' });
+        const r = await Umzug.anstossen({ ...AUFTRAG, paketIds: [1] });
+        const k = r.vorgemerkt[0].kennung;
+        assert.ok(!welt.aufrufe.some(a => a[0] === 'image'), 'ohne Auskunft wurde das Image der Sitzung trotzdem geändert');
+        assert.match(vermerk(k).auspraegung_offen || '', /1\.0\.125/);
+        assert.strictEqual(vermerk(k).auspraegung, undefined);
+    });
+    await pruefe('imageBeiwerk: Zusätze am Image bleiben beim ABGELÖSTEN Wechsel — bei einem fremden nicht', async () => {
+        const vorher = { ref: 'r/proton', tag: '2026.10-GE-Proton10-32', digest: 'x', platform: 'linux/amd64' };
+        const jetzt = { ref: 'r/proton', tag: 'latest-GE-Proton11-9' };
+        const w = { von: 'GE-Proton10-32', nach: 'GE-Proton11-9' };
+        assert.deepStrictEqual(S.imageBeiwerk(vorher, jetzt, w), { platform: 'linux/amd64' });
+        assert.deepStrictEqual(S.imageBeiwerk(vorher, jetzt, null), {}, 'ohne Wechselvermerk ist eine andere Ausprägung ein anderes Image');
+        assert.deepStrictEqual(S.imageBeiwerk(vorher, { ref: 'r/proton', tag: 'latest-GE-Proton11-5' }, w), {}, 'nur die vermerkte Ausprägung erbt');
     });
 
     console.log('\nDie Kette');

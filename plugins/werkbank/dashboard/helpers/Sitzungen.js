@@ -3790,13 +3790,16 @@ function bereitUeber(stufe) {
  * alles außer Name, Tag und Anheftung. Nur solange es dasselbe Image ist: Ein
  * anderes Image hat seine eigene Plattform.
  */
-function imageBeiwerk(vorher, jetzt) {
+function imageBeiwerk(vorher, jetzt, wechsel = null) {
     if (!vorher || typeof vorher !== 'object') return {};
     // Dasselbe Image heisst: derselbe Name, dieselbe Ausprägung. Der Monat
     // darf wechseln — ein Umzug auf einen neuen Bau ist genau das, und
     // `platform`/`arch` gingen sonst bei jedem Umzug verloren (wie Valheim
-    // 1.0.21 am 2026-10-07).
-    if (jetzt && (vorher.ref !== jetzt.ref || imageVariante(vorher.tag) !== imageVariante(jetzt.tag))) return {};
+    // 1.0.21 am 2026-10-07). Ebenso die Ausprägung, wenn ein Umzug sie
+    // ABLÖST (2026-10-15, GE-Proton10-32 → 11-9 — Umzug.neueAuspraegung).
+    const abgeloest = Boolean(wechsel && imageVariante(vorher.tag) === wechsel.von
+        && jetzt && imageVariante(jetzt.tag) === wechsel.nach);
+    if (jetzt && (vorher.ref !== jetzt.ref || (imageVariante(vorher.tag) !== imageVariante(jetzt.tag) && !abgeloest))) return {};
     const { ref, tag, digest, pinned_at, ...beiwerk } = vorher;
     return beiwerk;
 }
@@ -3864,7 +3867,7 @@ function veroeffentlichungsPaket(sitzung, liste, pruefung, autor, imageVorher = 
         // der Name des Standes, auf dem geprüft wurde (`image_tag`, aus dem
         // Etikett des Images).
         image: {
-            ...imageBeiwerk(imageVorher, pruefung.entwurf?.image),
+            ...imageBeiwerk(imageVorher, pruefung.entwurf?.image, sitzung.entwurf?.werkbank?.umzug?.auspraegung),
             ...(pruefung.entwurf?.image || {}),
             tag: paketTag(pruefung),
             digest: pruefung.ergebnis?.image_digest,
@@ -4248,7 +4251,7 @@ module.exports = {
     schrittAusfuehren, ausgabeAnhaengen, beenden, pruefsummeEintragen, laufenderSchritt,
     herausnehmen, schrittWiederholen, verwerfen, entwurfAlsPaket,
     PRUEF_SUFFIX, fingerabdruck, technisch,
-    pruefeBildAdresse, angaben, angabenSpeichern, veroeffentlichungsStand, veroeffentlichungsPaket, veroeffentlichen, laufendePruefung, pruefungen, durchlaufMaengel, pruefen,
+    pruefeBildAdresse, angaben, angabenSpeichern, veroeffentlichungsStand, veroeffentlichungsPaket, imageBeiwerk, veroeffentlichen, laufendePruefung, pruefungen, durchlaufMaengel, pruefen,
     pruefungAbbrechen, pruefProtokoll, pruefungBeenden, entwurfSchreiben,
     EINSTELLUNG, pfadFehler, einstellungAusFormular, einstellungSpeichern, einstellungEntfernen, einstellungRolleSetzen, einstellungenOrdnen, probewerteSetzen, probewerte,
     rolleAusFormular, rolleAlsFormular,
