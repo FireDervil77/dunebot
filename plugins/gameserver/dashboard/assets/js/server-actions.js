@@ -75,7 +75,7 @@ async function serverAction(serverId, action, optionen = {}) {
             const messages = {
                 start: optionen.update ? 'Server wird aktualisiert und gestartet …' : 'Server wird gestartet...',
                 stop: 'Server wird gestoppt...',
-                restart: 'Server wird neugestartet...'
+                restart: optionen.update ? 'Server wird aktualisiert und neu gestartet …' : 'Server wird neugestartet...'
             };
             
             if (window.showToast) {

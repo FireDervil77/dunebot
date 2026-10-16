@@ -175,7 +175,7 @@ function ohneEgg(payload) {
         assert.strictEqual(updateBeimStart(p, true), false);
     });
 
-    await check('Nur der Start-Knopf fragt: Neustart, geplante Aufgaben, Absturz und Bot starten ohne', async () => {
+    await check('Nur Starten und Neu starten fragen: geplante Aufgaben, Absturz und Bot starten ohne', async () => {
         const fs = require('fs');
         const { ohneKommentare } = require('./lib/quelltext');
         const lies = (p) => ohneKommentare(fs.readFileSync(path.join(__dirname, '..', p), 'utf8'));
@@ -185,8 +185,8 @@ function ohneEgg(payload) {
             ...lies('apps/dashboard/helpers/IPCServer.js').matchAll(/buildStartPayload\(([^)]*)\)/g),
         ].map(m => m[1].replace(/\s+/g, ' ').trim());
         const mit = aufrufe.filter(a => /update/.test(a));
-        assert.deepStrictEqual(mit, ['server, guildId, Logger, { update: mitUpdate }'],
-            `Aufrufe mit Update-Wahl: ${JSON.stringify(mit)} — erwartet genau einer (Start-Route)`);
+        assert.deepStrictEqual(mit, ['server, guildId, Logger, { update: mitUpdate }', 'server, guildId, Logger, { update: mitUpdate }'],
+            `Aufrufe mit Update-Wahl: ${JSON.stringify(mit)} — erwartet genau zwei (Start- und Neustart-Route)`);
         assert.ok(aufrufe.length >= 5, `nur ${aufrufe.length} Aufrufe gefunden — der Wächter sucht an der falschen Stelle`);
         assert.match(lies('plugins/gameserver/dashboard/routes/servers.js'), /const mitUpdate = istWahr\(req\.body\?\.update\)/);
     });
@@ -208,6 +208,8 @@ function ohneEgg(payload) {
         const seite = fs.readFileSync(path.join(__dirname, '..', 'plugins/gameserver/dashboard/views/guild/server-detail.ejs'), 'utf8');
         assert.match(seite, /<% if \(locals\.startMitUpdate\) \{ %>/);
         assert.match(seite, /serverAction\('<%= server\.id %>', 'start', \{ update: true \}\)/);
+        assert.match(seite, /serverAction\('<%= server\.id %>', 'restart', \{ update: true \}\)/);
+        assert.match(seite, /dropdown-toggle-split" data-fb-aktion="restart"/, 'der Neustart-Pfeil trägt nicht data-fb-aktion="restart"');
         assert.match(seite, /dropdown-toggle-split" data-fb-aktion="start"/, 'der Pfeil trägt nicht data-fb-aktion="start" — die Live-Anzeige liesse ihn stehen');
         const live = fs.readFileSync(path.join(__dirname, '..', 'plugins/gameserver/dashboard/assets/js/gameserver-live.js'), 'utf8');
         assert.match(live, /querySelectorAll\(`\[data-fb-aktion="\$\{aktion\}"\]`\)/, 'die Live-Anzeige schaltet nur das erste Element einer Aktion');

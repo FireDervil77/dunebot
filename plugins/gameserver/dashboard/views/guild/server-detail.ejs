@@ -104,11 +104,29 @@
         <% } %>
         </div>
 
+<%# „Neu starten" wie „Starten": Hauptteil ohne Update, Pfeil „Mit Update
+    neu starten" (2026-10-16). Beide tragen data-fb-aktion="restart". %>
+        <div class="btn-group">
         <button class="btn btn-white btn-sm" data-fb-aktion="restart"
                 onclick="serverAction('<%= server.id %>', 'restart')"
                 <%= k.restart.sichtbar ? '' : 'hidden' %>
                 <%= k.restart.aktiv ? '' : 'disabled' %>
                 <% if (!k.restart.aktiv && k.restart.grund) { %>title="<%= k.restart.grund %>"<% } %>>Neu starten</button>
+        <% if (locals.startMitUpdate) { %>
+        <button class="btn btn-white btn-sm dropdown-toggle dropdown-toggle-split" data-fb-aktion="restart"
+                data-bs-toggle="dropdown" aria-expanded="false" aria-label="Neustartoptionen"
+                <%= k.restart.sichtbar ? '' : 'hidden' %>
+                <%= k.restart.aktiv ? '' : 'disabled' %>></button>
+        <div class="dropdown-menu">
+          <a class="dropdown-item" href="#" onclick="serverAction('<%= server.id %>', 'restart'); return false;">
+            Neu starten<div class="text-secondary small">ohne Update — schnell</div>
+          </a>
+          <a class="dropdown-item" href="#" onclick="serverAction('<%= server.id %>', 'restart', { update: true }); return false;">
+            Mit Update neu starten<div class="text-secondary small">holt erst die neueste Fassung über Steam</div>
+          </a>
+        </div>
+        <% } %>
+        </div>
 
         <button class="btn btn-white btn-sm" data-fb-aktion="stop"
                 onclick="serverAction('<%= server.id %>', 'stop')"

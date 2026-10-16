@@ -3099,7 +3099,10 @@ router.post('/:serverId/restart', requirePermission('GAMESERVER.RESTART'), async
         const guildId = res.locals.guildId;
         const { serverId } = req.params;
 
-        Logger.info(`[Gameserver] Restart angefordert (ID: ${serverId})`);
+        // „Mit Update neu starten" (2026-10-16), wie beim Start: eine Wahl je
+        // Neustart. Ohne sie startet der Server neu, wie er ist.
+        const mitUpdate = istWahr(req.body?.update);
+        Logger.info(`[Gameserver] Restart angefordert (ID: ${serverId}${mitUpdate ? ', mit Update' : ''})`);
 
         // Server-Daten laden (gleiche Felder wie beim Start – der Daemon braucht
         // beim Neustart dieselbe Konfiguration)
@@ -3148,7 +3151,7 @@ router.post('/:serverId/restart', requirePermission('GAMESERVER.RESTART'), async
         // Config leben nur im Speicher des Daemons. Nach einem Daemon-Neustart
         // stoppte ein Restart den Server sonst und scheiterte dann mit
         // "docker image not set".
-        const { payload: restartPayload, error: payloadError } = await buildStartPayload(server, guildId, Logger);
+        const { payload: restartPayload, error: payloadError } = await buildStartPayload(server, guildId, Logger, { update: mitUpdate });
         if (payloadError) {
             return res.status(500).json({ success: false, message: payloadError });
         }
