@@ -445,11 +445,15 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (u && u.stand === 'gruen' && !liegtZurueck) {
                 // Nur solange das Paket NICHT wieder zurückliegt: Nach dem
                 // nächsten Bau ist der grüne Umzug von gestern keine Auskunft mehr.
-                zelle.appendChild(el('span', 'badge ' + (u.kanal === 'stable' ? 'bg-success-lt' : 'bg-warning-lt'),
-                    'umgezogen · ' + u.nach + (u.kanal === 'stable' ? ' freigegeben' : ' in test')));
+                const m = el('span', 'badge ' + (u.kanal === 'stable' ? 'bg-success-lt' : 'bg-warning-lt'),
+                    'umgezogen · ' + u.nach + (u.von_hand ? ' von Hand' : '') + (u.kanal === 'stable' ? ' freigegeben' : ' in test'));
+                if (u.von_hand) m.title = 'Der Umzug war rot' + (u.grund_vorher ? ' (' + u.grund_vorher + ')' : '') + ' — danach in der Sitzung von Hand veröffentlicht.';
+                zelle.appendChild(m);
                 if (u.kanal === 'test' && !u.freigebbar) {
                     const h = el('div', 'text-secondary small', 'Freigabe auf der Seite des Spiels');
-                    h.title = 'Die Fassung, aus der umgezogen wurde, war selbst nicht freigegeben — der Sammelknopf gibt sie deshalb nicht frei.';
+                    h.title = u.von_hand
+                        ? 'Von Hand veröffentlicht — daran ist mehr anders als das Image. Der Sammelknopf gibt nur reine Umzüge frei.'
+                        : 'Die Fassung, aus der umgezogen wurde, war selbst nicht freigegeben — der Sammelknopf gibt sie deshalb nicht frei.';
                     zelle.appendChild(h);
                 }
             } else if (u && u.stand === 'rot') {

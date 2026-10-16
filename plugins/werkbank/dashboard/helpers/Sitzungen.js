@@ -3970,6 +3970,8 @@ async function veroeffentlichen(sitzung, liste, pruefListe, { autor } = {}) {
         e.werkbank.veroeffentlicht = [...(e.werkbank.veroeffentlicht || []), {
             slug: paket.identity.slug, version: paket.identity.version, am: new Date().toISOString(),
             pruef_id: stand.pruefung.id, paket_id: r.paketId,
+            // Für die Umzugsübersicht, wenn ein roter Umzug von Hand endet.
+            image_tag: paket.image?.tag || null, image_digest: paket.image?.digest || null,
         }];
     });
     return { slug: paket.identity.slug, version: paket.identity.version, paketId: r.paketId, meldungen: zeilen };

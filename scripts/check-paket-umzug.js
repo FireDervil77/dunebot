@@ -569,6 +569,49 @@ const AUFTRAG = { guildId: '1', userId: '42', autor: 'Betreiber', rootserverId: 
         assert.strictEqual((await Umzug.stand()).umzuege.find(u => u.paket_id === 3).freigebbar, false);
     });
 
+    await pruefe('Roter Umzug, danach in der Sitzung von Hand veröffentlicht: gilt als umgezogen — auch verworfen, nie über den Sammelknopf', async () => {
+        // StarRupture, 2026-10-16: rot auf 11-9, Bildschirm dazu, grün, von Hand 1.1.4.
+        neueWelt([[1, A, 'stable'], [2, B, 'stable']]);
+        const r = await Umzug.anstossen({ ...AUFTRAG, paketIds: [1, 2] });
+        const [erste, zweite] = r.vorgemerkt.map(v => v.kennung);
+        await urteil(erste, false, ['nach 5m0s nicht bereit']);
+        await urteil(zweite, false, ['rot']);
+        let nach = Object.fromEntries((await Umzug.stand()).umzuege.map(u => [u.paket_id, u]));
+        assert.strictEqual(nach[1].stand, 'rot');
+
+        // Was Sitzungen.veroeffentlichen in der Sitzung festhält — und die Fassung dazu.
+        const s = sitzungNach(erste);
+        const version = S.naechsteFassung(A.identity.version);
+        welt.pakete.get(1).fassungen.push({ id: 501, version, channel: 'test', test_passed_at: '2026-10-16 09:27:48', fbpkg: kopie(A) });
+        s.entwurf.werkbank.veroeffentlicht = [{ slug: A.identity.slug, version, am: new Date(Date.now() + 1000).toISOString(),
+            pruef_id: 92, paket_id: 1, image_tag: '2026.10-GE-Proton11-9', image_digest: DIGEST }];
+        // Ein Eintrag für ein ANDERES Paket macht den Umzug von Paket 2 nicht grün.
+        sitzungNach(zweite).entwurf.werkbank.veroeffentlicht = [{ slug: 'fremd', version: '9.9.9', am: new Date(Date.now() + 1000).toISOString(), pruef_id: 1, paket_id: 77 }];
+
+        let st = await Umzug.stand();
+        nach = Object.fromEntries(st.umzuege.map(u => [u.paket_id, u]));
+        assert.strictEqual(nach[1].stand, 'gruen', 'die rote Zeile bliebe für immer stehen');
+        assert.strictEqual(nach[1].von_hand, true);
+        assert.strictEqual(nach[1].nach, version);
+        assert.strictEqual(nach[1].grund, null);
+        assert.strictEqual(nach[1].grund_vorher, 'nach 5m0s nicht bereit', 'der rote Grund ging verloren');
+        assert.strictEqual(nach[1].image_digest, DIGEST);
+        assert.strictEqual(nach[1].freigebbar, false, 'der Sammelknopf gäbe frei, woran mehr als das Image anders ist');
+        assert.strictEqual(nach[2].stand, 'rot', 'ein fremdes Paket in „veroeffentlicht" machte den Umzug grün');
+        assert.deepStrictEqual(st.zaehlung, { wartet: 0, laeuft: 0, gruen: 1, rot: 1, freigebbar: 0 });
+        assert.strictEqual(vermerk(erste).stand, 'rot', 'der Vermerk wurde umgeschrieben — gelesen werden sollte nur');
+        assert.deepStrictEqual((await Umzug.freigeben({ userId: '42' })).freigegeben, []);
+
+        s.status = 'verworfen';
+        st = await Umzug.stand();
+        assert.strictEqual(st.umzuege.find(u => u.paket_id === 1).stand, 'gruen', 'nach dem Verwerfen stand der Umzug wieder auf rot');
+
+        // Sitzungen.veroeffentlichen hält Tag und Digest fest — sonst fehlt der Seite der Vergleich mit dem neuesten Bau.
+        const quelle = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'plugins/werkbank/dashboard/helpers/Sitzungen.js'), 'utf8'));
+        const teil = quelle.slice(quelle.indexOf('async function veroeffentlichen('), quelle.indexOf('async function laufSetzen('));
+        assert.match(teil, /veroeffentlicht = \[[\s\S]+paket_id: r\.paketId,[\s\S]+image_tag: paket\.image\?\.tag[\s\S]+image_digest: paket\.image\?\.digest/);
+    });
+
     console.log('\nDie Knöpfe');
 
     await pruefe('Routen: vor /:id — und was umzieht, entscheidet der Image-Stand auf dem Server', async () => {
@@ -665,6 +708,7 @@ const AUFTRAG = { guildId: '1', userId: '42', autor: 'Betreiber', rootserverId: 
         assert.match(skript, /u\.stand === 'gruen' && u\.image_digest && p\.neuester && p\.neuester\.digest === u\.image_digest\) zurueck\.delete\(id\)/,
             'ein grün umgezogenes Paket gälte bis zum Neuladen weiter als „zurück"');
         assert.match(skript, /if \(neuFertig\) ladeImageStand\(\)/, 'der Image-Stand würde erst am Ende der ganzen Reihe neu gefragt');
+        assert.match(skript, /u\.von_hand \? ' von Hand' : ''/, 'die Seite sagt nicht, dass ein Umzug von Hand zu Ende gebracht wurde');
     });
 
     console.log(fehler ? `\n❌ ${fehler} Prüfung(en) fehlgeschlagen` : '\n✅ Umzug: eine Kette aus den Bausteinen der Werkbank, außer dem Image ändert sich nichts, und freigegeben wird mit einem Klick');

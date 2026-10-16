@@ -400,6 +400,33 @@ async function abbrechen(kennung) {
 // ── Übersicht und Freigabe ───────────────────────────────────────────────────
 
 /**
+ * Ein roter Umzug, den der Betreiber in derselben Sitzung von Hand zu Ende
+ * gebracht hat, gilt als umgezogen.
+ *
+ * Anlass StarRupture, 2026-10-16: Der Umzug auf GE-Proton11-9 war rot (#86),
+ * in der offenen Sitzung kam `display: virtual` dazu, der Durchlauf #92 war
+ * grün, veröffentlicht wurde von Hand (1.1.4) — der Umzugs-Knopf darf das
+ * nicht, es ändert mehr als das Image. Der Vermerk blieb auf rot, auch nach dem
+ * Verwerfen, und „Noch einmal umziehen" kam nie, weil das Paket auf dem
+ * neuesten Bau steht. Die rote Zeile wäre für immer stehen geblieben.
+ *
+ * Gelesen wird nur, was die Sitzung beim Veröffentlichen ohnehin festhält
+ * (`werkbank.veroeffentlicht`) — der Vermerk selbst bleibt, wie er war. Das
+ * wirkt deshalb auch für Sitzungen, die vor dieser Regel von Hand veröffentlicht
+ * haben. Der rote Grund geht nicht verloren (`grund_vorher`).
+ */
+function vonHandAbgeschlossen(s) {
+    const u = s.umzug;
+    if (u.stand !== STAND.rot) return u;
+    const v = (s.entwurf?.werkbank?.veroeffentlicht || [])
+        .filter(x => Number(x.paket_id) === Number(u.paket_id) && (!u.am || !x.am || x.am >= u.am))
+        .pop();
+    if (!v) return u;
+    return { ...u, stand: STAND.gruen, nach: v.version, von_hand: true, grund_vorher: u.grund || null, grund: null,
+        pruef_id: v.pruef_id ?? u.pruef_id, image_tag: v.image_tag || null, image_digest: v.image_digest || null };
+}
+
+/**
  * Je Paket der jüngste Umzug — wartend, laufend, grün oder rot.
  *
  * `freigebbar`: Die umgezogene Fassung liegt noch in `test`, ist die neueste,
@@ -413,8 +440,9 @@ async function stand() {
     for (const s of alle) jePaket.set(Number(s.umzug.paket_id), s);   // nach id sortiert: der letzte gewinnt
     const aus = [];
     for (const [paketId, s] of jePaket) {
-        const u = s.umzug;
+        const u = vonHandAbgeschlossen(s);
         const zeile = { paket_id: paketId, slug: u.slug, von: u.von, nach: u.nach, stand: u.stand, grund: u.grund || null,
+            von_hand: Boolean(u.von_hand), grund_vorher: u.grund_vorher || null,
             auspraegung: u.auspraegung || null, auspraegung_offen: u.auspraegung_offen || null,
             kennung: s.kennung, sitzung_offen: s.status === 'offen', guild_id: s.guild_id,
             am: u.am || null, begonnen: u.begonnen || null, beendet: u.beendet || null,
@@ -425,7 +453,9 @@ async function stand() {
             const f = fassungen.find(x => x.version === u.nach);
             zeile.fassung_id = f ? f.id : null;
             zeile.kanal = f ? f.channel : null;
-            zeile.freigebbar = Boolean(f && f.channel === 'test' && f.test_passed_at
+            // Von Hand veröffentlicht heißt: mehr als das Image ist anders. Das
+            // gibt der Betreiber auf der Seite des Spiels frei, nicht der Sammelknopf.
+            zeile.freigebbar = Boolean(!u.von_hand && f && f.channel === 'test' && f.test_passed_at
                 && fassungen[0] && fassungen[0].id === f.id && u.von_kanal === 'stable');
         }
         aus.push(zeile);
