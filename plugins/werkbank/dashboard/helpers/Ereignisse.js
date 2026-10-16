@@ -356,6 +356,50 @@ function verteile(action, handler) {
 let angemeldet = false;
 
 /** Beim Router anmelden — einmal je Prozess. */
+// ── Schritte, die ein Daemon-Neustart verschluckte (2026-10-16, Baustelle 199) ──
+//
+// Ein Schritt laeuft in einem Container des Daemons. Startet der Daemon neu,
+// ist der Container weg — und sein Ende meldet niemand. Die Zeile stand dann
+// fuer immer auf `laeuft` und sperrte die Sitzung („Cubic Odysey": begonnen
+// 17:15:50, Neustart 17:16:21). Seither nennt der Daemon beim Verbinden
+// die Sitzungen, in denen er gerade einen Schritt fuehrt (`schritte_aktiv`).
+// Jeder `laeuft`-Schritt seiner Maschinen, der dort fehlt, wird hier
+// abgeschlossen — wie ein gescheiterter, mit Grund.
+//
+// Nur Schritte, die schon eine halbe Minute laufen: Ein Schritt, der gerade
+// in dem Augenblick angelegt wurde, in dem die Liste entstand, stuende sonst
+// darin noch nicht.
+const WAISE_GRUND = 'abgebrochen: der Daemon führt diesen Schritt nicht mehr (Neustart oder Verbindungsabriss) — sein Ende kam nie an';
+
+async function beiSchritteAktiv(payload, _nachricht, kontext = {}) {
+    const daemonId = kontext?.daemonId;
+    if (!daemonId || !Array.isArray(payload?.sitzungen)) return 0;
+    const Logger = ServiceManager.get('Logger');
+    const laufend = new Set(payload.sitzungen.map(String));
+    const zeilen = await ServiceManager.get('dbService').query(`
+        SELECT x.id AS schrittId, s.kennung, s.guild_id AS guildId
+          FROM werkbank_schritte x
+          JOIN werkbank_sitzungen s ON s.id = x.sitzung_id
+          JOIN rootserver r ON r.id = s.rootserver_id
+         WHERE r.daemon_id = ? AND x.status = 'laeuft'
+           AND x.begonnen_am < NOW() - INTERVAL 30 SECOND`, [daemonId]);
+    let n = 0;
+    for (const z of zeilen) {
+        if (laufend.has(z.kennung)) continue;
+        try {
+            await schreibePuffer(z.schrittId);
+        } catch (fehler) {
+            Logger.error(`[Werkbank] Ausgabe von Schritt ${z.schrittId} nicht gespeichert:`, fehler);
+        }
+        await Sitzungen.beenden(z.schrittId, { status: 'fehler', fehler: WAISE_GRUND });
+        vergiss(z.kennung);
+        Logger.warn(`[Werkbank] Sitzung ${z.kennung}: Schritt ${z.schrittId} abgeschlossen — der Daemon führt ihn nicht mehr`);
+        sende(z.guildId, { action: 'fehlgeschlagen', sitzung_id: z.kennung, schritt_id: z.schrittId, error: WAISE_GRUND });
+        n++;
+    }
+    return n;
+}
+
 function anmelden() {
     if (angemeldet) return;
     const eventRouter = require('../../../../apps/dashboard/helpers/IPMEventRouter');
@@ -369,12 +413,14 @@ function anmelden() {
     eventRouter.register(NS, 'ports', verteile('ports', beiPorts));
     eventRouter.register(NS, 'beendet', verteile('beendet', beiBeendet));
     eventRouter.register(NS, 'pruefung', beiPruefung);
+    eventRouter.register(NS, 'schritte_aktiv', beiSchritteAktiv);
     angemeldet = true;
 }
 
 module.exports = {
     anmelden, merke, vergiss, merkeLauf, vergissLauf, merkePruefung, vergissPruefung, verteile,
     beiAusgabe, beiEnde, beiStatus, beiGestartet, beiKonsole, beiBereitschaft, beiPorts, beiBeendet, beiPruefung, umzugWeiter,
+    beiSchritteAktiv,
     _laufend: laufend, _puffer: puffer, _laeufe: laeufe, _konsolenPuffer: konsolenPuffer,
     _pruefungen: pruefungen, _pruefPuffer: pruefPuffer,
 };
