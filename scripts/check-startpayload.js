@@ -26,7 +26,7 @@ if (!ServiceManager.has('Logger')) {
 }
 
 const HELPERS = path.join(__dirname, '../plugins/gameserver/dashboard/helpers');
-const { buildStartPayload, baueInstallNutzlast, paketWerteAnlegen, autoUpdateAus, autoUpdateBeimAnlegen,
+const { buildStartPayload, baueInstallNutzlast, paketWerteAnlegen, updateBeimStart,
         werteFuerDaemon } = require(path.join(HELPERS, 'StartPayload'));
 
 let passed = 0;
@@ -148,36 +148,71 @@ function ohneEgg(payload) {
         assert.ok(/query/.test(error), error);
     });
 
-    // Seit 2026-10-15 ist Auto-Update eine Eigenschaft des SERVERS (Spalte).
-    // Vorher entschied die Paketeinstellung — und die hatte am Ende nur noch
-    // Astro Colony; Enshrouded (219) stand auf „an" und zog nie ein Update.
-    await check('Auto-Update folgt der Spalte am Server, nicht einem Paketwert', async () => {
-        // Fixture: paket_werte sagt '1', die Spalte 0 → aus.
-        assert.strictEqual((await buildStartPayload(server({ auto_update: 0 }), 'g1')).payload.auto_update, false);
+    // Seit 2026-10-16 ist Update eine Wahl beim START („Mit Update starten"),
+    // kein Schalter: Der Server startet standardmäßig ohne. Bis dahin (seit
+    // 2026-10-15) entschied die Spalte `gameservers.auto_update`, davor eine
+    // Paketeinstellung, die am Ende nur noch Astro Colony trug.
+    await check('Ohne Wahl kein Update — weder Spalte noch Paketwert schalten es ein', async () => {
         const an = server({
             auto_update: 1,
-            paket_werte: JSON.stringify({ name: 'x', world_name: 'w', auto_update: '0' }),
+            paket_werte: JSON.stringify({ name: 'x', world_name: 'w', auto_update: '1' }),
         });
-        assert.strictEqual((await buildStartPayload(an, 'g1')).payload.auto_update, true);
+        assert.strictEqual((await buildStartPayload(an, 'g1')).payload.auto_update, false,
+            'die alte Spalte oder ein alter Paketwert schaltete das Update noch ein');
     });
 
-    await check('Auch ein Paket ohne Einstellung auto_update wird aktualisiert (Enshrouded)', async () => {
+    await check('„Mit Update starten" setzt es — auch für ein Paket ohne Einstellung auto_update (Enshrouded)', async () => {
+        assert.strictEqual((await buildStartPayload(server({ auto_update: 0 }), 'g1', null, { update: true })).payload.auto_update, true);
         const p = paket(x => { x.settings = x.settings.filter(e => e.key !== 'auto_update'); });
-        assert.strictEqual(autoUpdateAus({ auto_update: 1 }, p), true);
-        assert.strictEqual(autoUpdateAus({ auto_update: 0 }, p), false);
+        assert.strictEqual(updateBeimStart(p, true), true);
+        assert.strictEqual(updateBeimStart(p, false), false);
+        assert.strictEqual(updateBeimStart(p, undefined), false);
+        assert.strictEqual(updateBeimStart(p, '1'), true, 'die Anfrage schickt JSON — aber auch ein Formularwert muss gelten');
     });
 
-    await check('Ohne SteamCMD-Schritt kein Auto-Update — der Daemon aktualisiert nur das', async () => {
+    await check('Ohne SteamCMD-Schritt kein Update, auch wenn gewählt — der Daemon aktualisiert nur das', async () => {
         const p = paket(x => { x.install.steps = [{ type: 'download', url: 'https://example.org/x.zip' }]; });
-        assert.strictEqual(autoUpdateAus({ auto_update: 1 }, p), false);
+        assert.strictEqual(updateBeimStart(p, true), false);
     });
 
-    await check('Neuer Server: Eingabe gilt, sonst an bei SteamCMD', async () => {
-        assert.strictEqual(autoUpdateBeimAnlegen(paket(), undefined), true);
-        assert.strictEqual(autoUpdateBeimAnlegen(paket(), '0'), false);
-        assert.strictEqual(autoUpdateBeimAnlegen(paket(), '1'), true);
-        const ohneSteam = paket(x => { x.install.steps = [{ type: 'download', url: 'https://example.org/x.zip' }]; });
-        assert.strictEqual(autoUpdateBeimAnlegen(ohneSteam, undefined), false);
+    await check('Nur der Start-Knopf fragt: Neustart, geplante Aufgaben, Absturz und Bot starten ohne', async () => {
+        const fs = require('fs');
+        const { ohneKommentare } = require('./lib/quelltext');
+        const lies = (p) => ohneKommentare(fs.readFileSync(path.join(__dirname, '..', p), 'utf8'));
+        const aufrufe = [
+            ...lies('plugins/gameserver/dashboard/routes/servers.js').matchAll(/buildStartPayload\(([^)]*)\)/g),
+            ...lies('plugins/gameserver/dashboard/helpers/CronWorker.js').matchAll(/buildStartPayload\(([^)]*)\)/g),
+            ...lies('apps/dashboard/helpers/IPCServer.js').matchAll(/buildStartPayload\(([^)]*)\)/g),
+        ].map(m => m[1].replace(/\s+/g, ' ').trim());
+        const mit = aufrufe.filter(a => /update/.test(a));
+        assert.deepStrictEqual(mit, ['server, guildId, Logger, { update: mitUpdate }'],
+            `Aufrufe mit Update-Wahl: ${JSON.stringify(mit)} — erwartet genau einer (Start-Route)`);
+        assert.ok(aufrufe.length >= 5, `nur ${aufrufe.length} Aufrufe gefunden — der Wächter sucht an der falschen Stelle`);
+        assert.match(lies('plugins/gameserver/dashboard/routes/servers.js'), /const mitUpdate = istWahr\(req\.body\?\.update\)/);
+    });
+
+    await check('Die Spalte auto_update schreibt niemand mehr (Anlegen, Bot, Bearbeiten)', async () => {
+        const fs = require('fs');
+        const { ohneKommentare } = require('./lib/quelltext');
+        for (const p of ['plugins/gameserver/dashboard/routes/servers.js', 'apps/dashboard/helpers/IPCServer.js']) {
+            const q = ohneKommentare(fs.readFileSync(path.join(__dirname, '..', p), 'utf8'));
+            assert.doesNotMatch(q, /auto_update\s*=\s*\?/, `${p} setzt auto_update noch per UPDATE`);
+            assert.doesNotMatch(q, /auto_restart,\s*auto_update/, `${p} schreibt auto_update noch per INSERT`);
+        }
+        const seite = fs.readFileSync(path.join(__dirname, '..', 'plugins/gameserver/dashboard/views/guild/gameserver-edit.ejs'), 'utf8');
+        assert.doesNotMatch(seite, /name="auto_update"/, 'die Bearbeiten-Seite hat den Schalter noch');
+    });
+
+    await check('Serverseite: Pfeil „Mit Update starten" nur mit SteamCMD, und die Live-Anzeige schaltet ihn mit', async () => {
+        const fs = require('fs');
+        const seite = fs.readFileSync(path.join(__dirname, '..', 'plugins/gameserver/dashboard/views/guild/server-detail.ejs'), 'utf8');
+        assert.match(seite, /<% if \(locals\.startMitUpdate\) \{ %>/);
+        assert.match(seite, /serverAction\('<%= server\.id %>', 'start', \{ update: true \}\)/);
+        assert.match(seite, /dropdown-toggle-split" data-fb-aktion="start"/, 'der Pfeil trägt nicht data-fb-aktion="start" — die Live-Anzeige liesse ihn stehen');
+        const live = fs.readFileSync(path.join(__dirname, '..', 'plugins/gameserver/dashboard/assets/js/gameserver-live.js'), 'utf8');
+        assert.match(live, /querySelectorAll\(`\[data-fb-aktion="\$\{aktion\}"\]`\)/, 'die Live-Anzeige schaltet nur das erste Element einer Aktion');
+        const js = fs.readFileSync(path.join(__dirname, '..', 'plugins/gameserver/dashboard/assets/js/server-actions.js'), 'utf8');
+        assert.match(js, /body: JSON\.stringify\(optionen\.update \? \{ update: true \} : \{\}\)/);
     });
 
     await check('Anlegen fragt auto_update nicht als Paketeinstellung', async () => {

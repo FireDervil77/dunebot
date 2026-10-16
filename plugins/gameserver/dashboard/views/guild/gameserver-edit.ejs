@@ -266,29 +266,8 @@
                                     </small>
                                 </div>
 
-                                <!-- Auto Update -->
-                                <div class="mb-3">
-                                    <div class="form-check form-switch">
-                                        <input type="checkbox" 
-                                               class="form-check-input" 
-                                               id="auto_update"
-                                               name="auto_update"
-                                               value="1"
-                                               <%= server.auto_update ? 'checked' : '' %>>
-                                        <label class="form-check-label" for="auto_update">
-                                            <%= tr('gameserver:SERVER.AUTO_UPDATE') %>
-                                        </label>
-                                    </div>
-                                    <small class="form-text text-secondary">
-                                        <%= tr('gameserver:SERVER.AUTO_UPDATE_DESC') %>
-                                    </small>
-                                    <% if (locals.autoUpdateOhneSteam) { %>
-                                    <small class="form-text text-warning d-block">
-                                        Dieses Spiel lädt seine Dateien nicht über Steam — der Schalter hat hier keine Wirkung.
-                                    </small>
-                                    <% } %>
-                                </div>
-
+                                <%# Auto-Update: seit 2026-10-16 kein Schalter mehr, sondern eine Wahl am
+                                    Start-Knopf der Serverseite („Mit Update starten"). %>
                                 <!-- Max Players: abgeleitet, nicht eingebbar (Konzept 23.1) -->
                                 <div class="mb-3">
                                     <label>

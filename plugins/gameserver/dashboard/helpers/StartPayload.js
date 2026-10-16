@@ -93,10 +93,20 @@ function istWahr(wert) {
  * Server aktualisiert wird, ist eine Entscheidung des Betreibers über SEINEN
  * Server (wie der Name), und ein Paket kann sie nicht vergessen.
  *
- * Seitdem gilt die Spalte, für jedes Paket mit SteamCMD-Schritt — nur die
+ * Danach galt die Spalte, für jedes Paket mit SteamCMD-Schritt — nur die
  * aktualisiert der Daemon (`AktualisiereAusPaket`, `nurSteam`). Trägt ein
  * älteres Paket noch die Einstellung `auto_update`, wird sie nirgends gezeigt,
  * gefragt oder gespeichert (`gehoertDemServer`).
+ *
+ * ── Update ist eine Wahl beim Start, kein Schalter (2026-10-16) ─────────────
+ *
+ * Betreiber: Der Server soll standardmäßig OHNE Update starten — das spart
+ * bei jedem Start Last und Zeit —, und wer ein Update will, wählt es am
+ * Start-Knopf („Mit Update starten"). Der Schalter auf der Bearbeiten-Seite
+ * ist weg, die Spalte `gameservers.auto_update` liest und schreibt niemand
+ * mehr. Neustart, geplante Aufgaben, Neustart nach Absturz und der Bot starten
+ * immer ohne Update (abgesprochen). Der Daemon brauchte dafür nichts: Er
+ * bekommt `auto_update` schon mit jedem Start-Auftrag.
  */
 const AUTO_UPDATE = 'auto_update';
 
@@ -111,30 +121,16 @@ function aktualisiertUeberSteam(paket) {
 }
 
 /**
- * Wird vor dem Start aktualisiert? Der Schalter am Server — sofern das Paket
- * überhaupt über SteamCMD lädt.
- *
- * @param {object} server  Zeile aus `gameservers` (Spalte `auto_update`)
- * @param {object} paket
- * @returns {boolean}
- */
-function autoUpdateAus(server, paket) {
-    return istWahr(server?.auto_update) && aktualisiertUeberSteam(paket);
-}
-
-/**
- * Der Schalter eines NEUEN Servers: was mitkam (Formularfeld `auto_update`
- * oder, aus einem älteren Paket, `setting_auto_update`), sonst an für jedes
- * Paket mit SteamCMD-Schritt — so stand die Vorgabe der Pakete, die die
- * Einstellung trugen.
+ * Wird vor diesem Start aktualisiert? Nur, wenn der Start es verlangt („Mit
+ * Update starten") UND das Paket über SteamCMD lädt — anderes aktualisiert der
+ * Daemon nicht.
  *
  * @param {object} paket
- * @param {*} eingabe  undefined = nichts mitgekommen
+ * @param {*} gewuenscht  aus der Anfrage; alles außer wahr heißt nein
  * @returns {boolean}
  */
-function autoUpdateBeimAnlegen(paket, eingabe) {
-    if (eingabe !== undefined && eingabe !== null && eingabe !== '') return istWahr(eingabe);
-    return aktualisiertUeberSteam(paket);
+function updateBeimStart(paket, gewuenscht) {
+    return istWahr(gewuenscht) && aktualisiertUeberSteam(paket);
 }
 
 /**
@@ -228,9 +224,11 @@ function grenzenAus(server) {
  * @param {object} server   - Zeile aus loadServerForStart (gs.* samt Paket-JOIN)
  * @param {string} guildId
  * @param {object} [Logger]
+ * @param {{update?: boolean}} [optionen]  update: vor dem Start SteamCMD laufen
+ *        lassen („Mit Update starten"). Fehlt es, wird nicht aktualisiert.
  * @returns {Promise<{payload: object|null, error: string|null, dockerImage: string|null}>}
  */
-async function buildStartPayload(server, guildId, Logger = null) {
+async function buildStartPayload(server, guildId, Logger = null, { update = false } = {}) {
     const serverId = server.id;
 
     // Der Inhaltsvertrag wird HIER aufgeloest, nicht im Daemon: Er bekommt das
@@ -326,7 +324,7 @@ async function buildStartPayload(server, guildId, Logger = null) {
         package:         paket,
         settings,
         lader_aktiv:     laderAktiv,
-        auto_update:     autoUpdateAus(server, paket),
+        auto_update:     updateBeimStart(paket, update),
         resource_limits: grenzenAus(server),
     };
 
@@ -352,7 +350,7 @@ async function buildStartPayload(server, guildId, Logger = null) {
     melde(`[StartPayload] Server ${serverId}: Paket ${server.paket_slug || paket.identity?.slug} `
         + `${server.paket_version || paket.identity?.version} (${server.paket_channel || '?'}) — `
         + `${Object.keys(settings).length} von ${(paket.settings || []).length} Werten, `
-        + `Auto-Update ${payload.auto_update ? 'an' : 'aus'}.`);
+        + `${payload.auto_update ? 'mit Update' : 'ohne Update'}.`);
 
     return { payload, error: null, dockerImage: image, zusatzports: zusatz };
 }
@@ -428,7 +426,7 @@ function baueInstallNutzlast(server, guildId, optionen = {}) {
 function paketWerteAnlegen(paket, eingaben = {}, serverName = null) {
     const werte = {};
     for (const eintrag of paket?.settings || []) {
-        if (gehoertDemServer(eintrag)) continue; // Spalte am Server, siehe AUTO_UPDATE
+        if (gehoertDemServer(eintrag)) continue; // Wahl beim Start, siehe AUTO_UPDATE
         let wert = eingaben[eintrag.key];
         if (eintrag.key === 'name' && serverName) wert = serverName;
         // Eine Bitmaske ohne Eingabe ist nicht „nichts angekreuzt", sondern
@@ -539,8 +537,8 @@ async function loadServerForStart(dbService, serverId, guildId = null) {
 // weiter benutzte, bekäme still die alte Regel.
 
 module.exports = {
-    buildStartPayload, baueInstallNutzlast, paketWerteAnlegen, autoUpdateAus, istWahr,
-    autoUpdateBeimAnlegen, aktualisiertUeberSteam, gehoertDemServer,
+    buildStartPayload, baueInstallNutzlast, paketWerteAnlegen, istWahr,
+    updateBeimStart, aktualisiertUeberSteam, gehoertDemServer,
     loadServerForStart, ladePaketFuerServer, ladePaketFuerAnlegen, imageAusPaket,
     // Nur fuer scripts/check-startpayload.js: Die Regel, welcher Wert beim
     // Start gilt, ist zu teuer erkauft, um sie nur indirekt zu pruefen.

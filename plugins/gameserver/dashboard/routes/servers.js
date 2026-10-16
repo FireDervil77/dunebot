@@ -13,7 +13,7 @@ const bcrypt = require('bcrypt');
 const { ServiceManager } = require('dunebot-core');
 const StatusService = require('../helpers/StatusService');
 const { buildStartPayload, loadServerForStart, baueInstallNutzlast,
-        paketWerteAnlegen, autoUpdateBeimAnlegen, aktualisiertUeberSteam, gehoertDemServer, istWahr } = require('../helpers/StartPayload');
+        paketWerteAnlegen, aktualisiertUeberSteam, gehoertDemServer, istWahr } = require('../helpers/StartPayload');
 // Welche Paketfassung gilt — für einen Server, beim Anlegen — steht in EINER
 // Datei (Baustelle 172). Hier wird nur noch gefragt.
 const { FASSUNG_FUER_SERVER, ladePaketFuerServer, ladePaketFuerAnlegen, ladePaketeZuServern,
@@ -786,8 +786,7 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
             allocated_disk_gb,
             
             // Step 3 Advanced Settings
-            auto_restart,
-            auto_update
+            auto_restart
         } = req.body;
 
         Logger.info(`[Gameserver] Server-Erstellung gestartet für Guild ${guildId}`, {
@@ -976,10 +975,9 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
         for (const [feld, wert] of Object.entries(req.body)) {
             if (feld.startsWith('setting_')) eingaben[feld.slice('setting_'.length)] = wert;
         }
-        // Auto-Update ist eine Spalte am Server (StartPayload.AUTO_UPDATE), kein
-        // Paketwert. Ein älteres Paket kann es noch als `setting_auto_update`
-        // gefragt haben — das gilt dann wie das Formularfeld.
-        const autoUpdateEingabe = auto_update !== undefined ? auto_update : eingaben.auto_update;
+        // Update ist seit 2026-10-16 eine Wahl beim Start, kein Wert des Servers
+        // (StartPayload.updateBeimStart). Ein älteres Paket kann es noch als
+        // `setting_auto_update` fragen — das landet nicht in den Paketwerten.
         delete eingaben.auto_update;
         // ── Ein Modpack bestimmt Lader und Ausgabe — der Browser nicht ─────
         //
@@ -1013,9 +1011,8 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
         // Ebenso eine Liste mit einem Eintrag, der nicht zur Regel passt.
         const listenFehler = Liste.fehlerInWerten(paket, paketWerte);
         if (listenFehler) return res.status(400).json({ success: false, message: listenFehler });
-        const autoAktualisieren = autoUpdateBeimAnlegen(paket, autoUpdateEingabe);
         Logger.info(`[Gameserver] Paketwerte festgehalten: ${Object.keys(paketWerte).length} von `
-            + `${(paket.settings || []).length} Einstellungen, Auto-Update ${autoAktualisieren ? 'an' : 'aus'}`);
+            + `${(paket.settings || []).length} Einstellungen`);
 
         // User-ID aus Session extrahieren (falls vorhanden)
         const userId = res.locals.user?.id || '0';
@@ -1041,7 +1038,6 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
                 frozen_game_data,
                 launch_params,
                 auto_restart,
-                auto_update,
                 allocated_ram_mb,
                 allocated_cpu_percent,
                 allocated_disk_gb,
@@ -1049,7 +1045,7 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
                 channel,
                 status,
                 created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, 'temp', ?, '{}', ?, '{}', NULL, ?, ?, ?, ?, ?, ?, ?, 'installing', NOW())
+            ) VALUES (?, ?, ?, ?, ?, ?, 'temp', ?, '{}', ?, '{}', NULL, ?, ?, ?, ?, ?, ?, 'installing', NOW())
         `, [
             guildId,
             userId,
@@ -1061,8 +1057,6 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
             JSON.stringify(paketWerte),
             // Das Formular schickt die Strings "0"/"1" – und "0" ist in JS truthy.
             toBool(auto_restart, true) ? 1 : 0,
-            // Die Spalte IST der Schalter — der Start liest sie (autoUpdateAus).
-            autoAktualisieren ? 1 : 0,
             // Geprüfte Werte, keine Rohdaten aus dem Formular: die drei Felder
             // sind Pflicht und wurden oben gegen die Kapazität des RootServers
             // gerechnet. Damit ist dieser INSERT zugleich die Buchung.
@@ -1857,7 +1851,6 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
                 gs.install_path,
                 gs.launch_params,
                 gs.auto_restart,
-                gs.auto_update,
                 gs.addon_marketplace_id,
                 gs.template_name,
                 gs.addon_version,
@@ -2230,7 +2223,10 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
             user,
             rootServers,
             // Entscheidet, ob der Konsolen-Tab ein Eingabefeld zeigt (Konzept 23.3)
-            consoleTransport: resolveConsoleTransport(gameData, paketFuerKonsole)
+            consoleTransport: resolveConsoleTransport(gameData, paketFuerKonsole),
+            // „Mit Update starten" nur, wo es etwas zu aktualisieren gibt: Der
+            // Daemon zieht nur SteamCMD-Schritte nach (2026-10-16).
+            startMitUpdate: Boolean(paketFuerKonsole) && aktualisiertUeberSteam(paketFuerKonsole),
         });
 
     } catch (error) {
@@ -2273,7 +2269,6 @@ router.get('/:serverId/edit', requirePermission('GAMESERVER.EDIT'), async (req, 
                 gs.template_name,
                 gs.addon_version,
                 gs.auto_restart,
-                gs.auto_update,
                 gs.paket_werte,
                 gs.rootserver_id,
                 gs.allocated_ram_mb,
@@ -2344,21 +2339,8 @@ router.get('/:serverId/edit', requirePermission('GAMESERVER.EDIT'), async (req, 
             Logger.warn(`[Gameserver] Kapazität für RootServer ${server.rootserver_id} nicht lesbar: ${err.message}`);
         }
 
-        // Auto-Update aktualisiert nur, was über SteamCMD kommt (Daemon,
-        // `nurSteam`). Bei einem anderen Spiel sagt die Seite das, statt einen
-        // Schalter anzubieten, der still nichts tut.
-        let autoUpdateOhneSteam = false;
-        try {
-            const pz = await ladePaketFuerServer(dbService, serverId);
-            const paket = pz ? (typeof pz.paket_json === 'string' ? JSON.parse(pz.paket_json) : pz.paket_json) : null;
-            autoUpdateOhneSteam = Boolean(paket) && !aktualisiertUeberSteam(paket);
-        } catch (err) {
-            Logger.warn(`[Gameserver] Paket von Server ${serverId} nicht lesbar: ${err.message}`);
-        }
-
         return await themeManager.renderView(res, 'guild/gameserver-edit', {
             kapazitaet,
-            autoUpdateOhneSteam,
             // "Einstellungen" ueberall gleich: der Knopf auf der Serverseite
             // heisst so, die Karte auf dieser Seite auch. Vorher stand hier
             // "Server bearbeiten" — drei Namen fuer dieselbe Sache, und der
@@ -2585,7 +2567,7 @@ router.put('/:serverId', requirePermission('GAMESERVER.EDIT'), async (req, res) 
         // überschrieb, änderte am Spiel nichts - der Wert wanderte lautlos zurück,
         // sobald die nächste Abfrage durchlief.
         const {
-            name, auto_restart, auto_update,
+            name, auto_restart,
             allocated_ram_mb, allocated_cpu_percent, allocated_disk_gb,
             backup_keep, backup_keep_days
         } = req.body;
@@ -2683,11 +2665,12 @@ router.put('/:serverId', requirePermission('GAMESERVER.EDIT'), async (req, res) 
         // ankam (Egg-Rückbau B).
 
         // Update ausführen
-        const felder = ['name = ?', 'auto_restart = ?', 'auto_update = ?'];
+        // `auto_update` schreibt diese Route seit 2026-10-16 nicht mehr: Update
+        // ist eine Wahl am Start-Knopf (StartPayload.updateBeimStart).
+        const felder = ['name = ?', 'auto_restart = ?'];
         const werte  = [
             name.trim(),
             toBool(auto_restart) ? 1 : 0,
-            toBool(auto_update) ? 1 : 0,
         ];
 
         if (neueRessourcen) {
@@ -2860,7 +2843,10 @@ router.post('/:serverId/start', requirePermission('GAMESERVER.START'), async (re
         const guildId = res.locals.guildId;
         const { serverId } = req.params;
 
-        Logger.info(`[Gameserver] Start angefordert (ID: ${serverId})`);
+        // „Mit Update starten" (2026-10-16): eine Wahl je Start, kein Schalter am
+        // Server. Ohne sie startet der Server, wie er ist.
+        const mitUpdate = istWahr(req.body?.update);
+        Logger.info(`[Gameserver] Start angefordert (ID: ${serverId}${mitUpdate ? ', mit Update' : ''})`);
 
         // Server-Daten laden (identisch zum Neustart-Pfad)
         const server = await loadServerForStart(dbService, serverId, guildId);
@@ -2942,7 +2928,7 @@ router.post('/:serverId/start', requirePermission('GAMESERVER.START'), async (re
         // Dieselbe Funktion nutzen Neustart und Cronjob – sonst driften die Pfade
         // auseinander, wie es beim Restart bereits passiert war.
         const { payload: startPayload, error: payloadError, dockerImage } =
-            await buildStartPayload(server, guildId, Logger);
+            await buildStartPayload(server, guildId, Logger, { update: mitUpdate });
 
         if (payloadError) {
             Logger.error(`[Gameserver] ${payloadError} (Server ${serverId})`);
@@ -2975,7 +2961,7 @@ router.post('/:serverId/start', requirePermission('GAMESERVER.START'), async (re
         );
 
         // IPM-Command an Daemon senden
-        Logger.info(`[Gameserver] Sende Start-Command an Daemon ${server.daemon_id} (Image: ${dockerImage}${startPayload.auto_update ? ', mit Auto-Update' : ''})`);
+        Logger.info(`[Gameserver] Sende Start-Command an Daemon ${server.daemon_id} (Image: ${dockerImage}${startPayload.auto_update ? ', mit Update' : ''})`);
 
         const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.start', startPayload, 30000);
 

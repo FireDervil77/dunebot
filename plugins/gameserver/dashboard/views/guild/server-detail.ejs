@@ -77,11 +77,32 @@
       <div class="fb-aktionen" style="display:flex;gap:8px"
            data-fb-live="aktionen" data-fb-server="<%= server.id %>">
 
+<%# „Starten" startet ohne Update; der Pfeil bietet „Mit Update starten"
+    (2026-10-16, statt des Schalters auf der Bearbeiten-Seite). Beide tragen
+    data-fb-aktion="start" — die Live-Anzeige schaltet ALLE Elemente einer
+    Aktion, sonst bliebe der Pfeil stehen, wenn der Server läuft. Den Pfeil
+    gibt es nur, wenn das Paket über SteamCMD lädt. %>
+        <div class="btn-group">
         <button class="btn btn-primary btn-sm" data-fb-aktion="start"
                 onclick="serverAction('<%= server.id %>', 'start')"
                 <%= k.start.sichtbar ? '' : 'hidden' %>
                 <%= k.start.aktiv ? '' : 'disabled' %>
                 <% if (!k.start.aktiv && k.start.grund) { %>title="<%= k.start.grund %>"<% } %>>Starten</button>
+        <% if (locals.startMitUpdate) { %>
+        <button class="btn btn-primary btn-sm dropdown-toggle dropdown-toggle-split" data-fb-aktion="start"
+                data-bs-toggle="dropdown" aria-expanded="false" aria-label="Startoptionen"
+                <%= k.start.sichtbar ? '' : 'hidden' %>
+                <%= k.start.aktiv ? '' : 'disabled' %>></button>
+        <div class="dropdown-menu">
+          <a class="dropdown-item" href="#" onclick="serverAction('<%= server.id %>', 'start'); return false;">
+            Starten<div class="text-secondary small">ohne Update — schnell</div>
+          </a>
+          <a class="dropdown-item" href="#" onclick="serverAction('<%= server.id %>', 'start', { update: true }); return false;">
+            Mit Update starten<div class="text-secondary small">holt erst die neueste Fassung über Steam</div>
+          </a>
+        </div>
+        <% } %>
+        </div>
 
         <button class="btn btn-white btn-sm" data-fb-aktion="restart"
                 onclick="serverAction('<%= server.id %>', 'restart')"

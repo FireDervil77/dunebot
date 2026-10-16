@@ -15,8 +15,10 @@
  * Führt Server-Action aus (Start, Stop, Restart)
  * @param {string} serverId - Server-ID
  * @param {string} action - Action-Type: 'start', 'stop', 'restart'
+ * @param {{update?: boolean}} [optionen] - update: „Mit Update starten"
+ *        (2026-10-16) — vor dem Start holt der Daemon die neueste Fassung.
  */
-async function serverAction(serverId, action) {
+async function serverAction(serverId, action, optionen = {}) {
     console.log(`[ServerAction] ${action} für Server ${serverId}`);
 
     // Bestätigungsdialog nur für Stop (nicht für Start/Restart)
@@ -39,7 +41,11 @@ async function serverAction(serverId, action) {
         }
         return;
     }    // Button disablen während Request
-    const button = event.target;
+    // Aus dem Menü des Pfeils („Mit Update starten") gerufen, ist event.target
+    // ein Menüeintrag — gesperrt und umbeschriftet wird der Knopf daneben.
+    const ziel = (typeof event !== 'undefined' && event) ? event.target : null;
+    const imMenue = ziel && ziel.closest && ziel.closest('.dropdown-menu');
+    const button = (imMenue ? imMenue.closest('.btn-group')?.querySelector('button') : ziel?.closest?.('button')) || ziel;
     const originalText = button.innerHTML;
     button.disabled = true;
     button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Lade...';
@@ -53,6 +59,7 @@ async function serverAction(serverId, action) {
             headers: {
                 'Content-Type': 'application/json',
             },
+            body: JSON.stringify(optionen.update ? { update: true } : {}),
         });
 
         const result = await response.json();
@@ -66,7 +73,7 @@ async function serverAction(serverId, action) {
             
             // Erfolgs-Meldungen
             const messages = {
-                start: 'Server wird gestartet...',
+                start: optionen.update ? 'Server wird aktualisiert und gestartet …' : 'Server wird gestartet...',
                 stop: 'Server wird gestoppt...',
                 restart: 'Server wird neugestartet...'
             };

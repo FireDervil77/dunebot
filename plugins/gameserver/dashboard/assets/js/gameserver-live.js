@@ -521,14 +521,17 @@
                         // haengender Start braucht einen Weg zurueck. Gesperrt
                         // wird nur "Neu starten".
                         const soll = knopfZustand(z);
+                        // ALLE Elemente einer Aktion: „Starten" hat seit
+                        // 2026-10-16 einen Pfeil daneben („Mit Update starten"),
+                        // der mit ihm erscheinen und verschwinden muss.
                         const setze = (aktion) => {
-                            const b = el.querySelector(`[data-fb-aktion="${aktion}"]`);
-                            if (!b) return;
                             const s = soll[aktion];
-                            b.hidden = !s.sichtbar;
-                            b.disabled = !s.aktiv;
-                            // Ein gesperrter Knopf ohne Grund ist eine Sackgasse.
-                            b.title = s.aktiv ? '' : (s.grund || '');
+                            el.querySelectorAll(`[data-fb-aktion="${aktion}"]`).forEach((b) => {
+                                b.hidden = !s.sichtbar;
+                                b.disabled = !s.aktiv;
+                                // Ein gesperrter Knopf ohne Grund ist eine Sackgasse.
+                                b.title = s.aktiv ? '' : (s.grund || '');
+                            });
                         };
                         setze('start');
                         setze('restart');

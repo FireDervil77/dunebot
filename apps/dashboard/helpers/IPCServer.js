@@ -583,7 +583,7 @@ class IPCServer {
                     );
                     if (!addon) return message.reply({ success: false, error: `Spiel \`${addon_slug}\` nicht gefunden` });
 
-                    const { ladePaketFuerAnlegen, paketWerteAnlegen, autoUpdateBeimAnlegen,
+                    const { ladePaketFuerAnlegen, paketWerteAnlegen,
                             loadServerForStart, baueInstallNutzlast } =
                         require('../../../plugins/gameserver/dashboard/helpers/StartPayload');
                     const { vergibPortsAusPaket } =
@@ -631,15 +631,15 @@ class IPCServer {
                             `INSERT INTO gameservers
                                 (guild_id, user_id, rootserver_id, addon_marketplace_id, template_name,
                                  name, install_path, ports, env_variables, paket_werte, frozen_game_data,
-                                 launch_params, auto_restart, auto_update,
+                                 launch_params, auto_restart,
                                  allocated_ram_mb, allocated_cpu_percent, allocated_disk_gb,
                                  addon_version, channel, status, created_at)
-                             VALUES (?, ?, ?, ?, ?, ?, 'temp', ?, '{}', ?, '{}', NULL, 0, ?, NULL, NULL, NULL, ?, ?, 'installing', NOW())`,
+                             VALUES (?, ?, ?, ?, ?, ?, 'temp', ?, '{}', ?, '{}', NULL, 0, NULL, NULL, NULL, ?, ?, 'installing', NOW())`,
                             [guildId, owner_user_id || '0', rootserverId, addon.id,
                              paket.identity?.name || addon.name, server_name,
                              JSON.stringify(vergabe.ports), JSON.stringify(paketWerte),
-                             // Spalte am Server, kein Paketwert (StartPayload.AUTO_UPDATE).
-                             autoUpdateBeimAnlegen(paket, payload.env_overrides?.auto_update) ? 1 : 0,
+                             // auto_update nicht mehr: Update ist seit 2026-10-16 eine
+                             // Wahl am Start-Knopf (StartPayload.updateBeimStart).
                              paket.identity?.version || addon.version || '1.0.0',
                              pz.kanal]
                         );
@@ -774,7 +774,7 @@ class IPCServer {
                     // naechsten Poll einen Stopp-Knopf anzubieten, der zu frueh kommt.
                     require('../../../plugins/gameserver/dashboard/helpers/PanelService').pushZustandswechsel(serverId);
 
-                    Logger.info(`[IPC/Gameserver] Start-Command an Daemon ${srv.daemon_id} (Image: ${dockerImage}${startPayload.auto_update ? ', mit Auto-Update' : ''})`);
+                    Logger.info(`[IPC/Gameserver] Start-Command an Daemon ${srv.daemon_id} (Image: ${dockerImage}${startPayload.auto_update ? ', mit Update' : ''})`);
 
                     const startR = await ipmServer.sendCommand(srv.daemon_id, 'gameserver.start', startPayload, 30000);
                     if (!startR?.success) {
