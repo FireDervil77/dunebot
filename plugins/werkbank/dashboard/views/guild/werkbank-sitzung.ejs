@@ -469,8 +469,16 @@
           <div class="col-lg-5">
             <form id="formStart">
               <div class="mb-3">
+                <% if (startFormular.proton) { %>
+                <%# Proton-Sitzung (2026-10-16): Proton und runinprefix sind immer gleich und
+                    stehen fest davor (Startzeile.protonStart) — das Feld nennt nur das Spiel. %>
+                <label class="form-label" for="sProgram">Spiel (.exe, relativ zu game/)</label>
+                <div class="small text-secondary mb-1">Gestartet über <code>/opt/fb/proton/proton runinprefix</code> — das setzt die Werkbank davor.</div>
+                <input class="form-control font-monospace" id="sProgram" name="program" value="<%= startFormular.program %>" placeholder="./Spiel/Binaries/Win64/SpielServer-Win64-Shipping.exe">
+                <% } else { %>
                 <label class="form-label" for="sProgram">Programm (relativ zu game/)</label>
                 <input class="form-control font-monospace" id="sProgram" name="program" value="<%= startFormular.program %>" placeholder="./bin/x64/factorio">
+                <% } %>
               </div>
               <%
                 // Startzeilen-Baukasten (S1, 2026-09-30): Form · Quelle · Bedingung je Zeile.

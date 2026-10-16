@@ -269,4 +269,62 @@ function zeilenAusArgs(args) {
     });
 }
 
-module.exports = { argsAusZeilen, zeilenAusArgs, zerlege };
+// ── Proton: oben steht das Spiel, nicht Proton (2026-10-16) ───────────────────
+//
+// Betreiber: „der run-Programm relativ zum Game ist immer gleich". Bei jedem
+// Windows-Spiel unter Proton begann der Startteil mit denselben zwei Dingen —
+// Programm `/opt/fb/proton/proton`, erste Zeile `runinprefix` (nicht `run`,
+// das koppelt das Spiel ab) — und erst die zweite Zeile nannte das Spiel. Im
+// Feld „Programm (relativ zu game/)" stand ein absoluter Pfad, der nichts mit
+// dem Spiel zu tun hat.
+//
+// Jetzt nennt das Feld in einer Proton-Sitzung die .exe; Proton und
+// `runinprefix` setzt die Werkbank davor. Das Paketformat bleibt, wie es ist —
+// umgerechnet wird nur zwischen Formular und Entwurf. Schlüssel vorhandener
+// Zeilen bleiben (`vorher`): Sonst sähe der Paketvergleich eines Umzugs eine
+// Änderung, wo keine ist.
+
+const PROTON = '/opt/fb/proton/proton';
+const PROTON_VERB = 'runinprefix';
+
+/** Steht der Start schon in Proton-Form (Programm, runinprefix, feste .exe)? */
+function protonForm(start) {
+    const a = Array.isArray(start?.args) ? start.args : [];
+    const fest = (x) => x && (x.from || 'fixed') === 'fixed' && !x.when && typeof x.form === 'string';
+    return start?.program === PROTON && fest(a[0]) && a[0].form === PROTON_VERB && fest(a[1]) ? a : null;
+}
+
+/**
+ * Entwurf → Formular einer Proton-Sitzung: das Spiel ins Feld, die übrigen
+ * Zeilen darunter. Passt der Start nicht in die Form (alte Sitzung mit `run`,
+ * leer), bleibt er, wie er ist.
+ */
+function protonAlsFormular(start) {
+    const a = protonForm(start);
+    if (!a) return null;
+    return { program: a[1].form, zeilen: zeilenAusArgs(a.slice(2)) };
+}
+
+/**
+ * Formular → Entwurf einer Proton-Sitzung. `spiel` ist das Feld (die .exe).
+ * Steht dort noch Proton selbst (alte Schreibweise), wird nichts davorgesetzt.
+ *
+ * @param {string} spiel
+ * @param {object[]} args      die Zeilen des Formulars, schon übersetzt
+ * @param {object} [vorher]    der bisherige Start — für die Schlüssel
+ */
+function protonStart(spiel, args, vorher) {
+    if (!spiel || spiel === PROTON) return { program: spiel, args };
+    const alt = protonForm(vorher) || [];
+    const vergeben = new Set((args || []).map(x => x.key));
+    const verbKey = alt[0]?.key && !vergeben.has(alt[0].key) ? alt[0].key : schluessel(PROTON_VERB, vergeben);
+    vergeben.add(verbKey);
+    const spielKey = alt[1]?.key && alt[1].form === spiel && !vergeben.has(alt[1].key) ? alt[1].key : schluessel(spiel, vergeben);
+    return {
+        program: PROTON,
+        args: [{ key: verbKey, form: PROTON_VERB, from: 'fixed' }, { key: spielKey, form: spiel, from: 'fixed' }, ...(args || [])],
+    };
+}
+
+module.exports = { argsAusZeilen, zeilenAusArgs, zerlege, PROTON, protonAlsFormular, protonStart };
+

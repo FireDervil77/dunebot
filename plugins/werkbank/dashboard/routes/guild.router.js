@@ -69,7 +69,12 @@ const { ServiceManager } = require('dunebot-core');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 const { renderView, renderFehler, fehler } = require('./_shared');
 const Sitzungen = require('../helpers/Sitzungen');
-const { argsAusZeilen, zeilenAusArgs } = require('../helpers/Startzeile');
+const { argsAusZeilen, zeilenAusArgs, protonAlsFormular, protonStart } = require('../helpers/Startzeile');
+
+/** Läuft die Sitzung auf dem Proton-Image? Dann nennt das Programmfeld das Spiel (Startzeile.protonStart). */
+function istProton(sitzung) {
+    return /(^|\/)fb\/proton$/.test(String(sitzung?.image?.ref || ''));
+}
 // Dieselben Anzeigenamen wie die Einstellungskarte des Servers — eine Liste, nicht zwei.
 const { GRUPPE, WIRKUNG, RISIKO } = require('../../../gameserver/dashboard/helpers/Serverseite');
 const Tags = require('../../../../apps/dashboard/helpers/Tags');
@@ -167,7 +172,7 @@ function pruefeProgramm(programm) {
  *               beenden immer; bei command:/rcon: sagt man es dazu, sonst
  *               meldet der Auftragsbau die fehlende Angabe als Lücke.
  */
-function startAusFormular(b, einstellungen) {
+function startAusFormular(b, einstellungen, { proton = false, vorher = null } = {}) {
     // Zahlen zählen mit — die Nutzlast kommt als JSON, nicht nur aus Textfeldern.
     const text = (k) => (typeof b[k] === 'string' ? b[k] : typeof b[k] === 'number' ? String(b[k]) : '');
     const zeilen = (k) => text(k).split(/\r?\n/).map(z => z.trim()).filter(Boolean);
@@ -175,7 +180,9 @@ function startAusFormular(b, einstellungen) {
     pruefeProgramm(start.program);
     if (text('workdir').trim()) start.workdir = text('workdir').trim();
 
-    const args = argsAusZeilen(Array.isArray(b.zeilen) ? b.zeilen : [], einstellungen);
+    let args = argsAusZeilen(Array.isArray(b.zeilen) ? b.zeilen : [], einstellungen);
+    // Proton: das Feld nennt das Spiel; Proton und runinprefix kommen davor.
+    if (proton) ({ program: start.program, args } = protonStart(start.program, args, vorher));
     if (args.length) start.args = args;
 
     const folge = zeilen('stop').map((z) => {
@@ -216,8 +223,9 @@ function startAusFormular(b, einstellungen) {
 }
 
 /** Die Gegenrichtung für die Vorbelegung des Formulars. */
-function startAlsFormular(start) {
+function startAlsFormular(start, { proton = false } = {}) {
     const s = start || {};
+    const pf = proton ? protonAlsFormular(s) : null;
     const stoppZeile = (e) => {
         const x = typeof e === 'string' ? { step: e } : e;
         return [x.step, x.timeout_sec || '', SIGNALE.includes(x.step) || x.terminates === undefined ? '' : (x.terminates ? 'beendet' : 'weiter')]
@@ -225,8 +233,10 @@ function startAlsFormular(start) {
     };
     const log = s.ready_when?.log_line;
     return {
-        program: s.program || '', workdir: s.workdir || '',
-        zeilen: zeilenAusArgs(s.args),
+        program: pf ? pf.program : (s.program || ''), workdir: s.workdir || '',
+        zeilen: pf ? pf.zeilen : zeilenAusArgs(s.args),
+        // Proton-Sitzung: das Feld nennt das Spiel (Seite zeigt Proton davor).
+        proton,
         // Leer: die übliche Folge vorschlagen — sichtbar im Feld, nicht still ergänzt.
         stop: (s.stop?.sequence || []).map(stoppZeile).join('\n') || 'sigint 30\nsigkill 10',
         ready_port: s.ready_when?.port || '',
@@ -367,7 +377,7 @@ router.get('/:kennung', requirePermission('WERKBANK.VIEW'), async (req, res) => 
             veroeffentlichung: await Sitzungen.veroeffentlichungsStand(sitzung, liste, pruefungen),
             veroeffentlicht: sitzung.entwurf?.werkbank?.veroeffentlicht || [],
             durchlaufMaengel: Sitzungen.durchlaufMaengel(entwurf),
-            startFormular: startAlsFormular(sitzung.entwurf?.start),
+            startFormular: startAlsFormular(sitzung.entwurf?.start, { proton: istProton(sitzung) }),
             werkbankTeil: Sitzungen.werkbankTeil(sitzung),
             einstellungen: sitzung.entwurf?.settings || [],
             hinweise: sitzung.entwurf?.hints || [],
@@ -479,7 +489,8 @@ router.post('/:kennung/start', requirePermission('WERKBANK.BAUEN'), async (req, 
     try {
         const sitzung = await offeneSitzung(req, res);
         await Sitzungen.startSpeichern(sitzung, {
-            start: startAusFormular(req.body || {}, sitzung.entwurf?.settings),
+            start: startAusFormular(req.body || {}, sitzung.entwurf?.settings,
+                { proton: istProton(sitzung), vorher: sitzung.entwurf?.start }),
             memory_mb: req.body?.memory_mb, cpu_prozent: req.body?.cpu_prozent,
         });
         return res.json({ success: true });
@@ -495,7 +506,8 @@ router.post('/:kennung/startzeile', requirePermission('WERKBANK.BAUEN'), async (
         const sitzung = await offeneSitzung(req, res);
         const program = typeof req.body?.program === 'string' ? req.body.program.trim() : '';
         pruefeProgramm(program);
-        const start = { program, args: argsAusZeilen(Array.isArray(req.body?.zeilen) ? req.body.zeilen : [], sitzung.entwurf?.settings) };
+        const args = argsAusZeilen(Array.isArray(req.body?.zeilen) ? req.body.zeilen : [], sitzung.entwurf?.settings);
+        const start = istProton(sitzung) ? protonStart(program, args, sitzung.entwurf?.start) : { program, args };
         return res.json({ success: true, ...(await Sitzungen.startzeile(sitzung, start)) });
     } catch (error) {
         return fehler(res, error, 'Keine Vorschau', 400);
@@ -508,7 +520,8 @@ router.post('/:kennung/starten', requirePermission('WERKBANK.BAUEN'), async (req
         // Mit Formular: erst speichern — gestartet wird, was auf dem Bildschirm steht.
         if (req.body?.program !== undefined) {
             await Sitzungen.startSpeichern(sitzung, {
-                start: startAusFormular(req.body, sitzung.entwurf?.settings),
+                start: startAusFormular(req.body, sitzung.entwurf?.settings,
+                    { proton: istProton(sitzung), vorher: sitzung.entwurf?.start }),
                 memory_mb: req.body.memory_mb, cpu_prozent: req.body.cpu_prozent,
             });
         }

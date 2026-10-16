@@ -398,6 +398,46 @@ async function pruefe(name, fn) {
         assert.match(startAlsFormular(undefined).stop, /sigkill 10$/, 'leer: Vorschlag im Feld');
     });
 
+    // Proton (2026-10-16): Proton und runinprefix sind immer gleich — das Feld
+    // nennt das Spiel, die Werkbank setzt beides davor. Paketformat unverändert.
+    await pruefe('Proton-Sitzung: oben das Spiel, Proton + runinprefix davor — verlustfrei, Schlüssel bleiben', async () => {
+        const icarus = {
+            program: '/opt/fb/proton/proton',
+            args: [
+                { key: 'runinprefix', form: 'runinprefix', from: 'fixed' },
+                { key: 'icarus_binaries_win64_icarusserver_win64_shipping_exe', form: './IcarusServer.exe', from: 'fixed' },
+                { key: 'log', form: '-log', from: 'fixed' },
+                { key: 'queryport', form: '-QueryPort={{value}}', from: 'port:query', when: 'not_empty' },
+            ],
+            stop: { sequence: [{ step: 'sigint', timeout_sec: 30, terminates: true }, { step: 'sigkill', timeout_sec: 10, terminates: true }] },
+        };
+        const f = startAlsFormular(icarus, { proton: true });
+        assert.strictEqual(f.program, './IcarusServer.exe', 'das Feld nennt nicht das Spiel');
+        assert.strictEqual(f.proton, true);
+        assert.deepStrictEqual(f.zeilen.map(z => z.form), ['-log', '-QueryPort={{Wert}}'], 'Proton/runinprefix stehen noch in den Zeilen');
+        // Zurück: genau das, was vorher im Entwurf stand — auch der Schlüssel der .exe-Zeile,
+        // der nicht aus dem Feld ableitbar ist. Sonst sähe ein Umzug eine Änderung.
+        assert.deepStrictEqual(startAusFormular(f, [], { proton: true, vorher: icarus }), icarus);
+        // Neu, ohne Vorgänger: Proton + runinprefix + Spiel.
+        const neu = startAusFormular({ program: './Game/Binaries/Win64/X.exe', zeilen: [{ form: '-log', quelle: 'fest' }], stop: 'sigkill 10' }, [], { proton: true });
+        assert.strictEqual(neu.program, '/opt/fb/proton/proton');
+        assert.deepStrictEqual(neu.args.map(a => a.form), ['runinprefix', './Game/Binaries/Win64/X.exe', '-log']);
+        // Alte Schreibweise im Feld (Proton selbst) bleibt, wie sie ist.
+        const alt = startAusFormular({ program: '/opt/fb/proton/proton', zeilen: [{ form: 'runinprefix', quelle: 'fest' }], stop: 'sigkill 10' }, [], { proton: true });
+        assert.deepStrictEqual(alt.args.map(a => a.form), ['runinprefix']);
+        // `run` (koppelt ab) wird nicht still umgeschrieben: dann bleibt das Formular wie bisher.
+        const mitRun = { ...icarus, args: [{ key: 'run', form: 'run', from: 'fixed' }, ...icarus.args.slice(1)] };
+        assert.strictEqual(startAlsFormular(mitRun, { proton: true }).program, '/opt/fb/proton/proton');
+        // Ohne Proton-Image ändert sich nichts.
+        assert.strictEqual(startAlsFormular(icarus).program, '/opt/fb/proton/proton');
+        assert.deepStrictEqual(startAusFormular({ program: './x', stop: 'sigkill 10' }).program, './x');
+        // Alle drei Wege der Route rechnen um: Anzeige, Speichern (zwei Routen), Vorschau.
+        const router = ohneKommentare(fs.readFileSync(path.join(__dirname, '..', 'plugins/werkbank/dashboard/routes/guild.router.js'), 'utf8'));
+        assert.match(router, /startAlsFormular\(sitzung\.entwurf\?\.start, \{ proton: istProton\(sitzung\) \}\)/);
+        assert.strictEqual((router.match(/\{ proton: istProton\(sitzung\), vorher: sitzung\.entwurf\?\.start \}/g) || []).length, 2);
+        assert.match(router, /istProton\(sitzung\) \? protonStart\(program, args, sitzung\.entwurf\?\.start\)/);
+    });
+
     await pruefe('Starten schickt Startteil, Portnummern und RAM/CPU — und legt einen Lauf an', async () => {
         const s = sitzungMitStart();
         const r = await Sitzungen.starten(s, [{ status: 'ok', schritt: { type: 'download' } }, { status: 'fehler', schritt: { type: 'x' } }]);
