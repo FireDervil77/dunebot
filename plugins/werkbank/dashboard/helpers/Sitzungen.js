@@ -2239,12 +2239,37 @@ async function pruefen(sitzung, liste) {
     return { pruefId };
 }
 
-/** Hängt fest (Daemon weg, Dashboard neu gestartet)? Von Hand rot setzen. */
+/**
+ * Einen Prüfdurchlauf abbrechen.
+ *
+ * Bis 2026-10-16 setzte das nur die Zeile auf rot — der Daemon lief weiter,
+ * installierte, startete, wartete seine Frist ab, und ein neuer Durchlauf
+ * scheiterte so lange am belegten Volume (Icarus #94/#95). Jetzt zuerst der
+ * Daemon (`werkbank.pruefung_abbrechen`, ab 1.0.126): Er beendet den Durchlauf,
+ * räumt ab und schickt sein Urteil „von Hand abgebrochen" wie jedes andere —
+ * die Zeile bleibt bis dahin auf „läuft", damit kein neuer Durchlauf in das
+ * Aufräumen hineinstartet.
+ *
+ * Nur wenn der Daemon den Durchlauf nicht kennt (Neustart, nicht erreichbar,
+ * ältere Fassung), wird die Zeile hier rot gesetzt — der Fall, für den es den
+ * Knopf ursprünglich gab.
+ *
+ * @returns {{daemon: boolean, grund?: string}}  daemon: das Urteil kommt noch
+ */
 async function pruefungAbbrechen(sitzung) {
     const p = await laufendePruefung(sitzung.kennung);
     if (!p) throw new Error('Es läuft kein Prüfdurchlauf.');
-    await pruefungBeenden(p.pruefId, { gruen: false, gruende: ['von Hand abgebrochen — das Urteil des Daemons kam nicht'] });
+    let antwort;
+    try {
+        antwort = await (await daemonFuer(sitzung)).senden('werkbank.pruefung_abbrechen', {});
+    } catch (fehler) {
+        antwort = { success: false, error: fehler.message };   // nicht erreichbar
+    }
+    if (antwort?.success) return { daemon: true };
+    const grund = antwort?.error || 'Der Daemon hat nicht geantwortet';
+    await pruefungBeenden(p.pruefId, { gruen: false, gruende: [`von Hand abgebrochen — der Daemon führt ihn nicht (${grund})`] });
     require('./Ereignisse').vergissPruefung(sitzung.kennung);
+    return { daemon: false, grund };
 }
 
 async function pruefProtokoll(pruefId, text) {

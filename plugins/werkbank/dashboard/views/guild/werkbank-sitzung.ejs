@@ -2161,8 +2161,8 @@
         <div class="d-flex gap-2 mb-3">
           <% if (pruefLaeuft) { %>
             <button class="btn btn-outline-danger" type="button" id="knopfPruefAbbrechen"
-                    title="Nur wenn er hängt — etwa nach einem Neustart von Daemon oder Dashboard. Setzt den Eintrag hier rot; der Daemon wird dadurch NICHT angehalten. Läuft der Durchlauf dort noch, endet er von selbst, und bis dahin weist er einen neuen ab.">
-              Als abgebrochen markieren
+                    title="Hält den Durchlauf auf dem Daemon an — auch mitten in der Installation — und räumt sein Volume ab. Kennt der Daemon ihn nicht mehr (Neustart), wird der Eintrag hier rot gesetzt.">
+              Durchlauf abbrechen
             </button>
           <% } else { %>
             <button class="btn btn-primary" type="button" id="knopfPruefen" <%= (durchlaufMaengel.length || beschaeftigt) ? 'disabled' : '' %>>
@@ -3115,9 +3115,17 @@
   var knopfPruefAbbrechen = document.getElementById('knopfPruefAbbrechen');
   if (knopfPruefAbbrechen) {
     knopfPruefAbbrechen.addEventListener('click', async function () {
-      if (!confirm('Den Durchlauf als abgebrochen (rot) markieren?\n\nDas hält ihn auf dem Daemon NICHT an. Läuft er dort noch, lädt und startet er weiter bis zum Ende — und bis dahin wird ein neuer Durchlauf abgewiesen. Sinnvoll nur, wenn er wirklich hängt.')) return;
-      try { await schicke(hier + '/pruefung/abbrechen'); window.location.reload(); }
-      catch (fehler) { melde('error', fehler.message); }
+      knopfPruefAbbrechen.disabled = true;
+      try {
+        var r = await schicke(hier + '/pruefung/abbrechen');
+        melde(r.daemon ? 'info' : 'warning', r.message);
+        // Hält der Daemon an, kommt das Urteil über die Live-Ausgabe; die Seite
+        // lädt dann ohnehin. Sonst ist der Eintrag schon rot.
+        if (!r.daemon) window.location.reload();
+      } catch (fehler) {
+        knopfPruefAbbrechen.disabled = false;
+        melde('error', fehler.message);
+      }
     });
   }
 

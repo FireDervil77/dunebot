@@ -653,11 +653,17 @@ router.post('/:kennung/pruefen', requirePermission('WERKBANK.BAUEN'), async (req
 router.post('/:kennung/pruefung/abbrechen', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
     try {
         const sitzung = await offeneSitzung(req, res);
-        await Sitzungen.pruefungAbbrechen(sitzung);
-        // Gehörte der Durchlauf zu einem Umzug, endet der damit rot, und das
-        // nächste Paket kommt dran.
-        require('../helpers/Ereignisse').umzugWeiter(sitzung.kennung);
-        return res.json({ success: true });
+        const r = await Sitzungen.pruefungAbbrechen(sitzung);
+        // Hält der Daemon an, kommt sein Urteil gleich als werkbank.pruefung und
+        // reicht es selbst an den Umzug weiter (Ereignisse.beiPruefung). Nur wenn
+        // die Zeile hier rot gesetzt wurde, muss der Umzug es jetzt erfahren.
+        if (!r.daemon) require('../helpers/Ereignisse').umzugWeiter(sitzung.kennung);
+        return res.json({
+            success: true, daemon: r.daemon,
+            message: r.daemon
+                ? 'Abbruch angefordert — der Daemon hält den Durchlauf an und räumt ab. Das Urteil folgt gleich.'
+                : `Als abgebrochen markiert. Der Daemon führt ihn nicht (${r.grund}).`,
+        });
     } catch (error) {
         return fehler(res, error, 'Nicht abgebrochen', 400);
     }
