@@ -207,11 +207,20 @@ async function waehlbareImages() {
     return [...gesehen.values()].sort((a, b) => (a.ref + a.tag).localeCompare(b.ref + b.tag));
 }
 
-/** Die Maschinen dieser Guild, mit Daemon-Stand. */
+/**
+ * Die Maschinen dieser Guild, mit Daemon-Stand — in der Reihenfolge, in der
+ * sie angelegt wurden.
+ *
+ * Bis 2026-10-16 nach Namen: „Dein ServerHost Server2" stand vor
+ * „DeinServerHost", weil das Leerzeichen vor dem „S" sortiert, und der
+ * Betreiber startete eine Sitzung aus Versehen auf der zweiten Maschine. Die
+ * Reihenfolge entscheidet auch, wohin ein Umzug ohne Wahl geht (die erste
+ * erreichbare).
+ */
 async function maschinen(guildId) {
     const ipm = ServiceManager.has('ipmServer') ? ServiceManager.get('ipmServer') : null;
     const zeilen = await db().query(
-        'SELECT id, name, daemon_id FROM rootserver WHERE guild_id = ? ORDER BY name', [guildId]);
+        'SELECT id, name, daemon_id FROM rootserver WHERE guild_id = ? ORDER BY id', [guildId]);
     return zeilen.map(z => ({
         id: z.id, name: z.name, daemon_id: z.daemon_id,
         online: Boolean(z.daemon_id && ipm?.isDaemonOnline(z.daemon_id)),
