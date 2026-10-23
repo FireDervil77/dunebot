@@ -214,6 +214,16 @@ class BotPlugin {
                     continue;
                 }
 
+                // Ein Plugin-"ready" erreicht kein Plugin ausser `core`: der
+                // PluginManager schaltet Plugins je Guild frei, und "ready"
+                // traegt keine. So lief greeting/events/ready.js nie (bis
+                // 2026-10-23). Die Arbeit je Guild gehoert in `onGuildEnable` —
+                // das laeuft beim Start fuer jede Guild und beim Einschalten.
+                if (eventName === 'ready' || eventName === 'clientReady') {
+                    Logger.warn(`Event ${eventName} in plugin ${this.name} wird nicht registriert — es erreicht keine Guild. Stattdessen onGuildEnable(guildId) nutzen.`);
+                    continue;
+                }
+
                 // WICHTIG: Event sowohl in events als auch eventHandlers speichern
                 this.events.set(eventName, event);
                 this.eventHandlers.set(eventName, event); // Diese Zeile wurde hinzugefügt!

@@ -147,11 +147,11 @@ ServiceManager.register("bootHooks", bootHooks);
                             Logger.error(`Fehler beim Laden der Guild-spezifischen Plugins für Guild ${guild.id}:`, guildError);
                         }
                     }
-                    
-                    // WICHTIG: Erst NACH dem Laden aller Guild-Plugins das ready Event emittieren
-                    await client.pluginManager.emit("ready", client);
-                    
-                    Logger.info('Guild-specific plugins loaded and ready event emitted');
+
+                    // Ein Plugin-"ready" gibt es nicht mehr: es trug keine Guild
+                    // und erreichte darum nie ein Plugin ausser `core`. Arbeit
+                    // je Guild steht in `onGuildEnable` (siehe BotPlugin.js).
+                    Logger.info('Guild-specific plugins loaded');
                 } catch (error) {
                     Logger.error('Error loading guild-specific plugins:', error);
                 }

@@ -6,6 +6,7 @@
 const path = require('path');
 const { BotPlugin, VersionHelper } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
+const { inviteCache, cacheGuildInvites, removeGuildCache } = require('./inviteTracker');
 
 /**
  * Greeting-Plugin für den Bot-Teil von FireBot
@@ -50,14 +51,14 @@ class GreetingBotPlugin extends BotPlugin {
      */
     async onGuildEnable(guildId) {
         const Logger = ServiceManager.get("Logger");
-        Logger.info(`Template-Plugin für Guild ${guildId} aktiviert`);
-        
-        // Beispiel: Guild-spezifische Konfiguration
-        // const dbService = ServiceManager.get('dbService');
-        // await dbService.setConfig('template', 'guildSetting', 'default', 'bot', guildId);
-        
-        // Beispiel: Standardwerte für diese Guild setzen
-        // await this._initializeGuildDefaults(guildId);
+        Logger.info(`Greeting-Plugin für Guild ${guildId} aktiviert`);
+
+        // Vergleichsstand für die Einladungs-Zuordnung (inviteTracker.js).
+        // Läuft beim Start (aus dem clientReady-Handler) und beim Einschalten.
+        const guild = ServiceManager.get('client')?.guilds.cache.get(guildId);
+        if (guild && await cacheGuildInvites(guild)) {
+            Logger.info(`[Greeting] Einladungs-Speicher für ${guild.name} angelegt (${inviteCache.get(guildId).size} Einladungen)`);
+        }
     }
     
     /**
@@ -70,11 +71,8 @@ class GreetingBotPlugin extends BotPlugin {
      */
     async onGuildDisable(guildId) {
         const Logger = ServiceManager.get("Logger");
-        Logger.info(`Template-Plugin für Guild ${guildId} deaktiviert`);
-        
-        // Beispiel: Guild-spezifische Daten löschen oder archivieren
-        // const dbService = ServiceManager.get('dbService');
-        // await dbService.query('DELETE FROM template_data WHERE guild_id = ?', [guildId]);
+        Logger.info(`Greeting-Plugin für Guild ${guildId} deaktiviert`);
+        removeGuildCache(guildId);
     }
 
      /**
