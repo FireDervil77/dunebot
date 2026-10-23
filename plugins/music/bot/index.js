@@ -77,7 +77,7 @@ class MusicBotPlugin extends BotPlugin {
         };
 
         if (client.isReady()) wiederaufnehmen();
-        else client.once('ready', wiederaufnehmen);
+        else client.once('clientReady', wiederaufnehmen);
 
         Logger.success('[Musik] Plugin aktiviert');
     }

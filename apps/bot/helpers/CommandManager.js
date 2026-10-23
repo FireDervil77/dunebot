@@ -40,7 +40,7 @@ class CommandManager {
         if (client.isReady()) {
             this.registerClientEventHandlers();
         } else {
-            client.once('ready', () => {
+            client.once('clientReady', () => {
                 this.registerClientEventHandlers();
                 Logger.debug('CommandManager Client-Event-Handler registriert nach Ready');
             });

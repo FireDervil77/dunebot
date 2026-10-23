@@ -7,7 +7,7 @@
  *   2. Die Entscheidungen der Begruessung (`apps/bot/helpers/willkommenEntscheidung.js`)
  *   3. Der Ruecksprung aus der Einladung (`apps/dashboard/helpers/Einladung.js`)
  *   4. Die Verdrahtung — steht der Einladungslink nur noch an einer Stelle,
- *      liest `ready.js` den richtigen Schluessel, gibt es die Texte in beiden
+ *      liest `clientReady.js` den richtigen Schluessel, gibt es die Texte in beiden
  *      Sprachen?
  *
  * Keine Datenbank, kein Discord, kein Netz.
@@ -271,8 +271,8 @@ pruefeWahr('die Rechte stehen genau einmal im Helfer',
     (ohneKommentare(lies('apps/dashboard/helpers/Einladung.js')).match(/1374891929078/g) || []).length === 1);
 
 console.log('\n7. Die Sprache der Guild');
-const ready = ohneKommentare(lies('apps/bot/events/ready.js'));
-pruefeWahr('ready.js liest `settings?.LOCALE` (gross)', /settings\?\.LOCALE/.test(ready));
+const ready = ohneKommentare(lies('apps/bot/events/clientReady.js'));
+pruefeWahr('clientReady.js liest `settings?.LOCALE` (gross)', /settings\?\.LOCALE/.test(ready));
 pruefeWahr('und nicht mehr `settings?.locale` (klein — gibt es nicht)', !/settings\?\.locale\b/.test(ready));
 
 const guildManager = ohneKommentare(lies('packages/dunebot-core/lib/GuildManager.js'));

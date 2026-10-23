@@ -3,7 +3,7 @@ const { ActivityType } = require("discord.js");
 const SpieleUpdates = require("../helpers/SpieleUpdates");
 
 /**
- * Kern-Event: ready
+ * Kern-Event: clientReady (discord.js 14.22 benennt `ready` um; der alte Name entfällt in v15)
  * Wird ausgeführt wenn der Bot sich erfolgreich bei Discord angemeldet hat.
  * Synchronisiert alle bekannten Guilds über den GuildManager.
  *

@@ -106,8 +106,8 @@ ServiceManager.register("bootHooks", bootHooks);
         // Phase 5: Events registrieren
         await bootHooks.doAction('before_register_events', { client });
 
-        // 'ready'-Event: immer registrieren (IPC-Init + Guild-Plugin-Loading)
-        client.on("ready", async () => { // Änderung von once zu on
+        // 'clientReady'-Event: immer registrieren (IPC-Init + Guild-Plugin-Loading)
+        client.on("clientReady", async () => { // Änderung von once zu on
             Logger.info('Bot logged in successfully');
             
             // IPC nur einmal initialisieren wenn noch nicht vorhanden

@@ -521,7 +521,7 @@ class Config {
             const configPath = this.configPath;
             Logger.debug(`Versuche lokale Konfiguration zu laden von: ${configPath}`);
             
-            if (fs.existsSync(configPath)) {
+            if (configPath && fs.existsSync(configPath)) {
                 const configContent = fs.readFileSync(configPath, "utf8");
                 Logger.debug(`Konfigurationsdatei gefunden mit Inhalt: ${configContent.substring(0, 100)}...`);
                 

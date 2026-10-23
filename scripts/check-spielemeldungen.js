@@ -689,7 +689,7 @@ const n = (text, mehr) => S.ausRoh(roh(text, mehr));
         for (const [datei, aufruf] of [['messageCreate', 'beiNachricht(message)'], ['messageUpdate', 'beiNachricht(neu)'], ['messageDelete', 'beiLoeschung(message)']]) {
             assert.ok(ohneKommentare(lies(`apps/bot/events/${datei}.js`)).includes(`SpieleUpdates.${aufruf}`), `${datei} ruft den Leser nicht`);
         }
-        assert.ok(ohneKommentare(lies('apps/bot/events/ready.js')).includes('SpieleUpdates.nachholen(client)'));
+        assert.ok(ohneKommentare(lies('apps/bot/events/clientReady.js')).includes('SpieleUpdates.nachholen(client)'));
         const anstoss = require(path.join(WURZEL, 'apps/bot/ipc/SPIELE_UPDATES_NACHHOLEN.js'));
         assert.strictEqual(typeof anstoss, 'function');
         assert.ok(ohneKommentare(lies('apps/dashboard/routes/admin/content.router.js')).includes("broadcastOne('dashboard:SPIELE_UPDATES_NACHHOLEN'"),
