@@ -216,9 +216,31 @@ const beiKonsole = zumLauf('konsole', async (p, lauf, kennung) => {
  */
 function nachweisZeilen(p) {
     const n = Array.isArray(p.nachweis) ? p.nachweis : [];
-    if (!n.length) return ['── Einstellungen: fb-init hat Dateien geschrieben (keine Einstellung im Entwurf)'];
-    return ['── Einstellungen — kam der Wert an?'].concat(n.map(x =>
-        `   ${x.zustand === 'angekommen' ? '✓' : '✗'} ${x.key} → ${x.ziel}${x.wo ? ' ' + x.wo : ''}: ${x.zustand}${x.hinweis ? ' — ' + x.hinweis : ''}`));
+    const zeilen = !n.length
+        ? ['── Einstellungen: fb-init hat Dateien geschrieben (keine Einstellung im Entwurf)']
+        : ['── Einstellungen — kam der Wert an?'].concat(n.map(x =>
+            `   ${x.zustand === 'angekommen' ? '✓' : '✗'} ${x.key} → ${x.ziel}${x.wo ? ' ' + x.wo : ''}: ${x.zustand}${x.hinweis ? ' — ' + x.hinweis : ''}`));
+    return zeilen.concat(angelegteDateien(p));
+}
+
+/**
+ * Dateien, die es vor dem Schreiben nicht gab (`files[].created` von fb-init,
+ * internal/parser/bericht.go). Der Daemon reicht die Meldung unverändert durch;
+ * gelesen hat das Feld bis 2026-10-24 niemand.
+ *
+ * Anlass Windrose: Auf leerem Volume legte fb-init `R5/ServerDescription.json`
+ * als `{}` an und schrieb nur unsere Schlüssel hinein. Dem Spiel fehlte
+ * `Version`, es hielt die Datei für kaputt, ergänzte sie nicht und stürzte ab.
+ * Im Protokoll stand dazu nur „✓ angekommen" — richtig, aber nicht genug. Eine
+ * Datei, die sonst das Spiel beim ersten Start schreibt, enthält hier NUR, was
+ * wir setzen; ob das Spiel damit auskommt, zeigt erst der Start.
+ */
+function angelegteDateien(p) {
+    const files = Array.isArray(p.files) ? p.files : [];
+    return files.filter(f => f && f.created === true && f.file).map(f =>
+        `   ⚠ ${f.file} gab es nicht — fb-init hat sie angelegt, nur mit dem, was das Paket setzt. `
+        + 'Schreibt das Spiel diese Datei sonst beim ersten Start selbst, fehlt ihr jetzt alles andere; '
+        + 'braucht es ein Pflichtfeld, gehört es in den config-Eintrag.');
 }
 
 const beiBereitschaft = zumLauf('bereitschaft', async (p, lauf, kennung) => {
@@ -423,4 +445,5 @@ module.exports = {
     beiSchritteAktiv,
     _laufend: laufend, _puffer: puffer, _laeufe: laeufe, _konsolenPuffer: konsolenPuffer,
     _pruefungen: pruefungen, _pruefPuffer: pruefPuffer,
+    _nachweisZeilen: nachweisZeilen,
 };
