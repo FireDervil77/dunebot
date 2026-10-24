@@ -37,12 +37,23 @@
           <label class="fb-spiel" data-fb-wahl="<%= p.slug %>">
             <input type="radio" name="_wahl" value="<%= p.slug %>" hidden>
             <div style="display:flex;gap:12px;align-items:start">
-              <div style="flex:1 1 auto">
+              <%# Das Bild kommt zur Auskunft dazu, es ersetzt keine (Entwurf 5a):
+                  klein, links, und ohne Bild bleibt der Platz leer statt zu
+                  springen — sonst stehen die Namen nicht mehr untereinander. %>
+              <div style="flex:0 0 56px;width:56px;height:56px;border-radius:6px;overflow:hidden;background:#f1f3f6">
+                <% if (p.icon) { %>
+                  <img src="<%= p.icon %>" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block">
+                <% } %>
+              </div>
+              <div style="flex:1 1 auto;min-width:0">
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                   <span style="font-weight:600;font-size:15px"><%= p.name %></span>
                   <% (p.tags || []).slice(0, 4).forEach(function (tag) { %><span class="fb-pille"><%= tag %></span><% }) %>
                   <% if (p.version) { %>
                     <span class="fb-pille fb-mono"><%= p.version %><%= p.kanal ? ' · ' + p.kanal : '' %></span>
+                  <% } %>
+                  <% if (p.laufzeit) { %>
+                    <span class="fb-pille fb-mono" title="<%= p.image %>"><%= p.laufzeit %></span>
                   <% } %>
                 </div>
                 <% if (p.beschreibung) { %>

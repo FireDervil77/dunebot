@@ -1451,6 +1451,13 @@ function bauePaketAuswahl(paketZeilen, ohnePaket = [], tagsJeSpiel = {}) {
             quelle:   (p.install?.steps || []).map(s =>
                         s.type === 'steamcmd' ? 'SteamCMD lädt App ' + s.app : s.type).join(', ') || null,
             image:    p.image?.ref ? (p.image.tag ? p.image.ref + ':' + p.image.tag : p.image.ref) : null,
+            // Für die Zeile: nur der Name des Images samt Tag, ohne Registry —
+            // „proton:2026.10-GE-Proton11-9" sagt, worauf das Spiel läuft;
+            // der Host davor ist bei allen Paketen derselbe.
+            laufzeit: p.image?.ref
+                ? p.image.ref.split('/').pop() + (p.image.tag ? ':' + p.image.tag : '')
+                : null,
+            icon:     z.icon_url || null,
         });
     }
 

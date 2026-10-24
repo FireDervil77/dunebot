@@ -167,12 +167,18 @@ async function ladePaketeZuServern(dbService, servers) {
 /**
  * Alle Pakete, aus denen diese Guild einen Server anlegen darf — je Paket die
  * Fassung, mit der er entstünde (Schritt 1 des Anlegens).
+ *
+ * `icon_url` kommt aus der Spieledatenbank, nicht aus dem Paket: Das Bild
+ * gehört dem Spiel im Panel (wie die Tags) und soll sich ändern lassen, ohne
+ * eine neue Fassung einzuliefern. LEFT JOIN, damit ein Paket ohne Eintrag dort
+ * nicht aus der Auswahl fällt.
  */
 async function ladePaketeFuerAnlegen(dbService, guildId) {
     return dbService.query(`
-        SELECT pk.id, pk.slug, pv.fbpkg, pv.version, pv.channel
+        SELECT pk.id, pk.slug, pv.fbpkg, pv.version, pv.channel, am.icon_url
           FROM packages pk
           JOIN package_versions pv ON pv.id = ${FASSUNG_FUER_ANLEGEN}
+          LEFT JOIN addon_marketplace am ON am.id = pk.id
          ORDER BY pk.slug`, [istKontrollGuild(guildId) ? 1 : 0]);
 }
 
