@@ -480,6 +480,15 @@ function baueSpieler(server, live) {
  * Besitzer nichts.
  */
 function wirktNurText(bed, paket) {
+    return `Wirkt nur, wenn ${bedingungSatz(bed, paket)}.`;
+}
+
+/**
+ * Eine Bedingung als Satzteil: „„Direktverbindung" an ist". Geteilt mit der
+ * Werkbank (Fälle der Bereitschaft und der Verbindung), damit Panel und
+ * Werkbank dieselben Worte benutzen.
+ */
+function bedingungSatz(bed, paket) {
     const key = String(bed.from || '').replace(/^setting:/, '');
     const bezug = (paket?.settings || []).find(s => s.key === key);
     const name = bezug?.name?.de || bezug?.name?.en || key;
@@ -496,7 +505,7 @@ function wirktNurText(bed, paket) {
       : w.startsWith('!=') ? 'nicht auf ' + namen(w.slice(2)) + ' steht'
       : w.startsWith('=')  ? 'auf ' + namen(w.slice(1)) + ' steht'
       : 'passt';
-    return `Wirkt nur, wenn „${name}" ${zustand}.`;
+    return `„${name}" ${zustand}`;
 }
 
 function baueEinstellungen(server, paket, hoehe) {
@@ -1598,6 +1607,7 @@ module.exports.INSTALL_PHASE = INSTALL_PHASE;
 module.exports.baueKnopfzeile = baueKnopfzeile;
 module.exports.baueVerbindung = baueVerbindung;
 module.exports.beitrittsPasswort = beitrittsPasswort;
+module.exports.bedingungSatz = bedingungSatz;
 module.exports.baueAdresse = baueAdresse;
 module.exports.geltendeWerte = geltendeWerte;
 module.exports.bauePille = bauePille;

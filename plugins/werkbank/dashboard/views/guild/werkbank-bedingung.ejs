@@ -1,0 +1,41 @@
+<%#
+  Eine Bedingung: Einstellung · Art · Wert (Stufe 9 S6, 2026-10-25).
+
+  Für die Fälle der Bereitschaft, die Fälle der Verbindungsangabe und „wirkt
+  nur, wenn …" an einer Einstellung — dieselben Arten wie im Startzeilen-
+  Baukasten, damit „wenn an" überall dasselbe heißt. Eingesammelt wird auf dem
+  Server (Sitzungen.bedingungAusFeldern) aus `<vorsilbe>_key`, `_art`, `_wert`.
+
+  Aufruf — immer alle angeben:
+
+    include('werkbank-bedingung', {
+      vorsilbe:      'bedingung' | 'wirkt',
+      titel:         'Wenn',
+      einstellungen: Liste der Einstellungen im Entwurf,
+      leer:          '— immer —' | ''   (leer = Pflicht, keine „immer"-Wahl)
+    })
+%>
+<% const ARTNAME = { 'true': 'wenn an', 'false': 'wenn aus', not_empty: 'wenn gesetzt', empty: 'wenn leer', '=': 'gleich …', '!=': 'ungleich …' }; %>
+<div class="row g-2" data-bedingung="<%= vorsilbe %>">
+  <div class="col-md-5">
+    <label class="form-label"><%= titel %></label>
+    <select class="form-select" name="<%= vorsilbe %>_key">
+      <option value=""><%= leer || '— Einstellung wählen —' %></option>
+      <% einstellungen.forEach(function (s) { %>
+        <option value="<%= s.key %>"><%= (s.name && (s.name.de || s.name.en)) || s.key %> (<%= s.key %>)</option>
+      <% }) %>
+    </select>
+  </div>
+  <div class="col-md-3">
+    <label class="form-label">Zustand</label>
+    <select class="form-select" name="<%= vorsilbe %>_art">
+      <% ['true', 'false', 'not_empty', 'empty', '=', '!='].forEach(function (a) { %>
+        <option value="<%= a %>"><%= ARTNAME[a] %></option>
+      <% }) %>
+    </select>
+  </div>
+  <div class="col-md-4">
+    <label class="form-label">Wert</label>
+    <input class="form-control font-monospace" name="<%= vorsilbe %>_wert" placeholder="nur bei gleich/ungleich — a,b" autocomplete="off">
+  </div>
+</div>

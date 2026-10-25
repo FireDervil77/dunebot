@@ -43,7 +43,7 @@
            : _imEntwurf ? ['bg-secondary-lt', String(_imEntwurf), 'Schritte im Entwurf'] : null },
     { id: 'starten', titel: 'Starten', satz: 'Probestart, Konsole, Ports beobachten', icon: 'fa-solid fa-play',
       marke: spielLaeuft ? ['bg-blue-lt', 'läuft', 'Das Spiel läuft'] : null },
-    { id: 'verbindung', titel: 'Verbindung', satz: 'Ports, Abfrage, Fernsteuerung', icon: 'fa-solid fa-network-wired',
+    { id: 'verbindung', titel: 'Verbindung', satz: 'Ports, Abfrage, Fernsteuerung, Verbindungsangabe', icon: 'fa-solid fa-network-wired',
       marke: _warnVerbindung ? ['bg-yellow-lt', '⚠ ' + _warnVerbindung, 'Hinweise in diesem Reiter']
            : entwurfPorts.length ? ['bg-secondary-lt', String(entwurfPorts.length), 'Ports im Entwurf'] : null },
     { id: 'einstellungen', titel: 'Einstellungen', satz: 'Einstellungen und Hinweise für Betreiber', icon: 'fa-solid fa-sliders',
@@ -650,6 +650,104 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Bereitschaft je nach Einstellung (`ready_when.cases`, Stufe 9 S6) ── -->
+  <%
+    // Windrose: P2P öffnet keinen Port, Direktverbindung schon. Welcher Weg gilt,
+    // hängt an einer Einstellung — der erste passende Fall ersetzt den Grundfall
+    // aus dem Probestart. Entschieden wird im Daemon (pkgspec.Fuer).
+    //
+    // `locals.`: Der laufende Prozess liest diese Vorlage von der Platte, die
+    // Route erst nach einem Neustart — bis dahin fehlt `bereitFaelle`, und ohne
+    // den Ersatz wäre die ganze Seite ein 500.
+    const bereitFaelle = locals.bereitFaelle || { grundfall: null, faelle: [], fehlt: true };
+  %>
+  <div class="col-12">
+    <div class="card" id="karteBereitFaelle">
+      <div class="card-header">
+        <h3 class="card-title">Bereitschaft je nach Einstellung</h3>
+        <div class="card-actions"><span class="text-secondary small"><%= bereitFaelle.faelle.length %> <%= bereitFaelle.faelle.length === 1 ? 'Fall' : 'Fälle' %></span></div>
+      </div>
+      <div class="card-body">
+        <% if (bereitFaelle.fehlt) { %>
+          <div class="alert alert-warning py-2 small">Diese Karte ist neu — bedienbar nach dem nächsten Neustart des Dashboards.</div>
+        <% } %>
+        <p class="text-secondary small">
+          Für Spiele, die je nach Einstellung anders „bereit" werden — etwa ohne Port im P2P-Modus und mit Port bei
+          Direktverbindung. Geprüft wird von oben nach unten; der <strong>erste passende Fall</strong> ersetzt den Grundfall
+          aus dem Probestart, passt keiner, gilt der Grundfall. Jeder Fall braucht wie der Grundfall einen Port oder die
+          begründete Ausnahme samt Zeile.
+        </p>
+        <div class="mb-3 small">
+          <span class="text-secondary">Grundfall:</span>
+          <% if (bereitFaelle.grundfall) { %><span class="font-monospace"><%= bereitFaelle.grundfall %></span>
+          <% } else { %><span class="text-warning">noch keiner — erst im Probestart „Bereit, wenn Port" oder „Ohne Port, weil …" festlegen</span><% } %>
+        </div>
+
+        <% if (bereitFaelle.faelle.length) { %>
+          <div class="table-responsive mb-3">
+            <table class="table table-sm table-vcenter">
+              <thead><tr><th class="w-1">#</th><th>Wenn</th><th>Dann bereit über</th><th class="w-1"></th></tr></thead>
+              <tbody>
+                <% bereitFaelle.faelle.forEach(function (f) { %>
+                  <tr>
+                    <td><%= f.nr + 1 %></td>
+                    <td><%= f.wenn %></td>
+                    <td class="font-monospace small"><%= f.dann %></td>
+                    <td class="text-nowrap">
+                      <% if (f.nr > 0) { %><button class="btn btn-sm btn-outline-secondary" type="button" data-bereitfall-hoch="<%= f.nr %>" title="Nach oben — früher geprüft" <%= spielLaeuft ? 'disabled' : '' %>>↑</button><% } %>
+                      <button class="btn btn-sm btn-outline-secondary" type="button" data-bereitfall-bearbeiten="<%= JSON.stringify(f) %>" <%= spielLaeuft ? 'disabled' : '' %>>Bearbeiten</button>
+                      <button class="btn btn-sm btn-outline-danger" type="button" data-bereitfall-entfernen="<%= f.nr %>" <%= spielLaeuft ? 'disabled' : '' %>>Entfernen</button>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+
+        <details id="bereitFallDetails" <%= bereitFaelle.faelle.length || !bereitFaelle.grundfall ? '' : 'open' %>>
+          <summary class="mb-2"><span id="bereitFallUeberschrift">Neuer Fall</span></summary>
+          <form id="formBereitFall" class="row g-2" autocomplete="off">
+            <input type="hidden" name="nr" value="">
+            <div class="col-12">
+              <%- include('werkbank-bedingung', { vorsilbe: 'bedingung', titel: 'Wenn', einstellungen: einstellungen, leer: '' }) %>
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label">Bereit, wenn Port</label>
+              <select class="form-select" name="port">
+                <option value="">—</option>
+                <% entwurfPorts.forEach(function (p) { %><option value="<%= p.purpose %>"><%= p.purpose %></option><% }) %>
+              </select>
+            </div>
+            <div class="col-sm-5">
+              <label class="form-label">Zeile — eine je Zeile</label>
+              <textarea class="form-control font-monospace" name="log_line" rows="1" placeholder="mit „Ohne Port“ die Bedingung, sonst ein Zusatz"></textarea>
+            </div>
+            <div class="col-sm-3">
+              <label class="form-label">Frist (s)</label>
+              <input class="form-control" name="timeout_sec" type="number" min="1" placeholder="wie Grundfall">
+            </div>
+            <div class="col-sm-8">
+              <label class="form-label">Ohne Port, weil …</label>
+              <input class="form-control" name="without_port" maxlength="300" placeholder="leer lassen, wenn ein Port gewählt ist">
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label">Abfrage</label>
+              <select class="form-select" name="query">
+                <option value="">wie Grundfall</option><option value="an">an</option><option value="aus">aus</option>
+              </select>
+            </div>
+            <div class="col-12 d-flex gap-2">
+              <button class="btn btn-primary" type="submit" <%= spielLaeuft ? 'disabled' : '' %>><i class="fa-solid fa-floppy-disk me-1"></i>Fall speichern</button>
+              <button class="btn btn-outline-secondary" type="button" id="knopfBereitFallNeu">Leeren</button>
+              <% if (spielLaeuft) { %><span class="text-secondary small align-self-center">Während des Probestarts gesperrt — der Fall gehört zum Entwurf.</span><% } %>
+            </div>
+          </form>
+        </details>
       </div>
     </div>
   </div>
@@ -1304,6 +1402,115 @@
     </div>
   </div>
 
+  <!-- ── Verbindungsangabe (`connect`, Stufe 9 S6) ──────────────────────── -->
+  <%
+    // Womit Spieler verbinden — Serverseite, Serverliste, Discord-Panel. Ohne
+    // diese Angabe zeigen alle die Adresse wie bisher. Gehört nicht zum
+    // Geprüften (wie die Hinweise): Ändern verlangt keinen neuen Durchlauf.
+    const vk = locals.verbindungKarte || { connect: null, grund: null, faelle: [], zeigbar: [], fehlt: true };
+    const VERBINDUNG = locals.VERBINDUNG || { label: 60, hint: 300 };
+    const textOf = function (t) { return t ? (t.de || t.en || '') : ''; };
+  %>
+  <div class="col-12">
+    <div class="card" id="karteVerbindung">
+      <div class="card-header">
+        <h3 class="card-title">Verbindungsangabe</h3>
+        <div class="card-actions"><span class="text-secondary small"><%= vk.connect ? (vk.faelle.length + ' ' + (vk.faelle.length === 1 ? 'Fall' : 'Fälle')) : 'nicht gesetzt — es gilt die Adresse' %></span></div>
+      </div>
+      <div class="card-body">
+        <% if (vk.fehlt) { %>
+          <div class="alert alert-warning py-2 small">Diese Karte ist neu — bedienbar nach dem nächsten Neustart des Dashboards.</div>
+        <% } %>
+        <p class="text-secondary small">
+          Was Spieler zum Verbinden brauchen — gezeigt auf der Serverseite, in der Serverliste und im Discord-Panel. Ohne
+          Angabe steht dort die Adresse (IP:Port). Ein Spiel mit Einladungscode zeigt stattdessen die Einstellung, die den Code
+          trägt; hängt das an einer Einstellung (Windrose: P2P oder Direktverbindung), nimm Fälle — der erste passende ersetzt
+          den Grundfall. Ein Passwort ist nie eine Verbindungsangabe. Gehört nicht zum Geprüften.
+        </p>
+
+        <form id="formVerbindung" class="row g-2 mb-3" autocomplete="off">
+          <div class="col-md-4">
+            <label class="form-label">Grundfall zeigt</label>
+            <select class="form-select" name="show">
+              <% vk.zeigbar.forEach(function (z) { %><option value="<%= z.wert %>" <%= vk.connect && vk.connect.show === z.wert ? 'selected' : '' %>><%= z.name %></option><% }) %>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Bezeichnung (de)</label>
+            <input class="form-control" name="label_de" maxlength="<%= VERBINDUNG.label %>" value="<%= vk.connect && vk.connect.label ? (vk.connect.label.de || '') : '' %>" placeholder="leer = Name der Einstellung bzw. „Adresse“">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Bezeichnung (en)</label>
+            <input class="form-control" name="label_en" maxlength="<%= VERBINDUNG.label %>" value="<%= vk.connect && vk.connect.label ? (vk.connect.label.en || '') : '' %>">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Hinweis (de)</label>
+            <input class="form-control" name="hint_de" maxlength="<%= VERBINDUNG.hint %>" value="<%= vk.connect && vk.connect.hint ? (vk.connect.hint.de || '') : '' %>" placeholder="etwa: Im Spiel unter „Beitreten“ → „Einladungscode“ eingeben.">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Hinweis (en)</label>
+            <input class="form-control" name="hint_en" maxlength="<%= VERBINDUNG.hint %>" value="<%= vk.connect && vk.connect.hint ? (vk.connect.hint.en || '') : '' %>">
+          </div>
+          <div class="col-12 d-flex gap-2">
+            <button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk me-1"></i>Verbindungsangabe speichern</button>
+            <% if (vk.connect) { %><button class="btn btn-outline-danger" type="button" id="knopfVerbindungEntfernen">Ganz entfernen — wieder die Adresse</button><% } %>
+          </div>
+        </form>
+
+        <% if (vk.faelle.length) { %>
+          <div class="table-responsive mb-3">
+            <table class="table table-sm table-vcenter">
+              <thead><tr><th class="w-1">#</th><th>Wenn</th><th>Zeigt</th><th>Bezeichnung · Hinweis</th><th class="w-1"></th></tr></thead>
+              <tbody>
+                <% vk.faelle.forEach(function (f) { %>
+                  <tr>
+                    <td><%= f.nr + 1 %></td>
+                    <td><%= f.wenn %></td>
+                    <td><%= f.zeigt %></td>
+                    <td class="small"><%= textOf(f.fall.label) || '—' %><% if (f.fall.hint) { %><div class="text-secondary"><%= textOf(f.fall.hint) %></div><% } %></td>
+                    <td class="text-nowrap">
+                      <% if (f.nr > 0) { %><button class="btn btn-sm btn-outline-secondary" type="button" data-verbindungsfall-hoch="<%= f.nr %>" title="Nach oben — früher geprüft">↑</button><% } %>
+                      <button class="btn btn-sm btn-outline-secondary" type="button" data-verbindungsfall-bearbeiten="<%= JSON.stringify(f) %>">Bearbeiten</button>
+                      <button class="btn btn-sm btn-outline-danger" type="button" data-verbindungsfall-entfernen="<%= f.nr %>">Entfernen</button>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+
+        <% if (vk.connect) { %>
+          <details id="verbindungsFallDetails">
+            <summary class="mb-2"><span id="verbindungsFallUeberschrift">Neuer Fall</span></summary>
+            <form id="formVerbindungsFall" class="row g-2" autocomplete="off">
+              <input type="hidden" name="nr" value="">
+              <div class="col-12">
+                <%- include('werkbank-bedingung', { vorsilbe: 'bedingung', titel: 'Wenn', einstellungen: einstellungen, leer: '' }) %>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Dann zeigt</label>
+                <select class="form-select" name="show">
+                  <% vk.zeigbar.forEach(function (z) { %><option value="<%= z.wert %>"><%= z.name %></option><% }) %>
+                </select>
+              </div>
+              <div class="col-md-4"><label class="form-label">Bezeichnung (de)</label><input class="form-control" name="label_de" maxlength="<%= VERBINDUNG.label %>"></div>
+              <div class="col-md-4"><label class="form-label">Bezeichnung (en)</label><input class="form-control" name="label_en" maxlength="<%= VERBINDUNG.label %>"></div>
+              <div class="col-md-6"><label class="form-label">Hinweis (de)</label><input class="form-control" name="hint_de" maxlength="<%= VERBINDUNG.hint %>"></div>
+              <div class="col-md-6"><label class="form-label">Hinweis (en)</label><input class="form-control" name="hint_en" maxlength="<%= VERBINDUNG.hint %>"></div>
+              <div class="col-12 d-flex gap-2">
+                <button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk me-1"></i>Fall speichern</button>
+                <button class="btn btn-outline-secondary" type="button" id="knopfVerbindungsFallNeu">Leeren</button>
+              </div>
+            </form>
+          </details>
+        <% } else { %>
+          <div class="text-secondary small">Fälle gibt es, sobald ein Grundfall gespeichert ist.</div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
   </div></div>
 
   <div class="col-12" data-reiter="einstellungen" role="tabpanel" aria-labelledby="reiter-einstellungen"><div class="row row-cards">
@@ -1567,6 +1774,13 @@
                 <input class="form-check-input" type="checkbox" name="join_password">
                 <span class="form-check-label">Beitrittspasswort — darf ins Discord-Panel (nie RCON- oder Kontozugang)</span>
               </label>
+            </div>
+            <%# Stufe 9 S6: Trifft die Bedingung nicht zu, zeigt das Panel die
+                Einstellung ausgegraut mit „Wirkt nur, wenn …" — versteckt wird
+                sie nicht, geschrieben wird sie weiter. %>
+            <div class="col-12">
+              <%- include('werkbank-bedingung', { vorsilbe: 'wirkt', titel: 'Wirkt nur, wenn', einstellungen: einstellungen, leer: '— immer —' }) %>
+              <div class="form-hint">Etwa der Einladungscode: wirkt nur, wenn „Direktverbindung" aus ist. Leer = wirkt immer.</div>
             </div>
             <div class="col-12" data-nur-typ="choice flags">
               <div class="form-label"><label for="eAuswahl">Möglichkeiten</label><span data-nur-typ="flags"><%- include('werkbank-hilfe', { text:
@@ -2381,6 +2595,66 @@
     try { daten = await antwort.json(); } catch (e) { /* kein JSON */ }
     if (!antwort.ok || !daten.success) throw new Error(daten.message || ('HTTP ' + antwort.status));
     return daten;
+  }
+
+  // Eine Bedingung {from, when} in die drei Felder von werkbank-bedingung.ejs
+  // (Stufe 9 S6) — die Gegenrichtung von Sitzungen.bedingungAusFeldern.
+  function bedingungFuellen(form, vorsilbe, bed) {
+    var key = form.elements[vorsilbe + '_key'], art = form.elements[vorsilbe + '_art'], wert = form.elements[vorsilbe + '_wert'];
+    if (!key) return;
+    if (!bed) { key.value = ''; art.value = 'true'; wert.value = ''; return; }
+    var w = String(bed.when || '');
+    key.value = String(bed.from || '').replace(/^setting:/, '');
+    if (w.indexOf('!=') === 0) { art.value = '!='; wert.value = w.slice(2); }
+    else if (w.indexOf('=') === 0) { art.value = '='; wert.value = w.slice(1); }
+    else { art.value = w; wert.value = ''; }
+  }
+
+  // Liste mit Fällen: Bearbeiten füllt das Formular, Entfernen und ↑ schicken
+  // die Stelle (Stufe 9 S6, beide Fallkarten).
+  function fallKarte(o) {
+    var form = document.getElementById(o.form);
+    if (!form) return;
+    function leer() {
+      form.reset(); form.nr.value = '';
+      document.getElementById(o.ueberschrift).textContent = 'Neuer Fall';
+    }
+    var neu = document.getElementById(o.neu);
+    if (neu) neu.addEventListener('click', leer);
+    document.querySelectorAll('[data-' + o.marke + '-bearbeiten]').forEach(function (k) {
+      k.addEventListener('click', function () {
+        var f = JSON.parse(k.getAttribute('data-' + o.marke + '-bearbeiten'));
+        leer();
+        form.nr.value = f.nr;
+        bedingungFuellen(form, 'bedingung', f.fall);
+        o.fuellen(form, f.fall);
+        document.getElementById(o.ueberschrift).textContent = 'Fall ' + (f.nr + 1) + ' bearbeiten';
+        document.getElementById(o.details).open = true;
+        form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+    form.addEventListener('submit', async function (ev) {
+      ev.preventDefault();
+      var knopf = form.querySelector('button[type=submit]');
+      knopf.disabled = true;
+      try {
+        await schicke(hier + o.pfad, Object.fromEntries(new FormData(form)));
+        window.location.reload();
+      } catch (fehler) { knopf.disabled = false; melde('error', fehler.message); }
+    });
+    ['entfernen', 'hoch'].forEach(function (was) {
+      document.querySelectorAll('[data-' + o.marke + '-' + was + ']').forEach(function (k) {
+        k.addEventListener('click', async function () {
+          var nr = k.getAttribute('data-' + o.marke + '-' + was);
+          if (was === 'entfernen' && !confirm('Fall ' + (Number(nr) + 1) + ' aus dem Entwurf nehmen?')) return;
+          k.disabled = true;
+          try {
+            await schicke(hier + o.pfad + '/' + encodeURIComponent(nr) + '/' + was);
+            window.location.reload();
+          } catch (fehler) { k.disabled = false; melde('error', fehler.message); }
+        });
+      });
+    });
   }
 
   // ── Ausgabe in Schüben (2026-10-09) ───────────────────────────────────
@@ -3407,6 +3681,7 @@
         formE.pattern_hint_en.value = (e.pattern_hint && e.pattern_hint.en) || '';
         formE.required.checked = !!e.required;
         formE.join_password.checked = !!e.join_password;
+        bedingungFuellen(formE, 'wirkt', e.applies_when);
         formE.choices.value = (e.choices || []).map(function (c) { return c.value + (c.name && c.name.de ? '=' + c.name.de : ''); }).join('\n');
         formE.role.value = (e.role === 'player' && e.ask_on_create === false) ? 'player_spaeter' : e.role;
         formE.takes_effect.value = e.takes_effect;
@@ -3908,6 +4183,49 @@
           melde('error', fehler.message);
         }
       });
+    });
+  }
+
+  // ── Fälle je nach Einstellung (Stufe 9 S6) ────────────────────────────
+  fallKarte({
+    form: 'formBereitFall', marke: 'bereitfall', pfad: '/bereit-faelle', neu: 'knopfBereitFallNeu',
+    ueberschrift: 'bereitFallUeberschrift', details: 'bereitFallDetails',
+    fuellen: function (form, f) {
+      form.port.value = f.port || '';
+      form.log_line.value = Array.isArray(f.log_line) ? f.log_line.join('\n') : (f.log_line || '');
+      form.timeout_sec.value = f.timeout_sec || '';
+      form.without_port.value = f.without_port || '';
+      form.query.value = f.query === true ? 'an' : f.query === false ? 'aus' : '';
+    }
+  });
+  fallKarte({
+    form: 'formVerbindungsFall', marke: 'verbindungsfall', pfad: '/verbindung/faelle', neu: 'knopfVerbindungsFallNeu',
+    ueberschrift: 'verbindungsFallUeberschrift', details: 'verbindungsFallDetails',
+    fuellen: function (form, f) {
+      form.show.value = f.show;
+      ['label', 'hint'].forEach(function (t) {
+        form[t + '_de'].value = (f[t] && f[t].de) || '';
+        form[t + '_en'].value = (f[t] && f[t].en) || '';
+      });
+    }
+  });
+  var formV = document.getElementById('formVerbindung');
+  if (formV) {
+    formV.addEventListener('submit', async function (ev) {
+      ev.preventDefault();
+      var knopf = formV.querySelector('button[type=submit]');
+      knopf.disabled = true;
+      try {
+        await schicke(hier + '/verbindung', Object.fromEntries(new FormData(formV)));
+        window.location.reload();
+      } catch (fehler) { knopf.disabled = false; melde('error', fehler.message); }
+    });
+    var weg = document.getElementById('knopfVerbindungEntfernen');
+    if (weg) weg.addEventListener('click', async function () {
+      if (!confirm('Verbindungsangabe samt Fällen entfernen? Danach zeigen Serverseite, Liste und Panel wieder die Adresse.')) return;
+      weg.disabled = true;
+      try { await schicke(hier + '/verbindung/entfernen'); window.location.reload(); }
+      catch (fehler) { weg.disabled = false; melde('error', fehler.message); }
     });
   }
 

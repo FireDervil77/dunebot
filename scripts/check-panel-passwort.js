@@ -175,7 +175,8 @@ pruefe('Werkbank: Kästchen nur am Passwort, landet als join_password', () => {
     assert.ok(!('join_password' in Sitzungen.einstellungAusFormular(formular({}))));
     assert.throws(() => Sitzungen.einstellungAusFormular(formular({ type: 'text', join_password: 'on' })), /nur eine Einstellung vom Typ Passwort/);
     const q = ohneKommentare(lies('plugins/werkbank/dashboard/helpers/Sitzungen.js'));
-    assert.match(q, /'pattern', 'pattern_hint', 'join_password'\]/);
+    const felder = /const EINSTELLUNG_FELDER = \[([^\]]*)\]/.exec(q);
+    assert.ok(felder && /'join_password'/.test(felder[1]), 'EINSTELLUNG_FELDER: eine abgewählte Markierung bliebe stehen');
     assert.match(q, /Beitrittspasswort ist schon/);
     assert.match(ohneKommentareEjs(lies('plugins/werkbank/dashboard/views/guild/werkbank-sitzung.ejs')),
         /data-nur-typ="password"[\s\S]{0,200}name="join_password"/);

@@ -636,6 +636,8 @@ function entwurfAlsPaket(sitzung, liste) {
     // Hinweise sind Text für Menschen — sie reisen mit, zählen aber nicht zum
     // technischen Teil (`technisch`): Wer einen Satz verbessert, prüft nicht neu.
     if (Array.isArray(e.hints) && e.hints.length) paket.hints = e.hints;
+    // Verbindungsangabe (Stufe 9 S6) — wie die Hinweise nicht im Geprüften.
+    if (e.connect) paket.connect = e.connect;
     return paket;
 }
 
@@ -691,6 +693,278 @@ async function hinweisEntfernen(sitzung, key) {
     });
 }
 
+// ── Fälle je nach Einstellung (Stufe 9 S6, 2026-10-25) ──────────────────────
+//
+// Windrose hat zwei Verbindungsarten, die sich ausschließen: P2P (kein Port,
+// Einladungscode) und Direktverbindung (Port, Adresse). Was davon gilt, hängt an
+// einer Einstellung. Das Paket sagt es mit Fällen — der erste passende ersetzt
+// den Grundfall:
+//
+//   start.ready_when.cases  woran fb-init „bereit" erkennt (entschieden im
+//                           Daemon, pkgspec.Fuer; die Regeln hier sind die von
+//                           pruefeFaelle, gesagt, wo getippt wird)
+//   connect (+ cases)       womit Spieler verbinden — Serverseite, Liste, Panel
+//   settings[].applies_when „wirkt nur, wenn …" (im Einstellungsformular)
+//
+// `connect` gehört wie die Hinweise NICHT zum Geprüften (`technisch`): Es
+// ändert nur, was angezeigt wird. Die Fälle der Bereitschaft stehen in `start`
+// und zählen mit.
+const FALL = {
+    // Dieselben Arten wie im Startzeilen-Baukasten (BEDINGUNGEN in der Ansicht).
+    arten: ['true', 'false', 'not_empty', 'empty', '=', '!='],
+    max: 8,
+};
+
+/**
+ * Eine Bedingung aus den Feldern `<vorsilbe>_key`, `_art`, `_wert` — oder null,
+ * wenn kein Schlüssel gewählt ist. Ob es die Einstellung gibt, prüft der
+ * Aufrufer (er kennt die Liste).
+ */
+function bedingungAusFeldern(b, vorsilbe, name) {
+    const text = (k) => (typeof b?.[`${vorsilbe}_${k}`] === 'string' ? b[`${vorsilbe}_${k}`].trim() : '');
+    const key = text('key');
+    if (!key) return null;
+    const art = text('art');
+    if (!FALL.arten.includes(art)) throw new Error(`${name}: „wenn an", „wenn aus", „wenn gesetzt", „wenn leer", „gleich …" oder „ungleich …".`);
+    let when = art;
+    if (art === '=' || art === '!=') {
+        const wert = text('wert').split(',').map(t => t.trim()).filter(Boolean).join(',');
+        if (!wert) throw new Error(`${name}: „${art === '=' ? 'gleich' : 'ungleich'} …" braucht einen Wert — mehrere mit Komma.`);
+        when = art + wert;
+    }
+    return { from: `setting:${key}`, when };
+}
+
+/** Gibt es die Einstellung, an der die Bedingung hängt? */
+function pruefeBezug(bed, settings, name) {
+    const key = String(bed.from).replace(/^setting:/, '');
+    if (!(settings || []).some(s => s.key === key)) {
+        throw new Error(`${name}: Die Einstellung „${key}" gibt es im Entwurf nicht — erst anlegen.`);
+    }
+}
+
+/** Ein Fall der Bereitschaft aus dem Formular — dieselben Regeln wie pruefeFaelle im Daemon. */
+function bereitFallAusFormular(b, e) {
+    const text = (k) => (typeof b?.[k] === 'string' ? b[k].trim() : '');
+    const bed = bedingungAusFeldern(b, 'bedingung', 'Bedingung');
+    if (!bed) throw new Error('Bedingung: Ein Fall hängt an einer Einstellung — welche?');
+    pruefeBezug(bed, e.settings, 'Bedingung');
+    const fall = { ...bed };
+    const port = text('port');
+    if (port) {
+        if (!(e.ports || []).some(p => p.purpose === port)) throw new Error(`Port „${port}" belegt der Entwurf nicht.`);
+        fall.port = port;
+    }
+    const zeilen = text('log_line').split(/\r?\n/).map(z => z.trim()).filter(Boolean);
+    if (zeilen.length) fall.log_line = zeilen.length === 1 ? zeilen[0] : zeilen;
+    if (text('without_port')) {
+        if (fall.port) throw new Error('„Ohne Port, weil …" gilt nur ohne Port — eins von beiden leeren.');
+        if (!zeilen.length) throw new Error('Ohne Port ist die Zeile die Bedingung — bitte eine Zeile angeben.');
+        fall.without_port = text('without_port').slice(0, 300);
+    }
+    if (!fall.port && !fall.without_port) {
+        throw new Error('Weder Port noch „Ohne Port, weil …" — ein Fall braucht, woran fb-init „bereit" erkennt (Portpflicht).');
+    }
+    if (text('query') === 'an') fall.query = true;
+    else if (text('query') === 'aus') fall.query = false;
+    if (text('timeout_sec')) {
+        const n = Number(text('timeout_sec'));
+        if (!Number.isInteger(n) || n < 1) throw new Error('Frist: ganze Sekunden ab 1 — leer heißt „wie der Grundfall".');
+        fall.timeout_sec = n;
+    }
+    return fall;
+}
+
+/** Index aus dem Formular: '' = neu, sonst die Stelle in der Liste. */
+function fallIndex(wert, laenge) {
+    if (wert === undefined || wert === null || String(wert).trim() === '') return -1;
+    const i = Number(wert);
+    if (!Number.isInteger(i) || i < 0 || i >= laenge) throw new Error('Diesen Fall gibt es nicht mehr — Seite neu laden.');
+    return i;
+}
+
+/** Eine Liste unter `e` anlegen, ändern, entfernen oder umstellen — für beide Fallarten. */
+function fallListeAendern(liste, { index, neu, entfernen, hoch }) {
+    const l = [...(liste || [])];
+    if (entfernen) { l.splice(index, 1); return l; }
+    if (hoch) { if (index > 0) [l[index - 1], l[index]] = [l[index], l[index - 1]]; return l; }
+    if (index >= 0) l[index] = neu;
+    else {
+        if (l.length >= FALL.max) throw new Error(`Höchstens ${FALL.max} Fälle — der erste passende gilt, mehr liest niemand mehr.`);
+        l.push(neu);
+    }
+    return l;
+}
+
+async function bereitFallSpeichern(sitzung, b) {
+    await pruefeFrei(sitzung);
+    return entwurfSchreiben(sitzung, (e) => {
+        if (!hatBereitschaft(e.start)) {
+            throw new Error('Erst den Grundfall festlegen (Probestart: „Bereit, wenn Port" oder „Ohne Port, weil …") — Fälle ersetzen ihn nur.');
+        }
+        const rw = e.start.ready_when;
+        const index = fallIndex(b?.nr, (rw.cases || []).length);
+        rw.cases = fallListeAendern(rw.cases, { index, neu: bereitFallAusFormular(b, e) });
+    });
+}
+
+async function bereitFallAendern(sitzung, nr, was) {
+    await pruefeFrei(sitzung);
+    return entwurfSchreiben(sitzung, (e) => {
+        const rw = e.start?.ready_when;
+        const index = fallIndex(nr, (rw?.cases || []).length);
+        rw.cases = fallListeAendern(rw.cases, { index, [was]: true });
+        if (!rw.cases.length) delete rw.cases;
+    });
+}
+
+/** Die Bereitschaftswirkung eines Falls (oder des Grundfalls) in Worten. */
+function bereitText(r) {
+    const teile = [];
+    if (r.port) teile.push(`Port „${r.port}"`);
+    if (r.without_port) teile.push(`ohne Port (${r.without_port})`);
+    const zeilen = Array.isArray(r.log_line) ? r.log_line : (r.log_line ? [r.log_line] : []);
+    if (zeilen.length) teile.push(`Zeile „${zeilen.join('" / „')}"`);
+    if (r.query === true) teile.push('mit Abfrage');
+    if (r.query === false) teile.push('ohne Abfrage');
+    if (r.timeout_sec) teile.push(`Frist ${r.timeout_sec} s`);
+    return teile.join(' · ') || '—';
+}
+
+/** Was die Karte „Bereitschaft je nach Einstellung" zeigt. */
+function bereitFaelleStand(sitzung) {
+    const e = sitzung.entwurf || {};
+    const rw = e.start?.ready_when || null;
+    const paket = { settings: e.settings || [] };
+    const { bedingungSatz } = require('../../../gameserver/dashboard/helpers/Serverseite');
+    return {
+        grundfall: rw && hatBereitschaft(e.start) ? bereitText(rw) : null,
+        faelle: (rw?.cases || []).map((c, i) => ({
+            nr: i, fall: c, wenn: bedingungSatz(c, paket), dann: bereitText(c),
+        })),
+    };
+}
+
+/** `address` oder `setting:<key>` — nie ein Passwort (dieselbe Regel wie baueVerbindung). */
+function zeigeAusFormular(wert, settings) {
+    const v = String(wert || '').trim();
+    if (v === 'address') return v;
+    const m = /^setting:([a-z][a-z0-9_]*)$/.exec(v);
+    if (!m) throw new Error('Zeigen: die Adresse oder eine Einstellung.');
+    const s = (settings || []).find(x => x.key === m[1]);
+    if (!s) throw new Error(`Die Einstellung „${m[1]}" gibt es im Entwurf nicht.`);
+    if (s.type === 'password') throw new Error('Ein Passwort ist keine Verbindungsangabe — sie steht offen auf Serverseite, Liste und im Panel.');
+    return v;
+}
+
+/** Bezeichnung und Hinweis (de/en) aus dem Formular — leere Sprachen fallen weg. */
+function textPaar(b, vorsilbe, max) {
+    const text = (k) => (typeof b?.[k] === 'string' ? b[k].trim() : '');
+    const aus = {};
+    for (const sprache of ['de', 'en']) {
+        const t = text(`${vorsilbe}_${sprache}`);
+        if (t.length > max) throw new Error(`${vorsilbe === 'label' ? 'Bezeichnung' : 'Hinweis'} (${sprache}): höchstens ${max} Zeichen.`);
+        if (t) aus[sprache] = t;
+    }
+    return Object.keys(aus).length ? aus : null;
+}
+
+const VERBINDUNG = { label: 60, hint: 300 };
+
+function verbindungAusFormular(b, e, mitBedingung) {
+    const v = {};
+    if (mitBedingung) {
+        const bed = bedingungAusFeldern(b, 'bedingung', 'Bedingung');
+        if (!bed) throw new Error('Bedingung: Ein Fall hängt an einer Einstellung — welche?');
+        pruefeBezug(bed, e.settings, 'Bedingung');
+        Object.assign(v, bed);
+    }
+    v.show = zeigeAusFormular(b?.show, e.settings);
+    const label = textPaar(b, 'label', VERBINDUNG.label);
+    const hint = textPaar(b, 'hint', VERBINDUNG.hint);
+    if (label) v.label = label;
+    if (hint) v.hint = hint;
+    return v;
+}
+
+/** Der Grundfall der Verbindungsangabe — die Fälle bleiben stehen. */
+async function verbindungSpeichern(sitzung, b) {
+    return entwurfSchreiben(sitzung, (e) => {
+        const neu = verbindungAusFormular(b, e, false);
+        e.connect = { ...neu, ...(e.connect?.cases?.length ? { cases: e.connect.cases } : {}) };
+    });
+}
+
+async function verbindungEntfernen(sitzung) {
+    return entwurfSchreiben(sitzung, (e) => { delete e.connect; });
+}
+
+async function verbindungFallSpeichern(sitzung, b) {
+    return entwurfSchreiben(sitzung, (e) => {
+        if (!e.connect) throw new Error('Erst den Grundfall der Verbindungsangabe speichern — Fälle ersetzen ihn nur.');
+        const index = fallIndex(b?.nr, (e.connect.cases || []).length);
+        e.connect.cases = fallListeAendern(e.connect.cases, { index, neu: verbindungAusFormular(b, e, true) });
+    });
+}
+
+async function verbindungFallAendern(sitzung, nr, was) {
+    return entwurfSchreiben(sitzung, (e) => {
+        const index = fallIndex(nr, (e.connect?.cases || []).length);
+        e.connect.cases = fallListeAendern(e.connect.cases, { index, [was]: true });
+        if (!e.connect.cases.length) delete e.connect.cases;
+    });
+}
+
+/** Was die Karte „Verbindungsangabe" zeigt. */
+function verbindungStand(sitzung) {
+    const e = sitzung.entwurf || {};
+    const settings = e.settings || [];
+    const { bedingungSatz } = require('../../../gameserver/dashboard/helpers/Serverseite');
+    const name = (s) => (s.name && (s.name.de || s.name.en)) || s.key;
+    const zeigen = (show) => {
+        if (show === 'address') return 'Adresse (IP:Port)';
+        const s = settings.find(x => `setting:${x.key}` === show);
+        return s ? `Einstellung „${name(s)}"` : `${show} (fehlt im Entwurf)`;
+    };
+    const c = e.connect || null;
+    return {
+        connect: c,
+        grund: c ? { zeigt: zeigen(c.show) } : null,
+        faelle: (c?.cases || []).map((f, i) => ({ nr: i, fall: f, wenn: bedingungSatz(f, { settings }), zeigt: zeigen(f.show) })),
+        // Was sich zeigen lässt: die Adresse oder jede Einstellung außer Passwörtern.
+        zeigbar: [{ wert: 'address', name: 'Adresse (IP:Port)' },
+            ...settings.filter(s => s.type !== 'password').map(s => ({ wert: `setting:${s.key}`, name: `${name(s)} (${s.key})` }))],
+    };
+}
+
+/**
+ * Verweise der Fälle, die ins Leere zeigen — vor dem Durchlauf gesagt. Der
+ * Daemon prüft die Bereitschaftsfälle ebenso (pruefeFaelle); `connect` und
+ * `applies_when` liest nur das Dashboard, hier fiele es sonst niemandem auf.
+ */
+function faelleMaengel(paket) {
+    const m = [];
+    const keys = new Set((paket.settings || []).map(s => s.key));
+    const zwecke = new Set((paket.ports || []).map(p => p.purpose));
+    const Bedingung = require('../../../gameserver/dashboard/helpers/Bedingung');
+    const bezug = (bed, wo) => {
+        const key = String(bed?.from || '').replace(/^setting:/, '');
+        if (!/^setting:/.test(String(bed?.from || '')) || !keys.has(key)) m.push(`${wo} hängt an „${key || bed?.from}", die es im Entwurf nicht gibt.`);
+        if (!bed?.when || !Bedingung.bekannt(bed.when)) m.push(`${wo}: unbekannte Bedingung „${bed?.when ?? ''}".`);
+    };
+    (paket.start?.ready_when?.cases || []).forEach((c, i) => {
+        bezug(c, `Bereitschaft, Fall ${i + 1}`);
+        if (c.port && !zwecke.has(c.port)) m.push(`Bereitschaft, Fall ${i + 1}: Port „${c.port}" belegt der Entwurf nicht.`);
+    });
+    (paket.connect?.cases || []).forEach((c, i) => bezug(c, `Verbindungsangabe, Fall ${i + 1}`));
+    for (const show of [paket.connect?.show, ...(paket.connect?.cases || []).map(c => c.show)].filter(Boolean)) {
+        const key = /^setting:(.+)$/.exec(show)?.[1];
+        if (key && !keys.has(key)) m.push(`Verbindungsangabe zeigt „${key}", die es im Entwurf nicht gibt.`);
+    }
+    for (const s of paket.settings || []) if (s.applies_when) bezug(s.applies_when, `„Wirkt nur, wenn" an „${s.key}"`);
+    return m;
+}
+
 // Welche Felder die Formulare der Werkbank selbst schreiben. Alles andere an
 // demselben Gegenstand gehört einem geöffneten Paket und bleibt beim Speichern
 // stehen (`behalteUnbekanntes`).
@@ -698,7 +972,7 @@ const START_FELDER = ['program', 'workdir', 'args', 'stop', 'ready_when'];
 const BEREIT_FELDER = ['port', 'log_line', 'without_port', 'timeout_sec'];
 const EINSTELLUNG_FELDER = ['key', 'group', 'name', 'description', 'type', 'default', 'min', 'max',
     'choices', 'apply', 'takes_effect', 'risk', 'role', 'ask_on_create', 'required', 'item_pattern', 'max_items',
-    'pattern', 'pattern_hint', 'join_password'];
+    'pattern', 'pattern_hint', 'join_password', 'applies_when'];
 
 /**
  * `neu` ersetzt in `vorher` genau die Felder, die das Formular kennt — ein
@@ -903,6 +1177,8 @@ function entwurfAusPaket(paket) {
     if (p.env && Object.keys(p.env).length) entwurf.env = p.env;
     if (Array.isArray(p.settings) && p.settings.length) entwurf.settings = p.settings;
     if (Array.isArray(p.hints) && p.hints.length) entwurf.hints = p.hints;
+    // Stufe 9 S6: eigene Karte „Verbindungsangabe".
+    if (p.connect) entwurf.connect = p.connect;
 
     const d = {};
     for (const k of DURCHGEREICHT) if (p[k] !== undefined) d[k] = p[k];
@@ -913,7 +1189,7 @@ function entwurfAusPaket(paket) {
     ordne(entwurf);
 
     // Alles, wofür es weder eine Karte noch einen Platz im Durchgereichten gibt.
-    const bekannt = ['format', 'identity', 'image', 'ports', 'install', 'start', 'env', 'settings', 'hints', 'status', ...DURCHGEREICHT];
+    const bekannt = ['format', 'identity', 'image', 'ports', 'install', 'start', 'env', 'settings', 'hints', 'connect', 'status', ...DURCHGEREICHT];
     const rest = Object.keys(p).filter(k => !bekannt.includes(k));
     for (const k of Object.keys(p.install || {})) {
         if (k !== 'steps' && !INSTALL_DURCHGEREICHT.includes(k)) rest.push(`install.${k}`);
@@ -1294,6 +1570,13 @@ function einstellungAusFormular(b) {
         throw new Error('Vorgabe: die Summe, mit der das Spiel startet — 0, wenn nichts angekreuzt sein soll.');
     }
     if (b.required === true || b.required === 'on' || b.required === '1') e.required = true;
+    // „Wirkt nur, wenn …" (Stufe 9 S6): Ob es die Einstellung gibt, an der es
+    // hängt, prüft einstellungSpeichern — nur dort ist die Liste bekannt.
+    const wirkt = bedingungAusFeldern(b, 'wirkt', 'Wirkt nur, wenn');
+    if (wirkt) {
+        if (wirkt.from === `setting:${key}`) throw new Error('Wirkt nur, wenn: Eine Einstellung kann nicht an sich selbst hängen.');
+        e.applies_when = wirkt;
+    }
     // Beitrittspasswort (Stufe 9 S5): nur ein Passwort kann es sein.
     if (b.join_password === true || b.join_password === 'on' || b.join_password === '1') {
         if (e.type !== 'password') throw new Error('Beitrittspasswort: nur eine Einstellung vom Typ Passwort.');
@@ -1375,6 +1658,7 @@ async function einstellungSpeichern(sitzung, formular) {
         const liste = Array.isArray(e.settings) ? e.settings : [];
         const doppelt = liste.find(x => x.key === neu.key && x.key !== alt);
         if (doppelt) throw new Error(`Den Schlüssel „${neu.key}" gibt es schon.`);
+        if (neu.applies_when) pruefeBezug(neu.applies_when, liste, 'Wirkt nur, wenn');
         // Das Panel zeigt genau EIN Beitrittspasswort — kein stilles Umhängen.
         const zweites = neu.join_password && liste.find(x => x.join_password === true && x.key !== (alt || neu.key));
         if (zweites) throw new Error(`Beitrittspasswort ist schon „${zweites.key}" — dort zuerst abschalten.`);
@@ -1399,6 +1683,18 @@ async function einstellungEntfernen(sitzung, key) {
         const haengt = festzeilenFlach(e).filter(z => z.value.includes(`{{setting:${key}}}`));
         if (haengt.length) {
             throw new Error(`Die feste Zeile ${haengt.map(z => `${z.file} → ${z.key}`).join(', ')} verweist auf „${key}" — erst dort ändern oder entfernen.`);
+        }
+        // Ebenso ein Fall (Stufe 9 S6): Eine Bedingung an einer fehlenden
+        // Einstellung trifft je nach Form immer oder nie — beides still.
+        const bezug = `setting:${key}`;
+        const faelle = [
+            ...(e.start?.ready_when?.cases || []).filter(c => c.from === bezug).map(() => 'Bereitschaft je nach Einstellung'),
+            ...(e.connect?.cases || []).filter(c => c.from === bezug).map(() => 'Verbindungsangabe'),
+            ...(e.connect && [e.connect.show, ...(e.connect.cases || []).map(c => c.show)].includes(bezug) ? ['Verbindungsangabe (zeigt sie)'] : []),
+            ...(e.settings || []).filter(x => x.applies_when?.from === bezug).map(x => `„Wirkt nur, wenn" an „${x.key}"`),
+        ];
+        if (faelle.length) {
+            throw new Error(`An „${key}" hängt noch: ${[...new Set(faelle)].join(', ')} — erst dort ändern oder entfernen.`);
         }
         e.settings = (e.settings || []).filter(x => x.key !== key);
         if (e.werkbank?.werte) delete e.werkbank.werte[key];
@@ -2226,6 +2522,7 @@ function durchlaufMaengel(paket) {
     const seq = paket.start?.stop?.sequence || [];
     if (seq.length < 2) m.push('Die Stoppfolge hat nur sigkill — grün verlangt, dass das Spiel VORHER endet (etwa „command:/quit 30 beendet").');
     for (const z of ungenutztePorts(paket)) m.push(`Auf den Port „${z}" verweist nichts — das Spiel erführe seine Nummer nicht.`);
+    m.push(...faelleMaengel(paket));
     for (const s of paket.install?.steps || []) {
         if (s.type === 'download' && !s.checksum) {
             m.push(`Der Download ${s.target || s.url} hat keine Prüfsumme — den Schritt einmal laufen lassen, die Werkbank trägt sie ein.`);
@@ -4305,6 +4602,8 @@ function gruppiere(liste, ab = 6) {
 }
 
 module.exports = {
+    FALL, VERBINDUNG, bereitFallSpeichern, bereitFallAendern, bereitFaelleStand, bereitFallAusFormular,
+    verbindungSpeichern, verbindungEntfernen, verbindungFallSpeichern, verbindungFallAendern, verbindungStand, faelleMaengel,
     uebernommeneAusfuehren, ketteFortsetzen, offeneUebernommene,
     angabenTags, tagsUebergeben, portBild, konsolenZeileZu, laufPortsMerken,
     FESTZEILE, festzeilenStand, festzeileSpeichern, festzeileEntfernen,

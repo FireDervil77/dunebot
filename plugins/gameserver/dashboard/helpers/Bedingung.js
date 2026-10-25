@@ -88,4 +88,15 @@ function waehleFall(faelle, settings) {
     return -1;
 }
 
-module.exports = { gilt, wahr, wertVon, trifftZu, waehleFall };
+/**
+ * Versteht `gilt` diese Bedingung? Dieselbe Regel wie pkgspec.BedingungBekannt
+ * im Daemon. Für Fälle gilt zusätzlich: nicht leer — ein Fall ohne Bedingung
+ * träfe immer und machte den Grundfall unerreichbar.
+ */
+function bekannt(bedingung) {
+    const b = bedingung ?? '';
+    if (['', 'true', 'false', 'empty', 'not_empty'].includes(b)) return true;
+    return b.startsWith('=') || b.startsWith('!=');
+}
+
+module.exports = { gilt, wahr, wertVon, trifftZu, waehleFall, bekannt };

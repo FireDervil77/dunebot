@@ -381,6 +381,10 @@ router.get('/:kennung', requirePermission('WERKBANK.VIEW'), async (req, res) => 
             werkbankTeil: Sitzungen.werkbankTeil(sitzung),
             einstellungen: sitzung.entwurf?.settings || [],
             hinweise: sitzung.entwurf?.hints || [],
+            // Stufe 9 S6: Fälle der Bereitschaft und die Verbindungsangabe.
+            bereitFaelle: Sitzungen.bereitFaelleStand(sitzung),
+            verbindungKarte: Sitzungen.verbindungStand(sitzung),
+            VERBINDUNG: Sitzungen.VERBINDUNG,
             festzeilen: Sitzungen.festzeilenStand(sitzung),
             FESTZEILE: Sitzungen.FESTZEILE,
             voraussetzungen: Sitzungen.voraussetzungenStand(sitzung),
@@ -708,6 +712,65 @@ router.post('/:kennung/hinweise/:key/entfernen', requirePermission('WERKBANK.BAU
         return res.json({ success: true });
     } catch (error) {
         return fehler(res, error, 'Hinweis nicht entfernt', 400);
+    }
+});
+
+// ── Fälle je nach Einstellung (Stufe 9 S6, 2026-10-25) ─────────────────────────
+router.post('/:kennung/bereit-faelle', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.bereitFallSpeichern(await offeneSitzung(req, res), req.body || {});
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Fall nicht gespeichert', 400);
+    }
+});
+
+// Express 5 kennt keine Muster im Pfad mehr — geprüft wird hier.
+router.post('/:kennung/bereit-faelle/:nr/:was', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        if (!['entfernen', 'hoch'].includes(req.params.was)) throw new Error('Unbekannte Aktion.');
+        await Sitzungen.bereitFallAendern(await offeneSitzung(req, res), req.params.nr, req.params.was);
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Fall nicht geändert', 400);
+    }
+});
+
+router.post('/:kennung/verbindung', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.verbindungSpeichern(await offeneSitzung(req, res), req.body || {});
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Verbindungsangabe nicht gespeichert', 400);
+    }
+});
+
+router.post('/:kennung/verbindung/entfernen', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.verbindungEntfernen(await offeneSitzung(req, res));
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Verbindungsangabe nicht entfernt', 400);
+    }
+});
+
+router.post('/:kennung/verbindung/faelle', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.verbindungFallSpeichern(await offeneSitzung(req, res), req.body || {});
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Fall nicht gespeichert', 400);
+    }
+});
+
+// Express 5 kennt keine Muster im Pfad mehr — geprüft wird hier.
+router.post('/:kennung/verbindung/faelle/:nr/:was', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        if (!['entfernen', 'hoch'].includes(req.params.was)) throw new Error('Unbekannte Aktion.');
+        await Sitzungen.verbindungFallAendern(await offeneSitzung(req, res), req.params.nr, req.params.was);
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Fall nicht geändert', 400);
     }
 });
 
