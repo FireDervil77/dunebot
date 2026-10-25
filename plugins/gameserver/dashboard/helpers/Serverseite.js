@@ -124,7 +124,11 @@ function baueUebersicht(server, paket, zusatz = {}) {
         kopf:          baueKopf(server, paket),
         zustand:       baueZustand(server),
         adresse:       baueAdresse(server),
-        laufzeit:      baueLaufzeit(server.laeuft_seit),
+        // Nur bei laufendem Server: Ging ein Stopp an der Daemon-Meldung
+        // vorbei (ServerStopp schreibt `offline` selbst), stünde sonst bei
+        // einem gestoppten Server „seit … ohne Unterbrechung".
+        laufzeit:      server.status === 'online' ? baueLaufzeit(server.laeuft_seit) : null,
+        laeuft:        server.status === 'online',
         spieler:       baueSpieler(server, zusatz.live),
         einstellungen: baueEinstellungen(server, paket, hoehe),
         befehle:       baueBefehle(paket),

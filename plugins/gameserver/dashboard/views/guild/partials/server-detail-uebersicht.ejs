@@ -147,9 +147,12 @@
         </div>
 
         <div class="fb-muted" style="font-size:13px">
-          <%= u.laufzeit ? u.laufzeit.text : 'Laufzeit wird erst ab dem nächsten Start gezählt.' %>
+          <%# Der Hinweis gilt nur noch für einen Server, der schon vor dem
+              ersten Schreiben von `laeuft_seit` (2026-10-25) lief. Ein
+              gestoppter Server hat keine Laufzeit — dort steht nichts. %>
+          <% if (u.laufzeit) { %><%= u.laufzeit.text %><% } else if (u.laeuft) { %>Laufzeit wird erst ab dem nächsten Start gezählt.<% } %>
           <% if (u.kennzahlen) { %>
-            &nbsp;·&nbsp;
+            <% if (u.laufzeit || u.laeuft) { %>&nbsp;·&nbsp;<% } %>
             <% if (u.kennzahlen.cpu !== null) { %>CPU <span class="fb-mono"><%= u.kennzahlen.cpu.toFixed(1) %>&nbsp;%</span><% } %>
             <% if (u.kennzahlen.ram !== null) { %>&nbsp; RAM <span class="fb-mono"><%= Math.round(u.kennzahlen.ram) %><%= u.kennzahlen.ramMax ? '/' + Math.round(u.kennzahlen.ramMax) : '' %>&nbsp;MB</span><% } %>
           <% } %>
