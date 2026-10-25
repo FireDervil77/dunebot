@@ -8,6 +8,29 @@
  * @context {boolean} istKontrollGuild - sieht auch fremde guild_only-Eintraege
  * @context {string}  ladeFehler       - gesetzt, wenn die Abfrage scheiterte
 %>
+<%
+  // Die Kategorien an EINER Stelle — Auswahl im Formular und Abzeichen an der
+  // Liste lesen beide hier. Vorher stand im Abzeichen der rohe Schlüssel
+  // („dashboard"), und eine neue Kategorie hätte englisch dagestanden.
+  // Der Wert landet in user_feedback.category (varchar), der Router prüft keine
+  // Liste — ein alter, hier nicht mehr geführter Wert zeigt sich roh.
+  // Spiele und Erweiterungen für Spiele seit 2026-10-25 (Betreiber).
+  const kategorien = [
+    ['',                'GENERAL',         'Allgemein'],
+    ['commands',        'COMMANDS',        'Commands'],
+    ['dashboard',       'DASHBOARD',       'Dashboard'],
+    ['plugins',         'PLUGINS',         'Plugins'],
+    ['games',           'GAMES',           'Spiele (neues Spiel für den Gameserver)'],
+    ['game_extensions', 'GAME_EXTENSIONS', 'Erweiterungen für Spiele (Mods, Modpacks, Karten)'],
+    ['integration',     'INTEGRATION',     'Integration'],
+    ['ui',              'UI',              'Benutzeroberfläche'],
+    ['other',           'OTHER',           'Sonstiges'],
+  ];
+  const kategorieName = (wert) => {
+    const k = kategorien.find(([w]) => w === wert);
+    return k ? tr('FEATURE_REQUEST.CATEGORIES.' + k[1], k[2]) : wert;
+  };
+%>
 
 <%# ── Hinweis ─────────────────────────────────────────────────────────────── %>
 <div class="alert alert-info alert-dismissible mb-3" role="alert">
@@ -96,7 +119,7 @@ function _kennzahl(farbe, symbol, wert, beschriftung) {
 
                             <div class="d-flex gap-2 align-items-center flex-wrap">
                                 <% if (feature.category) { %>
-                                    <span class="badge bg-secondary-lt"><%= feature.category %></span>
+                                    <span class="badge bg-secondary-lt"><%= kategorieName(feature.category) %></span>
                                 <% } %>
 
                                 <%
@@ -177,13 +200,9 @@ function _kennzahl(farbe, symbol, wert, beschriftung) {
                     <div class="mb-3">
                         <label class="form-label"><%= tr('FEATURE_REQUEST.CATEGORY_LABEL', 'Kategorie') %></label>
                         <select class="form-select" name="category">
-                            <option value="">Allgemein</option>
-                            <option value="commands">Commands</option>
-                            <option value="dashboard">Dashboard</option>
-                            <option value="plugins">Plugins</option>
-                            <option value="integration">Integration</option>
-                            <option value="ui">Benutzeroberfläche</option>
-                            <option value="other">Sonstiges</option>
+                            <% kategorien.forEach(function (k) { %>
+                              <option value="<%= k[0] %>"><%= tr('FEATURE_REQUEST.CATEGORIES.' + k[1], k[2]) %></option>
+                            <% }); %>
                         </select>
                     </div>
                     <div class="mb-3">

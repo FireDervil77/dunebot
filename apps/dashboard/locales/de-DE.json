@@ -542,6 +542,17 @@
     "NO_FEATURES": "Keine Feature Requests vorhanden",
     "TITLE_LABEL": "Titel",
     "CATEGORY_LABEL": "Kategorie",
+    "CATEGORIES": {
+      "GENERAL": "Allgemein",
+      "COMMANDS": "Commands",
+      "DASHBOARD": "Dashboard",
+      "PLUGINS": "Plugins",
+      "GAMES": "Spiele (neues Spiel für den Gameserver)",
+      "GAME_EXTENSIONS": "Erweiterungen für Spiele (Mods, Modpacks, Karten)",
+      "INTEGRATION": "Integration",
+      "UI": "Benutzeroberfläche",
+      "OTHER": "Sonstiges"
+    },
     "DESCRIPTION_LABEL": "Beschreibung",
     "DESCRIPTION_HINT": "Beschreibe das Feature so detailliert wie möglich"
   },

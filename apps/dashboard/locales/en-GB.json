@@ -523,6 +523,17 @@
     "NO_FEATURES": "No feature requests available",
     "TITLE_LABEL": "Title",
     "CATEGORY_LABEL": "Category",
+    "CATEGORIES": {
+      "GENERAL": "General",
+      "COMMANDS": "Commands",
+      "DASHBOARD": "Dashboard",
+      "PLUGINS": "Plugins",
+      "GAMES": "Games (new game for the game server)",
+      "GAME_EXTENSIONS": "Game extensions (mods, modpacks, maps)",
+      "INTEGRATION": "Integration",
+      "UI": "User interface",
+      "OTHER": "Other"
+    },
     "DESCRIPTION_LABEL": "Description",
     "DESCRIPTION_HINT": "Describe the feature as detailed as possible"
   },
