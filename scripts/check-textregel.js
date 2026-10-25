@@ -176,7 +176,8 @@ pruefe('Werkbank: Formular hat die Felder, Bearbeiten f√ºllt sie, Probewerte pr√
     assert.match(ejs, /data-nur-typ="text password"[\s\S]{0,300}name="pattern"[\s\S]{0,300}name="pattern_hint_de"[\s\S]{0,300}name="pattern_hint_en"/);
     assert.match(ejs, /formE\.pattern\.value = e\.pattern \|\| ''/);
     const quelle = ohneKommentare(lies('plugins/werkbank/dashboard/helpers/Sitzungen.js'));
-    assert.match(quelle, /'pattern', 'pattern_hint'\]/, 'EINSTELLUNG_FELDER: eine geleerte Regel bliebe stehen');
+    const felder = /const EINSTELLUNG_FELDER = \[([^\]]*)\]/.exec(quelle);
+    assert.ok(felder && /'pattern'/.test(felder[1]) && /'pattern_hint'/.test(felder[1]), 'EINSTELLUNG_FELDER: eine geleerte Regel bliebe stehen');
     assert.match(quelle, /const fehler = Textregel\.fehlerDesWerts\(einstellung, wert\);\s*if \(fehler\) throw/);
 });
 

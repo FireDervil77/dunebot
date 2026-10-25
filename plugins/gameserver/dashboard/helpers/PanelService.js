@@ -149,7 +149,7 @@ class PanelService {
             : (server.game_data || {});
         const { display } = resolveStatusConfig(gameData);
 
-        const verbindung = await PanelService._verbindung(dbService, server);
+        const { verbindung, passwort } = await PanelService._ausDemPaket(dbService, server);
 
         let pushed = 0, skipped = 0;
 
@@ -161,6 +161,7 @@ class PanelService {
                 display,
                 gameName: server.game_name,
                 verbindung,
+                passwort,
             });
             const hash = payloadHash(payload);
 
@@ -186,35 +187,64 @@ class PanelService {
     }
 
     /**
-     * Die Verbindungsangabe fürs Panel (Stufe 9) — dieselbe Rechnung wie auf
-     * der Serverseite (`baueVerbindung`), als fertiges Label/Text-Paar.
+     * Was das Panel aus dem Paket braucht — einmal geladen, zwei Angaben.
      *
-     * Nur wenn das Paket `connect` nennt: Bisher stand im Panel keine Adresse,
-     * und ein Feld, das plötzlich in jedem Panel auftaucht, wäre eine Änderung,
-     * die niemand bestellt hat. Ein Fehler beim Laden kostet nur dieses Feld.
+     * Verbindung (Stufe 9): dieselbe Rechnung wie auf der Serverseite
+     * (`baueVerbindung`), als fertiges Label/Text-Paar. Nur wenn das Paket
+     * `connect` nennt: Bisher stand im Panel keine Adresse, und ein Feld, das
+     * plötzlich in jedem Panel auftaucht, wäre eine Änderung, die niemand
+     * bestellt hat.
+     *
+     * Passwort (S5): nur die Einstellung mit `join_password`; ob es im Panel
+     * steht, entscheidet der Schalter am Panel (der Presenter fragt ihn).
+     *
+     * Ein Fehler beim Laden kostet nur diese beiden Felder.
      *
      * @private
-     * @returns {Promise<{label: string, text: string}|null>}
+     * @returns {Promise<{verbindung: {label, text}|null, passwort: {name, wert}|null}>}
      */
-    static async _verbindung(dbService, server) {
+    static async _ausDemPaket(dbService, server) {
+        const leer = { verbindung: null, passwort: null };
         try {
             const { ladePaketFuerServer } = require('./Paketfassung');
-            const { baueVerbindung, baueAdresse } = require('./Serverseite');
+            const { baueVerbindung, baueAdresse, beitrittsPasswort } = require('./Serverseite');
             const zeile = await ladePaketFuerServer(dbService, server.id);
-            if (!zeile) return null;
+            if (!zeile) return leer;
             const paket = typeof zeile.paket_json === 'string' ? JSON.parse(zeile.paket_json) : zeile.paket_json;
+            const pw = beitrittsPasswort(paket, server);
+            const passwort = pw ? { name: pw.name, wert: pw.wert } : null;
+
             const v = baueVerbindung(paket, server);
-            if (!v) return null;
+            if (!v) return { verbindung: null, passwort };
             if (v.art === 'einstellung') {
-                return { label: v.label, text: v.wert || 'noch nicht festgelegt' };
+                return { verbindung: { label: v.label, text: v.wert || 'noch nicht festgelegt' }, passwort };
             }
             const adresse = baueAdresse(server);
             const zeile1 = adresse?.zeilen?.find(z => z.zweck === 'game') || adresse?.zeilen?.[0];
-            return zeile1 ? { label: v.label || 'Adresse', text: zeile1.ip || zeile1.text } : null;
+            return {
+                verbindung: zeile1 ? { label: v.label || 'Adresse', text: zeile1.ip || zeile1.text } : null,
+                passwort,
+            };
         } catch (err) {
-            ServiceManager.get('Logger')?.warn?.(`[PanelService] Verbindungsangabe für Server ${server.id} nicht gebaut: ${err.message}`);
-            return null;
+            ServiceManager.get('Logger')?.warn?.(`[PanelService] Angaben aus dem Paket für Server ${server.id} nicht gebaut: ${err.message}`);
+            return leer;
         }
+    }
+
+    /**
+     * Nennt das Paket dieses Servers ein Beitrittspasswort? Für das Formular:
+     * Ohne `join_password` hätte der Schalter nichts zu zeigen.
+     *
+     * @returns {Promise<{name: string}|null>}
+     */
+    static async passwortVerfuegbar(serverId) {
+        const dbService = ServiceManager.get('dbService');
+        const { ladePaketFuerServer } = require('./Paketfassung');
+        const zeile = await ladePaketFuerServer(dbService, serverId);
+        if (!zeile) return null;
+        const paket = typeof zeile.paket_json === 'string' ? JSON.parse(zeile.paket_json) : zeile.paket_json;
+        const e = (paket?.settings || []).find(s => s.join_password === true && s.type === 'password');
+        return e ? { name: (e.name && (e.name.de || e.name.en)) || e.key } : null;
     }
 
     /**
@@ -341,6 +371,7 @@ class PanelService {
             show_players:  !!panel.show_players,
             show_controls: !!panel.show_controls,
             show_refresh:  !!panel.show_refresh,
+            show_password: !!panel.show_password,
         };
     }
 
@@ -357,29 +388,31 @@ class PanelService {
      * @param {string} args.channelId
      * @param {boolean} [args.showPlayers]
      * @param {boolean} [args.showControls]
+     * @param {boolean} [args.showPassword] - Beitrittspasswort als Spoiler (Vorgabe aus)
      * @param {number} [args.minIntervalS]
      * @param {string} [args.createdBy]
      * @returns {Promise<object>} angelegtes Panel
      */
     static async create({ guildId, serverId, channelId, showPlayers = false,
-                          showControls = true, showRefresh = true,
+                          showControls = true, showRefresh = true, showPassword = false,
                           minIntervalS = 60, createdBy = null }) {
         const dbService = ServiceManager.get('dbService');
 
         await dbService.query(
             `INSERT INTO gameserver_status_panels
                 (guild_id, server_id, channel_id, show_players, show_controls, show_refresh,
-                 min_interval_s, created_by)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 show_password, min_interval_s, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE
                 show_players   = VALUES(show_players),
                 show_controls  = VALUES(show_controls),
                 show_refresh   = VALUES(show_refresh),
+                show_password  = VALUES(show_password),
                 min_interval_s = VALUES(min_interval_s),
                 enabled        = 1,
                 last_error     = NULL`,
             [guildId, serverId, channelId, showPlayers ? 1 : 0, showControls ? 1 : 0,
-             showRefresh ? 1 : 0, Math.max(MIN_INTERVAL_UNTERGRENZE, Number(minIntervalS) || 60), createdBy]
+             showRefresh ? 1 : 0, showPassword ? 1 : 0, Math.max(MIN_INTERVAL_UNTERGRENZE, Number(minIntervalS) || 60), createdBy]
         );
 
         PanelService.invalidateIndex();
@@ -409,11 +442,12 @@ class PanelService {
      * @param {boolean} [args.showPlayers]
      * @param {boolean} [args.showControls]
      * @param {boolean} [args.showRefresh]
+     * @param {boolean} [args.showPassword]
      * @param {number}  [args.minIntervalS]
      * @returns {Promise<object|null>} geändertes Panel oder null
      */
     static async update({ guildId, panelId, serverId, channelId, showPlayers, showControls,
-                          showRefresh, minIntervalS }) {
+                          showRefresh, showPassword, minIntervalS }) {
         const dbService = ServiceManager.get('dbService');
 
         // Zwei Wege zum selben Panel: Das Dashboard kennt die id, der Bot-Befehl
@@ -434,6 +468,7 @@ class PanelService {
         if (showPlayers  !== undefined && showPlayers  !== null) { sets.push('show_players = ?');  values.push(showPlayers  ? 1 : 0); }
         if (showControls !== undefined && showControls !== null) { sets.push('show_controls = ?'); values.push(showControls ? 1 : 0); }
         if (showRefresh  !== undefined && showRefresh  !== null) { sets.push('show_refresh = ?');  values.push(showRefresh  ? 1 : 0); }
+        if (showPassword !== undefined && showPassword !== null) { sets.push('show_password = ?'); values.push(showPassword ? 1 : 0); }
         if (minIntervalS !== undefined && minIntervalS !== null) {
             sets.push('min_interval_s = ?');
             values.push(Math.max(MIN_INTERVAL_UNTERGRENZE, Number(minIntervalS) || 60));

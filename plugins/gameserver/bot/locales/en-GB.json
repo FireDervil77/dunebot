@@ -33,6 +33,7 @@
         "OPT_PANEL_CONTROLS": "Buttons to start and stop (default: yes)",
         "OPT_PANEL_INTERVAL": "Minimum seconds between updates (default 60)",
         "SUB_PANEL_EDIT": "Change the settings of a status panel",
-        "OPT_PANEL_REFRESH": "Show the 'reload' button (default: yes)"
+        "OPT_PANEL_REFRESH": "Show the 'reload' button (default: yes)",
+        "OPT_PANEL_PASSWORD": "Show the join password as a spoiler – anyone in the channel can reveal it (default: no)"
     }
 }

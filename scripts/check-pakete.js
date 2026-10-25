@@ -231,6 +231,11 @@ function pruefeInvarianten(paket) {
             + `Weg für dieselbe Aussage, gebaut ohne nachzusehen, dass das Wurzelfeld längst da war.`);
     }
 
+    const beitritt = (paket.settings || []).filter(s => s.join_password === true);
+    if (beitritt.length > 1) {
+        verstoesse.push(`join_password an ${beitritt.map(s => `"${s.key}"`).join(' und ')} — das Panel zeigt genau EIN Beitrittspasswort.`);
+    }
+
     // ── Einstellungen: Ziel muss vollständig beschrieben sein ────────────────
     for (const s of paket.settings || []) {
         for (const z of s.apply || []) {
@@ -314,6 +319,11 @@ function pruefeInvarianten(paket) {
                     hinweise.push(`Einstellung "${s.key}": pattern ohne pattern_hint — am Feld steht dann der Ausdruck selbst.`);
                 }
             }
+        }
+        // Beitrittspasswort (Stufe 9 S5): nur ein Passwort, und nur eines je
+        // Paket — das Panel zeigt genau diese Einstellung.
+        if (s.join_password !== undefined && s.type !== 'password') {
+            verstoesse.push(`Einstellung "${s.key}": join_password gilt nur für type "password".`);
         }
         if (Textregel.hatRegel(s) && s.default !== undefined && s.default !== null) {
             const vorgabe = Textregel.fehlerDesWerts(s, s.default);

@@ -1697,12 +1697,24 @@ router.get('/:serverId/panels', requirePermission('GAMESERVER.VIEW'), async (req
 
         const panels = await dbService.query(
             `SELECT id, channel_id, message_id, enabled, min_interval_s,
-                    show_players, show_controls, show_refresh, last_pushed_at, last_error
+                    show_players, show_controls, show_refresh, show_password, last_pushed_at, last_error
              FROM gameserver_status_panels
              WHERE server_id = ? AND guild_id = ?
              ORDER BY id`,
             [serverId, guildId]
         );
+
+        // Nennt das Paket ein Beitrittspasswort (Stufe 9 S5)? Ohne zeigt das
+        // Formular den Schalter nicht an — er hätte nichts zu zeigen. Der Wert
+        // selbst geht nicht mit: Das Formular braucht nur den Namen.
+        let passwort = null;
+        try {
+            const [gehoert] = await dbService.query(
+                'SELECT id FROM gameservers WHERE id = ? AND guild_id = ? LIMIT 1', [serverId, guildId]);
+            if (gehoert) passwort = await PanelService.passwortVerfuegbar(serverId);
+        } catch (err) {
+            Logger.warn(`[Gameserver] Beitrittspasswort für Server ${serverId} nicht ermittelt: ${err.message}`);
+        }
 
         // Kanalnamen kennt nur der Bot. Dafür gibt es den Kern-Handler
         // GET_GUILD_CHANNELS – ein plugin-eigener wäre eine Dublette. Fällt der
@@ -1717,7 +1729,7 @@ router.get('/:serverId/panels', requirePermission('GAMESERVER.VIEW'), async (req
             if (hit) channels = hit.channels || [];
         }
 
-        return res.json({ success: true, panels, channels });
+        return res.json({ success: true, panels, channels, passwort });
 
     } catch (error) {
         Logger.error('[Gameserver] Panels nicht geladen:', error);
@@ -1737,7 +1749,7 @@ router.post('/:serverId/panels', requirePermission('GAMESERVER.EDIT'), async (re
     try {
         const guildId  = res.locals.guildId;
         const serverId = Number(req.params.serverId);
-        const { channel_id: channelId, show_players, show_controls, show_refresh, min_interval_s } = req.body;
+        const { channel_id: channelId, show_players, show_controls, show_refresh, show_password, min_interval_s } = req.body;
 
         if (!channelId) {
             return res.status(400).json({ success: false, error: 'Kanal fehlt' });
@@ -1759,6 +1771,7 @@ router.post('/:serverId/panels', requirePermission('GAMESERVER.EDIT'), async (re
             showPlayers:  toBool(show_players),
             showControls: show_controls === undefined ? true : toBool(show_controls),
             showRefresh:  show_refresh  === undefined ? true : toBool(show_refresh),
+            showPassword: toBool(show_password),
             minIntervalS: Number(min_interval_s) || 60,
             createdBy:    res.locals.user?.id || null,
         });
@@ -1784,7 +1797,7 @@ router.patch('/:serverId/panels/:panelId', requirePermission('GAMESERVER.EDIT'),
     const Logger = ServiceManager.get('Logger');
 
     try {
-        const { show_players, show_controls, show_refresh, min_interval_s } = req.body;
+        const { show_players, show_controls, show_refresh, show_password, min_interval_s } = req.body;
 
         const panel = await PanelService.update({
             guildId:      res.locals.guildId,
@@ -1792,6 +1805,7 @@ router.patch('/:serverId/panels/:panelId', requirePermission('GAMESERVER.EDIT'),
             showPlayers:  show_players   === undefined ? undefined : toBool(show_players),
             showControls: show_controls  === undefined ? undefined : toBool(show_controls),
             showRefresh:  show_refresh   === undefined ? undefined : toBool(show_refresh),
+            showPassword: show_password  === undefined ? undefined : toBool(show_password),
             minIntervalS: min_interval_s === undefined ? undefined : Number(min_interval_s),
         });
 

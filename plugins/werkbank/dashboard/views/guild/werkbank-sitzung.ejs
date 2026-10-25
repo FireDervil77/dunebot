@@ -1559,6 +1559,15 @@
                 <span class="form-check-label">Pflicht — ohne Wert startet das Spiel nicht</span>
               </label>
             </div>
+            <%# Stufe 9 S5: DAS Passwort, mit dem Spieler beitreten — nur diese
+                Einstellung darf ein Discord-Panel zeigen (als Spoiler, wenn
+                der Besitzer es am Panel einschaltet). Höchstens eine je Paket. %>
+            <div class="col-md-6 d-flex align-items-end" data-nur-typ="password">
+              <label class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" name="join_password">
+                <span class="form-check-label">Beitrittspasswort — darf ins Discord-Panel (nie RCON- oder Kontozugang)</span>
+              </label>
+            </div>
             <div class="col-12" data-nur-typ="choice flags">
               <div class="form-label"><label for="eAuswahl">Möglichkeiten</label><span data-nur-typ="flags"><%- include('werkbank-hilfe', { text:
                 'Für Werte, die das Spiel als Summe liest — in der Doku steht dann „1 = …, 2 = …, 4 = …, addieren". '
@@ -3397,6 +3406,7 @@
         formE.pattern_hint_de.value = (e.pattern_hint && e.pattern_hint.de) || '';
         formE.pattern_hint_en.value = (e.pattern_hint && e.pattern_hint.en) || '';
         formE.required.checked = !!e.required;
+        formE.join_password.checked = !!e.join_password;
         formE.choices.value = (e.choices || []).map(function (c) { return c.value + (c.name && c.name.de ? '=' + c.name.de : ''); }).join('\n');
         formE.role.value = (e.role === 'player' && e.ask_on_create === false) ? 'player_spaeter' : e.role;
         formE.takes_effect.value = e.takes_effect;

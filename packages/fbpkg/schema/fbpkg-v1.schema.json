@@ -662,6 +662,10 @@
           "maxLength": 200,
           "description": "Nur bei type `text` und `password`: regulaerer Ausdruck, den der Wert GANZ erfuellen muss (das Panel setzt `^(?:…)$` darum). Ein leerer Wert wird nicht geprueft — ob einer da sein muss, sagt `required`. Geprueft beim Anlegen (Dashboard und Discord), beim Speichern und in der Werkbank.\n\nSeit 2026-10-25 (Stufe 9): Der Windrose-Einladungscode braucht mindestens 6 Zeichen aus 0–9, a–z, A–Z. Ohne Regel lief ein falscher Code erst beim Start auf — als Absturz des Spiels."
         },
+        "join_password": {
+          "type": "boolean",
+          "description": "Nur bei type `password`, hoechstens eine je Paket: DAS Passwort, mit dem Spieler beitreten. Nur diese Einstellung darf das Discord-Panel zeigen (Schalter `show_password` am Panel, als Spoiler). Fehlt die Markierung, zeigt kein Panel ein Passwort.\n\nSeit 2026-10-25 (Stufe 9 S5). Warum ausdruecklich und nicht 'das erste Passwort': Bei Minecraft ist das erste Passwort der RCON-Zugang, bei Factorio das Kennwort des factorio.com-Kontos."
+        },
         "pattern_hint": {
           "$ref": "#/definitions/text",
           "description": "Die Regel in Worten, fuer Menschen: steht am Feld und in der Meldung, wenn der Wert nicht passt. Ohne sie zeigt das Panel den Ausdruck selbst."

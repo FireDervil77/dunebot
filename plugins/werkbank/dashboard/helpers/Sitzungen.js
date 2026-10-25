@@ -698,7 +698,7 @@ const START_FELDER = ['program', 'workdir', 'args', 'stop', 'ready_when'];
 const BEREIT_FELDER = ['port', 'log_line', 'without_port', 'timeout_sec'];
 const EINSTELLUNG_FELDER = ['key', 'group', 'name', 'description', 'type', 'default', 'min', 'max',
     'choices', 'apply', 'takes_effect', 'risk', 'role', 'ask_on_create', 'required', 'item_pattern', 'max_items',
-    'pattern', 'pattern_hint'];
+    'pattern', 'pattern_hint', 'join_password'];
 
 /**
  * `neu` ersetzt in `vorher` genau die Felder, die das Formular kennt — ein
@@ -1294,6 +1294,11 @@ function einstellungAusFormular(b) {
         throw new Error('Vorgabe: die Summe, mit der das Spiel startet — 0, wenn nichts angekreuzt sein soll.');
     }
     if (b.required === true || b.required === 'on' || b.required === '1') e.required = true;
+    // Beitrittspasswort (Stufe 9 S5): nur ein Passwort kann es sein.
+    if (b.join_password === true || b.join_password === 'on' || b.join_password === '1') {
+        if (e.type !== 'password') throw new Error('Beitrittspasswort: nur eine Einstellung vom Typ Passwort.');
+        e.join_password = true;
+    }
 
     // Ziele: je Zeile eines. Das Formular schickt sie als Liste.
     const ziele = Array.isArray(b.apply) ? b.apply : [];
@@ -1370,6 +1375,9 @@ async function einstellungSpeichern(sitzung, formular) {
         const liste = Array.isArray(e.settings) ? e.settings : [];
         const doppelt = liste.find(x => x.key === neu.key && x.key !== alt);
         if (doppelt) throw new Error(`Den Schlüssel „${neu.key}" gibt es schon.`);
+        // Das Panel zeigt genau EIN Beitrittspasswort — kein stilles Umhängen.
+        const zweites = neu.join_password && liste.find(x => x.join_password === true && x.key !== (alt || neu.key));
+        if (zweites) throw new Error(`Beitrittspasswort ist schon „${zweites.key}" — dort zuerst abschalten.`);
         const i = liste.findIndex(x => x.key === (alt || neu.key));
         // Felder, die das Formular nicht kennt (`managed_by`, `warn_text`,
         // `required_when` … an einer Einstellung aus einem geöffneten Paket),

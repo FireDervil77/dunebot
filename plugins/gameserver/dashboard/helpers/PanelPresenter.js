@@ -170,6 +170,40 @@ function playerListField(players) {
 }
 
 /**
+ * Text so, dass Discord ihn wörtlich zeigt — für den Inhalt eines Spoilers.
+ *
+ * Ein `|` im Passwort beendete sonst den Spoiler mittendrin (der Rest stünde
+ * offen da), ein `*` oder `_` machte Teile fett oder kursiv und verschluckte
+ * dabei die Zeichen. Der Rückstrich davor ist Discords eigenes Mittel.
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+function woertlich(text) {
+    return String(text).replace(/[\\`*_~|>#\-\[\]()]/g, '\\$&');
+}
+
+/**
+ * Das Passwort-Feld (Stufe 9 S5) — nur wenn der Besitzer es am Panel
+ * eingeschaltet hat UND das Paket ein Beitrittspasswort nennt.
+ *
+ * Als Spoiler: verdeckt, bis jemand klickt. Das schützt nicht — jeder im Kanal
+ * kann klicken; das Formular sagt es so. Hat der Server kein Passwort, steht
+ * das ehrlich da statt eines leeren Spoilers.
+ *
+ * @param {{name: string, wert: string|null}|null} passwort
+ * @returns {{name: string, value: string, inline: boolean}|null}
+ */
+function passwortField(passwort) {
+    if (!passwort) return null;
+    return {
+        name:   passwort.name || 'Passwort',
+        value:  passwort.wert ? `||${woertlich(passwort.wert)}||` : 'kein Passwort gesetzt',
+        inline: true,
+    };
+}
+
+/**
  * Baut die vollständige Panel-Nutzlast für den Bot.
  *
  * @param {object} args
@@ -178,9 +212,11 @@ function playerListField(players) {
  * @param {object} args.snapshot - Snapshot aus dem StatusService
  * @param {object} args.display - display-Block des Addons
  * @param {string} [args.gameName]
+ * @param {{label: string, text: string}|null} [args.verbindung] - PanelService._ausDemPaket
+ * @param {{name: string, wert: string|null}|null} [args.passwort] - nur gezeigt bei panel.show_password
  * @returns {object} Nutzlast für gameserver:UPDATE_STATUS_PANEL
  */
-function buildPanelPayload({ panel, server, snapshot, display, gameName, verbindung = null }) {
+function buildPanelPayload({ panel, server, snapshot, display, gameName, verbindung = null, passwort = null }) {
     const online = !!snapshot.online;
 
     // Die Feld-Quellen aus display.fields zeigen auf die Query-Form (map, ping,
@@ -205,6 +241,11 @@ function buildPanelPayload({ panel, server, snapshot, display, gameName, verbind
     // Als Code-Feld, damit es sich in Discord mit einem Klick kopieren lässt.
     if (verbindung && verbindung.label && verbindung.text) {
         fields.push({ name: verbindung.label, value: `\`${verbindung.text}\``, inline: false });
+    }
+
+    if (panel.show_password) {
+        const feld = passwortField(passwort);
+        if (feld) fields.push(feld);
     }
 
     if (online && panel.show_players) {
@@ -288,5 +329,7 @@ module.exports = {
     formatValue,
     fieldValue,
     playerCountText,
+    passwortField,
+    woertlich,
     MAX_PLAYER_NAMES,
 };

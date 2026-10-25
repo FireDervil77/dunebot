@@ -222,6 +222,12 @@ module.exports = {
                         required: false,
                     },
                     {
+                        name: 'passwort',
+                        type: ApplicationCommandOptionType.Boolean,
+                        description: 'gameserver:SERVER.OPT_PANEL_PASSWORD',
+                        required: false,
+                    },
+                    {
                         name: 'abstand',
                         type: ApplicationCommandOptionType.Integer,
                         description: 'gameserver:SERVER.OPT_PANEL_INTERVAL',
@@ -267,6 +273,12 @@ module.exports = {
                         name: 'spielernamen',
                         type: ApplicationCommandOptionType.Boolean,
                         description: 'gameserver:SERVER.OPT_PANEL_PLAYERS',
+                        required: false,
+                    },
+                    {
+                        name: 'passwort',
+                        type: ApplicationCommandOptionType.Boolean,
+                        description: 'gameserver:SERVER.OPT_PANEL_PASSWORD',
                         required: false,
                     },
                     {
@@ -545,6 +557,7 @@ module.exports = {
                         show_controls:  interaction.options.getBoolean('buttons')      ?? true,
                         show_refresh:   interaction.options.getBoolean('neu_laden')    ?? true,
                         show_players:   interaction.options.getBoolean('spielernamen') ?? false,
+                        show_password:  interaction.options.getBoolean('passwort')     ?? false,
                         min_interval_s: interaction.options.getInteger('abstand')      ?? 60,
                         actor_user_id:  interaction.user.id,
                     }, 30_000);
@@ -554,6 +567,10 @@ module.exports = {
                     const hints = [`Panel steht in ${channel}.`];
                     if (res.data?.show_players) {
                         hints.push('⚠️ **Spielernamen sind sichtbar** – jeder im Kanal sieht, wer online ist.');
+                    }
+                    if (res.data?.show_password) {
+                        hints.push('⚠️ **Das Beitrittspasswort steht als Spoiler im Panel** – verdeckt, aber jeder im '
+                            + 'Kanal kann es mit einem Klick aufdecken. Nennt das Spielpaket keines, bleibt das Feld weg.');
                     }
                     if (res.data?.show_controls) {
                         hints.push(
@@ -587,6 +604,7 @@ module.exports = {
                         show_controls:  interaction.options.getBoolean('buttons'),
                         show_refresh:   interaction.options.getBoolean('neu_laden'),
                         show_players:   interaction.options.getBoolean('spielernamen'),
+                        show_password:  interaction.options.getBoolean('passwort'),
                         min_interval_s: interaction.options.getInteger('abstand'),
                         actor_user_id:  interaction.user.id,
                     }, 30_000);
@@ -602,6 +620,7 @@ module.exports = {
                                 { name: 'Start/Stop',    value: d.show_controls ? 'an' : 'aus',                 inline: true },
                                 { name: 'Neu laden',     value: d.show_refresh  ? 'an' : 'aus',                 inline: true },
                                 { name: 'Spielernamen',  value: d.show_players  ? '⚠️ sichtbar' : 'verborgen',  inline: true },
+                                { name: 'Passwort',      value: d.show_password ? '⚠️ als Spoiler' : 'verborgen', inline: true },
                                 { name: 'Mindestabstand', value: `${d.min_interval_s} s`,                        inline: true },
                             )
                             .setColor(0x57F287)
@@ -657,8 +676,9 @@ module.exports = {
                         const flags = [
                             buttons.length ? buttons.join(' + ') : 'nur Anzeige',
                             p.show_players  ? '⚠️ Namen sichtbar' : 'ohne Namen',
+                            p.show_password ? '⚠️ Passwort als Spoiler' : null,
                             p.enabled ? `alle ${p.min_interval_s} s` : '⛔ stillgelegt',
-                        ];
+                        ].filter(Boolean);
                         embed.addFields({
                             name:  `#${p.server_id} — ${p.server_name || 'unbekannt'}`,
                             value: `<#${p.channel_id}> · ${flags.join(' · ')}`

@@ -344,6 +344,30 @@ function baueVerbindung(paket, server = {}) {
     };
 }
 
+/**
+ * Das Beitrittspasswort fürs Discord-Panel (Stufe 9 S5) — oder null.
+ *
+ * Nur die Einstellung, die das Paket ausdrücklich als `join_password` nennt.
+ * Nie „das erste Passwort": Das wäre bei Minecraft der RCON-Zugang, bei
+ * Factorio das Kennwort des factorio.com-Kontos. Wirkt die Einstellung gerade
+ * nicht (`applies_when`), gibt es auch nichts zu zeigen.
+ *
+ * @returns {{key: string, name: string, wert: string|null}|null}
+ *          `wert` null heißt: der Server hat kein Passwort gesetzt
+ */
+function beitrittsPasswort(paket, server = {}) {
+    const e = (paket?.settings || []).find(s => s.join_password === true && s.type === 'password');
+    if (!e) return null;
+    const werte = geltendeWerte(paket, server);
+    if (e.applies_when && !Bedingung.trifftZu(e.applies_when, werte)) return null;
+    const wert = werte[e.key];
+    return {
+        key:  e.key,
+        name: (e.name && (e.name.de || e.name.en)) || e.key,
+        wert: wert === undefined || wert === null || String(wert) === '' ? null : String(wert),
+    };
+}
+
 function baueAdresse(server) {
     const nameGilt = Boolean(server.fqdn_gilt) && Boolean(server.fqdn);
     const host = server.bind_ip
@@ -1573,6 +1597,7 @@ module.exports.TON_FARBE = TON_FARBE;
 module.exports.INSTALL_PHASE = INSTALL_PHASE;
 module.exports.baueKnopfzeile = baueKnopfzeile;
 module.exports.baueVerbindung = baueVerbindung;
+module.exports.beitrittsPasswort = beitrittsPasswort;
 module.exports.baueAdresse = baueAdresse;
 module.exports.geltendeWerte = geltendeWerte;
 module.exports.bauePille = bauePille;

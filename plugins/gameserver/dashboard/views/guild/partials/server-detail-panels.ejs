@@ -96,6 +96,23 @@
                     steht ohnehin immer im Panel.
                 </div>
 
+                <%# Stufe 9 S5: nur wenn das Paket ein Beitrittspasswort nennt
+                    (`join_password`) — load() blendet den Block dann ein. %>
+                <div id="panel-password-block" hidden>
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" id="panel-password">
+                        <label class="form-check-label" for="panel-password">
+                            <span data-passwort-name>Passwort</span> als Spoiler anzeigen
+                        </label>
+                    </div>
+                    <div class="form-text mb-3 text-warning-emphasis">
+                        Standardmäßig aus. Discord zeigt einen Spoiler verdeckt, bis jemand
+                        draufklickt — <strong>das schützt nicht</strong>: Jeder, der den Kanal
+                        sieht, kann ihn aufdecken. Nur einschalten, wenn alle im Kanal das
+                        Passwort ohnehin bekommen sollen.
+                    </div>
+                </div>
+
                 <button class="btn btn-primary w-100" id="panel-create">
                     <i class="fab fa-discord me-1"></i>Panel anlegen und posten
                 </button>
@@ -110,6 +127,8 @@
     const BASE = '/guild/<%= guildId %>/plugins/gameserver/servers/' + SERVER_ID + '/panels';
 
     let channels = [];
+    // Nennt das Paket ein Beitrittspasswort? { name } oder null — aus GET /panels.
+    let passwort = null;
 
     function escapeHtml(text) {
         const div = document.createElement('div');
@@ -171,6 +190,11 @@
                  +     toggle(p, 'show_controls', 'Start/Stop')
                  +     toggle(p, 'show_refresh', 'Neu laden')
                  +     toggle(p, 'show_players', 'Spielernamen', 'text-warning-emphasis')
+                 // Auch ohne Paketangabe sichtbar, solange er an ist — sonst
+                 // ließe er sich nicht mehr abschalten.
+                 +     ((passwort || p.show_password)
+                         ? toggle(p, 'show_password', escapeHtml((passwort && passwort.name) || 'Passwort') + ' (Spoiler)', 'text-warning-emphasis')
+                         : '')
                  +     '<div class="d-flex align-items-center">'
                  +       '<span class="small text-secondary me-1">alle</span>'
                  +       '<input type="number" class="form-control form-control-sm" style="width:5.5rem"'
@@ -253,6 +277,10 @@
             if (!data.success) throw new Error(data.error || 'Laden fehlgeschlagen');
 
             channels = data.channels || [];
+            passwort = data.passwort || null;
+            const block = document.getElementById('panel-password-block');
+            block.hidden = !passwort;
+            if (passwort) block.querySelector('[data-passwort-name]').textContent = passwort.name;
             renderChannels();
             renderPanels(data.panels || []);
         } catch (err) {
@@ -282,6 +310,7 @@
                     show_players:   document.getElementById('panel-players').checked,
                     show_controls:  document.getElementById('panel-controls').checked,
                     show_refresh:   document.getElementById('panel-refresh').checked,
+                    show_password:  !!passwort && document.getElementById('panel-password').checked,
                     min_interval_s: Number(document.getElementById('panel-interval').value) || 60,
                 }),
             });
