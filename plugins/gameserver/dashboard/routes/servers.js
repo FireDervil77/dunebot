@@ -22,6 +22,7 @@ const { vergibPortsAusPaket } = require('../helpers/Portvergabe');
 const Inhalte = require('../helpers/Inhalte');
 const Bitmaske = require('../helpers/Bitmaske');
 const Liste = require('../helpers/Liste');
+const Textregel = require('../helpers/Textregel');
 const Quellen = require('../helpers/Quellen');
 const ServerStopp = require('../helpers/ServerStopp');
 const ServerState = require('../helpers/ServerState');
@@ -1012,6 +1013,9 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
         // Ebenso eine Liste mit einem Eintrag, der nicht zur Regel passt.
         const listenFehler = Liste.fehlerInWerten(paket, paketWerte);
         if (listenFehler) return res.status(400).json({ success: false, message: listenFehler });
+        // Ebenso ein Text, der die Regel des Pakets nicht erfüllt (Stufe 9 S4).
+        const textFehler = Textregel.fehlerInWerten(paket, paketWerte);
+        if (textFehler) return res.status(400).json({ success: false, message: textFehler });
         Logger.info(`[Gameserver] Paketwerte festgehalten: ${Object.keys(paketWerte).length} von `
             + `${(paket.settings || []).length} Einstellungen`);
 
@@ -3509,6 +3513,10 @@ router.put('/:serverId/variables', requirePermission('GAMESERVER.EDIT'), async (
             }
             if (Liste.istListe(eintrag)) {
                 const fehler = Liste.fehlerDesWerts(eintrag, wert);
+                if (fehler) return res.status(400).json({ success: false, message: `„${key}": ${fehler}` });
+            }
+            if (Textregel.hatRegel(eintrag)) {
+                const fehler = Textregel.fehlerDesWerts(eintrag, wert);
                 if (fehler) return res.status(400).json({ success: false, message: `„${key}": ${fehler}` });
             }
             // Ja/Nein immer als 1/0 — wie beim Anlegen (paketWerteAnlegen);

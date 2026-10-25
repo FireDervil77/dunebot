@@ -1538,6 +1538,17 @@
               </div>
               <div class="form-hint">Eine Zeile je Eintrag. Die Prüfregel muss jeder Eintrag ganz erfüllen. Geschrieben wird eine Liste von Texten — nur in eine json- oder yaml-Datei.</div>
             </div>
+            <%# Textregel (Stufe 9 S4): was der Wert ganz erfüllen muss, und
+                dieselbe Regel in Worten — die stehen am Feld im Panel. %>
+            <div class="col-md-12" data-nur-typ="text password">
+              <label class="form-label">Prüfregel</label>
+              <div class="input-group">
+                <input class="form-control font-monospace" name="pattern" placeholder="z. B. [0-9A-Za-z]{6,}" autocomplete="off" style="max-width:16rem">
+                <input class="form-control" name="pattern_hint_de" placeholder="in Worten (de): Mindestens 6 Zeichen, nur 0–9, a–z, A–Z" autocomplete="off">
+                <input class="form-control" name="pattern_hint_en" placeholder="in Worten (en)" autocomplete="off">
+              </div>
+              <div class="form-hint">Leer = jeder Text geht. Der Wert muss die Regel ganz erfüllen; ein leerer Wert wird nicht geprüft (dafür ist „Pflicht" da). Die Worte stehen im Panel am Feld und in der Meldung — ohne sie zeigt das Panel den Ausdruck.</div>
+            </div>
             <div class="col-md-3" data-nur-typ="number">
               <label class="form-label">Grenzen</label>
               <div class="input-group"><input class="form-control" name="min" placeholder="min"><input class="form-control" name="max" placeholder="max"></div>
@@ -3382,6 +3393,9 @@
         formE.max.value = e.max === undefined ? '' : e.max;
         formE.item_pattern.value = e.item_pattern || '';
         formE.max_items.value = e.max_items === undefined ? '' : e.max_items;
+        formE.pattern.value = e.pattern || '';
+        formE.pattern_hint_de.value = (e.pattern_hint && e.pattern_hint.de) || '';
+        formE.pattern_hint_en.value = (e.pattern_hint && e.pattern_hint.en) || '';
         formE.required.checked = !!e.required;
         formE.choices.value = (e.choices || []).map(function (c) { return c.value + (c.name && c.name.de ? '=' + c.name.de : ''); }).join('\n');
         formE.role.value = (e.role === 'player' && e.ask_on_create === false) ? 'player_spaeter' : e.role;

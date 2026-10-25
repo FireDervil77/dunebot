@@ -307,9 +307,10 @@ const zeichne = (daten) => ejs.renderFile(path.join(ANSICHTEN, 'partials/bitmask
         assert.strictEqual(gemeldet.length, 2);
 
         // Und die Karte hört wirklich auf `input` an JEDEM Feld mit data-fb-feld —
-        // auch an einem versteckten.
+        // auch an einem versteckten. Seit der Liste (2026-10-15) steht dort
+        // zusätzlich `textarea[data-fb-feld]`; entscheidend ist der input-Teil.
         const karte = ohneKommentareEjs(fs.readFileSync(path.join(ANSICHTEN, 'partials/server-detail-uebersicht.ejs'), 'utf8'));
-        assert.match(karte, /querySelectorAll\('input\[data-fb-feld\]'\)\.forEach\(function \(i\) \{\s*i\.addEventListener\('input'/);
+        assert.match(karte, /querySelectorAll\('input\[data-fb-feld\](?:, textarea\[data-fb-feld\])?'\)\.forEach\(function \(i\) \{\s*i\.addEventListener\('input'/);
     });
 
     await pruefe('Speichern und Anlegen: die Summe wird geprüft, nicht „ist einer der Werte"', () => {

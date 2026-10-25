@@ -41,6 +41,7 @@ const Ajv  = require('ajv');
 // GameDigs Katalog — dieselbe Tabelle, aus der fb-probe seine A2S-Liste erzeugt.
 const GAMEDIG_KENNUNGEN = new Set(Object.keys(require('gamedig').games));
 const Bitmaske = require('../plugins/gameserver/dashboard/helpers/Bitmaske');
+const Textregel = require('../plugins/gameserver/dashboard/helpers/Textregel');
 
 const SCHEMA_PFAD    = path.join(__dirname, '../packages/fbpkg/schema/fbpkg-v1.schema.json');
 const BEISPIEL_PFAD  = path.join(__dirname, '../packages/fbpkg/beispiele');
@@ -297,6 +298,26 @@ function pruefeInvarianten(paket) {
             }
         } else if (s.item_pattern !== undefined || s.max_items !== undefined) {
             hinweise.push(`Einstellung "${s.key}": item_pattern/max_items gelten nur für type "list".`);
+        }
+        // Textregel (Stufe 9 S4): nur an Text und Passwort; eine Vorgabe, die
+        // ihre eigene Regel nicht erfüllt, ließe keinen Server mit Vorgabe zu.
+        if (s.pattern !== undefined || s.pattern_hint !== undefined) {
+            if (!Textregel.TYPEN.includes(s.type)) {
+                verstoesse.push(`Einstellung "${s.key}": pattern/pattern_hint gelten nur für type "text" und "password".`);
+            } else if (s.pattern === undefined) {
+                hinweise.push(`Einstellung "${s.key}": pattern_hint ohne pattern beschreibt eine Regel, die niemand prüft.`);
+            } else {
+                try { new RegExp(`^(?:${s.pattern})$`); } catch (fehler) {
+                    verstoesse.push(`Einstellung "${s.key}": pattern ist kein gültiger Ausdruck — ${fehler.message}`);
+                }
+                if (!s.pattern_hint) {
+                    hinweise.push(`Einstellung "${s.key}": pattern ohne pattern_hint — am Feld steht dann der Ausdruck selbst.`);
+                }
+            }
+        }
+        if (Textregel.hatRegel(s) && s.default !== undefined && s.default !== null) {
+            const vorgabe = Textregel.fehlerDesWerts(s, s.default);
+            if (vorgabe) verstoesse.push(`Einstellung "${s.key}": Vorgabe ${vorgabe}`);
         }
         // Auswahl nach Feld im Pfad (`liste[name=x].feld`) kennen nur json und yaml.
         for (const z of s.apply || []) {

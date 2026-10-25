@@ -36,6 +36,7 @@ const { lesePortzwecke } = require('./Portvergabe');
 const { istKontrollGuild } = require('./Paketfassung');
 const Bitmaske = require('./Bitmaske');
 const Liste = require('./Liste');
+const Textregel = require('./Textregel');
 const { gehoertDemServer, werteFuerDaemon } = require('./StartPayload');
 const Bedingung = require('./Bedingung');
 
@@ -558,6 +559,9 @@ function baueEinstellungen(server, paket, hoehe) {
             max:         Number.isFinite(e.max) ? e.max : null,
             // Liste (2026-10-15): mehrzeiliges Feld, eine Zeile je Eintrag.
             liste:       Liste.istListe(e) ? { regel: e.item_pattern || null, hoechstens: Number.isInteger(e.max_items) ? e.max_items : null } : null,
+            // Stufe 9 S4: was ein Text erfüllen muss — Hinweis am Feld, der
+            // Browser prüft damit vor (assets/js/textregel.js).
+            regel:       Textregel.fuerAnzeige(e),
             // Stufe 9: Wirkt die Einstellung gerade? Nur ein Satz, wenn NICHT —
             // die Karte graut sie dann aus, versteckt sie aber nicht, und
             // geschrieben wird sie weiter.
@@ -1997,6 +2001,7 @@ function baueWerteSchritt(paket, maschine, imageLiegtDa) {
             min: Number.isFinite(e.min) ? e.min : null,
             max: Number.isFinite(e.max) ? e.max : null,
             liste: Liste.istListe(e) ? { regel: e.item_pattern || null, hoechstens: Number.isInteger(e.max_items) ? e.max_items : null } : null,
+            regel: Textregel.fuerAnzeige(e),
         }))),
         // Wieviele Einstellungen NICHT gefragt werden. Das eigene Namensfeld
         // zaehlt hier nicht mit: Es ist keine Einstellung des Pakets.

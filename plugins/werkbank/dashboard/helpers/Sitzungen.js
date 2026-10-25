@@ -24,6 +24,7 @@ const Quellen = require('../../../gameserver/dashboard/helpers/Quellen');
 const Abruf = require('../../../gameserver/dashboard/helpers/Abruf');
 const Bitmaske = require('../../../gameserver/dashboard/helpers/Bitmaske');
 const Liste = require('../../../gameserver/dashboard/helpers/Liste');
+const Textregel = require('../../../gameserver/dashboard/helpers/Textregel');
 const { gehoertDemServer } = require('../../../gameserver/dashboard/helpers/StartPayload');
 const Oeffentlich = require('../../../../packages/fbpkg/lib/oeffentlich');
 // Die Tags eines Spiels gehören dem Spiel im Panel, nicht dem Paket (2026-10-08) —
@@ -696,7 +697,8 @@ async function hinweisEntfernen(sitzung, key) {
 const START_FELDER = ['program', 'workdir', 'args', 'stop', 'ready_when'];
 const BEREIT_FELDER = ['port', 'log_line', 'without_port', 'timeout_sec'];
 const EINSTELLUNG_FELDER = ['key', 'group', 'name', 'description', 'type', 'default', 'min', 'max',
-    'choices', 'apply', 'takes_effect', 'risk', 'role', 'ask_on_create', 'required', 'item_pattern', 'max_items'];
+    'choices', 'apply', 'takes_effect', 'risk', 'role', 'ask_on_create', 'required', 'item_pattern', 'max_items',
+    'pattern', 'pattern_hint'];
 
 /**
  * `neu` ersetzt in `vorher` genau die Felder, die das Formular kennt — ein
@@ -1256,6 +1258,22 @@ function einstellungAusFormular(b) {
         }
         if (text('default') !== '') throw new Error('Eine Liste startet leer — Einträge kommen im Panel dazu. Das Feld „Vorgabe" leer lassen.');
     }
+    // Textregel (Stufe 9 S4): was ein Text oder Passwort GANZ erfüllen muss,
+    // dazu die Regel in Worten. Geprüft im Panel beim Anlegen und Speichern.
+    const hinweisDe = text('pattern_hint_de'), hinweisEn = text('pattern_hint_en');
+    if (text('pattern') || hinweisDe || hinweisEn) {
+        if (!Textregel.TYPEN.includes(e.type)) throw new Error('Prüfregel: nur für Text und Passwort — bei einer Liste heißt sie „Prüfregel je Eintrag".');
+        const muster = text('pattern');
+        if (!muster) throw new Error('Prüfregel: ein Hinweis ohne Regel beschreibt etwas, das niemand prüft.');
+        if (muster.length > 200) throw new Error('Prüfregel: höchstens 200 Zeichen.');
+        try { new RegExp(`^(?:${muster})$`); } catch (fehler) { throw new Error(`Prüfregel: kein gültiger Ausdruck — ${fehler.message}`); }
+        e.pattern = muster;
+        if (hinweisDe || hinweisEn) {
+            e.pattern_hint = {};
+            if (hinweisDe) e.pattern_hint.de = hinweisDe;
+            if (hinweisEn) e.pattern_hint.en = hinweisEn;
+        }
+    }
     const vorgabe = text('default');
     if (vorgabe !== '') {
         if (e.type === 'number' && !Number.isFinite(Number(vorgabe))) throw new Error('Vorgabe: keine Zahl.');
@@ -1264,6 +1282,9 @@ function einstellungAusFormular(b) {
             const fehler = Bitmaske.fehlerDesWerts(e, vorgabe);
             if (fehler) throw new Error(`Vorgabe: ${fehler}`);
         }
+        // Eine Vorgabe gegen die eigene Regel ließe keinen Server mit Vorgabe zu.
+        const textFehler = Textregel.fehlerDesWerts(e, vorgabe);
+        if (textFehler) throw new Error(`Vorgabe: ${textFehler}`);
         e.default = e.type === 'number' || e.type === 'flags' ? Number(vorgabe) : e.type === 'boolean' ? istWahr(vorgabe) : vorgabe;
     } else if (e.type === 'boolean') {
         e.default = false;
@@ -1476,6 +1497,12 @@ async function probewerteSetzen(sitzung, werte) {
         const einstellung = (sitzung.entwurf?.settings || []).find(x => x.key === key);
         if (!Liste.istListe(einstellung) || wert === null || wert === undefined) continue;
         const fehler = Liste.fehlerDesWerts(einstellung, wert);
+        if (fehler) throw new Error(`„${key}": ${fehler}`);
+    }
+    // Ebenso die Textregel (Stufe 9 S4).
+    for (const [key, wert] of eintraege) {
+        const einstellung = (sitzung.entwurf?.settings || []).find(x => x.key === key);
+        const fehler = Textregel.fehlerDesWerts(einstellung, wert);
         if (fehler) throw new Error(`„${key}": ${fehler}`);
     }
     let gesetzt = 0, entfernt = 0;

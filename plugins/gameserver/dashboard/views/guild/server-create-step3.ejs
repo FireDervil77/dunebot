@@ -111,7 +111,15 @@
                            <% if (f.min !== null) { %>min="<%= f.min %>"<% } %>
                            <% if (f.max !== null) { %>max="<%= f.max %>"<% } %>
                            <%= f.pflicht ? 'required' : '' %>
+                           <% if (f.regel) { %>data-fb-regel="<%= JSON.stringify(f.regel) %>"<% } %>
                            value="<%= f.geheim ? '' : (f.vorgabe !== undefined ? f.vorgabe : '') %>">
+                    <% if (f.regel) { %>
+                      <%# Stufe 9 S4: die Regel in Worten; die Meldung erscheint
+                          beim Tippen, und das Formular schickt mit falschem
+                          Wert nicht ab (setCustomValidity in textregel.js). %>
+                      <div class="fb-muted" style="font-size:12px;margin-top:4px"><%= f.regel.hinweis %></div>
+                      <div data-fb-regel-meldung hidden style="font-size:12px;margin-top:2px;color:var(--fb-danger)"></div>
+                    <% } %>
                   <% } %>
                 </div>
               </div>
@@ -406,6 +414,7 @@
   </form>
 </div>
 
+<script src="/assets/plugins/gameserver/js/textregel.js"></script>
 <script>
 /*
  * Das Formular schickte bis zum 2026-08-22 ganz normal ab — und die Route

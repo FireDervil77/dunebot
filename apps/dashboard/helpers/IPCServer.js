@@ -616,6 +616,9 @@ class IPCServer {
                     const listenFehler = require('../../../plugins/gameserver/dashboard/helpers/Liste')
                         .fehlerInWerten(paket, paketWerte);
                     if (listenFehler) return message.reply({ success: false, error: listenFehler });
+                    const textFehler = require('../../../plugins/gameserver/dashboard/helpers/Textregel')
+                        .fehlerInWerten(paket, paketWerte);
+                    if (textFehler) return message.reply({ success: false, error: textFehler });
 
                     // Ports nach dem Paket — dieselbe Vergabe wie im Dashboard.
                     let vergabe;

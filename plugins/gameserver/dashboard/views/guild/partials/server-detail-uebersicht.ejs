@@ -349,8 +349,15 @@
                          <% if (e.max !== null) { %>max="<%= e.max %>"<% } %>
                          value="<%= e.hatWert ? String(e.wert) : '' %>"
                          placeholder="<%= e.hatWert ? '' : 'kein Wert hinterlegt' %>"
+                         <% if (e.regel) { %>data-fb-regel="<%= JSON.stringify(e.regel) %>"<% } %>
                          data-fb-feld="<%= e.variable %>"
                          data-fb-alt="<%= e.hatWert ? String(e.wert) : '' %>">
+                  <% if (e.regel) { %>
+                    <%# Stufe 9 S4: die Regel in Worten am Feld, darunter die
+                        Meldung, sobald der getippte Wert sie verletzt. %>
+                    <div class="fb-muted" style="font-size:12px;margin-top:4px"><%= e.regel.hinweis %></div>
+                    <div data-fb-regel-meldung hidden style="font-size:12px;margin-top:2px;color:var(--fb-danger)"></div>
+                  <% } %>
                 <% } %>
                 <% if (e.risiko) { %>
                   <div class="fb-muted" style="font-size:12px;margin-top:4px;color:#b35309"><%= e.risiko %></div>
@@ -611,6 +618,7 @@
 })();
 </script>
 
+<script src="/assets/plugins/gameserver/js/textregel.js"></script>
 <script>
 /*
  * Die Einstellungskarte — Entwurf vom 2026-08-18, Artboard 4.
@@ -654,6 +662,12 @@
     if (t) document.getElementById('fb-fuss-text').textContent = t;
   }
 
+  // Meldungen als Toast, nicht als alert() — der hält die ganze Seite an.
+  function melde(text) {
+    if (window.showToast) window.showToast('error', text);
+    else alert(text);
+  }
+
   function merken(feld, wert, alt) {
     if (String(wert) === String(alt)) delete geaendert[feld];
     else geaendert[feld] = String(wert);
@@ -689,6 +703,23 @@
   });
 
   document.getElementById('fb-speichern').addEventListener('click', function () {
+    // Stufe 9 S4: Ein geänderter Wert, der die Regel des Pakets verletzt, geht
+    // gar nicht erst los — die Meldung steht schon am Feld, hier springt nur
+    // der Blick dorthin. Unveränderte Felder halten das Speichern nicht auf;
+    // der Server prüft ebenso nur, was geschickt wird.
+    var falsch = null;
+    if (window.fbTextregel) {
+      Object.keys(geaendert).forEach(function (k) {
+        var feld = document.querySelector('[data-fb-regel][data-fb-feld="' + k + '"]');
+        if (feld && window.fbTextregel.pruefe(feld) && !falsch) falsch = feld;
+      });
+    }
+    if (falsch) {
+      falsch.focus();
+      falsch.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (window.showToast) window.showToast('error', 'Nicht gespeichert: Ein Wert erfüllt die Vorgabe nicht — siehe Feld.');
+      return;
+    }
     var riskant = Object.keys(geaendert).filter(function (k) { return (wirkung[k] || {}).risiko; });
     if (riskant.length) {
       var t = riskant.map(function (k) { return '• ' + wirkung[k].name + ': ' + wirkung[k].risiko; }).join('\n');
@@ -702,10 +733,10 @@
     }).then(function (r) { return r.json(); }).then(function (a) {
       if (a && a.success) { location.reload(); }
       else { knopf.disabled = false; knopf.textContent = 'Speichern';
-             alert('Nicht gespeichert: ' + ((a && a.message) || 'unbekannter Grund')); }
+             melde('Nicht gespeichert: ' + ((a && a.message) || 'unbekannter Grund')); }
     }).catch(function (e) {
       knopf.disabled = false; knopf.textContent = 'Speichern';
-      alert('Nicht gespeichert: ' + e.message);
+      melde('Nicht gespeichert: ' + e.message);
     });
   });
 })();
