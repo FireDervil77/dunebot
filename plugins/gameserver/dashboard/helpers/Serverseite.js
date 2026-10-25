@@ -1123,7 +1123,7 @@ function bauePaketkarte(server, paket, zeile) {
  *      geprüft gegen die Tabelle des Daemons).
  *   3. Sonst der Grundfall.
  *
- * @returns {{port: string|number|null, without_port: string, log_line: *, query: boolean, fall: number, quelle: string}}
+ * @returns {{port: string|number|null, without_port: string, log_line: *, log_file: string, query: boolean, fall: number, quelle: string}}
  */
 function geltendeBereitschaft(paket, server = {}) {
     const basis = paket.start.ready_when;
@@ -1142,6 +1142,7 @@ function geltendeBereitschaft(paket, server = {}) {
             port: plan.port || null,
             without_port: plan.without_port || '',
             log_line: plan.log_line || null,
+            log_file: plan.log_file || '',
             query: plan.query === true,
             fall: Number.isInteger(plan.case) ? plan.case : -1,
             quelle: 'fb-init',
@@ -1158,6 +1159,7 @@ function geltendeBereitschaft(paket, server = {}) {
         port: gewaehlt.port || null,
         without_port: gewaehlt.without_port || '',
         log_line: gewaehlt.log_line || null,
+        log_file: gewaehlt.log_file || '',
         query: gewaehlt.query === true,
         fall,
         quelle: faelle.length ? 'vorschau' : 'paket',
@@ -1180,7 +1182,11 @@ function baueBereitschaft(paket, server = {}) {
         { schluessel: 'process', name: 'Prozess', verlangt: true,
           erklaerung: 'Das Programm läuft — PID 1 ist fb-init, exec ohne Shell.' },
         ...(ohnePort ? [{ schluessel: 'log_line', name: 'Logzeile', verlangt: true,
-          erklaerung: 'Das Spiel hat seine Bereitschaftszeile geschrieben. Ohne Port, weil: ' + r.without_port }] : []),
+          // Stufe 9: Steht die Zeile in einer Datei (Windrose: R5.log), sagt
+          // die Leiter, wo fb-init sie sucht.
+          erklaerung: 'Das Spiel hat seine Bereitschaftszeile geschrieben'
+            + (r.log_file ? ` (gesucht auf der Konsole und in game/${r.log_file})` : '')
+            + '. Ohne Port, weil: ' + r.without_port }] : []),
         { schluessel: 'port', name: 'Port', verlangt: Boolean(r.port),
           // Aus dem Plan kommt die Nummer, aus dem Paket der Zweck.
           erklaerung: !r.port ? (r.without_port ? 'In diesem Fall wird kein Port geprüft.' : 'Kein Port im Paket genannt.')

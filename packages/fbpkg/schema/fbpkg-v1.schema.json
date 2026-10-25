@@ -30,6 +30,12 @@
       "pattern": "^(true|false|empty|not_empty|!?=.+)$",
       "description": "Dieselben Formen wie `when` in der Startzeile (pkgspec.gilt): true, false, empty, not_empty, =a,b, !=a,b. Geprüft wird der Wert, den der Server beim Start bekäme (mit Vorgabe). Eine Tabelle für Daemon und Dashboard: firebot_daemon/internal/pkgspec/testdata/bedingungen.json."
     },
+    "logDatei": {
+      "type": "string",
+      "maxLength": 200,
+      "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$))(?!.*//)(?!.*\\\\)\\S.*$",
+      "description": "Datei relativ zu game/, in der die Logzeile zusätzlich gesucht wird (Stufe 9, 2026-10-25) — für Spiele, die ihre Bereitschaftszeile nicht auf die Konsole schreiben. Anlass Windrose: „Host server is ready for owner to connect“ steht nur in R5/Saved/Logs/R5.log. Nur mit log_line; fb-init zählt nur, was nach dem Start in die Datei kommt (eine ersetzte oder neu angelegte Datei von vorn). Ohne „..“, ohne führenden /."
+    },
     "text": {
       "description": "Text, den ein Mensch liest — zweisprachig. Fehlt de, zeigt die Oberfläche en.",
       "type": "object",
@@ -1034,6 +1040,7 @@
               "minimum": 1,
               "default": 300
             },
+            "log_file": { "$ref": "#/definitions/logDatei" },
             "cases": {
               "type": "array",
               "description": "Bereitschaft je nach Einstellung (Stufe 9, 2026-10-25). Der ERSTE Fall, dessen Bedingung zutrifft, ersetzt den Grundfall ganz; timeout_sec wird geerbt, wenn der Fall keins nennt. Aufgelöst im Daemon beim Auftragsbau (pkgspec.ReadyWhen.Fuer); fb-init meldet den gewählten Plan zurück. Anlass Windrose: P2P öffnet keinen Port, Direktverbindung schon. Jeder Fall erfüllt für sich die Portpflicht.",
@@ -1063,7 +1070,8 @@
                     ]
                   },
                   "query": { "type": "boolean" },
-                  "timeout_sec": { "type": "integer", "minimum": 1 }
+                  "timeout_sec": { "type": "integer", "minimum": 1 },
+                  "log_file": { "$ref": "#/definitions/logDatei" }
                 }
               }
             }

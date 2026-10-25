@@ -762,6 +762,8 @@ function bereitFallAusFormular(b, e) {
         if (!zeilen.length) throw new Error('Ohne Port ist die Zeile die Bedingung — bitte eine Zeile angeben.');
         fall.without_port = text('without_port').slice(0, 300);
     }
+    const datei = logDateiAusFormular(text('log_file'), zeilen.length > 0);
+    if (datei) fall.log_file = datei;
     if (!fall.port && !fall.without_port) {
         throw new Error('Weder Port noch „Ohne Port, weil …" — ein Fall braucht, woran fb-init „bereit" erkennt (Portpflicht).');
     }
@@ -773,6 +775,22 @@ function bereitFallAusFormular(b, e) {
         fall.timeout_sec = n;
     }
     return fall;
+}
+
+/**
+ * Die Logdatei der Bereitschaft (Stufe 9): relativ zu game/, ohne „..", nur
+ * mit Zeile — dieselbe Regel wie LogDateiGueltig im Daemon. Für Spiele, die
+ * ihre Bereitschaftszeile nicht auf die Konsole schreiben (Windrose: R5.log).
+ */
+function logDateiAusFormular(wert, hatZeile) {
+    const d = String(wert || '').trim().replace(/^game\//, '');
+    if (!d) return null;
+    if (!hatZeile) throw new Error('Logdatei ohne Zeile — in der Datei gäbe es nichts zu suchen.');
+    if (d.startsWith('/') || d.includes('\\') || d.split('/').some(t => t === '..' || t === '')) {
+        throw new Error('Logdatei: ein Pfad relativ zu game/, ohne „.." — etwa R5/Saved/Logs/R5.log.');
+    }
+    if (d.length > 200) throw new Error('Logdatei: höchstens 200 Zeichen.');
+    return d;
 }
 
 /** Index aus dem Formular: '' = neu, sonst die Stelle in der Liste. */
@@ -827,6 +845,7 @@ function bereitText(r) {
     if (zeilen.length) teile.push(`Zeile „${zeilen.join('" / „')}"`);
     if (r.query === true) teile.push('mit Abfrage');
     if (r.query === false) teile.push('ohne Abfrage');
+    if (r.log_file) teile.push(`in game/${r.log_file}`);
     if (r.timeout_sec) teile.push(`Frist ${r.timeout_sec} s`);
     return teile.join(' · ') || '—';
 }
@@ -969,7 +988,7 @@ function faelleMaengel(paket) {
 // demselben Gegenstand gehört einem geöffneten Paket und bleibt beim Speichern
 // stehen (`behalteUnbekanntes`).
 const START_FELDER = ['program', 'workdir', 'args', 'stop', 'ready_when'];
-const BEREIT_FELDER = ['port', 'log_line', 'without_port', 'timeout_sec'];
+const BEREIT_FELDER = ['port', 'log_line', 'without_port', 'timeout_sec', 'log_file'];
 const EINSTELLUNG_FELDER = ['key', 'group', 'name', 'description', 'type', 'default', 'min', 'max',
     'choices', 'apply', 'takes_effect', 'risk', 'role', 'ask_on_create', 'required', 'item_pattern', 'max_items',
     'pattern', 'pattern_hint', 'join_password', 'applies_when'];
@@ -4602,7 +4621,7 @@ function gruppiere(liste, ab = 6) {
 }
 
 module.exports = {
-    FALL, VERBINDUNG, bereitFallSpeichern, bereitFallAendern, bereitFaelleStand, bereitFallAusFormular,
+    FALL, VERBINDUNG, logDateiAusFormular, bereitFallSpeichern, bereitFallAendern, bereitFaelleStand, bereitFallAusFormular,
     verbindungSpeichern, verbindungEntfernen, verbindungFallSpeichern, verbindungFallAendern, verbindungStand, faelleMaengel,
     uebernommeneAusfuehren, ketteFortsetzen, offeneUebernommene,
     angabenTags, tagsUebergeben, portBild, konsolenZeileZu, laufPortsMerken,

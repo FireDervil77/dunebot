@@ -124,6 +124,45 @@ const DIREKT = { ...bed('use_direct_connection', 'true'), port: 'game', log_line
         await wirft(() => S.bereitFallAendern(s, '0', 'entfernen'), /gibt es nicht mehr/);
     });
 
+    await pruefe('Logdatei (Windrose: R5.log): im Fall nur mit Zeile, nur in game/; die Liste nennt sie', async () => {
+        const s = sitzung();
+        await S.bereitFallSpeichern(s, { ...bed('use_direct_connection', 'false'), port: '', without_port: 'P2P', log_line: 'Host server is ready', log_file: 'game/R5/Saved/Logs/R5.log' });
+        assert.strictEqual(s.entwurf.start.ready_when.cases[0].log_file, 'R5/Saved/Logs/R5.log', 'ein vorangestelltes game/ wird abgenommen');
+        assert.match(S.bereitFaelleStand(s).faelle[0].dann, /in game\/R5\/Saved\/Logs\/R5\.log/);
+        await wirft(() => S.bereitFallSpeichern(s, { ...DIREKT, log_file: 'x.log' }), /ohne Zeile/);
+        await wirft(() => S.bereitFallSpeichern(s, { ...DIREKT, log_line: 'x', log_file: '../../etc/shadow' }), /relativ zu game\//);
+        // Der Probestart (Grundfall) nimmt dieselbe Regel.
+        const r = ohneKommentare(lies('plugins/werkbank/dashboard/routes/guild.router.js'));
+        assert.match(r, /const datei = Sitzungen\.logDateiAusFormular\(text\('log_file'\), Boolean\(bereit\.log_line\)\);\s*if \(datei\) bereit\.log_file = datei;/);
+        assert.match(r, /log_file: s\.ready_when\?\.log_file \|\| '',/);
+        assert.match(ohneKommentare(lies('plugins/werkbank/dashboard/helpers/Sitzungen.js')), /const BEREIT_FELDER = \[[^\]]*'log_file'/,
+            'BEREIT_FELDER: eine geleerte Logdatei bliebe stehen');
+        const v = ohneKommentareEjs(lies('plugins/werkbank/dashboard/views/guild/werkbank-sitzung.ejs'));
+        assert.match(v, /id="sLogFile" name="log_file"[^>]*value="<%= startFormular\.log_file %>"/);
+        assert.match(v, /form\.log_file\.value = f\.log_file \|\| '';/);
+        // Schema und Paketwächter kennen das Feld.
+        const schema = JSON.parse(lies('packages/fbpkg/schema/fbpkg-v1.schema.json'));
+        const rw = schema.properties.start.properties.ready_when;
+        assert.strictEqual(rw.properties.log_file.$ref, '#/definitions/logDatei');
+        assert.strictEqual(rw.properties.cases.items.properties.log_file.$ref, '#/definitions/logDatei');
+        const gilt = new Ajv().compile(schema.definitions.logDatei);
+        for (const gut of ['R5/Saved/Logs/R5.log', 'x.log']) assert.ok(gilt(gut), gut);
+        for (const schlecht of ['/abs', '../x', 'a/../b', 'a//b', 'a\\b', ' x']) assert.ok(!gilt(schlecht), schlecht);
+        assert.match(lies('scripts/check-pakete.js'), /log_file „\$\{r\.log_file\}" ohne log_line/);
+    });
+
+    await pruefe('die Leiter der Serverseite sagt, wo fb-init die Zeile sucht', async () => {
+        const { baueBereitschaft } = require('../plugins/gameserver/dashboard/helpers/Serverseite');
+        const paket = { start: { ready_when: { without_port: 'P2P', log_line: 'Host server is ready', log_file: 'R5/Saved/Logs/R5.log' } }, settings: [] };
+        const b = baueBereitschaft(paket, {});
+        const stufe = JSON.stringify(b);
+        assert.match(stufe, /gesucht auf der Konsole und in game\/R5\/Saved\/Logs\/R5\.log/);
+        // Aus dem Plan von fb-init ebenso.
+        const ausPlan = JSON.stringify(baueBereitschaft({ start: { ready_when: { port: 'game' } }, settings: [] },
+            { bereitschaft_plan: JSON.stringify({ case: 0, without_port: 'P2P', log_line: ['x'], log_file: 'Logs/a.log' }) }));
+        assert.match(ausPlan, /in game\/Logs\/a\.log/);
+    });
+
     console.log('\nVerbindungsangabe');
 
     await pruefe('Grundfall, dann ein Fall; der Grundfall behält beim Speichern seine Fälle', async () => {

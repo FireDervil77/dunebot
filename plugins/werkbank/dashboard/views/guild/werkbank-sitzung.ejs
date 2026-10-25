@@ -545,6 +545,13 @@
                 <input class="form-control" id="sOhnePort" name="without_port" maxlength="300" value="<%= startFormular.without_port %>" placeholder="leer lassen — nur für Spiele, die keinen prüfbaren Port öffnen">
                 <div class="form-hint">Die Ausnahme von der Portpflicht. Dann ist die Zeile die Bedingung: Ändert das Spiel seine Meldung, wird der Server nicht mehr bereit. Hat das Spiel einen Abfrageport, nimm lieber den.</div>
               </div>
+              <%# Stufe 9: Manche Spiele schreiben die Zeile nicht auf die Konsole
+                  (Windrose: nur nach R5/Saved/Logs/R5.log). %>
+              <div class="mb-3">
+                <label class="form-label" for="sLogFile">Zeile steht in Datei (relativ zu game/)</label>
+                <input class="form-control font-monospace" id="sLogFile" name="log_file" maxlength="200" value="<%= startFormular.log_file %>" placeholder="leer = nur die Konsole — etwa R5/Saved/Logs/R5.log">
+                <div class="form-hint">Nur nötig, wenn die Zeile nicht auf der Konsole erscheint. fb-init sucht dann auch in der Datei und zählt nur, was nach dem Start dazukommt.</div>
+              </div>
               <div class="row g-2 mb-3">
                 <div class="col-6">
                   <label class="form-label" for="sMem">Arbeitsspeicher (MB)</label>
@@ -734,6 +741,10 @@
             <div class="col-sm-8">
               <label class="form-label">Ohne Port, weil …</label>
               <input class="form-control" name="without_port" maxlength="300" placeholder="leer lassen, wenn ein Port gewählt ist">
+            </div>
+            <div class="col-sm-8">
+              <label class="form-label">Zeile steht in Datei (relativ zu game/)</label>
+              <input class="form-control font-monospace" name="log_file" maxlength="200" placeholder="leer = nur die Konsole — etwa R5/Saved/Logs/R5.log">
             </div>
             <div class="col-sm-4">
               <label class="form-label">Abfrage</label>
@@ -4195,6 +4206,7 @@
       form.log_line.value = Array.isArray(f.log_line) ? f.log_line.join('\n') : (f.log_line || '');
       form.timeout_sec.value = f.timeout_sec || '';
       form.without_port.value = f.without_port || '';
+      form.log_file.value = f.log_file || '';
       form.query.value = f.query === true ? 'an' : f.query === false ? 'aus' : '';
     }
   });

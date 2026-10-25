@@ -231,6 +231,15 @@ function pruefeInvarianten(paket) {
             + `Weg für dieselbe Aussage, gebaut ohne nachzusehen, dass das Wurzelfeld längst da war.`);
     }
 
+    // Logdatei der Bereitschaft (Stufe 9): ohne Zeile gäbe es darin nichts zu
+    // suchen — dieselbe Regel wie pruefeLogDatei im Daemon.
+    const rw = paket.start?.ready_when || {};
+    [['start.ready_when', rw], ...(rw.cases || []).map((c, i) => [`start.ready_when.cases[${i}]`, c])].forEach(([wo, r]) => {
+        if (r.log_file && !(Array.isArray(r.log_line) ? r.log_line.length : String(r.log_line || '').trim())) {
+            verstoesse.push(`${wo}: log_file „${r.log_file}" ohne log_line — in der Datei gäbe es nichts zu suchen.`);
+        }
+    });
+
     const beitritt = (paket.settings || []).filter(s => s.join_password === true);
     if (beitritt.length > 1) {
         verstoesse.push(`join_password an ${beitritt.map(s => `"${s.key}"`).join(' und ')} — das Panel zeigt genau EIN Beitrittspasswort.`);

@@ -216,6 +216,10 @@ function startAusFormular(b, einstellungen, { proton = false, vorher = null } = 
         if (!bereit.log_line) throw new Error('Ohne Port ist die Zeile die Bedingung — bitte eine Zeile angeben.');
         bereit.without_port = text('without_port').trim().slice(0, 300);
     }
+    // Stufe 9: Steht die Zeile nur in einer Datei (Windrose: R5.log), sucht
+    // fb-init sie auch dort. Dieselbe Regel wie die Fälle (Sitzungen.js).
+    const datei = Sitzungen.logDateiAusFormular(text('log_file'), Boolean(bereit.log_line));
+    if (datei) bereit.log_file = datei;
     const frist = Number(text('timeout_sec'));
     if (Number.isInteger(frist) && frist > 0) bereit.timeout_sec = frist;
     if (Object.keys(bereit).length) start.ready_when = bereit;
@@ -243,6 +247,7 @@ function startAlsFormular(start, { proton = false } = {}) {
         without_port: s.ready_when?.without_port || '',
         log_line: Array.isArray(log) ? log[0] : (log || ''),
         timeout_sec: s.ready_when?.timeout_sec || '',
+        log_file: s.ready_when?.log_file || '',
     };
 }
 
