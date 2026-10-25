@@ -136,7 +136,7 @@ router.get('/', requirePermission('GAMESERVER.VIEW'), async (req, res) => {
                 gs.bereitschaft_stufe,
                 gs.bereitschaft_grund,
                 gs.bereitschaft_am,
-                gs.bereitschaft_bereit,
+                gs.bereitschaft_bereit, gs.bereitschaft_plan,
                 -- Der gemessene Platz (B101). Er steht seit der Migration
                 -- 20260921_160000 in derselben Zeile; vorher lag er in
                 -- server_registry und kam dort nie an (Baustelle 146).
@@ -1406,7 +1406,7 @@ router.get('/status', requirePermission('GAMESERVER.VIEW'), async (req, res) => 
         const servers = await dbService.query(
             `SELECT id, status, error_message, current_players, max_players,
                     addon_marketplace_id,
-                    bereitschaft_stufe, bereitschaft_grund, bereitschaft_am, bereitschaft_bereit,
+                    bereitschaft_stufe, bereitschaft_grund, bereitschaft_am, bereitschaft_bereit, bereitschaft_plan, paket_werte,
                     last_started_at, last_status_update,
                     -- Fuer den Platz (B101): gebucht, gemessen, und ob die harte
                     -- Grenze greift — alles in derselben Zeile.
@@ -1876,7 +1876,7 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
                 gs.bereitschaft_stufe,
                 gs.bereitschaft_grund,
                 gs.bereitschaft_am,
-                gs.bereitschaft_bereit,
+                gs.bereitschaft_bereit, gs.bereitschaft_plan,
                 -- Platz und Live-Messwerte (B101, B146) — sie standen bis zum
                 -- 2026-09-21 in der toten server_registry. Ohne sie zeigt die
                 -- Serverseite weder den Platzbalken noch den Messstreifen.

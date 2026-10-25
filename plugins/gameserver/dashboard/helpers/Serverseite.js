@@ -36,7 +36,23 @@ const { lesePortzwecke } = require('./Portvergabe');
 const { istKontrollGuild } = require('./Paketfassung');
 const Bitmaske = require('./Bitmaske');
 const Liste = require('./Liste');
-const { gehoertDemServer } = require('./StartPayload');
+const { gehoertDemServer, werteFuerDaemon } = require('./StartPayload');
+const Bedingung = require('./Bedingung');
+
+/**
+ * Die Werte eines Servers, wie der Daemon sie beim Start bekäme — gespeicherte
+ * Werte, fehlende mit der Vorgabe des Pakets (werteFuerDaemon). Gegen DIESE
+ * prüfen Fälle und `applies_when` (Stufe 9): Eine Einstellung, die nie
+ * gespeichert wurde, gilt beim Start mit ihrer Vorgabe — also hier auch.
+ */
+function geltendeWerte(paket, server = {}) {
+    let werte = {};
+    try {
+        const p = typeof server.paket_werte === 'string' ? JSON.parse(server.paket_werte) : server.paket_werte;
+        if (p && typeof p === 'object') werte = p;
+    } catch { werte = {}; }
+    return werteFuerDaemon(paket || {}, werte).settings;
+}
 
 /** Höhenstufen (B.7): wer welche Einstellungen zu sehen bekommt. */
 const HOEHE = {
@@ -967,11 +983,70 @@ function bauePaketkarte(server, paket, zeile) {
  * Seite, die einen Betreiber wirklich in die Irre führen würde: Er würde
  * glauben, ein Spieler kommt rein.
  */
-function baueBereitschaft(paket, server = {}) {
-    const r = paket?.start?.ready_when;
-    if (!r) return null;
+/**
+ * Welche Bereitschaft gilt für diesen Server? (Stufe 9, 2026-10-25)
+ *
+ * Ein Paket kann sie an eine Einstellung hängen (`ready_when.cases`): Windrose
+ * prüft im P2P-Modus eine Logzeile, mit Direktverbindung den Port. Entschieden
+ * wird im Daemon; fb-init meldet den gewählten Plan mit jeder Meldung zurück
+ * (`bereitschaft_plan`). In dieser Reihenfolge:
+ *
+ *   1. Der Plan von fb-init — wenn er zu DIESEM Lauf gehört (dieselbe Prüfung
+ *      wie für die Stufe: `bereitschaft_am` nach `last_started_at`). Das ist,
+ *      was wirklich geprüft wird.
+ *   2. Ohne Plan (gestoppt, älteres Image): die Vorschau — der Fall, den der
+ *      Daemon mit den Werten dieses Servers wählen würde. Dieselben Werte wie
+ *      beim Start (`werteFuerDaemon`), dieselbe Bedingung (helpers/Bedingung,
+ *      geprüft gegen die Tabelle des Daemons).
+ *   3. Sonst der Grundfall.
+ *
+ * @returns {{port: string|number|null, without_port: string, log_line: *, query: boolean, fall: number, quelle: string}}
+ */
+function geltendeBereitschaft(paket, server = {}) {
+    const basis = paket.start.ready_when;
 
-    // Die Leiter, wie das Paket sie verlangt.
+    const gestartetAm = server.last_started_at ? new Date(server.last_started_at).getTime() : null;
+    const gemeldetAm  = server.bereitschaft_am ? new Date(server.bereitschaft_am).getTime() : null;
+    const ausDiesemLauf = !(Number.isFinite(gestartetAm) && Number.isFinite(gemeldetAm) && gemeldetAm < gestartetAm);
+    let plan = null;
+    if (server.bereitschaft_plan && ausDiesemLauf) {
+        try {
+            plan = typeof server.bereitschaft_plan === 'string' ? JSON.parse(server.bereitschaft_plan) : server.bereitschaft_plan;
+        } catch { plan = null; }
+    }
+    if (plan && typeof plan === 'object') {
+        return {
+            port: plan.port || null,
+            without_port: plan.without_port || '',
+            log_line: plan.log_line || null,
+            query: plan.query === true,
+            fall: Number.isInteger(plan.case) ? plan.case : -1,
+            quelle: 'fb-init',
+        };
+    }
+
+    const faelle = Array.isArray(basis.cases) ? basis.cases : [];
+    let gewaehlt = basis, fall = -1;
+    if (faelle.length) {
+        fall = Bedingung.waehleFall(faelle, geltendeWerte(paket, server));
+        if (fall >= 0) gewaehlt = { ...faelle[fall], timeout_sec: faelle[fall].timeout_sec || basis.timeout_sec };
+    }
+    return {
+        port: gewaehlt.port || null,
+        without_port: gewaehlt.without_port || '',
+        log_line: gewaehlt.log_line || null,
+        query: gewaehlt.query === true,
+        fall,
+        quelle: faelle.length ? 'vorschau' : 'paket',
+    };
+}
+
+function baueBereitschaft(paket, server = {}) {
+    if (!paket?.start?.ready_when) return null;
+    const r = geltendeBereitschaft(paket, server);
+
+    // Die Leiter, wie das Paket sie verlangt — genauer: wie sie für DIESEN
+    // Server gilt (Stufe 9, `geltendeBereitschaft`).
     //
     // `log_line` steht nur bei der Ausnahme ohne Port auf der Leiter (Baustelle
     // 158, 2026-09-25) — dort ist die Zeile die Bedingung, und fb-init prueft
@@ -984,7 +1059,10 @@ function baueBereitschaft(paket, server = {}) {
         ...(ohnePort ? [{ schluessel: 'log_line', name: 'Logzeile', verlangt: true,
           erklaerung: 'Das Spiel hat seine Bereitschaftszeile geschrieben. Ohne Port, weil: ' + r.without_port }] : []),
         { schluessel: 'port', name: 'Port', verlangt: Boolean(r.port),
-          erklaerung: r.port ? 'Der Port „' + r.port + '" lauscht.' : 'Kein Port im Paket genannt.' },
+          // Aus dem Plan kommt die Nummer, aus dem Paket der Zweck.
+          erklaerung: !r.port ? (r.without_port ? 'In diesem Fall wird kein Port geprüft.' : 'Kein Port im Paket genannt.')
+                    : typeof r.port === 'number' ? 'Port ' + r.port + ' lauscht.'
+                    : 'Der Port „' + r.port + '" lauscht.' },
         { schluessel: 'query', name: 'Abfrage', verlangt: r.query === true,
           erklaerung: r.query === true ? 'Das Spiel antwortet auf eine Abfrage.' : 'Keine Abfrage verlangt.' },
     ];

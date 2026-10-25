@@ -838,13 +838,20 @@ class GameserverPlugin extends DashboardPlugin {
         // `art` (Daemon vor 1.0.96) bleibt es unbekannt, und die Leiter gilt.
         const bereit = art === 'ready' ? 1 : (art ? 0 : null);
 
+        // Der Plan dieses Laufs (Stufe 9): Was fb-init prüft — welcher Fall aus
+        // `ready_when.cases`, mit Port oder Logzeile. Er kommt mit JEDER
+        // Meldung; fehlt er (älteres Image), steht NULL da, und die Leiter
+        // kommt aus dem Paket wie bisher.
+        const plan = payload?.plan && typeof payload.plan === 'object' ? payload.plan : null;
+
         try {
             await dbService.query(
                 `UPDATE gameservers
                     SET bereitschaft_stufe = ?, bereitschaft_grund = ?, bereitschaft_am = NOW(),
-                        bereitschaft_bereit = ?
+                        bereitschaft_bereit = ?, bereitschaft_plan = ?
                   WHERE id = ?`,
-                [stage || null, hinweis ? String(hinweis).slice(0, 500) : null, bereit, server_id]
+                [stage || null, hinweis ? String(hinweis).slice(0, 500) : null, bereit,
+                    plan ? JSON.stringify(plan) : null, server_id]
             );
 
             const [server] = await dbService.query(
