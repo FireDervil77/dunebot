@@ -180,7 +180,7 @@ function playerListField(players) {
  * @param {string} [args.gameName]
  * @returns {object} Nutzlast für gameserver:UPDATE_STATUS_PANEL
  */
-function buildPanelPayload({ panel, server, snapshot, display, gameName }) {
+function buildPanelPayload({ panel, server, snapshot, display, gameName, verbindung = null }) {
     const online = !!snapshot.online;
 
     // Die Feld-Quellen aus display.fields zeigen auf die Query-Form (map, ping,
@@ -199,6 +199,13 @@ function buildPanelPayload({ panel, server, snapshot, display, gameName }) {
         { name: 'Spieler', value: playerCountText(snapshot), inline: true },
         ...buildFields(display?.fields, data),
     ];
+
+    // Womit Spieler verbinden (Stufe 9, `connect` im Paket) — fertig gerechnet
+    // in PanelService._verbindung, dieselbe Rechnung wie auf der Serverseite.
+    // Als Code-Feld, damit es sich in Discord mit einem Klick kopieren lässt.
+    if (verbindung && verbindung.label && verbindung.text) {
+        fields.push({ name: verbindung.label, value: `\`${verbindung.text}\``, inline: false });
+    }
 
     if (online && panel.show_players) {
         const list = playerListField(snapshot.players);

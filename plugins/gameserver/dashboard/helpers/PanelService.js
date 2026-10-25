@@ -131,9 +131,14 @@ class PanelService {
         const [server] = await dbService.query(
             `SELECT gs.id, gs.name, gs.status,
                     am.name AS game_name,
-                    COALESCE(am.game_data, gs.frozen_game_data) AS game_data
+                    COALESCE(am.game_data, gs.frozen_game_data) AS game_data,
+                    -- Fuer die Verbindungsangabe (Stufe 9): Werte und Adresse,
+                    -- dieselben Felder wie auf der Serverseite.
+                    gs.paket_werte, gs.ports, gs.bind_ip,
+                    r.host AS rootserver_ip, r.fqdn, r.fqdn_gilt
              FROM gameservers gs
              LEFT JOIN addon_marketplace am ON gs.addon_marketplace_id = am.id
+             LEFT JOIN rootserver r ON r.id = gs.rootserver_id
              WHERE gs.id = ? LIMIT 1`,
             [serverId]
         );
@@ -144,6 +149,8 @@ class PanelService {
             : (server.game_data || {});
         const { display } = resolveStatusConfig(gameData);
 
+        const verbindung = await PanelService._verbindung(dbService, server);
+
         let pushed = 0, skipped = 0;
 
         for (const panel of panels) {
@@ -153,6 +160,7 @@ class PanelService {
                 snapshot,
                 display,
                 gameName: server.game_name,
+                verbindung,
             });
             const hash = payloadHash(payload);
 
@@ -175,6 +183,38 @@ class PanelService {
         }
 
         return { pushed, skipped };
+    }
+
+    /**
+     * Die Verbindungsangabe fürs Panel (Stufe 9) — dieselbe Rechnung wie auf
+     * der Serverseite (`baueVerbindung`), als fertiges Label/Text-Paar.
+     *
+     * Nur wenn das Paket `connect` nennt: Bisher stand im Panel keine Adresse,
+     * und ein Feld, das plötzlich in jedem Panel auftaucht, wäre eine Änderung,
+     * die niemand bestellt hat. Ein Fehler beim Laden kostet nur dieses Feld.
+     *
+     * @private
+     * @returns {Promise<{label: string, text: string}|null>}
+     */
+    static async _verbindung(dbService, server) {
+        try {
+            const { ladePaketFuerServer } = require('./Paketfassung');
+            const { baueVerbindung, baueAdresse } = require('./Serverseite');
+            const zeile = await ladePaketFuerServer(dbService, server.id);
+            if (!zeile) return null;
+            const paket = typeof zeile.paket_json === 'string' ? JSON.parse(zeile.paket_json) : zeile.paket_json;
+            const v = baueVerbindung(paket, server);
+            if (!v) return null;
+            if (v.art === 'einstellung') {
+                return { label: v.label, text: v.wert || 'noch nicht festgelegt' };
+            }
+            const adresse = baueAdresse(server);
+            const zeile1 = adresse?.zeilen?.find(z => z.zweck === 'game') || adresse?.zeilen?.[0];
+            return zeile1 ? { label: v.label || 'Adresse', text: zeile1.ip || zeile1.text } : null;
+        } catch (err) {
+            ServiceManager.get('Logger')?.warn?.(`[PanelService] Verbindungsangabe für Server ${server.id} nicht gebaut: ${err.message}`);
+            return null;
+        }
     }
 
     /**

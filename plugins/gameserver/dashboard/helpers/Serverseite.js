@@ -140,6 +140,9 @@ function baueUebersicht(server, paket, zusatz = {}) {
         kopf:          baueKopf(server, paket),
         zustand:       baueZustand(server),
         adresse:       baueAdresse(server),
+        // Was Spieler zum Verbinden brauchen (Stufe 9): Adresse oder z. B.
+        // Einladungscode — null, wenn das Paket nichts dazu sagt.
+        verbindung:    baueVerbindung(paket, server),
         // Nur bei laufendem Server: Ging ein Stopp an der Daemon-Meldung
         // vorbei (ServerStopp schreibt `offline` selbst), stünde sonst bei
         // einem gestoppten Server „seit … ohne Unterbrechung".
@@ -293,6 +296,53 @@ function baueZustand(server) {
  * `text` bleibt der Spielport, damit nichts, was diese Zeile heute liest,
  * plötzlich etwas anderes bekommt. Neu ist `zeilen`.
  */
+/**
+ * Was Spieler zum Verbinden brauchen — `connect` im Paket (Stufe 9, 2026-10-25).
+ *
+ * Windrose verbindet im P2P-Modus über einen Einladungscode, nicht über
+ * IP:Port; die Adresse auf der Karte führte dort niemanden hinein. Das Paket
+ * sagt deshalb, was gezeigt wird: `show: "address"` (die Adresse wie bisher)
+ * oder `show: "setting:<key>"` (der Wert einer Einstellung), mit Fällen wie bei
+ * der Bereitschaft. Gezeigt wird der Wert, den der Server beim Start bekäme
+ * (geltendeWerte) — also auch eine Vorgabe, die nie gespeichert wurde.
+ *
+ * Eine Einstellung vom Typ `password` wird hier NIE gezeigt: Das Kennwort auf
+ * der Übersicht (und im Discord-Panel) ist eine eigene Entscheidung des
+ * Besitzers (Stufe 9, S5), keine Nebenwirkung von `connect`.
+ *
+ * @returns {null|{art: 'adresse', label: ?string, hinweis: ?string, fall: number}
+ *               |{art: 'einstellung', key: string, label: string, wert: ?string, hinweis: ?string, fall: number}}
+ *          null = das Paket sagt nichts (Ansicht wie bisher)
+ */
+function baueVerbindung(paket, server = {}) {
+    const c = paket?.connect;
+    if (!c || typeof c !== 'object') return null;
+
+    const werte = geltendeWerte(paket, server);
+    const faelle = Array.isArray(c.cases) ? c.cases : [];
+    const fall = Bedingung.waehleFall(faelle, werte);
+    const g = fall >= 0 ? faelle[fall] : c;
+    const text = (t) => (t && typeof t === 'object' ? (t.de || t.en || '') : (t || ''));
+
+    const m = /^setting:(.+)$/.exec(String(g.show || 'address'));
+    if (!m) return { art: 'adresse', label: text(g.label) || null, hinweis: text(g.hint) || null, fall };
+
+    const key = m[1];
+    const e = (paket.settings || []).find(s => s.key === key);
+    if (!e || e.type === 'password') {
+        return { art: 'adresse', label: null, hinweis: null, fall };
+    }
+    const wert = werte[key];
+    return {
+        art: 'einstellung',
+        key,
+        label: text(g.label) || text(e.name) || key,
+        wert: wert === undefined || wert === null || String(wert).trim() === '' ? null : String(wert),
+        hinweis: text(g.hint) || null,
+        fall,
+    };
+}
+
 function baueAdresse(server) {
     const nameGilt = Boolean(server.fqdn_gilt) && Boolean(server.fqdn);
     const host = server.bind_ip
@@ -396,6 +446,34 @@ function baueSpieler(server, live) {
  * ersetzt. Genau das hätte am 2026-08-19 eine Welt gekostet: Die Vorgabe für
  * `world_name` ist „Dedicated", der laufende Server spielt „BoomTown".
  */
+/**
+ * „Wirkt nur, wenn …" für eine Einstellung mit `applies_when` (Stufe 9).
+ *
+ * Windrose: Einladungscode und Region gelten nur im P2P-Modus, also wenn
+ * „Direktverbindung" aus ist. Der Satz nennt die Bezugseinstellung mit ihrem
+ * Namen im Panel und den Zustand in Worten — `when: "false"` sagt einem
+ * Besitzer nichts.
+ */
+function wirktNurText(bed, paket) {
+    const key = String(bed.from || '').replace(/^setting:/, '');
+    const bezug = (paket?.settings || []).find(s => s.key === key);
+    const name = bezug?.name?.de || bezug?.name?.en || key;
+    const namen = (liste) => liste.split(',').map(t => t.trim()).filter(Boolean).map((w) => {
+        const c = (bezug?.choices || []).find(x => String(x.value) === w);
+        return '„' + (c?.name?.de || c?.name?.en || w) + '"';
+    }).join(' oder ');
+    const w = String(bed.when ?? '');
+    const zustand =
+        w === 'true'      ? 'an ist'
+      : w === 'false'     ? 'aus ist'
+      : w === 'empty'     ? 'leer ist'
+      : w === 'not_empty' ? 'gesetzt ist'
+      : w.startsWith('!=') ? 'nicht auf ' + namen(w.slice(2)) + ' steht'
+      : w.startsWith('=')  ? 'auf ' + namen(w.slice(1)) + ' steht'
+      : 'passt';
+    return `Wirkt nur, wenn „${name}" ${zustand}.`;
+}
+
 function baueEinstellungen(server, paket, hoehe) {
     const alle = Array.isArray(paket?.settings) ? paket.settings : [];
     // Dieselbe Form wie unten, auch ohne Einstellungen: Die Übersicht liest
@@ -413,6 +491,9 @@ function baueEinstellungen(server, paket, hoehe) {
 
     const sichtbar = [];
     let verborgen = 0;
+    // Für `applies_when` (Stufe 9): die Werte, wie der Server sie beim Start
+    // bekäme — dieselben, gegen die der Daemon seine Fälle prüft.
+    const geltend = geltendeWerte(paket, server);
 
     for (const e of alle) {
         if (!erlaubt.has(e.role || 'expert')) { verborgen++; continue; }
@@ -477,6 +558,11 @@ function baueEinstellungen(server, paket, hoehe) {
             max:         Number.isFinite(e.max) ? e.max : null,
             // Liste (2026-10-15): mehrzeiliges Feld, eine Zeile je Eintrag.
             liste:       Liste.istListe(e) ? { regel: e.item_pattern || null, hoechstens: Number.isInteger(e.max_items) ? e.max_items : null } : null,
+            // Stufe 9: Wirkt die Einstellung gerade? Nur ein Satz, wenn NICHT —
+            // die Karte graut sie dann aus, versteckt sie aber nicht, und
+            // geschrieben wird sie weiter.
+            wirktNur:    e.applies_when && !Bedingung.trifftZu(e.applies_when, geltend)
+                ? wirktNurText(e.applies_when, paket) : null,
         });
     }
     // Nach Gruppen bündeln — in der Reihenfolge, in der sie im Paket stehen.
@@ -1412,6 +1498,8 @@ function baueServerListe(zeilen, paketNachServer = {}) {
                 rootserver_ip: s.server_ip,
                 ports:         s.ports,
             }),
+            // Dieselbe Verbindungsangabe wie auf der Serverseite (Stufe 9).
+            verbindung: baueVerbindung(paket, s),
             maschine: s.rootserver_name || null,
             paket:    paket ? `${paket.identity.slug} ${paket.identity.version || ''}`.trim() : null,
             // Dieselbe Rechnung wie der Messstreifen auf der Serverseite — nicht
@@ -1480,6 +1568,9 @@ module.exports.PLATZ_FARBE = PLATZ_FARBE;
 module.exports.TON_FARBE = TON_FARBE;
 module.exports.INSTALL_PHASE = INSTALL_PHASE;
 module.exports.baueKnopfzeile = baueKnopfzeile;
+module.exports.baueVerbindung = baueVerbindung;
+module.exports.baueAdresse = baueAdresse;
+module.exports.geltendeWerte = geltendeWerte;
 module.exports.bauePille = bauePille;
 // Ausdruecklich exportiert, damit scripts/check-bereitschaft.js die Leiter
 // pruefen kann, ohne eine ganze Seite zu bauen.

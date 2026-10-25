@@ -110,7 +110,23 @@
     Steam-Abfrage, der Abfrageport antwortet. Eine Zeile fuer beides hat den
     Betreiber die Adresse weitergeben lassen, unter der Steam nichts findet. %>
         <div style="display:flex;flex-direction:column;gap:6px">
-          <% if (u.adresse) { %>
+          <%# Stufe 9 (2026-10-25): Das Paket sagt, womit Spieler verbinden. Windrose
+              im P2P-Modus über einen Einladungscode — IP:Port führte dort niemanden
+              hinein. Gerechnet in baueVerbindung (Serverseite.js). %>
+          <% if (u.verbindung && u.verbindung.art === 'einstellung') { %>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <span class="fb-muted" style="font-size:12px;min-width:112px"><%= u.verbindung.label %></span>
+              <% if (u.verbindung.wert) { %>
+                <div class="fb-mono fb-chip"><%= u.verbindung.wert %></div>
+                <button type="button" class="btn btn-white btn-sm" data-fb-kopieren="<%= u.verbindung.wert %>">Kopieren</button>
+              <% } else { %>
+                <span class="fb-muted" style="font-size:13px">noch nicht festgelegt — bei den Einstellungen eintragen</span>
+              <% } %>
+            </div>
+            <% if (u.verbindung.hinweis) { %>
+              <div class="fb-muted" style="font-size:12px"><%= u.verbindung.hinweis %></div>
+            <% } %>
+          <% } else if (u.adresse) { %>
             <%# Die Beschriftungsspalte auch dann, wenn nur die IP-Zeile eine traegt —
                 sonst steht das Feld mit dem Namen links vom Feld mit der IP (Betreiber, 2026-10-06). %>
             <% const adresseMitSpalte = u.adresse.zeilen.length > 1 || u.adresse.zeilen.some(function (z) { return z.ip; }); %>
@@ -254,9 +270,14 @@
         <% (u.einstellungen.gruppen || []).forEach(function (g) { %>
           <% if (g.name) { %><div class="fb-abschnitt"><%= g.name %></div><% } %>
           <% g.eintraege.forEach(function (e) { %>
-            <div class="fb-zeile">
+            <%# Stufe 9: `applies_when` trifft nicht zu — ausgegraut, nicht versteckt;
+                bedienbar bleibt sie, geschrieben wird sie weiter. %>
+            <div class="fb-zeile"<%- e.wirktNur ? ' style="opacity:.6"' : '' %>>
               <div>
                 <div style="font-weight:500"><%= e.name %></div>
+                <% if (e.wirktNur) { %>
+                  <div class="fb-muted" style="font-size:12px;margin-top:2px"><%= e.wirktNur %></div>
+                <% } %>
                 <% if (e.beschreibung) { %>
                   <div class="fb-muted" style="font-size:13px;margin-top:2px;text-wrap:pretty"><%= e.beschreibung %></div>
                   <%# Ein Hinweis, keine Sperre. Er erscheint nur, wenn die

@@ -158,7 +158,14 @@
                   derselbe Server wieder zwei Wahrheiten, je nachdem wo man
                   hinsieht. Genau das war M-1. %>
               <td style="font-size:13px">
-                <% if (!s.adresse) { %>—<% } else { %>
+                <%# Stufe 9: Verbindet das Spiel über eine Einstellung (Windrose P2P:
+                    Einladungscode), steht DIE hier — wie auf der Serverseite. %>
+                <% if (s.verbindung && s.verbindung.art === 'einstellung') { %>
+                  <div>
+                    <span class="fb-muted" style="font-size:11px"><%= s.verbindung.label %></span>
+                    <span class="fb-mono"><%= s.verbindung.wert || '—' %></span>
+                  </div>
+                <% } else if (!s.adresse) { %>—<% } else { %>
                   <% s.adresse.zeilen.forEach(function (z) { %>
                     <div>
                       <% if (s.adresse.zeilen.length > 1) { %>

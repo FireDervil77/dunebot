@@ -15,6 +15,21 @@
     "status"
   ],
   "definitions": {
+    "bedingungFrom": {
+      "type": "string",
+      "pattern": "^setting:[a-z][a-z0-9_]*$",
+      "description": "Woran ein Fall hängt (Stufe 9): eine Einstellung des Pakets, `setting:<schlüssel>`."
+    },
+    "connectShow": {
+      "type": "string",
+      "pattern": "^(address|setting:[a-z][a-z0-9_]*)$",
+      "description": "`address` oder `setting:<schlüssel>`."
+    },
+    "bedingungWhen": {
+      "type": "string",
+      "pattern": "^(true|false|empty|not_empty|!?=.+)$",
+      "description": "Dieselben Formen wie `when` in der Startzeile (pkgspec.gilt): true, false, empty, not_empty, =a,b, !=a,b. Geprüft wird der Wert, den der Server beim Start bekäme (mit Vorgabe). Eine Tabelle für Daemon und Dashboard: firebot_daemon/internal/pkgspec/testdata/bedingungen.json."
+    },
     "text": {
       "description": "Text, den ein Mensch liest — zweisprachig. Fehlt de, zeigt die Oberfläche en.",
       "type": "object",
@@ -652,6 +667,16 @@
           "minimum": 1,
           "description": "Nur bei type `list`: hoechstens so viele Eintraege."
         },
+        "applies_when": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["from", "when"],
+          "description": "Wann die Einstellung wirkt (Stufe 9, 2026-10-25). Trifft die Bedingung nicht zu, zeigt das Panel sie ausgegraut mit „Wirkt nur, wenn …“ — nicht versteckt, und geschrieben wird sie weiter. Windrose: Einladungscode und Region wirken nur ohne Direktverbindung.",
+          "properties": {
+            "from": { "$ref": "#/definitions/bedingungFrom" },
+            "when": { "$ref": "#/definitions/bedingungWhen" }
+          }
+        },
         "required_when": {
           "type": "string",
           "description": "Bedingte Pflicht: Die Einstellung muss einen Wert haben, WENN eine andere einen bestimmten hat — Form 'schluessel=wert', z.B. 'public_listing=1'.\n\nWarum (gemessen 2026-08-23): Valheim verlangt ein Kennwort nur fuer einen OEFFENTLICH sichtbaren Server. Ohne Kennwort und mit -public 1 kommt 'Error bad password: The password is too short'; mit -public 0 bleibt diese Meldung aus. `required: true` waere hier zu streng und wuerde einen versteckten Server ohne Kennwort verbieten, den es geben darf."
@@ -995,6 +1020,39 @@
               "type": "integer",
               "minimum": 1,
               "default": 300
+            },
+            "cases": {
+              "type": "array",
+              "description": "Bereitschaft je nach Einstellung (Stufe 9, 2026-10-25). Der ERSTE Fall, dessen Bedingung zutrifft, ersetzt den Grundfall ganz; timeout_sec wird geerbt, wenn der Fall keins nennt. Aufgelöst im Daemon beim Auftragsbau (pkgspec.ReadyWhen.Fuer); fb-init meldet den gewählten Plan zurück. Anlass Windrose: P2P öffnet keinen Port, Direktverbindung schon. Jeder Fall erfüllt für sich die Portpflicht.",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["from", "when"],
+                "allOf": [
+                  {
+                    "if": { "not": { "required": ["port"] } },
+                    "then": { "required": ["without_port", "log_line"] }
+                  },
+                  {
+                    "if": { "required": ["without_port"] },
+                    "then": { "not": { "required": ["port"] } }
+                  }
+                ],
+                "properties": {
+                  "from": { "$ref": "#/definitions/bedingungFrom" },
+                  "when": { "$ref": "#/definitions/bedingungWhen" },
+                  "port": { "type": "string" },
+                  "without_port": { "type": "string", "pattern": "\\S" },
+                  "log_line": {
+                    "oneOf": [
+                      { "type": "string", "pattern": "\\S" },
+                      { "type": "array", "items": { "type": "string", "pattern": "\\S" }, "minItems": 1 }
+                    ]
+                  },
+                  "query": { "type": "boolean" },
+                  "timeout_sec": { "type": "integer", "minimum": 1 }
+                }
+              }
             }
           }
         },
@@ -1423,6 +1481,32 @@
           "type": "array",
           "items": {
             "type": "string"
+          }
+        }
+      }
+    },
+    "connect": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Was Spieler zum Verbinden brauchen (Stufe 9, 2026-10-25) — gezeigt auf Serverseite, Serverliste und im Discord-Panel. `show`: `address` (IP:Port wie ohne dieses Feld) oder `setting:<schlüssel>` (der Wert einer Einstellung, nie einer vom Typ password). Fälle wie bei ready_when: der erste passende ersetzt den Grundfall. Anlass Windrose: im P2P-Modus verbindet man über einen Einladungscode, nicht über IP:Port. Ohne dieses Feld: Adresse wie bisher, kein Feld im Discord-Panel.",
+      "required": ["show"],
+      "properties": {
+        "show": { "$ref": "#/definitions/connectShow" },
+        "label": { "$ref": "#/definitions/text" },
+        "hint": { "$ref": "#/definitions/text" },
+        "cases": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["from", "when", "show"],
+            "properties": {
+              "from": { "$ref": "#/definitions/bedingungFrom" },
+              "when": { "$ref": "#/definitions/bedingungWhen" },
+              "show": { "$ref": "#/definitions/connectShow" },
+              "label": { "$ref": "#/definitions/text" },
+              "hint": { "$ref": "#/definitions/text" }
+            }
           }
         }
       }
