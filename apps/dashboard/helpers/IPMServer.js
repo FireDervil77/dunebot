@@ -1348,29 +1348,11 @@ class IPMServer {
             }
 
             // Server-Status in MySQL aktualisieren
-            //
-            // `laeuft_seit` (Migration 20260819_170000) wurde bis 2026-10-25 nie
-            // geschrieben — die Seite sagte deshalb immer „Laufzeit wird erst ab
-            // dem nächsten Start gezählt". Geschrieben wird es NUR hier, wo der
-            // Daemon den echten Zustand meldet; der Start-Knopf setzt nur
-            // `starting`.
-            //
-            // Neu gesetzt wird der Zeitpunkt nur, wenn der Server vorher NICHT
-            // online war: Nach einem Daemon-Neustart meldet die Wiederanbindung
-            // erneut `running` (manager.go, meldeStatus), obwohl der Server
-            // durchlief. Jeder andere Zustand löscht ihn.
-            //
-            // ⚠ `laeuft_seit` muss im SET VOR `status` stehen: MySQL weist von
-            // links nach rechts zu und liest in späteren Ausdrücken schon den
-            // neuen Wert — dahinter wäre `status` immer schon 'online'.
             const result = await this.dbService.query(
-                `UPDATE gameservers
-                 SET laeuft_seit = ${dbStatus === 'online'
-                        ? "CASE WHEN status = 'online' AND laeuft_seit IS NOT NULL THEN laeuft_seit ELSE NOW() END"
-                        : 'NULL'},
-                     status = ?,
+                `UPDATE gameservers 
+                 SET status = ?, 
                      updated_at = NOW()
-                     ${dbStatus === 'online' ? ', last_started_at = NOW()' : ''}
+                     ${dbStatus === 'online' ? ', last_started_at = NOW()' : ''} 
                  WHERE id = ?`,
                 [dbStatus, server_id]
             );

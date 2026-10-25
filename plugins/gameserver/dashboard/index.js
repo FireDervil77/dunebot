@@ -898,10 +898,29 @@ class GameserverPlugin extends DashboardPlugin {
             // Beim Verlassen des Fehlerzustands wird er geloescht: Eine alte
             // Begruendung an einem laufenden Server ist schlimmer als keine,
             // weil sie beim naechsten Blick wie die aktuelle aussieht.
+            //
+            // `laeuft_seit` (Migration 20260819_170000) wurde bis 2026-10-25 nie
+            // geschrieben — die Serverseite sagte deshalb immer „Laufzeit wird
+            // erst ab dem nächsten Start gezählt". Geschrieben wird es NUR hier,
+            // wo der Daemon den echten Zustand meldet; der Start-Knopf setzt nur
+            // `starting`. (Der gleichnamige Handler in IPMServer.js läuft nicht —
+            // dieser hier ist der autoritative, siehe _registerEventHandlers dort.)
+            //
+            // Neu gesetzt wird der Zeitpunkt nur, wenn der Server vorher NICHT
+            // online war: Nach einem Daemon-Neustart meldet die Wiederanbindung
+            // erneut `running` (manager.go, meldeStatus), obwohl der Server
+            // durchlief. Jeder andere Zustand löscht ihn.
+            //
+            // ⚠ `laeuft_seit` muss im SET VOR `status` stehen: MySQL weist von
+            // links nach rechts zu und liest in späteren Ausdrücken schon den
+            // neuen Wert — dahinter wäre `status` immer schon 'online'.
+            const laeuftSeit = dbStatus === 'online'
+                ? "CASE WHEN status = 'online' AND laeuft_seit IS NOT NULL THEN laeuft_seit ELSE NOW() END"
+                : 'NULL';
             if (dbStatus === 'error') {
                 await dbService.query(
                     `UPDATE gameservers
-                        SET status = ?, error_message = ?, last_status_update = NOW(), updated_at = NOW()
+                        SET laeuft_seit = NULL, status = ?, error_message = ?, last_status_update = NOW(), updated_at = NOW()
                       WHERE id = ?`,
                     [dbStatus, error || null, server_id]
                 );
@@ -916,7 +935,7 @@ class GameserverPlugin extends DashboardPlugin {
             } else {
                 await dbService.query(
                     `UPDATE gameservers
-                        SET status = ?, error_message = NULL, last_status_update = NOW(), updated_at = NOW()
+                        SET laeuft_seit = ${laeuftSeit}, status = ?, error_message = NULL, last_status_update = NOW(), updated_at = NOW()
                       WHERE id = ?`,
                     [dbStatus, server_id]
                 );
