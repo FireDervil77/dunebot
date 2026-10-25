@@ -208,7 +208,14 @@ const pruefe = (ok, was, zusatz = '') => {
     for (const [name, von, bis] of bloecke) {
         const a = ohneKommentare.indexOf(von);
         const b = a >= 0 ? ohneKommentare.indexOf(bis, a) : -1;
-        const block = a >= 0 ? ohneKommentare.slice(a, b > a ? b : undefined) : '';
+        let block = a >= 0 ? ohneKommentare.slice(a, b > a ? b : undefined) : '';
+        // Seit 2026-10-25 nimmt die Übersicht ihre Grundabfrage aus
+        // helpers/Serverliste.js (dieselbe wie das Widget) — dann zählt die.
+        if (/let query = SERVER_LISTE_SQL;/.test(block)) {
+            block += fs.readFileSync(require('path').join(__dirname, '../plugins/gameserver/dashboard/helpers/Serverliste.js'), 'utf8')
+                .replace(/\/\*[\s\S]*?\*\//g, '')
+                .split('\n').map(z => z.replace(/(^|\s)\/\/.*$/, '').replace(/(^|\s)--\s.*$/, '')).join('\n');
+        }
         pruefe(a >= 0 && /bereitschaft_stufe/.test(block) && /bereitschaft_bereit/.test(block),
             name + ' wählt bereitschaft_stufe und bereitschaft_bereit aus',
             a < 0 ? 'Block nicht gefunden — Anker anpassen' : '');

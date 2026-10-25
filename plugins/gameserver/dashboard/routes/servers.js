@@ -22,6 +22,7 @@ const { vergibPortsAusPaket } = require('../helpers/Portvergabe');
 const Inhalte = require('../helpers/Inhalte');
 const Bitmaske = require('../helpers/Bitmaske');
 const Liste = require('../helpers/Liste');
+const { SERVER_LISTE_SQL } = require('../helpers/Serverliste');
 const Textregel = require('../helpers/Textregel');
 const Quellen = require('../helpers/Quellen');
 const ServerStopp = require('../helpers/ServerStopp');
@@ -120,67 +121,8 @@ router.get('/', requirePermission('GAMESERVER.VIEW'), async (req, res) => {
         // ========================================
         // 2. SERVER-LISTE mit JOINs
         // ========================================
-        let query = `
-            SELECT 
-                gs.id,
-                gs.name,
-                gs.status,
-                gs.error_message,
-                gs.current_players,
-                gs.max_players,
-                gs.addon_marketplace_id,
-                gs.template_name,
-                gs.addon_version,
-                -- Ohne diese drei zeigte die Bereitschaftskarte "noch nicht
-                -- gemeldet", obwohl die Stufe in der Zeile stand. Der Handler
-                -- schrieb sie, die Ansicht las sie nur nie (2026-08-23).
-                gs.bereitschaft_stufe,
-                gs.bereitschaft_grund,
-                gs.bereitschaft_am,
-                gs.bereitschaft_bereit, gs.bereitschaft_plan,
-                -- Der gemessene Platz (B101). Er steht seit der Migration
-                -- 20260921_160000 in derselben Zeile; vorher lag er in
-                -- server_registry und kam dort nie an (Baustelle 146).
-                gs.platz_belegt_bytes,
-                gs.platz_grenze_bytes,
-                gs.platz_gemessen_am,
-                gs.platz_ueber,
-                gs.platz_geschaetzt,
-                -- Die Live-Messwerte (CPU, RAM, Verkehr). Sie standen bis zum
-                -- 2026-09-21 in der toten server_registry und wurden hier nie
-                -- geholt — baueKennzahlen lieferte deshalb immer null.
-                -- (Keine Backticks in dieser Abfrage: Template-Literal.)
-                gs.cpu_percent,
-                gs.ram_used_mb,
-                gs.ram_total_mb,
-                gs.last_heartbeat,
-                gs.net_rx_bytes,
-                gs.net_tx_bytes,
-                gs.net_rx_rate,
-                gs.net_tx_rate,
-                gs.install_progress,
-                gs.install_phase,
-                gs.paket_werte,
-                gs.update_available,
-                gs.created_at,
-                gs.last_started_at,
-                gs.rootserver_id,
-                gs.ports,
-                gs.bind_ip,
-                am.name as game_name,
-                am.slug as game_slug,
-                am.icon_url as game_icon,
-                JSON_EXTRACT(gs.ports, '$.game.internal') as game_port,
-                r.host as server_ip,
-                r.fqdn,
-                r.fqdn_gilt,
-                r.name as rootserver_name,
-                r.daemon_id
-            FROM gameservers gs
-            LEFT JOIN addon_marketplace am ON gs.addon_marketplace_id = am.id
-            LEFT JOIN rootserver r ON gs.rootserver_id = r.id
-            WHERE gs.guild_id = ?
-        `;
+        // Dieselbe Abfrage wie das Widget auf dem Hauptdashboard (Serverliste.js).
+        let query = SERVER_LISTE_SQL;
         const params = [guildId];
 
         // Status-Filter anwenden

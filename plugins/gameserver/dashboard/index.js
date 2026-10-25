@@ -257,6 +257,7 @@ class GameserverPlugin extends DashboardPlugin {
         this._registerAssets(); //  NEU: Assets registrieren
         this._setupRoutes();
         this._registerHooks();
+        this._registerWidgets();
         this._registerEventHandlers(); //  NEU: Event-Handler registrieren (idempotent)
 
         // Hier legte `_syncOfficialAddons` bis zum 2026-09-10 bei JEDEM Start
@@ -1499,11 +1500,62 @@ class GameserverPlugin extends DashboardPlugin {
     }
 
     /**
-     * Dashboard-Widgets registrieren
+     * Dashboard-Widgets registrieren.
+     *
+     * „Gameserver" auf dem Hauptdashboard (2026-10-25): welche Server es gibt
+     * und wie es ihnen geht — Vorbild ist das RootServer-Widget des
+     * Masterservers. Die Methode stand bis dahin leer und wurde nirgends
+     * aufgerufen.
+     *
+     * Nur mit GAMESERVER.VIEW: Wer die Serverliste nicht sehen darf, sieht sie
+     * auch hier nicht. Ein Fehler kostet nur dieses Widget, nie das Dashboard.
      */
     _registerWidgets() {
         const Logger = ServiceManager.get('Logger');
-        Logger.debug('[Gameserver] Widgets registriert');
+        const pluginManager = ServiceManager.get('pluginManager');
+        if (!pluginManager?.hooks) {
+            Logger.warn('[Gameserver] PluginManager/Hooks nicht verfügbar – Widget nicht registriert');
+            return;
+        }
+        // Einmal je Prozess: onEnable läuft je Guild.
+        if (GameserverPlugin._widgetAngemeldet) return;
+        GameserverPlugin._widgetAngemeldet = true;
+
+        pluginManager.hooks.addFilter('guild_dashboard_widgets', async (widgets, options) => {
+            const { guildId, enabledPlugins, user, themeManager: tm } = options || {};
+            const aktiv = Array.isArray(enabledPlugins)
+                && enabledPlugins.some(p => p === 'gameserver' || p?.name === 'gameserver');
+            if (!aktiv || !guildId) return widgets;
+
+            try {
+                const userId = user?.info?.id;
+                const permissionManager = ServiceManager.get('permissionManager');
+                if (!userId || !permissionManager || !await permissionManager.hasPermission(userId, guildId, 'GAMESERVER.VIEW')) {
+                    return widgets;
+                }
+                const { ladeServerListe } = require('./helpers/Serverliste');
+                const { zeilen, ...liste } = await ladeServerListe(ServiceManager.get('dbService'), guildId);
+                const icons = Object.fromEntries(zeilen.filter(z => z.game_icon).map(z => [z.id, z.game_icon]));
+                const themeManager = tm || ServiceManager.get('themeManager');
+                const content = await themeManager.renderWidgetPartial('gameserver-uebersicht', {
+                    guildId, liste, icons, plugin: 'gameserver',
+                });
+                widgets.push({
+                    id: 'gameserver-uebersicht',
+                    title: 'Gameserver',
+                    area: 'dashboard-secondary',
+                    position: 40,
+                    size: 4,
+                    icon: 'fa-solid fa-gamepad',
+                    cardClass: '',
+                    content,
+                });
+            } catch (err) {
+                Logger.error('[Gameserver] Widget „Gameserver" nicht gerendert:', err);
+            }
+            return widgets;
+        });
+        Logger.debug('[Gameserver] Widget „Gameserver" registriert');
     }
 
 }

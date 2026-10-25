@@ -1,0 +1,50 @@
+<%
+    // Widget auf dem Hauptdashboard (2026-10-25): welche Gameserver es gibt
+    // und wie es ihnen geht. Aus DERSELBEN Aufbereitung wie die Übersicht
+    // (Serverliste.ladeServerListe → baueServerListe) — Zustand und
+    // Spielerzahl sagen hier dasselbe wie dort.
+    //
+    // Tabler-Badges statt `fb-pille`: Deren Stile lädt nur das Plugin auf
+    // seinen eigenen Seiten, hier stünde die Pille ungestaltet da.
+    const TON = { green: 'success', yellow: 'warning', blue: 'info', red: 'danger', gray: 'secondary' };
+    const MAX = 8;
+    const basis = '/guild/' + guildId + '/plugins/gameserver/servers';
+    const eintraege = (liste && liste.liste) || [];
+    const z = (liste && liste.zahlen) || { alle: 0, online: 0, spieler: 0 };
+%>
+<% if (!eintraege.length) { %>
+    <div class="text-center text-secondary py-2" style="font-size:.85rem;">
+        <i class="fa-solid fa-gamepad me-1"></i>
+        Noch kein Gameserver.
+        <a href="<%= basis %>/create" class="ms-1">Jetzt anlegen →</a>
+    </div>
+<% } else { %>
+    <div class="d-flex gap-3 mb-2 text-secondary" style="font-size:.8rem;">
+        <span><strong class="text-body"><%= z.online %></strong> von <%= z.alle %> laufen</span>
+        <span><strong class="text-body"><%= z.spieler %></strong> Spieler gemessen</span>
+    </div>
+    <div class="list-group list-group-flush">
+        <% eintraege.slice(0, MAX).forEach(function (s) { %>
+            <a href="<%= basis %>/<%= s.id %>" class="list-group-item list-group-item-action px-0 py-2 d-flex align-items-center gap-2">
+                <% if (icons[s.id]) { %>
+                    <img src="<%= icons[s.id] %>" alt="" width="28" height="28" style="border-radius:6px;object-fit:cover;flex:none;">
+                <% } else { %>
+                    <span class="avatar avatar-sm" style="flex:none;"><i class="fa-solid fa-gamepad"></i></span>
+                <% } %>
+                <span class="flex-grow-1 text-truncate" style="min-width:0;">
+                    <span class="d-block text-truncate fw-semibold" title="<%= s.name %>"><%= s.name %></span>
+                    <span class="d-block text-truncate text-secondary" style="font-size:.75rem;"><%= s.spiel %></span>
+                </span>
+                <span class="text-end" style="flex:none;">
+                    <span class="badge bg-<%= TON[s.zustand.ton] || 'secondary' %>-lt" style="font-size:.7rem;"><%= s.zustand.text %></span>
+                    <% if (s.spieler.jetzt !== null) { %>
+                        <span class="d-block text-secondary" style="font-size:.7rem;"><%= s.spieler.jetzt %> / <%= s.spieler.max !== null ? s.spieler.max : '?' %></span>
+                    <% } %>
+                </span>
+            </a>
+        <% }) %>
+    </div>
+    <div class="mt-2" style="font-size:.8rem;">
+        <a href="<%= basis %>"><i class="fa-solid fa-arrow-right me-1"></i><%= eintraege.length > MAX ? 'Alle ' + eintraege.length + ' Server' : 'Zur Übersicht' %></a>
+    </div>
+<% } %>
