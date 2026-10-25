@@ -24,6 +24,7 @@ const Bitmaske = require('../helpers/Bitmaske');
 const Liste = require('../helpers/Liste');
 const Quellen = require('../helpers/Quellen');
 const ServerStopp = require('../helpers/ServerStopp');
+const ServerState = require('../helpers/ServerState');
 const { baueUebersicht, baueServerListe, bauePaketAuswahl,
         baueMaschinenAuswahl, baueWerteSchritt,
         baueBereitschaftAuskunft, bauePlatz,
@@ -1406,7 +1407,7 @@ router.get('/status', requirePermission('GAMESERVER.VIEW'), async (req, res) => 
             `SELECT id, status, error_message, current_players, max_players,
                     addon_marketplace_id,
                     bereitschaft_stufe, bereitschaft_grund, bereitschaft_am, bereitschaft_bereit,
-                    last_started_at,
+                    last_started_at, last_status_update,
                     -- Fuer den Platz (B101): gebucht, gemessen, und ob die harte
                     -- Grenze greift — alles in derselben Zeile.
                     allocated_disk_gb, disk_quota_enforced, disk_quota_note,
@@ -1450,6 +1451,9 @@ router.get('/status', requirePermission('GAMESERVER.VIEW'), async (req, res) => 
                     // Browser bekommt Text und Farbe, nicht die Schwellen.
                     platz: bauePlatz(s),
                     messwerte: baueMesswerte(s),
+                    // Für ein hängendes `stopping` in der Knopfzeile — die Frist
+                    // aus ServerState, damit sie an einer Stelle steht.
+                    uebergang: { seit: s.last_status_update, frist: ServerState.UEBERGANG_VERFAELLT_MS },
                 };
             })
         });
@@ -1859,6 +1863,12 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
                 gs.current_map,
                 gs.last_started_at,
                 gs.last_stopped_at,
+                -- laeuft_seit fuer die Laufzeit, last_status_update fuer ein
+                -- haengendes stopping in der Knopfzeile (2026-10-25). Beide
+                -- fehlten: Die Laufzeit stand deshalb nie da, auch nachdem sie
+                -- geschrieben wurde.
+                gs.laeuft_seit,
+                gs.last_status_update,
                 -- Ohne diese drei baute baueBereitschaft() die Leiter aus
                 -- undefined und schrieb "nicht gemessen" hin, obwohl die Stufe
                 -- in derselben Zeile stand. Der Helfer war richtig, die

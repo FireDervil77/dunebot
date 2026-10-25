@@ -1205,6 +1205,7 @@ module.exports = { baueUebersicht, HOEHE, WIRKUNG, RISIKO, GRUPPE, BEFEHL_NAME, 
  * die Seite sagte "Laeuft" und der Knopf daneben "Starten".
  */
 const { knopfZustand, pillenZustand } = require('../assets/js/gameserver-live.js');
+const { UEBERGANG_VERFAELLT_MS } = require('./ServerState');
 
 /**
  * Welcher Knopf steht beim ERSTEN Rendern wie da?
@@ -1241,6 +1242,9 @@ function baueKnopfzeile(paket, server) {
         bereit:  a.bereit,
         messbar: a.messbar,
         text:    a.text,
+        // Für ein hängendes `stopping` — dieselbe Frist wie die Route.
+        seit:    server.last_status_update || null,
+        frist:   UEBERGANG_VERFAELLT_MS,
     });
 }
 

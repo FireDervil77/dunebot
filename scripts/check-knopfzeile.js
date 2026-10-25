@@ -80,6 +80,30 @@ const faelle = [
      'start:gesperrt restart:weg stop:weg',
      'Starten bleibt stehen, aber gesperrt — sonst waere die Zeile leer.'],
 
+    // ── Ein `stopping`, das stehenbleibt (2026-10-25, Server 221) ──────────
+    // Der Daemon meldete beim Neustart `stopping` und danach nichts, bis
+    // „bereit" — im P2P-Modus nie. Ohne Ventil hatte die Seite keinen Knopf.
+    ['Wird gestoppt, noch in der Frist',
+     { status: 'stopping', seit: 1_000_000, frist: 300_000, jetzt: 1_000_000 + 60_000 },
+     'start:gesperrt restart:weg stop:weg',
+     'Eine Minute ist ein normaler Stopp — warten.'],
+
+    ['Wird gestoppt, über der Frist',
+     { status: 'stopping', seit: 1_000_000, frist: 300_000, jetzt: 1_000_000 + 301_000 },
+     'start:weg restart:gesperrt stop:aktiv',
+     'STOPPEN MUSS WIEDER DA SEIN — sonst ist der Server ohne Datenbank nicht einzufangen. '
+     + 'Starten nicht: der Container kann laengst wieder laufen.'],
+
+    ['Wird gestoppt, ohne Zeitpunkt',
+     { status: 'stopping', frist: 300_000 },
+     'start:gesperrt restart:weg stop:weg',
+     'Ohne seit laesst sich nichts fuer ueberfaellig erklaeren.'],
+
+    ['Wird installiert, über der Frist',
+     { status: 'installing', seit: 1_000_000, frist: 300_000, jetzt: 1_000_000 + 3_600_000 },
+     'start:gesperrt restart:weg stop:weg',
+     'Installieren darf lange dauern — das Ventil gilt nur fuer stopping.'],
+
     ['Wird installiert',
      { status: 'installing' },
      'start:gesperrt restart:weg stop:weg',

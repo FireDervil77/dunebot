@@ -129,12 +129,36 @@
      *   Stoppen     solange irgendetwas laeuft — auch beim Starten, denn ein
      *               haengender Start braucht einen Weg zurueck
      *
-     * @param {{status?: string, bereit?: boolean, messbar?: boolean, text?: string}} z
+     * ── Ein `stopping`, das stehenbleibt (2026-10-25) ──────────────────────
+     *
+     * Server 221 stand nach einem Neustart auf „Stoppt gerade": Der Daemon
+     * meldete `stopping`, startete neu und meldete danach nichts, bis „bereit"
+     * kam — im P2P-Modus nie. „Starten" war gesperrt, „Stoppen" gar nicht da,
+     * obwohl die Route einen Stopp nach fünf Minuten längst annimmt
+     * (`ServerState.pruefeAktion`, das Ventil dort). Steht `stopping` länger
+     * als `frist`, gilt der Server als laufend: „Stoppen" ist wieder da.
+     * „Starten" nicht — der Container kann längst wieder laufen (so bei 221),
+     * und ein Start scheiterte dann an „already running". Erst stoppen, dann
+     * steht „Starten" ohnehin wieder da.
+     *
+     * `seit` und `frist` kommen vom Server (`last_status_update`,
+     * `ServerState.UEBERGANG_VERFAELLT_MS`) — die Frist steht damit an einer
+     * Stelle. Fehlt eins, bleibt es beim Sperren: ohne Zeitpunkt lässt sich
+     * nichts für überfällig erklären. Nur `stopping`: Installieren und
+     * Aktualisieren dürfen lange dauern, und einen Knopf mitten in eine
+     * laufende Installation anzubieten wäre die schlechtere Falle.
+     *
+     * @param {{status?: string, bereit?: boolean, messbar?: boolean, text?: string,
+     *          seit?: string|number, frist?: number, jetzt?: number}} z
      * @returns {{start: object, restart: object, stop: object}}
      */
     function knopfZustand(z = {}) {
-        const laeuft  = z.status === 'online' || z.status === 'starting';
-        const werkelt = z.status === 'stopping'
+        const seitMs  = z.seit ? new Date(z.seit).getTime() : NaN;
+        const haengt  = z.status === 'stopping'
+                     && Number.isFinite(seitMs) && Number.isFinite(z.frist)
+                     && ((z.jetzt ?? Date.now()) - seitMs) > z.frist;
+        const laeuft  = z.status === 'online' || z.status === 'starting' || haengt;
+        const werkelt = (z.status === 'stopping' && !haengt)
                      || z.status === 'installing'
                      || z.status === 'updating';
         // Kein `ready_when` heisst NICHT "nicht bereit" — sonst waere so ein
@@ -160,6 +184,8 @@
                 sichtbar: laeuft,
                 aktiv:    neustartbar,
                 grund:    neustartbar ? ''
+                        : haengt
+                            ? 'Der Server hat sich nach dem Stoppen nicht zurückgemeldet — erst stoppen.'
                         : z.status === 'starting'
                             ? (z.text ? `Startet noch — ${z.text}.` : 'Der Server startet noch.')
                             : 'Der Server ist noch nicht bereit.',
@@ -222,7 +248,9 @@
             // Beurteilung nachholen. Ohne das Nachholen stuenden die Knoepfe
             // auf dem Stand von vor dem Ereignis.
             sse.on('status_changed', (d) => {
-                this.uebernimm(d.server_id, { status: d.status });
+                // `seit`: Ab jetzt läuft die Frist für einen hängenden Übergang
+                // neu (knopfZustand) — dieselbe Uhr wie `last_status_update`.
+                this.uebernimm(d.server_id, { status: d.status, seit: Date.now() });
                 this.holeBald();
             });
             // Ein Absturz kommt als eigenes Ereignis, nicht als status_changed
@@ -438,6 +466,10 @@
                     const b = s.bereitschaft || null;
                     this.uebernimm(s.id, {
                         status:  s.status,
+                        // Für ein hängendes `stopping` (knopfZustand): wann der
+                        // Zustand zuletzt wechselte, und die Frist vom Server.
+                        seit:    s.uebergang ? s.uebergang.seit : undefined,
+                        frist:   s.uebergang ? s.uebergang.frist : undefined,
                         stufe:   b ? b.stufe : s.bereitschaft_stufe,
                         grund:   b ? b.grund : s.bereitschaft_grund,
                         spieler: s.current_players,
