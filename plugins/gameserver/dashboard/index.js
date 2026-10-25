@@ -819,8 +819,20 @@ class GameserverPlugin extends DashboardPlugin {
         const Logger = ServiceManager.get('Logger');
         const dbService = ServiceManager.get('dbService');
 
-        const { server_id, stage, hinweis, art } = payload || {};
+        const { server_id, hinweis, art } = payload || {};
         if (!server_id) return;
+
+        // ── Die Stufe „Prozess" (2026-10-25, Windrose 221) ──────────────────
+        //
+        // `started` und `progress` tragen keine `stage`. Bis heute schrieb
+        // dieser Handler dann NULL — und die Karte sagte „noch keine Stufe
+        // gemeldet", während fb-init längst „der Prozess läuft aber" gemeldet
+        // hatte (Windrose im P2P-Modus: kein Port, also nie mehr als das).
+        // Beide sagen „Prozess läuft": `started` direkt, `progress` kommt nur
+        // aus den Wachschleifen, solange der Prozess lebt (fb-init ready.go).
+        // `failed` und unbekannte Arten bleiben ohne Stufe.
+        const stage = payload?.stage
+            || (art === 'started' || art === 'progress' ? 'process' : null);
 
         // Hat fb-init „bereit" gesagt? Nur `ready` zaehlt (Baustelle 160). Ohne
         // `art` (Daemon vor 1.0.96) bleibt es unbekannt, und die Leiter gilt.
