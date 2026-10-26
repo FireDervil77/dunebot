@@ -2401,6 +2401,7 @@
           Der ganze Entwurf auf einem <strong>leeren</strong> Volume — installieren wie beim Kunden, starten, auf den Port warten,
           mit deiner Stoppfolge anhalten. Grün heißt: alles lief, bereit über den Port, und das Spiel endete, bevor sigkill nötig war.
           Das Prüf-Volume wird danach gelöscht.
+          Hat die Bereitschaft Fälle, startet der Durchlauf nach der Installation einmal je Fall — grün nur, wenn jeder gestartete Fall grün ist.
         </p>
         <% if (pruefung && !pruefLaeuft && pruefHash !== entwurfHash) { %>
           <div class="alert alert-warning py-2 small">Der technische Teil (Image, Ports, Schritte, Start, Einstellungen) hat sich seit diesem Durchlauf geändert — das Urteil gilt für den alten Stand. Name, Beschreibung und Bild zählen nicht mit.</div>
@@ -2432,12 +2433,48 @@
               <div class="alert alert-info py-2 small mb-2">Auf dem Daemon lief noch ein früherer Durchlauf dieser Sitzung — etwa einer, der hier als abgebrochen markiert wurde. Er endet von selbst und räumt sein Prüf-Volume ab; danach geht ein neuer Durchlauf. Über das Paket sagt dieses Urteil nichts.</div>
             <% } %>
           <% } %>
+          <% const faelle = Array.isArray(e.faelle) ? e.faelle : null; %>
           <div class="small text-secondary mb-2">
             Installation <%= e.installation || '—' %><%= e.install_sek ? ' (' + e.install_sek + ' s)' : '' %>
+            <% if (!faelle) { %>
             · bereit <%= e.bereitschaft ? 'über ' + e.bereitschaft + ' nach ' + e.bereit_nach_sek + ' s' : 'nie' %>
             · Ende Code <%= e.exit_code !== undefined ? e.exit_code : '—' %><%= e.stopp_sek !== undefined && e.bereitschaft ? ', Stopp ' + e.stopp_sek + ' s' : '' %>
             <% if (e.rcon) { %>· Fernsteuerung <%= e.rcon.angemeldet ? 'angemeldet nach ' + e.rcon.nach_sek + ' s' : 'nicht erreicht' %><% } %>
+            <% } else { %>· danach ein Start je Fall der Bereitschaft<% } %>
           </div>
+          <%# S7 (2026-10-26): Ein Paket mit Fällen wird je Fall einmal gestartet,
+              alle auf derselben Installation. Ungeprüft heißt: Für diesen Fall
+              ließ sich kein Wert ableiten — er ist nicht belegt, macht aber nicht rot. %>
+          <% if (faelle) { %>
+            <div class="table-responsive mb-2">
+              <table class="table table-sm table-vcenter small mb-0" id="pruefFaelle">
+                <thead><tr><th>Fall</th><th>Werte</th><th>Bereitschaft</th><th>Urteil</th></tr></thead>
+                <tbody>
+                <% faelle.forEach(function (f) {
+                     const plan = f.plan || null;
+                     const werte = Object.keys(f.werte || {}).sort().map(function (k) { return k + ' = ' + f.werte[k]; }).join(', ');
+                     const wie = !plan ? '—' : plan.port ? 'Port „' + plan.port + '"' + (plan.query ? ' + Abfrage' : '')
+                       : 'Zeile' + (plan.log_file ? ' in ' + plan.log_file : ' auf der Konsole'); %>
+                  <tr data-fall="<%= f.fall %>">
+                    <td class="text-nowrap"><%= f.fall < 0 ? 'Grundfall' : 'Fall ' + (f.fall + 1) %></td>
+                    <td class="font-monospace"><%= werte || 'Probewerte' %></td>
+                    <td><%= wie %></td>
+                    <td>
+                      <% if (f.ungeprueft) { %><span class="badge bg-secondary-lt">ungeprüft</span>
+                        <div class="text-secondary"><%= f.ungeprueft %></div>
+                      <% } else if (f.gruen) { %><span class="badge bg-green-lt">grün</span>
+                        <span class="text-secondary">bereit über <%= f.bereitschaft %> nach <%= f.bereit_nach_sek %> s, Stopp <%= f.stopp_sek %> s<%= f.rcon ? (f.rcon.angemeldet ? ', Fernsteuerung angemeldet' : '') : '' %></span>
+                      <% } else { %><span class="badge bg-red-lt">rot</span>
+                        <span class="text-secondary"><%= f.bereitschaft ? 'bereit über ' + f.bereitschaft + ' nach ' + f.bereit_nach_sek + ' s' : 'nie bereit' %></span>
+                      <% } %>
+                      <% if (f.hinweis) { %><div class="text-warning"><%= f.hinweis %></div><% } %>
+                    </td>
+                  </tr>
+                <% }) %>
+                </tbody>
+              </table>
+            </div>
+          <% } %>
         <% } %>
         <details <%= pruefLaeuft ? 'open' : '' %>>
           <summary class="text-secondary small">Protokoll</summary>

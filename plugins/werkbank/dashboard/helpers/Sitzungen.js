@@ -2557,8 +2557,13 @@ async function pruefen(sitzung, liste) {
     if (maengel.length) throw new Error(maengel.join(' '));
     const w = werkbankTeil(sitzung);
     // Ohne Nummer für den Bereitschaftsport entstünde kein Auftrag (Job.Validate).
-    if (paket.start.ready_when.port && !w.portnummern[paket.start.ready_when.port]) {
-        throw new Error(`Der Port „${paket.start.ready_when.port}" hat in dieser Sitzung keine Nummer — erst beobachten und übernehmen.`);
+    // Seit S7 startet der Durchlauf je Fall einmal — jeder Fall mit Port
+    // braucht dessen Nummer, nicht nur der Grundfall.
+    const bereit = paket.start.ready_when;
+    for (const [wo, port] of [['', bereit.port], ...(bereit.cases || []).map((c, i) => [` (Bereitschaft, Fall ${i + 1})`, c.port])]) {
+        if (port && !w.portnummern[port]) {
+            throw new Error(`Der Port „${port}"${wo} hat in dieser Sitzung keine Nummer — erst beobachten und übernehmen.`);
+        }
     }
     const daemon = await daemonFuer(sitzung);
 
@@ -2629,10 +2634,28 @@ async function pruefProtokoll(pruefId, text) {
         [text, MAX_AUSGABE, pruefId]);
 }
 
+/**
+ * Das Urteil speichern — und zurückgeben, wie es gespeichert wurde.
+ *
+ * Ein Daemon vor S7 (bis 1.0.135) startet ein Paket mit Fällen der
+ * Bereitschaft nur einmal, mit den Probewerten, und meldet trotzdem grün. Das
+ * belegt einen Fall, nicht das Paket: ohne `faelle` im Ergebnis ist ein
+ * solches Grün hier rot.
+ */
 async function pruefungBeenden(pruefId, ergebnis) {
+    let e = ergebnis || {};
+    if (e.gruen && !Array.isArray(e.faelle)) {
+        const [z] = await db().query('SELECT entwurf FROM werkbank_pruefungen WHERE id = ?', [pruefId]);
+        const faelle = json(z?.entwurf, null)?.start?.ready_when?.cases;
+        if (Array.isArray(faelle) && faelle.length) {
+            e = { ...e, gruen: false, gruende: [...(e.gruende || []),
+                `Der Daemon kennt keine Fälle der Bereitschaft (vor S7) — geprüft ist nur der Fall, den die Probewerte treffen, nicht die ${faelle.length + 1} des Pakets. Daemon aktualisieren und neu prüfen.`] };
+        }
+    }
     await db().query(
         `UPDATE werkbank_pruefungen SET status = ?, ergebnis = ?, beendet_am = NOW() WHERE id = ? AND status = 'laeuft'`,
-        [ergebnis?.gruen ? 'gruen' : 'rot', JSON.stringify(ergebnis || {}), pruefId]);
+        [e.gruen ? 'gruen' : 'rot', JSON.stringify(e), pruefId]);
+    return e;
 }
 
 // ── Stufe 4: Angaben, Präsentation, Veröffentlichen ──────────────────────────

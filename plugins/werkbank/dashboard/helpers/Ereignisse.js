@@ -346,8 +346,9 @@ async function beiPruefung(payload) {
         return;
     }
     await schreibePruefPuffer(pr.pruefId);
-    const ergebnis = payload.ergebnis && typeof payload.ergebnis === 'object' ? payload.ergebnis : { gruen: false, gruende: ['Urteil ohne Inhalt'] };
-    await Sitzungen.pruefungBeenden(pr.pruefId, ergebnis);
+    const gemeldet = payload.ergebnis && typeof payload.ergebnis === 'object' ? payload.ergebnis : { gruen: false, gruende: ['Urteil ohne Inhalt'] };
+    // Gespeichert wird womöglich ein anderes Urteil (Daemon ohne Fälle) — gemeldet wird das gespeicherte.
+    const ergebnis = await Sitzungen.pruefungBeenden(pr.pruefId, gemeldet);
     vergissPruefung(kennung);
     sende(pr.guildId, { action: 'pruefung', sitzung_id: kennung, gruen: Boolean(ergebnis.gruen) });
     Logger.info(`[Werkbank] Sitzung ${kennung}: Prüfdurchlauf ${pr.pruefId} ${ergebnis.gruen ? 'GRÜN' : 'rot'}`);
