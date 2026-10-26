@@ -514,8 +514,13 @@ router.post('/settings/spiele-updates/save', async (req, res) => {
 
     // Der Bot merkt sich den Kanal eine Minute. Der Anstoß gilt deshalb auch
     // beim Abschalten — sonst läse er bis dahin weiter.
-    const antwort = await ServiceManager.get('ipcServer')
+    // Handler aus apps/bot/ipc/ antworten in einer Hülle `{ success, data }`;
+    // die Zahlen und ein Fehler des Nachholens stehen in `data`. Ohne das
+    // Auspacken stand im Toast „undefined Nachrichten gelesen" — in Grün,
+    // auch wenn der Bot gescheitert war (2026-10-25).
+    const huelle = await ServiceManager.get('ipcServer')
         .broadcastOne('dashboard:SPIELE_UPDATES_NACHHOLEN', {}, true, { timeout: 60_000 });
+    const antwort = huelle?.data ?? huelle;
 
     if (!kanal) {
         return res.json({ success: true, message: 'Es werden keine Spiele-Updates mehr eingelesen. Was schon im Blog steht, bleibt.' });

@@ -698,6 +698,35 @@ const n = (text, mehr) => S.ausRoh(roh(text, mehr));
         assert.ok(ohneKommentare(lies('apps/bot/extenders/BotClient.js')).includes('GatewayIntentBits.MessageContent'));
     });
 
+    await pruefe('der Toast nach dem Nachholen nennt die Zahlen des Bots; scheitert der Bot, wird er gelb', async () => {
+        // Am 2026-10-25 stand dort „undefined Nachrichten gelesen" in Grün: Die
+        // Route las die Zahlen aus der Hülle statt aus `data`.
+        assert.ok(/kernIpcHandlers[\s\S]{0,300}message\.reply\(\{ success: true, data \}\)/.test(ohneKommentare(lies('apps/bot/helpers/IPCClient.js'))),
+            'der Bot verpackt die Antwort seiner Kern-Handler nicht mehr in { success, data } — die Fälle unten stimmen nicht mehr');
+        const route = require(path.join(WURZEL, 'apps/dashboard/routes/admin/content.router.js')).stack
+            .find(l => l.route?.path === '/settings/spiele-updates/save' && l.route.methods.post).route.stack[0].handle;
+        const vorherDb = ServiceManager.has('dbService') ? ServiceManager.get('dbService') : null;
+        const vorherIpc = ServiceManager.has('ipcServer') ? ServiceManager.get('ipcServer') : null;
+        ServiceManager.register('dbService', { query: async () => [] });
+        const sende = async (huelle) => {
+            ServiceManager.register('ipcServer', { broadcastOne: async () => huelle });
+            let antwort;
+            await route({ body: { channel_id: '123456789012345678', channel_name: 'game-updates' } }, { status() { return this; }, json(a) { antwort = a; } });
+            return antwort;
+        };
+        try {
+            const gut = await sende({ success: true, data: { success: true, gelesen: 7, neu: 2, geaendert: 1 } });
+            assert.ok(!gut.warnung && gut.message.includes('7 Nachrichten gelesen, 2 neue Meldungen im Blog, 1 geändert'), gut.message);
+            const bot = await sende({ success: true, data: { success: false, error: 'Kanal nicht lesbar' } });
+            assert.ok(bot.warnung && bot.message.includes('Kanal nicht lesbar'), bot.message);
+            const weg = await sende({ success: false, data: null, error: 'Timed out' });
+            assert.ok(weg.warnung && weg.message.includes('Timed out'), weg.message);
+        } finally {
+            if (vorherDb) ServiceManager.register('dbService', vorherDb);
+            if (vorherIpc) ServiceManager.register('ipcServer', vorherIpc);
+        }
+    });
+
     await pruefe('die Regel steht an einer Stelle: Bot und Dashboard wandeln nichts selbst um', () => {
         for (const p of ['apps/bot/helpers/SpieleUpdates.js', 'apps/dashboard/routes/frontend.router.js', 'apps/dashboard/routes/admin/content.router.js']) {
             const code = ohneKommentare(lies(p));
