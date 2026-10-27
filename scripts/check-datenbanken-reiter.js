@@ -14,6 +14,10 @@
  *   Rechte     Zugang/Kennwort/Anlegen/Löschen nur mit FILES.MANAGE
  *   Ansicht    Knöpfe nur mit Recht; kein Kennwort im HTML; Löschen mit Namen
  *
+ * S4 (2026-10-27): Schalter beim Anlegen (Paket requirements.database →
+ * Pflicht), Entscheidung VOR den Ports, Anlegen nach dem INSERT; Löschen mit
+ * dem Server — erst die Datenbanken, scheitert eine, bleibt alles (erzwingbar).
+ *
  *   node scripts/check-datenbanken-reiter.js
  */
 'use strict';
@@ -54,6 +58,10 @@ ServiceManager.register('dbService', {
         }
         if (/^UPDATE gameserver_datenbanken SET bytes = \?, groesse_am = NOW\(\) WHERE server_id = \? AND nr = \?$/.test(t)) {
             spur.zeilen.filter(z => z.server_id === w[1] && z.nr === w[2]).forEach(z => { z.bytes = w[0]; z.groesse_am = new Date(); });
+            return {};
+        }
+        if (/^DELETE FROM gameserver_datenbanken WHERE server_id = \?$/.test(t)) {
+            spur.zeilen = spur.zeilen.filter(z => z.server_id !== w[0]);
             return {};
         }
         if (/^DELETE FROM gameserver_datenbanken WHERE server_id = \? AND nr = \?$/.test(t)) {
@@ -292,6 +300,87 @@ const wirft = async (fn, muster, status) => {
         assert.ok(!voll.includes('id="dbAnlegen"') && voll.includes('Grenze ist erreicht'));
         const aus = zeichne(true, { stand: D.stand({ ...SERVER, db_gewuenscht: 0 }, 0), liste: [] });
         assert.ok(aus.includes('bietet keine Datenbanken an') && !aus.includes('id="dbAnlegen"'));
+    });
+
+    console.log('\nS4: beim Anlegen und Löschen des Servers');
+
+    const PAKET_PFLICHT = { identity: { name: 'Spiel X' }, requirements: { database: 'required' } };
+    const PAKET_FREI = { identity: { name: 'Spiel Y' } };
+    await pruefe('entscheideBeimAnlegen: Pflicht, Schalter (auch als Array aus dem Formular), nicht möglich', () => {
+        const e = D.entscheideBeimAnlegen;
+        assert.deepStrictEqual(e(PAKET_PFLICHT, SERVER, undefined), { anlegen: true, fehler: null });
+        assert.match(e(PAKET_PFLICHT, { ...SERVER, db_gewuenscht: 0 }, 'true').fehler, /^Spiel X braucht eine Datenbank, dieser Rootserver bietet keine an: /);
+        assert.deepStrictEqual(e(PAKET_FREI, SERVER, undefined), { anlegen: false, fehler: null });
+        assert.deepStrictEqual(e(PAKET_FREI, SERVER, ['false']), { anlegen: false, fehler: null });
+        assert.deepStrictEqual(e(PAKET_FREI, SERVER, ['false', 'true']), { anlegen: true, fehler: null }, 'verstecktes false + Schalter');
+        assert.deepStrictEqual(e(PAKET_FREI, SERVER, 'true'), { anlegen: true, fehler: null });
+        assert.match(e(PAKET_FREI, { ...SERVER, db_moeglich: 0, db_grund: 'Container aus' }, 'true').fehler, /geht auf diesem Rootserver nicht: Container aus/);
+        assert.match(e(PAKET_PFLICHT, { ...SERVER, db_je_server: 0 }, undefined).fehler, /Grenze ist erreicht: 0/);
+    });
+
+    await pruefe('Anlegeroute: Entscheidung vor den Ports, Anlegen nach dem INSERT, Fehler in der Antwort', () => {
+        const q = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/routes/servers.js'), 'utf8'));
+        const start = q.indexOf("router.post('/', requirePermission('GAMESERVER.CREATE')");
+        const ende = q.indexOf('router.post(', start + 10);
+        const r = q.slice(start, ende);
+        const entscheid = r.indexOf('Datenbanken.entscheideBeimAnlegen(paket, rootserver, req.body.datenbank_anlegen)');
+        assert.ok(entscheid > 0, 'keine Entscheidung');
+        assert.ok(entscheid < r.indexOf('vergibPortsAusPaket('), 'erst Ports, dann die Ablehnung — die Ports blieben belegt');
+        assert.ok(r.indexOf('Datenbanken.anlegen(') > r.indexOf('INSERT INTO gameservers'), 'Anlegen vor dem INSERT');
+        assert.ok(/r\.db_gewuenscht, r\.db_moeglich, r\.db_grund, r\.db_je_server/.test(r), 'Rootserver ohne Datenbank-Angaben');
+        assert.ok(/datenbank_fehler: datenbankFehler/.test(r), 'Fehler nicht in der Antwort');
+        const step3 = fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/views/guild/server-create-step3.ejs'), 'utf8');
+        assert.ok(/if \(a\.d\.datenbank_fehler\)/.test(step3), 'Schritt 3 springt weiter und verschluckt den Fehler');
+    });
+
+    await pruefe('Löschroute: Datenbanken vor dem Deinstallieren; scheitern → nichts gelöscht, erzwingbar', () => {
+        const q = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/routes/servers.js'), 'utf8'));
+        const start = q.indexOf("router.delete('/:serverId', requirePermission('GAMESERVER.DELETE')");
+        const r = q.slice(start, q.indexOf('router.', start + 20));
+        const db = r.indexOf('Datenbanken.allesLoeschen(');
+        assert.ok(db > 0 && db < r.indexOf("'gameserver.uninstall'"), 'Datenbanken nicht vor dem Deinstallieren');
+        assert.ok(db > r.indexOf('ServerStopp.stoppeFallsLaeuft('), 'Datenbank weg, während das Spiel noch läuft');
+        assert.ok(/erzwingen: forceDelete/.test(r) && /canForce: true/.test(r.slice(db, db + 900)), 'nicht erzwingbar');
+        assert.strictEqual((r.match(/dbHinweis/g) || []).length, 4, 'die drei Abbruchmeldungen danach sagen nicht, dass die Datenbank schon weg ist');
+    });
+
+    await pruefe('allesLoeschen: alles weg; Fehler → Zeile bleibt; erzwungen → Zeilen weg, Rest im Log', async () => {
+        spur.zeilen = [];
+        await D.anlegen(SERVER); await D.anlegen(SERVER);
+        assert.deepStrictEqual(await D.allesLoeschen(SERVER), { geloescht: ['s222_1', 's222_2'], fehler: [] });
+        assert.strictEqual(spur.zeilen.length, 0);
+        await D.anlegen(SERVER);
+        spur.fehlerBei['db.loeschen'] = 'Container läuft nicht';
+        const ohne = await D.allesLoeschen(SERVER);
+        assert.deepStrictEqual(ohne.fehler, ['s222_1: Container läuft nicht']);
+        assert.strictEqual(spur.zeilen.length, 1, 'Zeile ohne Erzwingen gelöscht');
+        await D.allesLoeschen(SERVER, { erzwingen: true });
+        assert.strictEqual(spur.zeilen.length, 0);
+        assert.ok(logs.some(l => /erzwungen gelöscht — im Container bleiben: s222_1/.test(l)), 'Rest nicht im Log');
+    });
+
+    const SCHRITT3 = path.join(WURZEL, 'plugins/gameserver/dashboard/views/guild/server-create-step3.ejs');
+    await pruefe('Schritt 3: Schalter nur mit Angebot; Pflicht fest an; Pflicht ohne Angebot nennt den Grund', () => {
+        const q = fs.readFileSync(SCHRITT3, 'utf8');
+        const a = q.indexOf('Datenbank (Stufe 11 S4)'), b = q.indexOf('<% if (werte.aufVorgabe > 0) { %>', a);
+        const stueck = q.slice(q.lastIndexOf('<%#', a), b);
+        const zeig = (wahl) => ejs.render(stueck, { locals: { datenbankWahl: wahl } });
+        assert.ok(!zeig(null).includes('datenbank_anlegen'));
+        assert.ok(!zeig({ pflicht: false, moeglich: false, grund: 'x' }).includes('datenbank_anlegen'));
+        const frei = zeig({ pflicht: false, moeglich: true, grund: null });
+        assert.ok(/name="datenbank_anlegen" value="false"[\s\S]*form-switch[\s\S]*name="datenbank_anlegen" value="true"/.test(frei), 'verstecktes false vor dem Schalter');
+        assert.ok(!/checked/.test(frei), 'Vorgabe muss aus sein');
+        const pflicht = zeig({ pflicht: true, moeglich: true, grund: null });
+        assert.ok(/name="datenbank_anlegen" value="true"/.test(pflicht) && /checked disabled/.test(pflicht));
+        assert.ok(zeig({ pflicht: true, moeglich: false, grund: 'Container aus' }).includes('bietet keine an: Container aus'));
+    });
+
+    await pruefe('Schema und Werkbank kennen requirements.database', () => {
+        const schema = JSON.parse(fs.readFileSync(path.join(WURZEL, 'packages/fbpkg/schema/fbpkg-v1.schema.json'), 'utf8'));
+        assert.deepStrictEqual(schema.properties.requirements.properties.database.enum, ['required']);
+        const w = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'plugins/werkbank/dashboard/helpers/Sitzungen.js'), 'utf8'));
+        assert.ok(/VORAUSSETZUNG_FELDER = \['os_packages', 'display', 'database'\]/.test(w));
+        assert.ok(/if \(neu\.database\) r\.database = neu\.database; else delete r\.database;/.test(w));
     });
 
     console.log(fehler ? `\n✗ ${fehler} gescheitert, ${bestanden} bestanden` : `\n✓ ${bestanden} bestanden`);

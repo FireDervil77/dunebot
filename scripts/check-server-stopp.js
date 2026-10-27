@@ -57,6 +57,9 @@ const db = {
             return { affectedRows: 1 };
         }
         if (/^DELETE FROM gameservers WHERE id = \?$/.test(t)) { this.geloescht = true; return { affectedRows: 1 }; }
+        // Datenbanken des Servers (Stufe 11 S4): Die Löschroute fragt sie vor
+        // dem Deinstallieren ab — dieser Server hat keine.
+        if (/^SELECT nr, name, bytes, groesse_am, created_at FROM gameserver_datenbanken WHERE server_id = \? ORDER BY nr$/.test(t)) return [];
         throw new Error('Unerwartete Abfrage: ' + t.slice(0, 90));
     },
 };

@@ -102,7 +102,7 @@ const gleich = (a, b, was) => assert.deepStrictEqual(sortiert(a), sortiert(b), w
 const wirft = (tun, muster) => assert.rejects(tun, (e) => { assert.match(e.message, muster); return true; });
 
 /** Die Karte so im Formular, wie die Seite sie vorbelegt. */
-const formular = (stand) => ({ os_packages: stand.pakete.map(p => p.name).join('\n'), display: stand.bildschirm ? '1' : '' });
+const formular = (stand) => ({ os_packages: stand.pakete.map(p => p.name).join('\n'), display: stand.bildschirm ? '1' : '', database: stand.datenbank ? '1' : '' });
 
 /** Core Keeper, wie es der Betreiber am 2026-10-09 gebaut hat — noch ohne Voraussetzungen. */
 function frisch(mehr = {}) {

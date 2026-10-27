@@ -618,6 +618,7 @@ router.get('/create', requirePermission('GAMESERVER.CREATE'), async (req, res) =
 
             // ── Werte nach dem Entwurf (Artboard 5c) ────────────────────────
             let werte = { felder: [], aufVorgabe: 0, passiert: {} };
+            let datenbankWahl = null;
             let paketFuerWerte = null;
             try {
                 const pz = await ladePaketFuerAnlegen(dbService, addonData.id, guildId);
@@ -632,8 +633,11 @@ router.get('/create', requirePermission('GAMESERVER.CREATE'), async (req, res) =
                     const roh = await dbService.query(`
                         SELECT r.id, r.name, r.hostname, r.host, r.daemon_status,
                                r.cpu_cores, r.ram_total_gb, r.disk_total_gb,
-                               r.fqdn, r.fqdn_gilt
+                               r.fqdn, r.fqdn_gilt,
+                               r.daemon_id, r.db_gewuenscht, r.db_moeglich, r.db_grund, r.db_je_server
                           FROM rootserver r WHERE r.id = ? AND r.guild_id = ?`, [rsId, guildId]);
+                    // Datenbank beim Anlegen (Stufe 11 S4): Schalter, Pflicht, Grund.
+                    datenbankWahl = require('../helpers/Datenbanken').wahlBeimAnlegen(paketFuerWerte, roh[0] || null);
                     // Dieselbe Rechnung wie in Schritt 2 — also auch derselbe
                     // Vorrat, nach rootserver_id statt nach einer Spalte, die
                     // es nicht gibt.
@@ -667,6 +671,7 @@ router.get('/create', requirePermission('GAMESERVER.CREATE'), async (req, res) =
             return await themeManager.renderView(res, 'guild/server-create-step3', {
                 title: 'Server anlegen — Werte',
                 werte,
+                datenbankWahl,
                 inhalte,
                 // Haengt der Inhalt am Lader, kann diese Seite ihn noch nicht
                 // kennen — er wird hier gerade gewaehlt. Dann steht dort ein
@@ -769,7 +774,8 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
                 r.daemon_id,
                 r.host,
                 r.hostname,
-                r.system_user
+                r.system_user,
+                r.db_gewuenscht, r.db_moeglich, r.db_grund, r.db_je_server
             FROM rootserver r
             WHERE r.id = ?
         `, [rootserver_id]);
@@ -888,6 +894,13 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
             });
         }
         const templateName = paket.identity?.name || addon.name;
+
+        // Datenbank (Stufe 11 S4): Pflicht laut Paket oder Schalter in Schritt 3.
+        // Entschieden VOR dem Vergeben der Ports — eine Ablehnung hat dann
+        // nichts zurückzunehmen.
+        const Datenbanken = require('../helpers/Datenbanken');
+        const dbWahl = Datenbanken.entscheideBeimAnlegen(paket, rootserver, req.body.datenbank_anlegen);
+        if (dbWahl.fehler) return res.status(400).json({ success: false, message: dbWahl.fehler });
 
         // ── Ports nach dem Paket (Portvergabe.js) ───────────────────────────
         //
@@ -1079,6 +1092,22 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
             Logger.info(`[Gameserver] ${gewaehlteMods.length} Mod(s) für Server ${serverId} vorgemerkt`);
         }
 
+        // Die Datenbank gleich jetzt, nicht erst nach der Installation: Ihre
+        // Zugangsdaten müssen vor dem ersten Start da sein (Platzhalter, S5),
+        // und „nach der Installation starten" käme sonst zuvor. Scheitert sie,
+        // bleibt der Server — anlegen lässt sie sich unter Server → Datenbanken.
+        let datenbank = null, datenbankFehler = null;
+        if (dbWahl.anlegen) {
+            try {
+                const z = await Datenbanken.anlegen({ ...rootserver, id: serverId, guild_id: guildId, daemon_id: daemonId });
+                datenbank = z.name;
+                Logger.info(`[Gameserver] Datenbank ${z.name} für Server ${serverId} angelegt`);
+            } catch (err) {
+                datenbankFehler = err.message;
+                Logger.warn(`[Gameserver] Datenbank für Server ${serverId} nicht angelegt: ${err.message}`);
+            }
+        }
+
         // ✅ SFTP-Credentials direkt beim Server-Erstellen setzen
         // Username = system_user des Rootservers (Linux-User dem das Verzeichnis gehört)
         // Das Passwort wird hier nur gehasht abgelegt; der Nutzer holt es sich
@@ -1189,8 +1218,12 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
 
         res.json({
             success: true,
-            message: `Server "${server_name}" wird installiert...`,
+            message: `Server "${server_name}" wird installiert...`
+                + (datenbank ? ` Datenbank ${datenbank} ist angelegt.` : '')
+                + (datenbankFehler ? ` Die Datenbank ging nicht: ${datenbankFehler} — unter Server → Datenbanken erneut anlegen.` : ''),
             serverId,
+            datenbank,
+            datenbank_fehler: datenbankFehler,
             redirectUrl: `/guild/${guildId}/plugins/gameserver/servers`
         });
     } catch (error) {
@@ -2439,6 +2472,25 @@ router.delete('/:serverId', requirePermission('GAMESERVER.DELETE'), async (req, 
         const forceDelete = req.query.force === 'true';
         let uninstallSuccess = false;
         let uninstallError = null;
+
+        // Datenbanken zuerst (Stufe 11 S4): Scheitert eine, ist noch nichts
+        // gelöscht — der Server bleibt, wie beim Deinstallieren lässt es sich
+        // erzwingen. Ohne diesen Schritt blieben Datenbank und Konto im
+        // Container stehen, und niemand wüsste mehr von ihnen.
+        const Datenbanken = require('../helpers/Datenbanken');
+        const dbLoeschung = await Datenbanken.allesLoeschen(
+            { id: Number(serverId), daemon_id: server.daemon_id }, { erzwingen: forceDelete });
+        if (dbLoeschung.fehler.length && !forceDelete) {
+            return res.status(500).json({
+                success: false,
+                message: `Datenbank nicht gelöscht (${dbLoeschung.fehler.join('; ')}). Server wurde NICHT gelöscht.`,
+                canForce: true
+            });
+        }
+        // Ab hier sind die Datenbanken weg — scheitert danach die
+        // Deinstallation, muss die Meldung das sagen.
+        const dbHinweis = dbLoeschung.geloescht.length
+            ? ` Die Datenbank(en) ${dbLoeschung.geloescht.join(', ')} sind bereits gelöscht.` : '';
         
         if (server.daemon_id && ipmServer && ipmServer.isDaemonOnline(server.daemon_id)) {
             try {
@@ -2470,7 +2522,7 @@ router.delete('/:serverId', requirePermission('GAMESERVER.DELETE'), async (req, 
                     if (!forceDelete) {
                         return res.status(500).json({
                             success: false,
-                            message: `Deinstallation fehlgeschlagen: ${uninstallError}. Server wurde NICHT aus der Datenbank gelöscht.`,
+                            message: `Deinstallation fehlgeschlagen: ${uninstallError}. Server wurde NICHT aus der Datenbank gelöscht.${dbHinweis}`,
                             canForce: true
                         });
                     }
@@ -2483,7 +2535,7 @@ router.delete('/:serverId', requirePermission('GAMESERVER.DELETE'), async (req, 
                 if (!forceDelete) {
                     return res.status(500).json({
                         success: false,
-                        message: `IPM-Fehler: ${uninstallError}. Server wurde NICHT aus der Datenbank gelöscht.`,
+                        message: `IPM-Fehler: ${uninstallError}. Server wurde NICHT aus der Datenbank gelöscht.${dbHinweis}`,
                         canForce: true
                     });
                 }
@@ -2495,7 +2547,7 @@ router.delete('/:serverId', requirePermission('GAMESERVER.DELETE'), async (req, 
             if (!forceDelete) {
                 return res.status(503).json({
                     success: false,
-                    message: 'Daemon ist offline. Server kann nicht deinstalliert werden.',
+                    message: 'Daemon ist offline. Server kann nicht deinstalliert werden.' + dbHinweis,
                     canForce: true
                 });
             }

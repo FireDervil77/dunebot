@@ -767,7 +767,7 @@
   <%
     // Was das Spiel vom Image verlangt. `vorhanden` ist dreiwertig: true, false
     // oder null = zu dieser Liste an diesem Image nicht nachgezählt.
-    const vor = locals.voraussetzungen || { pakete: [], bildschirm: false, bildschirmVorhanden: null, gefragt: false, geprueftAm: null, geprueftAn: null, fehlt: [], ungeprueft: null, sonstiges: [] };
+    const vor = locals.voraussetzungen || { pakete: [], bildschirm: false, datenbank: false, bildschirmVorhanden: null, gefragt: false, geprueftAm: null, geprueftAn: null, fehlt: [], ungeprueft: null, sonstiges: [] };
     const VOR = locals.VORAUSSETZUNG || { max: 40 };
     const vorMarke = function (v) {
       return v === true ? '<span class="badge bg-success-lt">im Image</span>'
@@ -849,6 +849,16 @@
                 + 'Der Server stellt vor dem Spiel einen unsichtbaren Bildschirm auf und sagt dem Spiel, wo er ist (DISPLAY). '
                 + 'Woran man es merkt: Das Spiel endet kurz nach dem Start mit Signal 11, oder es bleibt bei „Desktop is 0 x 0" stehen. '
                 + 'Mit dem Schalter gehört -nographics aus der Startzeile. Braucht das Image-Paket xvfb.' }) %>
+            </div>
+            <div class="d-flex align-items-start mt-3">
+              <label class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" name="database" value="1" <%= vor.datenbank ? 'checked' : '' %>>
+                <span class="form-check-label">Braucht eine Datenbank</span>
+              </label><%- include('werkbank-hilfe', { text:
+                'Für Spiele, die ohne MariaDB/MySQL nicht laufen. '
+                + 'Beim Anlegen eines Servers wird die Datenbank dann mitangelegt, der Schalter ist fest an — '
+                + 'auf einem Rootserver ohne Datenbanken lehnt das Panel das Anlegen mit Grund ab. '
+                + 'Ohne den Schalter ist sie frei wählbar. Die Datenbank liegt im Container fb-datenbank des Rootservers.' }) %>
             </div>
             <% if (vor.sonstiges.length) { %>
               <div class="text-secondary small mt-3">
@@ -3997,7 +4007,8 @@
       try {
         vorMelden(await schicke(hier + '/voraussetzungen', {
           os_packages: formVor.os_packages.value,
-          display: formVor.display.checked ? '1' : ''
+          display: formVor.display.checked ? '1' : '',
+          database: formVor.database.checked ? '1' : ''
         }), true);
       } catch (fehler) {
         knopf.disabled = false;

@@ -157,6 +157,44 @@
               </div>
             <% }); %>
 
+            <%# ── Datenbank (Stufe 11 S4) ─────────────────────────────────
+                Nur, wenn der Rootserver Datenbanken anbietet — oder das Spiel
+                eine braucht (dann fest an, und geht es nicht, sagt es warum;
+                die Anlegeroute lehnt dann ab). Weitere später unter
+                Server → Datenbanken. Das versteckte „false" steht VOR dem
+                Schalter: Ohne Haken fehlt er in FormData. %>
+            <% const dbw = locals.datenbankWahl; %>
+            <% if (dbw && (dbw.moeglich || dbw.pflicht)) { %>
+              <div class="fb-abschnitt">Datenbank</div>
+              <div class="fb-zeile">
+                <div>
+                  <div style="font-weight:500">Datenbank mit anlegen</div>
+                  <div class="fb-muted" style="font-size:13px;margin-top:2px">
+                    <% if (dbw.pflicht && dbw.moeglich) { %>
+                      Dieses Spiel braucht eine Datenbank — sie wird mit angelegt.
+                    <% } else if (dbw.pflicht) { %>
+                      <span style="color:var(--fb-danger)">Dieses Spiel braucht eine Datenbank, dieser Rootserver bietet keine an: <%= dbw.grund %></span>
+                    <% } else { %>
+                      Im Container fb-datenbank des Rootservers, mit eigenem Konto. Weitere lassen sich später unter Server → Datenbanken anlegen.
+                    <% } %>
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center">
+                  <% if (dbw.pflicht) { %>
+                    <input type="hidden" name="datenbank_anlegen" value="true">
+                    <div class="form-check form-switch m-0">
+                      <input class="form-check-input" type="checkbox" checked disabled aria-label="Datenbank mit anlegen (Pflicht)">
+                    </div>
+                  <% } else { %>
+                    <input type="hidden" name="datenbank_anlegen" value="false">
+                    <div class="form-check form-switch m-0">
+                      <input class="form-check-input" type="checkbox" name="datenbank_anlegen" value="true" id="fb-datenbank-anlegen" aria-label="Datenbank mit anlegen">
+                    </div>
+                  <% } %>
+                </div>
+              </div>
+            <% } %>
+
             <% if (werte.aufVorgabe > 0) { %>
               <div class="fb-muted" style="font-size:13px;margin-top:16px">
                 <%= werte.aufVorgabe %> weitere Einstellungen bleiben auf ihrer Vorgabe.
@@ -453,8 +491,22 @@
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
       .then(function (a) {
         if (a.ok && a.d && a.d.success) {
-          window.location.href = a.d.redirectUrl ||
-            form.action.replace(/\/create.*$/, '');
+          var ziel = a.d.redirectUrl || form.action.replace(/\/create.*$/, '');
+          // Server angelegt, Datenbank nicht (Stufe 11 S4): Die Meldung muss
+          // stehen bleiben — ein Sprung zur Liste verschluckte sie. Statt des
+          // Knopfs ein Link: Ein zweites Absenden legte den Server doppelt an.
+          if (a.d.datenbank_fehler) {
+            text.textContent = a.d.message;
+            kasten.style.display = '';
+            knopf.style.display = 'none';
+            var weiter = document.createElement('a');
+            weiter.href = ziel;
+            weiter.className = knopf.className;
+            weiter.textContent = 'Weiter zur Serverliste';
+            knopf.parentNode.insertBefore(weiter, knopf);
+            return;
+          }
+          window.location.href = ziel;
           return;
         }
         zeige((a.d && a.d.message) || 'Die Antwort des Servers war nicht lesbar.');

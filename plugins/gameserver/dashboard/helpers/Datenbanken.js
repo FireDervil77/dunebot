@@ -191,6 +191,75 @@ async function groessenMessen(server) {
     };
 }
 
+// ── Beim Anlegen und Löschen eines Servers (S4) ─────────────────────────────
+
+/** Sagt das Paket, dass das Spiel ohne Datenbank nicht läuft? */
+function pflicht(paket) {
+    return paket?.requirements?.database === 'required';
+}
+
+/**
+ * Was Schritt 3 zeigt: ob es den Schalter gibt, ob er fest an ist, und warum
+ * nicht, wenn der Rootserver keine Datenbanken anbietet.
+ */
+function wahlBeimAnlegen(paket, rootserver) {
+    const s = stand(rootserver || {}, 0);
+    return { pflicht: pflicht(paket), moeglich: s.moeglich && s.frei, grund: s.grund || null };
+}
+
+/**
+ * Die Entscheidung der Anlegeroute — VOR dem Vergeben der Ports, damit eine
+ * Ablehnung nichts zurückzunehmen hat.
+ *
+ * @param {*} angehakt  der Wert des Schalters (Formular: 'true'/'false')
+ * @returns {{anlegen: boolean, fehler: string|null}}
+ */
+function entscheideBeimAnlegen(paket, rootserver, angehakt) {
+    const w = wahlBeimAnlegen(paket, rootserver);
+    // Verstecktes „false" vor dem Schalter: Mit Haken kommen beide, und
+    // Express macht daraus ein Array — es gilt der letzte (der Schalter).
+    const wert = Array.isArray(angehakt) ? angehakt[angehakt.length - 1] : angehakt;
+    const gewollt = w.pflicht || wert === true || wert === 'true' || wert === 'on';
+    if (!gewollt) return { anlegen: false, fehler: null };
+    if (!w.moeglich) {
+        const name = paket?.identity?.name || 'Dieses Spiel';
+        return {
+            anlegen: false,
+            fehler: w.pflicht
+                ? `${name} braucht eine Datenbank, dieser Rootserver bietet keine an: ${w.grund}`
+                : `Eine Datenbank geht auf diesem Rootserver nicht: ${w.grund}`,
+        };
+    }
+    return { anlegen: true, fehler: null };
+}
+
+/**
+ * Alle Datenbanken eines Servers löschen — beim Löschen des Servers.
+ *
+ * Scheitert eine, bleibt ihre Zeile (und die Route bricht ab), es sei denn,
+ * es wird erzwungen: Dann gehen die Zeilen trotzdem, und was im Container
+ * bleibt, steht im Log (und taucht bei `db.liste` als fremd auf).
+ *
+ * @returns {Promise<{geloescht: string[], fehler: string[]}>}
+ */
+async function allesLoeschen(server, { erzwingen = false } = {}) {
+    const db = ServiceManager.get('dbService');
+    const geloescht = [], fehlerListe = [];
+    for (const d of await liste(server.id)) {
+        try {
+            await loeschen(server, d.nr);
+            geloescht.push(d.name);
+        } catch (e) {
+            fehlerListe.push(`${d.name}: ${e.message}`);
+        }
+    }
+    if (fehlerListe.length && erzwingen) {
+        await db.query('DELETE FROM gameserver_datenbanken WHERE server_id = ?', [server.id]);
+        ServiceManager.get('Logger').warn(`[Gameserver] Server ${server.id} erzwungen gelöscht — im Container bleiben: ${fehlerListe.join('; ')}`);
+    }
+    return { geloescht, fehler: fehlerListe };
+}
+
 function zugangAus(name, kennwort) {
     return { name, benutzer: name, kennwort, host: HOST, port: PORT };
 }
@@ -209,4 +278,5 @@ module.exports = {
     HOST, PORT,
     ladeServer, liste, stand, anlegen, zugang, neuesKennwort, loeschen, groessenMessen,
     groesseText, freieNummer,
+    pflicht, wahlBeimAnlegen, entscheideBeimAnlegen, allesLoeschen,
 };

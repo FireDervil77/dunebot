@@ -902,6 +902,12 @@
           },
           "description": "Systempakete, die das Spiel zum Laufen braucht — z.B. libatomic1, libpulse-dev. Gehoert ins Paket, weil es eine Eigenschaft des SPIELS ist, keine des Images: Wer das Laufzeit-Image wechselt, muss wissen, was fehlen darf und was nicht.\n\nFuer Valheim aus dem offiziellen Wiki: libpulse-dev, libatomic1, libc6 (https://valheim.fandom.com/wiki/Dedicated_servers). Doku ist kein Nachweis — ob sie im aktuellen Image schon stecken, gehoert gemessen."
         },
+        "database": {
+          "enum": [
+            "required"
+          ],
+          "description": "Braucht das Spiel eine Datenbank (MariaDB/MySQL), um zu laufen? `required`: Beim Anlegen eines Servers wird sie mitangelegt (Schalter fest an), und auf einem Rootserver ohne Datenbanken lehnt das Panel das Anlegen mit Grund ab. Fehlt das Feld, ist sie frei waehlbar (Vorgabe aus). Die Datenbank liegt im Container fb-datenbank des Rootservers (Stufe 11, 2026-10-27)."
+        },
         "display": {
           "enum": [
             "virtual"

@@ -3390,12 +3390,15 @@ async function festzeileEntfernen(sitzung, b) {
 
 const VORAUSSETZUNG = {
     max: 40, bildschirm: 'virtual', bildschirmPaket: 'xvfb', frist: 120000,
+    // requirements.database (Stufe 11 S4): Das Panel legt die Datenbank beim
+    // Anlegen eines Servers mit an; der Daemon braucht das Feld nicht.
+    datenbank: 'required',
     zuAlt: 'Der Daemon dieser Maschine kennt das Nachzählen noch nicht — es kommt mit 1.0.115.',
 };
 // Dieselbe Regel wie im Daemon (werkbank_voraussetzungen.go): Die Namen gehen
 // als Argumente an dpkg-query, und was mit „-" beginnt, wäre dort ein Schalter.
 const RE_OS_PAKET = /^[a-z0-9][a-z0-9+.-]{1,99}(:[a-z0-9-]{1,20})?$/;
-const VORAUSSETZUNG_FELDER = ['os_packages', 'display'];
+const VORAUSSETZUNG_FELDER = ['os_packages', 'display', 'database'];
 
 /** Was der Daemon gefragt würde — als Text, an dem ein gemerkter Befund hängt. */
 function voraussetzungenFrage(sitzung) {
@@ -3430,6 +3433,7 @@ function voraussetzungenStand(sitzung) {
     return {
         pakete: namen.map(name => ({ name, vorhanden: je.has(name) ? je.get(name) : null })),
         bildschirm,
+        datenbank: r.database === VORAUSSETZUNG.datenbank,
         // Der Bildschirm hängt am Paket xvfb — der Daemon fragt es mit.
         bildschirmVorhanden: bildschirm && befund ? befund.display_vorhanden === true : null,
         gefragt: voraussetzungenGefragt(sitzung),
@@ -3461,7 +3465,11 @@ function voraussetzungenAusFormular(b) {
         if (!namen.includes(n)) namen.push(n);
     }
     if (namen.length > VORAUSSETZUNG.max) throw new Error(`Höchstens ${VORAUSSETZUNG.max} Systempakete.`);
-    return { os_packages: namen, display: istWahr(b?.display) ? VORAUSSETZUNG.bildschirm : '' };
+    return {
+        os_packages: namen,
+        display: istWahr(b?.display) ? VORAUSSETZUNG.bildschirm : '',
+        database: istWahr(b?.database) ? VORAUSSETZUNG.datenbank : '',
+    };
 }
 
 /**
@@ -3477,6 +3485,7 @@ async function voraussetzungenSpeichern(sitzung, b) {
         const r = { ...(e.requirements || {}) };
         if (neu.os_packages.length || Array.isArray(r.os_packages)) r.os_packages = neu.os_packages;
         if (neu.display) r.display = neu.display; else delete r.display;
+        if (neu.database) r.database = neu.database; else delete r.database;
         if (Object.keys(r).length || gab) e.requirements = r; else delete e.requirements;
     });
     return voraussetzungenPruefen(sitzung);
