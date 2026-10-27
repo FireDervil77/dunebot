@@ -195,7 +195,9 @@ async function pruefe(was, tun) {
         const m = require(path.join(WURZEL, 'plugins/gameserver/migrations/20261027_140000_spielfassung_am_server.js'));
         // information_schema sieht nur den Bestand: An der Kopie legt die
         // Migration an, was dem Bestand fehlt — genau das, was sie dort täte.
-        const db = { query: async (sql, w) => (await c.query(sql, w))[0] };
+        // Wie dbService in der Produktion: execute, also Prepared Statements —
+        // mit c.query lief am 2026-10-27 eine Migration grün, die dort scheiterte.
+        const db = { query: async (sql, w = []) => (await c.execute(sql, w))[0] };
         await m.up(db);
         await m.up(db);   // zweites Mal: nichts zu tun
         assert.deepStrictEqual(await spalten(), ['spielfassung_am', 'spielfassung_build', 'spielfassung_label']);

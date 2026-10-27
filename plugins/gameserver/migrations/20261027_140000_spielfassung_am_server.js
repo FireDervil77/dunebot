@@ -22,7 +22,11 @@ module.exports = {
         for (const [name, art] of SPALTEN) {
             // SHOW COLUMNS statt information_schema: Es fragt genau die Tabelle,
             // die das ALTER danach trifft — auch eine TEMPORARY-Kopie im Wächter.
-            const [da] = await db.query('SHOW COLUMNS FROM gameservers LIKE ?', [name]);
+            // Der Name steht als Text drin, nicht als `?`: dbService.query ist
+            // `execute` (Prepared Statement), und MariaDB nimmt dort hinter
+            // SHOW … LIKE keinen Platzhalter — am 2026-10-27 daran gescheitert
+            // („near '?'"). Die Namen sind Konstanten aus dieser Datei.
+            const [da] = await db.query(`SHOW COLUMNS FROM gameservers LIKE '${name}'`);
             if (da) continue;
             await db.query(`ALTER TABLE gameservers ADD COLUMN ${name} ${art}`);
         }

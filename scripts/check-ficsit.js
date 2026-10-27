@@ -115,7 +115,9 @@ async function pruefe(was, tun) {
         await c.query('CREATE TEMPORARY TABLE gameserver_content LIKE fb_gc_form');
         const [[k]] = await c.query('SHOW CREATE TABLE gameserver_content');
         assert.match(k['Create Table'], /^CREATE TEMPORARY TABLE/, 'die Kopie verdeckt den Bestand nicht — abgebrochen');
-        const db = { query: async (sql, w) => (await c.query(sql, w))[0] };
+        // Wie dbService in der Produktion: execute, also Prepared Statements —
+        // mit c.query lief am 2026-10-27 eine Migration grün, die dort scheiterte.
+        const db = { query: async (sql, w = []) => (await c.execute(sql, w))[0] };
         const m = require(path.join(WURZEL, 'plugins/gameserver/migrations/20261027_120000_inhalt_quelle_ficsit.js'));
         if (echtVorher.includes("'ficsit'")) return 'Bestand trägt ficsit schon — Migration lief';
         await m.up(db);
