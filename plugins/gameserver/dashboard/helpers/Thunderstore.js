@@ -15,7 +15,7 @@
  *   Suche    GET /api/cyberstorm/listing/{community}/?q=…&ordering=most-downloaded
  *   Paket    GET /api/experimental/package/{ns}/{name}/           → .latest
  *   Fassung  GET /api/experimental/package/{ns}/{name}/{fassung}/ → direkt
- *   Datei    GET /package/download/{ns}/{name}/{fassung}/  → 302 auf gcdn
+ *   Datei    GET /package/download/{ns}/{name}/{fassung}/  → 302 auf ccdn (bis 2026-10: gcdn)
  *
  * ⚠ Drei Messungen, die anders ausfielen als erwartet:
  *
@@ -41,8 +41,10 @@ const { ServiceManager } = require('dunebot-core');
  *
  * Der Downloadweg ist gemessen: `thunderstore.io/package/download/…` antwortet
  * 302 auf `gcdn.thunderstore.io`. Ohne den zweiten Namen ginge kein Download.
+ * Am 2026-10-27 gemessen: Die Umleitung zeigt jetzt auf `ccdn.thunderstore.io`
+ * — `gcdn.` bleibt, weil es weiter ausliefert und ältere Adressen darauf zeigen.
  */
-const HERKUNFT = ['thunderstore.io', 'gcdn.thunderstore.io'];
+const HERKUNFT = ['thunderstore.io', 'gcdn.thunderstore.io', 'ccdn.thunderstore.io'];
 
 // ── Wer dieser Anbieter ist (Vertrag in Quellen.js) ────────────────────────
 //
