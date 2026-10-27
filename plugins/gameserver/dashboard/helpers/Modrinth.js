@@ -61,6 +61,8 @@ const KENNUNG = 'modrinth';
 const TITEL = 'Modrinth';
 /** Wie der „Raum" bei diesem Anbieter heisst — fuer Texte in der Oberflaeche. */
 const RAUM_NAME = 'Lader';
+/** Womit Mitspieler dieselben Mods bekommen (Stufe 10 S4). Adresse am 2026-10-27 aufgerufen: 200. */
+const MANAGER = { name: 'Modrinth App', url: 'https://modrinth.com/app' };
 
 const BASIS = 'https://api.modrinth.com/v2';
 const SEITE = 'https://modrinth.com';
@@ -906,7 +908,7 @@ async function aktualisierungen(raum, zeilen) {
 
 module.exports = {
     sucheModpacks, modpackFassung, clientDateien, laderBeiUns, laderBeiModrinth,
-    KENNUNG, TITEL, RAUM_NAME, HERKUNFT, PRO_SEITE,
+    KENNUNG, TITEL, RAUM_NAME, HERKUNFT, PRO_SEITE, MANAGER,
     istErlaubt, suche, verzeichnis, adresse, paket, aufloesen, aktualisierungen, fassungen,
     hoeher, neuerAls,
 };

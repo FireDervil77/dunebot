@@ -20,8 +20,27 @@
   ganze ein lernender Prozess den man ueberblicken kann") — aber eingeklappt.
   Sie gehoeren nicht in dieselbe Liste wie das Laufende.
 %>
-<div id="inhalte-wurzel" data-server="<%= server.id %>" data-guild="<%= guildId %>">
+<div id="inhalte-wurzel" data-server="<%= server.id %>" data-guild="<%= guildId %>" data-name="<%= server.name %>">
   <div class="fb-muted" style="font-size:13px">Wird geladen …</div>
+</div>
+
+<%# Liste für Mitspieler (Stufe 10 S4, Betreiber 2026-10-27: „Listenansicht oder
+    downloadbares .txt in einem extra Modal"). Der Inhalt kommt aus derselben
+    Liste wie die Marke „Mitspieler brauchen ihn auch" — gezeichnet beim Öffnen. %>
+<div class="modal fade" id="inhalte-spieler-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fa-solid fa-users me-2"></i>Mods für deine Mitspieler</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+      </div>
+      <div class="modal-body" id="inhalte-spieler-inhalt"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-white" onclick="inhaltKopieren()"><i class="fa-solid fa-copy me-1"></i>Kopieren</button>
+        <button type="button" class="btn btn-primary" onclick="inhaltTxt()"><i class="fa-solid fa-download me-1"></i>Als .txt herunterladen</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -396,37 +415,21 @@
     }
 
     if (brauchen.length) {
-      // Mit Adresse: Die Liste wird weitergegeben, und „EpicLoot 0.9.22" allein
-      // schickt jeden Mitspieler erst einmal auf die Suche.
-      const liste = brauchen.map(m => {
-        const kopf = `${m.name || m.kennung}${m.fassung ? ' ' + m.fassung : ''}`
-                   + (m.art === 'loader' ? '   ← zuerst installieren' : '');
-        return m.url ? `${kopf}\n  ${m.url}` : `${kopf}\n  (hochgeladen — Datei vom Server nötig)`;
-      }).join('\n');
-
       const lader = brauchen.find(m => m.art === 'loader');
       const modAnzahl = brauchen.filter(m => m.art !== 'loader').length;
       const satz = lader
         ? `Der Lader und ${modAnzahl} ${modAnzahl === 1 ? 'Mod' : 'Mods'} müssen auch bei deinen Mitspielern liegen.`
         : `${modAnzahl} ${modAnzahl === 1 ? 'Mod braucht' : 'Mods brauchen'} deine Mitspieler auch.`;
+      // Die Liste selbst steht im Modal (Stufe 10 S4) — hier nur der Satz und
+      // der Weg dorthin. Bis dahin ein Textfeld mit festem „r2modman", auch
+      // bei Modrinth.
       html += `
-        <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--fb-border)">
-          <div style="font-size:13px">
+        <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--fb-border);display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <div style="font-size:13px;flex:1 1 260px">
             <strong>${satz}</strong> Wer sie nicht hat, kommt nicht auf den Server.
           </div>
-          ${lader ? `
-            <div class="fb-muted" style="font-size:12px;margin-top:4px">
-              Zuerst der Lader
-              ${lader.url ? `(<a href="${escape(lader.url)}" target="_blank" rel="noopener noreferrer">${escape(lader.name || lader.kennung)}</a>)`
-                          : `(${escape(lader.name || lader.kennung)})`},
-              danach die Mods in seinen Ordner. Auf der verlinkten Seite steht,
-              wie er eingerichtet wird; die meisten Spieler nehmen dafür einen
-              Mod-Manager wie <span class="fb-mono">r2modman</span>.
-            </div>` : ''}
-          <textarea id="inhalte-weitergeben" class="form-control fb-mono" rows="${Math.min(10, brauchen.length * 2 + 1)}"
-                    style="margin-top:8px;font-size:12px" readonly>${escape(liste)}</textarea>
-          <button class="btn btn-white btn-sm" style="margin-top:6px" onclick="inhaltKopieren()">
-            Liste zum Weitergeben kopieren
+          <button class="btn btn-white btn-sm" onclick="inhaltSpielerListe()">
+            <i class="fa-solid fa-users me-1"></i>Liste für Mitspieler
           </button>
         </div>`;
     }
@@ -510,6 +513,11 @@
             <label class="form-label" style="font-size:12px">Fassung</label>
             <input id="inhalt-fassung" class="form-control form-control-sm" placeholder="1.2.3">
           </div>
+          ${ZULETZT && String(ZULETZT.pfad || '').includes('<Mod>') ? `
+          <div style="flex:0 0 160px">
+            <label class="form-label" style="font-size:12px">Ordner</label>
+            <input id="inhalt-ordner" class="form-control form-control-sm fb-mono" placeholder="so, wie der Mod heißt">
+          </div>` : ''}
           <div style="flex:1 1 200px">
             <label class="form-label" style="font-size:12px">Datei (.dll oder .zip)</label>
             <input id="inhalt-datei" type="file" class="form-control form-control-sm">
@@ -534,6 +542,9 @@
     daten.append('art', document.getElementById('inhalt-art').value);
     daten.append('name', document.getElementById('inhalt-name').value);
     daten.append('fassung', document.getElementById('inhalt-fassung').value);
+    // Ordner je Mod (Stufe 10 S2): Der Name kommt vom Menschen, nicht aus dem Dateinamen.
+    const ordner = document.getElementById('inhalt-ordner');
+    if (ordner) daten.append('ordner', ordner.value.trim());
 
     knopf.disabled = true;
     meldung.textContent = 'Wird hochgeladen …';
@@ -591,8 +602,8 @@
           Ohne Eingabe siehst du die beliebtesten — zum Schauen, was es für dieses
           Spiel überhaupt gibt. Was ein Mod zum Laufen braucht, kommt bei der
           Installation mit, der Lader meistens auch.
-          <br>Nicht alles hier gehört auf einen Server: Mod-Manager wie
-          <span class="fb-mono">r2modman</span> laufen beim Spieler.
+          ${((quellenListe().find(q => q.kennung === quelleJetzt()) || {}).manager) ? `<br>Nicht alles hier gehört auf einen Server: Mod-Manager wie
+          <span class="fb-mono">${escape(quellenListe().find(q => q.kennung === quelleJetzt()).manager.name)}</span> laufen beim Spieler.` : ''}
         </div>
         <div id="ts-treffer" style="margin-top:8px"></div>
       </div>`;
@@ -1151,13 +1162,74 @@
       .finally(() => { knopf.disabled = false; window.inhalteLaden(); });
   };
 
+  // ── Liste für Mitspieler (Stufe 10 S4) ─────────────────────────────────────
+  //
+  // Dieselbe Auswahl wie die Marke am Eintrag: aktiv und „Mitspieler brauchen
+  // ihn auch", der Lader zuerst. Mit Adresse, Fassung und dem Mod-Manager der
+  // Quelle — „EpicLoot 0.9.22" allein schickt jeden erst einmal auf die Suche.
+  function spielerListe() {
+    const d = ZULETZT || {};
+    const brauchen = [d.lader, ...(d.mods || [])].filter(e => e && e.aktiv && e.client_side);
+    brauchen.sort((x, y) => (x.art === 'loader' ? -1 : 0) - (y.art === 'loader' ? -1 : 0));
+    const quellen = [...new Set(brauchen.map(m => m.quelle))];
+    const manager = (d.quellen || []).filter(q => q.manager && quellen.includes(q.kennung)).map(q => q.manager);
+    return { brauchen, manager, ohneSeite: brauchen.some(m => !m.url) };
+  }
+
+  function spielerText() {
+    const { brauchen, manager } = spielerListe();
+    const name = wurzel.dataset.name || ('Server ' + SERVER);
+    const zeilen = [`Mods für ${name} — Stand ${new Date().toLocaleDateString('de-DE')}`, ''];
+    for (const m of brauchen) {
+      zeilen.push(`${m.name || m.kennung}${m.fassung ? ' ' + m.fassung : ''}${m.art === 'loader' ? '   ← zuerst installieren' : ''}`);
+      zeilen.push(m.url ? '  ' + m.url : '  (hochgeladen — die Datei gibt es nur vom Server)');
+    }
+    if (manager.length) {
+      zeilen.push('', 'Am einfachsten mit:');
+      for (const g of manager) zeilen.push(`  ${g.name} — ${g.url}`);
+    }
+    return zeilen.join('\n') + '\n';
+  }
+
+  window.inhaltSpielerListe = function () {
+    const { brauchen, manager, ohneSeite } = spielerListe();
+    const ziel = document.getElementById('inhalte-spieler-inhalt');
+    ziel.innerHTML = `
+      <p style="font-size:13px">Genau diese Fassungen — eine andere passt womöglich nicht zum Server.</p>
+      <table class="table table-sm table-vcenter" style="font-size:13px">
+        <thead><tr><th>Mod</th><th>Fassung</th><th>Seite</th></tr></thead>
+        <tbody>${brauchen.map(m => `
+          <tr>
+            <td>${escape(m.name || m.kennung)}${m.art === 'loader' ? ' <span class="badge bg-azure-lt">zuerst installieren</span>' : ''}</td>
+            <td class="fb-mono">${escape(m.fassung || 'unbekannt')}</td>
+            <td>${m.url ? `<a href="${escape(m.url)}" target="_blank" rel="noopener noreferrer">öffnen</a>` : '<span class="fb-muted">hochgeladen</span>'}</td>
+          </tr>`).join('')}</tbody>
+      </table>
+      ${manager.length ? `<div class="fb-muted" style="font-size:12px">Am einfachsten mit ${manager.map(g =>
+        `<a href="${escape(g.url)}" target="_blank" rel="noopener noreferrer">${escape(g.name)}</a>`).join(' oder ')} — dort die Mods und Fassungen von oben wählen.</div>` : ''}
+      ${ohneSeite ? '<div class="fb-muted" style="font-size:12px;margin-top:6px">Hochgeladene Einträge haben keine Seite — die Datei bekommen Mitspieler nur von dir.</div>' : ''}`;
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('inhalte-spieler-modal')).show();
+  };
+
   window.inhaltKopieren = function () {
-    const feld = document.getElementById('inhalte-weitergeben');
-    if (!feld) return;
-    feld.select();
-    // Erst markieren, dann die Zwischenablage versuchen: Scheitert sie (kein
-    // https, oder der Browser fragt), steht wenigstens die Auswahl da.
-    try { navigator.clipboard.writeText(feld.value); } catch (e) { /* markiert reicht */ }
+    const text = spielerText();
+    // Die Zwischenablage braucht https und die Erlaubnis des Browsers —
+    // scheitert sie, bleibt die .txt.
+    Promise.resolve()
+      .then(() => navigator.clipboard.writeText(text))
+      .then(() => melde('success', 'Liste kopiert.'))
+      .catch(() => melde('warning', 'Kopieren ging nicht — nimm „Als .txt herunterladen".'));
+  };
+
+  window.inhaltTxt = function () {
+    const name = (wurzel.dataset.name || 'server').replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'server';
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([spielerText()], { type: 'text/plain;charset=utf-8' }));
+    a.download = `mods-${name}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   };
 
   window.inhalteLaden();

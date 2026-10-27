@@ -678,7 +678,9 @@ async function pruefe(name, fn) {
         assert.deepStrictEqual(r.antwort.raeume, { thunderstore: 'valheim' });
         assert.deepStrictEqual(r.antwort.quellen,
             [{ kennung: 'thunderstore', titel: 'Thunderstore',
-               raumName: 'Gemeinschaft', raum: 'valheim' }]);
+               raumName: 'Gemeinschaft', raum: 'valheim',
+               // Stufe 10 S4: womit Mitspieler die Mods bekommen.
+               manager: { name: 'r2modman', url: 'https://r2modman.com' } }]);
         assert.strictEqual(r.antwort.mods[0].url,
             'https://thunderstore.io/c/valheim/p/ValheimModding/Jotunn/');
     });

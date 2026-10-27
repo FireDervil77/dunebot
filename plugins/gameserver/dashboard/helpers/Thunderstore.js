@@ -55,6 +55,12 @@ const KENNUNG = 'thunderstore';
 const TITEL = 'Thunderstore';
 /** Thunderstore teilt seinen Katalog nach SPIELEN — das ist hier der „Raum". */
 const RAUM_NAME = 'Gemeinschaft';
+/**
+ * Womit Mitspieler dieselben Mods bekommen (Stufe 10 S4) — steht in der Liste
+ * zum Weitergeben. Bis dahin stand „r2modman" fest in der Ansicht, auch bei
+ * Modrinth. Adresse am 2026-10-27 aufgerufen: 200.
+ */
+const MANAGER = { name: 'r2modman', url: 'https://r2modman.com' };
 
 const BASIS = 'https://thunderstore.io';
 const FRIST_MS = 15000;
@@ -435,7 +441,7 @@ function adresse(raum, kennung) {
 }
 
 module.exports = {
-    KENNUNG, TITEL, RAUM_NAME, HERKUNFT, PRO_SEITE,
+    KENNUNG, TITEL, RAUM_NAME, HERKUNFT, PRO_SEITE, MANAGER,
     istErlaubt, suche, verzeichnis, adresse, paket, aufloesen, aktualisierungen, fassungen,
     hoeher, neuerAls, teileKennung, teileOhneFassung,
 };

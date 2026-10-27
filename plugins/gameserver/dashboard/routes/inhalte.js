@@ -125,6 +125,8 @@ router.get('/:serverId/inhalte', requirePermission('GAMESERVER.VIEW'), async (re
             quellen: Quellen.ausPaket(inhalt).map(q => ({
                 kennung: q, titel: Quellen.fuer(q).TITEL,
                 raumName: Quellen.fuer(q).RAUM_NAME, raum: raeume[q] || null,
+                // Womit Mitspieler die Mods bekommen — fuer die Liste (Stufe 10 S4).
+                manager: Quellen.fuer(q).MANAGER || null,
             })),
             raeume,
             // Was das PAKET sagt — ohne das weiss die Ansicht nicht, ob sie

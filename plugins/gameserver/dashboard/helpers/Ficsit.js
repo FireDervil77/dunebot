@@ -51,6 +51,12 @@ const KENNUNG = 'ficsit';
 const TITEL = 'ficsit.app';
 /** ficsit.app kennt nur ein Spiel — der „Raum" steht trotzdem im Paket, wie bei den anderen. */
 const RAUM_NAME = 'Spiel';
+/**
+ * Womit Mitspieler dieselben Mods bekommen (Stufe 10 S4). Nicht smm.ficsit.app:
+ * Die Adresse startet sofort den Download einer .exe (gemessen 2026-10-27) —
+ * die Projektseite sagt erst, was man da holt.
+ */
+const MANAGER = { name: 'Satisfactory Mod Manager', url: 'https://github.com/satisfactorymodding/SatisfactoryModManager' };
 
 const API = 'https://api.ficsit.app';
 const FRIST_MS = 15000;
@@ -392,7 +398,7 @@ async function aktualisierungen(raum, zeilen, optionen = {}) {
 }
 
 module.exports = {
-    KENNUNG, TITEL, RAUM_NAME, HERKUNFT, PRO_SEITE,
+    KENNUNG, TITEL, RAUM_NAME, HERKUNFT, PRO_SEITE, MANAGER,
     istErlaubt, suche, verzeichnis, adresse, paket, aufloesen, aktualisierungen, fassungen,
     hoeher, neuerAls,
     // für den Wächter
