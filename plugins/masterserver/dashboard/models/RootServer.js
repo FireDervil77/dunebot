@@ -129,17 +129,17 @@ class RootServer {
                 COUNT(DISTINCT g.id) AS gameserver_count,
                 SUM(CASE WHEN g.status = 'online' THEN 1 ELSE 0 END) AS gameserver_running_count
              FROM rootserver r LEFT JOIN gameservers g ON r.id = g.rootserver_id
-             WHERE r.guild_id = ? GROUP BY r.id ORDER BY r.created_at DESC`;
+             WHERE r.guild_id = ? GROUP BY r.id ORDER BY r.created_at ASC, r.id ASC`;
         } else {
             query = `SELECT r.*, 0 AS gameserver_count, 0 AS gameserver_running_count
-                     FROM rootserver r WHERE r.guild_id = ? ORDER BY r.created_at DESC`;
+                     FROM rootserver r WHERE r.guild_id = ? ORDER BY r.created_at ASC, r.id ASC`;
         }
         return await dbService.query(query, [guildId]);
     }
 
     static async getAll() {
         const dbService = ServiceManager.get('dbService');
-        return await dbService.query('SELECT * FROM rootserver ORDER BY created_at DESC');
+        return await dbService.query('SELECT * FROM rootserver ORDER BY created_at ASC, id ASC');
     }
 
     static async update(id, data) {

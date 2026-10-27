@@ -22,13 +22,40 @@ const { ServiceManager } = require('dunebot-core');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 const RootServer = require('../models/RootServer');
 
+// ── Welcher Daemon kennt den Task? (2026-10-27) ─────────────────────────────
+//
+// Tasks liegen im Daemon der Maschine, auf der sie laufen. Bis hierher fragte
+// jede Route „den ersten" Rootserver der Guild — bei zwei Maschinen war das
+// zufällig der neueste, und die Tasks eines Servers auf der anderen Maschine
+// gab es nicht. Aufgefallen, als die Übersicht ältesten-zuerst sortiert wurde:
+// Das hätte den Fehler bloß auf die andere Maschine verschoben.
+
+/** Der Daemon, auf dem dieser Gameserver läuft — oder null. */
+async function daemonDesServers(guildId, serverId) {
+    const [z] = await ServiceManager.get('dbService').query(
+        `SELECT r.daemon_id FROM gameservers gs JOIN rootserver r ON r.id = gs.rootserver_id
+          WHERE gs.id = ? AND gs.guild_id = ?`, [serverId, guildId]);
+    return z?.daemon_id || null;
+}
+
 /**
- * Ermittelt den Daemon, der die Tasks dieser Guild führt.
- * @returns {Promise<object|null>}
+ * Den Daemon suchen, der diesen Task kennt: alle verbundenen der Guild, der
+ * Reihe nach. Gibt {daemonId, antwort} zurück oder wirft „Task nicht gefunden".
  */
-async function daemonDerGuild(guildId) {
-    const [rs] = await RootServer.getByGuild(guildId);
-    return rs || null;
+async function daemonMitTask(guildId, taskId) {
+    const ipmServer = ServiceManager.get('ipmServer');
+    let letzterFehler = null;
+    for (const rs of await RootServer.getByGuild(guildId)) {
+        if (!rs.daemon_id || !ipmServer?.isDaemonOnline(rs.daemon_id)) continue;
+        try {
+            const antwort = await taskKommando(rs.daemon_id, 'task:get', { task_id: taskId });
+            if (antwort?.task) return { daemonId: rs.daemon_id, antwort };
+        } catch (fehler) {
+            if (!/nicht gefunden|not found/i.test(fehler.message || '')) letzterFehler = fehler;
+        }
+    }
+    if (letzterFehler) throw letzterFehler;
+    throw new Error('Task nicht gefunden');
 }
 
 /**
@@ -55,12 +82,7 @@ router.get('/:taskId', requirePermission('MASTERSERVER.VIEW'), async (req, res) 
     const guildId = res.locals.guildId;
 
     try {
-        const daemon = await daemonDerGuild(guildId);
-        if (!daemon) {
-            return res.status(404).json({ success: false, error: 'Kein Daemon für diese Guild konfiguriert' });
-        }
-
-        const antwort = await taskKommando(daemon.daemon_id, 'task:get', { task_id: taskId });
+        const { antwort } = await daemonMitTask(guildId, taskId);
 
         res.json({ success: true, task: antwort.task || null });
 
@@ -88,12 +110,12 @@ router.get('/server/:serverId', requirePermission('MASTERSERVER.VIEW'), async (r
     const { limit = 20, status } = req.query;
 
     try {
-        const daemon = await daemonDerGuild(guildId);
-        if (!daemon) {
-            return res.status(404).json({ success: false, error: 'Kein Daemon für diese Guild konfiguriert' });
+        const daemonId = await daemonDesServers(guildId, serverId);
+        if (!daemonId) {
+            return res.status(404).json({ success: false, error: 'Server nicht gefunden' });
         }
 
-        const antwort = await taskKommando(daemon.daemon_id, 'task:list', {
+        const antwort = await taskKommando(daemonId, 'task:list', {
             server_id: serverId,
             limit: parseInt(limit, 10) || 20,
             status: status || null
@@ -125,12 +147,8 @@ router.post('/:taskId/cancel', requirePermission('MASTERSERVER.DAEMON.MANAGE'), 
     const guildId = res.locals.guildId;
 
     try {
-        const daemon = await daemonDerGuild(guildId);
-        if (!daemon) {
-            return res.status(404).json({ success: false, error: 'Kein Daemon für diese Guild konfiguriert' });
-        }
-
-        await taskKommando(daemon.daemon_id, 'task:cancel', { task_id: taskId });
+        const { daemonId } = await daemonMitTask(guildId, taskId);
+        await taskKommando(daemonId, 'task:cancel', { task_id: taskId });
 
         Logger.info(`[Masterserver] Task ${taskId} abgebrochen (Guild ${guildId})`);
         res.json({ success: true, message: 'Task abgebrochen' });
