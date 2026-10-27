@@ -447,6 +447,10 @@ async function sucheAntwort(inhalt, quelle, raum, begriff, seite, spielfassung =
         seiten:   Math.max(1, Math.ceil(roh.gesamt / (roh.proSeite || 20))),
         weiter:   roh.weiter,
         zurueck:  roh.zurueck,
+        // Was auf dieser Seite herausfiel (ficsit.app: Broken, ohne Linux-Ziel,
+        // falsche Spielfassung) — sonst stuenden 14 Treffer da und niemand
+        // wuesste, warum nicht 20.
+        ausgeblendet: roh.ausgeblendet || 0,
         // Wer wirklich stoebern will, ist im Verzeichnis besser aufgehoben als
         // in einer Karte mit 20 Zeilen.
         verzeichnis: anbieter.verzeichnis(raum),

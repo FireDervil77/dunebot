@@ -195,6 +195,17 @@ async function pruefe(name, fn) {
         assert.strictEqual(db.zeilen[1].art, 'mod');
     });
 
+    // ficsit.app nennt je Datei eine SHA-256 (Stufe 10, 2026-10-27); der Daemon
+    // prueft sie vor dem Auspacken. Wer keine nennt, schickt auch keine.
+    await pruefe('Eine Prüfsumme am Paket geht mit zum Daemon — ohne Prüfsumme keine', async () => {
+        stelleThunderstore([BEPINEX, { ...JOTUNN, sha256: 'ab'.repeat(32) }]);
+        await InhalteHolen.installiere({
+            server: SERVER, inhalt: INHALT, guildId: 'g1', quelle: 'thunderstore', kennung: 'ValheimModding-Jotunn' });
+        assert.strictEqual(daemon.abrufe.length, 2);
+        assert.ok(!('sha256' in daemon.abrufe[0]), 'ohne Prüfsumme am Paket darf keine mitgehen');
+        assert.strictEqual(daemon.abrufe[1].sha256, 'ab'.repeat(32));
+    });
+
     // ── Der Fund vom 2026-09-13 (Server 189) ────────────────────────────────
     //
     // Ein Mod verlangte BepInEx 5.4.2200, installiert war 5.4.2333. `legeAb`

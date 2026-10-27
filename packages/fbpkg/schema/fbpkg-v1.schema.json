@@ -1236,6 +1236,10 @@
                 },
                 "curseforge": {
                   "type": "string"
+                },
+                "ficsit": {
+                  "type": "string",
+                  "description": "mod_reference des Laders bei ficsit.app, fuer Satisfactory 'SML'"
                 }
               }
             },
@@ -1275,7 +1279,8 @@
               "modrinth",
               "curseforge",
               "steam-workshop",
-              "upload"
+              "upload",
+              "ficsit"
             ]
           }
         },
@@ -1297,6 +1302,10 @@
             "steam-workshop": {
               "type": "string",
               "description": "Die AppID des Spiels, als Zeichenkette"
+            },
+            "ficsit": {
+              "type": "string",
+              "description": "ficsit.app fuehrt nur Satisfactory; der Wert ist ein Name fuer den Raum ('satisfactory'), die API fragt ihn nicht ab"
             }
           }
         },

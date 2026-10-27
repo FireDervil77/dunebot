@@ -456,7 +456,7 @@ function frisch(mehr = {}) {
         assert.ok(stand.quellen.some(q => !q.angebunden), 'jede Quelle des Schemas ist angebunden — dann stimmt der Hilfetext der Karte nicht mehr');
         // Der Hilfetext nennt die drei beim Namen.
         const ansicht = ohneKommentareEjs(lies(WURZEL, 'plugins/werkbank/dashboard/views/guild/werkbank-sitzung.ejs'));
-        if (angebunden.join(',') === 'modrinth,thunderstore,upload') assert.ok(ansicht.includes('Angebunden sind heute Hochladen, Thunderstore und Modrinth'));
+        if (angebunden.join(',') === 'ficsit,modrinth,thunderstore,upload') assert.ok(ansicht.includes('Angebunden sind heute Hochladen, Thunderstore, Modrinth und ficsit.app'));
         else assert.fail(`angebunden sind jetzt ${angebunden.join(', ')} — der Hilfetext der Karte nennt noch die alten drei`);
     });
     await pruefe('die Leser sind da: der Reiter „Inhalte" liest Ablageort, Neustart und Raum aus dem Paket', async () => {

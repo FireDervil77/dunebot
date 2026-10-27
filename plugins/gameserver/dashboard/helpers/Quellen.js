@@ -63,11 +63,14 @@
 
 const Thunderstore = require('./Thunderstore');
 const Modrinth = require('./Modrinth');
+// Satisfactory (Stufe 10, 2026-10-27).
+const Ficsit = require('./Ficsit');
 
 /** Alle Anbieter, die diesen Weg gehen. `upload` ist keiner — da bringt der Betreiber die Datei. */
 const ANBIETER = {
     [Thunderstore.KENNUNG]: Thunderstore,
     [Modrinth.KENNUNG]: Modrinth,
+    [Ficsit.KENNUNG]: Ficsit,
 };
 
 /** Alle erlaubten Herkuenfte zusammen — `scripts/check-herkunftsliste.js` liest sie hier. */

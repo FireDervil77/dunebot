@@ -3862,7 +3862,8 @@ async function konsolenfilterSpeichern(sitzung, b) {
 //
 //   supported       die Mod-Verwaltung des Servers gibt es nur damit
 //   sources         welche Wege der Reiter „Inhalte" anbietet; angebunden sind
-//                   Upload, Thunderstore und Modrinth (helpers/Quellen.js) —
+//                   Upload, Thunderstore, Modrinth und seit 2026-10-27 ficsit.app
+//                   (helpers/Quellen.js) —
 //                   CurseForge und Workshop nennt das Schema, es gibt sie nicht
 //   source_ids      der „Raum" des Spiels beim Anbieter; ohne ihn gibt es dort
 //                   keine Suche
@@ -3872,7 +3873,7 @@ async function konsolenfilterSpeichern(sitzung, b) {
 //   activation      liest niemand; es beschreibt nur. `start` gehört zum Lader.
 
 const MODS = {
-    quellen: ['upload', 'thunderstore', 'modrinth', 'curseforge', 'steam-workshop'],
+    quellen: ['upload', 'thunderstore', 'modrinth', 'ficsit', 'curseforge', 'steam-workshop'],
     aktivierung: ['file_present', 'list', 'setting', 'start'],
     // Der flache Teil — Lader und Varianten haben ihre eigenen Karten (LADER, variantenStand).
     felder: ['supported', 'sources', 'source_ids', 'path', 'activation', 'order_matters', 'needs_restart', 'client_side'],
@@ -4003,7 +4004,7 @@ async function modsSpeichern(sitzung, b) {
 // sie und lässt sie stehen; bearbeitbar werden sie, wenn ein Spiel sie braucht.
 
 const LADER = {
-    quellen: ['thunderstore', 'modrinth', 'curseforge'],
+    quellen: ['thunderstore', 'modrinth', 'ficsit', 'curseforge'],
     felder: ['key', 'installable_as_content', 'packages', 'path', 'log', 'adds'],
     max: { name: 60, paket: 120, pfad: 200, variablen: 30, wert: 400 },
 };

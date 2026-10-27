@@ -269,6 +269,8 @@ async function legeAb({ server, inhalt, guildId, quelle, pakete, fehlend = [] })
             adresse:       p.adresse,
             dateiname:     `${p.kennung}-${p.fassung}.zip`,
             entpacken:     true,
+            // Nur ficsit.app nennt sie (2026-10-27); der Daemon prueft vor dem Auspacken.
+            ...(p.sha256 ? { sha256: p.sha256 } : {}),
         }, FRIST_MS).catch(fehler => ({ success: false, error: fehler.message }));
 
         if (!antwort?.success) {
