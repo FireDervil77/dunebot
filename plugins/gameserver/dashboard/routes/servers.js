@@ -2186,14 +2186,31 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
             fernsteuerung: 'RCON',
             aufgaben: 'Wiederkehrende Aufgaben', panels: 'Discord-Panels',
             oeffentlich: 'Öffentliche Seite',
+            datenbanken: 'Datenbanken',
         };
         const bereich = BEREICHE[req.query.bereich] ? req.query.bereich : null;
+
+        // Datenbanken (Stufe 11 S3): Liste und Stand gleich mitgeben — die
+        // Seite zeigt sie ohne Nachladen; Größe misst erst der Knopf.
+        let datenbanken = null;
+        if (bereich === 'datenbanken') {
+            const Datenbanken = require('../helpers/Datenbanken');
+            try {
+                const dbServer = await Datenbanken.ladeServer(server.id, guildId);
+                const liste = await Datenbanken.liste(server.id);
+                datenbanken = { stand: Datenbanken.stand(dbServer || {}, liste.length), liste };
+            } catch (err) {
+                Logger.error('[Gameserver] Datenbanken konnten nicht geladen werden', err);
+                datenbanken = { fehler: err.message };
+            }
+        }
 
         await themeManager.renderView(res, 'guild/server-detail', {
             title: `Server: ${server.name}`,
             uebersicht,
             bereich,
             bereichName: bereich ? BEREICHE[bereich] : null,
+            datenbanken,
             activeMenu: `/guild/${guildId}/plugins/gameserver/servers`,
             server,
             gameData,

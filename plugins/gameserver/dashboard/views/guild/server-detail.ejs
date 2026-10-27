@@ -274,6 +274,7 @@
        ['aufgaben',     'Aufgaben'],
        ['panels',       'Panels'],
        ['oeffentlich',  'Öffentlich'],
+       ['datenbanken',  'Datenbanken'],
      ]; %>
   <nav class="fb-bereiche">
     <% bereiche.forEach(function (b) { %>
@@ -331,6 +332,8 @@
           <%- include('partials/server-detail-panels', { server, guildId, userPermissions }) %>
         <% } else if (bereich === 'oeffentlich') { %>
           <%- include('partials/server-detail-public', { server, guildId, userPermissions }) %>
+        <% } else if (bereich === 'datenbanken') { %>
+          <%- include('partials/server-detail-datenbanken', { server, guildId, userPermissions, datenbanken: locals.datenbanken }) %>
         <% } %>
       </div>
     </div>

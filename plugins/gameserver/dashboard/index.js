@@ -561,6 +561,9 @@ class GameserverPlugin extends DashboardPlugin {
             // Inhalte je Server (Mods und Lader, E6/B.12). VOR filesRouter, der
             // mit '/' alles faengt, was danach kommt.
             this.guildRouter.use('/servers', require('./routes/inhalte'));
+
+            // Datenbanken je Server (Stufe 11 S3) — ebenfalls VOR filesRouter.
+            this.guildRouter.use('/servers', require('./routes/datenbanken'));
             
             // File-Management (WebFTP) - eigener /servers/:serverId/... Prefix in files.js
             this.guildRouter.use('/', filesRouter);

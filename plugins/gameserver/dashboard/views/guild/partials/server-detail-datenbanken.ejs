@@ -1,0 +1,239 @@
+<%#
+  Datenbanken des Servers — Stufe 11 S3, 2026-10-27.
+
+  Jede Datenbank liegt im Container fb-datenbank des Rootservers, mit eigenem
+  Konto nur für sie. Name und Konto vergibt der Daemon (s<server>_<nr>).
+  Das Kennwort liegt verschlüsselt im Panel (D4) und ist für alle sichtbar,
+  die Dateien verwalten dürfen (GAMESERVER.FILES.MANAGE) — dieselbe Grenze wie
+  beim SFTP-Passwort. Die Größe misst erst der Knopf; „nie gemessen" ist eine
+  eigene Auskunft, keine 0.
+%>
+<%
+  const canManage = Boolean(userPermissions && userPermissions.permissions && userPermissions.permissions['GAMESERVER.FILES.MANAGE']);
+  const d = datenbanken || {};
+  const st = d.stand || { moeglich: false, grund: 'Unbekannt.', grenze: 0, anzahl: 0, frei: false };
+  const liste = d.liste || [];
+  const datum = (w) => w ? new Date(w).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+%>
+<div id="dbBereich" data-basis="/guild/<%= guildId %>/plugins/gameserver/servers/<%= server.id %>/datenbanken">
+
+  <% if (d.fehler) { %>
+    <div class="alert alert-danger py-2 small">Die Datenbanken konnten nicht geladen werden: <%= d.fehler %></div>
+  <% } %>
+
+  <div class="d-flex flex-wrap align-items-center gap-2 mb-2 small">
+    <% if (!st.moeglich) { %>
+      <span class="text-secondary"><i class="fa-solid fa-database me-1"></i><%= st.grund %></span>
+    <% } else { %>
+      <span><i class="fa-solid fa-database me-1"></i><strong><%= st.anzahl %></strong> von <strong><%= st.grenze %></strong> Datenbanken genutzt</span>
+      <% if (st.grund) { %><span class="text-secondary">— <%= st.grund %></span><% } %>
+    <% } %>
+    <span class="ms-auto"></span>
+    <% if (liste.length) { %>
+      <button type="button" class="btn btn-sm btn-outline-secondary" id="dbMessen"><i class="fa-solid fa-ruler me-1"></i>Größe messen</button>
+    <% } %>
+    <% if (canManage && st.moeglich && st.frei) { %>
+      <button type="button" class="btn btn-sm btn-primary" id="dbAnlegen"><i class="fa-solid fa-plus me-1"></i>Datenbank anlegen</button>
+    <% } %>
+  </div>
+
+  <% if (liste.length) { %>
+    <div class="table-responsive">
+      <table class="table table-sm table-vcenter mb-2">
+        <thead><tr><th>Name</th><th>Größe</th><th>Angelegt</th><th></th></tr></thead>
+        <tbody>
+          <% liste.forEach(function (z) { %>
+            <tr data-nr="<%= z.nr %>" data-name="<%= z.name %>">
+              <td class="font-monospace"><%= z.name %></td>
+              <td><span data-groesse><%= z.groesse %></span><% if (z.groesse_am) { %> <span class="text-secondary small" data-gemessen>(<%= datum(z.groesse_am) %>)</span><% } else { %> <span class="text-secondary small" data-gemessen></span><% } %></td>
+              <td class="text-secondary small"><%= datum(z.created_at) %></td>
+              <td class="text-end text-nowrap">
+                <% if (canManage) { %>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" data-aktion="zugang"><i class="fa-solid fa-key me-1"></i>Zugangsdaten</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" data-aktion="kennwort">Neues Kennwort</button>
+                  <button type="button" class="btn btn-sm btn-outline-danger" data-aktion="loeschen" title="Löschen"><i class="fa-solid fa-trash"></i></button>
+                <% } %>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } else if (st.moeglich) { %>
+    <p class="text-secondary small">Dieser Server hat noch keine Datenbank.</p>
+  <% } %>
+
+  <% if (canManage) { %>
+    <div class="alert alert-info py-2 small" id="dbZugang" style="display:none">
+      <div class="mb-1"><strong id="dbZugangTitel">Zugangsdaten</strong> — so im Spiel eintragen:</div>
+      <div class="d-flex flex-wrap gap-3">
+        <span>Host <span class="font-monospace user-select-all" data-feld="host"></span></span>
+        <span>Port <span class="font-monospace user-select-all" data-feld="port"></span></span>
+        <span>Datenbank <span class="font-monospace user-select-all" data-feld="name"></span></span>
+        <span>Benutzer <span class="font-monospace user-select-all" data-feld="benutzer"></span></span>
+        <span>Kennwort <span class="font-monospace user-select-all" data-feld="kennwort"></span>
+          <button type="button" class="btn btn-sm btn-white ms-1" id="dbKopieren"><i class="fa-solid fa-copy"></i></button></span>
+      </div>
+      <div class="text-secondary mt-1">Erreichbar nur für Spiele auf diesem Rootserver — von außen (z. B. HeidiSQL) gibt es keinen Zugang.</div>
+    </div>
+  <% } %>
+</div>
+
+<% if (canManage) { %>
+<div class="modal modal-blur fade" id="dbLoeschenModal" tabindex="-1" aria-labelledby="dbLoeschenTitel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content border border-danger border-2">
+      <div class="modal-status bg-danger"></div>
+      <div class="modal-header bg-danger-lt">
+        <h5 class="modal-title text-danger fw-bold" id="dbLoeschenTitel">
+          <i class="fa-solid fa-triangle-exclamation me-2"></i>Datenbank ENDGÜLTIG löschen
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-danger fw-bold fs-3 mb-2">„<span id="dbLoeschenName"></span>" wird gelöscht — mit allen Tabellen und dem Konto.</p>
+        <p class="text-danger fw-bold mb-3">Das lässt sich nicht zurücknehmen. Eine Sicherung der Datenbank gibt es noch nicht.</p>
+        <label class="form-label fw-bold" for="dbLoeschenEingabe">Zum Bestätigen den Namen eintippen: <span class="font-monospace text-danger" id="dbLoeschenSoll"></span></label>
+        <input type="text" class="form-control font-monospace" id="dbLoeschenEingabe" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal">Abbrechen</button>
+        <button type="button" class="btn btn-danger fw-bold" id="dbLoeschenKnopf" disabled><i class="fa-solid fa-trash me-1"></i>Endgültig löschen</button>
+      </div>
+    </div>
+  </div>
+</div>
+<% } %>
+
+<script>
+(function () {
+  'use strict';
+  var bereich = document.getElementById('dbBereich');
+  if (!bereich) return;
+  var basis = bereich.getAttribute('data-basis');
+  var melde = function (typ, text) { if (typeof showToast === 'function') showToast(typ, text); };
+
+  async function rufe(methode, pfad, inhalt) {
+    var a = await fetch(basis + pfad, {
+      method: methode,
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: inhalt ? JSON.stringify(inhalt) : (methode === 'GET' ? undefined : '{}')
+    });
+    var d = await a.json().catch(function () { return {}; });
+    if (!a.ok || !d.success) throw new Error(d.message || ('HTTP ' + a.status));
+    return d;
+  }
+
+  var kasten = document.getElementById('dbZugang');
+  function zeigeZugang(titel, z) {
+    if (!kasten) return;
+    document.getElementById('dbZugangTitel').textContent = titel;
+    ['host', 'port', 'name', 'benutzer', 'kennwort'].forEach(function (f) {
+      kasten.querySelector('[data-feld="' + f + '"]').textContent = String(z[f]);
+    });
+    kasten.style.display = '';
+  }
+  var kopieren = document.getElementById('dbKopieren');
+  if (kopieren) kopieren.addEventListener('click', function () {
+    var wert = kasten.querySelector('[data-feld="kennwort"]').textContent;
+    Promise.resolve().then(function () { return navigator.clipboard.writeText(wert); })
+      .then(function () { melde('success', 'Kennwort kopiert.'); })
+      .catch(function () { melde('warning', 'Kopieren ging nicht — das Kennwort ist markierbar.'); });
+  });
+
+  var anlegen = document.getElementById('dbAnlegen');
+  if (anlegen) anlegen.addEventListener('click', async function () {
+    anlegen.disabled = true;
+    try {
+      var d = await rufe('POST', '');
+      melde('success', 'Datenbank ' + d.zugang.name + ' angelegt.');
+      // Neu laden, damit Liste und Zähler stimmen — den Zugang vorher zeigen.
+      zeigeZugang('Neu angelegt: ' + d.zugang.name, d.zugang);
+      setTimeout(function () { location.reload(); }, 2500);
+    } catch (e) {
+      melde('error', 'Nicht angelegt: ' + e.message);
+      anlegen.disabled = false;
+    }
+  });
+
+  var messen = document.getElementById('dbMessen');
+  if (messen) messen.addEventListener('click', async function () {
+    messen.disabled = true;
+    try {
+      var d = await rufe('POST', '/groessen');
+      (d.datenbanken || []).forEach(function (z) {
+        var zeile = bereich.querySelector('tr[data-nr="' + z.nr + '"]');
+        if (!zeile) return;
+        zeile.querySelector('[data-groesse]').textContent = z.groesse;
+        zeile.querySelector('[data-gemessen]').textContent = z.groesse_am ? '(gerade eben)' : '';
+      });
+      if (d.fehlt && d.fehlt.length) melde('warning', 'Im Container fehlt: ' + d.fehlt.join(', '));
+      else melde('success', 'Größe gemessen.');
+    } catch (e) {
+      melde('error', 'Nicht gemessen: ' + e.message);
+    } finally {
+      messen.disabled = false;
+    }
+  });
+
+  var modalEl = document.getElementById('dbLoeschenModal');
+  var eingabe = document.getElementById('dbLoeschenEingabe');
+  var loeschKnopf = document.getElementById('dbLoeschenKnopf');
+  var loeschZiel = null;
+  if (eingabe) eingabe.addEventListener('input', function () {
+    loeschKnopf.disabled = !loeschZiel || eingabe.value.trim() !== loeschZiel.name;
+  });
+  if (loeschKnopf) loeschKnopf.addEventListener('click', async function () {
+    if (!loeschZiel) return;
+    loeschKnopf.disabled = true;
+    try {
+      await rufe('DELETE', '/' + loeschZiel.nr, { bestaetigung: eingabe.value.trim() });
+      melde('success', 'Datenbank ' + loeschZiel.name + ' gelöscht.');
+      location.reload();
+    } catch (e) {
+      melde('error', 'Nicht gelöscht: ' + e.message);
+      loeschKnopf.disabled = false;
+    }
+  });
+
+  bereich.addEventListener('click', async function (ev) {
+    var knopf = ev.target.closest('[data-aktion]');
+    if (!knopf) return;
+    var zeile = knopf.closest('tr');
+    var nr = zeile.getAttribute('data-nr'), name = zeile.getAttribute('data-name');
+    var aktion = knopf.getAttribute('data-aktion');
+    if (aktion === 'loeschen') {
+      loeschZiel = { nr: nr, name: name };
+      document.getElementById('dbLoeschenName').textContent = name;
+      document.getElementById('dbLoeschenSoll').textContent = name;
+      eingabe.value = '';
+      loeschKnopf.disabled = true;
+      bootstrap.Modal.getOrCreateInstance(modalEl).show();
+      return;
+    }
+    if (aktion === 'kennwort' && knopf.getAttribute('data-sicher') !== 'ja') {
+      // Zweiter Klick bestätigt: Das alte Kennwort gilt danach nicht mehr —
+      // ein laufendes Spiel verliert seine Verbindung, bis es das neue hat.
+      knopf.setAttribute('data-sicher', 'ja');
+      knopf.textContent = 'Wirklich? Altes gilt dann nicht mehr';
+      knopf.classList.replace('btn-outline-secondary', 'btn-warning');
+      return;
+    }
+    knopf.disabled = true;
+    try {
+      var d = aktion === 'zugang' ? await rufe('GET', '/' + nr + '/zugang') : await rufe('POST', '/' + nr + '/kennwort');
+      zeigeZugang(aktion === 'zugang' ? 'Zugangsdaten ' + name : 'Neues Kennwort für ' + name, d.zugang);
+      if (aktion === 'kennwort') melde('success', 'Neues Kennwort gesetzt — im Spiel eintragen.');
+    } catch (e) {
+      melde('error', e.message);
+    } finally {
+      knopf.disabled = false;
+      if (aktion === 'kennwort') {
+        knopf.removeAttribute('data-sicher');
+        knopf.textContent = 'Neues Kennwort';
+        knopf.classList.replace('btn-warning', 'btn-outline-secondary');
+      }
+    }
+  });
+})();
+</script>
