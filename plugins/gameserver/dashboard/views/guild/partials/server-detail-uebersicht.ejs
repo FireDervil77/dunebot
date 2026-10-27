@@ -570,6 +570,7 @@
         <% } %>
         <% [['Paket', (u.paket.slug || '') + ' ' + (u.paket.version || '')],
             ['Fassung', u.paket.kanal === 'stable' ? 'freigegeben' : (u.paket.kanal === 'test' ? 'Testfassung, nicht freigegeben' : null)],
+            ['Spiel', u.paket.spiel],
             ['Image', u.paket.image],
             ['Digest', u.paket.digest],
             ['Quelle', u.paket.quelle]].forEach(function (z) { %>

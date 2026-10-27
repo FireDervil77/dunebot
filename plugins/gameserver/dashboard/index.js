@@ -859,6 +859,14 @@ class GameserverPlugin extends DashboardPlugin {
                 'SELECT guild_id, name FROM gameservers WHERE id = ?', [server_id]);
             if (!server) return;
 
+            // Einmal je Start die Spielfassung nachlesen (Stufe 10 S3): Ein
+            // Update gibt es nur beim Start, und `started` kommt genau einmal.
+            // Nicht abgewartet — die Bereitschaft wartet auf niemanden.
+            if (art === 'started') {
+                require('./helpers/Spielfassung').aktualisiereServer(server_id).catch(fehler =>
+                    Logger.error(`[Gameserver] Spielfassung für Server ${server_id} nicht gelesen:`, fehler));
+            }
+
             Logger.info(`[Gameserver] Bereitschaft ${server.name} (${server_id}): `
                 + `${stage || 'unbekannt'}${hinweis ? ' — ' + hinweis : ''}`);
 
@@ -1196,6 +1204,23 @@ class GameserverPlugin extends DashboardPlugin {
             const inhalt = paket?.content || null;
             const InhalteHolen = require('./helpers/InhalteHolen');
 
+            // ── Die Spielfassung ZUERST (Stufe 10 S3) ──────────────────────
+            //
+            // Jetzt liegt die Datei, die sie nennt, zum ersten Mal da. Die
+            // vorgemerkten Mods unten wählen ihre Fassung danach — ohne sie
+            // käme bei ficsit.app die neueste, auch wenn sie ein neueres Spiel
+            // verlangt. Scheitert das Lesen, geht es ohne weiter (Log).
+            const Spielfassung = require('./helpers/Spielfassung');
+            let frisch = null;
+            try {
+                frisch = await Spielfassung.aktualisiere(server, paket);
+                if (frisch) Logger.info(`[Gameserver] Server ${serverId}: Spielfassung ${frisch.label || frisch.build} (${frisch.build})`);
+            } catch (fehler) {
+                Logger.error(`[Gameserver] Spielfassung für Server ${serverId} nicht gelesen:`, fehler);
+            }
+            const spielfassung = await Spielfassung.fuerMods(
+                { ...server, spielfassung_build: frisch?.build || null }, paket);
+
             // ── Das Modpack ZUERST (2026-09-23) ────────────────────────────
             //
             // Es bringt `config/` und andere Beigaben mit; eine einzeln
@@ -1232,7 +1257,7 @@ class GameserverPlugin extends DashboardPlugin {
 
 
             const ergebnis = await InhalteHolen.holeGeplante({
-                server, inhalt, guildId: server.guild_id });
+                server, inhalt, guildId: server.guild_id, spielfassung });
             if (!ergebnis) return;
 
             Logger.info(`[Gameserver] Server ${serverId}: ${ergebnis.installiert.length} Mod(s) `

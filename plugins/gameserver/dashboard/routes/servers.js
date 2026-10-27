@@ -1869,6 +1869,10 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
                 -- (Keine Backticks in dieser Abfrage: Sie steht in einem
                 -- Template-Literal und waere damit zu Ende.)
                 gs.paket_werte,
+                -- Stufe 10 S3: gelesen aus management.game_version.
+                gs.spielfassung_build,
+                gs.spielfassung_label,
+                gs.spielfassung_am,
                 am.name as game_name,
                 am.slug as game_slug,
                 am.icon_url as game_icon,

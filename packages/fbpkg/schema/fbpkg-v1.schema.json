@@ -1434,6 +1434,17 @@
             "type": "string"
           }
         },
+        "game_version": {
+          "description": "Wo das Spiel seine Fassung hinschreibt (Stufe 10 S3, 2026-10-27). Die Datei ist JSON — Unreal schreibt sie so; ein Format-Feld gibt es mit Absicht nicht, es waere eine vierte Formatliste neben apply/config/files.patch, die nur liest. Das Dashboard liest die Datei nach der Installation und bei jedem Start: 'build' prueft Mods (ficsit.app vergleicht game_version gegen die Changelist), 'label' steht in der Anzeige. Jedes Unreal-Spiel schreibt Engine/Binaries/Linux/<Ziel>-Linux-Shipping.version (JSON). Ohne Angabe keine Anzeige — geraten wird nichts.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["file", "build"],
+          "properties": {
+            "file": { "type": "string", "pattern": "^(?!/)(?!.*\\.\\.)[^\\\\]+$", "description": "Relativ zu game/, ohne fuehrenden / und ohne .." },
+            "build": { "type": "string", "minLength": 1, "description": "Schluessel der Build-Nummer, etwa 'Changelist'" },
+            "label": { "type": "string", "minLength": 1, "description": "Schluessel der lesbaren Fassung, etwa 'GameVersion'" }
+          }
+        },
         "update": {
           "type": "object",
           "additionalProperties": false,

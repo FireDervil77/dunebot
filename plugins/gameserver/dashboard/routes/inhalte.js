@@ -30,6 +30,7 @@ const Inhalte = require('../helpers/Inhalte');
 const InhalteHolen = require('../helpers/InhalteHolen');
 const Quellen = require('../helpers/Quellen');
 const BepInExLog = require('../helpers/BepInExLog');
+const Spielfassung = require('../helpers/Spielfassung');
 
 /**
  * Server samt Paket laden — und pruefen, dass er zur Guild gehoert.
@@ -41,7 +42,7 @@ async function ladeServerUndPaket(dbService, serverId, guildId) {
     // gewaehlten Lader (Minecraft), und der steht dort.
     const [server] = await dbService.query(
         `SELECT id, name, guild_id, rootserver_id, install_path, addon_marketplace_id, status,
-                paket_werte
+                paket_werte, spielfassung_build
            FROM gameservers WHERE id = ? AND guild_id = ?`,
         [serverId, guildId]
     );
@@ -507,9 +508,10 @@ async function sucheAntwort(inhalt, quelle, raum, begriff, seite, spielfassung =
  * stoesst ein Mensch an, kein Takt.
  */
 async function spielfassungVonServer(ipmServer, dbService, geladen) {
-    const ausWerten = String(paketWerte(geladen).version || '').trim();
-    if (ausWerten && ausWerten !== 'latest') return ausWerten;
-    return merkzettel(ipmServer, dbService, geladen, 'minecraft-version');
+    // Seit Stufe 10 S3 steht die Regel in helpers/Spielfassung.js — dort liest
+    // auch, wer KEINE Route ist (Installation fertig → vorgemerkte Mods).
+    // `management.game_version` zuerst, sonst die drei Stufen oben.
+    return Spielfassung.fuerMods(geladen.server, geladen.paket);
 }
 
 /**
@@ -526,46 +528,11 @@ async function spielfassungVonServer(ipmServer, dbService, geladen) {
  * die schlimmer ist als keine.
  */
 async function laderVonServer(ipmServer, dbService, geladen) {
-    const vomMerkzettel = await merkzettel(ipmServer, dbService, geladen, 'minecraft-lader');
+    // Merkzettel und Werte lesen seit Stufe 10 S3 in helpers/Spielfassung.js —
+    // eine Stelle fuer die Base64-Falle aus Baustelle 135, nicht zwei.
+    const vomMerkzettel = await Spielfassung.merkzettel(geladen.server, 'minecraft-lader');
     if (vomMerkzettel) return vomMerkzettel;
-    return String(paketWerte(geladen).loader || '').trim() || null;
-}
-
-/** Die Einstellungen dieses Servers, wie sie in `gameservers.paket_werte` stehen. */
-function paketWerte(geladen) {
-    try {
-        return typeof geladen.server?.paket_werte === 'string'
-            ? JSON.parse(geladen.server.paket_werte) : (geladen.server?.paket_werte || {});
-    } catch {
-        return {};
-    }
-}
-
-/**
- * Ein Merkzettel des Installationsskripts aus `.fb`.
- *
- * Eine Funktion statt zweier fast gleicher: Die Fassung und der Lader liegen
- * nebeneinander im selben Ordner, werden gleich gelesen und gleich zerlegt.
- * Zwei Fassungen davon waeren zwei Stellen, an denen die Base64-Falle aus
- * Baustelle 135 wieder einziehen kann — einmal korrigiert, einmal nicht.
- */
-async function merkzettel(ipmServer, dbService, geladen, name) {
-    try {
-        const daemonId = await daemonVon(dbService, geladen.server);
-        if (!daemonId || !ipmServer?.isDaemonOnline(daemonId)) return null;
-        const gelesen = await ipmServer.sendCommand(daemonId, 'gameserver.files.read', {
-            server_id: String(geladen.server.id),
-            rootserver_id: String(geladen.server.rootserver_id),
-            install_path: geladen.server.install_path,
-            path: `/.fb/${name}`,
-        }, 8000).catch(() => null);
-        if (!gelesen?.success) return null;
-        // Der Daemon liefert Base64, immer (Baustelle 135).
-        const text = Buffer.from(String(gelesen.data?.content || ''), 'base64').toString('utf8');
-        return text.trim().split(/\s+/)[0] || null;
-    } catch {
-        return null;
-    }
+    return String(Spielfassung.paketWerte(geladen.server).loader || '').trim() || null;
 }
 
 /** Suchen fuer einen bestehenden Server. */
@@ -746,9 +713,12 @@ router.get('/:serverId/inhalte/vorschau', requirePermission('GAMESERVER.VIEW'), 
         const gewaehlt = quelleWaehlen(res, inhalt, req.query.quelle);
         if (gewaehlt.absage) return;
 
+        // Die Spielfassung waehlt mit (Stufe 10 S3) — die Vorschau soll zeigen,
+        // was wirklich kaeme, nicht die neueste Fassung fuer ein anderes Spiel.
         const schau = await InhalteHolen.vorschau({
             serverId: req.params.serverId, inhalt, quelle: gewaehlt.quelle,
             kennung: req.query.kennung, fassung: req.query.fassung || null,
+            spielfassung: await spielfassungVonServer(null, dbService, geladen),
         });
         return res.json({ success: true, ...schau });
     } catch (error) {
@@ -843,6 +813,7 @@ router.post('/:serverId/inhalte/holen', requirePermission('GAMESERVER.FILES.MANA
             server: geladen.server, inhalt, guildId, quelle: gewaehlt.quelle,
             kennung: String(req.body.kennung),
             fassung: req.body.fassung ? String(req.body.fassung) : null,
+            spielfassung: await spielfassungVonServer(null, dbService, geladen),
         });
 
         Logger.info(`[Gameserver/Inhalte] ${gewaehlt.quelle} ${req.body.kennung} auf Server ${serverId}: `
@@ -888,7 +859,8 @@ router.post('/:serverId/inhalte/geplant-holen', requirePermission('GAMESERVER.FI
         if (gewaehlt.absage) return;
 
         const ergebnis = await InhalteHolen.holeGeplante({
-            server: geladen.server, inhalt, guildId });
+            server: geladen.server, inhalt, guildId,
+            spielfassung: await spielfassungVonServer(null, dbService, geladen) });
 
         if (!ergebnis) {
             return res.json({ success: true, nichts: true,
@@ -1023,12 +995,16 @@ router.get('/:serverId/inhalte/aktualisierungen', requirePermission('GAMESERVER.
         // gerade nicht antwortet, nimmt die anderen nicht mit — seine Zeilen
         // tragen dann den Grund.
         const stand = [];
+        // ficsit.app schlaegt sonst eine Fassung vor, die ein neueres Spiel
+        // verlangt (Stufe 10 S3); Thunderstore und Modrinth nehmen das dritte
+        // Argument nicht.
+        const spielfassung = await spielfassungVonServer(null, dbService, geladen);
         for (const name of namen) {
             const seine = zeilen.filter(z => z.quelle === name);
             if (!seine.length) continue;
             const raum = Quellen.raumAus(inhalt, name);
             try {
-                stand.push(...await Quellen.fuer(name).aktualisierungen(raum, seine));
+                stand.push(...await Quellen.fuer(name).aktualisierungen(raum, seine, { spielfassung }));
             } catch (fehler) {
                 Logger.warn(`[Gameserver/Inhalte] ${name} nicht abfragbar: ${fehler.message}`);
                 for (const z of seine) {
@@ -1083,6 +1059,7 @@ router.post('/:serverId/inhalte/:id/aktualisieren', requirePermission('GAMESERVE
 
         const ergebnis = await InhalteHolen.aktualisiere({
             server: geladen.server, inhalt, guildId, zeile,
+            spielfassung: await spielfassungVonServer(null, dbService, geladen),
         });
 
         if (!ergebnis.geaendert) {

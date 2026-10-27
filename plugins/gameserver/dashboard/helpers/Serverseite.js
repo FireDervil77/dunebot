@@ -1088,6 +1088,11 @@ function bauePaketkarte(server, paket, zeile) {
         quelle:  (paket.install?.steps || []).map(s =>
                     s.type === 'steamcmd' ? 'steamcmd · App ' + s.app : s.type).join(', ') || null,
         welten:  paket.management?.saves || null,
+        // Was das Spiel selbst über sich sagt (Stufe 10 S3) — nur, wenn das
+        // Paket die Datei nennt und sie gelesen wurde; sonst steht nichts da.
+        spiel:   server?.spielfassung_build
+            ? (server.spielfassung_label ? `${server.spielfassung_label} (Build ${server.spielfassung_build})` : String(server.spielfassung_build))
+            : null,
     };
 }
 
@@ -1351,6 +1356,8 @@ function baueWelt(sicherungen) {
 }
 
 module.exports = { baueUebersicht, HOEHE, WIRKUNG, RISIKO, GRUPPE, BEFEHL_NAME, BEFEHL_QUELLE };
+// Für den Wächter (check-spielfassung): die Zeile „Spiel" im Paket-Block.
+module.exports.bauePaketkarte = bauePaketkarte;
 
 /**
  * Die Serverliste — Entwurf vom 2026-08-18, Artboard 1.

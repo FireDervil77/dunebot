@@ -115,11 +115,13 @@ function zielFuer(inhalt, art, kennung) {
  * waehlt, bekommt BepInEx, ohne es zu wissen. Genau das soll die Vorschau
  * zeigen, bevor jemand klickt.
  */
-async function vorschau({ serverId, inhalt, quelle, kennung, fassung = null }) {
+async function vorschau({ serverId, inhalt, quelle, kennung, fassung = null, spielfassung = null }) {
     const anbieter = Quellen.fuer(quelle);
     const raum = Quellen.raumAus(inhalt, quelle);
 
-    const { pakete, fehlend } = await anbieter.aufloesen(raum, kennung, fassung);
+    // Die Spielfassung des Servers (Stufe 10 S3): ficsit.app und Modrinth
+    // waehlen damit eine Fassung, die zum Spiel passt; Thunderstore kennt keine.
+    const { pakete, fehlend } = await anbieter.aufloesen(raum, kennung, fassung, { spielfassung });
 
     let vorhanden = new Map();
     if (serverId) {
@@ -318,7 +320,7 @@ async function legeAb({ server, inhalt, guildId, quelle, pakete, fehlend = [] })
  * @param {{server: object, inhalt: object, guildId: string, quelle?: string,
  *          kennung: string, fassung?: string}} auftrag
  */
-async function installiere({ server, inhalt, guildId, quelle, kennung, fassung = null }) {
+async function installiere({ server, inhalt, guildId, quelle, kennung, fassung = null, spielfassung = null }) {
     if (!inhalt?.supported) {
         throw new Error('Dieses Spiel nimmt laut seinem Paket keine Inhalte auf.');
     }
@@ -331,7 +333,7 @@ async function installiere({ server, inhalt, guildId, quelle, kennung, fassung =
     const anbieter = Quellen.fuer(gewaehlt);
     const raum = Quellen.raumAus(inhalt, gewaehlt);
 
-    const { pakete, fehlend } = await anbieter.aufloesen(raum, kennung, fassung);
+    const { pakete, fehlend } = await anbieter.aufloesen(raum, kennung, fassung, { spielfassung });
     return legeAb({ server, inhalt, guildId, quelle: gewaehlt, pakete, fehlend });
 }
 
@@ -344,7 +346,7 @@ async function installiere({ server, inhalt, guildId, quelle, kennung, fassung =
  *
  * @returns {Promise<object|null>} null, wenn nichts vorgemerkt war
  */
-async function holeGeplante({ server, inhalt, guildId }) {
+async function holeGeplante({ server, inhalt, guildId, spielfassung = null }) {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
 
@@ -367,7 +369,7 @@ async function holeGeplante({ server, inhalt, guildId }) {
     for (const zeile of zeilen) {
         try {
             const e = await installiere({ server, inhalt, guildId, quelle: zeile.quelle,
-                kennung: zeile.kennung, fassung: zeile.fassung });
+                kennung: zeile.kennung, fassung: zeile.fassung, spielfassung });
             gesamt.installiert.push(...e.installiert);
             gesamt.fehlgeschlagen.push(...e.fehlgeschlagen);
             gesamt.fehlend.push(...e.fehlend);
@@ -478,7 +480,7 @@ async function entferneDateien({ server, zeile, inhalt = null }) {
  *
  * @returns {Promise<object>} wie `installiere`, zusaetzlich `vorher`/`nachher`
  */
-async function aktualisiere({ server, inhalt, guildId, zeile }) {
+async function aktualisiere({ server, inhalt, guildId, zeile, spielfassung = null }) {
     // Aktualisiert wird bei DEM Anbieter, von dem die Zeile kam — nicht bei dem,
     // den das Paket zuerst nennt. Ein Mod wandert nicht die Quelle.
     const anbieter = Quellen.fuer(zeile.quelle);
@@ -489,14 +491,14 @@ async function aktualisiere({ server, inhalt, guildId, zeile }) {
     // Wer sie danach noch einmal liest, meldet „2.30.0 → 2.30.0".
     const vorher = zeile.fassung;
 
-    const neuestes = await anbieter.paket(raum, zeile.kennung);
+    const neuestes = await anbieter.paket(raum, zeile.kennung, null, { spielfassung });
     if (!anbieter.neuerAls(neuestes, zeile)) {
         return { geaendert: false, vorher, nachher: neuestes.fassung,
                  installiert: [], fehlgeschlagen: [], fehlend: [] };
     }
 
     const ergebnis = await installiere({ server, inhalt, guildId,
-        quelle: zeile.quelle, kennung: zeile.kennung });
+        quelle: zeile.quelle, kennung: zeile.kennung, spielfassung });
 
     // Aufgeraeumt hat `legeAb` — hier wird der Eintrag DIESES Mods gesucht.
     // Ein leerer Eintrag heisst: Es gab nichts zu entfernen (gleiche Fassung
