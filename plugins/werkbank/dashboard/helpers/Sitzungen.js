@@ -1106,7 +1106,7 @@ function mischeEinstellung(vorher, neu) {
  *                      des Schemas bringt, reist dann mit, statt zu verschwinden.
  */
 const GANZ = '*';
-const EIGENE = { management: ['query', 'rcon', 'saves', 'persist'], files: ['denylist', 'public'], install: ['cache', 'entfernen'],
+const EIGENE = { management: ['query', 'rcon', 'saves', 'persist', 'game_version'], files: ['denylist', 'public'], install: ['cache', 'entfernen'],
     commands: GANZ, config: GANZ, requirements: GANZ, console: GANZ,
     content: ['supported', 'sources', 'source_ids', 'path', 'activation', 'order_matters', 'needs_restart', 'client_side',
         'loader', 'by_setting', 'variants'] };
@@ -3759,6 +3759,63 @@ function nachInstallationAusFormular(b) {
     return { entfernen: namen, depotCache: istWahr(b?.steam_depot) };
 }
 
+// ── Spielfassung (`management.game_version`, Stufe 10 S5, 2026-10-27) ───────
+//
+// Wo das Spiel seine Fassung hinschreibt. Das Panel liest die Datei nach der
+// Installation und bei jedem Start (gameserver/helpers/Spielfassung.js):
+// `build` prüft Mods (ficsit.app: game_version gegen die Changelist), `label`
+// steht auf der Serverseite. Die Datei ist JSON — jedes Unreal-Spiel schreibt
+// `Engine/Binaries/Linux/<Ziel>-Linux-Shipping.version`.
+
+const SPIELFASSUNG = { max: { pfad: 200 }, schluessel: /^[A-Za-z0-9_.-]{1,60}$/ };
+
+function spielfassungAusFormular(b) {
+    const text = (v) => (typeof v === 'string' ? v.trim() : '');
+    const file = text(b?.file).replace(/^game\//, '');
+    const build = text(b?.build);
+    const label = text(b?.label);
+    if (!file) {
+        if (build || label) throw new Error('Spielfassung: ohne Datei gibt es nichts zu lesen — Datei eintragen oder alles leeren.');
+        return null;
+    }
+    if (file.length > SPIELFASSUNG.max.pfad || !RE_DATEI.test(file) || file.includes('\\')) {
+        throw new Error('Spielfassung, Datei: relativ zu game/, ohne führenden „/" und ohne „..".');
+    }
+    if (!SPIELFASSUNG.schluessel.test(build)) throw new Error('Spielfassung: der Schlüssel der Build-Nummer gehört dazu, etwa „Changelist".');
+    if (label && !SPIELFASSUNG.schluessel.test(label)) throw new Error('Spielfassung: der Schlüssel der Anzeige aus Buchstaben, Ziffern, „_", „." und „-" — etwa „GameVersion".');
+    return { file, build, ...(label ? { label } : {}) };
+}
+
+/** Was die Karte „Spielfassung" zeigt. */
+function spielfassungStand(sitzung) {
+    const g = sitzung.entwurf?.management?.game_version || {};
+    return { file: g.file || '', build: g.build || '', label: g.label || '' };
+}
+
+async function spielfassungSpeichern(sitzung, b) {
+    await pruefeFrei(sitzung);
+    const neu = spielfassungAusFormular(b);
+    return entwurfSchreiben(sitzung, (e) => {
+        const m = { ...(e.management || {}) };
+        if (neu) m.game_version = neu; else delete m.game_version;
+        if (Object.keys(m).length) e.management = m; else delete e.management;
+    });
+}
+
+/**
+ * Probe am Volume der Sitzung: Was würde der Server lesen? Über denselben
+ * Lesebefehl wie „Schlüssel aus Datei" — der Daemon liest, die Werkbank zeigt.
+ */
+async function spielfassungProbe(sitzung, b) {
+    const g = spielfassungAusFormular(b);
+    if (!g) throw new Error('Spielfassung: erst eine Datei eintragen.');
+    const lesung = await schluesselLesen(sitzung, { datei: g.file, parser: 'json' });
+    const wert = (k) => (lesung.funde.find(f => f.pfad === k) || {}).wert;
+    const build = wert(g.build);
+    if (build === undefined || build === '') throw new Error(`„${g.build}" steht nicht in ${g.file}.`);
+    return { build: String(build), label: g.label ? (wert(g.label) ?? null) : null };
+}
+
 /** Was die Karte „Nach der Installation" zeigt. */
 function nachInstallationStand(sitzung) {
     const i = sitzung.entwurf?.install || {};
@@ -4673,6 +4730,7 @@ module.exports = {
     DATEITEIL, dateiteilStand, dateiteilSpeichern, dateiteilAusFormular, umleitungsVorschlaege,
     downloadVerweise, downloadBasis, downloadNutzlast, downloadAdresse,
     MODS, modsStand, modsSpeichern, modsAusFormular,
+    spielfassungStand, spielfassungSpeichern, spielfassungProbe, spielfassungAusFormular,
     LADER, laderStand, laderSpeichern, variantenStand, variantenSpeichern,
     NACHINSTALL, nachInstallationStand, nachInstallationSpeichern, KONSOLENFILTER, konsolenfilterStand, konsolenfilterSpeichern,
     zuPaket, entfernbar, sitzungEntfernen,

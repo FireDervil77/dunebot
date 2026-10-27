@@ -2301,6 +2301,43 @@
     </div>
   </div>
 
+  <!-- ── Spielfassung (`management.game_version`, Stufe 10 S5) ── -->
+  <%
+    const sf = locals.spielfassung || { file: '', build: '', label: '' };
+  %>
+  <div class="col-12">
+    <div class="card" id="karteSpielfassung">
+      <div class="card-header">
+        <h3 class="card-title">Spielfassung</h3>
+        <div class="card-actions"><span class="text-secondary small"><%= sf.file ? 'aus ' + sf.file : 'keine Angabe — das Panel zeigt keine Spielfassung' %></span></div>
+      </div>
+      <div class="card-body">
+        <form id="formSpielfassung" class="row g-3" autocomplete="off">
+          <div class="col-md-6">
+            <div class="form-label"><label for="spielfassungDatei">Datei</label><%- include('werkbank-hilfe', { text:
+              'Wo das Spiel seine Fassung hinschreibt, relativ zu game/. Jedes Unreal-Spiel schreibt Engine/Binaries/Linux/<Ziel>-Linux-Shipping.version (JSON). '
+              + 'Das Panel liest sie nach der Installation und bei jedem Start: Die Build-Nummer prüft Mods (ficsit.app vergleicht gegen sie), die Anzeige steht auf der Serverseite. '
+              + 'Leer = keine Spielfassung — geraten wird nichts.' }) %></div>
+            <input class="form-control font-monospace" id="spielfassungDatei" name="file" value="<%= sf.file %>" placeholder="Engine/Binaries/Linux/FactoryServer-Linux-Shipping.version">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" for="spielfassungBuild">Schlüssel der Build-Nummer</label>
+            <input class="form-control font-monospace" id="spielfassungBuild" name="build" value="<%= sf.build %>" placeholder="Changelist">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" for="spielfassungLabel">Schlüssel der Anzeige</label>
+            <input class="form-control font-monospace" id="spielfassungLabel" name="label" value="<%= sf.label %>" placeholder="GameVersion">
+          </div>
+          <div class="col-12 d-flex gap-2 align-items-center flex-wrap">
+            <button class="btn btn-primary" type="submit" <%= beschaeftigt ? 'disabled' : '' %>><i class="fa-solid fa-floppy-disk me-1"></i>Speichern</button>
+            <button class="btn btn-outline-secondary" type="button" id="knopfSpielfassungProbe"><i class="fa-solid fa-magnifying-glass me-1"></i>Aus der Sitzung lesen</button>
+            <span class="text-secondary small" id="spielfassungProbe"></span>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <!-- ── Hinweise für Betreiber (2026-10-06) ───────────────────────────── -->
   <%
     // Was sich nicht einstellen lässt und was man trotzdem wissen muss. Fester
@@ -4076,6 +4113,29 @@
       }
     });
   }
+  // ── Spielfassung (Stufe 10 S5) ───────────────────────────────────────
+  function spielfassungAus(form) {
+    return { file: form.file.value, build: form.build.value, label: form.label.value };
+  }
+  einfachesFormular('formSpielfassung', '/spielfassung', spielfassungAus);
+  (function () {
+    var knopf = document.getElementById('knopfSpielfassungProbe');
+    var ziel = document.getElementById('spielfassungProbe');
+    if (!knopf) return;
+    knopf.addEventListener('click', async function () {
+      knopf.disabled = true;
+      ziel.textContent = 'Wird gelesen …';
+      try {
+        var d = await schicke(hier + '/spielfassung/probe', spielfassungAus(document.getElementById('formSpielfassung')));
+        ziel.textContent = 'Gelesen: ' + (d.label ? d.label + ' (Build ' + d.build + ')' : d.build);
+      } catch (fehler) {
+        ziel.textContent = '';
+        melde('error', fehler.message);
+      } finally {
+        knopf.disabled = false;
+      }
+    });
+  })();
   einfachesFormular('formNachInstallation', '/nachinstallation', function (form) {
     return { entfernen: form.entfernen.value, steam_depot: form.steam_depot.checked ? '1' : '' };
   });

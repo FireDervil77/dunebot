@@ -49,6 +49,11 @@ ServiceManager.register('dbService', {
         if (/^UPDATE gameservers SET spielfassung_build = \?, spielfassung_label = \?, spielfassung_am = NOW\(\) WHERE id = \?$/.test(t)) {
             spur.geschrieben.push(w); return {};
         }
+        // Werkbank (S5): Entwurf schreiben und „läuft gerade etwas?".
+        if (/^UPDATE werkbank_sitzungen SET entwurf = \? WHERE id = \?$/.test(t)) return {};
+        if (/FROM werkbank_pruefungen p JOIN werkbank_sitzungen s[\s\S]*p\.status = 'laeuft'/.test(t)) return [];
+        if (/^SELECT id FROM werkbank_schritte WHERE sitzung_id = \? AND status = 'laeuft' LIMIT 1$/.test(t)) return [];
+        if (/FROM werkbank_laeufe l JOIN werkbank_sitzungen s[\s\S]*l\.status <> 'beendet'/.test(t)) return [];
         throw new Error(`Attrappe kennt die Abfrage nicht: ${t.slice(0, 90)}`);
     },
 });
@@ -162,6 +167,30 @@ async function pruefe(was, tun) {
         assert.strictEqual(bauePaketkarte({}, p).spiel, null);
         const ansicht = fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/views/guild/partials/server-detail-uebersicht.ejs'), 'utf8');
         assert.ok(ansicht.includes("['Spiel', u.paket.spiel]"), 'die Zeile steht nicht in der Seite');
+    });
+
+    console.log('\nWerkbank (S5): Karte „Spielfassung"');
+
+    await pruefe('speichern, leeren, Pfad- und Schlüsselregeln — und das Paket trägt es', async () => {
+        const S = require(path.join(WURZEL, 'plugins/werkbank/dashboard/helpers/Sitzungen.js'));
+        const sitzung = { id: 1, kennung: 'probe', image: { ref: 'fb/steamcmd', tag: 'latest' },
+            entwurf: { identity: { slug: 'satisfactory' }, management: { persist: [] } } };
+        await S.spielfassungSpeichern(sitzung, { file: 'game/' + ANGABE.file, build: 'Changelist', label: 'GameVersion' });
+        assert.deepStrictEqual(sitzung.entwurf.management.game_version, ANGABE, '„game/" vorn wird abgeschnitten, sonst unverändert');
+        assert.deepStrictEqual(S.spielfassungStand(sitzung), { file: ANGABE.file, build: 'Changelist', label: 'GameVersion' });
+        assert.deepStrictEqual(S.entwurfAlsPaket(sitzung, []).management.game_version, ANGABE, 'das Paket trägt es nicht');
+        await S.spielfassungSpeichern(sitzung, { file: ANGABE.file, build: 'Changelist', label: '' });
+        assert.ok(!('label' in sitzung.entwurf.management.game_version), 'eine leere Anzeige steht als Feld da');
+        await S.spielfassungSpeichern(sitzung, { file: '', build: '', label: '' });
+        assert.ok(!('game_version' in sitzung.entwurf.management), 'leeren nimmt es nicht weg');
+        assert.deepStrictEqual(sitzung.entwurf.management, { persist: [] }, 'das Übrige in management ist angefasst');
+        for (const [b, muster] of [[{ file: '../x', build: 'C' }, /ohne führenden/], [{ file: '/abs', build: 'C' }, /ohne führenden/],
+            [{ file: 'a.version', build: '' }, /Build-Nummer gehört dazu/], [{ file: '', build: 'C' }, /ohne Datei/],
+            [{ file: 'a.version', build: 'C', label: 'Game Version' }, /Anzeige aus Buchstaben/]]) {
+            await assert.rejects(S.spielfassungSpeichern(sitzung, b), muster);
+        }
+        await assert.rejects(S.spielfassungProbe(sitzung, { file: '' }), /erst eine Datei/);
+        assert.ok(S.EIGENE.management.includes('game_version'), 'ohne Karte fiele es ins Durchgereichte');
     });
 
     console.log('\nSchema und Datenbank');

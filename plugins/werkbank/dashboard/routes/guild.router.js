@@ -401,6 +401,7 @@ router.get('/:kennung', requirePermission('WERKBANK.VIEW'), async (req, res) => 
             downloadAdresse: await Sitzungen.downloadAdresse(sitzung),
             DATEITEIL: Sitzungen.DATEITEIL,
             nachInstallation: Sitzungen.nachInstallationStand(sitzung),
+            spielfassung: Sitzungen.spielfassungStand(sitzung),
             mods: Sitzungen.modsStand(sitzung),
             MODS: Sitzungen.MODS,
             lader: Sitzungen.laderStand(sitzung),
@@ -835,6 +836,24 @@ router.post('/:kennung/spielstand', requirePermission('WERKBANK.BAUEN'), async (
         return res.json({ success: true });
     } catch (error) {
         return fehler(res, error, 'Dateien und Spielstand nicht gespeichert', 400);
+    }
+});
+
+// ── Spielfassung (`management.game_version`, Stufe 10 S5, 2026-10-27) ──
+router.post('/:kennung/spielfassung', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.spielfassungSpeichern(await offeneSitzung(req, res), req.body || {});
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Nicht gespeichert', 400);
+    }
+});
+router.post('/:kennung/spielfassung/probe', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        const gelesen = await Sitzungen.spielfassungProbe(await offeneSitzung(req, res), req.body || {});
+        return res.json({ success: true, ...gelesen });
+    } catch (error) {
+        return fehler(res, error, 'Nicht gelesen', 400);
     }
 });
 
