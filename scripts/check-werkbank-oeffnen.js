@@ -106,7 +106,26 @@ function alsFormular(e) {
         // sein `ask_on_create: false` — in diesem Nachbau, nicht auf der Seite.
         role: S.rolleAlsFormular(e), takes_effect: e.takes_effect, risk: e.risk || 'none',
         apply: (e.apply || []).map(z => Object.fromEntries(Object.entries(z).map(([k, v]) => [k, String(v)]))),
+        // Was die Seite seit Stufe 9 S4–S6 vorbelegt (werkbank-sitzung.ejs, Bearbeiten
+        // + bedingungFuellen). Ohne diese Felder verlor windorse 1.0.9 hier fünfmal
+        // join_password, applies_when und pattern — im Nachbau, nicht auf der Seite
+        // (gefunden 2026-10-27; rot seit S6).
+        item_pattern: e.item_pattern || '', max_items: e.max_items === undefined ? '' : String(e.max_items),
+        pattern: e.pattern || '',
+        pattern_hint_de: (e.pattern_hint && e.pattern_hint.de) || '', pattern_hint_en: (e.pattern_hint && e.pattern_hint.en) || '',
+        ...(e.join_password ? { join_password: 'on' } : {}),
+        ...wirktFelder(e.applies_when),
     };
+}
+
+/** Wie bedingungFuellen auf der Seite: `from`/`when` in die drei Felder der Bedingung. */
+function wirktFelder(bed) {
+    if (!bed) return { wirkt_key: '', wirkt_art: 'true', wirkt_wert: '' };
+    const w = String(bed.when || '');
+    const key = String(bed.from || '').replace(/^setting:/, '');
+    if (w.startsWith('!=')) return { wirkt_key: key, wirkt_art: '!=', wirkt_wert: w.slice(2) };
+    if (w.startsWith('=')) return { wirkt_key: key, wirkt_art: '=', wirkt_wert: w.slice(1) };
+    return { wirkt_key: key, wirkt_art: w, wirkt_wert: '' };
 }
 
 (async () => {

@@ -166,6 +166,11 @@ const db = {
             if (x) x.protokoll = (x.protokoll + p[0]).slice(-p[1]);
             return { affectedRows: 1 };
         }
+        // Stufe 9 S7: Ein Grün ohne `faelle` sieht nach, ob der Entwurf Fälle hatte.
+        if (/^SELECT entwurf FROM werkbank_pruefungen WHERE id = \?$/.test(t)) {
+            const x = this.pruefungen.find(y => y.id === p[0]);
+            return x ? [{ entwurf: x.entwurf }] : [];
+        }
         if (/^UPDATE werkbank_pruefungen SET status = \?, ergebnis = \?, beendet_am = NOW\(\) WHERE id = \? AND status = 'laeuft'$/.test(t)) {
             const x = this.pruefungen.find(y => y.id === p[2] && y.status === 'laeuft');
             if (x) Object.assign(x, { status: p[0], ergebnis: p[1] });
