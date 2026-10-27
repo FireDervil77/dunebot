@@ -222,6 +222,20 @@ function frisch(mehr = {}) {
         assert.strictEqual(an.entwurf.content.supported, false);
         assert.strictEqual(an.entwurf.content.path, 'game/BepInEx/plugins');
     });
+    // Stufe 10 S2 (2026-10-27): Satisfactory legt jeden Mod in einen eigenen Ordner.
+    await pruefe('Ordner je Mod: {{content:key}} nur als letzter Abschnitt — Mods und Lader, und das Schema nimmt es', async () => {
+        const s = frisch();
+        const sat = (mehr = {}) => gut({ sources: ['ficsit'], source_ids: { ficsit: 'satisfactory' }, path: 'game/FactoryGame/Mods/{{content:key}}', ...mehr });
+        await S.modsSpeichern(s, sat());
+        assert.strictEqual(s.entwurf.content.path, 'game/FactoryGame/Mods/{{content:key}}');
+        await S.laderSpeichern(s, { an: '1', key: 'sml', path: 'game/FactoryGame/Mods/SML', log: '', installable_as_content: '1',
+            packages: { ficsit: 'SML' }, env: [] });
+        gleich(s.entwurf.content.loader, { key: 'sml', path: 'game/FactoryGame/Mods/SML', packages: { ficsit: 'SML' } });
+        assert.ok(giltContent(s.entwurf.content), JSON.stringify(giltContent.errors));
+        await wirft(() => S.modsSpeichern(s, sat({ path: 'game/{{content:key}}/Mods' })), /nur als letzter Abschnitt/);
+        await wirft(() => S.modsSpeichern(s, sat({ path: 'FactoryGame/Mods/{{content:key}}' })), /ab der Wurzel des Volumes/);
+        await wirft(() => S.modsSpeichern(s, sat({ path: '../x/{{content:key}}' })), /aus dem Volume|ab der Wurzel/);
+    });
     await pruefe('die Reihenfolge der Quellen bleibt, neue kommen hinten an, abgewählte gehen', async () => {
         const s = frisch({ content: { supported: true, sources: ['upload', 'thunderstore'], source_ids: { thunderstore: 'valheim' }, path: 'game/mods' } });
         await S.modsSpeichern(s, gut({ sources: ['modrinth', 'thunderstore', 'upload'], source_ids: { thunderstore: 'valheim', modrinth: 'fabric' }, path: 'game/mods' }));

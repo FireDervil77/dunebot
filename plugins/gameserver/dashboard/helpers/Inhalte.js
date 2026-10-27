@@ -241,7 +241,50 @@ function paketAdresse(zeile, raeume) {
     return Quellen.fuer(zeile.quelle).adresse(raum, zeile.kennung);
 }
 
+// ── Ein Ordner je Mod (Stufe 10 S2, 2026-10-27) ─────────────────────────────
+//
+// Bis hierher lag jeder Mod eines Spiels in EINEM Ordner (`content.path`,
+// etwa `game/BepInEx/plugins`). Satisfactory will einen je Mod: Eine `.smod`
+// ist der Plugin-Ordner selbst (`SML.uplugin`, `Binaries/`, `Content/`) und
+// gehört nach `FactoryGame/Mods/<mod_reference>/` — ausgepackt in den
+// gemeinsamen Ordner lägen die `.uplugin` aller Mods übereinander.
+//
+// Das Paket sagt es mit einem Platzhalter als LETZTEM Abschnitt:
+// `game/FactoryGame/Mods/{{content:key}}`. Er wird zur Kennung des Mods. Ohne
+// Platzhalter bleibt alles, wie es war.
+
+const PLATZHALTER = '{{content:key}}';
+const RE_ORDNER = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
+
+/** Hat dieser Pfad einen Ordner je Mod? */
+function jeMod(pfad) {
+    return String(pfad || '').includes(PLATZHALTER);
+}
+
+/**
+ * Der Ablageort für EINEN Inhalt — mit seiner Kennung statt des Platzhalters.
+ *
+ * Die Kennung wird ein Ordnername auf dem Server; sie kommt vom Anbieter oder
+ * aus einem Formular. Deshalb streng: ein Abschnitt, Buchstaben, Ziffern,
+ * `.`, `_`, `-`, kein `..`. Eine andere wirft — geraten wird kein Ordner.
+ */
+function ablageFuer(pfad, kennung) {
+    const p = String(pfad || '');
+    if (!jeMod(p)) return p;
+    const k = String(kennung || '');
+    if (!RE_ORDNER.test(k) || k.includes('..')) {
+        throw new Error(`„${k}" taugt nicht als Ordnername für einen Mod (Buchstaben, Ziffern, „.", „_", „-").`);
+    }
+    return p.split(PLATZHALTER).join(k);
+}
+
+/** Für die Anzeige: `game/FactoryGame/Mods/<Mod>` statt des Platzhalters. */
+function pfadAnzeige(pfad) {
+    return pfad ? String(pfad).split(PLATZHALTER).join('<Mod>') : pfad;
+}
+
 module.exports = {
     fuerServer, laderAktiv, eintragen, entfernen, schalten, dateienAus, paketAdresse,
     ART_LADER, ART_MOD, ART_MODPACK,
+    PLATZHALTER, jeMod, ablageFuer, pfadAnzeige,
 };

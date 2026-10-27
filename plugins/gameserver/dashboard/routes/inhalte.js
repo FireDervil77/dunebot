@@ -153,7 +153,8 @@ router.get('/:serverId/inhalte', requirePermission('GAMESERVER.VIEW'), async (re
                     return w[schluessel] || null;
                 } catch { return null; }
             })(),
-            pfad: inhalt?.path || null,
+            // Mit Ordner je Mod: `…/Mods/<Mod>` statt des Platzhalters (Stufe 10 S2).
+            pfad: Inhalte.pfadAnzeige(inhalt?.path) || null,
             // Was das Paket WOERTLICH nennt — auch `upload` und Anbieter, die
             // dieses Dashboard noch nicht kann.
             quellenImPaket: inhalt?.sources || [],
@@ -225,7 +226,24 @@ router.post('/:serverId/inhalte', requirePermission('GAMESERVER.FILES.MANAGE'), 
 
         // Der Lader bringt seine Struktur mit und gehoert in die Wurzel; ein Mod
         // in den Ordner, den das Paket nennt.
-        const ziel = art === Inhalte.ART_LADER ? '' : inhalt.path;
+        //
+        // Ordner je Mod (Stufe 10 S2): Der Name des Ordners wird nicht aus dem
+        // Dateinamen geraten — `PowerChecker-2.4.10.zip` hiesse sonst ein
+        // Ordner „PowerChecker-2.4.10", und das Spiel faende den Mod unter
+        // seinem Namen nicht. Wer hochlaedt, nennt ihn (`ordner`).
+        let ziel = art === Inhalte.ART_LADER ? '' : inhalt.path;
+        if (Inhalte.jeMod(ziel)) {
+            if (!String(req.body.ordner || '').trim()) {
+                return res.status(409).json({ success: false,
+                    message: `Dieses Spiel legt jeden Mod in einen eigenen Ordner (${Inhalte.pfadAnzeige(ziel)}). `
+                           + 'Zum Hochladen gehört der Name dieses Ordners — so, wie der Mod heißt.' });
+            }
+            try {
+                ziel = Inhalte.ablageFuer(ziel, String(req.body.ordner).trim());
+            } catch (fehler) {
+                return res.status(400).json({ success: false, message: fehler.message });
+            }
+        }
         const entpacken = /\.zip$/i.test(req.file.originalname);
 
         const antwort = await ipmServer.sendCommand(daemonId, 'gameserver.content.install', {

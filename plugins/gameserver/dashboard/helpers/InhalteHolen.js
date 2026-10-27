@@ -99,9 +99,13 @@ function laderBleibt(inhalt, paket, da, anbieter) {
         && anbieter.hoeher(da.fassung, paket.fassung);
 }
 
-function zielFuer(inhalt, art) {
-    if (art === Inhalte.ART_LADER) return inhalt.loader?.path || '';
-    return inhalt.path || '';
+/**
+ * Mit Kennung: Steht im Pfad ein Ordner je Mod (`{{content:key}}`, Stufe 10
+ * S2), wird er zu DIESEM Mod aufgelöst.
+ */
+function zielFuer(inhalt, art, kennung) {
+    const pfad = art === Inhalte.ART_LADER ? (inhalt.loader?.path || '') : (inhalt.path || '');
+    return Inhalte.ablageFuer(pfad, kennung);
 }
 
 /**
@@ -258,9 +262,19 @@ async function legeAb({ server, inhalt, guildId, quelle, pakete, fehlend = [] })
                 + (weg.ohneListe ? ' (alte Zeile ohne Dateiliste — nichts zu entfernen)' : ''));
         }
 
+        // Ordner je Mod: Eine Kennung, die kein Ordnername sein kann, scheitert
+        // HIER mit Grund in der Zeile — nicht beim Daemon an einem halben Pfad.
+        let ziel;
+        try {
+            ziel = zielFuer(inhalt, art, p.kennung);
+        } catch (fehler) {
+            await Inhalte.eintragen({ ...grundzeile, status: 'fehlgeschlagen', fehler: fehler.message });
+            ergebnis.fehlgeschlagen.push({ kennung: p.kennung, fassung: p.fassung, fehler: fehler.message });
+            continue;
+        }
+
         await Inhalte.eintragen({ ...grundzeile, status: 'geplant' });
 
-        const ziel = zielFuer(inhalt, art);
         const antwort = await ipmServer.sendCommand(daemonId, 'gameserver.content.fetch', {
             server_id:     String(server.id),
             rootserver_id: String(server.rootserver_id),
@@ -421,6 +435,15 @@ async function entferneDateien({ server, zeile, inhalt = null }) {
     const daemonId = await daemonVon(dbService, server);
     if (!daemonId || !ipmServer?.isDaemonOnline(daemonId)) {
         return { bestaetigt: 0, gesamt: dateien.length, blieb: dateien, ohneListe: false };
+    }
+
+    // Ordner je Mod (Stufe 10 S2): Der Ordner gehört nur diesem Mod und geht
+    // zuletzt mit — sonst bliebe nach jedem Entfernen ein leeres
+    // `FactoryGame/Mods/<Mod>/` samt Unterordnern liegen. Nur mit Paket: Ohne
+    // `inhalt` ist nicht sicher, ob der Ordner geteilt ist.
+    const pfad = !inhalt ? '' : zeile.art === Inhalte.ART_LADER ? (inhalt.loader?.path || '') : (inhalt.path || '');
+    if (Inhalte.jeMod(pfad)) {
+        try { dateien = [...dateien, Inhalte.ablageFuer(pfad, zeile.kennung)]; } catch { /* kein gültiger Ordnername: nur die Dateien */ }
     }
 
     let bestaetigt = 0;

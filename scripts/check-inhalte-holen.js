@@ -37,6 +37,17 @@ const INHALT = {
     needs_restart: true,
 };
 
+// Satisfactory-artig: ein Ordner je Mod (Stufe 10 S2), der Lader in einem festen.
+const INHALT_JE_MOD = {
+    supported: true,
+    sources: ['upload', 'thunderstore'],
+    source_ids: { thunderstore: 'satisfactory' },
+    loader: { key: 'sml', path: 'game/FactoryGame/Mods/SML', packages: { thunderstore: 'SML' } },
+    path: 'game/FactoryGame/Mods/{{content:key}}',
+    client_side: true,
+    needs_restart: true,
+};
+
 // ── Attrappen ───────────────────────────────────────────────────────────────
 const db = {
     zeilen: [],          // gameserver_content
@@ -74,7 +85,7 @@ const db = {
         // beim Anlegen (über packages) — die Modsuche stellt die zweite.
         if (/FROM gameservers gs\s+JOIN packages pk/.test(sql) || /FROM packages pk\s+LEFT JOIN package_versions pv/.test(sql)) {
             return [{ paket_slug: 'valheim', paket_version: '1.0.10', paket_channel: 'test',
-                      paket_json: JSON.stringify({ identity: { slug: 'valheim' }, content: INHALT }) }];
+                      paket_json: JSON.stringify({ identity: { slug: 'valheim' }, content: db.inhaltErsatz || INHALT }) }];
         }
         if (/SELECT \*(, DATE_FORMAT)?[\s\S]*?FROM gameserver_content\s+WHERE id = \? AND server_id = \?/.test(sql)
             || /SELECT \* FROM gameserver_content WHERE id = \? AND server_id = \?/.test(sql)) {
@@ -103,6 +114,7 @@ const db = {
 
 const daemon = {
     abrufe: [],          // gameserver.content.fetch
+    hochgeladen: [],     // gameserver.content.install
     geloescht: [],       // gameserver.files.delete
     gelistet: [], gelesen: [], logInhalt: '', logFehlt: false,
     scheitern: new Set(),
@@ -115,6 +127,11 @@ const daemon = {
             }
             const wurzel = nutzlast.ziel ? nutzlast.ziel + '/' : '';
             return { success: true, data: { dateien: [wurzel + 'A.dll', wurzel + 'B.dll'] } };
+        }
+        // Hochladen (Stufe 10 S2): nur was ankam, nicht was es tut.
+        if (befehl === 'gameserver.content.install') {
+            this.hochgeladen.push(nutzlast);
+            return { success: true, data: { dateien: [(nutzlast.ziel ? nutzlast.ziel + '/' : '') + nutzlast.dateiname] } };
         }
         if (befehl === 'gameserver.files.delete') {
             this.geloescht.push(nutzlast.path);
@@ -164,8 +181,8 @@ const JOTUNN  = { kennung: 'ValheimModding-Jotunn', name: 'Jotunn', fassung: '2.
 
 let bestanden = 0;
 async function pruefe(name, fn) {
-    db.zeilen = []; daemon.abrufe = []; daemon.geloescht = []; daemon.scheitern = new Set(); db.serverStatus = null;
-    daemon.gelistet = []; daemon.gelesen = []; daemon.logInhalt = ''; daemon.logFehlt = false;
+    db.zeilen = []; daemon.abrufe = []; daemon.geloescht = []; daemon.scheitern = new Set(); db.serverStatus = null; db.inhaltErsatz = null;
+    daemon.gelistet = []; daemon.gelesen = []; daemon.logInhalt = ''; daemon.logFehlt = false; daemon.hochgeladen = [];
     try {
         await fn();
         console.log(`  ✓ ${name}`);
@@ -204,6 +221,30 @@ async function pruefe(name, fn) {
         assert.strictEqual(daemon.abrufe.length, 2);
         assert.ok(!('sha256' in daemon.abrufe[0]), 'ohne Prüfsumme am Paket darf keine mitgehen');
         assert.strictEqual(daemon.abrufe[1].sha256, 'ab'.repeat(32));
+    });
+
+    // ── Ordner je Mod (Stufe 10 S2, 2026-10-27) ─────────────────────────────
+    //
+    // Satisfactory: Eine `.smod` IST der Plugin-Ordner. In einen gemeinsamen
+    // Ordner ausgepackt laegen die `.uplugin` aller Mods uebereinander.
+    await pruefe('Ordner je Mod: jeder Mod in seinen eigenen, der Lader in seinen festen', async () => {
+        stelleThunderstore([
+            { kennung: 'SML', name: 'SML', fassung: '3.12.0', adresse: BEPINEX.adresse, bytes: 1 },
+            { kennung: 'PowerChecker', name: 'Power Checker', fassung: '2.4.10', adresse: JOTUNN.adresse, bytes: 1 },
+        ]);
+        await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT_JE_MOD, guildId: 'g1',
+            quelle: 'thunderstore', kennung: 'PowerChecker' });
+        assert.deepStrictEqual(daemon.abrufe.map(a => a.ziel), ['game/FactoryGame/Mods/SML', 'game/FactoryGame/Mods/PowerChecker']);
+    });
+
+    await pruefe('Ordner je Mod: eine Kennung, die kein Ordnername sein kann, scheitert vor dem Daemon — mit Grund', async () => {
+        stelleThunderstore([{ kennung: '../boese', name: 'Böse', fassung: '1.0.0', adresse: JOTUNN.adresse, bytes: 1 }]);
+        const e = await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT_JE_MOD, guildId: 'g1',
+            quelle: 'thunderstore', kennung: '../boese' });
+        assert.strictEqual(daemon.abrufe.length, 0, 'ein halber Pfad ging an den Daemon');
+        assert.strictEqual(e.fehlgeschlagen.length, 1);
+        assert.match(e.fehlgeschlagen[0].fehler, /taugt nicht als Ordnername/);
+        assert.strictEqual(db.zeilen[0].status, 'fehlgeschlagen');
     });
 
     // ── Der Fund vom 2026-09-13 (Server 189) ────────────────────────────────
@@ -408,6 +449,19 @@ async function pruefe(name, fn) {
         assert.deepStrictEqual(daemon.geloescht, ['/BepInEx/plugins/Alt.dll']);
     });
 
+    await pruefe('Ordner je Mod: Entfernen nimmt den Ordner des Mods zuletzt mit — ohne Paket nicht', async () => {
+        const zeile = { art: 'mod', kennung: 'PowerChecker', ablage: 'game/FactoryGame/Mods/PowerChecker',
+            dateien: JSON.stringify(['game/FactoryGame/Mods/PowerChecker/PowerChecker.uplugin']) };
+        await InhalteHolen.entferneDateien({ server: SERVER, zeile, inhalt: INHALT_JE_MOD });
+        assert.deepStrictEqual(daemon.geloescht, ['/game/FactoryGame/Mods/PowerChecker/PowerChecker.uplugin', '/game/FactoryGame/Mods/PowerChecker']);
+        daemon.geloescht = [];
+        await InhalteHolen.entferneDateien({ server: SERVER, zeile, inhalt: null });
+        assert.deepStrictEqual(daemon.geloescht, ['/game/FactoryGame/Mods/PowerChecker/PowerChecker.uplugin'], 'ohne Paket ist nicht sicher, dass der Ordner ihm allein gehört');
+        daemon.geloescht = [];
+        await InhalteHolen.entferneDateien({ server: SERVER, zeile: { ...zeile, ablage: 'BepInEx/plugins' }, inhalt: INHALT });
+        assert.ok(!daemon.geloescht.some(d => !/\.uplugin$/.test(d)), 'ein gemeinsamer Ordner darf nie mitgehen');
+    });
+
     // ── Die Zahl zaehlt Bestaetigungen, keine Dateien (gemessen 2026-09-14) ─
     //
     // `os.RemoveAll` im Daemon gibt bei einem fehlenden Pfad `nil` zurueck — ein
@@ -488,14 +542,14 @@ async function pruefe(name, fn) {
         assert.ok(schicht, `Route ${methode.toUpperCase()} ${pfad} fehlt`);
         return schicht.route.stack[schicht.route.stack.length - 1].handle;
     }
-    async function rufe(methode, pfad, { params = {}, query = {}, body = {} } = {}) {
+    async function rufe(methode, pfad, { params = {}, query = {}, body = {}, file } = {}) {
         let status = 200, antwort = null;
         const res = {
             locals: { guildId: 'g1' },
             status(s) { status = s; return this; },
             json(o) { antwort = o; return this; },
         };
-        await handlerFuer(methode, pfad)({ params: { serverId: '186', ...params }, query, body }, res);
+        await handlerFuer(methode, pfad)({ params: { serverId: '186', ...params }, query, body, file }, res);
         return { status, antwort };
     }
 
@@ -596,6 +650,23 @@ async function pruefe(name, fn) {
         assert.strictEqual(r.antwort.gestoebert, true, 'ohne Begriff wird gestoebert');
         assert.strictEqual(r.antwort.treffer[0].url,
             'https://thunderstore.io/c/valheim/p/ValheimModding/Jotunn/');
+    });
+
+    await pruefe('Ordner je Mod beim Hochladen: ohne Ordnername abgewiesen, mit ihm dorthin, ein schlechter 400', async () => {
+        db.inhaltErsatz = INHALT_JE_MOD;
+        const datei = { originalname: 'PowerChecker-2.4.10.zip', buffer: Buffer.from('PK') };
+        let r = await rufe('post', '/:serverId/inhalte', { body: { art: 'mod' }, file: datei });
+        assert.strictEqual(r.status, 409);
+        assert.match(r.antwort.message, /eigenen Ordner \(game\/FactoryGame\/Mods\/<Mod>\)/);
+        assert.strictEqual(daemon.hochgeladen.length, 0);
+        r = await rufe('post', '/:serverId/inhalte', { body: { art: 'mod', ordner: '../x' }, file: datei });
+        assert.strictEqual(r.status, 400);
+        assert.strictEqual(daemon.hochgeladen.length, 0);
+        r = await rufe('post', '/:serverId/inhalte', { body: { art: 'mod', ordner: 'PowerChecker' }, file: datei });
+        assert.strictEqual(r.status, 200, JSON.stringify(r.antwort));
+        assert.strictEqual(daemon.hochgeladen[0].ziel, 'game/FactoryGame/Mods/PowerChecker');
+        const liste = await rufe('get', '/:serverId/inhalte');
+        assert.strictEqual(liste.antwort.pfad, 'game/FactoryGame/Mods/<Mod>');
     });
 
     await pruefe('Die Liste eines Servers traegt die Adressen mit', async () => {

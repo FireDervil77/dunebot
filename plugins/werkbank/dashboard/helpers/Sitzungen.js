@@ -21,6 +21,8 @@ const crypto = require('crypto');
 const { ServiceManager } = require('dunebot-core');
 const Paketfassung = require('../../../gameserver/dashboard/helpers/Paketfassung');
 const Quellen = require('../../../gameserver/dashboard/helpers/Quellen');
+// Ordner je Mod (`{{content:key}}`): Platzhalter und Regel stehen dort.
+const Inhalte = require('../../../gameserver/dashboard/helpers/Inhalte');
 const Abruf = require('../../../gameserver/dashboard/helpers/Abruf');
 const Bitmaske = require('../../../gameserver/dashboard/helpers/Bitmaske');
 const Liste = require('../../../gameserver/dashboard/helpers/Liste');
@@ -3880,6 +3882,21 @@ const MODS = {
     max: { pfad: 200, kennung: 80 },
 };
 const RE_MOD_KENNUNG = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+/**
+ * Ordner je Mod (Stufe 10 S2, 2026-10-27): `{{content:key}}` nur als LETZTER
+ * Abschnitt — `game/FactoryGame/Mods/{{content:key}}`. Zurück kommt der Pfad
+ * ohne ihn; den prüfen die üblichen Regeln. Woanders im Pfad wäre er ein Ordner
+ * mit dem Namen des Mods mitten im Baum, und das will kein Spiel.
+ */
+function ohneOrdnerJeMod(pfad, was) {
+    const marke = '/' + Inhalte.PLATZHALTER;
+    const ohne = pfad.endsWith(marke) ? pfad.slice(0, -marke.length) : pfad;
+    if (ohne.includes('{{')) {
+        throw new Error(`${was}: „${Inhalte.PLATZHALTER}" geht nur als letzter Abschnitt (game/FactoryGame/Mods/${Inhalte.PLATZHALTER}) — sonst kein Platzhalter.`);
+    }
+    return ohne;
+}
 /** Hat das Panel diesen Weg? `upload` ist kein Anbieter — da bringt der Betreiber die Datei. */
 const modQuelleAngebunden = (q) => q === 'upload' || Quellen.gibtEs(q);
 
@@ -3910,10 +3927,11 @@ function modsAusFormular(b, hatVarianten) {
     const path = text(b?.path).replace(/\/+$/, '');
     if (path) {
         if (path.length > MODS.max.pfad) throw new Error(`Ablageort: höchstens ${MODS.max.pfad} Zeichen.`);
-        pruefeVolumePfad(path, 'Ablageort');
+        const ohne = ohneOrdnerJeMod(path, 'Ablageort');
+        pruefeVolumePfad(ohne, 'Ablageort');
         // Gemessen am 2026-09-12 an Server 188: ohne „game/" landen die Mods in
         // der Wurzel des Volumes, das Spiel läuft in game/ — und nichts lädt.
-        if (!/^(game|data)\/[^/]/.test(path)) throw new Error('Ablageort: ab der Wurzel des Volumes, also mit „game/" davor (game/BepInEx/plugins) — sonst liegen die Mods neben dem Spiel statt darin.');
+        if (!/^(game|data)\/[^/]/.test(ohne)) throw new Error('Ablageort: ab der Wurzel des Volumes, also mit „game/" davor (game/BepInEx/plugins) — sonst liegen die Mods neben dem Spiel statt darin.');
     }
     const activation = text(b?.activation);
     if (activation && !MODS.aktivierung.includes(activation)) throw new Error(`Aktivierung: ${MODS.aktivierung.join(', ')}.`);
@@ -4026,8 +4044,9 @@ function laderAusFormular(b) {
     const path = text(b?.path).replace(/\/+$/, '');
     if (path) {
         if (path.length > LADER.max.pfad) throw new Error(`Mod-Lader, Ordner: höchstens ${LADER.max.pfad} Zeichen.`);
-        pruefeVolumePfad(path, 'Mod-Lader, Ordner');
-        if (!/^(game|data)(\/|$)/.test(path)) throw new Error('Mod-Lader, Ordner: ab der Wurzel des Volumes — für ein Spiel, das aus game/ startet, also „game".');
+        const ohne = ohneOrdnerJeMod(path, 'Mod-Lader, Ordner');
+        pruefeVolumePfad(ohne, 'Mod-Lader, Ordner');
+        if (!/^(game|data)(\/|$)/.test(ohne)) throw new Error('Mod-Lader, Ordner: ab der Wurzel des Volumes — für ein Spiel, das aus game/ startet, also „game".');
     }
     const log = text(b?.log);
     if (log) {
