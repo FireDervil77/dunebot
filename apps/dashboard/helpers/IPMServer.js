@@ -462,6 +462,34 @@ class IPMServer {
         };
     }
 
+    /**
+     * Die Server-Registry für die Anmeldeantwort — beide Wege (Wiederanmeldung,
+     * Erstanmeldung) aus einer Stelle.
+     *
+     * Zahlen als Zahlen: `ROUND(… / 1024.0, 2)` ist DECIMAL und kommt aus mysql2
+     * als Text. Der Daemon liest `ram_limit_gb` als Zahl und schrieb deshalb
+     * bei jedem Server „RAM: 0.0GB" ins Log (gemessen 2026-10-27 an Rootserver
+     * 55, eingetragen waren 8–16 GB). Gelesen wird der Wert dort bisher nur für
+     * diese Logzeile — eine Logzeile, die lügt, schickt trotzdem auf die
+     * falsche Spur.
+     * @private
+     */
+    async _serverRegistry(rootserverId) {
+        const zeilen = await this.dbService.query(
+            `SELECT id AS server_id, name,
+                    ROUND(allocated_ram_mb / 1024.0, 2) AS ram_limit_gb,
+                    allocated_disk_gb AS disk_limit_gb
+             FROM gameservers
+             WHERE rootserver_id = ?`,
+            [rootserverId]
+        );
+        return (zeilen || []).map(z => ({
+            ...z,
+            ram_limit_gb:  z.ram_limit_gb  === null ? null : Number(z.ram_limit_gb),
+            disk_limit_gb: z.disk_limit_gb === null ? null : Number(z.disk_limit_gb),
+        }));
+    }
+
     async _handleRegister(ws, payload, clientIp) {
         const { token, daemon_id, version, hardware, sftp_fingerprint, sftp_port, sftp_grund,
                 abruf_port, base_directory } = payload;
@@ -526,14 +554,7 @@ class IPMServer {
                     await this._logDaemonEvent(daemon_id, 'reconnected', { version });
                     
                     // Server-Registry für diesen RootServer laden
-                    const reconnectServers = await this.dbService.query(
-                        `SELECT id AS server_id, name,
-                                ROUND(allocated_ram_mb / 1024.0, 2) AS ram_limit_gb,
-                                allocated_disk_gb AS disk_limit_gb
-                         FROM gameservers
-                         WHERE rootserver_id = ?`,
-                        [daemon.id]
-                    );
+                    const reconnectServers = await this._serverRegistry(daemon.id);
                     
                     ws.send(JSON.stringify({ 
                         type: 'registered', 
@@ -640,14 +661,7 @@ class IPMServer {
             await this._logDaemonEvent(daemon_id, 'first_registration', { version });
 
             // Server-Registry für diesen RootServer laden (kann leer sein bei Erst-Registrierung)
-            const firstRegServers = await this.dbService.query(
-                `SELECT id AS server_id, name,
-                        ROUND(allocated_ram_mb / 1024.0, 2) AS ram_limit_gb,
-                        allocated_disk_gb AS disk_limit_gb
-                 FROM gameservers
-                 WHERE rootserver_id = ?`,
-                [rootserverByToken.id]
-            );
+            const firstRegServers = await this._serverRegistry(rootserverByToken.id);
 
             ws.send(JSON.stringify({ 
                 type: 'registered', 
