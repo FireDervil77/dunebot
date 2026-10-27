@@ -81,7 +81,7 @@ class RootServer {
                 data.fqdn          || null,
                 data.fastdlEnabled ? 1 : 0,
                 // Absicht, nicht Fähigkeit: `db_moeglich` setzt ausschliesslich
-                // der Maschinenbefund beim Verbinden des Daemons.
+                // der Zustand des Containers fb-datenbank (uebernimmDatenbank).
                 data.dbGewuenscht  ? 1 : 0,
                 Number.isFinite(data.dbJeServer) ? data.dbJeServer : 0,
                 // SFTP für externe Programme — Absicht wie oben (2026-10-27).
@@ -154,7 +154,9 @@ class RootServer {
             // Nachträglich änderbar (2026-10-27): Der Wizard läuft auf einer
             // eingerichteten Maschine nicht mehr — der Befund sagt dann, was
             // in der daemon.yaml noch zu tun ist.
-            'sftp_gewuenscht', 'sftp_port_wunsch'
+            'sftp_gewuenscht', 'sftp_port_wunsch',
+            // Datenbanken: Wunsch und Grenze, änderbar seit Stufe 11 (2026-10-27).
+            'db_gewuenscht', 'db_je_server'
         ];
         const fields = [];
         const values = [];
@@ -395,20 +397,40 @@ class RootServer {
         return s;
     }
 
+    /**
+     * Zustand des Datenbank-Containers übernehmen (Stufe 11, 2026-10-27) —
+     * aus der Anmeldung und aus dem Ereignis `datenbank.befund`.
+     *
+     * @param {string} daemonId
+     * @param {object|null} zustand  null = Daemon ohne Datenbank-Teil
+     */
+    static async uebernimmDatenbank(daemonId, zustand) {
+        const dbService = ServiceManager.get('dbService');
+        const M = require('../helpers/Maschinenbefund');
+        const [zeile] = await dbService.query('SELECT db_gewuenscht FROM rootserver WHERE daemon_id = ?', [daemonId]);
+        if (!zeile) return null;
+        const d = M.leiteDatenbankAb(!!zeile.db_gewuenscht, zustand || null);
+        await dbService.query('UPDATE rootserver SET db_moeglich = ?, db_grund = ? WHERE daemon_id = ?',
+            [d.moeglich, d.grund, daemonId]);
+        return d;
+    }
+
     static async uebernimmMaschinenbefund(daemonId, befund, gesehenIp) {
         const dbService = ServiceManager.get('dbService');
         const M = require('../helpers/Maschinenbefund');
 
         // Die Absicht steht schon in der Zeile — sie kommt aus dem Formular.
         const [zeile] = await dbService.query(
-            'SELECT id, host, fqdn, fastdl_enabled, db_gewuenscht FROM rootserver WHERE daemon_id = ?',
+            'SELECT id, host, fqdn, fastdl_enabled FROM rootserver WHERE daemon_id = ?',
             [daemonId]
         );
         if (!zeile) return null;
 
         const name   = await M.pruefeNamen(zeile.fqdn, gesehenIp, zeile.host);
         const fastdl = M.leiteFastdlAb(!!zeile.fastdl_enabled, befund && befund.webserver);
-        const db     = M.leiteDatenbankAb(!!zeile.db_gewuenscht, befund && befund.datenbank);
+        // Datenbanken nicht mehr hier: `befund.datenbank` ist die MySQL der
+        // Maschine, die kein Spiel erreicht. db_moeglich schreibt allein
+        // uebernimmDatenbank (Container fb-datenbank, Stufe 11).
 
         await dbService.query(
             `UPDATE rootserver SET
@@ -421,9 +443,7 @@ class RootServer {
                 fqdn_gilt        = ?,
                 fqdn_grund       = ?,
                 fastdl_moeglich  = ?,
-                fastdl_grund     = ?,
-                db_moeglich      = ?,
-                db_grund         = ?
+                fastdl_grund     = ?
              WHERE daemon_id = ?`,
             [
                 M.nackteIp(gesehenIp),
@@ -435,13 +455,11 @@ class RootServer {
                 name.grund,
                 fastdl.moeglich,
                 fastdl.grund,
-                db.moeglich,
-                db.grund,
                 daemonId,
             ]
         );
 
-        return { name, fastdl, db, hardwareBelastbar: M.hardwareIstBelastbar(befund?.virtualisierung) };
+        return { name, fastdl, hardwareBelastbar: M.hardwareIstBelastbar(befund?.virtualisierung) };
     }
 
     /**

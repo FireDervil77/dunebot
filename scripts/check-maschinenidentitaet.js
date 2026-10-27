@@ -102,7 +102,7 @@ function pruefe(bedingung, was, zusatz = '') {
         pruefe(b1.db_moeglich === 0, 'Datenbanken sind nicht möglich', b1.db_grund);
         pruefe(b1.virtualisierung === 'kvm', 'Die Virtualisierung ist festgehalten');
 
-        console.log('\n▸ 3. Dieselbe Maschine, aber mit nginx und laufendem MySQL');
+        console.log('\n▸ 3. Dieselbe Maschine, aber mit nginx und laufendem MySQL — dann mit Container');
         await RootServer.uebernimmMaschinenbefund(angelegt.daemonId, {
             virtualisierung: 'lxc',
             webserver: { art: 'nginx', installiert: true, laeuft: true, port80_belegt: true, grund: 'nginx läuft' },
@@ -113,7 +113,13 @@ function pruefe(bedingung, was, zusatz = '') {
             'SELECT fastdl_moeglich, fastdl_grund, db_moeglich, db_grund FROM rootserver WHERE id = ?',
             [angelegt.id]);
         pruefe(n2[0].fastdl_moeglich === 1, 'Jetzt ist FastDL möglich', n2[0].fastdl_grund);
-        pruefe(n2[0].db_moeglich === 1, 'Jetzt sind Datenbanken möglich', n2[0].db_grund);
+        // Seit Stufe 11 (2026-10-27) macht die MySQL der MASCHINE nichts mehr
+        // möglich — kein Spiel erreicht sie. Möglich heißt: der Container läuft.
+        pruefe(n2[0].db_moeglich === 0, 'Eine laufende Host-MySQL macht Datenbanken NICHT möglich', n2[0].db_grund);
+        await RootServer.uebernimmDatenbank(angelegt.daemonId,
+            { laeuft: true, fassung: '11.4.13-MariaDB', adresse: 'fb-datenbank:3306' });
+        const [n3] = await conn.query('SELECT db_moeglich, db_grund FROM rootserver WHERE id = ?', [angelegt.id]);
+        pruefe(n3[0].db_moeglich === 1, 'Mit laufendem Container fb-datenbank sind Datenbanken möglich', n3[0].db_grund);
 
         console.log('\n▸ 4. Die Adresse zeigt nie einen ungeprüften Namen (M-1)');
         const ports = JSON.stringify({ game: { external: 25002 } });

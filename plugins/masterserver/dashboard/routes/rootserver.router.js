@@ -228,6 +228,9 @@ router.post('/', requirePermission('MASTERSERVER.ROOTSERVER.CREATE'), async (req
         // Spielports gibt es beim Anlegen noch nicht — der Bereich wird danach vergeben.
         const sftpPortFehler = Maschinenbefund.sftpPortFehler(sftpPort, null);
         if (sftpPortFehler) return res.status(400).json({ success: false, message: sftpPortFehler });
+        const dbAnlegen = dbGewuenscht === 'true' || dbGewuenscht === true;
+        const dbFehlerAnlegen = dbGrenzeFehler(dbAnlegen, dbJeServer ?? 0);
+        if (dbFehlerAnlegen) return res.status(400).json({ success: false, message: dbFehlerAnlegen });
 
         // ✅ Auto-Generated Values (NEW Format - gs-guild_ Prefix!)
         // WICHTIG: Guild-ID auf 10 Zeichen kürzen (Linux Username Limit bei System-Usern)
@@ -250,8 +253,8 @@ router.post('/', requirePermission('MASTERSERVER.ROOTSERVER.CREATE'), async (req
             fastdlEnabled: fastdlEnabled === 'true' || fastdlEnabled === true,
             // Datenbanken: Wunsch und Grenze. Ob es geht, entscheidet der Befund
             // der Maschine — nicht dieses Häkchen.
-            dbGewuenscht: dbGewuenscht === 'true' || dbGewuenscht === true,
-            dbJeServer: Math.max(0, parseInt(dbJeServer, 10) || 0),
+            dbGewuenscht: dbAnlegen,
+            dbJeServer: Number(dbJeServer ?? 0),
             // SFTP für externe Programme (2026-10-27): Wunsch, geht an den Wizard.
             sftpGewuenscht: sftpGewuenscht === 'true' || sftpGewuenscht === true,
             sftpPortWunsch: String(sftpPort ?? '').trim() ? Number(sftpPort) : null,
@@ -469,6 +472,52 @@ async function sftpAnwenden(rootserverId) {
     }
 }
 
+/**
+ * Datenbank-Wunsch an den verbundenen Daemon (`datenbank.anwenden`, Stufe 11).
+ *
+ * Anders als bei SFTP wartet die Route nicht auf das Ergebnis: Das erste
+ * Einschalten holt ein Image und wartet die Ersteinrichtung ab. Der Daemon
+ * nimmt sofort an, der Zustand kommt als Ereignis `datenbank.befund`
+ * (IPMServer → RootServer.uebernimmDatenbank). Bis dahin steht hier, was
+ * gerade geschieht — nicht der alte Stand.
+ *
+ * @returns {Promise<string>} ein Satz für die Rückmeldung
+ */
+async function datenbankAnwenden(rootserverId) {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    const neu = await RootServer.getById(rootserverId);
+    const an = !!neu?.db_gewuenscht;
+    const setze = (grund) => dbService.query(
+        'UPDATE rootserver SET db_moeglich = 0, db_grund = ? WHERE id = ?', [grund, rootserverId]);
+    const ipm = ServiceManager.has('ipmServer') ? ServiceManager.get('ipmServer') : null;
+    if (!neu?.daemon_id || !ipm?.isDaemonOnline(neu.daemon_id)) {
+        await setze(an ? 'Gewünscht — gilt, sobald der Daemon sich wieder anmeldet.' : 'Nicht angefordert.');
+        return 'gilt, sobald der Daemon sich wieder anmeldet';
+    }
+    try {
+        await ipm.sendCommand(neu.daemon_id, 'datenbank.anwenden', { an }, 15000);
+        await setze(an ? 'Gewünscht — der Daemon richtet den Container fb-datenbank gerade ein.' : 'Nicht angefordert.');
+        return an ? 'der Daemon richtet den Container ein, der Stand erscheint unter „Datenbanken"' : 'der Daemon stoppt den Container, die Daten bleiben erhalten';
+    } catch (fehler) {
+        // Ein Daemon vor 1.0.140 kennt den Befehl nicht.
+        Logger.warn(`[Masterserver] Datenbanken nicht angewendet (Rootserver ${rootserverId}): ${fehler.message}`);
+        await setze(an ? `Gewünscht, noch nicht angewendet: ${String(fehler.message).slice(0, 150)}` : 'Nicht angefordert.');
+        return `noch nicht angewendet (${fehler.message})`;
+    }
+}
+
+/**
+ * Datenbanken je Gameserver: eine ganze Zahl von 0 bis 20; mit Häkchen
+ * mindestens 1. Gibt den Fehler in einem Satz zurück oder null.
+ */
+function dbGrenzeFehler(gewuenscht, jeServer) {
+    const n = Number(String(jeServer ?? '').trim());
+    if (!Number.isInteger(n) || n < 0 || n > 20) return 'Datenbanken je Gameserver: eine ganze Zahl von 0 bis 20.';
+    if (gewuenscht && n < 1) return 'Mit Datenbanken braucht jeder Gameserver mindestens eine.';
+    return null;
+}
+
 router.put('/:id', requirePermission('MASTERSERVER.ROOTSERVER.EDIT'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const guildId = res.locals.guildId;
@@ -486,11 +535,17 @@ router.put('/:id', requirePermission('MASTERSERVER.ROOTSERVER.EDIT'), async (req
         }
 
         const { name, host, daemon_port, hostname, datacenter, country_code, description, ram_total_gb, disk_total_gb,
-                sftp_gewuenscht, sftp_port_wunsch } = req.body;
+                sftp_gewuenscht, sftp_port_wunsch, db_gewuenscht, db_je_server } = req.body;
 
         const portFehler = sftp_port_wunsch === undefined ? null
             : Maschinenbefund.sftpPortFehler(sftp_port_wunsch, await spielportBereich(rootserver.id));
         if (portFehler) return res.status(400).json({ success: false, message: portFehler });
+
+        // Datenbanken: Fehlt das Häkchen im Formular (älteres Formular), bleibt alles, wie es ist.
+        const dbAn = db_gewuenscht === undefined ? undefined : (db_gewuenscht === 'true' || db_gewuenscht === true);
+        const dbFehler = dbAn === undefined ? null
+            : dbGrenzeFehler(dbAn, db_je_server === undefined ? rootserver.db_je_server : db_je_server);
+        if (dbFehler) return res.status(400).json({ success: false, message: dbFehler });
 
         // RootServer aktualisieren
         await RootServer.update(rootserverId, {
@@ -508,17 +563,24 @@ router.put('/:id', requirePermission('MASTERSERVER.ROOTSERVER.EDIT'), async (req
                 : (sftp_gewuenscht === 'true' || sftp_gewuenscht === true ? 1 : 0),
             sftp_port_wunsch: sftp_port_wunsch === undefined ? undefined
                 : (String(sftp_port_wunsch).trim() ? Number(sftp_port_wunsch) : null),
+            db_gewuenscht: dbAn === undefined ? undefined : (dbAn ? 1 : 0),
+            db_je_server:  dbAn === undefined || db_je_server === undefined ? undefined : Number(db_je_server),
         });
 
         // SFTP sofort anwenden, nicht erst bei der nächsten Anmeldung (2026-10-27):
         // Der Daemon startet, stoppt oder verlegt den Dienst samt Firewall-Regel.
         const sftpMeldung = await sftpAnwenden(rootserver.id);
+        // Datenbanken nur, wenn sich das Häkchen änderte: Ein zweites
+        // „an" täte nichts, setzte aber den Grund kurz auf „wird eingerichtet".
+        const dbMeldung = dbAn !== undefined && (dbAn ? 1 : 0) !== (rootserver.db_gewuenscht ? 1 : 0)
+            ? await datenbankAnwenden(rootserver.id) : null;
 
         Logger.info(`[Masterserver] RootServer updated: ${rootserverId}`);
 
         res.json({
             success: true,
             message: 'RootServer erfolgreich aktualisiert' + (sftpMeldung ? ' — SFTP: ' + sftpMeldung : '')
+                + (dbMeldung ? ' — Datenbanken: ' + dbMeldung : '')
         });
 
     } catch (error) {

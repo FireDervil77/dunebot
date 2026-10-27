@@ -127,31 +127,36 @@ function leiteFastdlAb(gewuenscht, webserver) {
 }
 
 /**
- * Datenbanken: gleiche Bauart wie FastDL.
+ * Datenbanken (Stufe 11, 2026-10-27): Wunsch gegen den Zustand des Containers
+ * `fb-datenbank`, den der Daemon (ab 1.0.140) bei jeder Anmeldung und nach
+ * `datenbank.anwenden` meldet.
  *
- * Ein vorhandenes, aber uns unbekanntes MySQL ist ausdrücklich KEIN Hindernis —
- * es wird nur nicht angefasst. Ein eigenes Konto entsteht daneben, wenn es
- * gebraucht wird (M-5).
+ * Bis dahin stand hier, ob auf der MASCHINE ein MySQL läuft. Das war die
+ * falsche Frage: Die lauscht nur auf 127.0.0.1, kein Spiel im Docker-Netz kam
+ * an sie heran — „möglich" stand da, gegangen ist nichts.
+ *
+ * @param {boolean} gewuenscht
+ * @param {{laeuft:boolean, fassung?:string, adresse?:string, grund?:string}|null} zustand
+ *        null = der Daemon kennt den Container nicht (Fassung vor 1.0.140)
  */
-function leiteDatenbankAb(gewuenscht, datenbank) {
+function leiteDatenbankAb(gewuenscht, zustand) {
     if (!gewuenscht) {
         return { moeglich: 0, grund: 'Nicht angefordert.' };
     }
-    if (!datenbank) {
-        return { moeglich: 0, grund: 'Die Maschine hat noch nichts gemeldet.' };
+    if (!zustand || typeof zustand !== 'object') {
+        return { moeglich: 0, grund: 'Gewünscht, der Daemon kennt den Datenbank-Container aber noch nicht (ab Daemon 1.0.140).' };
     }
-    if (datenbank.laeuft) {
-        return {
-            moeglich: 1,
-            grund: datenbank.bekannt
-                ? 'MySQL läuft, Zugangsdaten sind hinterlegt.'
-                : 'MySQL läuft. Ein eigenes Konto wird angelegt, das vorhandene bleibt unberührt.',
-        };
+    if (zustand.laeuft) {
+        const fassung = zustand.fassung ? ` (MariaDB ${String(zustand.fassung).split('-')[0]})` : '';
+        return { moeglich: 1, grund: `Container fb-datenbank läuft${fassung}, Spiele erreichen ihn als ${zustand.adresse || 'fb-datenbank:3306'}.` };
     }
-    if (datenbank.vorhanden) {
-        return { moeglich: 0, grund: 'MySQL ist installiert, läuft aber nicht.' };
+    // Die Anmeldung trägt den Stand VOR dem Anwenden. „nicht eingerichtet",
+    // „gestoppt" oder „abgeschaltet" heißt bei gewünschten Datenbanken: Der
+    // Daemon richtet ihn gerade ein — das Ergebnis kommt als Ereignis.
+    if (/^(nicht eingerichtet|gestoppt|abgeschaltet|noch nicht gemessen)/.test(String(zustand.grund || ''))) {
+        return { moeglich: 0, grund: 'Gewünscht — der Daemon richtet den Container fb-datenbank gerade ein.' };
     }
-    return { moeglich: 0, grund: 'Kein MySQL/MariaDB auf dieser Maschine.' };
+    return { moeglich: 0, grund: `Gewünscht, läuft aber nicht: ${String(zustand.grund || 'ohne Angabe').slice(0, 200)}` };
 }
 
 /**

@@ -546,6 +546,23 @@ sudo journalctl -u firebot-daemon -n 50</code></pre>
                                 <label>Beschreibung</label>
                                 <textarea class="form-control" name="description" rows="2"><%= rootserver.description || '' %></textarea>
                             </div>
+                            <%# Datenbanken (Stufe 11, 2026-10-27) — dieselbe Bauart wie SFTP. %>
+                            <div class="row">
+                                <div class="col-md-8 mb-3">
+                                    <input type="hidden" name="db_gewuenscht" value="false">
+                                    <div class="form-check form-switch">
+                                        <input type="checkbox" class="form-check-input" id="editDb" name="db_gewuenscht" value="true" onchange="var n=document.getElementById('editDbJeServer'); if (this.checked && Number(n.value) < 1) n.value = 1;" <%= rootserver.db_gewuenscht ? 'checked' : '' %>>
+                                        <label class="form-check-label" for="editDb">Datenbanken für Gameserver anbieten</label>
+                                    </div>
+                                    <small class="form-text text-secondary">
+                                        Der Daemon richtet dafür einen eigenen MariaDB-Container ein (etwa 200 MB RAM, einmal je Maschine), erreichbar nur für die Spiele. Ausschalten stoppt ihn, die Daten bleiben erhalten.
+                                    </small>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="editDbJeServer">Datenbanken je Gameserver</label>
+                                    <input type="number" class="form-control" id="editDbJeServer" name="db_je_server" min="0" max="20" step="1" value="<%= Number(rootserver.db_je_server) || 0 %>">
+                                </div>
+                            </div>
                             <%# SFTP für externe Programme (2026-10-27). Das versteckte Feld steht
                                 VOR dem Kästchen: Ohne Haken fehlt das Kästchen in FormData, und
                                 „aus" wäre nicht von „nicht geschickt" zu unterscheiden. %>

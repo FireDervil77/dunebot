@@ -274,6 +274,17 @@ class IPMServer {
                         
                         this.Logger.info(`[IPMServer] Daemon ${daemonId} registriert (Guild: ${result.metadata.guild_id}, Connections: ${currentConnections + 1}/${this.maxConnectionsPerDaemon})`);
 
+                        // Datenbank-Container (Stufe 11): auch ohne Feld — ein
+                        // Daemon vor 1.0.140 kennt ihn nicht, und genau das
+                        // steht dann am Rootserver statt eines alten „möglich".
+                        // VOR dem Maschinenbefund (DNS-Prüfung, Sekunden): Das
+                        // Ereignis `datenbank.befund` nach dem Anwenden darf
+                        // nicht von diesem älteren Stand überschrieben werden.
+                        if (message.payload) {
+                            await RootServer.uebernimmDatenbank(daemonId, message.payload.datenbank || null)
+                                .catch(e => this.Logger.warn(`[IPMServer] Datenbank-Befund für ${daemonId} nicht übernommen: ${e.message}`));
+                        }
+
                         // ── Maschinenbefund übernehmen (M-1 bis M-6) ────────
                         //
                         // Hier und nicht im Heartbeat: Virtualisierung,
@@ -306,6 +317,7 @@ class IPMServer {
                                 this.Logger.error('[IPMServer] Maschinenbefund konnte nicht übernommen werden', error);
                             }
                         }
+
                         
                         // ✅ RE-TRIGGER: Gameserver mit Status 'installing' erneut senden (NACH Connection-Registrierung!)
                         if (result.isReconnect) {
@@ -1934,6 +1946,14 @@ class IPMServer {
                 port: payload?.sftp_port || null, grund: payload?.sftp_grund || null,
                 fingerabdruck: payload?.sftp_fingerprint || null,
             });
+        });
+
+        // Datenbank-Container nach dem Anwenden des Wunsches (Daemon,
+        // datenbank.Steuerung, Stufe 11): kommt nach `datenbank.anwenden` immer,
+        // nach der Anmeldung nur, wenn sich etwas änderte.
+        eventRouter.register('datenbank', 'befund', async (payload, message, context) => {
+            if (!context?.daemonId) return;
+            await RootServer.uebernimmDatenbank(context.daemonId, payload?.datenbank || null);
         });
 
         // ✅ Handler für install.status (granulare Phasen: pulling_image, installing_game, cleanup)
