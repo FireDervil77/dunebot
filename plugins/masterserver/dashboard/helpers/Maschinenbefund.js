@@ -173,11 +173,35 @@ function leiteSftpAb(gewuenscht, port, grund) {
             : { moeglich: 0, grund: 'Nicht angefordert.' };
     }
     if (p) return { moeglich: 1, grund: `Läuft auf Port ${p}.` };
+    // Seit der Daemon den Wunsch selbst umsetzt (sftp.Steuerung), heißt
+    // „abgeschaltet" bei gewünschtem SFTP: Er hat ihn noch nicht bekommen —
+    // nicht neu angemeldet, oder eine Fassung vor der Steuerung.
     if (/abgeschaltet/.test(String(grund || ''))) {
-        return { moeglich: 0, grund: 'Gewünscht, aber in der daemon.yaml aus — dort „sftp: enabled: true" setzen, den Daemon neu starten und 2022/tcp freigeben.' };
+        return { moeglich: 0, grund: 'Gewünscht, der Daemon hat es aber noch nicht übernommen — er tut es bei der nächsten Anmeldung (ab Daemon 1.0.139).' };
     }
     if (grund) return { moeglich: 0, grund: `Gewünscht, läuft aber nicht: ${String(grund).slice(0, 180)}` };
     return { moeglich: 0, grund: 'Gewünscht, aber der Daemon meldet keinen SFTP-Server (ältere Fassung sagt nicht, warum).' };
+}
+
+/** Ports, die SFTP nie bekommt — dieselbe Liste prüft der Daemon (sftp.Steuerung). */
+const SFTP_GESPERRT = { 22: 'SSH', 80: 'Web', 443: 'Web', 3306: 'MySQL', 9340: 'Daemon', 9350: 'Sicherungsabruf' };
+
+/**
+ * Taugt dieser Port für SFTP? Leer = Vorgabe 2022. Gibt den Fehler in einem
+ * Satz zurück oder null.
+ *
+ * @param {string|number|null} wert
+ * @param {{von: number, bis: number}|null} spielports  der Bereich, aus dem die Maschine Spielports vergibt
+ */
+function sftpPortFehler(wert, spielports = null) {
+    if (wert === null || wert === undefined || String(wert).trim() === '') return null;
+    const p = Number(String(wert).trim());
+    if (!Number.isInteger(p) || p < 1024 || p > 65535) return 'SFTP-Port: eine ganze Zahl von 1024 bis 65535.';
+    if (SFTP_GESPERRT[p]) return `SFTP-Port ${p} gehört ${SFTP_GESPERRT[p]}.`;
+    if (spielports && p >= spielports.von && p <= spielports.bis) {
+        return `SFTP-Port ${p} liegt im Bereich der Spielports (${spielports.von}–${spielports.bis}).`;
+    }
+    return null;
 }
 
 /**
@@ -199,5 +223,5 @@ module.exports = {
     leiteDatenbankAb,
     hardwareIstBelastbar,
     istRueckschleife,
-    nackteIp, leiteSftpAb
+    nackteIp, leiteSftpAb, sftpPortFehler
 };

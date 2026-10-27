@@ -16,6 +16,15 @@ const router = express.Router();
 const { ServiceManager } = require('dunebot-core');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 const RootServer = require('../models/RootServer');
+const Maschinenbefund = require('../helpers/Maschinenbefund');
+
+/** Der Bereich, aus dem diese Maschine Spielports vergibt — oder null, solange keiner angelegt ist. */
+async function spielportBereich(rootserverId) {
+    if (!rootserverId) return null;
+    const [b] = await ServiceManager.get('dbService').query(
+        'SELECT MIN(port) AS von, MAX(port) AS bis FROM port_allocations WHERE rootserver_id = ?', [rootserverId]);
+    return b && b.von ? { von: Number(b.von), bis: Number(b.bis) } : null;
+}
 const RootServer_getDaemon = async (guildId) => { const rows = await require('../models/RootServer').getByGuild(guildId); const rs = rows[0] || null; if (rs) { rs.status = rs.daemon_status; rs.version = rs.daemon_version; } return rs; };
 
 // Helper: themeManager.renderView() wrapper
@@ -206,7 +215,7 @@ router.post('/', requirePermission('MASTERSERVER.ROOTSERVER.CREATE'), async (req
             datacenter, countryCode,
             fqdn, fastdlEnabled,
             dbGewuenscht, dbJeServer,
-            sftpGewuenscht
+            sftpGewuenscht, sftpPort
         } = req.body;
 
         // Validierung
@@ -216,6 +225,9 @@ router.post('/', requirePermission('MASTERSERVER.ROOTSERVER.CREATE'), async (req
                 message: 'Pflichtfelder fehlen: Name und IP-Adresse'
             });
         }
+        // Spielports gibt es beim Anlegen noch nicht — der Bereich wird danach vergeben.
+        const sftpPortFehler = Maschinenbefund.sftpPortFehler(sftpPort, null);
+        if (sftpPortFehler) return res.status(400).json({ success: false, message: sftpPortFehler });
 
         // ✅ Auto-Generated Values (NEW Format - gs-guild_ Prefix!)
         // WICHTIG: Guild-ID auf 10 Zeichen kürzen (Linux Username Limit bei System-Usern)
@@ -242,6 +254,7 @@ router.post('/', requirePermission('MASTERSERVER.ROOTSERVER.CREATE'), async (req
             dbJeServer: Math.max(0, parseInt(dbJeServer, 10) || 0),
             // SFTP für externe Programme (2026-10-27): Wunsch, geht an den Wizard.
             sftpGewuenscht: sftpGewuenscht === 'true' || sftpGewuenscht === true,
+            sftpPortWunsch: String(sftpPort ?? '').trim() ? Number(sftpPort) : null,
             // Hardware bleibt leer: Der Daemon meldet sie beim ersten Verbinden.
             cpuCores: null,
             cpuThreads: null,
@@ -427,6 +440,35 @@ router.get('/:id', requirePermission('MASTERSERVER.ROOTSERVER.VIEW'), async (req
 // Route: RootServer bearbeiten (PUT)
 // PUT /guild/:guildId/plugins/masterserver/rootservers/:id
 // =====================================================
+/**
+ * SFTP-Wunsch an den verbundenen Daemon (sftp.anwenden) und seinen Befund
+ * übernehmen. Ist er nicht verbunden, geschieht es bei der nächsten Anmeldung
+ * (Absicht) — die Meldung sagt das.
+ *
+ * @returns {Promise<string|null>} ein Satz für die Rückmeldung, oder null bei Daemon ohne SFTP-Teil
+ */
+async function sftpAnwenden(rootserverId) {
+    const Logger = ServiceManager.get('Logger');
+    const neu = await RootServer.getById(rootserverId);
+    const ipm = ServiceManager.has('ipmServer') ? ServiceManager.get('ipmServer') : null;
+    if (!neu?.daemon_id || !ipm?.isDaemonOnline(neu.daemon_id)) {
+        return 'gilt, sobald der Daemon sich wieder anmeldet';
+    }
+    try {
+        const a = await ipm.sendCommand(neu.daemon_id, 'sftp.anwenden',
+            { an: !!neu.sftp_gewuenscht, port: Number(neu.sftp_port_wunsch) || 0 }, 45000);
+        const d = a?.data && typeof a.data === 'object' ? a.data : (a || {});
+        const s = await RootServer.uebernimmSftp(neu.daemon_id, {
+            port: d.sftp_port || null, grund: d.sftp_grund || null, fingerabdruck: d.sftp_fingerprint || null });
+        return s?.grund || null;
+    } catch (fehler) {
+        // Ein Daemon vor der Steuerung kennt den Befehl nicht — dann gilt der
+        // Wunsch bei der nächsten Anmeldung erst mit dem neuen Daemon.
+        Logger.warn(`[Masterserver] SFTP nicht angewendet (Rootserver ${rootserverId}): ${fehler.message}`);
+        return `noch nicht angewendet (${fehler.message})`;
+    }
+}
+
 router.put('/:id', requirePermission('MASTERSERVER.ROOTSERVER.EDIT'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const guildId = res.locals.guildId;
@@ -444,7 +486,11 @@ router.put('/:id', requirePermission('MASTERSERVER.ROOTSERVER.EDIT'), async (req
         }
 
         const { name, host, daemon_port, hostname, datacenter, country_code, description, ram_total_gb, disk_total_gb,
-                sftp_gewuenscht } = req.body;
+                sftp_gewuenscht, sftp_port_wunsch } = req.body;
+
+        const portFehler = sftp_port_wunsch === undefined ? null
+            : Maschinenbefund.sftpPortFehler(sftp_port_wunsch, await spielportBereich(rootserver.id));
+        if (portFehler) return res.status(400).json({ success: false, message: portFehler });
 
         // RootServer aktualisieren
         await RootServer.update(rootserverId, {
@@ -460,13 +506,19 @@ router.put('/:id', requirePermission('MASTERSERVER.ROOTSERVER.EDIT'), async (req
             // Fehlt das Feld, bleibt der Wunsch, wie er ist (älteres Formular).
             sftp_gewuenscht: sftp_gewuenscht === undefined ? undefined
                 : (sftp_gewuenscht === 'true' || sftp_gewuenscht === true ? 1 : 0),
+            sftp_port_wunsch: sftp_port_wunsch === undefined ? undefined
+                : (String(sftp_port_wunsch).trim() ? Number(sftp_port_wunsch) : null),
         });
+
+        // SFTP sofort anwenden, nicht erst bei der nächsten Anmeldung (2026-10-27):
+        // Der Daemon startet, stoppt oder verlegt den Dienst samt Firewall-Regel.
+        const sftpMeldung = await sftpAnwenden(rootserver.id);
 
         Logger.info(`[Masterserver] RootServer updated: ${rootserverId}`);
 
         res.json({
             success: true,
-            message: 'RootServer erfolgreich aktualisiert'
+            message: 'RootServer erfolgreich aktualisiert' + (sftpMeldung ? ' — SFTP: ' + sftpMeldung : '')
         });
 
     } catch (error) {

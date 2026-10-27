@@ -444,6 +444,9 @@ class IPMServer {
             db_je_server:  Number(zeile.db_je_server) || 0,
             // SFTP für externe Programme (2026-10-27) — der Wizard schreibt es in die daemon.yaml.
             sftp:          !!zeile.sftp_gewuenscht,
+            // 0 = Vorgabe 2022. Der Daemon (ab 1.0.139) wendet beides bei
+            // jeder Anmeldung an — die daemon.yaml fasst niemand mehr an.
+            sftp_port:     Number(zeile.sftp_port_wunsch) || 0,
         };
     }
 
@@ -1923,6 +1926,16 @@ class IPMServer {
         // → Werden im Gameserver-Plugin registriert (plugins/gameserver/dashboard/index.js)
         //   Plugin-Handler sind autoritativ: machen Status-Mapping, SSE-Broadcast + Crash-Logging.
         
+        // SFTP-Befund nach dem Anwenden des Wunsches (Daemon, sftp.Steuerung,
+        // 2026-10-27): Die Anmeldung trug noch den alten Stand.
+        eventRouter.register('sftp', 'befund', async (payload, message, context) => {
+            if (!context?.daemonId) return;
+            await RootServer.uebernimmSftp(context.daemonId, {
+                port: payload?.sftp_port || null, grund: payload?.sftp_grund || null,
+                fingerabdruck: payload?.sftp_fingerprint || null,
+            });
+        });
+
         // ✅ Handler für install.status (granulare Phasen: pulling_image, installing_game, cleanup)
         eventRouter.register('install', 'status', async (payload, message, context) => {
             const { server_id, phase, message: phaseMsg, step, steps, step_type } = payload;

@@ -107,8 +107,13 @@
                                     <label class="form-check-label" for="sftpGewuenscht">Dateizugang mit eigenen Programmen (FileZilla &amp; Co.)</label>
                                 </div>
                                 <small class="form-text text-secondary">
-                                    Öffnet Port 2022 mit Passwort-Login. Der Dateimanager im Panel geht auch ohne.
+                                    Öffnet einen Port mit Passwort-Login; der Daemon setzt die Firewall-Regel selbst. Der Dateimanager im Panel geht auch ohne.
                                 </small>
+                            </div>
+                            <div class="mb-3">
+                                <label for="sftpPort">SFTP-Port</label>
+                                <input type="number" class="form-control" id="sftpPort" name="sftpPort" min="1024" max="65535" placeholder="2022">
+                                <small class="form-text text-secondary">Leer = 2022. Nicht im Bereich der Spielports.</small>
                             </div>
                         </div>
                         <div class="col-md-6">

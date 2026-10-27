@@ -40,6 +40,8 @@ ServiceManager.register('dbService', {
         spur.abfragen.push([sql.trim(), w]);
         if (/^SELECT sftp_gewuenscht FROM rootserver WHERE daemon_id = \?$/.test(sql.trim())) return spur.zeile ? [spur.zeile] : [];
         if (/^UPDATE rootserver SET sftp_port = \?, sftp_moeglich = \?, sftp_grund = \? WHERE daemon_id = \?$/.test(sql.trim())) return {};
+        if (/^UPDATE rootserver SET sftp_fingerprint = \? WHERE daemon_id = \?$/.test(sql.trim())) return {};
+        if (/^SELECT MIN\(port\) AS von, MAX\(port\) AS bis FROM port_allocations WHERE rootserver_id = \?$/.test(sql.trim())) return [{ von: 25000, bis: 26000 }];
         throw new Error('Attrappe kennt die Abfrage nicht: ' + sql.trim().slice(0, 80));
     },
 });
@@ -61,10 +63,22 @@ async function pruefe(was, tun) {
         assert.deepStrictEqual(M.leiteSftpAb(true, 2022, null), { moeglich: 1, grund: 'Läuft auf Port 2022.' });
         assert.deepStrictEqual(M.leiteSftpAb(false, null, null), { moeglich: 0, grund: 'Nicht angefordert.' });
         assert.match(M.leiteSftpAb(false, 2022, null).grund, /nicht gewünscht — angeboten wird er nicht/);
-        assert.match(M.leiteSftpAb(true, null, 'in der daemon.yaml abgeschaltet (sftp.enabled: false)').grund, /sftp: enabled: true" setzen, den Daemon neu starten und 2022\/tcp freigeben/);
+        assert.match(M.leiteSftpAb(true, null, 'abgeschaltet (sftp.enabled: false)').grund, /noch nicht übernommen — er tut es bei der nächsten Anmeldung/);
         assert.match(M.leiteSftpAb(true, null, 'Start gescheitert: Port belegt').grund, /läuft aber nicht: Start gescheitert: Port belegt/);
         assert.match(M.leiteSftpAb(true, null, null).grund, /meldet keinen SFTP-Server/);
         assert.strictEqual(M.leiteSftpAb(true, 0, null).moeglich, 0, 'Port 0 ist kein Port');
+    });
+
+    await pruefe('sftpPortFehler: leer = 2022; nur 1024–65535, nicht SSH/Web/MySQL/Daemon/Abruf, nicht im Spielport-Bereich', () => {
+        for (const leer of [null, undefined, '', '  ']) assert.strictEqual(M.sftpPortFehler(leer), null);
+        assert.strictEqual(M.sftpPortFehler('2222', { von: 25000, bis: 26000 }), null);
+        assert.match(M.sftpPortFehler('80'), /1024 bis 65535/);
+        assert.match(M.sftpPortFehler('70000'), /1024 bis 65535/);
+        assert.match(M.sftpPortFehler('22.5'), /ganze Zahl/);
+        assert.match(M.sftpPortFehler(9340), /gehört Daemon/);
+        assert.match(M.sftpPortFehler(9350), /gehört Sicherungsabruf/);
+        assert.match(M.sftpPortFehler(3306), /gehört MySQL/);
+        assert.match(M.sftpPortFehler(25500, { von: 25000, bis: 26000 }), /Bereich der Spielports \(25000–26000\)/);
     });
 
     await pruefe('uebernimmSftp: Port, möglich und Grund — und ein Port, der nicht mehr läuft, wird gelöscht', async () => {
@@ -79,6 +93,8 @@ async function pruefe(was, tun) {
     await pruefe('die Absicht an den Wizard trägt sftp — und die Anmeldung übernimmt den Befund in beiden Wegen', () => {
         const ipm = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'apps/dashboard/helpers/IPMServer.js'), 'utf8'));
         assert.ok(/sftp:\s*!!zeile\.sftp_gewuenscht/.test(ipm), 'die Absicht nennt sftp nicht');
+        assert.ok(/sftp_port:\s*Number\(zeile\.sftp_port_wunsch\) \|\| 0/.test(ipm), 'die Absicht nennt den Port nicht');
+        assert.ok(/eventRouter\.register\('sftp', 'befund'/.test(ipm), 'der Befund nach dem Anwenden wird nicht übernommen');
         assert.ok(/sftp_port, sftp_grund,/.test(ipm), 'sftp_grund wird nicht gelesen');
         assert.strictEqual((ipm.match(/await RootServer\.uebernimmSftp\(daemon_id, \{ port: sftp_port \|\| null, grund: sftp_grund \|\| null \}\)/g) || []).length, 2,
             'Wiederanmeldung UND Erstanmeldung übernehmen den Befund');
@@ -98,8 +114,16 @@ async function pruefe(was, tun) {
             for (const wert of ['true', 'false', undefined]) {
                 await handle('put', '/:id')({ params: { id: '54' }, body: { name: 'x', ...(wert === undefined ? {} : { sftp_gewuenscht: wert }) } }, res);
             }
+            // Port: im Spielport-Bereich abgewiesen, ehe etwas gespeichert wird; leer = Vorgabe.
+            let antwort = null;
+            const res2 = { locals: { guildId: 'g1' }, status(c) { this.c = c; return this; }, json(o) { antwort = { c: this.c, ...o }; return this; } };
+            await handle('put', '/:id')({ params: { id: '54' }, body: { name: 'x', sftp_port_wunsch: '25500' } }, res2);
+            assert.strictEqual(antwort.c, 400);
+            assert.match(antwort.message, /Bereich der Spielports/);
+            await handle('put', '/:id')({ params: { id: '54' }, body: { name: 'x', sftp_gewuenscht: 'true', sftp_port_wunsch: '2222' } }, res2);
+            assert.match(antwort.message, /SFTP: gilt, sobald der Daemon sich wieder anmeldet/, 'ohne verbundenen Daemon sagt die Antwort, wann es gilt');
         } finally { Object.assign(RootServer, echt); }
-        assert.deepStrictEqual(gesehen, [1, 0, undefined]);
+        assert.deepStrictEqual(gesehen, [1, 0, undefined, 1]);
         const quelle = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'plugins/masterserver/dashboard/routes/rootserver.router.js'), 'utf8'));
         assert.ok(/sftpGewuenscht: sftpGewuenscht === 'true' \|\| sftpGewuenscht === true/.test(quelle), 'Anlegen reicht den Wunsch nicht weiter');
         const modell = fs.readFileSync(path.join(WURZEL, 'plugins/masterserver/dashboard/models/RootServer.js'), 'utf8');
@@ -147,7 +171,7 @@ async function pruefe(was, tun) {
         user: process.env.MYSQL_USER, password: process.env.MYSQL_PASSWORD, database: process.env.MYSQL_DATABASE });
     const spalten = async () => (await c.query("SHOW COLUMNS FROM rootserver LIKE 'sftp%'"))[0].map(z => z.Field).sort();
     const vorher = await spalten();
-    await pruefe('die Migration legt Wunsch, möglich und Grund an — an der Kopie; zweimal laufen schadet nicht', async () => {
+    await pruefe('die Migrationen legen Wunsch, Port, möglich und Grund an — an der Kopie; zweimal laufen schadet nicht', async () => {
         await c.query('CREATE TEMPORARY TABLE fb_rs_form LIKE rootserver');
         await c.query('CREATE TEMPORARY TABLE rootserver LIKE fb_rs_form');
         const [[k]] = await c.query('SHOW CREATE TABLE rootserver');
@@ -157,8 +181,11 @@ async function pruefe(was, tun) {
         const db = { query: async (sql, w = []) => (await c.execute(sql, w))[0] };
         await m.up(db);
         await m.up(db);
+        const m2 = require(path.join(WURZEL, 'plugins/masterserver/migrations/20261027_180000_sftp_port_wunsch.js'));
+        await m2.up(db);
+        await m2.up(db);
         const neu = await spalten();
-        for (const s of ['sftp_gewuenscht', 'sftp_moeglich', 'sftp_grund']) assert.ok(neu.includes(s), `${s} fehlt`);
+        for (const s of ['sftp_gewuenscht', 'sftp_moeglich', 'sftp_grund', 'sftp_port_wunsch']) assert.ok(neu.includes(s), `${s} fehlt`);
     });
     await c.query('DROP TEMPORARY TABLE IF EXISTS rootserver');
     await c.query('DROP TEMPORARY TABLE IF EXISTS fb_rs_form');

@@ -59,9 +59,9 @@ class RootServer {
               cpu_cores, ram_total_gb, disk_total_gb,
               datacenter, country_code,
               fqdn, fastdl_enabled,
-              db_gewuenscht, db_je_server, sftp_gewuenscht,
+              db_gewuenscht, db_je_server, sftp_gewuenscht, sftp_port_wunsch,
               created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'offline', 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'offline', 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
             [
                 daemonId,
                 data.guildId,
@@ -85,7 +85,8 @@ class RootServer {
                 data.dbGewuenscht  ? 1 : 0,
                 Number.isFinite(data.dbJeServer) ? data.dbJeServer : 0,
                 // SFTP für externe Programme — Absicht wie oben (2026-10-27).
-                data.sftpGewuenscht ? 1 : 0
+                data.sftpGewuenscht ? 1 : 0,
+                data.sftpPortWunsch || null
             ]
         );
 
@@ -153,7 +154,7 @@ class RootServer {
             // Nachträglich änderbar (2026-10-27): Der Wizard läuft auf einer
             // eingerichteten Maschine nicht mehr — der Befund sagt dann, was
             // in der daemon.yaml noch zu tun ist.
-            'sftp_gewuenscht'
+            'sftp_gewuenscht', 'sftp_port_wunsch'
         ];
         const fields = [];
         const values = [];
@@ -377,7 +378,7 @@ class RootServer {
      * Der Port wird auch GELÖSCHT, wenn keiner mehr läuft — `markOnline`
      * schreibt ihn nur, wenn einer kommt, und ließe so einen alten stehen.
      */
-    static async uebernimmSftp(daemonId, { port = null, grund = null } = {}) {
+    static async uebernimmSftp(daemonId, { port = null, grund = null, fingerabdruck = null } = {}) {
         const dbService = ServiceManager.get('dbService');
         const M = require('../helpers/Maschinenbefund');
         const [zeile] = await dbService.query('SELECT sftp_gewuenscht FROM rootserver WHERE daemon_id = ?', [daemonId]);
@@ -386,6 +387,11 @@ class RootServer {
         await dbService.query(
             'UPDATE rootserver SET sftp_port = ?, sftp_moeglich = ?, sftp_grund = ? WHERE daemon_id = ?',
             [Number(port) > 0 ? Number(port) : null, s.moeglich, s.grund, daemonId]);
+        // Der Fingerabdruck kommt auch mit dem Ereignis sftp.befund (Steuerung) —
+        // nur setzen, wenn einer da ist; ein abgeschalteter Server nennt keinen.
+        if (fingerabdruck) {
+            await dbService.query('UPDATE rootserver SET sftp_fingerprint = ? WHERE daemon_id = ?', [fingerabdruck, daemonId]);
+        }
         return s;
     }
 

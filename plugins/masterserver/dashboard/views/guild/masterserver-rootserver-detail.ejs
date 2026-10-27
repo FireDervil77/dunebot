@@ -556,9 +556,13 @@ sudo journalctl -u firebot-daemon -n 50</code></pre>
                                     <label class="form-check-label" for="editSftp">SFTP für eigene Programme anbieten (FileZilla &amp; Co.)</label>
                                 </div>
                                 <small class="form-text text-secondary">
-                                    Auf einer eingerichteten Maschine schaltet das den Dienst nicht ein — dafür in der daemon.yaml
-                                    <span class="font-monospace">sftp: enabled: true</span> setzen und den Daemon neu starten. Was fehlt, steht oben unter „SFTP".
+                                    Der Daemon übernimmt es beim Speichern (ist er nicht verbunden: bei der nächsten Anmeldung) und setzt die Firewall-Regel selbst. Was gerade läuft, steht oben unter „SFTP".
                                 </small>
+                            </div>
+                            <div class="mb-3" style="max-width:14rem">
+                                <label for="editSftpPort">SFTP-Port</label>
+                                <input type="number" class="form-control" id="editSftpPort" name="sftp_port_wunsch" min="1024" max="65535" placeholder="2022" value="<%= rootserver.sftp_port_wunsch || '' %>">
+                                <small class="form-text text-secondary">Leer = 2022. Ändern trennt die gespeicherten Profile aller Nutzer dieser Maschine.</small>
                             </div>
                             <button type="submit" class="btn btn-primary">
                                 <i class="fa-solid fa-save me-1"></i>Speichern
