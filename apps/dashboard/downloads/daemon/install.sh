@@ -343,6 +343,17 @@ setup_firewall() {
     log_warn "Keine aktive ufw/firewalld gefunden — Port ${port}/tcp ggf. selbst freigeben (SFTP-Dateizugang)"
 }
 
+### Ist SFTP in der daemon.yaml eingeschaltet?
+#
+# Liest den Abschnitt `sftp:` bis zum nächsten Abschnitt auf oberster Ebene und
+# sucht darin `enabled: true`. Kein YAML-Parser in der Shell — die Datei
+# schreibt der Daemon selbst (gopkg.in/yaml.v3: zwei Leerzeichen, true/false).
+sftp_eingeschaltet() {
+    local datei="${INSTALL_DIR}/${CONFIG_FILE}"
+    [[ -f "$datei" ]] || return 1
+    awk '/^sftp:/{drin=1; next} /^[^[:space:]#]/{drin=0} drin && /^[[:space:]]+enabled:[[:space:]]*true[[:space:]]*$/{gefunden=1} END{exit gefunden?0:1}' "$datei"
+}
+
 ### SFTP-Port beim Deinstallieren wieder schliessen
 #
 # Nur die Regel, die setup_firewall gesetzt hat. Fehlt sie, passiert nichts —
@@ -1036,9 +1047,6 @@ main() {
     # Ownership für Install-Dir setzen (root, da Daemon als root läuft)
     chown -R root:root "$INSTALL_DIR"
     
-    # SFTP-Port freigeben (der einzige Port, auf dem der Daemon lauscht)
-    setup_firewall 2022
-
     # Systemd Service
     create_systemd_service
     enable_service
@@ -1054,6 +1062,15 @@ main() {
         if validate_config && start_service; then
             EINRICHTUNG_FERTIG=1
         fi
+    fi
+
+    # SFTP-Port nur, wenn SFTP für externe Programme gewünscht ist (2026-10-27):
+    # Häkchen am Rootserver im Dashboard → Wizard → daemon.yaml. Bis dahin ging
+    # 2022/tcp VOR dem Wizard auf, immer — auch dort, wo gar kein SFTP lief.
+    if [[ "$EINRICHTUNG_FERTIG" == "1" ]] && sftp_eingeschaltet; then
+        setup_firewall 2022
+    else
+        log_info "SFTP für externe Programme ist aus — Port 2022 bleibt zu"
     fi
     
     # Post-Install Info
