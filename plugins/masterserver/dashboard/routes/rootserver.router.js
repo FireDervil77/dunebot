@@ -205,7 +205,8 @@ router.post('/', requirePermission('MASTERSERVER.ROOTSERVER.CREATE'), async (req
             backupLimit,
             datacenter, countryCode,
             fqdn, fastdlEnabled,
-            dbGewuenscht, dbJeServer
+            dbGewuenscht, dbJeServer,
+            sftpGewuenscht
         } = req.body;
 
         // Validierung
@@ -239,6 +240,8 @@ router.post('/', requirePermission('MASTERSERVER.ROOTSERVER.CREATE'), async (req
             // der Maschine — nicht dieses Häkchen.
             dbGewuenscht: dbGewuenscht === 'true' || dbGewuenscht === true,
             dbJeServer: Math.max(0, parseInt(dbJeServer, 10) || 0),
+            // SFTP für externe Programme (2026-10-27): Wunsch, geht an den Wizard.
+            sftpGewuenscht: sftpGewuenscht === 'true' || sftpGewuenscht === true,
             // Hardware bleibt leer: Der Daemon meldet sie beim ersten Verbinden.
             cpuCores: null,
             cpuThreads: null,
@@ -440,7 +443,8 @@ router.put('/:id', requirePermission('MASTERSERVER.ROOTSERVER.EDIT'), async (req
             });
         }
 
-        const { name, host, daemon_port, hostname, datacenter, country_code, description, ram_total_gb, disk_total_gb } = req.body;
+        const { name, host, daemon_port, hostname, datacenter, country_code, description, ram_total_gb, disk_total_gb,
+                sftp_gewuenscht } = req.body;
 
         // RootServer aktualisieren
         await RootServer.update(rootserverId, {
@@ -453,6 +457,9 @@ router.put('/:id', requirePermission('MASTERSERVER.ROOTSERVER.EDIT'), async (req
             description,
             ram_total_gb:  ram_total_gb ? parseFloat(ram_total_gb) : undefined,
             disk_total_gb: disk_total_gb ? parseFloat(disk_total_gb) : undefined,
+            // Fehlt das Feld, bleibt der Wunsch, wie er ist (älteres Formular).
+            sftp_gewuenscht: sftp_gewuenscht === undefined ? undefined
+                : (sftp_gewuenscht === 'true' || sftp_gewuenscht === true ? 1 : 0),
         });
 
         Logger.info(`[Masterserver] RootServer updated: ${rootserverId}`);

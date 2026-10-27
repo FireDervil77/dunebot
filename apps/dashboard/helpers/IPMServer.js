@@ -442,11 +442,13 @@ class IPMServer {
             fastdl:        !!zeile.fastdl_enabled,
             datenbanken:   !!zeile.db_gewuenscht,
             db_je_server:  Number(zeile.db_je_server) || 0,
+            // SFTP für externe Programme (2026-10-27) — der Wizard schreibt es in die daemon.yaml.
+            sftp:          !!zeile.sftp_gewuenscht,
         };
     }
 
     async _handleRegister(ws, payload, clientIp) {
-        const { token, daemon_id, version, hardware, sftp_fingerprint, sftp_port,
+        const { token, daemon_id, version, hardware, sftp_fingerprint, sftp_port, sftp_grund,
                 abruf_port, base_directory } = payload;
 
         if (!token || !daemon_id) {
@@ -502,6 +504,9 @@ class IPMServer {
                         // dann gesetzt werden, wenn er fehlt — dann als NULL.
                         abrufPort:       abruf_port ?? null,
                     });
+                    // SFTP: Port oder Grund, gegen den Wunsch am Rootserver (2026-10-27).
+                    await RootServer.uebernimmSftp(daemon_id, { port: sftp_port || null, grund: sftp_grund || null })
+                        .catch(e => this.Logger.warn(`[IPMServer] SFTP-Befund für ${daemon_id} nicht übernommen: ${e.message}`));
                     
                     await this._logDaemonEvent(daemon_id, 'reconnected', { version });
                     
@@ -612,6 +617,9 @@ class IPMServer {
                 baseDirectory:   base_directory || null,
                 abrufPort:       abruf_port ?? null,
             });
+            // SFTP: Port oder Grund, gegen den Wunsch am Rootserver (2026-10-27).
+            await RootServer.uebernimmSftp(daemon_id, { port: sftp_port || null, grund: sftp_grund || null })
+                .catch(e => this.Logger.warn(`[IPMServer] SFTP-Befund für ${daemon_id} nicht übernommen: ${e.message}`));
 
             // Audit-Log
             await this._logDaemonEvent(daemon_id, 'first_registration', { version });

@@ -17,7 +17,9 @@
             <strong>Keine Berechtigung:</strong> Du benötigst <code>GAMESERVER.FILES.VIEW</code> um Dateien anzusehen.
         </div>
     <% } else { %>
-        
+
+        <%- include('server-detail-sftp', { server, guildId, canManage }) %>
+
         <!-- Toolbar -->
         <div class="card mb-3">
             <div class="card-body">

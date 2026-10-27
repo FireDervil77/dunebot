@@ -155,6 +155,32 @@ function leiteDatenbankAb(gewuenscht, datenbank) {
 }
 
 /**
+ * SFTP für externe Programme (2026-10-27): Wunsch gegen das, was der Daemon
+ * beim Verbinden meldet — den Port des LAUFENDEN Servers, oder warum keiner läuft.
+ *
+ * Möglich nur, wenn beides stimmt. Läuft er ungewünscht (daemon.yaml von Hand
+ * eingeschaltet), wird er trotzdem nicht angeboten — und das steht da.
+ *
+ * @param {boolean} gewuenscht
+ * @param {number|null} port   gemeldeter Port, null = kein Server
+ * @param {string|null} grund  vom Daemon (ab 1.0.138), warum keiner läuft
+ */
+function leiteSftpAb(gewuenscht, port, grund) {
+    const p = Number(port) > 0 ? Number(port) : null;
+    if (!gewuenscht) {
+        return p
+            ? { moeglich: 0, grund: `Läuft auf Port ${p}, ist für diese Maschine aber nicht gewünscht — angeboten wird er nicht.` }
+            : { moeglich: 0, grund: 'Nicht angefordert.' };
+    }
+    if (p) return { moeglich: 1, grund: `Läuft auf Port ${p}.` };
+    if (/abgeschaltet/.test(String(grund || ''))) {
+        return { moeglich: 0, grund: 'Gewünscht, aber in der daemon.yaml aus — dort „sftp: enabled: true" setzen, den Daemon neu starten und 2022/tcp freigeben.' };
+    }
+    if (grund) return { moeglich: 0, grund: `Gewünscht, läuft aber nicht: ${String(grund).slice(0, 180)}` };
+    return { moeglich: 0, grund: 'Gewünscht, aber der Daemon meldet keinen SFTP-Server (ältere Fassung sagt nicht, warum).' };
+}
+
+/**
  * Warnt, wenn die Hardwarewerte nicht belastbar sind.
  *
  * Auf einer containervirtualisierten Maschine zeigen `/proc/cpuinfo` und
@@ -173,5 +199,5 @@ module.exports = {
     leiteDatenbankAb,
     hardwareIstBelastbar,
     istRueckschleife,
-    nackteIp,
+    nackteIp, leiteSftpAb
 };

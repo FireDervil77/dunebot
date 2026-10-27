@@ -1887,6 +1887,10 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
                 r.daemon_id,
                 r.sftp_fingerprint,
                 r.sftp_port AS rootserver_sftp_port,
+                -- SFTP für externe Programme: Wunsch und Befund (2026-10-27).
+                r.sftp_gewuenscht AS rootserver_sftp_gewuenscht,
+                r.sftp_moeglich AS rootserver_sftp_moeglich,
+                r.sftp_grund AS rootserver_sftp_grund,
                 r.system_user,
                 -- Das Spielpaket: Die Fernsteuerung eines Paketservers steht in
                 -- management.rcon, nicht in game_data (2026-09-22). Ohne diese
@@ -3619,7 +3623,9 @@ router.get('/:serverId/migration/status', requirePermission('GAMESERVER.VIEW'), 
 // SFTP: Passwort zurücksetzen
 // POST /guild/:guildId/plugins/gameserver/servers/:serverId/sftp/reset-password
 // ============================================================
-router.post('/:serverId/sftp/reset-password', requirePermission('GAMESERVER.EDIT'), async (req, res) => {
+// Recht seit 2026-10-27: wer Dateien verwalten darf (Betreiber) — SFTP ist
+// derselbe Zugriff mit einem eigenen Programm.
+router.post('/:serverId/sftp/reset-password', requirePermission('GAMESERVER.FILES.MANAGE'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
 

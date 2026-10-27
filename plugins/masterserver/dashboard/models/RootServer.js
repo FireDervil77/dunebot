@@ -59,9 +59,9 @@ class RootServer {
               cpu_cores, ram_total_gb, disk_total_gb,
               datacenter, country_code,
               fqdn, fastdl_enabled,
-              db_gewuenscht, db_je_server,
+              db_gewuenscht, db_je_server, sftp_gewuenscht,
               created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'offline', 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'offline', 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
             [
                 daemonId,
                 data.guildId,
@@ -83,7 +83,9 @@ class RootServer {
                 // Absicht, nicht Fähigkeit: `db_moeglich` setzt ausschliesslich
                 // der Maschinenbefund beim Verbinden des Daemons.
                 data.dbGewuenscht  ? 1 : 0,
-                Number.isFinite(data.dbJeServer) ? data.dbJeServer : 0
+                Number.isFinite(data.dbJeServer) ? data.dbJeServer : 0,
+                // SFTP für externe Programme — Absicht wie oben (2026-10-27).
+                data.sftpGewuenscht ? 1 : 0
             ]
         );
 
@@ -147,7 +149,11 @@ class RootServer {
             'ram_total_gb', 'disk_total_gb', 'cpu_cores', 'cpu_threads', 'cpu_model',
             'ram_limit_gb', 'disk_limit_gb', 'cpu_limit_percent',
             'datacenter', 'country_code',
-            'fqdn', 'fastdl_enabled', 'fastdl_url'
+            'fqdn', 'fastdl_enabled', 'fastdl_url',
+            // Nachträglich änderbar (2026-10-27): Der Wizard läuft auf einer
+            // eingerichteten Maschine nicht mehr — der Befund sagt dann, was
+            // in der daemon.yaml noch zu tun ist.
+            'sftp_gewuenscht'
         ];
         const fields = [];
         const values = [];
@@ -365,6 +371,24 @@ class RootServer {
      * @param {object} befund     was der Daemon gemessen hat
      * @param {string} gesehenIp  die IP, von der er verbindet
      */
+    /**
+     * SFTP-Befund aus der Anmeldung übernehmen (2026-10-27).
+     *
+     * Der Port wird auch GELÖSCHT, wenn keiner mehr läuft — `markOnline`
+     * schreibt ihn nur, wenn einer kommt, und ließe so einen alten stehen.
+     */
+    static async uebernimmSftp(daemonId, { port = null, grund = null } = {}) {
+        const dbService = ServiceManager.get('dbService');
+        const M = require('../helpers/Maschinenbefund');
+        const [zeile] = await dbService.query('SELECT sftp_gewuenscht FROM rootserver WHERE daemon_id = ?', [daemonId]);
+        if (!zeile) return null;
+        const s = M.leiteSftpAb(!!zeile.sftp_gewuenscht, port, grund);
+        await dbService.query(
+            'UPDATE rootserver SET sftp_port = ?, sftp_moeglich = ?, sftp_grund = ? WHERE daemon_id = ?',
+            [Number(port) > 0 ? Number(port) : null, s.moeglich, s.grund, daemonId]);
+        return s;
+    }
+
     static async uebernimmMaschinenbefund(daemonId, befund, gesehenIp) {
         const dbService = ServiceManager.get('dbService');
         const M = require('../helpers/Maschinenbefund');

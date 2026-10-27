@@ -98,6 +98,18 @@
                                     Ohne Häkchen rührt der Daemon MySQL auf dieser Maschine nicht an.
                                 </small>
                             </div>
+                            <%# SFTP für externe Programme (2026-10-27) — wie Datenbanken eine Absicht,
+                                die der Einrichtungs-Wizard in die daemon.yaml übernimmt. %>
+                            <div class="mb-3">
+                                <label for="sftpGewuenscht">SFTP</label>
+                                <div class="form-check form-switch mt-2">
+                                    <input type="checkbox" class="form-check-input" id="sftpGewuenscht" name="sftpGewuenscht" value="true">
+                                    <label class="form-check-label" for="sftpGewuenscht">Dateizugang mit eigenen Programmen (FileZilla &amp; Co.)</label>
+                                </div>
+                                <small class="form-text text-secondary">
+                                    Öffnet Port 2022 mit Passwort-Login. Der Dateimanager im Panel geht auch ohne.
+                                </small>
+                            </div>
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">

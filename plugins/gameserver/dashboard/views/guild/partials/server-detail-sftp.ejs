@@ -1,0 +1,98 @@
+<%#
+  SFTP für eigene Programme (FileZilla & Co.) — Baustelle 203, 2026-10-27.
+
+  Am 19.08. fiel diese Karte mit der alten Übersicht weg (4ad17042) und kam nie
+  zurück; die Konten gab es weiter, gesehen hat das Passwort niemand. Jetzt
+  steht sie wieder da — aber nur, wo der Rootserver SFTP wirklich anbietet
+  (Wunsch am Rootserver UND laufender Dienst, `sftp_moeglich`). Sonst ein Satz,
+  warum nicht. Der Dateimanager darunter geht in beiden Fällen.
+
+  Das Passwort liegt nur als Hash vor: Es ist genau einmal sichtbar, direkt nach
+  dem Setzen. Setzen darf, wer Dateien verwalten darf (GAMESERVER.FILES.MANAGE).
+%>
+<%
+  const sftpAn   = Boolean(server.rootserver_sftp_moeglich);
+  const sftpHost = (server.fqdn && server.fqdn_gilt) ? server.fqdn : server.rootserver_ip;
+  const sftpPort = server.rootserver_sftp_port;
+  const gesehen  = server.sftp_password_seen_at
+    ? new Date(server.sftp_password_seen_at).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : null;
+%>
+<div class="card mb-3" id="karteSftp">
+  <div class="card-body py-2">
+    <% if (!sftpAn) { %>
+      <div class="text-secondary small">
+        <i class="fa-solid fa-plug-circle-xmark me-1"></i>
+        SFTP für eigene Programme gibt es auf dieser Maschine nicht<%= server.rootserver_sftp_gewuenscht && server.rootserver_sftp_grund ? ' — ' + server.rootserver_sftp_grund : '.' %>
+        Der Dateimanager hier geht trotzdem.
+      </div>
+    <% } else { %>
+      <div class="d-flex flex-wrap align-items-center gap-3 small">
+        <strong><i class="fa-solid fa-network-wired me-1"></i>SFTP</strong>
+        <span>Host <span class="font-monospace"><%= sftpHost %></span></span>
+        <span>Port <span class="font-monospace"><%= sftpPort %></span></span>
+        <span>Benutzer <span class="font-monospace"><%= server.sftp_username %></span></span>
+        <span class="text-secondary">Passwort: <%= gesehen ? 'zuletzt neu gesetzt am ' + gesehen : 'noch nie angezeigt' %></span>
+        <% if (canManage) { %>
+          <button type="button" class="btn btn-sm btn-outline-secondary ms-auto" id="sftpNeuKnopf">
+            <i class="fa-solid fa-key me-1"></i><%= gesehen ? 'Neues Passwort setzen' : 'Passwort setzen' %>
+          </button>
+        <% } %>
+      </div>
+      <% if (server.sftp_fingerprint) { %>
+        <div class="text-secondary small mt-1">Fingerabdruck des Servers (beim ersten Verbinden vergleichen): <span class="font-monospace"><%= server.sftp_fingerprint %></span></div>
+      <% } %>
+      <% if (canManage) { %>
+        <div class="small mt-2" id="sftpRueckfrage" style="display:none">
+          <%= gesehen ? 'Das alte Passwort gilt danach nicht mehr.' : 'Das Passwort wird gleich einmal angezeigt — danach nie wieder.' %>
+          <button type="button" class="btn btn-sm btn-primary ms-2" id="sftpNeuJa">Jetzt setzen</button>
+          <button type="button" class="btn btn-sm btn-link" id="sftpNeuNein">Abbrechen</button>
+        </div>
+        <div class="alert alert-info py-2 small mt-2 mb-0" id="sftpNeu" style="display:none">
+          Neues Passwort — <strong>nur jetzt sichtbar</strong>:
+          <span class="font-monospace user-select-all" id="sftpNeuWert"></span>
+          <button type="button" class="btn btn-sm btn-white ms-2" id="sftpNeuKopieren"><i class="fa-solid fa-copy me-1"></i>Kopieren</button>
+        </div>
+      <% } %>
+    <% } %>
+  </div>
+</div>
+<% if (sftpAn && canManage) { %>
+<script>
+(function () {
+  'use strict';
+  const melde = (typ, text) => { if (typeof showToast === 'function') showToast(typ, text); };
+  const knopf = document.getElementById('sftpNeuKnopf');
+  const frage = document.getElementById('sftpRueckfrage');
+  const ja = document.getElementById('sftpNeuJa');
+  const kasten = document.getElementById('sftpNeu');
+  const wert = document.getElementById('sftpNeuWert');
+  knopf.addEventListener('click', () => { frage.style.display = ''; knopf.disabled = true; });
+  document.getElementById('sftpNeuNein').addEventListener('click', () => { frage.style.display = 'none'; knopf.disabled = false; });
+  ja.addEventListener('click', async () => {
+    ja.disabled = true;
+    try {
+      const a = await fetch('/guild/<%= guildId %>/plugins/gameserver/servers/<%= server.id %>/sftp/reset-password', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: '{}' });
+      const d = await a.json().catch(() => ({}));
+      if (!a.ok || !d.success) throw new Error(d.message || ('HTTP ' + a.status));
+      wert.textContent = d.sftp_password;
+      kasten.style.display = '';
+      frage.style.display = 'none';
+      melde('success', 'Neues SFTP-Passwort gesetzt.');
+    } catch (e) {
+      melde('error', 'Passwort nicht gesetzt: ' + e.message);
+      knopf.disabled = false;
+      frage.style.display = 'none';
+    } finally {
+      ja.disabled = false;
+    }
+  });
+  document.getElementById('sftpNeuKopieren').addEventListener('click', () => {
+    Promise.resolve().then(() => navigator.clipboard.writeText(wert.textContent))
+      .then(() => melde('success', 'Kopiert.'))
+      .catch(() => melde('warning', 'Kopieren ging nicht — das Passwort ist markierbar.'));
+  });
+})();
+</script>
+<% } %>

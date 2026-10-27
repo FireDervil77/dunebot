@@ -237,6 +237,25 @@
                         <% } %>
                     </div>
 
+                    <%# ── SFTP für externe Programme (2026-10-27) ────────── %>
+                    <div class="col-md-6">
+                        <div class="text-secondary" style="font-size:.75rem;">SFTP (eigene Programme)</div>
+                        <div>
+                            <% if (!rootserver.sftp_gewuenscht && !rootserver.sftp_port) { %>
+                                <span class="badge bg-secondary-lt">nicht angefordert</span>
+                            <% } else if (rootserver.sftp_moeglich === null || rootserver.sftp_moeglich === undefined) { %>
+                                <span class="badge bg-secondary-lt">noch nicht gemeldet</span>
+                            <% } else if (rootserver.sftp_moeglich) { %>
+                                <span class="badge bg-success-lt"><i class="fa-solid fa-check me-1"></i>möglich</span>
+                            <% } else { %>
+                                <span class="badge bg-warning-lt"><i class="fa-solid fa-triangle-exclamation me-1"></i><%= rootserver.sftp_gewuenscht ? 'angefordert, geht nicht' : 'läuft, nicht angefordert' %></span>
+                            <% } %>
+                        </div>
+                        <% if (rootserver.sftp_grund) { %>
+                            <div class="text-secondary mt-1" style="font-size:.78rem;"><%= rootserver.sftp_grund %></div>
+                        <% } %>
+                    </div>
+
                     <%#
                       Die Warnung, die alles andere entwertet, wenn sie zutrifft.
                       Auf einer containervirtualisierten Maschine zeigen
@@ -526,6 +545,20 @@ sudo journalctl -u firebot-daemon -n 50</code></pre>
                             <div class="mb-3">
                                 <label>Beschreibung</label>
                                 <textarea class="form-control" name="description" rows="2"><%= rootserver.description || '' %></textarea>
+                            </div>
+                            <%# SFTP für externe Programme (2026-10-27). Das versteckte Feld steht
+                                VOR dem Kästchen: Ohne Haken fehlt das Kästchen in FormData, und
+                                „aus" wäre nicht von „nicht geschickt" zu unterscheiden. %>
+                            <div class="mb-3">
+                                <input type="hidden" name="sftp_gewuenscht" value="false">
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" class="form-check-input" id="editSftp" name="sftp_gewuenscht" value="true" <%= rootserver.sftp_gewuenscht ? 'checked' : '' %>>
+                                    <label class="form-check-label" for="editSftp">SFTP für eigene Programme anbieten (FileZilla &amp; Co.)</label>
+                                </div>
+                                <small class="form-text text-secondary">
+                                    Auf einer eingerichteten Maschine schaltet das den Dienst nicht ein — dafür in der daemon.yaml
+                                    <span class="font-monospace">sftp: enabled: true</span> setzen und den Daemon neu starten. Was fehlt, steht oben unter „SFTP".
+                                </small>
                             </div>
                             <button type="submit" class="btn btn-primary">
                                 <i class="fa-solid fa-save me-1"></i>Speichern
