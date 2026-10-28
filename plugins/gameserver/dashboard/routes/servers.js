@@ -4138,9 +4138,12 @@ router.get('/:serverId/backups/:backupId/download',
             .update(`${serverId}\n${datei}\n${bis}`)
             .digest('hex');
 
-        // Die IP, nicht der Name: Den Link öffnet ein Browser, und der zwingt
-        // Namen unter firenetworks.de per HSTS auf https (Abruf.wirtFuerBrowser).
-        const wirt = require('../helpers/Abruf').wirtFuerBrowser(zeile);
+        // Die IP: Das Dashboard holt die Datei selbst beim Daemon ab und
+        // reicht sie durch (Abruf.reicheDurch, 2026-10-28) — der Browser sieht
+        // den Daemon nie. Bis dahin leitete die Route den Browser um, und HSTS,
+        // die Download-Sperre der Browser und Firewalls standen im Weg.
+        const Abruf = require('../helpers/Abruf');
+        const wirt = Abruf.wirtFuerBrowser(zeile);
 
         const adresse = `http://${wirt}:${zeile.abruf_port}/sicherung`
             + `?server=${encodeURIComponent(serverId)}`
@@ -4148,12 +4151,20 @@ router.get('/:serverId/backups/:backupId/download',
             + `&bis=${bis}`
             + `&sig=${unterschrift}`;
 
-        Logger.info(`[Gameserver/Backups] Abruf ausgestellt: Sicherung ${backupId} `
-            + `(Server ${serverId}) über ${wirt}:${zeile.abruf_port}, gültig 5 Minuten`);
+        Logger.info(`[Gameserver/Backups] Sicherung ${backupId} (Server ${serverId}) wird über das `
+            + `Dashboard ausgeliefert, von ${wirt}:${zeile.abruf_port}`
+            + (req.headers.range ? ` (Bereich ${req.headers.range})` : ''));
 
-        return res.redirect(adresse);
+        const ergebnis = await Abruf.reicheDurch(adresse, req, res, datei);
+        if (ergebnis.fehler) {
+            Logger.warn(`[Gameserver/Backups] Sicherung ${backupId} nicht ausgeliefert: ${ergebnis.fehler}`);
+        } else {
+            Logger.info(`[Gameserver/Backups] Sicherung ${backupId}: ${ergebnis.bytes} Bytes ausgeliefert (${ergebnis.status})`);
+        }
+        return undefined;
     } catch (error) {
         Logger.error('[Gameserver/Backups] Abruf konnte nicht ausgestellt werden:', error);
+        if (res.headersSent) return res.destroy(error);
         return res.status(500).json({ success: false, message: 'Serverfehler' });
     }
 });

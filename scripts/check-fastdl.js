@@ -159,7 +159,11 @@ const karte = (x = {}) => ({ denylist: '', saves: '', persist: [], 'public': '',
         // includeSubDomains auf firenetworks.de) zwingt der Browser jeden Namen
         // darunter auf https; der Dienst spricht nur http.
         const routen = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/routes/servers.js'), 'utf8'));
-        assert.match(routen, /const wirt = require\('\.\.\/helpers\/Abruf'\)\.wirtFuerBrowser\(zeile\)/);
+        assert.match(routen, /const wirt = Abruf\.wirtFuerBrowser\(zeile\)/);
+        // Seit 2026-10-28 reicht das Dashboard die Sicherung durch, statt umzuleiten
+        // (Abruf.reicheDurch; Verhalten in check-sicherung-download.js).
+        assert.match(routen, /await Abruf\.reicheDurch\(adresse, req, res, datei\)/);
+        assert.doesNotMatch(routen, /return res\.redirect\(adresse\)/, 'die Route leitet noch zum Daemon um');
         assert.strictEqual(Abruf.wirtFuerBrowser(maschine), '91.200.102.182', 'ein Browser-Link nimmt den Namen — HSTS macht daraus https');
         assert.strictEqual(Abruf.basis(maschine), 'http://node1.firenetworks.de:8081', 'Spielclients behalten den geprüften Namen');
         assert.doesNotMatch(routen, /fqdn_gilt && zeile\.fqdn\) \? zeile\.fqdn : zeile\.host/, 'die alte Rechnung steht noch daneben');
