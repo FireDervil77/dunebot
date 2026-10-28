@@ -45,6 +45,7 @@ const db = {
     portBuch: [],              // was an port_allocations geschrieben wurde
     tx: [],                    // Anweisungen in der Transaktion
     txWirft: null,             // Fehlertext, wenn die Transaktion scheitern soll
+    sicherungen: [],           // gameserver_backups (Namen) des Servers
     gescheitert: [],           // was als Fehlschlag eingetragen wurde
     async query(sql, p) {
         if (/FROM gameservers gs\s+LEFT JOIN rootserver r ON gs\.rootserver_id = r\.id\s+WHERE gs\.id = \? AND gs\.guild_id = \?/.test(sql)) {
@@ -64,6 +65,9 @@ const db = {
             return [{ paket_json: JSON.stringify({ identity: { name: 'Probe' }, ports: [
                 { purpose: 'game', assign: 'pool', protocol: 'udp', required: true },
                 { purpose: 'query', assign: 'game+1', protocol: 'udp', required: true }] }) }];
+        }
+        if (/SELECT name FROM gameserver_backups\s+WHERE server_id = \? AND status = 'completed' AND pruned_at IS NULL/.test(sql)) {
+            return this.sicherungen.map(name => ({ name }));
         }
         if (/SELECT id, port FROM port_allocations\s+WHERE rootserver_id = \? AND server_id IS NULL/.test(sql)) return this.vorrat;
         if (/UPDATE port_allocations SET server_id = 0, assigned_at = NOW\(\) WHERE id = \?/.test(sql)) {
@@ -108,10 +112,14 @@ const daemon = {
         if (befehl === 'db.anlegen') return { success: true, zugang: { name: `s7_${nutzlast.nr}` } };
         // Wie der Daemon antwortet — ein alter lässt die Felder einfach weg.
         if (befehl === 'gameserver.migrate.backup') {
-            return this.alt.has(id) ? { success: true } : { success: true, datenbanken: nutzlast.datenbanken };
+            if (this.alt.has(id)) return { success: true };
+            const s = nutzlast.sicherungen ? db.sicherungen.map(n => `${n}.tar.gz`) : [];
+            this.imArchiv = s;
+            return { success: true, datenbanken: nutzlast.datenbanken, sicherungen: s };
         }
         if (befehl === 'gameserver.migrate.restore') {
-            return this.alt.has(id) ? { success: true } : { success: true, eingespielt: nutzlast.datenbanken, hinweise: [] };
+            return this.alt.has(id) ? { success: true }
+                : { success: true, eingespielt: nutzlast.datenbanken, hinweise: [], sicherungen: this.imArchiv || [] };
         }
         return { success: true };
     },
@@ -134,6 +142,7 @@ let bestanden = 0;
 async function pruefe(name, fn) {
     db.nrs = []; db.ziel = { ...ZIEL }; db.migrationen = []; db.gescheitert = []; daemon.auftraege = []; daemon.amZiel = []; daemon.scheitern = {}; daemon.alt = new Set(); logs.length = 0;
     db.vorrat = VORRAT.map(z => ({ ...z })); db.portBuch = []; db.tx = []; db.txWirft = null;
+    db.sicherungen = []; daemon.imArchiv = [];
     try {
         await fn();
         console.log(`  ✓ ${name}`);
@@ -220,7 +229,8 @@ async function umzug() {
         assert.strictEqual(r.success, false);
         assert.strictEqual(befehle('db.loeschen', 'dz').length, 1, 'am Ziel abgebaut');
         assert.strictEqual(befehle('db.loeschen', 'dq').length, 0, 'an der Quelle nichts gelöscht');
-        assert.strictEqual(befehle('gameserver.uninstall').length, 0, 'gescheitert: die Spieldateien an der Quelle müssen bleiben');
+        assert.strictEqual(befehle('gameserver.uninstall', 'dq').length, 0, 'gescheitert: die Spieldateien an der Quelle müssen bleiben');
+        assert.strictEqual(befehle('gameserver.uninstall', 'dz').length, 1, 'das Ausgepackte am Ziel bleibt liegen');
     });
 
     // Erfolg genauso prüfen: Ein Daemon vor 1.0.148 kennt `datenbanken` nicht
@@ -347,6 +357,35 @@ async function umzug() {
         assert.strictEqual(befehle('db.loeschen', 'dz').length, 1, 'die Ziel-Datenbank bleibt liegen');
         assert.strictEqual(befehle('gameserver.migrate.cleanup', 'dz').length, 1, 'das Archiv am Ziel bleibt in /tmp liegen');
         assert.ok(logs.length === 0 || !logs.some(l => /nicht abgebaut/.test(l)));
+    });
+
+    console.log('\nSicherungen ziehen mit (Baustelle 209)');
+
+    await pruefe('Mit Sicherungen: gewünscht, bestätigt an Quelle und Ziel, dann Quelle deinstalliert', async () => {
+        db.sicherungen = ['Probe_2026-10-01', 'Probe_2026-10-02'];
+        const r = await umzug();
+        assert.strictEqual(r.success, true, r.error);
+        assert.strictEqual(befehle('gameserver.migrate.backup')[0].nutzlast.sicherungen, true);
+        assert.strictEqual(befehle('gameserver.uninstall', 'dq').length, 1);
+    });
+
+    await pruefe('Alter Daemon an der Quelle mit Sicherungen: kein Umzug, Quelle bleibt', async () => {
+        db.sicherungen = ['Probe_2026-10-01'];
+        daemon.alt.add('dq');
+        const r = await umzug();
+        assert.strictEqual(r.success, false);
+        assert.match(r.error, /Sicherung\(en\) nicht ins Archiv gelegt/);
+        assert.strictEqual(befehle('gameserver.uninstall', 'dq').length, 0);
+    });
+
+    await pruefe('Alter Daemon am Ziel mit Sicherungen: kein Umzug, Ziel geräumt, Quelle bleibt', async () => {
+        db.sicherungen = ['Probe_2026-10-01'];
+        daemon.alt.add('dz');
+        const r = await umzug();
+        assert.strictEqual(r.success, false);
+        assert.match(r.error, /Sicherung\(en\) nicht übernommen/);
+        assert.strictEqual(befehle('gameserver.uninstall', 'dz').length, 1);
+        assert.strictEqual(befehle('gameserver.uninstall', 'dq').length, 0);
     });
 
     await pruefe('Scheitert das Löschen an der Quelle, ist der Umzug trotzdem gelungen — und es steht im Log', async () => {

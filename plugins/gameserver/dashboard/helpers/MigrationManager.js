@@ -415,6 +415,9 @@ class MigrationManager {
         // Das Archiv am Ziel — der catch-Block räumt es mit weg, sonst blieb es
         // nach jedem gescheiterten Umzug in /tmp des Ziels (2026-10-28).
         let targetBackupPath = null;
+        // Ab dem Auspacken liegen am Ziel Spieldateien und Sicherungen — der
+        // catch-Block deinstalliert sie dort wieder, solange nicht umgeschrieben.
+        let amZielAusgepackt = false;
 
         try {
             // Schritt 0: Cronjobs anhalten.
@@ -516,8 +519,10 @@ class MigrationManager {
                         server_id: String(server.id),
                         daemon_id: sourceRootServer.daemon_id,
                         backup_path: backupPath,
-                        // Die Datenbanken reisen im Archiv mit (S7).
-                        datenbanken
+                        // Die Datenbanken reisen im Archiv mit (S7), die
+                        // Sicherungen ebenso (Baustelle 209, 2026-10-28).
+                        datenbanken,
+                        sicherungen: true
                     },
                     900000 // 15 Minuten Timeout (tar.gz großer Server dauert; 3 min waren zu knapp)
                 );
@@ -543,6 +548,22 @@ class MigrationManager {
                     throw new Error(`Der Quell-Daemon hat Datenbank ${fehlt.join(', ')} nicht ins Archiv gelegt `
                         + '— ist er älter als 1.0.148? Der Server bleibt, wo er ist.');
                 }
+            }
+
+            // Dasselbe für die Sicherungen (Baustelle 209): Ein Daemon vor
+            // 1.0.149 kennt den Wunsch nicht, packt ohne sie — und das Löschen
+            // an der Quelle nach dem Umzug nähme sie mit.
+            const erwarteteSicherungen = await this._sicherungenDesServers(server.id);
+            const imArchivSicherungen = backupResult.sicherungen ?? backupResult.data?.sicherungen;
+            if (erwarteteSicherungen.length && !Array.isArray(imArchivSicherungen)) {
+                throw new Error(`Der Quell-Daemon hat die ${erwarteteSicherungen.length} Sicherung(en) nicht ins Archiv gelegt `
+                    + '— ist er älter als 1.0.149? Der Server bleibt, wo er ist.');
+            }
+            const sicherungenImArchiv = Array.isArray(imArchivSicherungen) ? imArchivSicherungen : [];
+            const ohneArchiv = erwarteteSicherungen.filter(n => !sicherungenImArchiv.includes(`${n}.tar.gz`));
+            if (ohneArchiv.length) {
+                // Kein Grund abzubrechen: Diese Archive fehlten schon vorher.
+                this.Logger.warn(`[MigrationManager] Sicherung(en) ohne Archiv an der Quelle, ziehen nicht mit: ${ohneArchiv.join(', ')}`);
             }
 
             const backupSize = backupResult.backup_size_bytes ?? backupResult.data?.backup_size_bytes ?? 0;
@@ -579,6 +600,7 @@ class MigrationManager {
             }
 
             let restoreResult;
+            amZielAusgepackt = true;
             try {
                 restoreResult = await this.ipmServer.sendCommand(
                     targetRootServer.daemon_id,
@@ -599,6 +621,16 @@ class MigrationManager {
 
             if (!restoreResult?.success) {
                 throw new Error(`Restore fehlgeschlagen: ${restoreResult?.message || restoreResult?.error || 'Unbekannt'}`);
+            }
+
+            // Die Sicherungen: am Ziel muss liegen, was im Archiv war.
+            if (sicherungenImArchiv.length) {
+                const amZiel = restoreResult.sicherungen ?? restoreResult.data?.sicherungen ?? [];
+                const fehlt = sicherungenImArchiv.filter(n => !amZiel.includes(n));
+                if (fehlt.length) {
+                    throw new Error(`Der Ziel-Daemon hat ${fehlt.length} Sicherung(en) nicht übernommen (${fehlt.join(', ')}) `
+                        + '— ist er älter als 1.0.149? Der Server bleibt, wo er ist.');
+                }
             }
 
             // Dasselbe am Ziel: eingespielt ist nur, was der Daemon nennt.
@@ -813,6 +845,24 @@ class MigrationManager {
                 }
             }
 
+            // Was am Ziel ausgepackt wurde — Spieldateien und Sicherungen eines
+            // Servers, der dort nicht ist — wieder weg. Derselbe Befehl wie
+            // beim Löschen; am Ziel gibt es von diesem Server sonst nichts.
+            if (amZielAusgepackt && !umgeschrieben) {
+                try {
+                    const weg = await this.ipmServer.sendCommand(targetRootServer.daemon_id, 'gameserver.uninstall', {
+                        server_id: String(server.id),
+                        guild_id: guildId,
+                        rootserver_id: Number(targetRootServer.id),
+                        daemon_id: targetRootServer.daemon_id,
+                    }, 120000);
+                    if (weg?.success === false) throw new Error(weg.error || weg.message || 'kein Erfolg gemeldet');
+                    this.Logger.info(`[MigrationManager] Ausgepacktes am Ziel ${targetRootServer.name} wieder entfernt`);
+                } catch (zielErr) {
+                    this.Logger.warn(`[MigrationManager] Ausgepacktes am Ziel ${targetRootServer.name} NICHT entfernt: ${zielErr.message}`);
+                }
+            }
+
             // Vorläufig gebuchte Ports am Ziel wieder freigeben.
             if (zielBelegt.length && !umgeschrieben) {
                 try {
@@ -926,6 +976,18 @@ class MigrationManager {
      * Passt Ports an, falls Ziel-Server andere Ranges hat
      * @private
      */
+    /**
+     * Die Namen der Sicherungen eines Servers, deren Archiv es geben sollte
+     * (abgeschlossen, nicht von der Aufbewahrung entfernt).
+     * @private
+     */
+    async _sicherungenDesServers(serverId) {
+        const zeilen = await this.dbService.query(
+            `SELECT name FROM gameserver_backups
+              WHERE server_id = ? AND status = 'completed' AND pruned_at IS NULL`, [serverId]);
+        return (zeilen || []).map(z => z.name);
+    }
+
     /**
      * Die Ports am Ziel — nach dem Paket und aus dem Vorrat der Ziel-Maschine
      * (Portvergabe, dieselbe Regel wie beim Anlegen). Der bisherige Spielport
