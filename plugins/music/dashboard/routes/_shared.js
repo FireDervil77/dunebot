@@ -153,7 +153,7 @@ function auspacken(antworten) {
     const umschlag = antworten?.[0];
     if (!umschlag) return { success: false, error: 'Der Bot hat nicht geantwortet' };
     if (!umschlag.success) return { success: false, error: umschlag.error || 'Der Bot meldet einen Fehler' };
-    return umschlag.data ?? { success: false, error: 'Der Bot hat nichts zurueckgegeben' };
+    return umschlag.data ?? { success: false, error: 'Der Bot hat nichts zurückgegeben' };
 }
 
 /**

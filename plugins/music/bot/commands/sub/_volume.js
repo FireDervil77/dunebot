@@ -14,9 +14,9 @@ module.exports = async (mitglied, wert) => {
     });
     if (!p.ok) return antwort(p.fehler, 'warnung');
 
-    if (nurLesen) return antwort(`Die Lautstaerke steht auf **${p.abspieler.lautstaerke}%**.`);
+    if (nurLesen) return antwort(`Die Lautstärke steht auf **${p.abspieler.lautstaerke}%**.`);
 
     const neu = p.abspieler.lautstaerkeSetzen(wert);
-    const warnung = neu > 100 ? '\n\nUeber 100 % kann es uebersteuern.' : '';
-    return antwort(`Lautstaerke auf **${neu}%** gesetzt.${warnung}`);
+    const warnung = neu > 100 ? '\n\nÜber 100 % kann es übersteuern.' : '';
+    return antwort(`Lautstärke auf **${neu}%** gesetzt.${warnung}`);
 };

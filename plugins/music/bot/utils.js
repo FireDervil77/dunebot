@@ -42,17 +42,17 @@ async function pruefen(mitglied, optionen = {}) {
 
     const manager = mitglied?.client?.musicManager;
     if (!manager) {
-        return { ok: false, fehler: 'Das Musik-System laeuft gerade nicht.', manager: null, abspieler: null };
+        return { ok: false, fehler: 'Das Musik-System läuft gerade nicht.', manager: null, abspieler: null };
     }
 
     if (brauchtSprachkanal && !mitglied.voice?.channel) {
-        return { ok: false, fehler: 'Du musst dafuer in einem Sprachkanal sein.', manager, abspieler: null };
+        return { ok: false, fehler: 'Du musst dafür in einem Sprachkanal sein.', manager, abspieler: null };
     }
 
     const abspieler = manager.vorhanden(mitglied.guild.id);
 
     if (brauchtAbspieler && (!abspieler || !abspieler.verbunden)) {
-        return { ok: false, fehler: 'Es laeuft gerade nichts.', manager, abspieler: null };
+        return { ok: false, fehler: 'Es läuft gerade nichts.', manager, abspieler: null };
     }
 
     // Wer im falschen Kanal steht, soll nicht mitsteuern
@@ -61,7 +61,7 @@ async function pruefen(mitglied, optionen = {}) {
     }
 
     if (brauchtSteuerrecht && !(await manager.darfSteuern(mitglied))) {
-        return { ok: false, fehler: 'Dafuer brauchst du die DJ-Rolle.', manager, abspieler };
+        return { ok: false, fehler: 'Dafür brauchst du die DJ-Rolle.', manager, abspieler };
     }
 
     return { ok: true, fehler: null, manager, abspieler };
@@ -99,7 +99,7 @@ const HINWEISE = {
     SPOTIFY_UNVERFUEGBAR: 'Spotify ist nicht eingerichtet. Es fehlen SPOTIFY_CLIENT_ID und SPOTIFY_CLIENT_SECRET in apps/bot/.env.',
     SOUNDCLOUD_UNVERFUEGBAR: 'SoundCloud ist gerade nicht erreichbar.',
     NICHTS_GEFUNDEN: 'Dazu habe ich nichts gefunden.',
-    AUFLOESEN_FEHLGESCHLAGEN: 'Das konnte ich nicht aufloesen.',
+    AUFLOESEN_FEHLGESCHLAGEN: 'Das konnte ich nicht auflösen.',
     // Eintrag ohne Datei - etwa weil jemand von Hand aufgeraeumt hat oder die
     // Aufbewahrung gerade abgelaufen ist. Ehrlich melden ist besser, als im
     // Sprachkanal stumm zu bleiben.

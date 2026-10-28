@@ -20,8 +20,8 @@ module.exports = async (mitglied) => {
 
         return antwort(
             laeuft
-                ? 'Leitung neu gelegt — der Titel faengt von vorn an.'
-                : 'Leitung neu gelegt. In der Warteschlange stand nichts, was ich anspielen koennte.'
+                ? 'Leitung neu gelegt — der Titel fängt von vorn an.'
+                : 'Leitung neu gelegt. In der Warteschlange stand nichts, was ich anspielen könnte.'
         );
     } catch (err) {
         ServiceManager.get('Logger').error(

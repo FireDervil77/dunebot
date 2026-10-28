@@ -71,27 +71,27 @@ router.post('/', requirePermission('MUSIC.PLAYLISTS.MANAGE'), async (req, res) =
 
 router.put('/:id', requirePermission('MUSIC.PLAYLISTS.MANAGE'), async (req, res) => {
     const id = parseInt(req.params.id, 10);
-    if (Number.isNaN(id)) return res.status(400).json({ success: false, error: 'Ungueltige ID' });
+    if (Number.isNaN(id)) return res.status(400).json({ success: false, error: 'Ungültige ID' });
 
     try {
         const erfolg = await MusicPlaylists.update(id, res.locals.guildId, req.body);
         if (!erfolg) return res.status(404).json({ success: false, error: 'Liste nicht gefunden' });
         res.json({ success: true });
     } catch (error) {
-        fehler(res, error, 'Die Liste konnte nicht geaendert werden');
+        fehler(res, error, 'Die Liste konnte nicht geändert werden');
     }
 });
 
 router.delete('/:id', requirePermission('MUSIC.PLAYLISTS.MANAGE'), async (req, res) => {
     const id = parseInt(req.params.id, 10);
-    if (Number.isNaN(id)) return res.status(400).json({ success: false, error: 'Ungueltige ID' });
+    if (Number.isNaN(id)) return res.status(400).json({ success: false, error: 'Ungültige ID' });
 
     try {
         const erfolg = await MusicPlaylists.delete(id, res.locals.guildId);
         if (!erfolg) return res.status(404).json({ success: false, error: 'Liste nicht gefunden' });
         res.json({ success: true });
     } catch (error) {
-        fehler(res, error, 'Die Liste konnte nicht geloescht werden');
+        fehler(res, error, 'Die Liste konnte nicht gelöscht werden');
     }
 });
 
@@ -105,7 +105,7 @@ router.post('/:id/titel', requirePermission('MUSIC.PLAYLISTS.MANAGE'), async (re
     const id = parseInt(req.params.id, 10);
     const eingabe = String(req.body.eingabe || '').trim();
 
-    if (Number.isNaN(id)) return res.status(400).json({ success: false, error: 'Ungueltige ID' });
+    if (Number.isNaN(id)) return res.status(400).json({ success: false, error: 'Ungültige ID' });
     if (!eingabe) return res.status(400).json({ success: false, error: 'Es fehlt eine Adresse oder ein Suchbegriff' });
 
     const ipcServer = ServiceManager.get('ipcServer');
@@ -144,7 +144,7 @@ router.post('/:id/titel', requirePermission('MUSIC.PLAYLISTS.MANAGE'), async (re
  */
 router.post('/:id/aktuell', requirePermission('MUSIC.PLAYLISTS.MANAGE'), async (req, res) => {
     const id = parseInt(req.params.id, 10);
-    if (Number.isNaN(id)) return res.status(400).json({ success: false, error: 'Ungueltige ID' });
+    if (Number.isNaN(id)) return res.status(400).json({ success: false, error: 'Ungültige ID' });
 
     try {
         const zustand = await zustandHolen(res.locals.guildId);
@@ -152,7 +152,7 @@ router.post('/:id/aktuell', requirePermission('MUSIC.PLAYLISTS.MANAGE'), async (
             return res.status(503).json({ success: false, error: 'Der Bot ist nicht erreichbar' });
         }
         if (!zustand.aktuell) {
-            return res.status(400).json({ success: false, error: 'Gerade laeuft nichts' });
+            return res.status(400).json({ success: false, error: 'Gerade läuft nichts' });
         }
 
         return await titelAblegen(res, id, zustand.aktuell, angemeldeterNutzer(req, res));
@@ -171,7 +171,7 @@ router.post('/:id/verlauf/:verlaufId', requirePermission('MUSIC.PLAYLISTS.MANAGE
     const id = parseInt(req.params.id, 10);
     const verlaufId = parseInt(req.params.verlaufId, 10);
     if (Number.isNaN(id) || Number.isNaN(verlaufId)) {
-        return res.status(400).json({ success: false, error: 'Ungueltige ID' });
+        return res.status(400).json({ success: false, error: 'Ungültige ID' });
     }
 
     try {
@@ -194,7 +194,7 @@ router.delete('/:id/titel/:trackId', requirePermission('MUSIC.PLAYLISTS.MANAGE')
     const trackId = parseInt(req.params.trackId, 10);
 
     if (Number.isNaN(id) || Number.isNaN(trackId)) {
-        return res.status(400).json({ success: false, error: 'Ungueltige ID' });
+        return res.status(400).json({ success: false, error: 'Ungültige ID' });
     }
 
     try {
@@ -217,7 +217,7 @@ router.post('/:id/abspielen', requirePermission('MUSIC.PLAY'), async (req, res) 
     const id = parseInt(req.params.id, 10);
     const ipcServer = ServiceManager.get('ipcServer');
 
-    if (Number.isNaN(id)) return res.status(400).json({ success: false, error: 'Ungueltige ID' });
+    if (Number.isNaN(id)) return res.status(400).json({ success: false, error: 'Ungültige ID' });
     if (!ipcServer) return res.status(503).json({ success: false, error: 'Der Bot ist nicht erreichbar' });
 
     try {

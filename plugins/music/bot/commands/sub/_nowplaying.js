@@ -9,7 +9,7 @@ module.exports = async (mitglied) => {
     if (!p.ok) return antwort(p.fehler, 'warnung');
 
     const zustand = p.manager.zustand(mitglied.guild.id);
-    if (!zustand.aktuell) return antwort('Es laeuft gerade nichts.', 'warnung');
+    if (!zustand.aktuell) return antwort('Es läuft gerade nichts.', 'warnung');
 
     const t = zustand.aktuell;
     const gelaufen = t.positionSek || 0;
@@ -25,7 +25,7 @@ module.exports = async (mitglied) => {
     return {
         embeds: [{
             color: FARBE,
-            author: { name: zustand.pausiert ? 'Angehalten' : 'Jetzt laeuft' },
+            author: { name: zustand.pausiert ? 'Angehalten' : 'Jetzt läuft' },
             title: t.title.substring(0, 256),
             url: t.herkunftUrl || t.url,
             description: fortschritt || `\`${dauerText(gelaufen)} — live\``,
@@ -33,7 +33,7 @@ module.exports = async (mitglied) => {
             fields: [
                 { name: 'Quelle', value: t.source, inline: true },
                 { name: 'Lautstaerke', value: `${zustand.lautstaerke}%`, inline: true },
-                ...(t.requestedBy ? [{ name: 'Gewuenscht von', value: `<@${t.requestedBy}>`, inline: true }] : [])
+                ...(t.requestedBy ? [{ name: 'Gewünscht von', value: `<@${t.requestedBy}>`, inline: true }] : [])
             ],
             footer: { text: `${zustand.warteschlangeLaenge} weitere in der Warteschlange` }
         }]

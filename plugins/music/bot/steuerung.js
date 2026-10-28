@@ -87,7 +87,7 @@ function embed(z) {
         return {
             color: FARBE,
             author: { name: 'Musik' },
-            description: 'Gerade laeuft nichts. Mit `/music play` geht es los - ' +
+            description: 'Gerade läuft nichts. Mit `/music play` geht es los - ' +
                 'ich bleibe so lange hier im Kanal.'
         };
     }
@@ -95,7 +95,7 @@ function embed(z) {
     const balken = fortschritt(t.positionSek || 0, t.durationSec);
     const zeit = t.durationSec
         ? `\`${dauerText(t.positionSek || 0)}\` ${balken} \`${dauerText(t.durationSec)}\``
-        : '`live` — Internetradio laeuft ohne Ende';
+        : '`live` — Internetradio läuft ohne Ende';
 
     const felder = [
         { name: 'Quelle', value: String(t.source || '—'), inline: true },
@@ -104,7 +104,7 @@ function embed(z) {
     ];
 
     if (t.requestedBy) {
-        felder.push({ name: 'Gewuenscht von', value: `<@${t.requestedBy}>`, inline: true });
+        felder.push({ name: 'Gewünscht von', value: `<@${t.requestedBy}>`, inline: true });
     }
     if (z.warteschlangeLaenge > 0) {
         felder.push({ name: 'Danach', value: `${z.warteschlangeLaenge} in der Warteschlange`, inline: true });
@@ -115,7 +115,7 @@ function embed(z) {
 
     return {
         color: FARBE,
-        author: { name: z.pausiert ? 'Angehalten' : 'Jetzt laeuft' },
+        author: { name: z.pausiert ? 'Angehalten' : 'Jetzt läuft' },
         title: String(t.title || 'Unbekannter Titel').substring(0, 256),
         url: t.herkunftUrl || t.url || undefined,
         thumbnail: t.thumbnail ? { url: t.thumbnail } : undefined,

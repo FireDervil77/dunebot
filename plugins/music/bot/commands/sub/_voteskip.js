@@ -17,7 +17,7 @@ module.exports = async (mitglied) => {
     // Wer ohnehin steuern darf, braucht keine Abstimmung
     if (await p.manager.darfSteuern(mitglied)) {
         p.abspieler.ueberspringen(1);
-        return antwort(`Uebersprungen: ${aktuell ? titelZeile(aktuell) : '—'}`);
+        return antwort(`Übersprungen: ${aktuell ? titelZeile(aktuell) : '—'}`);
     }
 
     const zuhoerer = mitglied.voice.channel.members.filter(m => !m.user.bot).size;
@@ -30,10 +30,10 @@ module.exports = async (mitglied) => {
     if (ergebnis.erreicht) {
         p.abspieler.ueberspringen(1);
         return antwort(
-            `Genug Stimmen (**${ergebnis.gezaehlt}/${ergebnis.noetig}**) — uebersprungen: ` +
+            `Genug Stimmen (**${ergebnis.gezaehlt}/${ergebnis.noetig}**) — übersprungen: ` +
             `${aktuell ? titelZeile(aktuell) : '—'}`
         );
     }
 
-    return antwort(`Stimme gezaehlt: **${ergebnis.gezaehlt}/${ergebnis.noetig}**.`);
+    return antwort(`Stimme gezählt: **${ergebnis.gezaehlt}/${ergebnis.noetig}**.`);
 };

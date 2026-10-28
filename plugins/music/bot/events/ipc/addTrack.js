@@ -11,7 +11,7 @@ const { MusicSettings } = require('../../../shared/models');
 module.exports = async (payload, client) => {
     const { guildId, eingabe, angefordertVon, anfang } = payload;
 
-    if (!client.musicManager) return { success: false, error: 'Das Musik-System laeuft nicht' };
+    if (!client.musicManager) return { success: false, error: 'Das Musik-System läuft nicht' };
     if (!guildId || !eingabe) return { success: false, error: 'guildId und eingabe sind erforderlich' };
 
     const abspieler = client.musicManager.vorhanden(guildId);

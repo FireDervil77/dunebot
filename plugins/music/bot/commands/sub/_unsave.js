@@ -25,6 +25,6 @@ module.exports = async (mitglied, name) => {
     const weg = await MusicPlaylists.delete(liste.id, mitglied.guild.id);
 
     return weg
-        ? antwort(`**${listenName}** geloescht (${anzahl} Titel).`)
-        : antwort('Die Liste liess sich nicht loeschen.', 'fehler');
+        ? antwort(`**${listenName}** gelöscht (${anzahl} Titel).`)
+        : antwort('Die Liste ließ sich nicht löschen.', 'fehler');
 };

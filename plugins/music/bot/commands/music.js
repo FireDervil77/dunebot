@@ -467,7 +467,7 @@ async function ausfuehren(unterbefehl, mitglied, o) {
             return {
                 embeds: [{
                     color: 0xF59F00,
-                    description: 'Unbekannter Unterbefehl. Nutze `/music` und waehle aus der Liste.'
+                    description: 'Unbekannter Unterbefehl. Nutze `/music` und wähle aus der Liste.'
                 }]
             };
     }

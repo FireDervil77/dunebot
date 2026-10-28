@@ -26,14 +26,14 @@ module.exports = async (mitglied, seite = 1) => {
 
     if (zustand.aktuell) {
         felder.push({
-            name: zustand.pausiert ? 'Angehalten' : 'Laeuft gerade',
+            name: zustand.pausiert ? 'Angehalten' : 'Läuft gerade',
             value: `${titelZeile(zustand.aktuell)}\n\`${dauerText(zustand.aktuell.positionSek)} / ${dauerText(zustand.aktuell.durationSec)}\``
         });
     }
 
     if (ausschnitt.length > 0) {
         felder.push({
-            name: `Als Naechstes (Seite ${aktuelleSeite} von ${seiten})`,
+            name: `Als Nächstes (Seite ${aktuelleSeite} von ${seiten})`,
             value: ausschnitt.map((t, i) => titelZeile(t, von + i + 1)).join('\n').substring(0, 1024)
         });
     }
@@ -41,7 +41,7 @@ module.exports = async (mitglied, seite = 1) => {
     const fuss = [
         `${zustand.titelGesamt ?? zustand.warteschlange.length} Titel`,
         `Restspielzeit ${spielzeitText(zustand.restspielzeitSek)}`,
-        `Lautstaerke ${zustand.lautstaerke}%`,
+        `Lautstärke ${zustand.lautstaerke}%`,
         zustand.wiederholung !== 'aus' ? `Wiederholung: ${zustand.wiederholung}` : null,
         zustand.filter !== 'aus' ? `Filter: ${zustand.filter}` : null
     ].filter(Boolean).join(' · ');

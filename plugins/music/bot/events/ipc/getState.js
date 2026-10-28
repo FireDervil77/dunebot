@@ -6,7 +6,7 @@
  */
 module.exports = async (payload, client) => {
     const { guildId } = payload;
-    if (!client.musicManager) return { success: false, error: 'Das Musik-System laeuft nicht' };
+    if (!client.musicManager) return { success: false, error: 'Das Musik-System läuft nicht' };
     if (!guildId) return { success: false, error: 'guildId fehlt' };
 
     try {

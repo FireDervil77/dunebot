@@ -27,14 +27,14 @@ module.exports = async (mitglied, name, nurAktuell = false) => {
     const zustand = p.abspieler.zustand();
 
     if (nurAktuell && !zustand.aktuell) {
-        return antwort('Gerade laeuft nichts, was sich sichern liesse.', 'warnung');
+        return antwort('Gerade läuft nichts, was sich sichern ließe.', 'warnung');
     }
 
     const alle = nurAktuell
         ? [zustand.aktuell]
         : [...(zustand.aktuell ? [zustand.aktuell] : []), ...zustand.warteschlange];
 
-    if (alle.length === 0) return antwort('Es ist nichts da, was sich sichern liesse.', 'warnung');
+    if (alle.length === 0) return antwort('Es ist nichts da, was sich sichern ließe.', 'warnung');
 
     // `music_playlist_tracks.url` ist NOT NULL. Spotify-Titel tragen erst eine
     // Adresse, wenn sie an der Reihe waren - die koennen wir hier noch nicht

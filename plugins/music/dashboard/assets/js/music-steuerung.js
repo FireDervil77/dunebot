@@ -144,12 +144,12 @@
     };
 
     window.musicListeLoeschen = function (id, name) {
-        const frage = text('LISTE_LOESCHEN', 'Liste "{name}" wirklich loeschen?').replace('{name}', name);
+        const frage = text('LISTE_LOESCHEN', 'Liste "{name}" wirklich löschen?').replace('{name}', name);
         if (!window.confirm(frage)) return;
 
         anfrage('DELETE', '/listen/api/' + id)
             .then(function () {
-                melden(text('LISTE_GELOESCHT', 'Liste geloescht.'));
+                melden(text('LISTE_GELOESCHT', 'Liste gelöscht.'));
                 window.location.href = basis() + '/listen';
             })
             .catch(fehlerMelden);

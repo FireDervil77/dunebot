@@ -25,7 +25,7 @@ module.exports = async (mitglied, von, nach) => {
     if (!titel) return antwort('An dieser Stelle steht nichts.', 'warnung');
 
     if (!p.abspieler.verschieben(von - 1, nach - 1)) {
-        return antwort('Das liess sich nicht verschieben.', 'warnung');
+        return antwort('Das ließ sich nicht verschieben.', 'warnung');
     }
 
     // Wohin es wirklich ging - `verschieben` begrenzt auf das Ende der Liste

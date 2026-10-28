@@ -115,7 +115,7 @@ router.post('/ueberspringen', requirePermission('MUSIC.CONTROL'), (req, res) => 
 router.post('/lautstaerke', requirePermission('MUSIC.CONTROL'), (req, res) => {
     const wert = parseInt(req.body.wert, 10);
     if (Number.isNaN(wert) || wert < 0 || wert > 200) {
-        return res.status(400).json({ success: false, error: 'Die Lautstaerke muss zwischen 0 und 200 liegen' });
+        return res.status(400).json({ success: false, error: 'Die Lautstärke muss zwischen 0 und 200 liegen' });
     }
     return steuern(res, res.locals.guildId, 'lautstaerke', wert);
 });
@@ -139,7 +139,7 @@ router.post('/autoplay', requirePermission('MUSIC.SETTINGS.EDIT'), (req, res) =>
 router.delete('/warteschlange/:position', requirePermission('MUSIC.CONTROL'), (req, res) => {
     const position = parseInt(req.params.position, 10);
     if (Number.isNaN(position) || position < 0) {
-        return res.status(400).json({ success: false, error: 'Ungueltige Position' });
+        return res.status(400).json({ success: false, error: 'Ungültige Position' });
     }
     return steuern(res, res.locals.guildId, 'entfernen', position);
 });

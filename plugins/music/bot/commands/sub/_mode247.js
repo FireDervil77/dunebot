@@ -18,6 +18,6 @@ module.exports = async (mitglied, an) => {
     });
 
     return antwort(an
-        ? 'Dauerbetrieb **an** — ich bleibe im Sprachkanal, auch wenn nichts laeuft.'
+        ? 'Dauerbetrieb **an** — ich bleibe im Sprachkanal, auch wenn nichts läuft.'
         : 'Dauerbetrieb **aus** — ich gehe wieder, wenn nichts mehr kommt.');
 };

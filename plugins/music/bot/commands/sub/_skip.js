@@ -13,6 +13,6 @@ module.exports = async (mitglied, anzahl = 1) => {
     p.abspieler.ueberspringen(Math.max(1, anzahl));
 
     return antwort(anzahl > 1
-        ? `**${anzahl} Titel** uebersprungen.`
-        : `Uebersprungen: ${uebersprungen ? titelZeile(uebersprungen) : '—'}`);
+        ? `**${anzahl} Titel** übersprungen.`
+        : `Übersprungen: ${uebersprungen ? titelZeile(uebersprungen) : '—'}`);
 };

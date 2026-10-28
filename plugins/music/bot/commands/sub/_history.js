@@ -44,7 +44,7 @@ module.exports = async (mitglied, nummer = null) => {
     }
 
     const e = eintraege[nummer - 1];
-    if (!e) return antwort(`Im Verlauf stehen nur ${eintraege.length} Eintraege.`, 'warnung');
+    if (!e) return antwort(`Im Verlauf stehen nur ${eintraege.length} Einträge.`, 'warnung');
     if (!e.url) return antwort('Zu diesem Eintrag steht keine Quelle mehr fest.', 'warnung');
 
     const { aufgenommen } = await p.abspieler.hinzufuegen([{

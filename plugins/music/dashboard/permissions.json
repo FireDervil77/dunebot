@@ -5,14 +5,14 @@
     {
       "key": "MUSIC.VIEW",
       "name": "Musik ansehen",
-      "description": "Berechtigung um den Musik-Bereich zu oeffnen",
+      "description": "Berechtigung um den Musik-Bereich zu öffnen",
       "category": "music",
       "is_dangerous": 0,
       "requires": null
     },
     {
       "key": "MUSIC.PLAY",
-      "name": "Titel hinzufuegen",
+      "name": "Titel hinzufügen",
       "description": "Berechtigung um vom Dashboard aus Titel in die Warteschlange zu legen",
       "category": "music",
       "is_dangerous": 0,
@@ -21,7 +21,7 @@
     {
       "key": "MUSIC.CONTROL",
       "name": "Wiedergabe steuern",
-      "description": "Berechtigung um anzuhalten, zu ueberspringen, zu stoppen und die Lautstaerke zu setzen",
+      "description": "Berechtigung um anzuhalten, zu überspringen, zu stoppen und die Lautstärke zu setzen",
       "category": "music",
       "is_dangerous": 0,
       "requires": "MUSIC.VIEW"
@@ -29,7 +29,7 @@
     {
       "key": "MUSIC.PLAYLISTS.MANAGE",
       "name": "Wiedergabelisten verwalten",
-      "description": "Berechtigung um Wiedergabelisten anzulegen, zu aendern und zu loeschen",
+      "description": "Berechtigung um Wiedergabelisten anzulegen, zu ändern und zu löschen",
       "category": "music",
       "is_dangerous": 0,
       "requires": "MUSIC.VIEW"
@@ -60,7 +60,7 @@
     },
     {
       "key": "MUSIC.FILES.DELETE",
-      "name": "Eigene Tondateien loeschen",
+      "name": "Eigene Tondateien löschen",
       "description": "Berechtigung um hochgeladene Tondateien wieder zu entfernen",
       "category": "music",
       "is_dangerous": 0,

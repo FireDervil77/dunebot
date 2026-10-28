@@ -36,25 +36,25 @@ module.exports = async (interaction) => {
     const nurFuerDich = (text) =>
         interaction.reply({ content: text, flags: MessageFlags.Ephemeral }).catch(() => {});
 
-    if (!manager) return nurFuerDich('Das Musik-System laeuft gerade nicht.');
+    if (!manager) return nurFuerDich('Das Musik-System läuft gerade nicht.');
 
     const abspieler = manager.vorhanden(interaction.guildId);
     if (!abspieler || !abspieler.verbindung) {
-        return nurFuerDich('Es laeuft gerade nichts mehr. Diese Knoepfe sind veraltet.');
+        return nurFuerDich('Es läuft gerade nichts mehr. Diese Knöpfe sind veraltet.');
     }
 
     const mitglied = interaction.member;
 
     // Wer nicht dabei ist, steuert nicht mit
     const eigenerKanal = mitglied?.voice?.channel;
-    if (!eigenerKanal) return nurFuerDich('Du musst dafuer im Sprachkanal sein.');
+    if (!eigenerKanal) return nurFuerDich('Du musst dafür im Sprachkanal sein.');
     if (eigenerKanal.id !== abspieler.sprachKanalId) {
         return nurFuerDich('Du bist in einem anderen Sprachkanal als ich.');
     }
 
     // Die Warteschlange anzusehen darf jeder, alles andere braucht das Recht
     if (vorgang !== 'queue' && !(await manager.darfSteuern(mitglied))) {
-        return nurFuerDich('Dafuer brauchst du die DJ-Rolle.');
+        return nurFuerDich('Dafür brauchst du die DJ-Rolle.');
     }
 
     try {

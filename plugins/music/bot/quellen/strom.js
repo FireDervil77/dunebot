@@ -196,7 +196,7 @@ function tonstromVonSeite(adresse, qualitaet = 2) {
         const grund = err.code === 'ENOENT'
             ? `yt-dlp wurde nicht gefunden (gesucht als "${pfad}")`
             : err.message;
-        protokoll('error', `[Musik] yt-dlp liess sich nicht starten: ${grund}`);
+        protokoll('error', `[Musik] yt-dlp ließ sich nicht starten: ${grund}`);
         try { vorgang.stdout.destroy(new Error(grund)); } catch { /* schon zu */ }
     });
 

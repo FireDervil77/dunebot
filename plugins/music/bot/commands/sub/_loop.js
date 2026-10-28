@@ -16,7 +16,7 @@ module.exports = async (mitglied, modus) => {
     if (!p.ok) return antwort(p.fehler, 'warnung');
 
     if (!Object.values(GuildPlayer.WIEDERHOLUNG).includes(modus)) {
-        return antwort('Waehle `aus`, `titel` oder `liste`.', 'warnung');
+        return antwort('Wähle `aus`, `titel` oder `liste`.', 'warnung');
     }
 
     p.abspieler.wiederholungSetzen(modus);

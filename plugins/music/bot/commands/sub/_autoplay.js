@@ -13,6 +13,6 @@ module.exports = async (mitglied, an) => {
     await MusicSettings.updateSettings(mitglied.guild.id, { autoplay: an ? 1 : 0 });
 
     return antwort(an
-        ? 'Autoplay **an** — wenn die Warteschlange leer laeuft, suche ich passende Titel nach.'
+        ? 'Autoplay **an** — wenn die Warteschlange leer läuft, suche ich passende Titel nach.'
         : 'Autoplay **aus** — nach dem letzten Titel ist Schluss.');
 };

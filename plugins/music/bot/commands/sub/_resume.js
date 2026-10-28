@@ -5,6 +5,6 @@ module.exports = async (mitglied) => {
     const p = await pruefen(mitglied, { brauchtSteuerrecht: true, brauchtAbspieler: true });
     if (!p.ok) return antwort(p.fehler, 'warnung');
 
-    if (!p.abspieler.fortsetzen()) return antwort('Es laeuft bereits.', 'warnung');
+    if (!p.abspieler.fortsetzen()) return antwort('Es läuft bereits.', 'warnung');
     return antwort('Weiter geht es.');
 };

@@ -64,7 +64,7 @@ const FILTER = {
     // Filter kenne ich nicht", und das Dashboard speicherte still "aus".
     // Alle Schluessel sind jetzt klein; `schluessel()` haelt es auch so.
     ausgleich: {
-        name: 'Lautstaerke ausgleichen',
+        name: 'Lautstärke ausgleichen',
         ffmpeg: 'dynaudnorm=f=200',
         tempo: 1
     },
@@ -90,7 +90,7 @@ const FILTER = {
         tempo: 0.8
     },
     hoeher: {
-        name: 'Hoehere Tonlage',
+        name: 'Höhere Tonlage',
         ffmpeg: 'rubberband=pitch=1.15',
         tempo: 1
     },

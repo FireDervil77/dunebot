@@ -7,11 +7,11 @@
 module.exports = async (payload, client) => {
     const { guildId, vorgang, wert } = payload;
 
-    if (!client.musicManager) return { success: false, error: 'Das Musik-System laeuft nicht' };
+    if (!client.musicManager) return { success: false, error: 'Das Musik-System läuft nicht' };
     if (!guildId) return { success: false, error: 'guildId fehlt' };
 
     const abspieler = client.musicManager.vorhanden(guildId);
-    if (!abspieler) return { success: false, error: 'Es laeuft gerade nichts' };
+    if (!abspieler) return { success: false, error: 'Es läuft gerade nichts' };
 
     try {
         switch (vorgang) {
@@ -65,7 +65,7 @@ module.exports = async (payload, client) => {
 
             case 'verschieben':
                 if (!abspieler.verschieben(parseInt(wert?.von, 10), parseInt(wert?.nach, 10))) {
-                    return { success: false, error: 'Verschieben nicht moeglich' };
+                    return { success: false, error: 'Verschieben nicht möglich' };
                 }
                 return { success: true };
 

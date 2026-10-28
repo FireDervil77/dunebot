@@ -27,11 +27,11 @@ module.exports = async (mitglied, name) => {
 
     const filter = klangfilter.holen(name);
     const hinweis = filter.tempo !== 1
-        ? '\n\nDieser Filter aendert das Tempo — die angezeigte Dauer stimmt dann nicht mehr genau.'
+        ? '\n\nDieser Filter ändert das Tempo — die angezeigte Dauer stimmt dann nicht mehr genau.'
         : '';
 
     return antwort(
-        `Filter auf **${filter.name}** gesetzt. Er greift ab dem naechsten Titel — ` +
+        `Filter auf **${filter.name}** gesetzt. Er greift ab dem nächsten Titel — ` +
         `mit \`/music skip\` sofort.${hinweis}`
     );
 };

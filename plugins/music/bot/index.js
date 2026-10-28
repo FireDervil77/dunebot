@@ -58,7 +58,7 @@ class MusicBotPlugin extends BotPlugin {
         } else {
             Logger.error(
                 `[Musik] yt-dlp fehlt (gesucht als "${ytdlp.pfad}") - es wird kein Ton abgespielt. ` +
-                'Abhilfe: die eigenstaendige Datei nach ~/.local/bin/yt-dlp legen oder YTDLP_PATH setzen.'
+                'Abhilfe: die eigenständige Datei nach ~/.local/bin/yt-dlp legen oder YTDLP_PATH setzen.'
             );
         }
 
