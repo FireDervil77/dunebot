@@ -784,6 +784,10 @@ async function aufloesen(raum, kennung, fassung = null, optionen = {}) {
             return null;
         }
 
+        // `braucht` haelt fest, wen dieses Projekt mitbringt (siehe
+        // Ficsit.aufloesen). Auch ein schon gefundenes zaehlt — es wird nur
+        // nicht ein zweites Mal verfolgt.
+        p.braucht = [];
         for (const d of p.abhaengig) {
             let ziel = null;
             try {
@@ -803,8 +807,12 @@ async function aufloesen(raum, kennung, fassung = null, optionen = {}) {
                 fehlend.push(`Unlesbare Abhängigkeit von ${slug}`);
                 continue;
             }
-            if (gefunden.has(ziel.slug)) continue;
-            await verfolge(ziel.slug, ziel.fassung, tiefe + 1);
+            if (gefunden.has(ziel.slug)) {
+                p.braucht.push(gefunden.get(ziel.slug).kennung);
+                continue;
+            }
+            const kind = await verfolge(ziel.slug, ziel.fassung, tiefe + 1);
+            if (kind) p.braucht.push(kind.kennung);
         }
 
         const schon = gefunden.get(p.kennung);
@@ -815,7 +823,7 @@ async function aufloesen(raum, kennung, fassung = null, optionen = {}) {
     const wurzel = await verfolge(String(kennung), fassung, 0);
     if (!wurzel) throw new Error(fehlend[0] || `${kennung} nicht gefunden`);
 
-    return { pakete: [...gefunden.values()], fehlend };
+    return { pakete: [...gefunden.values()], fehlend, wurzel: wurzel.kennung };
 }
 
 /**

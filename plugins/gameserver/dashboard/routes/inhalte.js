@@ -144,6 +144,10 @@ router.get('/:serverId/inhalte', requirePermission('GAMESERVER.VIEW'), async (re
             // Minecraft-Server, er brauche BepInEx von Thunderstore (Betreiber,
             // 2026-09-22). Beides falsch, und das zweite fuehrt zum Klicken.
             laderAlsInhalt: Boolean(inhalt?.loader),
+            // Laesst sich der Lader abschalten, ohne ihn zu entfernen? Nur wenn
+            // er ueber den Start scharf wird (BepInEx). SML laedt, weil es
+            // daliegt — ein Schalter daneben waere wirkungslos (2026-10-28).
+            laderSchaltbar: Inhalte.laderUeberStart(inhalt),
             // Welcher Lader hier tatsaechlich laeuft — aus den Werten des
             // Servers, nicht geraten.
             laderGewaehlt: (() => {
@@ -285,10 +289,15 @@ router.post('/:serverId/inhalte', requirePermission('GAMESERVER.FILES.MANAGE'), 
             kennung: req.file.originalname,
             name: req.body.name || req.file.originalname,
             fassung: req.body.fassung || null,
-            // Bei einem Archiv sind es viele Dateien; die Spalte haelt den
-            // Zielordner, damit spaeteres Entfernen nicht raten muss.
+            // `ablage` ist die Anzeige, `dateien` die Wahrheit fuers Entfernen.
+            // Bis zum 2026-10-28 fehlte die Liste hier: Ein hochgeladenes
+            // Archiv blieb beim Entfernen komplett liegen.
             ablage: dateien.length === 1 ? dateien[0] : (ziel || '.'),
+            dateien,
             clientSide: Boolean(inhalt.client_side),
+            // Selbst gewaehlt; was es braucht, weiss niemand — `braucht` bleibt
+            // NULL, und neben ihm geht keine Abhaengigkeit mit.
+            mitgebracht: false,
             status: 'installiert',
         });
 
@@ -1090,12 +1099,22 @@ router.post('/:serverId/inhalte/:id/schalten', requirePermission('GAMESERVER.FIL
         const geladen = await ladeServerUndPaket(dbService, req.params.serverId, res.locals.guildId);
         if (!geladen) return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
 
+        // Siehe Inhalte.schalten: Nur ein Lader, der ueber den Start scharf
+        // wird, laesst sich abschalten. Alles andere laedt, solange es daliegt.
+        if (!Inhalte.laderUeberStart(geladen.paket?.content)) {
+            return res.status(409).json({
+                success: false,
+                message: 'Hier gibt es nichts abzuschalten — was auf dem Server liegt, wird geladen. '
+                    + 'Entfernen nimmt es herunter.'
+            });
+        }
+
         const getroffen = await Inhalte.schalten(
             req.params.id, req.params.serverId, req.body.aktiv === true || req.body.aktiv === '1');
         if (!getroffen) {
             return res.status(404).json({
                 success: false,
-                message: 'Eintrag nicht gefunden oder bereits entfernt'
+                message: 'Kein Lader mit dieser Kennung, oder er ist bereits entfernt'
             });
         }
         return res.json({ success: true, ...wirkung(geladen) });
@@ -1106,22 +1125,15 @@ router.post('/:serverId/inhalte/:id/schalten', requirePermission('GAMESERVER.FIL
 });
 
 /**
- * Entfernen — die Zeile bleibt, die Datei geht.
+ * Entfernen — die Zeile bleibt, die Datei geht, und was nur mitkam, geht mit.
  *
- * ── Der Lader ist der Sonderfall ────────────────────────────────────────────
- *
- * Er wird nur ABGESCHALTET, seine Dateien bleiben liegen. Das ist kein
- * Nachlassen, sondern folgt aus seiner Bauform: BepInEx wird ueber die
- * Umgebung scharf (doorstop). Ohne den Schalter laedt es nicht — ob die Dateien
- * daliegen, ist dem Spiel gleich. Sie zu loeschen hiesse, ein Verzeichnis mit
- * Dutzenden Eintraegen rueckwaerts abzuraeumen, und ein halb abgeraeumtes
- * BepInEx ist schlimmer als ein vollstaendiges, das nicht geladen wird.
+ * Was „entfernen" heisst — auch beim Lader —, steht in
+ * `InhalteHolen.entferne`; wer mitgeht, in `Inhalte.waisenVon`.
  */
 router.delete('/:serverId/inhalte/:id', requirePermission('GAMESERVER.FILES.MANAGE'),
     async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
-    const ipmServer = ServiceManager.get('ipmServer');
 
     try {
         const { serverId, id } = req.params;
@@ -1129,39 +1141,45 @@ router.delete('/:serverId/inhalte/:id', requirePermission('GAMESERVER.FILES.MANA
         const geladen = await ladeServerUndPaket(dbService, serverId, res.locals.guildId);
         if (!geladen) return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
 
-        const zeile = await Inhalte.entfernen(id, serverId);
-        if (!zeile) return res.status(404).json({ success: false, message: 'Eintrag nicht gefunden' });
+        const ergebnis = await InhalteHolen.entferneMitWaisen({
+            server: geladen.server, inhalt: geladen.paket?.content || null, zeileId: id });
+        if (!ergebnis) return res.status(404).json({ success: false, message: 'Eintrag nicht gefunden' });
 
-        // Geloescht wird die aufgehobene LISTE der Dateien, nicht `ablage`:
-        // Bei einem Mod aus mehreren Dateien steht dort der ZIELORDNER
-        // (`BepInEx/plugins`) — und den zu loeschen naehme jeden anderen Mod
-        // mit. Bis zum 2026-09-11 tat diese Route genau das.
-        let weg = { bestaetigt: 0, gesamt: 0, blieb: [], ohneListe: false };
-        if (zeile.art === Inhalte.ART_MOD) {
-            weg = await InhalteHolen.entferneDateien({
-                server: geladen.server, zeile, inhalt: geladen.paket?.content || null,
-            });
-        }
+        const { haupt, mit, unbekannt } = ergebnis;
+        const name = z => z.name || z.kennung;
 
         // Melden, nicht verschweigen: Eine Zeile auf „entfernt", deren Datei
         // noch liegt, laedt beim naechsten Start weiter — und niemand versteht
         // warum.
-        const hinweis = zeile.art === Inhalte.ART_LADER
-            ? 'Der Lader ist abgeschaltet. Seine Dateien bleiben liegen — ohne den '
-              + 'Schalter laedt er nicht.'
-            : weg.ohneListe
-                ? 'Die Zeile ist entfernt. Welche Dateien zu diesem Eintrag gehoeren, wurde '
-                  + 'bei seiner Installation nicht festgehalten — sie liegen noch auf dem Server.'
-                : weg.blieb.length
-                    ? `Die Zeile ist entfernt, ${weg.blieb.length} Datei(en) blieben liegen: `
-                      + weg.blieb.join(', ')
-                    : null;
+        const hinweise = [];
+        for (const e of [haupt, ...mit]) {
+            if (e.laderBleibt) {
+                hinweise.push(`${name(e.zeile)} ist abgeschaltet. Seine Dateien bleiben liegen — `
+                    + 'ohne den Schalter lädt er nicht.');
+            } else if (e.weg.ohneListe) {
+                hinweise.push(`Bei ${name(e.zeile)} wurde nicht festgehalten, welche Dateien dazugehören — `
+                    + 'sie liegen noch auf dem Server.');
+            } else if (e.weg.blieb.length) {
+                hinweise.push(`Von ${name(e.zeile)} blieben ${e.weg.blieb.length} Datei(en) liegen: `
+                    + e.weg.blieb.join(', '));
+            }
+        }
+        if (unbekannt.length) {
+            hinweise.push('Abhängigkeiten wurden nicht mitentfernt: Von '
+                + unbekannt.map(name).join(', ') + ' ist nicht bekannt, was sie brauchen.');
+        }
 
         // `bestaetigtWeg` statt `dateien`: Der Daemon meldet auch Erfolg, wenn
         // die Datei schon fehlte (siehe entferneDateien). Die Zahl sagt „dort
         // liegt nichts mehr", nicht „so viel haben wir geloescht".
-        return res.json({ success: true, dateiWeg: weg.bestaetigt > 0,
-                          bestaetigtWeg: weg.bestaetigt, hinweis, ...wirkung(geladen) });
+        return res.json({
+            success: true,
+            dateiWeg: haupt.weg.bestaetigt > 0,
+            bestaetigtWeg: haupt.weg.bestaetigt,
+            mitentfernt: mit.map(e => name(e.zeile)),
+            hinweis: hinweise.length ? hinweise.join(' ') : null,
+            ...wirkung(geladen),
+        });
     } catch (error) {
         Logger.error('[Gameserver/Inhalte] Entfernen fehlgeschlagen:', error);
         return res.status(500).json({ success: false, message: 'Serverfehler' });

@@ -1086,6 +1086,8 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
                     // Vorlaeufig aus dem Paket: Was der Katalog je Mod sagt,
                     // steht erst beim Holen fest und wird dann ueberschrieben.
                     clientSide: Boolean(inhalt.client_side),
+                    // Beim Anlegen gewaehlt — geht nie als Abhaengigkeit mit.
+                    mitgebracht: false,
                     status: 'geplant',
                 });
             }

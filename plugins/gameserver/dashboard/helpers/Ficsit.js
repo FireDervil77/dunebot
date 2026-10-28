@@ -329,8 +329,12 @@ async function aufloesen(raum, kennung, fassung = null, optionen = {}) {
             fehlend.push(`${k}${fest ? ' ' + fest : bereich ? ' ' + bereich : ''}: ${fehler.message}`);
             return null;
         }
+        // `braucht` haelt fest, wen dieser Mod auf den Server bringt — beim
+        // Entfernen geht mit, was danach niemand mehr braucht (2026-10-28).
+        p.braucht = [];
         for (const d of p.abhaengig) {
-            await verfolge(d.mod_id, null, d.condition || null, p.kennung, tiefe + 1);
+            const kind = await verfolge(d.mod_id, null, d.condition || null, p.kennung, tiefe + 1);
+            if (kind) p.braucht.push(kind.kennung);
         }
         gefunden.set(p.kennung, p);
         return p;
@@ -348,7 +352,7 @@ async function aufloesen(raum, kennung, fassung = null, optionen = {}) {
             }
         }
     }
-    return { pakete: [...gefunden.values()], fehlend };
+    return { pakete: [...gefunden.values()], fehlend, wurzel: wurzel.kennung };
 }
 
 /** Ist a hoeher als b? SemVer, wo es geht; sonst Zahl fuer Zahl wie bei Thunderstore. */

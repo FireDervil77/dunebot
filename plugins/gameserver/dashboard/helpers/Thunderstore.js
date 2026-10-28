@@ -343,14 +343,17 @@ async function aufloesen(raum, kennung, fassung = null) {
             return null;
         }
 
-        // Erst die Abhaengigkeiten — sie sollen vor dem Paket stehen.
+        // Erst die Abhaengigkeiten — sie sollen vor dem Paket stehen. `braucht`
+        // haelt fest, wen dieses Paket mitbringt (siehe Ficsit.aufloesen).
+        p.braucht = [];
         for (const eintrag of p.abhaengig) {
             const teil = teileKennung(eintrag);
             if (!teil) {
                 fehlend.push(`Unlesbare Abhaengigkeit: ${eintrag}`);
                 continue;
             }
-            await verfolge(teil.namespace, teil.name, teil.fassung, tiefe + 1);
+            const kind = await verfolge(teil.namespace, teil.name, teil.fassung, tiefe + 1);
+            if (kind) p.braucht.push(kind.kennung);
         }
 
         const schon = gefunden.get(p.kennung);
@@ -369,7 +372,7 @@ async function aufloesen(raum, kennung, fassung = null) {
         throw new Error(fehlend[0] || `${kennung} nicht gefunden`);
     }
 
-    return { pakete: [...gefunden.values()], fehlend };
+    return { pakete: [...gefunden.values()], fehlend, wurzel: wurzel.kennung };
 }
 
 /**

@@ -167,7 +167,7 @@ async function vorschau({ serverId, inhalt, quelle, kennung, fassung = null, spi
  *
  * @private
  */
-async function legeAb({ server, inhalt, guildId, quelle, pakete, fehlend = [] }) {
+async function legeAb({ server, inhalt, guildId, quelle, pakete, fehlend = [], wurzel = null, wurzelGewaehlt = true }) {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     const ipmServer = ServiceManager.get('ipmServer');
@@ -238,6 +238,13 @@ async function legeAb({ server, inhalt, guildId, quelle, pakete, fehlend = [] })
             // auch" ist die gröbere Auskunft von beiden.
             clientSide: typeof p.clientSeitig === 'boolean'
                 ? p.clientSeitig : Boolean(inhalt.client_side),
+            // Wer kam nur mit, und wen braucht er (2026-10-28)? Beim Entfernen
+            // geht mit, was danach niemand mehr braucht (`Inhalte.waisenVon`).
+            // Die Wurzel beim Aktualisieren: keine Aussage, sie bleibt, was
+            // sie war — sonst wuerde ein Update von SML es zum gewaehlten Mod.
+            mitgebracht: p.kennung !== wurzel ? true
+                : wurzelGewaehlt === null ? undefined : !wurzelGewaehlt,
+            braucht: Array.isArray(p.braucht) ? p.braucht : undefined,
         };
 
         if (art === Inhalte.ART_MOD && !inhalt.path) {
@@ -320,7 +327,8 @@ async function legeAb({ server, inhalt, guildId, quelle, pakete, fehlend = [] })
  * @param {{server: object, inhalt: object, guildId: string, quelle?: string,
  *          kennung: string, fassung?: string}} auftrag
  */
-async function installiere({ server, inhalt, guildId, quelle, kennung, fassung = null, spielfassung = null }) {
+async function installiere({ server, inhalt, guildId, quelle, kennung, fassung = null, spielfassung = null,
+                             wurzelGewaehlt = true }) {
     if (!inhalt?.supported) {
         throw new Error('Dieses Spiel nimmt laut seinem Paket keine Inhalte auf.');
     }
@@ -333,8 +341,8 @@ async function installiere({ server, inhalt, guildId, quelle, kennung, fassung =
     const anbieter = Quellen.fuer(gewaehlt);
     const raum = Quellen.raumAus(inhalt, gewaehlt);
 
-    const { pakete, fehlend } = await anbieter.aufloesen(raum, kennung, fassung, { spielfassung });
-    return legeAb({ server, inhalt, guildId, quelle: gewaehlt, pakete, fehlend });
+    const { pakete, fehlend, wurzel } = await anbieter.aufloesen(raum, kennung, fassung, { spielfassung });
+    return legeAb({ server, inhalt, guildId, quelle: gewaehlt, pakete, fehlend, wurzel, wurzelGewaehlt });
 }
 
 /**
@@ -450,6 +458,7 @@ async function entferneDateien({ server, zeile, inhalt = null }) {
 
     let bestaetigt = 0;
     const blieb = [];
+    const geloescht = [];
     for (const datei of dateien) {
         const antwort = await ipmServer.sendCommand(daemonId, 'gameserver.files.delete', {
             server_id:     String(server.id),
@@ -458,14 +467,134 @@ async function entferneDateien({ server, zeile, inhalt = null }) {
             path:          '/' + String(datei).replace(/^\/+/, ''),
         }, 30000).catch(fehler => ({ success: false, error: fehler.message }));
 
-        if (antwort?.success) bestaetigt++;
+        if (antwort?.success) { bestaetigt++; geloescht.push(datei); }
         else {
             blieb.push(datei);
             Logger.warn(`[Gameserver/Inhalte] Datei blieb liegen (${datei}): `
                 + `${antwort?.error || 'keine Antwort'}`);
         }
     }
+
+    // Ordner je Mod geht oben als Ganzes; sonst bleiben die Ordner, die das
+    // Archiv angelegt hat (SML: `Binaries/Linux`, `Content/Paks/LinuxServer`
+    // …), leer zurueck.
+    if (!Inhalte.jeMod(pfad)) {
+        const grenze = zeile.art === Inhalte.ART_LADER
+            ? String(pfad).replace(/\/+$/, '').split('/').slice(0, -1).join('/')
+            : String(pfad).replace(/\/+$/, '');
+        await raeumeLeereOrdner({ server, daemonId, dateien: geloescht, grenze });
+    }
     return { bestaetigt, gesamt: dateien.length, blieb, ohneListe: false };
+}
+
+/**
+ * Ordner wegraeumen, die nach dem Loeschen LEER sind — nur die.
+ *
+ * `gameserver.files.delete` loescht rekursiv (`os.RemoveAll`). Den Ablageort
+ * eines Laders einfach mitzunehmen waere bei BepInEx (`loader.path: game`) das
+ * ganze Spiel. Deshalb wird jeder Ordner vorher gelistet und nur geloescht,
+ * wenn nichts mehr darin liegt — von unten nach oben, und nie die `grenze`
+ * selbst oder etwas darueber. Ohne Grenze (Volume-Wurzel) geschieht nichts.
+ *
+ * Was hier scheitert, wird geloggt und sonst nicht gemeldet: Ein leerer Ordner
+ * laedt nichts. Die Dateien sind die Auskunft, die zaehlt.
+ */
+async function raeumeLeereOrdner({ server, daemonId, dateien, grenze }) {
+    const Logger = ServiceManager.get('Logger');
+    const ipmServer = ServiceManager.get('ipmServer');
+    const g = String(grenze || '').replace(/^\/+|\/+$/g, '');
+    if (!g || !dateien.length) return;
+
+    const ordner = new Set();
+    for (const datei of dateien) {
+        const teile = String(datei).replace(/^\/+/, '').split('/').slice(0, -1);
+        while (teile.length) {
+            const o = teile.join('/');
+            if (!o.startsWith(g + '/')) break;
+            ordner.add(o);
+            teile.pop();
+        }
+    }
+
+    const tiefe = o => o.split('/').length;
+    for (const o of [...ordner].sort((a, b) => tiefe(b) - tiefe(a))) {
+        const ziel = { server_id: String(server.id), rootserver_id: String(server.rootserver_id),
+                       install_path: server.install_path, path: '/' + o };
+        const liste = await ipmServer.sendCommand(daemonId, 'gameserver.files.list', ziel, 15000)
+            .catch(fehler => ({ success: false, error: fehler.message }));
+        if (!liste?.success || (liste.data?.files || []).length) continue;
+        const weg = await ipmServer.sendCommand(daemonId, 'gameserver.files.delete', ziel, 30000)
+            .catch(fehler => ({ success: false, error: fehler.message }));
+        if (!weg?.success) {
+            Logger.warn(`[Gameserver/Inhalte] Leerer Ordner blieb liegen (${o}): ${weg?.error || 'keine Antwort'}`);
+        }
+    }
+}
+
+/**
+ * Einen Inhalt entfernen — Zeile auf „entfernt", Dateien weg.
+ *
+ * ── Der Lader ───────────────────────────────────────────────────────────────
+ *
+ * Wird er ueber den Start scharf (BepInEx, `loader.adds`), wird er nur
+ * abgeschaltet; seine Dateien bleiben. Das folgt aus seiner Bauform: Ohne die
+ * Umgebung laedt er nicht, und ein halb abgeraeumtes BepInEx ist schlimmer
+ * als ein vollstaendiges, das nicht geladen wird.
+ *
+ * Wird er dagegen geladen, weil er daliegt (SML), gehen seine Dateien wie die
+ * eines Mods. Bis zum 2026-10-28 galt die BepInEx-Regel fuer jeden Lader: SML
+ * stand auf „entfernt", lag weiter in `FactoryGame/Mods/SML` — und der Server
+ * lud es.
+ *
+ * @returns {Promise<{zeile: object, weg: object, laderBleibt: boolean}|null>}
+ */
+async function entferne({ server, inhalt, zeileId }) {
+    const zeile = await Inhalte.entfernen(zeileId, server.id);
+    if (!zeile) return null;
+
+    // Geloescht wird die aufgehobene LISTE der Dateien, nicht `ablage`:
+    // Bei einem Mod aus mehreren Dateien steht dort der ZIELORDNER
+    // (`BepInEx/plugins`) — und den zu loeschen naehme jeden anderen Mod
+    // mit. Bis zum 2026-09-11 tat diese Route genau das.
+    const laderBleibt = zeile.art === Inhalte.ART_LADER && Inhalte.laderUeberStart(inhalt);
+    let weg = { bestaetigt: 0, gesamt: 0, blieb: [], ohneListe: false };
+    if (zeile.art === Inhalte.ART_MOD || (zeile.art === Inhalte.ART_LADER && !laderBleibt)) {
+        weg = await entferneDateien({ server, zeile, inhalt });
+    }
+    return { zeile, weg, laderBleibt };
+}
+
+/**
+ * Entfernen, und was danach niemand mehr braucht, gleich mit (Betreiber,
+ * 2026-10-28: „sollte dann aber automatisch passieren").
+ *
+ * Wer mitgeht, rechnet `Inhalte.waisenVon` — dort steht auch, wann NICHTS
+ * mitgeht. Gerechnet wird nach dem Entfernen ueber den ganzen Server, nicht nur
+ * ueber die Abhaengigkeiten des einen Mods: Was schon vorher verwaist lag,
+ * geht dabei ebenso.
+ *
+ * @returns {Promise<{haupt: object, mit: object[], unbekannt: object[]}|null>}
+ */
+async function entferneMitWaisen({ server, inhalt, zeileId }) {
+    const Logger = ServiceManager.get('Logger');
+    const haupt = await entferne({ server, inhalt, zeileId });
+    if (!haupt) return null;
+
+    const { waisen, unbekannt } = Inhalte.waisenVon(await Inhalte.fuerServer(server.id));
+    const mit = [];
+    for (const w of waisen) {
+        const e = await entferne({ server, inhalt, zeileId: w.id });
+        if (e) mit.push(e);
+    }
+    if (mit.length) {
+        Logger.info(`[Gameserver/Inhalte] Server ${server.id}: mit ${haupt.zeile.kennung} gingen `
+            + mit.map(e => e.zeile.kennung).join(', '));
+    }
+    if (unbekannt.length) {
+        Logger.info(`[Gameserver/Inhalte] Server ${server.id}: keine Abhaengigkeit mitentfernt — `
+            + `unbekannt, was ${unbekannt.map(z => z.kennung).join(', ')} braucht`);
+    }
+    return { haupt, mit, unbekannt };
 }
 
 /**
@@ -498,7 +627,7 @@ async function aktualisiere({ server, inhalt, guildId, zeile, spielfassung = nul
     }
 
     const ergebnis = await installiere({ server, inhalt, guildId,
-        quelle: zeile.quelle, kennung: zeile.kennung, spielfassung });
+        quelle: zeile.quelle, kennung: zeile.kennung, spielfassung, wurzelGewaehlt: null });
 
     // Aufgeraeumt hat `legeAb` — hier wird der Eintrag DIESES Mods gesucht.
     // Ein leerer Eintrag heisst: Es gab nichts zu entfernen (gleiche Fassung
@@ -582,6 +711,9 @@ async function installiereModpack({ server, guildId, paket, laderDesServers }) {
         // Ein Modpack ist serverseitig: Was die Mitspieler brauchen, steht auf
         // der Seite des Pakets — und sie brauchen es ohnehin komplett.
         clientSide: false,
+        // Selbst gewaehlt; was es braucht, ist unbekannt — also geht neben ihm
+        // keine Abhaengigkeit mit (`Inhalte.waisenVon`).
+        mitgebracht: false,
     };
 
     // ── Das Alte zuerst weg ────────────────────────────────────────────────
@@ -742,6 +874,6 @@ async function holeGeplantesModpack({ server, guildId }) {
 
 module.exports = {
     daemonVon, istLader,
-    vorschau, installiere, holeGeplante, aktualisiere, entferneDateien,
+    vorschau, installiere, holeGeplante, aktualisiere, entferneDateien, entferneMitWaisen,
     installiereModpack, holeGeplantesModpack,
 };

@@ -96,6 +96,10 @@
   // Was der Katalog ueber neuere Fassungen sagt — auf Knopfdruck geholt, nicht
   // beim Laden: Das ist eine Abfrage JE MOD bei einem fremden Dienst.
   const NEUER = {};
+  // Hat der Lader einen Schalter, der wirkt (BepInEx: ja, SML: nein)? Gesetzt
+  // beim Zeichnen; ein Mod hat seit dem 2026-10-28 keinen mehr — „aus" setzte
+  // nur ein Feld, die Dateien luden weiter.
+  let LADER_SCHALTBAR = false;
 
   // ── Welcher Anbieter gerade gefragt wird ─────────────────────────────────
   //
@@ -251,10 +255,11 @@
                       onclick="inhaltAktualisieren(${e.id}, '${escape(e.name || e.kennung)}')">
                 <i class="fa-solid fa-arrow-up"></i>
               </button>` : ''}
+            ${istLader && LADER_SCHALTBAR ? `
             <label class="form-check form-switch mb-0" title="${e.aktiv ? 'Aktiv' : 'Aus'}">
               <input class="form-check-input" type="checkbox" ${e.aktiv ? 'checked' : ''}
                      onchange="inhaltSchalten(${e.id}, this.checked)">
-            </label>
+            </label>` : ''}
             <button class="btn btn-sm btn-outline-danger" title="Entfernen"
                     onclick="inhaltEntfernen(${e.id}, '${escape(e.name || e.kennung)}')">
               <i class="fa-solid fa-xmark"></i>
@@ -276,6 +281,7 @@
       return;
     }
 
+    LADER_SCHALTBAR = Boolean(d.laderSchaltbar);
     const aktive = [d.lader, ...d.mods].filter(e => e && e.aktiv).length;
     // Die Anbieter, die dieses Dashboard fuer dieses Spiel fragen kann.
     const kataloge = d.quellen || [];
@@ -964,6 +970,10 @@
         // da liegt nichts mehr —, aber nur das eine ist wörtlich wahr.
         else melde('success', `„${name}“ entfernt`
           + (d.bestaetigtWeg ? ` — ${d.bestaetigtWeg} Datei(en) sind vom Server weg.` : '.'));
+        // Was nur als Abhängigkeit kam und niemand mehr braucht, ging mit.
+        if (d.mitentfernt && d.mitentfernt.length) {
+          melde('info', 'Mitentfernt, weil kein anderer Mod sie braucht: ' + d.mitentfernt.join(', '), 12000);
+        }
         wirkungMelden(d);
       })
       // Bis zum 2026-09-13 ohne Fehlerzweig: Scheiterte das Entfernen, kam nichts.

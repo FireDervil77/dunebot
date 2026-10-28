@@ -317,7 +317,7 @@ async function pruefe(name, fn) {
             if (/FROM rootserver WHERE id/.test(sql)) return [{ daemon_id: 'd1' }];
             if (/INSERT INTO gameserver_content/.test(sql)) {
                 const [serverId, guildId, art, quelle, kennung, name, fassung, veroeffentlicht,
-                       reihenfolge, ablage, dateien, clientSide, status] = params;
+                       reihenfolge, ablage, dateien, clientSide, , , status] = params;
                 const da = this.zeilen.find(z => z.kennung === kennung && z.quelle === quelle);
                 const zeile = da || { id: this.zeilen.length + 1, server_id: serverId, quelle, kennung };
                 Object.assign(zeile, { guild_id: guildId, art, name, fassung, veroeffentlicht,

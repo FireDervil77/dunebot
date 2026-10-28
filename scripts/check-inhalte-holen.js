@@ -37,6 +37,9 @@ const INHALT = {
     needs_restart: true,
 };
 
+// Valheim mit loader.adds — der Lader wird ueber den Start scharf.
+const MIT_ADDS_FRUEH = { ...INHALT, loader: { ...INHALT.loader, adds: { env: { DOORSTOP_ENABLE: 'TRUE' } } } };
+
 // Satisfactory-artig: ein Ordner je Mod (Stufe 10 S2), der Lader in einem festen.
 const INHALT_JE_MOD = {
     supported: true,
@@ -55,11 +58,21 @@ const db = {
         if (/FROM rootserver WHERE id/.test(sql)) return [{ daemon_id: 'd1' }];
         if (/INSERT INTO gameserver_content/.test(sql)) {
             const [serverId, guildId, art, quelle, kennung, name, fassung, veroeffentlicht,
-                   reihenfolge, ablage, dateien, clientSide, status, fehler] = params;
+                   reihenfolge, ablage, dateien, clientSide, mitgebracht, braucht, status, fehler] = params;
             const da = this.zeilen.find(z => z.kennung === kennung && z.quelle === quelle);
-            const zeile = da || { id: this.zeilen.length + 1, server_id: serverId, quelle, kennung };
+            const zeile = da || { id: this.zeilen.length + 1, server_id: serverId, quelle, kennung, aktiv: 1 };
+            // Das CASE aus Inhalte.eintragen, nachgesprochen: Eine Attrappe, die
+            // einfach ueberschreibt, liesse „einmal gewaehlt bleibt gewaehlt"
+            // nie scheitern.
+            const vorher = da ? da.mitgebracht : undefined;
+            zeile.mitgebracht = !da ? mitgebracht
+                : da.status === 'entfernt' ? mitgebracht
+                : mitgebracht === null ? vorher
+                : vorher === null || vorher === undefined ? (mitgebracht === 0 ? 0 : null)
+                : Math.min(vorher, mitgebracht);
             Object.assign(zeile, { guild_id: guildId, art, name, fassung, veroeffentlicht, reihenfolge,
-                ablage, dateien, client_side: clientSide, status, fehler });
+                ablage, dateien, client_side: clientSide, braucht, status, fehler });
+            if (da) zeile.aktiv = 1;
             if (!da) this.zeilen.push(zeile);
             return { insertId: da ? 0 : zeile.id };
         }
@@ -104,7 +117,8 @@ const db = {
             return { affectedRows: 1 };
         }
         if (/UPDATE gameserver_content SET aktiv = \?/.test(sql)) {
-            const z = this.zeilen.find(x => String(x.id) === String(params[1]) && x.status !== 'entfernt');
+            const z = this.zeilen.find(x => String(x.id) === String(params[1]) && x.art === params[3]
+                && x.status !== 'entfernt');
             if (z) z.aktiv = params[0];
             return { affectedRows: z ? 1 : 0 };
         }
@@ -117,6 +131,7 @@ const daemon = {
     hochgeladen: [],     // gameserver.content.install
     geloescht: [],       // gameserver.files.delete
     gelistet: [], gelesen: [], logInhalt: '', logFehlt: false,
+    leer: new Set(),     // Ordner, die beim Listen leer sind
     scheitern: new Set(),
     isDaemonOnline: () => true,
     async sendCommand(daemonId, befehl, nutzlast) {
@@ -139,6 +154,7 @@ const daemon = {
         }
         if (befehl === 'gameserver.files.list') {
             this.gelistet.push(nutzlast.path);
+            if (this.leer.has(nutzlast.path)) return { success: true, data: { files: [] } };
             return { success: true, data: { files: this.logFehlt ? [] : [
                 { name: 'LogOutput.log', is_dir: false, size: this.logInhalt.length, mod_time: '2026-09-13T14:26:42Z' }] } };
         }
@@ -183,6 +199,7 @@ let bestanden = 0;
 async function pruefe(name, fn) {
     db.zeilen = []; daemon.abrufe = []; daemon.geloescht = []; daemon.scheitern = new Set(); db.serverStatus = null; db.inhaltErsatz = null;
     daemon.gelistet = []; daemon.gelesen = []; daemon.logInhalt = ''; daemon.logFehlt = false; daemon.hochgeladen = [];
+    daemon.leer = new Set();
     try {
         await fn();
         console.log(`  ✓ ${name}`);
@@ -618,6 +635,136 @@ async function pruefe(name, fn) {
         assert.strictEqual(db.zeilen.find(z => z.id === 9).status, 'entfernt');
     });
 
+    console.log('\nAbhaengigkeiten (2026-10-28)');
+
+    // Satisfactory, Server 223: PowerChecker brachte MarcioCommonLibs und SML
+    // mit. Entfernt wurde PowerChecker — die beiden blieben, und der Server
+    // lud SML weiter. Die Kette ist echt (ficsit.app, 2026-10-27).
+    const SML = { kennung: 'SML', name: 'Satisfactory Mod Loader', fassung: '3.12.0', adresse: 'https://x/sml', bytes: 1, braucht: [] };
+    const MCL = { kennung: 'MarcioCommonLibs', name: 'MarcioCommonLibs', fassung: '1.3.12', adresse: 'https://x/mcl', bytes: 1, braucht: ['SML'] };
+    const PC  = { kennung: 'PowerChecker', name: 'PowerChecker', fassung: '2.4.10', adresse: 'https://x/pc', bytes: 1, braucht: ['MarcioCommonLibs', 'SML'] };
+    function stelleKette(pakete, wurzel) {
+        Thunderstore.aufloesen = async () => ({ pakete, fehlend: [], wurzel });
+    }
+    const zeileVon = k => db.zeilen.find(z => z.kennung === k);
+
+    await pruefe('Was mitkam, steht als mitgebracht da — mit dem, was es braucht', async () => {
+        stelleKette([SML, MCL, PC], 'PowerChecker');
+        await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT_JE_MOD, guildId: 'g1', kennung: 'PowerChecker' });
+        assert.strictEqual(zeileVon('PowerChecker').mitgebracht, 0);
+        assert.strictEqual(zeileVon('MarcioCommonLibs').mitgebracht, 1);
+        assert.strictEqual(zeileVon('SML').mitgebracht, 1);
+        assert.strictEqual(zeileVon('PowerChecker').braucht, JSON.stringify(['MarcioCommonLibs', 'SML']));
+        assert.strictEqual(zeileVon('SML').braucht, '[]', 'braucht nichts ist [] — nicht NULL');
+    });
+
+    await pruefe('Einmal selbst gewaehlt bleibt selbst gewaehlt; Aktualisieren aendert es nicht', async () => {
+        stelleKette([SML], 'SML');
+        await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT_JE_MOD, guildId: 'g1', kennung: 'SML' });
+        stelleKette([SML, MCL, PC], 'PowerChecker');
+        await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT_JE_MOD, guildId: 'g1', kennung: 'PowerChecker' });
+        assert.strictEqual(zeileVon('SML').mitgebracht, 0, 'SML war selbst gewaehlt — PowerChecker macht es nicht zur Abhaengigkeit');
+        // Aktualisieren der Wurzel: keine Aussage
+        stelleKette([SML, { ...MCL, fassung: '1.3.13' }], 'MarcioCommonLibs');
+        await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT_JE_MOD, guildId: 'g1',
+            kennung: 'MarcioCommonLibs', wurzelGewaehlt: null });
+        assert.strictEqual(zeileVon('MarcioCommonLibs').mitgebracht, 1, 'ein Update macht eine Abhaengigkeit nicht zum gewaehlten Mod');
+        // Altzeile (NULL) wird nie zu 1
+        zeileVon('MarcioCommonLibs').mitgebracht = null;
+        stelleKette([SML, MCL, PC], 'PowerChecker');
+        await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT_JE_MOD, guildId: 'g1', kennung: 'PowerChecker' });
+        assert.strictEqual(zeileVon('MarcioCommonLibs').mitgebracht, null);
+    });
+
+    await pruefe('Entfernen nimmt die verwaiste Kette mit — auch SML samt Dateien', async () => {
+        db.inhaltErsatz = INHALT_JE_MOD;
+        stelleKette([SML, MCL, PC], 'PowerChecker');
+        await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT_JE_MOD, guildId: 'g1', kennung: 'PowerChecker' });
+        daemon.geloescht = [];
+        const r = await rufe('delete', '/:serverId/inhalte/:id', { params: { id: String(zeileVon('PowerChecker').id) } });
+        assert.strictEqual(r.status, 200);
+        assert.deepStrictEqual(r.antwort.mitentfernt.sort(), ['MarcioCommonLibs', 'Satisfactory Mod Loader']);
+        for (const k of ['PowerChecker', 'MarcioCommonLibs', 'SML']) assert.strictEqual(zeileVon(k).status, 'entfernt', k);
+        assert.ok(daemon.geloescht.includes('/game/FactoryGame/Mods/SML/A.dll'), 'die Dateien von SML gehen — es laedt, weil es daliegt');
+        assert.ok(daemon.geloescht.includes('/game/FactoryGame/Mods/MarcioCommonLibs'));
+        assert.strictEqual(r.antwort.hinweis, null);
+    });
+
+    await pruefe('Was ein verbleibender Mod braucht, bleibt — der Lader auch', async () => {
+        db.inhaltErsatz = INHALT_JE_MOD;
+        const ANDERER = { kennung: 'Anderer', name: 'Anderer', fassung: '1.0.0', adresse: 'https://x/a', bytes: 1, braucht: ['MarcioCommonLibs', 'SML'] };
+        stelleKette([SML, MCL, PC], 'PowerChecker');
+        await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT_JE_MOD, guildId: 'g1', kennung: 'PowerChecker' });
+        stelleKette([SML, MCL, ANDERER], 'Anderer');
+        await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT_JE_MOD, guildId: 'g1', kennung: 'Anderer' });
+        const r = await rufe('delete', '/:serverId/inhalte/:id', { params: { id: String(zeileVon('PowerChecker').id) } });
+        assert.deepStrictEqual(r.antwort.mitentfernt, []);
+        assert.strictEqual(zeileVon('MarcioCommonLibs').status, 'installiert');
+        assert.strictEqual(zeileVon('SML').status, 'installiert');
+    });
+
+    await pruefe('Der Lader geht nicht, solange ein Mod liegt — auch wenn keiner ihn nennt', async () => {
+        db.inhaltErsatz = INHALT_JE_MOD;
+        stelleKette([SML, MCL, PC], 'PowerChecker');
+        await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT_JE_MOD, guildId: 'g1', kennung: 'PowerChecker' });
+        const STUMM = { kennung: 'Stumm', name: 'Stumm', fassung: '1.0.0', adresse: 'https://x/s', bytes: 1, braucht: [] };
+        stelleKette([STUMM], 'Stumm');
+        await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT_JE_MOD, guildId: 'g1', kennung: 'Stumm' });
+        const r = await rufe('delete', '/:serverId/inhalte/:id', { params: { id: String(zeileVon('PowerChecker').id) } });
+        assert.deepStrictEqual(r.antwort.mitentfernt, ['MarcioCommonLibs']);
+        assert.strictEqual(zeileVon('SML').status, 'installiert');
+    });
+
+    await pruefe('Ist unbekannt, was ein Mod braucht, geht nichts mit — und es wird gesagt', async () => {
+        db.inhaltErsatz = INHALT_JE_MOD;
+        stelleKette([SML, MCL, PC], 'PowerChecker');
+        await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT_JE_MOD, guildId: 'g1', kennung: 'PowerChecker' });
+        db.zeilen.push({ id: 50, server_id: 186, quelle: 'upload', art: 'mod', kennung: 'Eigenes.zip',
+            name: 'Eigenes', status: 'installiert', aktiv: 1, mitgebracht: 0, braucht: null, dateien: '[]' });
+        const r = await rufe('delete', '/:serverId/inhalte/:id', { params: { id: String(zeileVon('PowerChecker').id) } });
+        assert.deepStrictEqual(r.antwort.mitentfernt, []);
+        assert.match(r.antwort.hinweis, /Eigenes/);
+        assert.strictEqual(zeileVon('SML').status, 'installiert');
+    });
+
+    await pruefe('BepInEx (loader.adds) bleibt beim Entfernen liegen, SML nicht', async () => {
+        db.inhaltErsatz = MIT_ADDS_FRUEH;
+        db.zeilen.push({ id: 8, server_id: 186, quelle: 'thunderstore', art: 'loader', kennung: BEPINEX.kennung,
+            status: 'installiert', aktiv: 1, mitgebracht: 0, braucht: '[]',
+            dateien: JSON.stringify(['game/BepInEx/core/BepInEx.dll']) });
+        let r = await rufe('delete', '/:serverId/inhalte/:id', { params: { id: '8' } });
+        assert.deepStrictEqual(daemon.geloescht, []);
+        assert.match(r.antwort.hinweis, /abgeschaltet/);
+
+        db.zeilen = []; db.inhaltErsatz = INHALT_JE_MOD;
+        db.zeilen.push({ id: 8, server_id: 186, quelle: 'ficsit', art: 'loader', kennung: 'SML',
+            status: 'entfernt', aktiv: 0, mitgebracht: 0, braucht: '[]',
+            dateien: JSON.stringify(['game/FactoryGame/Mods/SML/SML.uplugin']) });
+        db.zeilen[0].status = 'installiert';
+        r = await rufe('delete', '/:serverId/inhalte/:id', { params: { id: '8' } });
+        assert.deepStrictEqual(daemon.geloescht, ['/game/FactoryGame/Mods/SML/SML.uplugin']);
+        assert.strictEqual(r.antwort.hinweis, null);
+    });
+
+    await pruefe('Leere Ordner gehen mit — volle und die Grenze nie', async () => {
+        const zeile = { art: 'loader', kennung: 'SML', dateien: JSON.stringify([
+            'game/FactoryGame/Mods/SML/SML.uplugin',
+            'game/FactoryGame/Mods/SML/Binaries/Linux/libSML.so',
+            'game/FactoryGame/Mods/SML/Content/Paks/LinuxServer/SML.pak']) };
+        daemon.leer = new Set(['/game/FactoryGame/Mods/SML/Binaries/Linux', '/game/FactoryGame/Mods/SML/Binaries',
+            '/game/FactoryGame/Mods/SML', '/game/FactoryGame/Mods']);
+        await InhalteHolen.entferneDateien({ server: SERVER, zeile, inhalt: INHALT_JE_MOD });
+        const ordner = daemon.geloescht.slice(3);
+        assert.deepStrictEqual(ordner, ['/game/FactoryGame/Mods/SML/Binaries/Linux', '/game/FactoryGame/Mods/SML/Binaries',
+            '/game/FactoryGame/Mods/SML'], 'tiefster zuerst; Content/… ist nicht leer (Attrappe) und bleibt');
+        assert.ok(!daemon.gelistet.includes('/game/FactoryGame/Mods'), 'die Grenze wird nicht einmal gefragt');
+
+        daemon.geloescht = []; daemon.gelistet = []; daemon.leer = new Set(['/game/BepInEx/core', '/game/BepInEx', '/game']);
+        await InhalteHolen.entferneDateien({ server: SERVER, inhalt: INHALT,
+            zeile: { art: 'loader', dateien: JSON.stringify(['game/BepInEx/core/BepInEx.dll']) } });
+        assert.deepStrictEqual(daemon.gelistet, [], 'loader.path „game": ohne Grenze unter der Wurzel wird nichts geraeumt');
+    });
+
     // ── Die Seite, auf die man verweisen kann ───────────────────────────────
     console.log('\nAdressen');
 
@@ -783,16 +930,49 @@ async function pruefe(name, fn) {
         assert.strictEqual(r.antwort.neustartNoetig, true);
     });
 
-    await pruefe('Schalten sagt es auch — und meldet einen Fehlschlag', async () => {
-        db.zeilen.push(JOTUNN_ZEILE());
+    // ── Geschaltet wird nur ein Lader, der ueber den Start scharf wird ──────
+    //
+    // Bis zum 2026-10-28 hatte jeder Mod einen Schalter. „Aus" setzte `aktiv`,
+    // die Dateien blieben liegen, das Spiel lud sie (Satisfactory; bei BepInEx
+    // zeigte der Ladestand es als „ausgeschaltet — lädt trotzdem").
+    const MIT_ADDS = { ...INHALT, loader: { ...INHALT.loader, adds: { env: { DOORSTOP_ENABLE: 'TRUE' } } } };
+    const BEPINEX_ZEILE = () => ({ id: 8, server_id: 186, quelle: 'thunderstore', art: 'loader',
+        kennung: BEPINEX.kennung, fassung: '5.4.2333', status: 'installiert', aktiv: 1,
+        dateien: JSON.stringify(['game/BepInEx/core/BepInEx.dll']) });
+
+    await pruefe('Schalten: der Lader mit loader.adds — und es sagt die Wirkung', async () => {
+        db.inhaltErsatz = MIT_ADDS;
+        db.zeilen.push(BEPINEX_ZEILE(), JOTUNN_ZEILE());
         let r = await rufe('post', '/:serverId/inhalte/:id/schalten',
-            { params: { id: '9' }, body: { aktiv: false } });
+            { params: { id: '8' }, body: { aktiv: false } });
         assert.strictEqual(r.status, 200);
         assert.strictEqual(r.antwort.laeuft, true);
         assert.strictEqual(db.zeilen[0].aktiv, 0);
         r = await rufe('post', '/:serverId/inhalte/:id/schalten',
-            { params: { id: '77' }, body: { aktiv: true } });
-        assert.strictEqual(r.status, 404);
+            { params: { id: '9' }, body: { aktiv: false } });
+        assert.strictEqual(r.status, 404, 'ein Mod hat keinen Schalter mehr');
+        assert.strictEqual(db.zeilen[1].aktiv, 1);
+    });
+
+    await pruefe('Schalten: ohne loader.adds gibt es nichts abzuschalten (SML)', async () => {
+        db.inhaltErsatz = INHALT_JE_MOD;
+        db.zeilen.push({ ...BEPINEX_ZEILE(), kennung: 'SML' });
+        const r = await rufe('post', '/:serverId/inhalte/:id/schalten',
+            { params: { id: '8' }, body: { aktiv: false } });
+        assert.strictEqual(r.status, 409);
+        assert.match(r.antwort.message, /Entfernen/);
+        assert.strictEqual(db.zeilen[0].aktiv, 1);
+    });
+
+    await pruefe('Der Reiter zeigt den Schalter nur am schaltbaren Lader', async () => {
+        assert.match(reiter, /istLader && LADER_SCHALTBAR \? `[\s\S]{0,200}form-switch/,
+            'der Schalter haengt nicht an istLader && LADER_SCHALTBAR');
+        assert.strictEqual((reiter.match(/inhaltSchalten\(\$\{e\.id\}/g) || []).length, 1);
+        assert.match(reiter, /LADER_SCHALTBAR = Boolean\(d\.laderSchaltbar\)/);
+        const r = await rufe('get', '/:serverId/inhalte');
+        assert.strictEqual(r.antwort.laderSchaltbar, false, 'INHALT nennt kein loader.adds');
+        db.inhaltErsatz = MIT_ADDS;
+        assert.strictEqual((await rufe('get', '/:serverId/inhalte')).antwort.laderSchaltbar, true);
     });
 
     await pruefe('Installieren sagt es auch', async () => {
