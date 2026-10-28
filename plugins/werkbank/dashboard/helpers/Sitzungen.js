@@ -25,6 +25,7 @@ const Quellen = require('../../../gameserver/dashboard/helpers/Quellen');
 const Inhalte = require('../../../gameserver/dashboard/helpers/Inhalte');
 const Abruf = require('../../../gameserver/dashboard/helpers/Abruf');
 const Bitmaske = require('../../../gameserver/dashboard/helpers/Bitmaske');
+const { DB_SCHLUESSEL } = require('../../../gameserver/dashboard/helpers/Datenbanken');
 const Liste = require('../../../gameserver/dashboard/helpers/Liste');
 const Textregel = require('../../../gameserver/dashboard/helpers/Textregel');
 const { gehoertDemServer } = require('../../../gameserver/dashboard/helpers/StartPayload');
@@ -3221,7 +3222,7 @@ async function befehlEntfernen(sitzung, key) {
 // Entwurf geben.
 
 const FESTZEILE = { parser: EINSTELLUNG.parser, max: { datei: 200, schluessel: 200, wert: 600 } };
-const RE_FEST_VERWEIS = /^\{\{(setting|port|content|env):([A-Za-z][A-Za-z0-9_]*)\}\}$/;
+const RE_FEST_VERWEIS = /^\{\{(setting|port|content|env|db):([A-Za-z][A-Za-z0-9_]*)\}\}$/;
 
 /** `entwurf.config` als flache Liste — eine Zeile je Schlüssel. */
 function festzeilenFlach(entwurf) {
@@ -3308,6 +3309,9 @@ function festzeileAusFormular(b, e) {
         }
         if (m[1] === 'setting' && !(e.settings || []).some(x => x.key === m[2])) {
             throw new Error(`${p}: Die Einstellung „${m[2]}" gibt es im Entwurf nicht — der Daemon ließe die Zeile dann aus.`);
+        }
+        if (m[1] === 'db' && !DB_SCHLUESSEL.includes(m[2])) {
+            throw new Error(`${p}: Für die Datenbank gibt es nur ${DB_SCHLUESSEL.map(k => `{{db:${k}}}`).join(', ')}.`);
         }
         // Die Download-Adresse gibt es nur, wenn das Paket etwas freigibt.
         if (p === DATEITEIL.verweis && !(Array.isArray(e.files?.public) && e.files.public.length)) {

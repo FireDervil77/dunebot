@@ -860,6 +860,14 @@
                 + 'auf einem Rootserver ohne Datenbanken lehnt das Panel das Anlegen mit Grund ab. '
                 + 'Ohne den Schalter ist sie frei wählbar. Die Datenbank liegt im Container fb-datenbank des Rootservers.' }) %>
             </div>
+            <div class="text-secondary small mt-1">
+              Zugang fürs Spiel: <span class="font-monospace">{{db:host}} {{db:port}} {{db:name}} {{db:user}} {{db:password}}</span><%- include('werkbank-hilfe', { text:
+                'Die Verweise wirken in der Umgebung, in festen Zeilen von Dateien und in der Startzeile (als Text mit Verweisen), '
+                + 'nicht in Installationsschritten — die Datenbank entsteht erst nach der Installation. '
+                + 'Der Probestart bekommt eine eigene Datenbank, sobald der Schalter an ist oder das Paket irgendwo auf {{db:…}} verweist; '
+                + 'sie verschwindet mit der Sitzung. Am Server gilt die erste Datenbank. Hat er keine, startet er trotzdem — '
+                + 'außer mit dem Schalter oben —, und was an {{db:…}} hängt, wird nicht geschrieben.' }) %>
+            </div>
             <% if (vor.sonstiges.length) { %>
               <div class="text-secondary small mt-3">
                 Das Paket trägt außerdem — bleibt unverändert:

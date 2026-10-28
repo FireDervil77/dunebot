@@ -454,9 +454,9 @@
           ]
         },
         "from": {
-          "description": "Woher der Wert kommt: fixed | setting:<key> | port:<purpose> | content:<auswahl> | free. Entfällt bei `parts` — dort stehen die Verweise im Text.",
+          "description": "Woher der Wert kommt: fixed | setting:<key> | port:<purpose> | content:<auswahl> | db:<host|port|name|user|password> | free. Entfällt bei `parts` — dort stehen die Verweise im Text.",
           "type": "string",
-          "pattern": "^(fixed|free|setting:[a-z][a-z0-9_]*|port:[a-z][a-z0-9_]*|content:[a-z][a-z0-9_]*)$"
+          "pattern": "^(fixed|free|setting:[a-z][a-z0-9_]*|port:[a-z][a-z0-9_]*|content:[a-z][a-z0-9_]*|db:(host|port|name|user|password))$"
         },
         "when": {
           "description": "Bedingung: 'true'/'false' (Schalterstellung), 'not_empty'/'empty' (Wert gesetzt oder nicht), '=wert'/'!=wert' (Gleichheit — seit 2026-09-22 fuer Auswahlen wie den Minecraft-Lader; verglichen wird der Wert von `from`). Fehlt = immer.",
@@ -906,7 +906,7 @@
           "enum": [
             "required"
           ],
-          "description": "Braucht das Spiel eine Datenbank (MariaDB/MySQL), um zu laufen? `required`: Beim Anlegen eines Servers wird sie mitangelegt (Schalter fest an), und auf einem Rootserver ohne Datenbanken lehnt das Panel das Anlegen mit Grund ab. Fehlt das Feld, ist sie frei waehlbar (Vorgabe aus). Die Datenbank liegt im Container fb-datenbank des Rootservers (Stufe 11, 2026-10-27)."
+          "description": "Braucht das Spiel eine Datenbank (MariaDB/MySQL), um zu laufen? `required`: Beim Anlegen eines Servers wird sie mitangelegt (Schalter fest an), und auf einem Rootserver ohne Datenbanken lehnt das Panel das Anlegen mit Grund ab. Fehlt das Feld, ist sie frei waehlbar (Vorgabe aus). Die Datenbank liegt im Container fb-datenbank des Rootservers (Stufe 11, 2026-10-27).\n\nDen Zugang bekommt das Spiel ueber Verweise — in env, config und start.args, nicht in install: {{db:host}}, {{db:port}}, {{db:name}}, {{db:user}}, {{db:password}} (S5, 2026-10-28). Mit `required` startet ein Server ohne Datenbank nicht; ohne das Feld startet er immer, eine Umgebungsvariable, die nur an {{db:…}} haengt, wird dann gar nicht gesetzt und ein Dateischluessel nicht geschrieben. Die Werkbank gibt jedem Probestart, der eine Datenbank braucht oder auf sie verweist, eine eigene."
         },
         "display": {
           "enum": [

@@ -40,8 +40,10 @@ const BEDINGUNGEN = ['', 'true', 'false', 'not_empty', 'empty'];
 // Alles, was wie ein Platzhalter aussieht — und die Formen, die der Daemon
 // einsetzt (pkgspec.ArtenHinweis). Was dazwischen liegt, ginge wörtlich an das
 // Spiel; der Daemon weist es erst beim Start ab.
+const { DB_SCHLUESSEL } = require('../../../gameserver/dashboard/helpers/Datenbanken');
+
 const PLATZHALTER = /\{\{[^}]*\}\}/g;
-const RE_VERWEIS = /^\{\{(setting|port|content|env):[^}\s]+\}\}$/;
+const RE_VERWEIS = /^\{\{(setting|port|content|env|db):[^}\s]+\}\}$/;
 
 /**
  * Ein Verweis in einer Zeile, deren Quelle nicht „Text mit Verweisen" ist.
@@ -56,7 +58,7 @@ const RE_VERWEIS = /^\{\{(setting|port|content|env):[^}\s]+\}\}$/;
  * die Quelle wählen und {{Wert}} schreiben.
  */
 function ratZumVerweis(form, p, quelle) {
-    const [, art, name] = p.match(/^\{\{(setting|port|content|env):([^}\s]+)\}\}$/);
+    const [, art, name] = p.match(/^\{\{(setting|port|content|env|db):([^}\s]+)\}\}$/);
     const mitWert = form.replace(p, '{{Wert}}');
     const text = 'Wähl als Quelle „Text mit Verweisen (ein Argument)"';
     if (quelle !== 'fest') {
@@ -81,6 +83,11 @@ function pruefePlatzhalter(form, quelle, nr) {
         WERT.lastIndex = 0;
         if (WERT.test(p)) continue;
         if (RE_VERWEIS.test(p)) {
+            const db = /^\{\{db:([^}\s]+)\}\}$/.exec(p);
+            if (db && !DB_SCHLUESSEL.includes(db[1])) {
+                throw new Error(`Zeile ${nr}: Für die Datenbank gibt es nur `
+                    + `${DB_SCHLUESSEL.map(k => `{{db:${k}}}`).join(', ')}.`);
+            }
             if (quelle === 'text') continue;
             throw new Error(`Zeile ${nr}: ${p} würde hier nicht eingesetzt und ginge wörtlich an das Spiel. `
                 + ratZumVerweis(form, p, quelle));

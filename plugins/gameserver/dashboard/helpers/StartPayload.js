@@ -312,6 +312,32 @@ async function buildStartPayload(server, guildId, Logger = null, { update = fals
             + `seinen Mod-Lader, auch wenn einer eingerichtet ist: ${fehler.message}`);
     }
 
+    // ── Die Datenbank des Servers (Stufe 11 S5, 2026-10-28) ─────────────────
+    //
+    // Der Zugang geht mit dem Auftrag; der Daemon setzt ihn für `{{db:…}}` ein
+    // und behält ihn nicht. Verlangt das Paket eine Datenbank, startet der
+    // Server ohne sie nicht — sonst liefe er mit halb geschriebener
+    // Konfiguration los. Kann es sie nur, startet er immer (Betreiber,
+    // 2026-10-28), und was an ihr hing, bleibt ungeschrieben.
+    const Datenbanken = require('./Datenbanken');
+    let datenbank = null;
+    try {
+        datenbank = await Datenbanken.zugangFuerStart(serverId);
+    } catch (fehler) {
+        if (Datenbanken.pflicht(paket)) {
+            return { payload: null, dockerImage: image,
+                error: `Kein Start: Der Zugang zur Datenbank ist nicht lesbar (${fehler.message}). `
+                     + 'Unter Server → Datenbanken ein neues Kennwort setzen.' };
+        }
+        Logger?.error?.(`[StartPayload] Server ${serverId}: Datenbank-Zugang nicht lesbar — der Server `
+            + `startet ohne: ${fehler.message}`);
+    }
+    if (!datenbank && Datenbanken.pflicht(paket)) {
+        return { payload: null, dockerImage: image,
+            error: 'Kein Start: Dieses Spiel braucht eine Datenbank, der Server hat keine. '
+                 + 'Anlegen unter Server → Datenbanken.' };
+    }
+
     const payload = {
         server_id:       String(serverId),
         daemon_id:       server.daemon_id,
@@ -326,6 +352,9 @@ async function buildStartPayload(server, guildId, Logger = null, { update = fals
         lader_aktiv:     laderAktiv,
         auto_update:     updateBeimStart(paket, update),
         resource_limits: grenzenAus(server),
+        // Fehlt das Feld, hat der Server keine — der Daemon setzt es bei
+        // jedem Auftrag neu (nutzlast.go DatenbankAus).
+        ...(datenbank ? { datenbank } : {}),
     };
 
     // ── Abruf für Spieler (2026-10-10) ───────────────────────────────────────

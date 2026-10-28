@@ -93,7 +93,10 @@ function pruefeInvarianten(paket) {
     // `parts` einer freien Zeichenkette vorzuziehen ist.
     for (const a of paket.start?.args || []) {
         for (const teil of a.parts || []) {
-            for (const [, art, ziel] of String(teil.text).matchAll(/\{\{(setting|port|content):([a-z0-9_]+)\}\}/g)) {
+            for (const [, art, ziel] of String(teil.text).matchAll(/\{\{(setting|port|content|db):([a-z0-9_]+)\}\}/g)) {
+                if (art === 'db' && !['host', 'port', 'name', 'user', 'password'].includes(ziel)) {
+                    verstoesse.push(`Verweis: Parameter "${a.key}" verweist auf db:${ziel} — es gibt nur host, port, name, user, password.`);
+                }
                 if (art === 'setting' && !einstellung.has(ziel)) {
                     verstoesse.push(`Verweis: Parameter "${a.key}" verweist auf setting:${ziel} — diese Einstellung gibt es nicht.`);
                 }

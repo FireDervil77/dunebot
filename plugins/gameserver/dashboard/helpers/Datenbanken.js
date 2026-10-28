@@ -17,6 +17,12 @@ const { encrypt, decrypt } = require('../../../../apps/dashboard/helpers/utils')
 const HOST = 'fb-datenbank';
 const PORT = 3306;
 
+/**
+ * Die Namen hinter `{{db:…}}` (S5). Dieselbe Liste steht im Daemon
+ * (`pkgspec.DbSchluessel`); `scripts/check-db-platzhalter.js` hält beide zusammen.
+ */
+const DB_SCHLUESSEL = ['host', 'port', 'name', 'user', 'password'];
+
 /** Server samt Rootserver-Angaben zu Datenbanken — nur in seiner Guild. */
 async function ladeServer(serverId, guildId) {
     const db = ServiceManager.get('dbService');
@@ -134,6 +140,23 @@ async function zugang(server, nr) {
         'SELECT name, kennwort_ver FROM gameserver_datenbanken WHERE server_id = ? AND nr = ?', [server.id, nr]);
     if (!z) throw fehler('Diese Datenbank gibt es nicht.', 404);
     return zugangAus(z.name, decrypt(z.kennwort_ver));
+}
+
+/**
+ * Der Zugang für den Startbefehl (Stufe 11 S5) — in der Form, die der Daemon
+ * für `{{db:…}}` liest: host, port, name, user, password.
+ *
+ * Es gilt die erste Datenbank des Servers (`s<id>_1`; bei mehreren die mit der
+ * kleinsten Nummer). null, wenn er keine hat. Ein Kennwort, das sich nicht
+ * entschlüsseln lässt, wirft — der Aufrufer entscheidet, ob der Start daran
+ * scheitert (pflicht) oder ohne Datenbank läuft.
+ */
+async function zugangFuerStart(serverId) {
+    const db = ServiceManager.get('dbService');
+    const [z] = await db.query(
+        'SELECT name, kennwort_ver FROM gameserver_datenbanken WHERE server_id = ? ORDER BY nr LIMIT 1', [serverId]);
+    if (!z) return null;
+    return { host: HOST, port: PORT, name: z.name, user: z.name, password: decrypt(z.kennwort_ver) };
 }
 
 /** Neues Kennwort: im Container setzen, dann speichern. */
@@ -275,8 +298,8 @@ function groesseText(bytes) {
 }
 
 module.exports = {
-    HOST, PORT,
-    ladeServer, liste, stand, anlegen, zugang, neuesKennwort, loeschen, groessenMessen,
+    HOST, PORT, DB_SCHLUESSEL,
+    ladeServer, liste, stand, anlegen, zugang, zugangFuerStart, neuesKennwort, loeschen, groessenMessen,
     groesseText, freieNummer,
     pflicht, wahlBeimAnlegen, entscheideBeimAnlegen, allesLoeschen,
 };
