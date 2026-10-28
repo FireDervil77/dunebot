@@ -291,12 +291,15 @@ setup_docker_network() {
     fi
 }
 
-### SFTP-Port in der Firewall
+### Ports der Dienste im Daemon in der Firewall: SFTP und Abruf
 #
-# Öffnen tut ihn seit 2026-10-27 der Daemon selbst (sftp.Steuerung, Go): wenn
-# er SFTP startet, auf dem Port, den der Rootserver im Dashboard nennt. Er merkt
-# sich die eigene Regel in der daemon.yaml (`sftp.firewall_port`). Hier bleibt
-# nur das Aufräumen beim Deinstallieren.
+# Öffnen tut sie der Daemon selbst (internal/firewall, Go): SFTP seit
+# 2026-10-27 (sftp.Steuerung, auf dem Port, den der Rootserver im Dashboard
+# nennt), den Abruf für Sicherungen und FastDL seit 2026-10-28
+# (sicherungsabruf.FuehreFirewall, solange der Dienst läuft). Er merkt sich
+# jeweils die eigene Regel in der daemon.yaml (`sftp.firewall_port`,
+# `sicherungsabruf.firewall_port`). Hier bleibt nur das Aufräumen beim
+# Deinstallieren.
 
 ### Der Port, dessen Regel der Daemon selbst gesetzt hat — leer, wenn keine.
 eigener_sftp_port() {
@@ -312,7 +315,7 @@ eigener_abruf_port() {
     awk '/^sicherungsabruf:/{drin=1; next} /^[^[:space:]#]/{drin=0} drin && /^[[:space:]]+firewall_port:[[:space:]]*[0-9]+[[:space:]]*$/{print $2; exit}' "$datei"
 }
 
-### SFTP-Port beim Deinstallieren wieder schliessen
+### Eine eigene Regel beim Deinstallieren wieder schliessen (SFTP, Abruf)
 #
 # Nur die Regel, die der Daemon gesetzt hat. Fehlt sie, passiert nichts —
 # dann hat sie jemand von Hand entfernt oder es gab nie eine.
@@ -799,8 +802,9 @@ uninstall() {
         log_success "Sudoers-Datei entfernt"
     fi
 
-    # SFTP-Port wieder schliessen — den, dessen Regel der Daemon selbst gesetzt
-    # hat (sftp.firewall_port). Ohne den Daemon lauscht dort niemand mehr.
+    # SFTP- und Abruf-Port wieder schliessen — die, deren Regel der Daemon
+    # selbst gesetzt hat (sftp/sicherungsabruf.firewall_port). Ohne den Daemon
+    # lauscht dort niemand mehr.
     local sftp_port
     sftp_port="$(eigener_sftp_port)"
     if [[ -n "$sftp_port" ]]; then
@@ -865,6 +869,35 @@ uninstall() {
         fi
     fi
     
+    # Datenbanken der Spiele (Stufe 11, seit 2026-10-27): Container fb-datenbank
+    # mit dem Volume fb-datenbank. Der Container geht unten mit den übrigen
+    # FireBot-Containern; das VOLUME hält die Daten aller Spiel-Datenbanken und
+    # wird hier eigens gefragt. Behält man es, braucht ein späterer Daemon das
+    # Root-Kennwort aus der daemon.yaml (datenbank.root_password) — deshalb wird
+    # sie dann gesichert, bevor der Installationsordner geht.
+    if command -v docker &>/dev/null && docker volume inspect fb-datenbank &>/dev/null; then
+        echo ""
+        log_warn "Volume 'fb-datenbank' gefunden — darin liegen ALLE Datenbanken der Gameserver dieser Maschine."
+        if prompt_yes_no "Datenbanken der Spiele ENDGÜLTIG löschen? (lässt sich nicht zurücknehmen)" "n"; then
+            docker rm -f fb-datenbank &>/dev/null || true
+            if docker volume rm fb-datenbank &>/dev/null; then
+                log_success "Datenbanken der Spiele gelöscht (Volume fb-datenbank)"
+            else
+                log_warn "Volume fb-datenbank konnte nicht gelöscht werden — 'docker volume rm fb-datenbank' von Hand"
+            fi
+        else
+            local db_sicherung="/root/firebot-daemon.yaml.$(date +%Y%m%d-%H%M%S)"
+            if [[ -f "$INSTALL_DIR/$CONFIG_FILE" ]] && cp -p "$INSTALL_DIR/$CONFIG_FILE" "$db_sicherung"; then
+                chmod 600 "$db_sicherung"
+                log_success "Datenbanken bleiben. Die daemon.yaml mit ihrem Root-Kennwort ist gesichert: $db_sicherung"
+                log_info "  Bei einer Neuinstallation 'datenbank.root_password' aus dieser Datei übernehmen."
+            else
+                log_warn "Datenbanken bleiben — die daemon.yaml mit ihrem Root-Kennwort ließ sich nicht sichern."
+                log_warn "  Bewahre $INSTALL_DIR/$CONFIG_FILE auf (Installations-Verzeichnis unten NICHT löschen)."
+            fi
+        fi
+    fi
+
     # Remove Installation
     echo ""
     if prompt_yes_no "Installations-Verzeichnis löschen? ($INSTALL_DIR)" "y"; then
