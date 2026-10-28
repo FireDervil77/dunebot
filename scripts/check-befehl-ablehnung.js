@@ -11,6 +11,9 @@
  * Ventil (5 Min.) auf „starting"/„stopping", der Grund des Daemons ging
  * verloren, `error_message` blieb leer.
  *
+ * Seit dem Abend desselben Tages geht der Discord-Stopp über ServerStopp
+ * (check-server-stopp.js prüft das) — hier bleiben vier Stellen.
+ *
  *   Voraussetzung  _resolveCommand wirft wirklich bei success: false —
  *                  ändert sich das, ist dieser Wächter neu zu denken
  *   Stellen        wer das Ergebnis von gameserver.start/stop/restart in eine
@@ -72,8 +75,8 @@ function zuweisungen(quelle) {
 
     const alle = DATEIEN.flatMap(d => zuweisungen(lies(d)).map(t => ({ ...t, datei: d })));
 
-    await pruefe('gefunden: mindestens die fünf Stellen', async () => {
-        assert.ok(alle.length >= 5, `nur ${alle.length} Zuweisungen gefunden — Muster veraltet?`);
+    await pruefe('gefunden: mindestens die vier Stellen', async () => {
+        assert.ok(alle.length >= 4, `nur ${alle.length} Zuweisungen gefunden — Muster veraltet?`);
     });
 
     await pruefe('jede Zuweisung hängt .catch( an', async () => {

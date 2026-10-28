@@ -798,33 +798,21 @@ class IPCServer {
                 case 'SERVER_STOP': {
                     if (!guildId || !serverId) return message.reply({ success: false, error: 'guild_id und server_id erforderlich' });
                     if (await actorMayNot('GAMESERVER.STOP')) return;
-                    const [srv] = await dbService.query(
-                        `SELECT gs.id, gs.name, gs.status, gs.last_status_update, r.daemon_id
-                         FROM gameservers gs
-                         LEFT JOIN rootserver r ON gs.rootserver_id = r.id
-                         WHERE gs.id = ? AND gs.guild_id = ? LIMIT 1`,
-                        [serverId, guildId]
-                    );
-                    if (!srv) return message.reply({ success: false, error: 'Gameserver nicht gefunden' });
 
-                    const stopErlaubt = pruefeServerAktion('stop', srv.status, srv.last_status_update);
-                    if (!stopErlaubt.erlaubt) return message.reply({ success: false, error: stopErlaubt.grund });
+                    // Derselbe Stoppweg wie die Web-Route (ServerStopp.stoppe), geholt
+                    // über den Anbieter in ServersteuerungRegistry — der Kern `require`t
+                    // das Plugin dafür nicht. Bis zum 2026-10-28 stand hier eigener
+                    // Code; er setzte bei Fehlschlag `error`, ServerStopp kehrt zum
+                    // vorherigen Zustand zurück und schreibt den Grund (Baustelle 119).
+                    const steuerung = require('dunebot-sdk').ServersteuerungRegistry.get('gameserver');
+                    if (!steuerung) return message.reply({ success: false, error: 'Das Gameserver-Plugin ist nicht aktiv' });
+                    const zustand = await steuerung.zustand(guildId, serverId);
+                    if (!zustand) return message.reply({ success: false, error: 'Gameserver nicht gefunden' });
 
-                    if (!srv.daemon_id) return message.reply({ success: false, error: 'Kein Daemon zugewiesen' });
-                    if (!ipmServer?.isDaemonOnline(srv.daemon_id)) return message.reply({ success: false, error: 'Daemon ist offline' });
-
-                    await dbService.query("UPDATE gameservers SET status = 'stopping', last_status_update = NOW() WHERE id = ?", [serverId]);
-                    require('../../../plugins/gameserver/dashboard/helpers/PanelService').pushZustandswechsel(serverId);
-                    const stopR = await ipmServer.sendCommand(srv.daemon_id, 'gameserver.stop', {
-                        server_id: String(serverId), guild_id: guildId,
-                    }, 30000).catch(fehler => ({ success: false, error: fehler.message })); // wirft bei Ablehnung, s. SERVER_START
-                    if (!stopR?.success) {
-                        const grund = stopR?.error || 'Stop fehlgeschlagen';
-                        await dbService.query("UPDATE gameservers SET status = 'error', error_message = ? WHERE id = ?", [grund, serverId]);
-                        require('../../../plugins/gameserver/dashboard/helpers/PanelService').pushZustandswechsel(serverId);
-                        return message.reply({ success: false, error: grund });
-                    }
-                    return message.reply({ success: true, data: { name: srv.name } });
+                    const ergebnis = await steuerung.stoppen(guildId, serverId,
+                        { grund: `Discord, User ${payload.actor_user_id || 'unbekannt'}` });
+                    if (!ergebnis.ok) return message.reply({ success: false, error: ergebnis.grund || 'Stop fehlgeschlagen' });
+                    return message.reply({ success: true, data: { name: zustand.name } });
                 }
 
                 // ── Gameserver neustarten ───────────────────────────────────────────────

@@ -41,10 +41,11 @@
  * - Scheitert der Befehl, kehrt der Status zu dem zurück, was er VORHER war —
  *   nicht pauschal zu `online`, wie es die Route bis dahin tat.
  *
- * Die übrigen Stopp-Wege laufen hier noch NICHT durch: der Discord-Befehl über
- * den Kern (richtig gebaut, aber eigener Code — der Kern darf kein Plugin
- * `require`n), CronWorker, MigrationManager und der Plugin-Abbau. Das ist
- * benannt, nicht vergessen: siehe `docs/Baustellen.md`, Baustelle 119.
+ * Der Discord-Befehl läuft seit 2026-10-28 hier durch: Der Kern
+ * (`IPCServer.js`, `SERVER_STOP`) holt den Anbieter aus `ServersteuerungRegistry`
+ * und `require`t das Plugin dafür nicht. Noch NICHT hier: CronWorker,
+ * MigrationManager und der Plugin-Abbau. Das ist benannt, nicht vergessen:
+ * siehe `docs/Baustellen.md`, Baustelle 119.
  *
  * @module helpers/ServerStopp
  */
@@ -64,8 +65,13 @@ const { pruefeAktion } = require('./ServerState');
 const STOPP_FRIST_MS = 150 * 1000;
 const TAKT_MS = 2000;
 
-/** SSE ist im Betrieb immer da — in einem Prüflauf nicht zwingend. */
+/**
+ * Browser und Discord-Panel erfahren den Wechsel sofort. Das Panel zog bis zum
+ * 2026-10-28 nur auf dem Discord-Weg sofort nach; sonst erst, wenn der Daemon
+ * „stopping" meldete. SSE ist im Betrieb immer da, in einem Prüflauf nicht zwingend.
+ */
 function melde(guildId, serverId, status, zusatz = {}) {
+    require('./PanelService').pushZustandswechsel(serverId);
     if (!ServiceManager.has('sseManager')) return;
     ServiceManager.get('sseManager').broadcast(guildId, 'gameserver', {
         action: 'status_changed',

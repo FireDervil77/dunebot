@@ -297,6 +297,33 @@ async function pruefe(name, fn) {
         } finally { ServerStopp.warteBisGestoppt = echtesWarten; }
     });
 
+    console.log('\nDiscord-Weg (seit 2026-10-28, Baustelle 119)');
+
+    await pruefe('SERVER_STOP im Kern stoppt über den Anbieter, nicht mit eigenem Befehl', async () => {
+        const { ohneKommentare } = require('./lib/quelltext');
+        const ipc = ohneKommentare(require('fs').readFileSync(
+            path.join(__dirname, '../apps/dashboard/helpers/IPCServer.js'), 'utf8'));
+        const ab = ipc.indexOf("case 'SERVER_STOP'");
+        assert.ok(ab > 0, 'case SERVER_STOP nicht gefunden');
+        const fall = ipc.slice(ab, ipc.indexOf('case ', ab + 20));
+        assert.match(fall, /ServersteuerungRegistry\.get\('gameserver'\)/);
+        assert.match(fall, /\.stoppen\(guildId, serverId/);
+        assert.doesNotMatch(fall, /'gameserver\.stop'/, 'eigener Stoppbefehl — zweiter Weg');
+        assert.doesNotMatch(fall, /UPDATE gameservers/, 'eigenes Statusschreiben — zweiter Weg');
+    });
+
+    await pruefe('Der Anbieter stoppt über ServerStopp.stoppe', async () => {
+        const { anbieter } = require('../plugins/gameserver/dashboard/helpers/Serversteuerung');
+        const echt = ServerStopp.stoppe;
+        let gerufen = null;
+        ServerStopp.stoppe = async (auftrag) => { gerufen = auftrag; return { ok: true, eingereiht: true }; };
+        try {
+            const r = await anbieter.stoppen('g1', 7, { grund: 'Discord' });
+            assert.deepStrictEqual(r, { ok: true, grund: undefined, eingereiht: true });
+            assert.strictEqual(gerufen.guildId, 'g1');
+        } finally { ServerStopp.stoppe = echt; }
+    });
+
     console.log(`\n${bestanden} Prüfung(en) bestanden.\n`);
     process.exit(process.exitCode || 0);
 })();
