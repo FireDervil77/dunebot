@@ -732,6 +732,31 @@ class MigrationManager {
                 }
             }
 
+            // Schritt 8c: Die Spieldateien an der Quelle löschen (Betreiber,
+            // 2026-10-28: „auf dem alten server werden die inhalte gelöscht.
+            // da das ja nun funktioniert."). Bis dahin blieb nach jedem Umzug
+            // eine vollständige Kopie auf dem alten Rootserver liegen
+            // (Baustelle 208; bei Server 217: /home/firebot/217 auf 54).
+            //
+            // Derselbe Befehl wie beim Löschen eines Servers: Er nimmt das
+            // Volume, die Freigaben für Spieler und den Eintrag im Speicher und
+            // in der SQLite des alten Daemons — dort meldete der Server sich
+            // sonst bis zum nächsten Neustart weiter. Erst jetzt: Der Server
+            // zeigt aufs Ziel, und dort ist alles ausgepackt. Bleibt etwas, steht
+            // es im Log; der Umzug ist trotzdem gelungen.
+            try {
+                const weg = await this.ipmServer.sendCommand(sourceRootServer.daemon_id, 'gameserver.uninstall', {
+                    server_id: String(server.id),
+                    guild_id: guildId,
+                    rootserver_id: Number(sourceRootServer.id),
+                    daemon_id: sourceRootServer.daemon_id,
+                }, 120000);
+                if (weg?.success === false) throw new Error(weg.error || weg.message || 'der Daemon meldete keinen Erfolg');
+                this.Logger.info(`[MigrationManager] Spieldateien von Server ${server.id} auf ${sourceRootServer.name} gelöscht`);
+            } catch (loeschErr) {
+                this.Logger.warn(`[MigrationManager] Spieldateien von Server ${server.id} auf ${sourceRootServer.name} NICHT gelöscht: ${loeschErr.message} — sie liegen dort noch`);
+            }
+
             // Schritt 9: Cleanup
             await this._cleanup(migrationId, sourceRootServer, targetRootServer, backupPath, targetBackupPath);
 

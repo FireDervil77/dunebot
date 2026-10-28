@@ -204,6 +204,13 @@ async function umzug() {
         assert.deepStrictEqual(befehle('gameserver.migrate.restore')[0].nutzlast.datenbanken, [1]);
         assert.strictEqual(befehle('db.loeschen', 'dq').length, 1, 'die alte an der Quelle geht');
         assert.strictEqual(befehle('db.loeschen', 'dz').length, 0, 'die neue am Ziel bleibt');
+        // Baustelle 208 (Betreiber: „auf dem alten server werden die inhalte gelöscht")
+        const weg = befehle('gameserver.uninstall');
+        assert.strictEqual(weg.length, 1, 'die Spieldateien an der Quelle werden nicht gelöscht');
+        assert.strictEqual(weg[0].id, 'dq', 'gelöscht wird nur an der Quelle');
+        assert.strictEqual(weg[0].nutzlast.rootserver_id, 54);
+        const folge = daemon.auftraege.map(a => a.befehl);
+        assert.ok(folge.indexOf('gameserver.migrate.restore') < folge.indexOf('gameserver.uninstall'), 'erst am Ziel auspacken, dann an der Quelle löschen');
     });
 
     await pruefe('Auspacken am Ziel scheitert: Ziel-Datenbank wieder weg, Quelle unberührt', async () => {
@@ -213,6 +220,7 @@ async function umzug() {
         assert.strictEqual(r.success, false);
         assert.strictEqual(befehle('db.loeschen', 'dz').length, 1, 'am Ziel abgebaut');
         assert.strictEqual(befehle('db.loeschen', 'dq').length, 0, 'an der Quelle nichts gelöscht');
+        assert.strictEqual(befehle('gameserver.uninstall').length, 0, 'gescheitert: die Spieldateien an der Quelle müssen bleiben');
     });
 
     // Erfolg genauso prüfen: Ein Daemon vor 1.0.148 kennt `datenbanken` nicht
@@ -339,6 +347,13 @@ async function umzug() {
         assert.strictEqual(befehle('db.loeschen', 'dz').length, 1, 'die Ziel-Datenbank bleibt liegen');
         assert.strictEqual(befehle('gameserver.migrate.cleanup', 'dz').length, 1, 'das Archiv am Ziel bleibt in /tmp liegen');
         assert.ok(logs.length === 0 || !logs.some(l => /nicht abgebaut/.test(l)));
+    });
+
+    await pruefe('Scheitert das Löschen an der Quelle, ist der Umzug trotzdem gelungen — und es steht im Log', async () => {
+        daemon.scheitern['gameserver.uninstall'] = 'fehler beim Löschen: permission denied';
+        const r = await umzug();
+        assert.strictEqual(r.success, true, r.error);
+        assert.ok(logs.some(l => /NICHT gelöscht: fehler beim Löschen/.test(l)), 'kein Hinweis im Log');
     });
 
     console.log('\nDialog');
