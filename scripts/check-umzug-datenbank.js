@@ -63,6 +63,7 @@ const daemon = {
     auftraege: [],
     amZiel: [],                // db.liste am Ziel
     scheitern: {},             // befehl → Fehlertext
+    alt: new Set(),            // Daemons vor 1.0.148: kennen `datenbanken` nicht
     isDaemonOnline: () => true,
     async syncSftpUsers() {},
     async sendCommand(id, befehl, nutzlast) {
@@ -70,6 +71,13 @@ const daemon = {
         if (this.scheitern[befehl]) throw new Error(this.scheitern[befehl]);
         if (befehl === 'db.liste') return { success: true, datenbanken: id === 'dz' ? this.amZiel : [] };
         if (befehl === 'db.anlegen') return { success: true, zugang: { name: `s7_${nutzlast.nr}` } };
+        // Wie der Daemon antwortet — ein alter lässt die Felder einfach weg.
+        if (befehl === 'gameserver.migrate.backup') {
+            return this.alt.has(id) ? { success: true } : { success: true, datenbanken: nutzlast.datenbanken };
+        }
+        if (befehl === 'gameserver.migrate.restore') {
+            return this.alt.has(id) ? { success: true } : { success: true, eingespielt: nutzlast.datenbanken, hinweise: [] };
+        }
         return { success: true };
     },
 };
@@ -88,7 +96,7 @@ const befehle = (b, id) => daemon.auftraege.filter(a => a.befehl === b && (!id |
 
 let bestanden = 0;
 async function pruefe(name, fn) {
-    db.nrs = []; db.ziel = { ...ZIEL }; daemon.auftraege = []; daemon.amZiel = []; daemon.scheitern = {}; logs.length = 0;
+    db.nrs = []; db.ziel = { ...ZIEL }; daemon.auftraege = []; daemon.amZiel = []; daemon.scheitern = {}; daemon.alt = new Set(); logs.length = 0;
     try {
         await fn();
         console.log(`  ✓ ${name}`);
@@ -168,6 +176,29 @@ async function umzug() {
         assert.strictEqual(r.success, false);
         assert.strictEqual(befehle('db.loeschen', 'dz').length, 1, 'am Ziel abgebaut');
         assert.strictEqual(befehle('db.loeschen', 'dq').length, 0, 'an der Quelle nichts gelöscht');
+    });
+
+    // Erfolg genauso prüfen: Ein Daemon vor 1.0.148 kennt `datenbanken` nicht
+    // und meldet trotzdem Erfolg. Ohne diese Prüfung stünde am Ende eine LEERE
+    // Datenbank am Ziel, und die alte wäre gelöscht.
+    await pruefe('Alter Daemon an der Quelle: kein Umzug, nichts angelegt, nichts gelöscht', async () => {
+        db.nrs = [1];
+        daemon.alt.add('dq');
+        const r = await umzug();
+        assert.strictEqual(r.success, false);
+        assert.match(r.error, /nicht ins Archiv gelegt/);
+        assert.strictEqual(befehle('db.anlegen').length, 0);
+        assert.strictEqual(befehle('db.loeschen').length, 0);
+    });
+
+    await pruefe('Alter Daemon am Ziel: kein Umzug, Ziel abgebaut, Quelle unberührt', async () => {
+        db.nrs = [1];
+        daemon.alt.add('dz');
+        const r = await umzug();
+        assert.strictEqual(r.success, false);
+        assert.match(r.error, /nicht eingespielt/);
+        assert.strictEqual(befehle('db.loeschen', 'dz').length, 1);
+        assert.strictEqual(befehle('db.loeschen', 'dq').length, 0);
     });
 
     await pruefe('Anlegen am Ziel scheitert: kein Auspacken, nichts gelöscht', async () => {

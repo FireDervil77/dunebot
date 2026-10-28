@@ -508,6 +508,19 @@ class MigrationManager {
             // WICHTIG: Der Daemon legt Zusatzfelder FLACH ins Response-Payload
             // (sendCommandResponseWithData spreadet `extra` direkt) — es gibt kein
             // `data`-Wrapper-Objekt. Defensive: beide Formen akzeptieren.
+            // Erfolg genauso prüfen (S7): Ein Daemon vor 1.0.148 kennt
+            // `datenbanken` nicht und packt still ohne sie — das Archiv sähe
+            // gleich aus. Ohne seine Bestätigung kein Umzug: Sonst stünde am
+            // Ende eine leere Datenbank am Ziel und die alte wäre gelöscht.
+            if (datenbanken.length) {
+                const imArchiv = backupResult.datenbanken ?? backupResult.data?.datenbanken ?? [];
+                const fehlt = datenbanken.filter(nr => !imArchiv.includes(nr));
+                if (fehlt.length) {
+                    throw new Error(`Der Quell-Daemon hat Datenbank ${fehlt.join(', ')} nicht ins Archiv gelegt `
+                        + '— ist er älter als 1.0.148? Der Server bleibt, wo er ist.');
+                }
+            }
+
             const backupSize = backupResult.backup_size_bytes ?? backupResult.data?.backup_size_bytes ?? 0;
             const backupChecksum = backupResult.checksum ?? backupResult.data?.checksum ?? null;
             this.Logger.info(`[MigrationManager] Backup erstellt: ${(backupSize / 1024 / 1024).toFixed(1)} MB — Transfer via HTTP-Streaming`);
@@ -562,6 +575,18 @@ class MigrationManager {
 
             if (!restoreResult?.success) {
                 throw new Error(`Restore fehlgeschlagen: ${restoreResult?.message || restoreResult?.error || 'Unbekannt'}`);
+            }
+
+            // Dasselbe am Ziel: eingespielt ist nur, was der Daemon nennt.
+            if (amZielAngelegt.length) {
+                const eingespielt = restoreResult.eingespielt ?? restoreResult.data?.eingespielt ?? [];
+                const fehlt = amZielAngelegt.filter(nr => !eingespielt.includes(nr));
+                if (fehlt.length) {
+                    const hinweise = restoreResult.hinweise ?? restoreResult.data?.hinweise ?? [];
+                    throw new Error(`Der Ziel-Daemon hat Datenbank ${fehlt.join(', ')} nicht eingespielt`
+                        + (hinweise.length ? ` (${hinweise.join(' ')})` : ' — ist er älter als 1.0.148?')
+                        + ' Der Server bleibt, wo er ist.');
+                }
             }
 
             // Schritt 5: Port-Allocations prüfen und ggf. anpassen
