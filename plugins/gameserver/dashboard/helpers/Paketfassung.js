@@ -272,7 +272,11 @@ async function freigabeJePaket(dbService) {
                (SELECT s.version FROM package_versions s
                  WHERE s.package_id = pk.id AND s.channel = 'stable'
                  ORDER BY s.published_at DESC, s.id DESC LIMIT 1) AS freigegeben,
+               (SELECT JSON_UNQUOTE(JSON_EXTRACT(s.fbpkg, '$.identity.author')) FROM package_versions s
+                 WHERE s.package_id = pk.id AND s.channel = 'stable'
+                 ORDER BY s.published_at DESC, s.id DESC LIMIT 1) AS freigegeben_autor,
                j.id AS neueste_id, j.version AS neueste, j.channel AS neueste_kanal,
+               JSON_UNQUOTE(JSON_EXTRACT(j.fbpkg, '$.identity.author')) AS neueste_autor,
                (j.test_passed_at IS NOT NULL) AS neueste_geprueft
           FROM packages pk
           LEFT JOIN package_versions j ON j.id = (
@@ -286,6 +290,10 @@ async function freigabeJePaket(dbService) {
             fassungen: Number(z.fassungen),
             freigegeben: z.freigegeben || null,
             neuer: wartet ? { id: Number(z.neueste_id), version: z.neueste, geprueft: Boolean(Number(z.neueste_geprueft)) } : null,
+            // Wer die gezeigte Fassung veröffentlicht hat — die Werkbank trägt
+            // den Discord-Benutzernamen ein (`identity.author`). Die
+            // freigegebene zählt; ohne Freigabe die neueste.
+            autor: (z.freigegeben ? z.freigegeben_autor : z.neueste_autor) || null,
         };
     }
     return aus;
@@ -460,17 +468,24 @@ async function entfernen(dbService, { paketId, slug }) {
  * Wer steht als Ersteller unter einem Spiel? (Betreiber, 2026-10-28)
  *
  * Bis heute fragten Kachel und Detailseite `author_name` ab — ein Feld, das
- * keine Abfrage liefert; es stand immer „von Unknown". Ein Spiel der
- * Plattform (ohne eigene Guild, heute alle) ist ein Angebot des Teams, nicht
- * einer Person: „FireBot-Team". Ein Paket, das eine Guild selbst baut, hätte
- * einen eigenen Ersteller — einen Namen dazu kennt das Panel noch nicht
- * (`users` trägt keinen), deshalb dann null, und die Zeile fehlt, statt etwas
- * zu erfinden.
+ * keine Abfrage lieferte; es stand immer „von Unknown". Dabei trägt jedes
+ * Paket seinen Ersteller: Die Werkbank schreibt beim Veröffentlichen den
+ * Discord-Benutzernamen nach `identity.author` (gemessen: `firedervil`,
+ * ältere Fassungen `firenetworks`). Betreiber: „der benutzername dabei wäre
+ * auch okay. nur wurde das wohl unter den spielen nie angezeigt."
+ *
+ * Also zuerst der Autor der gezeigten Fassung (`freigabeJePaket(...).autor`).
+ * Trägt sie keinen, gilt für ein Spiel der Plattform (ausdrücklich ohne
+ * Guild) „FireBot-Team"; sonst null, und die Zeile fehlt, statt etwas zu
+ * erfinden. Fehlt `guild_id` in der Zeile ganz, hat die Abfrage sie vergessen
+ * — dann wird nichts behauptet.
+ *
+ * @param {object} spiel  Zeile aus addon_marketplace (mit guild_id)
+ * @param {object|null} stand  Eintrag aus freigabeJePaket
  */
 const PLATTFORM_AUTOR = 'FireBot-Team';
-function autor(spiel) {
-    // Nur ein ausdrückliches NULL aus der Spalte: Fehlt `guild_id` in der
-    // Zeile ganz, hat die Abfrage sie vergessen — dann wird nichts behauptet.
+function autor(spiel, stand = null) {
+    if (stand && stand.autor) return String(stand.autor);
     return spiel && spiel.guild_id === null ? PLATTFORM_AUTOR : null;
 }
 

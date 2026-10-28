@@ -134,14 +134,15 @@ function quelldateien() {
     const KONTROLL = '900', FREMD = '901';
     const altKontroll = process.env.CONTROL_GUILD_ID;
     process.env.CONTROL_GUILD_ID = KONTROLL;
-    const doc = (slug, v) => JSON.stringify({ identity: { slug, version: v } });
+    // Mit Autor (2026-10-28): Die Spiele-Datenbank zeigt den der freigegebenen Fassung.
+    const doc = (slug, v, author) => JSON.stringify({ identity: { slug, version: v, ...(author ? { author } : {}) } });
     await c.query("INSERT INTO packages VALUES (1,'geprueft'),(2,'ungeprueft')");
     await c.query(`INSERT INTO package_versions (id, package_id, version, fbpkg, checksum, channel, published_at, test_passed_at) VALUES
         (11, 1, '1.0.0', ?, 'sha256:a', 'test', '2026-01-01 10:00:00', '2026-01-01 09:00:00'),
         (12, 1, '1.0.1', ?, 'sha256:b', 'test', '2026-01-02 10:00:00', '2026-01-02 09:00:00'),
         (13, 1, '1.0.2', ?, 'sha256:c', 'test', '2026-01-03 10:00:00', NULL),
         (21, 2, '2.0.0', ?, 'sha256:d', 'test', '2026-01-01 10:00:00', NULL)`,
-        [doc('geprueft', '1.0.0'), doc('geprueft', '1.0.1'), doc('geprueft', '1.0.2'), doc('ungeprueft', '2.0.0')]);
+        [doc('geprueft', '1.0.0'), doc('geprueft', '1.0.1', 'alice'), doc('geprueft', '1.0.2'), doc('ungeprueft', '2.0.0')]);
     await c.query("INSERT INTO gameservers (id, guild_id, addon_marketplace_id, channel) VALUES (1, ?, 1, 'test'), (2, ?, 1, 'stable'), (3, ?, 2, 'test')",
         [KONTROLL, KONTROLL, KONTROLL]);
     const fassung = async (id) => (await P.ladePaketFuerServer(db, id))?.paket_version ?? null;
@@ -217,30 +218,31 @@ function quelldateien() {
     await pruefe('Übersicht: „neuer" ist die neueste Fassung, solange sie nicht freigegeben ist', async () => {
         await c.query("INSERT INTO packages VALUES (3,'leer')");
         let s = await P.freigabeJePaket(db);
-        assert.deepStrictEqual(s[1], { fassungen: 3, freigegeben: null, neuer: { id: 13, version: '1.0.2', geprueft: false } });
-        assert.deepStrictEqual(s[2], { fassungen: 1, freigegeben: null, neuer: { id: 21, version: '2.0.0', geprueft: false } });
-        assert.deepStrictEqual(s[3], { fassungen: 0, freigegeben: null, neuer: null }, 'ein Paket ohne Fassung wartet auf nichts');
+        assert.deepStrictEqual(s[1], { fassungen: 3, freigegeben: null, neuer: { id: 13, version: '1.0.2', geprueft: false }, autor: null });
+        assert.deepStrictEqual(s[2], { fassungen: 1, freigegeben: null, neuer: { id: 21, version: '2.0.0', geprueft: false }, autor: null });
+        assert.deepStrictEqual(s[3], { fassungen: 0, freigegeben: null, neuer: null, autor: null }, 'ein Paket ohne Fassung wartet auf nichts');
 
         // Eine ältere Freigabe ändert nichts daran, dass die neueste wartet.
         await P.freigeben(db, { paketId: 1, fassungId: 12, userId: '1' });
         s = await P.freigabeJePaket(db);
-        assert.deepStrictEqual(s[1], { fassungen: 3, freigegeben: '1.0.1', neuer: { id: 13, version: '1.0.2', geprueft: false } });
+        assert.deepStrictEqual(s[1], { fassungen: 3, freigegeben: '1.0.1', neuer: { id: 13, version: '1.0.2', geprueft: false }, autor: 'alice' },
+            'der Autor der FREIGEGEBENEN Fassung, nicht der neuesten');
 
         // Eine geprüfte kommt dazu: Sie ist jetzt die neueste, und sie ist freigebbar.
         await c.query(`INSERT INTO package_versions (id, package_id, version, fbpkg, checksum, channel, published_at, test_passed_at)
-                       VALUES (14, 1, '1.0.3', ?, 'sha256:e', 'test', '2026-01-04 10:00:00', '2026-01-04 09:00:00')`, [doc('geprueft', '1.0.3')]);
+                       VALUES (14, 1, '1.0.3', ?, 'sha256:e', 'test', '2026-01-04 10:00:00', '2026-01-04 09:00:00')`, [doc('geprueft', '1.0.3', 'bob')]);
         s = await P.freigabeJePaket(db);
-        assert.deepStrictEqual(s[1], { fassungen: 4, freigegeben: '1.0.1', neuer: { id: 14, version: '1.0.3', geprueft: true } });
+        assert.deepStrictEqual(s[1], { fassungen: 4, freigegeben: '1.0.1', neuer: { id: 14, version: '1.0.3', geprueft: true }, autor: 'alice' });
 
         // Freigegeben: Es wartet nichts mehr — die älteren test-Fassungen (11, 13) zählen nicht.
         await P.freigeben(db, { paketId: 1, fassungId: 14, userId: '1' });
         s = await P.freigabeJePaket(db);
-        assert.deepStrictEqual(s[1], { fassungen: 4, freigegeben: '1.0.3', neuer: null });
+        assert.deepStrictEqual(s[1], { fassungen: 4, freigegeben: '1.0.3', neuer: null, autor: 'bob' });
 
         // Zurückgenommen: Die neueste wartet wieder, freigegeben ist die davor.
         await P.zuruecknehmen(db, { paketId: 1, fassungId: 14 });
         s = await P.freigabeJePaket(db);
-        assert.deepStrictEqual(s[1], { fassungen: 4, freigegeben: '1.0.1', neuer: { id: 14, version: '1.0.3', geprueft: true } });
+        assert.deepStrictEqual(s[1], { fassungen: 4, freigegeben: '1.0.1', neuer: { id: 14, version: '1.0.3', geprueft: true }, autor: 'alice' });
     });
 
     await c.query('DROP TEMPORARY TABLE gameservers, packages, package_versions');

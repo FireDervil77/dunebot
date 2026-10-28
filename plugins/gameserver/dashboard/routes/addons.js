@@ -91,7 +91,7 @@ router.get('/', requirePermission('GAMESERVER.ADDONS.VIEW'), async (req, res) =>
         // Entwurf oder freigegeben — für die Marke an der Kachel.
         const stand = await Paketfassung.freigabeJePaket(dbService);
         for (const a of (addons || [])) a.freigabe = stand[a.id] || null;
-        for (const a of (addons || [])) a.author_name = Paketfassung.autor(a);
+        for (const a of (addons || [])) a.author_name = Paketfassung.autor(a, a.freigabe);
 
         await themeManager.renderView(res, 'guild/gameserver-marketplace', {
             title: 'Spiele-Datenbank',
@@ -134,7 +134,7 @@ router.get('/:slug', requirePermission('GAMESERVER.ADDONS.VIEW'), async (req, re
 
         addon.tags = await Tags.fuer(dbService, 'spiel', addon.id);
         addon.freigabe = (await Paketfassung.freigabeJePaket(dbService))[addon.id] || null;
-        addon.author_name = Paketfassung.autor(addon);
+        addon.author_name = Paketfassung.autor(addon, addon.freigabe);
 
         // Ähnliche Spiele: die, die Tags mit diesem teilen — die mit den meisten
         // gemeinsamen zuerst. Nur was auch in der Liste stünde.
