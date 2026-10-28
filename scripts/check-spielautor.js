@@ -50,7 +50,7 @@ pruefe('Liste und Detail setzen author_name über die Regel, die Ansichten erfin
     assert.match(r, /addon\.author_name = Paketfassung\.autor\(addon, addon\.freigabe\)/);
     assert.strictEqual((r.match(/author_user_id, guild_id/g) || []).length, 2, 'beide Abfragen holen guild_id');
     for (const v of ['gameserver-marketplace.ejs', 'gameserver-addon-detail.ejs']) {
-        const t = fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/views/guild', v), 'utf8');
+        const t = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/views/guild', v), 'utf8'));
         assert.ok(!/author_name \|\| 'Unknown'/.test(t), `${v}: „Unknown" als Rückfall steht noch da`);
         assert.match(t, /<% if \(addon\.author_name\) \{ %>/);
     }

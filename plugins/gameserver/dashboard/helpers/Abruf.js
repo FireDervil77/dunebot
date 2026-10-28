@@ -27,6 +27,23 @@ function wirt(maschine) {
 }
 
 /**
+ * Für einen Link, den ein BROWSER öffnet (Sicherung herunterladen): immer die IP.
+ *
+ * Gemessen 2026-10-28: firenetworks.de sendet `Strict-Transport-Security:
+ * …; includeSubDomains; preload` (Apache und app.js). Jeder Browser, der die
+ * Seite kennt, zwingt damit `node1.firenetworks.de:9350` auf https — der
+ * Dienst des Daemons spricht nur http, der Download lief ins Leere
+ * („ERR_CONNECTION_TIMED_OUT" beim Betreiber). Seit `fqdn_gilt` für 54
+ * gesetzt ist, nahm der Link den Namen; am 2026-09-19, als er noch die IP
+ * nahm, ging es. Eine IP fällt unter keine HSTS-Regel.
+ *
+ * Spielclients (FastDL, `basis`) kennen kein HSTS — dort bleibt der Name.
+ */
+function wirtFuerBrowser(maschine) {
+    return maschine ? String(maschine.host || '').trim() : '';
+}
+
+/**
  * `http://wirt:port` — oder null, wenn die Maschine nichts ausliefert.
  * Eine IPv6-Adresse gehört in eckige Klammern.
  */
@@ -50,4 +67,4 @@ function gibtFrei(paket) {
     return Array.isArray(paket?.files?.public) && paket.files.public.length > 0;
 }
 
-module.exports = { wirt, basis, downloadAdresse, gibtFrei };
+module.exports = { wirt, wirtFuerBrowser, basis, downloadAdresse, gibtFrei };

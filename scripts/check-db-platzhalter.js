@@ -19,6 +19,7 @@
 
 const assert = require('assert');
 const fs = require('fs');
+const { ohneKommentare } = require('./lib/quelltext');
 const path = require('path');
 
 process.env.TOKEN_ENCRYPTION_KEY = process.env.TOKEN_ENCRYPTION_KEY || 'waechter-schluessel-nur-fuer-die-pruefung';
@@ -89,7 +90,7 @@ function server(p) {
     console.log('\nEine Liste, zwei Enden');
 
     await pruefe('DB_SCHLUESSEL im Dashboard = pkgspec.DbSchluessel im Daemon', async () => {
-        const go = fs.readFileSync(path.join(DAEMON, 'internal/pkgspec/argv.go'), 'utf8');
+        const go = ohneKommentare(fs.readFileSync(path.join(DAEMON, 'internal/pkgspec/argv.go'), 'utf8'));
         const m = go.match(/var DbSchluessel = \[\]string\{([^}]*)\}/);
         assert.ok(m, 'pkgspec.DbSchluessel nicht gefunden — Daemon-Repo unter ' + DAEMON + '?');
         const daemon = [...m[1].matchAll(/"([a-z]+)"/g)].map(x => x[1]);
@@ -97,7 +98,7 @@ function server(p) {
     });
 
     await pruefe('Das Verweismuster des Daemons kennt db', async () => {
-        const go = fs.readFileSync(path.join(DAEMON, 'internal/pkgspec/argv.go'), 'utf8');
+        const go = ohneKommentare(fs.readFileSync(path.join(DAEMON, 'internal/pkgspec/argv.go'), 'utf8'));
         assert.match(go, /var verweis = regexp\.MustCompile\(`[^`]*\(setting\|port\|content\|env\|db\)/);
     });
 
@@ -154,7 +155,7 @@ function server(p) {
     });
 
     await pruefe('Werkbank-Festzeilen: dasselbe Muster wie der Daemon', async () => {
-        const quelle = fs.readFileSync(path.join(WURZEL, 'plugins/werkbank/dashboard/helpers/Sitzungen.js'), 'utf8');
+        const quelle = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'plugins/werkbank/dashboard/helpers/Sitzungen.js'), 'utf8'));
         assert.match(quelle, /const RE_FEST_VERWEIS = \/\^\\\{\\\{\(setting\|port\|content\|env\|db\)/);
         assert.match(quelle, /m\[1\] === 'db' && !DB_SCHLUESSEL\.includes\(m\[2\]\)/);
     });
