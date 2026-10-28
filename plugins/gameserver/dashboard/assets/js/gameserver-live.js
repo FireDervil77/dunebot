@@ -466,6 +466,7 @@
                     const b = s.bereitschaft || null;
                     this.uebernimm(s.id, {
                         status:  s.status,
+                        umzug:   Boolean(s.umzug),
                         // Für ein hängendes `stopping` (knopfZustand): wann der
                         // Zustand zuletzt wechselte, und die Frist vom Server.
                         seit:    s.uebergang ? s.uebergang.seit : undefined,
@@ -624,7 +625,9 @@
                     }
 
                     case 'zustand-pille': {
-                        const e = ZUSTAende[z.status] || { text: z.status || '—' };
+                        // Ein laufender Umzug schlägt den Status (Umzugsstand) —
+                        // sonst zeigte die Pille mitten im Umzug „Aus".
+                        const e = z.umzug ? { text: 'Wird verschoben' } : (ZUSTAende[z.status] || { text: z.status || '—' });
                         el.textContent = e.text;
                         // Gruen heisst hier "laeuft", genau wie serverseitig
                         // (`baueZustand().gut`).

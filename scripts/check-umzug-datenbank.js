@@ -40,6 +40,8 @@ const ZIEL = { id: 55, name: 'Ziel', daemon_id: 'dz', host: '2.2.2.2', guild_id:
 const db = {
     nrs: [],
     ziel: { ...ZIEL },
+    migrationen: [],           // jüngste Umzugszeile(n) des Servers für Umzugsstand.letzter
+    gescheitert: [],           // was als Fehlschlag eingetragen wurde
     async query(sql, p) {
         if (/FROM gameservers gs\s+LEFT JOIN rootserver r ON gs\.rootserver_id = r\.id\s+WHERE gs\.id = \? AND gs\.guild_id = \?/.test(sql)) {
             return [{ id: 7, name: 'Probe', guild_id: 'g1', rootserver_id: 54, status: 'offline',
@@ -52,6 +54,16 @@ const db = {
             return [{ name: `s7_${p[1]}`, kennwort_ver: encrypt('AltesKennwort0123') }];
         }
         if (/INSERT INTO gameserver_migrations/.test(sql)) return { insertId: 1 };
+        if (/FROM gameserver_migrations WHERE server_id = \? ORDER BY id DESC LIMIT 1/.test(sql)) return this.migrationen;
+        // Wie MySQL im strikten Modus: current_step ist VARCHAR(100).
+        if (/UPDATE gameserver_migrations SET status = \?, progress_percent = \?, current_step = \?/.test(sql)
+            && String(p[2] || '').length > 100) {
+            throw new Error("Data too long for column 'current_step' at row 1");
+        }
+        if (/SET status = 'failed', progress_percent = 0, current_step = 'Fehlgeschlagen', error_message = \?/.test(sql)) {
+            this.gescheitert.push(p[0]);
+            return {};
+        }
         if (/^\s*UPDATE (gameservers|gameserver_migrations)/.test(sql)) return {};
         throw new Error('Unerwartete Abfrage: ' + String(sql).trim().replace(/\s+/g, ' ').slice(0, 90));
     },
@@ -96,7 +108,7 @@ const befehle = (b, id) => daemon.auftraege.filter(a => a.befehl === b && (!id |
 
 let bestanden = 0;
 async function pruefe(name, fn) {
-    db.nrs = []; db.ziel = { ...ZIEL }; daemon.auftraege = []; daemon.amZiel = []; daemon.scheitern = {}; daemon.alt = new Set(); logs.length = 0;
+    db.nrs = []; db.ziel = { ...ZIEL }; db.migrationen = []; db.gescheitert = []; daemon.auftraege = []; daemon.amZiel = []; daemon.scheitern = {}; daemon.alt = new Set(); logs.length = 0;
     try {
         await fn();
         console.log(`  ✓ ${name}`);
@@ -215,6 +227,55 @@ async function umzug() {
         assert.strictEqual(r.success, true, r.error);
         assert.strictEqual(daemon.auftraege.filter(a => a.befehl.startsWith('db.')).length, 0);
         assert.deepStrictEqual(befehle('gameserver.migrate.backup')[0].nutzlast.datenbanken, []);
+    });
+
+    console.log('\nSichtbarkeit und Sperre (2026-10-28, Umzug 16 / Server 217)');
+
+    await pruefe('Ein langer Grund: Fehlschlag mit ganzem Text eingetragen, Fehlerzweig läuft zu Ende', async () => {
+        db.nrs = [1];
+        daemon.alt.add('dq'); // genau der Fall von Umzug 16: Grund länger als 100 Zeichen
+        const r = await umzug();
+        assert.strictEqual(r.success, false);
+        assert.strictEqual(db.gescheitert.length, 1, 'kein Fehlschlag eingetragen');
+        assert.match(db.gescheitert[0], /nicht ins Archiv gelegt/);
+        assert.ok(db.gescheitert[0].length > 100, 'der Grund wurde gekürzt');
+        assert.strictEqual(befehle('gameserver.migrate.cleanup', 'dq').length, 1, 'das Archiv an der Quelle wurde nicht aufgeräumt');
+    });
+
+    await pruefe('Läuft schon ein Umzug, wird kein zweiter gestartet', async () => {
+        db.migrationen = [{ id: 15, status: 'backing_up', current_step: 'Backup wird erstellt...' }];
+        const r = await mm._validate(7, 55, 'g1');
+        assert.strictEqual(r.success, false);
+        assert.match(r.error, /läuft schon ein Umzug \(Backup wird erstellt/);
+        db.migrationen = [{ id: 15, status: 'failed' }];
+        assert.strictEqual((await mm._validate(7, 55, 'g1')).success, true, 'nach einem gescheiterten darf man es erneut versuchen');
+    });
+
+    await pruefe('Zustand: ein laufender Umzug schlägt den Status — in Liste, Live-Route und Live-Skript', async () => {
+        const { baueServerListe } = require(path.join(WURZEL, 'plugins/gameserver/dashboard/helpers/Serverseite.js'));
+        const zeile = (status, umzug_status) => baueServerListe([{ id: 7, status, umzug_status, ports: '{}' }]).liste[0].zustand;
+        assert.strictEqual(zeile('offline', 'transferring').text, 'Wird verschoben');
+        assert.strictEqual(zeile('updating', 'pending').text, 'Wird verschoben');
+        assert.strictEqual(zeile('offline', 'failed').text, 'Aus');
+        assert.strictEqual(zeile('offline', null).text, 'Aus');
+        const { SERVER_LISTE_SQL } = require(path.join(WURZEL, 'plugins/gameserver/dashboard/helpers/Serverliste.js'));
+        assert.match(SERVER_LISTE_SQL, /FROM gameserver_migrations m\s+WHERE m\.server_id = gs\.id ORDER BY m\.id DESC LIMIT 1\) AS umzug_status/);
+        // mysql2 ersetzt Platzhalter ohne Rücksicht auf Kommentare: Ein „?" in
+        // einem `--`-Kommentar bekam die Guild-Kennung, das echte blieb leer
+        // (gemessen 2026-10-28 — das Widget fiel still aus).
+        assert.strictEqual((SERVER_LISTE_SQL.match(/\?/g) || []).length, 1, 'die Grundabfrage hat genau einen Platzhalter');
+        const routen = fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/routes/servers.js'), 'utf8');
+        assert.match(routen, /umzug:\s+require\('\.\.\/helpers\/Umzugsstand'\)\.laeuft\(s\.umzug_status\)/);
+        const live = fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/assets/js/gameserver-live.js'), 'utf8');
+        assert.match(live, /z\.umzug \? \{ text: 'Wird verschoben' \}/);
+        assert.match(live, /umzug:\s+Boolean\(s\.umzug\)/);
+    });
+
+    await pruefe('Serverseite: Hinweis für laufenden und gescheiterten Umzug', async () => {
+        const v = fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/views/guild/server-detail.ejs'), 'utf8');
+        assert.match(v, /const uz = locals\.umzug; if \(uz\) \{/);
+        assert.match(v, /Wird auf „<%= uz\.nach %>“ verschoben/);
+        assert.match(v, /Umzug auf „<%= uz\.nach %>“ gescheitert/);
     });
 
     console.log('\nDialog');

@@ -1400,8 +1400,10 @@ router.get('/status', requirePermission('GAMESERVER.VIEW'), async (req, res) => 
                     -- Und der Install-Fortschritt (B44): Er reitet auf demselben
                     -- Weg, damit ein Nachholen nach einem Verbindungsabriss auch
                     -- die Bahn wieder richtig setzt.
-                    install_progress, install_phase
-               FROM gameservers WHERE guild_id = ?`,
+                    install_progress, install_phase,
+                    -- Ob ein Umzug läuft (Umzugsstand, gs.status sagt es nicht). Kein Fragezeichen hier: mysql2 hielte es für einen Platzhalter.
+                    ${require('../helpers/Umzugsstand').SPALTE}
+               FROM gameservers gs WHERE guild_id = ?`,
             [guildId]
         );
 
@@ -1414,6 +1416,8 @@ router.get('/status', requirePermission('GAMESERVER.VIEW'), async (req, res) => 
                 return {
                     id:              s.id,
                     status:          s.status,
+                    // Läuft ein Umzug, zeigt die Pille „Wird verschoben" statt des Status.
+                    umzug:           require('../helpers/Umzugsstand').laeuft(s.umzug_status),
                     current_players: s.current_players,
                     max_players:     s.max_players,
                     // Roh — die Ansicht zeigt die gemeldete Stufe weiterhin an.
@@ -1934,7 +1938,9 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
                 -- (Keine Backticks in diesem Kommentar: Er steht in einem
                 --  Template-Literal, und ein Backtick beendet es. Dritter
                 --  Treffer derselben Falle in diesem Haus.)
-                pv.fbpkg AS paket_json
+                pv.fbpkg AS paket_json,
+                -- Ob ein Umzug läuft (Umzugsstand, 2026-10-28). Kein Fragezeichen hier: mysql2 hielte es für einen Platzhalter.
+                ${require('../helpers/Umzugsstand').SPALTE}
             FROM gameservers gs
             LEFT JOIN addon_marketplace am ON gs.addon_marketplace_id = am.id
             LEFT JOIN rootserver r ON gs.rootserver_id = r.id
@@ -2249,9 +2255,35 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
             }
         }
 
+        // Der Umzug oben auf der Seite (2026-10-28): Läuft einer, steht er da
+        // mit Schritt; ist der letzte in den vergangenen 7 Tagen gescheitert,
+        // steht der Grund da. Bis dahin sah man beides nur im Dialog — wer
+        // ihn schloss oder die Seite neu lud, sah nichts mehr.
+        let umzug = null;
+        try {
+            const Umzugsstand = require('../helpers/Umzugsstand');
+            const z = await Umzugsstand.letzter(dbService, server.id);
+            const frisch = z && z.started_at && (Date.now() - new Date(z.started_at).getTime()) < 7 * 24 * 3600 * 1000;
+            if (z && (Umzugsstand.laeuft(z.status) || (z.status === 'failed' && frisch))) {
+                const name = id => (rootServers.find(r => Number(r.id) === Number(id)) || {}).name || `Rootserver ${id}`;
+                umzug = {
+                    laeuft: Umzugsstand.laeuft(z.status),
+                    schritt: z.current_step || z.status,
+                    prozent: Number(z.progress_percent) || 0,
+                    // Alte Zeilen trugen den Grund in current_step (bis 2026-10-28).
+                    grund: z.error_message || (z.status === 'failed' ? z.current_step : null),
+                    seit: z.started_at,
+                    nach: name(z.target_rootserver_id),
+                };
+            }
+        } catch (err) {
+            Logger.warn(`[Gameserver] Umzugsstand für Server ${server.id} nicht lesbar: ${err.message}`);
+        }
+
         await themeManager.renderView(res, 'guild/server-detail', {
             title: `Server: ${server.name}`,
             uebersicht,
+            umzug,
             bereich,
             bereichName: bereich ? BEREICHE[bereich] : null,
             datenbanken,

@@ -148,6 +148,24 @@
     </div>
   </div>
 
+  <%# ── Umzug auf eine andere Maschine (2026-10-28) ──────────────────────
+      Läuft einer, oder ist der letzte gescheitert, steht es hier — nicht nur
+      im Dialog. Gerechnet in der Route (Umzugsstand), hier nur gezeichnet. %>
+  <% const uz = locals.umzug; if (uz) { %>
+    <div class="alert <%= uz.laeuft ? 'alert-info' : 'alert-danger' %> d-flex align-items-start gap-2 mb-3" role="status" id="umzug-hinweis">
+      <i class="fa-solid <%= uz.laeuft ? 'fa-truck-moving' : 'fa-triangle-exclamation' %> mt-1"></i>
+      <div>
+        <% if (uz.laeuft) { %>
+          <strong>Wird auf „<%= uz.nach %>“ verschoben</strong> — <%= uz.schritt %> (<%= uz.prozent %> %).
+          <div class="small">Den Verlauf zeigt „Mehr → Auf andere Maschine“. Die Seite muss dafür nicht offen bleiben.</div>
+        <% } else { %>
+          <strong>Umzug auf „<%= uz.nach %>“ gescheitert</strong> (<%= new Date(uz.seit).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' }) %>): <%= uz.grund || 'ohne Grund' %>
+          <div class="small">Der Server ist dort geblieben, wo er war. Erneut versuchen über „Mehr → Auf andere Maschine“.</div>
+        <% } %>
+      </div>
+    </div>
+  <% } %>
+
   <%# ── Der Messstreifen: CPU, Arbeitsspeicher, Verkehr ──────────────────
       Wunsch des Betreibers (2026-09-21): "zwischen den Tabs und den Koepfen
       genau eine solche Anzeige pro Gameserver, und zwar CPU, Traffic und Memory

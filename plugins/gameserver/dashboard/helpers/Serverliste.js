@@ -69,7 +69,9 @@ const SERVER_LISTE_SQL = `
                 r.fqdn,
                 r.fqdn_gilt,
                 r.name as rootserver_name,
-                r.daemon_id
+                r.daemon_id,
+                -- Ob ein Umzug läuft, sagt seine Zeile, nicht gs.status (Umzugsstand). Kein Fragezeichen in diesem Kommentar: mysql2 hielte es für einen Platzhalter.
+                ${require('./Umzugsstand').SPALTE}
             FROM gameservers gs
             LEFT JOIN addon_marketplace am ON gs.addon_marketplace_id = am.id
             LEFT JOIN rootserver r ON gs.rootserver_id = r.id

@@ -227,6 +227,11 @@ function baueKopf(server, paket) {
  * Ansicht, dass hier eine Auskunft FEHLT und nicht etwa alles geklärt ist.
  */
 function baueZustand(server) {
+    // Ein laufender Umzug schlägt den Status: Der steht währenddessen auf
+    // `updating` oder schon auf `offline` (Umzugsstand, 2026-10-28).
+    if (require('./Umzugsstand').laeuft(server.umzug_status)) {
+        return { schluessel: 'umzug', text: 'Wird verschoben', ton: 'blue', gut: false, stufe: null };
+    }
     const s = String(server.status || 'unbekannt');
     const tafel = {
         online:     { text: 'Läuft',                    ton: 'green',  gut: true  },

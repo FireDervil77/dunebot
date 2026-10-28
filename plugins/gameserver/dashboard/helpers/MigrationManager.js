@@ -23,6 +23,7 @@ const path = require('path');
 const fs = require('fs').promises;
 const crypto = require('crypto');
 const Datenbanken = require('./Datenbanken');
+const Umzugsstand = require('./Umzugsstand');
 
 class MigrationManager {
     constructor() {
@@ -147,7 +148,7 @@ class MigrationManager {
      * Wird beim Plugin-Start aufgerufen.
      */
     async cleanupOrphanedMigrations() {
-        const RUNNING = ['pending', 'stopping_server', 'backing_up', 'transferring', 'restoring', 'updating_db'];
+        const RUNNING = Umzugsstand.LAEUFT;
 
         try {
             const orphaned = await this.dbService.query(
@@ -272,7 +273,7 @@ class MigrationManager {
             this._executeMigration(migrationId, server, sourceRootServer, targetRootServer, guildId, datenbanken)
                 .catch(err => {
                     this.Logger.error(`[MigrationManager] Migration ${migrationId} failed:`, err);
-                    this._updateMigrationStatus(migrationId, 'failed', 0, err.message);
+                    this._markiereGescheitert(migrationId, err.message);
                 });
 
             return { success: true, migrationId };
@@ -316,9 +317,15 @@ class MigrationManager {
             return { success: false, error: 'Server nicht gefunden' };
         }
 
-        // Server-Status prüfen
-        if (['installing', 'migrating'].includes(server.status)) {
-            return { success: false, error: `Server kann nicht migriert werden (Status: ${server.status})` };
+        // Server-Status prüfen. `migrating` gab es nie (die Tabelle kennt den
+        // Wert nicht); ob schon ein Umzug läuft, sagt dessen Zeile —
+        // Umzugsstand. Bis zum 2026-10-28 ließ sich ein zweiter starten.
+        if (server.status === 'installing') {
+            return { success: false, error: 'Server kann nicht umgezogen werden, während er installiert wird' };
+        }
+        const laufend = await Umzugsstand.letzter(this.dbService, server.id);
+        if (laufend && Umzugsstand.laeuft(laufend.status)) {
+            return { success: false, error: `Für diesen Server läuft schon ein Umzug (${laufend.current_step || laufend.status}).` };
         }
 
         // Quell-RootServer vorhanden?
@@ -709,7 +716,7 @@ class MigrationManager {
 
         } catch (error) {
             this.Logger.error(`[MigrationManager] Migration ${migrationId} error:`, error);
-            await this._updateMigrationStatus(migrationId, 'failed', 0, error.message);
+            await this._markiereGescheitert(migrationId, error.message);
 
             // Backup-Reste auf dem Quell-Daemon entfernen — sonst sammeln sich
             // bei mehreren Fehlversuchen mehrere GB pro Lauf in /tmp an
@@ -975,6 +982,30 @@ class MigrationManager {
             );
         } catch (err) {
             this.Logger.warn(`[MigrationManager] Cleanup target backup failed:`, err);
+        }
+    }
+
+    /**
+     * Einen Umzug als gescheitert eintragen — der Grund in `error_message`.
+     *
+     * Bis zum 2026-10-28 ging der Grund nach `current_step` (VARCHAR(100)).
+     * Ein längerer Grund ließ das UPDATE scheitern, und weil es als ERSTES im
+     * Fehlerzweig stand, lief nichts danach: Archiv nicht aufgeräumt,
+     * Cronjobs pausiert, keine Meldung an die Oberfläche (Umzug 16, Server
+     * 217). Deshalb hier der Grund in die TEXT-Spalte, und ein Fehlschlag
+     * dieses Eintrags hält den Fehlerzweig nicht mehr an.
+     * @private
+     */
+    async _markiereGescheitert(migrationId, grund) {
+        try {
+            await this.dbService.query(
+                `UPDATE gameserver_migrations
+                    SET status = 'failed', progress_percent = 0, current_step = 'Fehlgeschlagen', error_message = ?
+                  WHERE id = ?`,
+                [String(grund || 'unbekannt'), migrationId]
+            );
+        } catch (e) {
+            this.Logger.error(`[MigrationManager] Migration ${migrationId}: Fehlschlag nicht eingetragen (${e.message}) — Grund war: ${grund}`);
         }
     }
 
