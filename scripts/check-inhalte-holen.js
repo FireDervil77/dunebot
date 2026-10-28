@@ -690,6 +690,31 @@ async function pruefe(name, fn) {
         assert.strictEqual(r.antwort.hinweis, null);
     });
 
+    await pruefe('Die Rueckfrage nennt VORHER, was mitgeht — dasselbe wie das Entfernen danach', async () => {
+        db.inhaltErsatz = INHALT_JE_MOD;
+        stelleKette([SML, MCL, PC], 'PowerChecker');
+        await InhalteHolen.installiere({ server: SERVER, inhalt: INHALT_JE_MOD, guildId: 'g1', kennung: 'PowerChecker' });
+        const id = String(zeileVon('PowerChecker').id);
+        const v = await rufe('get', '/:serverId/inhalte/:id/entfernen-vorschau', { params: { id } });
+        assert.strictEqual(v.status, 200);
+        assert.strictEqual(v.antwort.name, 'PowerChecker');
+        assert.deepStrictEqual(v.antwort.mit.sort(), ['MarcioCommonLibs', 'Satisfactory Mod Loader']);
+        assert.strictEqual(daemon.geloescht.length, 0, 'die Vorschau loescht nichts');
+        assert.strictEqual(zeileVon('PowerChecker').status, 'installiert');
+        const r = await rufe('delete', '/:serverId/inhalte/:id', { params: { id } });
+        assert.deepStrictEqual(r.antwort.mitentfernt.sort(), v.antwort.mit);
+        const weg = await rufe('get', '/:serverId/inhalte/:id/entfernen-vorschau', { params: { id } });
+        assert.strictEqual(weg.status, 404, 'ein entfernter Eintrag hat keine Vorschau');
+    });
+
+    await pruefe('Der Reiter fragt im Modal, nicht mit confirm()', async () => {
+        const v = require('fs').readFileSync(path.join(__dirname,
+            '../plugins/gameserver/dashboard/views/guild/partials/server-detail-inhalte.ejs'), 'utf8');
+        assert.ok(!/\bconfirm\s*\(\s*`"\$\{name\}" entfernen/.test(v), 'das alte confirm() steht noch da');
+        assert.match(v, /entfernen-vorschau/);
+        assert.match(v, /id="inhalte-entfernen-modal"/);
+    });
+
     await pruefe('Was ein verbleibender Mod braucht, bleibt — der Lader auch', async () => {
         db.inhaltErsatz = INHALT_JE_MOD;
         const ANDERER = { kennung: 'Anderer', name: 'Anderer', fassung: '1.0.0', adresse: 'https://x/a', bytes: 1, braucht: ['MarcioCommonLibs', 'SML'] };

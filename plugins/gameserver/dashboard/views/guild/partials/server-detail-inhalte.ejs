@@ -43,6 +43,27 @@
   </div>
 </div>
 
+<%# Rückfrage vor dem Entfernen (Betreiber, 2026-10-28): nennt VORHER, was
+    mitgeht — dieselbe Rechnung wie das Entfernen selbst (Inhalte.waisenVon).
+    Kein Eintippen des Namens: Ein Mod lässt sich neu installieren, das ist
+    nicht die endgültige Sorte Löschen. %>
+<div class="modal fade" id="inhalte-entfernen-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border border-danger">
+      <div class="modal-status bg-danger"></div>
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fa-solid fa-xmark me-2 text-danger"></i>Entfernen</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+      </div>
+      <div class="modal-body" id="inhalte-entfernen-inhalt"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal">Abbrechen</button>
+        <button type="button" class="btn btn-danger" id="inhalte-entfernen-knopf"><i class="fa-solid fa-xmark me-1"></i>Entfernen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
   'use strict';
@@ -951,8 +972,40 @@
       .finally(() => window.inhalteLaden());
   };
 
+  // Erst fragen, was mitginge, dann zeigen, dann auf Knopfdruck entfernen.
+  // Scheitert die Vorschau, wird NICHT ohne Rueckfrage entfernt.
   window.inhaltEntfernen = function (id, name) {
-    if (!confirm(`"${name}" entfernen?`)) return;
+    fetch(`${BASIS}/${id}/entfernen-vorschau`)
+      .then(async (a) => {
+        const d = await a.json().catch(() => null);
+        if (!a.ok || !d || !d.success) throw new Error((d && d.message) || `HTTP ${a.status}`);
+        return d;
+      })
+      .then(v => {
+        const liste = n => `<ul class="mb-2">${n.map(x => `<li>${escape(x)}</li>`).join('')}</ul>`;
+        let html = `<p class="fw-bold mb-2">„${escape(v.name)}“ entfernen?</p>`;
+        html += v.laderBleibt
+          ? '<p class="mb-2">Der Lader wird abgeschaltet, seine Dateien bleiben liegen — ohne den Schalter lädt er nicht.</p>'
+          : `<p class="mb-2">Seine Dateien${v.dateien ? ` (${v.dateien})` : ''} werden vom Server gelöscht.</p>`;
+        if (v.mit.length) {
+          html += '<p class="mb-1">Mit ihm geht, was nur seinetwegen kam und kein anderer Mod braucht:</p>' + liste(v.mit);
+        }
+        if (v.unbekannt.length) {
+          html += '<p class="text-secondary small mb-2">Abhängigkeiten gehen nicht mit: Von '
+            + v.unbekannt.map(escape).join(', ') + ' ist nicht bekannt, was sie brauchen.</p>';
+        }
+        if (v.neustartNoetig && v.laeuft) {
+          html += '<p class="text-secondary small mb-0">Der Server läuft — wirksam nach dem nächsten Neustart.</p>';
+        }
+        document.getElementById('inhalte-entfernen-inhalt').innerHTML = html;
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('inhalte-entfernen-modal'));
+        document.getElementById('inhalte-entfernen-knopf').onclick = () => { modal.hide(); entfernenJetzt(id, name); };
+        modal.show();
+      })
+      .catch(e => melde('error', 'Nicht entfernt: ' + e.message));
+  };
+
+  function entfernenJetzt(id, name) {
     // Entfernt wird Datei fuer Datei, das braucht ein paar Sekunden — ohne
     // diese Zeile sah es aus, als passiere nichts.
     melde('info', `„${name}“ wird entfernt …`);
@@ -979,7 +1032,7 @@
       // Bis zum 2026-09-13 ohne Fehlerzweig: Scheiterte das Entfernen, kam nichts.
       .catch(e => melde('error', 'Nicht entfernt: ' + e.message))
       .finally(() => window.inhalteLaden());
-  };
+  }
 
   // ── Modpacks (Betreiber, 2026-09-23) ──────────────────────────────────────
   //

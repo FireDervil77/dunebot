@@ -1125,6 +1125,39 @@ router.post('/:serverId/inhalte/:id/schalten', requirePermission('GAMESERVER.FIL
 });
 
 /**
+ * Was ginge mit, wenn diese Zeile entfernt wird? Fuer die Rueckfrage im Reiter
+ * (Betreiber, 2026-10-28) — vorher statt nur im Toast danach.
+ */
+router.get('/:serverId/inhalte/:id/entfernen-vorschau', requirePermission('GAMESERVER.FILES.MANAGE'),
+    async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    try {
+        const geladen = await ladeServerUndPaket(dbService, req.params.serverId, res.locals.guildId);
+        if (!geladen) return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
+
+        const liste = await Inhalte.fuerServer(req.params.serverId);
+        const zeile = [liste.lader, liste.modpack, ...liste.mods].find(z => z && String(z.id) === String(req.params.id));
+        if (!zeile) return res.status(404).json({ success: false, message: 'Eintrag nicht gefunden oder bereits entfernt' });
+
+        const { waisen, unbekannt } = Inhalte.waisenVon(liste, zeile.id);
+        const name = z => z.name || z.kennung;
+        return res.json({
+            success: true,
+            name: name(zeile),
+            dateien: Inhalte.dateienAus(zeile).length,
+            laderBleibt: zeile.art === Inhalte.ART_LADER && Inhalte.laderUeberStart(geladen.paket?.content),
+            mit: waisen.map(name),
+            unbekannt: unbekannt.map(name),
+            ...wirkung(geladen),
+        });
+    } catch (error) {
+        Logger.error('[Gameserver/Inhalte] Vorschau zum Entfernen fehlgeschlagen:', error);
+        return res.status(500).json({ success: false, message: 'Serverfehler' });
+    }
+});
+
+/**
  * Entfernen — die Zeile bleibt, die Datei geht, und was nur mitkam, geht mit.
  *
  * Was „entfernen" heisst — auch beim Lader —, steht in

@@ -250,11 +250,17 @@ function laderUeberStart(inhalt) {
  * Der Lader geht zusaetzlich nur, wenn KEIN Mod und kein Modpack mehr da ist.
  * Nicht jeder Mod nennt ihn als Abhaengigkeit, und ohne ihn laedt keiner.
  *
+ * `ohneId` rechnet so, als waere diese Zeile schon entfernt — fuer die
+ * Rueckfrage, die VOR dem Entfernen nennt, was mitgeht (2026-10-28). Dieselbe
+ * Rechnung wie danach, damit die Vorschau nie etwas anderes verspricht.
+ *
  * @param {{lader: object|null, modpack: object|null, mods: object[]}} liste  aus `fuerServer`
+ * @param {number|string|null} [ohneId]
  * @returns {{waisen: object[], unbekannt: object[]}}
  */
-function waisenVon(liste) {
-    const laufend = [liste.lader, liste.modpack, ...liste.mods].filter(Boolean);
+function waisenVon(liste, ohneId = null) {
+    const laufend = [liste.lader, liste.modpack, ...liste.mods].filter(Boolean)
+        .filter(z => ohneId === null || String(z.id) !== String(ohneId));
     const schluessel = z => `${z.quelle}|${z.kennung}`;
     const nach = new Map(laufend.map(z => [schluessel(z), z]));
 
