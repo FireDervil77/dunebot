@@ -687,9 +687,15 @@ document.addEventListener('DOMContentLoaded', function() {
                                         const icon = isOnline ? '🟢' : isUnknown ? '🟡' : '🔴';
                                         const label = isOnline ? '' : isUnknown ? '(Status unbekannt)' : '(Offline)';
                                         %>
+                                        <% if (rs.umzug_grund) { %>
+                                        <option value="<%= rs.id %>" disabled title="<%= rs.umzug_grund %>">
+                                            <%= icon %> <%= rs.name %> — <%= rs.umzug_grund %>
+                                        </option>
+                                        <% } else { %>
                                         <option value="<%= rs.id %>">
                                             <%= icon %> <%= rs.name %> <%= label %>
                                         </option>
+                                        <% } %>
                                     <% } %>
                                 <% }); %>
                             <% } else { %>

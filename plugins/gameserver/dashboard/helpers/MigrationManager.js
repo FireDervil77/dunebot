@@ -22,6 +22,7 @@ const { ServiceManager } = require('dunebot-core');
 const path = require('path');
 const fs = require('fs').promises;
 const crypto = require('crypto');
+const Datenbanken = require('./Datenbanken');
 
 class MigrationManager {
     constructor() {
@@ -238,7 +239,7 @@ class MigrationManager {
                 return { success: false, error: validation.error };
             }
 
-            const { server, sourceRootServer, targetRootServer } = validation.data;
+            const { server, sourceRootServer, targetRootServer, datenbanken } = validation.data;
 
             // Migration-Eintrag in DB erstellen
             const result = await this.dbService.query(
@@ -268,7 +269,7 @@ class MigrationManager {
             });
 
             // Migration asynchron ausführen (nicht blockierend)
-            this._executeMigration(migrationId, server, sourceRootServer, targetRootServer, guildId)
+            this._executeMigration(migrationId, server, sourceRootServer, targetRootServer, guildId, datenbanken)
                 .catch(err => {
                     this.Logger.error(`[MigrationManager] Migration ${migrationId} failed:`, err);
                     this._updateMigrationStatus(migrationId, 'failed', 0, err.message);
@@ -356,12 +357,23 @@ class MigrationManager {
             [server.rootserver_id]
         );
 
+        // Datenbanken (Stufe 11 S7): Kann das Ziel sie aufnehmen, und liegt
+        // dort nicht schon eine? Hier, VOR dem Umzug — danach ist der Server
+        // gestoppt und das Archiv halb übertragen.
+        let datenbanken;
+        try {
+            datenbanken = await Datenbanken.pruefeUmzug(server.id, targetRootServer);
+        } catch (e) {
+            return { success: false, error: e.message };
+        }
+
         return {
             success: true,
             data: {
                 server,
                 sourceRootServer,
-                targetRootServer
+                targetRootServer,
+                datenbanken
             }
         };
     }
@@ -370,9 +382,15 @@ class MigrationManager {
      * Führt Migration aus (asynchron)
      * @private
      */
-    async _executeMigration(migrationId, server, sourceRootServer, targetRootServer, guildId) {
+    async _executeMigration(migrationId, server, sourceRootServer, targetRootServer, guildId, datenbanken = []) {
         // Außerhalb des try deklariert, damit der catch-Block das Backup aufräumen kann
         let backupPath = null;
+        // Datenbanken, die schon am Ziel angelegt sind — der catch-Block baut sie
+        // wieder ab, damit ein zweiter Versuch nicht an „liegt schon" scheitert.
+        let amZielAngelegt = [];
+        // Ab dem Umschreiben zeigt der Server aufs Ziel: Dann wird dort nichts
+        // mehr abgebaut, was danach auch immer scheitert.
+        let umgeschrieben = false;
 
         try {
             // Schritt 0: Cronjobs anhalten.
@@ -473,7 +491,9 @@ class MigrationManager {
                     {
                         server_id: String(server.id),
                         daemon_id: sourceRootServer.daemon_id,
-                        backup_path: backupPath
+                        backup_path: backupPath,
+                        // Die Datenbanken reisen im Archiv mit (S7).
+                        datenbanken
                     },
                     900000 // 15 Minuten Timeout (tar.gz großer Server dauert; 3 min waren zu knapp)
                 );
@@ -515,6 +535,12 @@ class MigrationManager {
                 guildId, server.id, migrationId, 'restoring', 70, 'Server wird wiederhergestellt'
             );
 
+            // Die Datenbanken am Ziel anlegen — mit ihrem bisherigen Kennwort —,
+            // bevor ausgepackt wird: Der Daemon spielt nur in vorhandene ein.
+            if (datenbanken.length) {
+                amZielAngelegt = await Datenbanken.anlegenAmZiel(server.id, targetRootServer, datenbanken);
+            }
+
             let restoreResult;
             try {
                 restoreResult = await this.ipmServer.sendCommand(
@@ -525,7 +551,8 @@ class MigrationManager {
                         daemon_id: targetRootServer.daemon_id,
                         backup_path: targetBackupPath,
                         guild_id: guildId,
-                        target_path: targetInstallPath
+                        target_path: targetInstallPath,
+                        datenbanken: amZielAngelegt
                     },
                     900000 // 15 Minuten (Entpacken großer Archive dauert)
                 );
@@ -589,6 +616,7 @@ class MigrationManager {
                     ['completed', 100, 'Migration abgeschlossen', JSON.stringify(newPorts), migrationId]
                 );
             });
+            umgeschrieben = true;
 
             // Schritt 7: Cronjobs am Ziel neu einplanen.
             // Muss NACH dem DB-Update laufen, damit die Jobs den neuen Rootserver
@@ -629,6 +657,19 @@ class MigrationManager {
                 }
             }
 
+            // Schritt 8b: Die Datenbanken an der Quelle löschen (S7, Betreiber
+            // 2026-10-28) — erst jetzt: Sie sind am Ziel eingespielt, und der
+            // Server zeigt dorthin. Bleibt eine, steht es im Log; der Umzug
+            // ist trotzdem gelungen.
+            if (datenbanken.length) {
+                const blieb = await Datenbanken.abbauen(sourceRootServer.daemon_id, server.id, datenbanken);
+                if (blieb.length) {
+                    this.Logger.warn(`[MigrationManager] Alte Datenbank(en) auf ${sourceRootServer.name} nicht gelöscht: ${blieb.join(', ')}`);
+                } else {
+                    this.Logger.info(`[MigrationManager] ${datenbanken.length} Datenbank(en) von ${sourceRootServer.name} entfernt`);
+                }
+            }
+
             // Schritt 9: Cleanup
             await this._cleanup(migrationId, sourceRootServer, targetRootServer, backupPath, targetBackupPath);
 
@@ -657,6 +698,15 @@ class MigrationManager {
                     );
                 } catch (cleanupErr) {
                     this.Logger.warn('[MigrationManager] Cleanup nach Fehler fehlgeschlagen:', cleanupErr?.message || cleanupErr);
+                }
+            }
+
+            // Am Ziel angelegte Datenbanken wieder abbauen — der Server bleibt an
+            // der Quelle, und seine Datenbank dort ist unberührt.
+            if (amZielAngelegt.length && !umgeschrieben) {
+                const blieb = await Datenbanken.abbauen(targetRootServer.daemon_id, server.id, amZielAngelegt);
+                if (blieb.length) {
+                    this.Logger.warn(`[MigrationManager] Datenbank(en) am Ziel ${targetRootServer.name} nicht abgebaut: ${blieb.join(', ')}`);
                 }
             }
 

@@ -188,6 +188,89 @@ function wiederherstellungsText(antwort) {
     return teile.length ? teile.join(' ') : null;
 }
 
+// ── Umzug auf einen anderen Rootserver (S7, 2026-10-28) ─────────────────────
+//
+// Die Kennung des Servers bleibt, also heißt die Datenbank am Ziel wieder
+// `s<id>_<nr>` — mit DEMSELBEN Kennwort (Betreiber: für den Spieler ändert
+// sich nichts). Die Zeilen in `gameserver_datenbanken` hängen am Server, nicht
+// am Rootserver; sie gelten nach dem Umzug von selbst für das Ziel.
+//
+// Geprüft wird VOR dem Umzug, bevor irgendetwas angehalten wird (Betreiber:
+// „vor dem umzug geprüft werden ob auf dem zielserver die verwendung von
+// datenbank überhaupt erlaubt ist bzw. ob die datenbank vorhanden ist").
+
+/**
+ * Warum dieser Rootserver als Ziel für einen Server mit `anzahl` Datenbanken
+ * nicht taugt — oder null. Rein, ohne Abfrage: auch für den Umzugsdialog.
+ */
+function umzugGrund(ziel, anzahl) {
+    if (!anzahl) return null;
+    const s = stand(ziel, 0);
+    if (!s.moeglich) return s.grund;
+    if (anzahl > s.grenze) {
+        return `Der Server hat ${anzahl} Datenbank(en), dort sind höchstens ${s.grenze} je Gameserver erlaubt.`;
+    }
+    return null;
+}
+
+/**
+ * Vor dem Umzug: Taugt das Ziel, und liegt dort nicht schon eine Datenbank
+ * dieses Servers (etwa von einem abgebrochenen Umzug)? Deren Kennwort kennt
+ * niemand — überschreiben hieße raten. Gibt die Nummern zurück.
+ */
+async function pruefeUmzug(serverId, ziel) {
+    const nrs = await nummern(serverId);
+    if (!nrs.length) return nrs;
+    const grund = umzugGrund(ziel, nrs.length);
+    if (grund) throw fehler(`Der Server hat eine Datenbank, der Zielserver kann sie nicht aufnehmen: ${grund}`, 409);
+    const antwort = await befehl({ daemon_id: ziel.daemon_id }, 'db.liste', { server_id: Number(serverId) });
+    const schon = (antwort.datenbanken || []).map(b => b.name);
+    if (schon.length) {
+        throw fehler(`Auf dem Zielserver liegt schon ${schon.join(', ')} — von einem früheren Umzug? `
+            + 'Erst dort entfernen, dann umziehen.', 409);
+    }
+    return nrs;
+}
+
+/**
+ * Die Datenbanken am Ziel anlegen, mit ihrem bisherigen Kennwort. Scheitert
+ * eine, werden die schon angelegten wieder abgebaut. Gibt die Nummern zurück.
+ */
+async function anlegenAmZiel(serverId, ziel, nrs) {
+    const angelegt = [];
+    try {
+        for (const nr of nrs) {
+            const { kennwort } = await zugang({ id: serverId }, nr);
+            await befehl({ daemon_id: ziel.daemon_id }, 'db.anlegen',
+                { server_id: Number(serverId), nr, kennwort });
+            angelegt.push(nr);
+        }
+    } catch (e) {
+        const blieb = await abbauen(ziel.daemon_id, serverId, angelegt);
+        if (blieb.length) e.message += ` — am Ziel nicht wieder abgebaut: ${blieb.join(', ')}`;
+        throw e;
+    }
+    return angelegt;
+}
+
+/**
+ * Datenbanken eines Servers auf EINEM Rootserver löschen — am Ziel nach einem
+ * gescheiterten Umzug, an der Quelle nach einem gelungenen. Ohne Zeilen
+ * anzufassen: Die gehören dem Server, und der lebt weiter. Gibt zurück, was
+ * blieb (mit Grund); „gibt es nicht" zählt als weg.
+ */
+async function abbauen(daemonId, serverId, nrs) {
+    const blieb = [];
+    for (const nr of nrs) {
+        try {
+            await befehl({ daemon_id: daemonId }, 'db.loeschen', { server_id: Number(serverId), nr });
+        } catch (e) {
+            if (!/gibt es nicht/.test(String(e.message))) blieb.push(`s${serverId}_${nr} (${e.message})`);
+        }
+    }
+    return blieb;
+}
+
 /** Neues Kennwort: im Container setzen, dann speichern. */
 async function neuesKennwort(server, nr) {
     const db = ServiceManager.get('dbService');
@@ -331,5 +414,6 @@ module.exports = {
     ladeServer, liste, stand, anlegen, zugang, zugangFuerStart, neuesKennwort, loeschen, groessenMessen,
     groesseText, freieNummer,
     nummern, sicherungsSpalte, wiederherstellungsText,
+    umzugGrund, pruefeUmzug, anlegenAmZiel, abbauen,
     pflicht, wahlBeimAnlegen, entscheideBeimAnlegen, allesLoeschen,
 };

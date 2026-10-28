@@ -2142,12 +2142,21 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
 
         // RootServers für Migration-Modal laden
         const rootServers = await dbService.query(
-            `SELECT r.id, r.name, r.daemon_id, r.daemon_status
+            `SELECT r.id, r.name, r.daemon_id, r.daemon_status,
+                    r.db_gewuenscht, r.db_moeglich, r.db_grund, r.db_je_server
              FROM rootserver r
              WHERE r.guild_id = ?
              ORDER BY r.name ASC`,
             [guildId]
         );
+        // Hat der Server eine Datenbank, taugt nicht jeder Rootserver als Ziel
+        // (Stufe 11 S7) — der Dialog sagt es vorher, der Umzug prüft es noch
+        // einmal (MigrationManager._validate, Datenbanken.pruefeUmzug).
+        {
+            const Datenbanken = require('../helpers/Datenbanken');
+            const anzahl = (await Datenbanken.nummern(server.id)).length;
+            for (const rs of rootServers) rs.umzug_grund = Datenbanken.umzugGrund(rs, anzahl);
+        }
 
         Logger.info(`[Gameserver] RootServers geladen (${rootServers.length}), registriere Assets...`);
 
