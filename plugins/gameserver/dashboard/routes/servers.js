@@ -3053,7 +3053,12 @@ router.post('/:serverId/start', requirePermission('GAMESERVER.START'), async (re
         // IPM-Command an Daemon senden
         Logger.info(`[Gameserver] Sende Start-Command an Daemon ${server.daemon_id} (Image: ${dockerImage}${startPayload.auto_update ? ', mit Update' : ''})`);
 
-        const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.start', startPayload, 30000);
+        // `sendCommand` wirft, wenn der Daemon ablehnt (IPMServer._resolveCommand).
+        // Ohne das `.catch` lief der Fehlerzweig unten nie: Der Server blieb bis zum
+        // Ventil auf „starting", und statt des Grundes kam „Serverfehler beim
+        // Starten" (2026-10-28, gefunden bei Baustelle 119).
+        const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.start', startPayload, 30000)
+            .catch(fehler => ({ success: false, error: fehler.message }));
 
         if (response.success) {
             if (response.task_id) {
@@ -3246,7 +3251,8 @@ router.post('/:serverId/restart', requirePermission('GAMESERVER.RESTART'), async
             return res.status(500).json({ success: false, message: payloadError });
         }
 
-        const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.restart', restartPayload, 30000);
+        const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.restart', restartPayload, 30000)
+            .catch(fehler => ({ success: false, error: fehler.message })); // wirft bei Ablehnung, s. Start-Route
 
         if (response.success) {
             // Der Status bleibt „starting", bis der Daemon „läuft" meldet — wie

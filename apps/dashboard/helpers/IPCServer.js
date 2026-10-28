@@ -779,10 +779,17 @@ class IPCServer {
 
                     Logger.info(`[IPC/Gameserver] Start-Command an Daemon ${srv.daemon_id} (Image: ${dockerImage}${startPayload.auto_update ? ', mit Update' : ''})`);
 
-                    const startR = await ipmServer.sendCommand(srv.daemon_id, 'gameserver.start', startPayload, 30000);
+                    // `sendCommand` wirft, wenn der Daemon ablehnt (IPMServer._resolveCommand) —
+                    // ein `success: false` kommt nie als Ergebnis an. Ohne das `.catch` lief
+                    // dieser Zweig nie: Der Server blieb bis zum Ventil auf „starting", der
+                    // Grund des Daemons ging verloren (2026-10-28, Baustelle 119).
+                    const startR = await ipmServer.sendCommand(srv.daemon_id, 'gameserver.start', startPayload, 30000)
+                        .catch(fehler => ({ success: false, error: fehler.message }));
                     if (!startR?.success) {
-                        await dbService.query("UPDATE gameservers SET status = 'error' WHERE id = ?", [serverId]);
-                        return message.reply({ success: false, error: startR?.message || 'Start fehlgeschlagen' });
+                        const grund = startR?.error || 'Start fehlgeschlagen';
+                        await dbService.query("UPDATE gameservers SET status = 'error', error_message = ? WHERE id = ?", [grund, serverId]);
+                        require('../../../plugins/gameserver/dashboard/helpers/PanelService').pushZustandswechsel(serverId);
+                        return message.reply({ success: false, error: grund });
                     }
                     return message.reply({ success: true, data: { name: srv.name } });
                 }
@@ -810,10 +817,12 @@ class IPCServer {
                     require('../../../plugins/gameserver/dashboard/helpers/PanelService').pushZustandswechsel(serverId);
                     const stopR = await ipmServer.sendCommand(srv.daemon_id, 'gameserver.stop', {
                         server_id: String(serverId), guild_id: guildId,
-                    }, 30000);
+                    }, 30000).catch(fehler => ({ success: false, error: fehler.message })); // wirft bei Ablehnung, s. SERVER_START
                     if (!stopR?.success) {
-                        await dbService.query("UPDATE gameservers SET status = 'error' WHERE id = ?", [serverId]);
-                        return message.reply({ success: false, error: stopR?.message || 'Stop fehlgeschlagen' });
+                        const grund = stopR?.error || 'Stop fehlgeschlagen';
+                        await dbService.query("UPDATE gameservers SET status = 'error', error_message = ? WHERE id = ?", [grund, serverId]);
+                        require('../../../plugins/gameserver/dashboard/helpers/PanelService').pushZustandswechsel(serverId);
+                        return message.reply({ success: false, error: grund });
                     }
                     return message.reply({ success: true, data: { name: srv.name } });
                 }
@@ -849,10 +858,13 @@ class IPCServer {
                     // auf die bloße Annahme des Auftrags hin.
                     await dbService.query("UPDATE gameservers SET status = 'starting', last_status_update = NOW() WHERE id = ?", [serverId]);
                     require('../../../plugins/gameserver/dashboard/helpers/PanelService').pushZustandswechsel(serverId);
-                    const restartR = await ipmServer.sendCommand(srv.daemon_id, 'gameserver.restart', restartPayload, 30000);
+                    const restartR = await ipmServer.sendCommand(srv.daemon_id, 'gameserver.restart', restartPayload, 30000)
+                        .catch(fehler => ({ success: false, error: fehler.message })); // wirft bei Ablehnung, s. SERVER_START
                     if (!restartR?.success) {
-                        await dbService.query("UPDATE gameservers SET status = 'offline' WHERE id = ?", [serverId]);
-                        return message.reply({ success: false, error: restartR?.error || restartR?.message || 'Restart fehlgeschlagen' });
+                        const grund = restartR?.error || 'Restart fehlgeschlagen';
+                        await dbService.query("UPDATE gameservers SET status = 'offline', error_message = ? WHERE id = ?", [grund, serverId]);
+                        require('../../../plugins/gameserver/dashboard/helpers/PanelService').pushZustandswechsel(serverId);
+                        return message.reply({ success: false, error: grund });
                     }
                     await dbService.query('UPDATE gameservers SET last_started_at = NOW() WHERE id = ?', [serverId]);
                     return message.reply({ success: true, data: { name: srv.name } });
