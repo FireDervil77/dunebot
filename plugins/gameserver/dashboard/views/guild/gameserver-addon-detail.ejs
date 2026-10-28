@@ -47,11 +47,13 @@
                                         </div>
                                     <% } %>
 
-                                    <!-- Author -->
+                                    <%# Ersteller: die Regel steht in Paketfassung.autor. %>
+                                    <% if (addon.author_name) { %>
                                     <p class="text-secondary">
-                                        <i class="fa-solid fa-user"></i> 
-                                        <%= tr('gameserver:ADDON.BY') %> <strong><%= addon.author_name || 'Unknown' %></strong>
+                                        <i class="fa-solid fa-user"></i>
+                                        <%= tr('gameserver:ADDON.BY') %> <strong><%= addon.author_name %></strong>
                                     </p>
+                                    <% } %>
                                 </div>
 
                                 <div class="col-md-4">

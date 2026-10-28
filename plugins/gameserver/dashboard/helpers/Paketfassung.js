@@ -456,9 +456,28 @@ async function entfernen(dbService, { paketId, slug }) {
     });
 }
 
+/**
+ * Wer steht als Ersteller unter einem Spiel? (Betreiber, 2026-10-28)
+ *
+ * Bis heute fragten Kachel und Detailseite `author_name` ab — ein Feld, das
+ * keine Abfrage liefert; es stand immer „von Unknown". Ein Spiel der
+ * Plattform (ohne eigene Guild, heute alle) ist ein Angebot des Teams, nicht
+ * einer Person: „FireBot-Team". Ein Paket, das eine Guild selbst baut, hätte
+ * einen eigenen Ersteller — einen Namen dazu kennt das Panel noch nicht
+ * (`users` trägt keinen), deshalb dann null, und die Zeile fehlt, statt etwas
+ * zu erfinden.
+ */
+const PLATTFORM_AUTOR = 'FireBot-Team';
+function autor(spiel) {
+    // Nur ein ausdrückliches NULL aus der Spalte: Fehlt `guild_id` in der
+    // Zeile ganz, hat die Abfrage sie vergessen — dann wird nichts behauptet.
+    return spiel && spiel.guild_id === null ? PLATTFORM_AUTOR : null;
+}
+
 module.exports = {
     KANAELE, istKontrollGuild, FASSUNG_FUER_SERVER, FASSUNG_FUER_ANLEGEN,
     ladePaketFuerServer, ladePaketFuerAnlegen, ladePaketeZuServern, ladePaketeFuerAnlegen, ladeNeuesteFassung, ladeNeuesteFassungen, ladeNeuesteFassungenMitInhalt,
     fassungenZuPaket, freigabeJePaket, serverJeKanal, freigeben, zuruecknehmen, kanalSetzen,
     entfernenVorschau, entfernen,
+    PLATTFORM_AUTOR, autor,
 };

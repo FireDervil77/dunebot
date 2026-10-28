@@ -27,6 +27,7 @@ const Tags = require('../../../../apps/dashboard/helpers/Tags');
 // nicht mehr `addon_marketplace.trust_level`.
 const Paketfassung = require('../helpers/Paketfassung');
 
+
 // ─────────────────────────────────────────────────────────────────────────────
 // GET / — Marketplace
 // ─────────────────────────────────────────────────────────────────────────────
@@ -41,7 +42,7 @@ router.get('/', requirePermission('GAMESERVER.ADDONS.VIEW'), async (req, res) =>
 
         let query = `
             SELECT id, slug, name, description,
-                   steam_app_id, author_user_id,
+                   steam_app_id, author_user_id, guild_id,
                    rating_avg, rating_count, install_count,
                    icon_url, banner_url, created_at
             FROM addon_marketplace
@@ -90,6 +91,7 @@ router.get('/', requirePermission('GAMESERVER.ADDONS.VIEW'), async (req, res) =>
         // Entwurf oder freigegeben — für die Marke an der Kachel.
         const stand = await Paketfassung.freigabeJePaket(dbService);
         for (const a of (addons || [])) a.freigabe = stand[a.id] || null;
+        for (const a of (addons || [])) a.author_name = Paketfassung.autor(a);
 
         await themeManager.renderView(res, 'guild/gameserver-marketplace', {
             title: 'Spiele-Datenbank',
@@ -119,7 +121,7 @@ router.get('/:slug', requirePermission('GAMESERVER.ADDONS.VIEW'), async (req, re
 
         const [addon] = await dbService.query(`
             SELECT id, slug, name, description,
-                   steam_app_id, steam_server_app_id, author_user_id,
+                   steam_app_id, steam_server_app_id, author_user_id, guild_id,
                    rating_avg, rating_count, install_count,
                    icon_url, banner_url, screenshots, created_at
             FROM addon_marketplace
@@ -132,6 +134,7 @@ router.get('/:slug', requirePermission('GAMESERVER.ADDONS.VIEW'), async (req, re
 
         addon.tags = await Tags.fuer(dbService, 'spiel', addon.id);
         addon.freigabe = (await Paketfassung.freigabeJePaket(dbService))[addon.id] || null;
+        addon.author_name = Paketfassung.autor(addon);
 
         // Ähnliche Spiele: die, die Tags mit diesem teilen — die mit den meisten
         // gemeinsamen zuerst. Nur was auch in der Liste stünde.

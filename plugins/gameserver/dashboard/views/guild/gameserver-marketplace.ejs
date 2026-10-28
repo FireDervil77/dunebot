@@ -172,10 +172,13 @@
                                                 </div>
                                             </div>
 
-                                            <!-- Author -->
+                                            <%# Ersteller: die Regel steht in Paketfassung.autor.
+                                                Ohne Namen fehlt die Zeile — kein „Unknown". %>
+                                            <% if (addon.author_name) { %>
                                             <small class="text-secondary">
-                                                <%= tr('gameserver:MARKETPLACE.BY') %> <%= addon.author_name || 'Unknown' %>
+                                                <%= tr('gameserver:MARKETPLACE.BY') %> <%= addon.author_name %>
                                             </small>
+                                            <% } %>
                                         </div>
 
                                         <div class="card-footer">
