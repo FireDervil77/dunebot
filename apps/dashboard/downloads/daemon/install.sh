@@ -305,6 +305,13 @@ eigener_sftp_port() {
     awk '/^sftp:/{drin=1; next} /^[^[:space:]#]/{drin=0} drin && /^[[:space:]]+firewall_port:[[:space:]]*[0-9]+[[:space:]]*$/{print $2; exit}' "$datei"
 }
 
+### Der Abruf-Port, dessen Regel der Daemon selbst gesetzt hat (seit 2026-10-28) — leer, wenn keine.
+eigener_abruf_port() {
+    local datei="${INSTALL_DIR}/${CONFIG_FILE}"
+    [[ -f "$datei" ]] || return 0
+    awk '/^sicherungsabruf:/{drin=1; next} /^[^[:space:]#]/{drin=0} drin && /^[[:space:]]+firewall_port:[[:space:]]*[0-9]+[[:space:]]*$/{print $2; exit}' "$datei"
+}
+
 ### SFTP-Port beim Deinstallieren wieder schliessen
 #
 # Nur die Regel, die der Daemon gesetzt hat. Fehlt sie, passiert nichts —
@@ -798,6 +805,12 @@ uninstall() {
     sftp_port="$(eigener_sftp_port)"
     if [[ -n "$sftp_port" ]]; then
         teardown_firewall "$sftp_port"
+    fi
+    # Dasselbe für den Abruf (Sicherungen, FastDL) — sicherungsabruf.firewall_port.
+    local abruf_port
+    abruf_port="$(eigener_abruf_port)"
+    if [[ -n "$abruf_port" ]]; then
+        teardown_firewall "$abruf_port"
     fi
 
     # Lese Config und entferne Daten-Verzeichnisse
