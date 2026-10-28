@@ -24,6 +24,8 @@ const fs = require('fs').promises;
 const crypto = require('crypto');
 const Datenbanken = require('./Datenbanken');
 const Umzugsstand = require('./Umzugsstand');
+const { vergibPortsAusPaket } = require('./Portvergabe');
+const { ladePaketFuerServer } = require('./Paketfassung');
 
 class MigrationManager {
     constructor() {
@@ -374,6 +376,15 @@ class MigrationManager {
             return { success: false, error: e.message };
         }
 
+        // Ports (2026-10-28): Reicht der Vorrat am Ziel für die Ports des
+        // Pakets? Dieselbe Regel wie beim Anlegen, nur ohne zu buchen —
+        // gebucht wird erst kurz vor dem Umschreiben (_zielports).
+        try {
+            await this._zielports(server, targetRootServer, { buchen: false });
+        } catch (e) {
+            return { success: false, error: `Am Zielserver: ${e.message}` };
+        }
+
         return {
             success: true,
             data: {
@@ -398,6 +409,9 @@ class MigrationManager {
         // Ab dem Umschreiben zeigt der Server aufs Ziel: Dann wird dort nichts
         // mehr abgebaut, was danach auch immer scheitert.
         let umgeschrieben = false;
+        // Vorläufig gebuchte Ports am Ziel (server_id = 0) — der catch-Block
+        // gibt sie wieder frei, solange nicht umgeschrieben ist.
+        let zielBelegt = [];
 
         try {
             // Schritt 0: Cronjobs anhalten.
@@ -600,7 +614,12 @@ class MigrationManager {
             await this._updateMigrationStatus(migrationId, 'updating_db', 85, 'Datenbank wird aktualisiert...');
             this._sendSSE(guildId, server.id, { type: 'migration_progress', migrationId, step: 'updating_db', progress: 85 });
 
-            const newPorts = await this._adjustPorts(server, targetRootServer);
+            // Ports am Ziel buchen — aus dessen Vorrat, mit den Kopplungen des
+            // Pakets (Portvergabe, wie beim Anlegen). Der bisherige Spielport
+            // bleibt, wenn er dort frei ist.
+            const vergabe = await this._zielports(server, targetRootServer, { buchen: true });
+            const newPorts = vergabe.ports;
+            zielBelegt = Object.values(vergabe.belegt).map(b => b.allocId);
 
             // Schritt 6: DB aktualisieren (transaktional)
             await this.dbService.transaction(async (tx) => {
@@ -624,22 +643,30 @@ class MigrationManager {
                 // Port-Allocations updaten (falls Tabelle existiert)
                 const [tables] = await tx.query("SHOW TABLES LIKE 'port_allocations'");
                 if (tables.length > 0) {
-                    // Die IP muss mitziehen, nicht nur die Rootserver-ID.
+                    // ── Seit 2026-10-28: freigeben und buchen, nicht verschieben ──
                     //
-                    // Der Portvorrat wird je IP gefuehrt: Eine Belegung sagt
-                    // "auf DIESER Adresse ist DIESER Port vergeben". Blieb die
-                    // alte IP stehen, war die Belegung auf dem Ziel unsichtbar
-                    // — die Vergabe hielt den Port dort fuer frei und gab ihn
-                    // ein zweites Mal aus. Docker lehnt den Start dann ab:
-                    // "Bind for <ip>:<port> failed: port is already allocated".
+                    // Bis heute wurden die Zeilen des Servers mit IHREN Nummern auf
+                    // das Ziel verschoben. Der Vorrat ist aber je Maschine
+                    // vorbereitet („jeder Port eine Zeile"): Gehört die Nummer am
+                    // Ziel schon einem anderen, wirft der Schlüssel
+                    // uk_rootserver_ip_port — Umzug 17 (Server 217: 25005 gehörte
+                    // auf 55 schon Server 222). Und die neuen Nummern, die
+                    // _adjustPorts ausgesucht hatte, standen nirgends im Buch.
                     //
-                    // Genau so ist es Server 157 (Rust) ergangen: Er bekam
-                    // Port 25000, den auf derselben Adresse bereits Server 155
-                    // hielt — dessen Belegung noch die IP des Quellservers trug.
+                    // Jetzt: An der Quelle wird frei, was der Server hielt (auch
+                    // Zusatzports — die bucht der nächste Start am Ziel neu), am
+                    // Ziel wird die vorläufige Buchung auf den Server gesetzt.
                     await tx.query(
-                        'UPDATE port_allocations SET rootserver_id = ?, ip = ? WHERE server_id = ?',
-                        [targetRootServer.id, targetRootServer.host, server.id]
+                        'UPDATE port_allocations SET server_id = NULL, assigned_at = NULL WHERE server_id = ? AND rootserver_id = ?',
+                        [server.id, sourceRootServer.id]
                     );
+                    if (zielBelegt.length) {
+                        await tx.query(
+                            `UPDATE port_allocations SET server_id = ?, assigned_at = NOW()
+                              WHERE id IN (${zielBelegt.map(() => '?').join(',')}) AND server_id = 0`,
+                            [server.id, ...zielBelegt]
+                        );
+                    }
                 }
 
                 // Migration als completed markieren
@@ -739,6 +766,23 @@ class MigrationManager {
                 const blieb = await Datenbanken.abbauen(targetRootServer.daemon_id, server.id, amZielAngelegt);
                 if (blieb.length) {
                     this.Logger.warn(`[MigrationManager] Datenbank(en) am Ziel ${targetRootServer.name} nicht abgebaut: ${blieb.join(', ')}`);
+                } else {
+                    // Auch das Gelingen gehört ins Log: Am 2026-10-28 ließ sich
+                    // nach Umzug 17 nicht sagen, ob s217_1 am Ziel geblieben war.
+                    this.Logger.info(`[MigrationManager] ${amZielAngelegt.length} Datenbank(en) am Ziel ${targetRootServer.name} wieder abgebaut`);
+                }
+            }
+
+            // Vorläufig gebuchte Ports am Ziel wieder freigeben.
+            if (zielBelegt.length && !umgeschrieben) {
+                try {
+                    await this.dbService.query(
+                        `UPDATE port_allocations SET server_id = NULL, assigned_at = NULL
+                          WHERE id IN (${zielBelegt.map(() => '?').join(',')}) AND server_id = 0`,
+                        zielBelegt
+                    );
+                } catch (portErr) {
+                    this.Logger.warn(`[MigrationManager] Vorläufige Ports am Ziel nicht freigegeben (${zielBelegt.join(', ')}): ${portErr.message}`);
                 }
             }
 
@@ -843,114 +887,34 @@ class MigrationManager {
      * @private
      */
     /**
-     * Passt Ports an, falls Ziel-Server andere Ranges hat oder Ports bereits belegt sind
+     * Die Ports am Ziel — nach dem Paket und aus dem Vorrat der Ziel-Maschine
+     * (Portvergabe, dieselbe Regel wie beim Anlegen). Der bisherige Spielport
+     * wird gewünscht; ist er dort nicht frei, entscheidet der Vorrat.
+     *
+     * Bis zum 2026-10-28 stand hier ein eigener Weg: freie Nummern zwischen
+     * 27000 und 37000, gezählt aus gameservers.ports anderer Server — ohne den
+     * Vorrat (port_allocations), ohne die Kopplungen des Pakets (query =
+     * game+1), und ohne die neuen Nummern zu buchen.
+     *
+     * @param {{buchen: boolean}} optionen  false: nur prüfen (vor dem Umzug)
+     * @returns {Promise<{ports: object, belegt: object}>}
      * @private
      */
-    async _adjustPorts(server, targetRootServer) {
-        const currentPorts = typeof server.ports === 'string' ? JSON.parse(server.ports) : server.ports;
-        
-        // Alle bereits belegten Ports auf Ziel-RootServer laden
-        const usedPorts = await this._getUsedPortsOnRootServer(targetRootServer.id, server.id);
-        
-        // Prüfen ob alle aktuellen Ports verfügbar sind
-        const portsToAllocate = Object.keys(currentPorts);
-        let needsReallocation = false;
-        
-        for (const portKey of portsToAllocate) {
-            const port = currentPorts[portKey];
-            const externalPort = port.external || port;
-            
-            if (usedPorts.includes(externalPort)) {
-                this.Logger.warn(`[MigrationManager] Port ${externalPort} (${portKey}) ist bereits belegt auf RootServer ${targetRootServer.id}`);
-                needsReallocation = true;
-                break;
-            }
-        }
-        
-        // Falls keine Reallocation nötig: Original-Ports zurückgeben
-        if (!needsReallocation) {
-            this.Logger.info(`[MigrationManager] Alle Ports verfügbar auf Ziel-Server, keine Anpassung nötig`);
-            return currentPorts;
-        }
-        
-        // Neue Ports allozieren
-        this.Logger.info(`[MigrationManager] Ports müssen neu alloziert werden...`);
-        const newPorts = {};
-        
-        for (const portKey of portsToAllocate) {
-            const oldPort = currentPorts[portKey];
-            const preferredPort = oldPort.external || oldPort;
-            
-            // Freien Port finden (Range: 27000-37000 wie in der Create-Logik)
-            const newPort = await this._findFreePort(targetRootServer.id, preferredPort, usedPorts);
-            
-            newPorts[portKey] = {
-                external: newPort,
-                internal: newPort
-            };
-            
-            usedPorts.push(newPort); // Merken für nächste Iteration
-            
-            this.Logger.info(`[MigrationManager] Port ${portKey}: ${preferredPort} → ${newPort}`);
-        }
-        
-        return newPorts;
-    }
-    
-    /**
-     * Lädt alle bereits belegten Ports auf einem RootServer
-     * @private
-     */
-    async _getUsedPortsOnRootServer(rootServerId, excludeServerId = null) {
-        const query = `
-            SELECT ports FROM gameservers 
-            WHERE rootserver_id = ? 
-            ${excludeServerId ? 'AND id != ?' : ''}
-        `;
-        const params = excludeServerId ? [rootServerId, excludeServerId] : [rootServerId];
-        
-        const servers = await this.dbService.query(query, params);
-        const usedPorts = [];
-        
-        for (const srv of servers) {
+    async _zielports(server, targetRootServer, { buchen }) {
+        const zeile = await ladePaketFuerServer(this.dbService, server.id);
+        const paket = zeile?.paket_json
+            ? (typeof zeile.paket_json === 'string' ? JSON.parse(zeile.paket_json) : zeile.paket_json)
+            : null;
+        if (!paket) throw new Error('Zum Server gibt es kein Paket — die Ports lassen sich nicht vergeben.');
+
+        const bisher = typeof server.ports === 'string' ? JSON.parse(server.ports || '{}') : (server.ports || {});
+        const wunsch = Number(bisher?.game?.external || bisher?.game?.internal) || null;
+        if (wunsch) {
             try {
-                const ports = typeof srv.ports === 'string' ? JSON.parse(srv.ports) : srv.ports;
-                for (const portKey in ports) {
-                    const port = ports[portKey];
-                    const externalPort = port.external || port;
-                    if (externalPort && !usedPorts.includes(externalPort)) {
-                        usedPorts.push(externalPort);
-                    }
-                }
-            } catch (err) {
-                this.Logger.warn(`[MigrationManager] Fehler beim Parsen von Ports:`, err);
-            }
+                return await vergibPortsAusPaket(this.dbService, targetRootServer.id, paket, wunsch, { buchen });
+            } catch { /* am Ziel nicht frei — dann der Vorrat */ }
         }
-        
-        return usedPorts;
-    }
-    
-    /**
-     * Findet einen freien Port im Standard-Range
-     * @private
-     */
-    async _findFreePort(rootServerId, preferredPort, usedPorts) {
-        const MIN_PORT = 27000;
-        const MAX_PORT = 37000;
-        
-        // Zuerst versuchen den bevorzugten Port zu verwenden
-        if (preferredPort >= MIN_PORT && preferredPort <= MAX_PORT && !usedPorts.includes(preferredPort)) {
-            return preferredPort;
-        }
-        
-        // Ansonsten ersten freien Port finden
-        for (let port = MIN_PORT; port <= MAX_PORT; port++) {
-            if (!usedPorts.includes(port)) {
-                return port;
-            }
-        }
-        
-        throw new Error('Keine freien Ports verfügbar im Range 27000-37000');
+        return vergibPortsAusPaket(this.dbService, targetRootServer.id, paket, null, { buchen });
     }
 
     /**

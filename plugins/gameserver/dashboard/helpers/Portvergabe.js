@@ -103,10 +103,13 @@ function portBedarf(paket) {
  * @param {number} rootserverId
  * @param {object} paket        FBPKG_v1
  * @param {number|null} wunschPort  vom Betreiber gewählter Spielport, oder null
+ * @param {{buchen?: boolean}} [optionen]  `buchen: false` wählt nur aus und
+ *        bucht nichts — für die Prüfung vor einem Umzug (2026-10-28), damit
+ *        dieselbe Regel entscheidet, ob die Ziel-Maschine reicht.
  * @returns {Promise<{ports:object, belegt:object}>}
  * @throws {Error} mit einem Satz, der sagt, was zu tun ist
  */
-async function vergibPortsAusPaket(dbService, rootserverId, paket, wunschPort = null) {
+async function vergibPortsAusPaket(dbService, rootserverId, paket, wunschPort = null, { buchen = true } = {}) {
     const { basis, weiterePool, gekoppelt } = lesePortzwecke(paket);
     if (!basis) {
         throw new Error('Das Paket nennt keinen Spielport (kein Zweck mit assign: pool).');
@@ -174,10 +177,12 @@ async function vergibPortsAusPaket(dbService, rootserverId, paket, wunschPort = 
 
     const eintragen = async (zweck, nummer, protokoll) => {
         const allocId = nachNummer.get(nummer);
-        await dbService.query(
-            'UPDATE port_allocations SET server_id = 0, assigned_at = NOW() WHERE id = ?',
-            [allocId]
-        );
+        if (buchen) {
+            await dbService.query(
+                'UPDATE port_allocations SET server_id = 0, assigned_at = NOW() WHERE id = ?',
+                [allocId]
+            );
+        }
         ports[zweck] = { internal: nummer, external: nummer, protocol: protokoll };
         belegt[zweck] = { allocId, port: nummer };
     };

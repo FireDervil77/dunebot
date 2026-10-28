@@ -41,6 +41,10 @@ const db = {
     nrs: [],
     ziel: { ...ZIEL },
     migrationen: [],           // jüngste Umzugszeile(n) des Servers für Umzugsstand.letzter
+    vorrat: [],                // freie port_allocations am Ziel: { id, port }
+    portBuch: [],              // was an port_allocations geschrieben wurde
+    tx: [],                    // Anweisungen in der Transaktion
+    txWirft: null,             // Fehlertext, wenn die Transaktion scheitern soll
     gescheitert: [],           // was als Fehlschlag eingetragen wurde
     async query(sql, p) {
         if (/FROM gameservers gs\s+LEFT JOIN rootserver r ON gs\.rootserver_id = r\.id\s+WHERE gs\.id = \? AND gs\.guild_id = \?/.test(sql)) {
@@ -54,6 +58,20 @@ const db = {
             return [{ name: `s7_${p[1]}`, kennwort_ver: encrypt('AltesKennwort0123') }];
         }
         if (/INSERT INTO gameserver_migrations/.test(sql)) return { insertId: 1 };
+        // Das Paket des Servers (Paketfassung.ladePaketFuerServer): Spielport aus
+        // dem Vorrat, query = game+1 — wie Core Keeper.
+        if (/FROM gameservers gs\s+JOIN packages pk/.test(sql)) {
+            return [{ paket_json: JSON.stringify({ identity: { name: 'Probe' }, ports: [
+                { purpose: 'game', assign: 'pool', protocol: 'udp', required: true },
+                { purpose: 'query', assign: 'game+1', protocol: 'udp', required: true }] }) }];
+        }
+        if (/SELECT id, port FROM port_allocations\s+WHERE rootserver_id = \? AND server_id IS NULL/.test(sql)) return this.vorrat;
+        if (/UPDATE port_allocations SET server_id = 0, assigned_at = NOW\(\) WHERE id = \?/.test(sql)) {
+            this.portBuch.push(['vorlaeufig', p[0]]); return {};
+        }
+        if (/UPDATE port_allocations SET server_id = NULL, assigned_at = NULL\s+WHERE id IN/.test(sql)) {
+            this.portBuch.push(['frei', ...p]); return {};
+        }
         if (/FROM gameserver_migrations WHERE server_id = \? ORDER BY id DESC LIMIT 1/.test(sql)) return this.migrationen;
         // Wie MySQL im strikten Modus: current_step ist VARCHAR(100).
         if (/UPDATE gameserver_migrations SET status = \?, progress_percent = \?, current_step = \?/.test(sql)
@@ -68,7 +86,12 @@ const db = {
         throw new Error('Unerwartete Abfrage: ' + String(sql).trim().replace(/\s+/g, ' ').slice(0, 90));
     },
     async transaction(fn) {
-        return fn({ query: async (sql) => (/SHOW TABLES/.test(sql) ? [[]] : {}) });
+        return fn({ query: async (sql, p) => {
+            if (/SHOW TABLES/.test(sql)) return [[{ t: 'port_allocations' }]];
+            this.tx.push([sql.replace(/\s+/g, ' ').trim(), p]);
+            if (this.txWirft && /port_allocations/.test(sql)) throw new Error(this.txWirft);
+            return {};
+        } });
     },
 };
 const daemon = {
@@ -99,7 +122,8 @@ ServiceManager.register('sseManager', { broadcast: still });
 
 const mm = require(path.join(WURZEL, 'plugins/gameserver/dashboard/helpers/MigrationManager.js'));
 mm._transferBackup = async () => {};
-mm._adjustPorts = async () => ({});
+// Freier Vorrat am Ziel: 25007 + 25008 (25005 gehört dort schon Server 222).
+const VORRAT = [{ id: 507, port: 25007 }, { id: 508, port: 25008 }, { id: 509, port: 25009 }];
 mm._cleanup = async () => {};
 mm._waitForServerStopped = async () => {};
 mm._startStepTicker = () => () => {};
@@ -109,6 +133,7 @@ const befehle = (b, id) => daemon.auftraege.filter(a => a.befehl === b && (!id |
 let bestanden = 0;
 async function pruefe(name, fn) {
     db.nrs = []; db.ziel = { ...ZIEL }; db.migrationen = []; db.gescheitert = []; daemon.auftraege = []; daemon.amZiel = []; daemon.scheitern = {}; daemon.alt = new Set(); logs.length = 0;
+    db.vorrat = VORRAT.map(z => ({ ...z })); db.portBuch = []; db.tx = []; db.txWirft = null;
     try {
         await fn();
         console.log(`  ✓ ${name}`);
@@ -276,6 +301,43 @@ async function umzug() {
         assert.match(v, /const uz = locals\.umzug; if \(uz\) \{/);
         assert.match(v, /Wird auf „<%= uz\.nach %>“ verschoben/);
         assert.match(v, /Umzug auf „<%= uz\.nach %>“ gescheitert/);
+    });
+
+    console.log('\nPorts am Ziel (2026-10-28, Umzug 17: Duplicate entry ...-25005)');
+
+    await pruefe('Vor dem Umzug: zu wenig Vorrat am Ziel → abgelehnt, ohne zu buchen', async () => {
+        db.vorrat = [{ id: 507, port: 25007 }]; // kein Nachbar für query = game+1
+        const r = await mm._validate(7, 55, 'g1');
+        assert.strictEqual(r.success, false);
+        assert.match(r.error, /^Am Zielserver: Nicht genug freie Ports/);
+        assert.strictEqual(db.portBuch.length, 0, 'die Prüfung hat gebucht');
+        assert.strictEqual(daemon.auftraege.length, 0);
+    });
+
+    await pruefe('Umzug: Ziel-Ports aus dem Vorrat (game+1 gekoppelt), Quelle frei, Ziel auf den Server gebucht', async () => {
+        const r = await umzug();
+        assert.strictEqual(r.success, true, r.error);
+        assert.deepStrictEqual(db.portBuch, [['vorlaeufig', 507], ['vorlaeufig', 508]], 'vorläufig 25007 + 25008');
+        const sqls = db.tx.map(([s]) => s);
+        const quelle = db.tx.find(([s]) => /SET server_id = NULL, assigned_at = NULL WHERE server_id = \? AND rootserver_id = \?/.test(s));
+        assert.ok(quelle, 'die Quelle wird nicht freigegeben:\n' + sqls.join('\n'));
+        assert.deepStrictEqual(quelle[1], [7, 54]);
+        const ziel = db.tx.find(([s]) => /SET server_id = \?, assigned_at = NOW\(\) WHERE id IN \(\?,\?\) AND server_id = 0/.test(s));
+        assert.ok(ziel, 'das Ziel wird nicht auf den Server gebucht');
+        assert.deepStrictEqual(ziel[1], [7, 507, 508]);
+        assert.ok(!sqls.some(s => /SET rootserver_id = \?, ip = \?/.test(s)), 'die alten Zeilen werden noch verschoben');
+        const gs = db.tx.find(([s]) => /UPDATE gameservers SET rootserver_id/.test(s));
+        assert.deepStrictEqual(JSON.parse(gs[1][1]).query, { internal: 25008, external: 25008, protocol: 'udp' });
+    });
+
+    await pruefe('Scheitert das Umschreiben: vorläufige Ziel-Ports wieder frei, Ziel-Datenbank abgebaut', async () => {
+        db.nrs = [1];
+        db.txWirft = "Duplicate entry '55-45.131.66.91-25005' for key 'uk_rootserver_ip_port'";
+        const r = await umzug();
+        assert.strictEqual(r.success, false);
+        assert.deepStrictEqual(db.portBuch.filter(b => b[0] === 'frei'), [['frei', 507, 508]]);
+        assert.strictEqual(befehle('db.loeschen', 'dz').length, 1, 'die Ziel-Datenbank bleibt liegen');
+        assert.ok(logs.length === 0 || !logs.some(l => /nicht abgebaut/.test(l)));
     });
 
     console.log('\nDialog');
