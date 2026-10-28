@@ -48,9 +48,10 @@ const db = {
     sicherungen: [],           // gameserver_backups (Namen) des Servers
     gescheitert: [],           // was als Fehlschlag eingetragen wurde
     async query(sql, p) {
-        if (/FROM gameservers gs\s+LEFT JOIN rootserver r ON gs\.rootserver_id = r\.id\s+WHERE gs\.id = \? AND gs\.guild_id = \?/.test(sql)) {
+        if (/FROM gameservers gs\s+LEFT JOIN rootserver r ON gs\.rootserver_id = r\.id[\s\S]*WHERE gs\.id = \? AND gs\.guild_id = \?/.test(sql)) {
+            assert.match(sql, /am\.slug AS addon_slug/, 'der Umzug holt den Slug nicht — gameserver.uninstall verlangt ihn');
             return [{ id: 7, name: 'Probe', guild_id: 'g1', rootserver_id: 54, status: 'offline',
-                install_path: '7-probe', ports: '{}', source_daemon_id: 'dq' }];
+                install_path: '7-probe', ports: '{}', source_daemon_id: 'dq', addon_slug: 'corekeeper' }];
         }
         if (/SELECT \* FROM rootserver WHERE id = \? AND guild_id = \?/.test(sql)) return [this.ziel];
         if (/SELECT \* FROM rootserver WHERE id = \?/.test(sql)) return [QUELLE];
@@ -107,6 +108,15 @@ const daemon = {
     async syncSftpUsers() {},
     async sendCommand(id, befehl, nutzlast) {
         this.auftraege.push({ id, befehl, nutzlast });
+        // Die Pflichtfelder wie im echten Handler (websocket/client.go,
+        // handleGameserverUninstall) — eine Attrappe, die alles annimmt, ließ
+        // Umzug 19 grün aussehen, und der Daemon lehnte mit „addon_slug fehlt" ab.
+        if (befehl === 'gameserver.uninstall') {
+            const fehlt = typeof nutzlast.server_id !== 'string' ? 'server_id fehlt'
+                : typeof nutzlast.rootserver_id !== 'number' ? 'rootserver_id fehlt'
+                : !nutzlast.addon_slug ? 'addon_slug fehlt' : null;
+            if (fehlt) return { success: false, error: fehlt };
+        }
         if (this.scheitern[befehl]) throw new Error(this.scheitern[befehl]);
         if (befehl === 'db.liste') return { success: true, datenbanken: id === 'dz' ? this.amZiel : [] };
         if (befehl === 'db.anlegen') return { success: true, zugang: { name: `s7_${nutzlast.nr}` } };
@@ -218,6 +228,7 @@ async function umzug() {
         assert.strictEqual(weg.length, 1, 'die Spieldateien an der Quelle werden nicht gelöscht');
         assert.strictEqual(weg[0].id, 'dq', 'gelöscht wird nur an der Quelle');
         assert.strictEqual(weg[0].nutzlast.rootserver_id, 54);
+        assert.ok(!logs.some(l => /NICHT gelöscht/.test(l)), 'der Daemon hat das Löschen abgelehnt: ' + logs.join(' | '));
         const folge = daemon.auftraege.map(a => a.befehl);
         assert.ok(folge.indexOf('gameserver.migrate.restore') < folge.indexOf('gameserver.uninstall'), 'erst am Ziel auspacken, dann an der Quelle löschen');
     });
@@ -231,6 +242,7 @@ async function umzug() {
         assert.strictEqual(befehle('db.loeschen', 'dq').length, 0, 'an der Quelle nichts gelöscht');
         assert.strictEqual(befehle('gameserver.uninstall', 'dq').length, 0, 'gescheitert: die Spieldateien an der Quelle müssen bleiben');
         assert.strictEqual(befehle('gameserver.uninstall', 'dz').length, 1, 'das Ausgepackte am Ziel bleibt liegen');
+        assert.ok(!logs.some(l => /NICHT entfernt/.test(l)), 'der Ziel-Daemon hat das Räumen abgelehnt: ' + logs.join(' | '));
     });
 
     // Erfolg genauso prüfen: Ein Daemon vor 1.0.148 kennt `datenbanken` nicht

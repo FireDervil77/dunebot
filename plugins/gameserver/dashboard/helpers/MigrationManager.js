@@ -308,9 +308,11 @@ class MigrationManager {
     async _validate(serverId, targetRootServerId, guildId) {
         // Server laden
         const [server] = await this.dbService.query(
-            `SELECT gs.*, r.daemon_id as source_daemon_id, r.name as source_rootserver_name
+            `SELECT gs.*, r.daemon_id as source_daemon_id, r.name as source_rootserver_name,
+                    am.slug AS addon_slug
              FROM gameservers gs
              LEFT JOIN rootserver r ON gs.rootserver_id = r.id
+             LEFT JOIN addon_marketplace am ON am.id = gs.addon_marketplace_id
              WHERE gs.id = ? AND gs.guild_id = ?`,
             [serverId, guildId]
         );
@@ -782,6 +784,9 @@ class MigrationManager {
                     guild_id: guildId,
                     rootserver_id: Number(sourceRootServer.id),
                     daemon_id: sourceRootServer.daemon_id,
+                    // Pflicht im Handler des Daemons, obwohl das Löschen selbst
+                    // es nicht liest — ohne lehnte er ab (Umzug 19, 2026-10-28).
+                    addon_slug: server.addon_slug,
                 }, 120000);
                 if (weg?.success === false) throw new Error(weg.error || weg.message || 'der Daemon meldete keinen Erfolg');
                 this.Logger.info(`[MigrationManager] Spieldateien von Server ${server.id} auf ${sourceRootServer.name} gelöscht`);
@@ -855,6 +860,7 @@ class MigrationManager {
                         guild_id: guildId,
                         rootserver_id: Number(targetRootServer.id),
                         daemon_id: targetRootServer.daemon_id,
+                        addon_slug: server.addon_slug,
                     }, 120000);
                     if (weg?.success === false) throw new Error(weg.error || weg.message || 'kein Erfolg gemeldet');
                     this.Logger.info(`[MigrationManager] Ausgepacktes am Ziel ${targetRootServer.name} wieder entfernt`);
