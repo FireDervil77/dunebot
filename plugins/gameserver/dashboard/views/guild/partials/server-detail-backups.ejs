@@ -93,6 +93,8 @@
     const GUILD_ID    = '<%= guildId %>';
     const SERVER_ID   = '<%= server.id %>';
     const BASE_URL    = `/guild/${GUILD_ID}/plugins/gameserver/servers/${SERVER_ID}/backups`;
+    // Die zuletzt geladene Liste — die Rückfrage beim Wiederherstellen liest daraus.
+    let LETZTE = [];
 
     const CAN_CREATE  = <%= userPermissions.permissions['GAMESERVER.BACKUPS.CREATE'] ? 'true' : 'false' %>;
     const CAN_DELETE  = <%= userPermissions.permissions['GAMESERVER.BACKUPS.DELETE'] ? 'true' : 'false' %>;
@@ -147,6 +149,7 @@
             if (!data.success) throw new Error(data.message);
 
             const backups = data.backups || [];
+            LETZTE = backups;
             ABRUF_MOEGLICH = Boolean(data.abruf);
             document.getElementById('backups-loading').style.display = 'none';
 
@@ -159,9 +162,13 @@
             tbody.innerHTML = backups.map(b => `
                 <tr data-backup-id="${b.id}">
                     <td><strong>${escHtml(b.name)}</strong></td>
-                    <td>${formatBytes(b.size_bytes)}</td>
+                    <td>${formatBytes(b.size_bytes)}${b.datenbanken ? `
+                        <span class="badge bg-azure-lt ms-1" title="Die Datenbank des Spiels steckt mit im Archiv und wird beim Wiederherstellen zurückgesetzt">
+                            <i class="fas fa-database me-1"></i>mit Datenbank</span>` : ''}</td>
                     <td>${statusBadge(b.status)}</td>
-                    <td class="text-secondary small">${escHtml(b.note) || '—'}</td>
+                    <td class="text-secondary small">${escHtml(b.note) || '—'}${b.wiederhergestellt ? `
+                        <div class="${/gescheitert/.test(b.wiederhergestellt) ? 'text-danger fw-bold' : 'text-secondary'} mt-1">
+                            <i class="fas fa-undo me-1"></i>${escHtml(b.wiederhergestellt)}</div>` : ''}</td>
                     <td><small>${fmtDate(b.created_at)}</small></td>
                     <td>
                         <div class="btn-group btn-group-sm">
@@ -245,7 +252,12 @@
 
     window.restoreBackup = async function(backupId, backupName) {
         if (!CAN_RESTORE) return;
-        if (!confirm(`Sicherung "${backupName}" wiederherstellen?\n\nACHTUNG: Aktuelle Serverdaten werden überschrieben! Der Server muss gestoppt sein.`)) return;
+        // Mit Datenbank (Stufe 11 S6) wird auch sie zurückgesetzt — das gehört
+        // in die Rückfrage, nicht erst in die Zeile danach.
+        const zeile = LETZTE.find(b => b.id === backupId);
+        const mitDb = zeile && zeile.datenbanken
+            ? '\nAuch die Datenbank des Spiels wird auf den Stand der Sicherung zurückgesetzt.' : '';
+        if (!confirm(`Sicherung "${backupName}" wiederherstellen?\n\nACHTUNG: Aktuelle Serverdaten werden überschrieben!${mitDb} Der Server muss gestoppt sein.`)) return;
 
         try {
             const resp = await fetch(`${BASE_URL}/${backupId}/restore`, { method: 'POST' });

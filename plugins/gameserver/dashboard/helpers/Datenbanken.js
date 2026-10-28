@@ -159,6 +159,35 @@ async function zugangFuerStart(serverId) {
     return { host: HOST, port: PORT, name: z.name, user: z.name, password: decrypt(z.kennwort_ver) };
 }
 
+// ── Sicherung und Wiederherstellung (S6, 2026-10-28) ─────────────────────────
+//
+// Die Dumps legt der Daemon ins Archiv der Sicherung (`.fb-datenbanken/<nr>.sql`).
+// Welche Datenbanken zum Server gehören, sagt das Panel — mit diesen Nummern,
+// bei der Sicherung (was mitkommt) und bei der Wiederherstellung (was es noch
+// gibt und eingespielt wird).
+
+/** Die Nummern der Datenbanken eines Servers, aufsteigend. */
+async function nummern(serverId) {
+    const db = ServiceManager.get('dbService');
+    const zeilen = await db.query('SELECT nr FROM gameserver_datenbanken WHERE server_id = ? ORDER BY nr', [serverId]);
+    return (zeilen || []).map(z => Number(z.nr)).filter(n => Number.isInteger(n) && n > 0);
+}
+
+/** Was in `gameserver_backups.datenbanken` steht: die gesicherten Nummern, oder null. */
+function sicherungsSpalte(antwort) {
+    const liste = Array.isArray(antwort?.datenbanken) ? antwort.datenbanken.map(Number).filter(n => n > 0) : [];
+    return liste.length ? JSON.stringify(liste) : null;
+}
+
+/** Was in `gameserver_backups.wiederhergestellt` steht — oder null, wenn es nichts zu sagen gibt. */
+function wiederherstellungsText(antwort) {
+    const teile = [];
+    const ein = Array.isArray(antwort?.eingespielt) ? antwort.eingespielt : [];
+    if (ein.length) teile.push(`Datenbank ${ein.join(', ')} auf den Stand der Sicherung gesetzt.`);
+    for (const h of Array.isArray(antwort?.hinweise) ? antwort.hinweise : []) teile.push(String(h));
+    return teile.length ? teile.join(' ') : null;
+}
+
 /** Neues Kennwort: im Container setzen, dann speichern. */
 async function neuesKennwort(server, nr) {
     const db = ServiceManager.get('dbService');
@@ -301,5 +330,6 @@ module.exports = {
     HOST, PORT, DB_SCHLUESSEL,
     ladeServer, liste, stand, anlegen, zugang, zugangFuerStart, neuesKennwort, loeschen, groessenMessen,
     groesseText, freieNummer,
+    nummern, sicherungsSpalte, wiederherstellungsText,
     pflicht, wahlBeimAnlegen, entscheideBeimAnlegen, allesLoeschen,
 };
