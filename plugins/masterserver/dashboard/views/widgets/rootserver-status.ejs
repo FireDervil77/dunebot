@@ -16,7 +16,7 @@
         const cpuCol  = cpuPct  >= 80 ? 'danger' : cpuPct  >= 60 ? 'warning' : 'success';
         const ramCol  = ramPct  >= 85 ? 'danger' : ramPct  >= 65 ? 'warning' : 'info';
         const diskCol = diskPct >= 90 ? 'danger' : diskPct >= 70 ? 'warning' : 'primary';
-        const online  = rs.status === 'online';
+        const online  = rs.daemon_status === 'online';
     %>
     <div class="mb-3<%= rsList.indexOf(rs) < rsList.length - 1 ? ' pb-3 border-bottom' : '' %>">
         <!-- Header: Name + Badge -->
