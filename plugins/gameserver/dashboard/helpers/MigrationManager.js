@@ -412,6 +412,9 @@ class MigrationManager {
         // Vorläufig gebuchte Ports am Ziel (server_id = 0) — der catch-Block
         // gibt sie wieder frei, solange nicht umgeschrieben ist.
         let zielBelegt = [];
+        // Das Archiv am Ziel — der catch-Block räumt es mit weg, sonst blieb es
+        // nach jedem gescheiterten Umzug in /tmp des Ziels (2026-10-28).
+        let targetBackupPath = null;
 
         try {
             // Schritt 0: Cronjobs anhalten.
@@ -562,7 +565,7 @@ class MigrationManager {
             await this._updateMigrationStatus(migrationId, 'restoring', 70, 'Server wird wiederhergestellt...');
             this._sendSSE(guildId, server.id, { type: 'migration_progress', migrationId, step: 'restoring', progress: 70 });
 
-            const targetBackupPath = `/tmp/migration-${server.id}-incoming.tar.gz`;
+            targetBackupPath = `/tmp/migration-${server.id}-incoming.tar.gz`;
             const targetInstallPath = server.install_path; // Bleibt gleich (relativ zur Guild)
 
             const stopRestoreTicker = this._startStepTicker(
@@ -757,6 +760,18 @@ class MigrationManager {
                     );
                 } catch (cleanupErr) {
                     this.Logger.warn('[MigrationManager] Cleanup nach Fehler fehlgeschlagen:', cleanupErr?.message || cleanupErr);
+                }
+            }
+            if (targetBackupPath) {
+                try {
+                    await this.ipmServer.sendCommand(
+                        targetRootServer.daemon_id,
+                        'gameserver.migrate.cleanup',
+                        { backup_path: targetBackupPath },
+                        30000
+                    );
+                } catch (cleanupErr) {
+                    this.Logger.warn(`[MigrationManager] Archiv am Ziel nicht aufgeräumt (${targetBackupPath}): ${cleanupErr?.message || cleanupErr}`);
                 }
             }
 

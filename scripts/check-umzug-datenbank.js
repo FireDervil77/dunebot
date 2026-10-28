@@ -337,6 +337,7 @@ async function umzug() {
         assert.strictEqual(r.success, false);
         assert.deepStrictEqual(db.portBuch.filter(b => b[0] === 'frei'), [['frei', 507, 508]]);
         assert.strictEqual(befehle('db.loeschen', 'dz').length, 1, 'die Ziel-Datenbank bleibt liegen');
+        assert.strictEqual(befehle('gameserver.migrate.cleanup', 'dz').length, 1, 'das Archiv am Ziel bleibt in /tmp liegen');
         assert.ok(logs.length === 0 || !logs.some(l => /nicht abgebaut/.test(l)));
     });
 
