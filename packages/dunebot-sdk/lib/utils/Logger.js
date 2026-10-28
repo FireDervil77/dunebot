@@ -33,7 +33,10 @@ class Logger {
                 target: "pino-pretty",
                 options: {
                     colorize: true,
-                    translateTime: "yyyy-mm-dd HH:mm:ss",
+                    // dateformat: `MM` = Minute, `mm` = Monat; `SYS:` = Ortszeit.
+                    // Bis 2026-10-28 stand hier „HH:mm" ohne SYS — jede Zeile
+                    // zeigte UTC-Stunde und Monat („15:10:…" am 28.10. um 16:36).
+                    translateTime: "SYS:yyyy-mm-dd HH:MM:ss",
                     ignore: fields
                         ? `pid,hostname,${Object.keys(fields).join(",")}`
                         : "pid,hostname",
