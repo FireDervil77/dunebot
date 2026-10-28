@@ -310,7 +310,16 @@ function roh(datei) {
         return (auf < 0 || zu < 0) ? '' : routen.slice(auf, zu);
     };
     const serverseite = abfrage('gs.sftp_password_seen_at');
-    const uebersicht  = abfrage("JSON_EXTRACT(gs.ports, '$.game.internal')");
+    // Die Übersicht steht seit dem 2026-10-25 nicht mehr in servers.js: Route
+    // und Widget teilen sich die Grundabfrage in helpers/Serverliste.js
+    // (26778f04). Gesucht wird sie dort — mit demselben Schnitt am Merkmal.
+    const serverliste = ohneKommentare(roh(path.join(WURZEL, 'plugins/gameserver/dashboard/helpers/Serverliste.js')) || '');
+    const uebersicht  = (() => {
+        const i = serverliste.indexOf("JSON_EXTRACT(gs.ports, '$.game.internal')");
+        if (i < 0) return '';
+        const auf = serverliste.lastIndexOf('`', i), zu = serverliste.indexOf('`', i);
+        return (auf < 0 || zu < 0) ? '' : serverliste.slice(auf, zu);
+    })();
     const status      = abfrage('disk_quota_enforced, disk_quota_note,');
 
     for (const [name, sql] of [['Serverseite', serverseite], ['/status', status]]) {
@@ -322,7 +331,10 @@ function roh(datei) {
             sql ? 'die Abfrage holt die Spalten nicht' : 'die Abfrage wurde nicht gefunden');
     }
     pruefe(uebersicht && /cpu_percent/.test(uebersicht),
-        'die Übersicht holt sie ebenfalls (für die Spalte je Server)');
+        'die Übersicht holt sie ebenfalls (für die Spalte je Server)',
+        uebersicht ? 'die Abfrage holt die Spalte nicht' : 'die Abfrage in helpers/Serverliste.js wurde nicht gefunden');
+    pruefe(/SERVER_LISTE_SQL/.test(routen),
+        'die Übersicht der Route nimmt diese Abfrage (SERVER_LISTE_SQL), keine eigene');
     pruefe(routen && !/lesePlatzstand/.test(routen),
         'die Sonderabfrage auf server_registry ist weg',
         'Sie las eine Tabelle mit null Zeilen.');

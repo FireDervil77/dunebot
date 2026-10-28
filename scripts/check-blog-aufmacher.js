@@ -198,8 +198,14 @@ function uebersetzer(locale) {
         assert.ok(router.includes("res.locals.blogNeu = await require('../helpers/Blog').zahlNeu()"));
         assert.ok(!/FROM blog_posts/.test(controller), 'der Controller fragt den Blog selbst ab');
         const css = lies('apps/dashboard/themes/default/assets/css/frontend.css');
-        // Rohtext gewollt: Gesucht wird, ob es die Klassen in der Stildatei gibt.
-        assert.ok(css.includes('.navmenu .menue-neu') && css.includes('.hero .hero-rubrik'));
+        // Rohtext gewollt: Gesucht wird, ob es die Klasse in der Stildatei gibt.
+        assert.ok(css.includes('.navmenu .menue-neu'), 'die Marke „Neu" am Menüpunkt hat keine Regel');
+        // `.hero .hero-rubrik` gehörte zum alten Hero und ging mit ihm (7adf76ed,
+        // 2026-10-13). Der neue (hero-kit) kennzeichnet den Aufmacher mit dem
+        // Bild „NEU" — das wird hier geprüft, nicht eine Klasse ohne Aufrufer.
+        const hero = ohneKommentare(lies('apps/dashboard/themes/default/partials/frontend/sections/hero.ejs'));
+        assert.match(hero, /if \(aufmacher\) \{\s*folien\.push\(\{[\s\S]{0,200}marke: \{ bild: 'badges\/gefuellt\/Badge_NEU_gefuellt\.png'/,
+            'die Aufmacher-Folie trägt keine Marke „NEU"');
     });
 
     // ═════════════════════════════════════════════════════════════
