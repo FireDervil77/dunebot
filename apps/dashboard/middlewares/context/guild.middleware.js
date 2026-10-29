@@ -151,8 +151,6 @@ try {
         res.locals.buyMeCoffeeUrl = '#';
     }
     
-    res.locals.pendingUpdatesCount = 0;
-    
     // Admin-Status für Templates (OWNER_IDS aus ENV)
     const { isAdminUser } = require('../admin.middleware');
     res.locals.isAdmin = isAdminUser(req.session?.user);

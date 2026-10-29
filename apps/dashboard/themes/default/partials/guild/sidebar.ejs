@@ -196,9 +196,6 @@
                   <span class="nav-link-icon"><i class="<%= eintrag.icon || 'fa-solid fa-circle' %>"></i></span>
                   <span class="nav-link-title">
                     <%= tr(eintrag.title, eintrag.title) %>
-                    <% if (eintrag.url && eintrag.url.includes('/plugins') && locals.pendingUpdatesCount > 0) { %>
-                      <span class="badge bg-warning text-dark ms-1"><%= locals.pendingUpdatesCount %></span>
-                    <% } %>
                   </span>
                 </a>
               </li>
