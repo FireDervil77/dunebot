@@ -5,8 +5,13 @@
     // Spielerzahl sagen hier dasselbe wie dort.
     //
     // Tabler-Badges statt `fb-pille`: Deren Stile lädt nur das Plugin auf
-    // seinen eigenen Seiten, hier stünde die Pille ungestaltet da.
-    const TON = { green: 'success', yellow: 'warning', blue: 'info', red: 'danger', gray: 'secondary' };
+    // seinen eigenen Seiten, hier stünde die Pille ungestaltet da. Die Farbe
+    // kommt fertig aus `baueZustand` (`abzeichen`), dieselbe wie im Live-Weg.
+    //
+    // Live seit 2026-10-29: `data-fb-live-guild` hängt `gameserver-live.js`
+    // ein — dasselbe Modul wie in der Übersicht, kein eigenes Skript. Der
+    // Filter in index.js reiht es ein. Vorher änderte sich das Widget erst
+    // nach dem Neuladen.
     const MAX = 8;
     const basis = '/guild/' + guildId + '/plugins/gameserver/servers';
     const eintraege = (liste && liste.liste) || [];
@@ -19,9 +24,10 @@
         <a href="<%= basis %>/create" class="ms-1">Jetzt anlegen →</a>
     </div>
 <% } else { %>
+  <div data-fb-live-guild="<%= guildId %>">
     <div class="d-flex gap-3 mb-2 text-secondary" style="font-size:.8rem;">
-        <span><strong class="text-body"><%= z.online %></strong> von <%= z.alle %> laufen</span>
-        <span><strong class="text-body"><%= z.spieler %></strong> Spieler gemessen</span>
+        <span><strong class="text-body" data-fb-live-summe="online"><%= z.online %></strong> von <span data-fb-live-summe="alle"><%= z.alle %></span> laufen</span>
+        <span><strong class="text-body" data-fb-live-summe="spieler"><%= z.spieler %></strong> Spieler gemessen</span>
     </div>
     <div class="list-group list-group-flush">
         <% eintraege.slice(0, MAX).forEach(function (s) { %>
@@ -36,10 +42,12 @@
                     <span class="d-block text-truncate text-secondary" style="font-size:.75rem;"><%= s.spiel %></span>
                 </span>
                 <span class="text-end" style="flex:none;">
-                    <span class="badge bg-<%= TON[s.zustand.ton] || 'secondary' %>-lt" style="font-size:.7rem;"><%= s.zustand.text %></span>
-                    <% if (s.spieler.jetzt !== null) { %>
-                        <span class="d-block text-secondary" style="font-size:.7rem;"><%= s.spieler.jetzt %> / <%= s.spieler.max !== null ? s.spieler.max : '?' %></span>
-                    <% } %>
+                    <span class="badge bg-<%= s.zustand.abzeichen || 'secondary' %>-lt" style="font-size:.7rem;"
+                          data-fb-live="zustand-abzeichen" data-fb-server="<%= s.id %>"><%= s.zustand.text %></span>
+                    <%# Immer im Text, sonst findet das Live-Modul nichts, sobald
+                        ein Server nach dem Laden Spieler meldet. %>
+                    <span class="d-block text-secondary" style="font-size:.7rem;"
+                          data-fb-live="spieler-wenn" data-fb-server="<%= s.id %>"<%= s.spieler.jetzt === null ? ' hidden' : '' %>><%= s.spieler.jetzt !== null ? s.spieler.jetzt + ' / ' + (s.spieler.max !== null ? s.spieler.max : '?') : '' %></span>
                 </span>
             </a>
         <% }) %>
@@ -47,4 +55,5 @@
     <div class="mt-2" style="font-size:.8rem;">
         <a href="<%= basis %>"><i class="fa-solid fa-arrow-right me-1"></i><%= eintraege.length > MAX ? 'Alle ' + eintraege.length + ' Server' : 'Zur Übersicht' %></a>
     </div>
+  </div>
 <% } %>

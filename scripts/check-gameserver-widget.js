@@ -11,6 +11,10 @@
  *   Rechte     nur mit GAMESERVER.VIEW, nur wenn das Plugin aktiv ist
  *   Anmeldung  _registerWidgets wird in onEnable gerufen (stand leer und
  *              ungerufen da) — und meldet den Filter nur einmal an
+ *   Live       (2026-10-29) das Widget reiht `gameserver-live.js` ein und
+ *              trägt dessen Haken; ein Statuswechsel zeichnet das Abzeichen
+ *              aus der Beurteilung des Servers (`baueZustand`) — vorher
+ *              änderte es sich erst nach dem Neuladen
  *
  * Gelesen wird aus der Datenbank, geschrieben nichts.
  *
@@ -47,6 +51,8 @@ const lies = (rel) => fs.readFileSync(path.join(WURZEL, rel), 'utf8');
     ServiceManager.register('permissionManager', { hasPermission: async (u, g, k) => darf && k === 'GAMESERVER.VIEW' });
     const filter = [];
     ServiceManager.register('pluginManager', { hooks: { addFilter: (n, fn) => { if (n === 'guild_dashboard_widgets') filter.push(fn); } } });
+    const eingereiht = [];
+    ServiceManager.register('assetManager', { enqueueScript: (h) => { eingereiht.push(h); return true; } });
     ServiceManager.register('themeManager', { renderWidgetPartial: async (name, data) =>
         ejs.renderFile(path.join(WURZEL, 'plugins', data.plugin, 'dashboard/views/widgets', name + '.ejs'), data, { async: true }) });
 
@@ -69,11 +75,60 @@ const lies = (rel) => fs.readFileSync(path.join(WURZEL, rel), 'utf8');
         const [w] = await lauf({});
         assert.ok(w && w.id === 'gameserver-uebersicht' && w.content);
         const { liste, zahlen } = await ladeServerListe(ServiceManager.get('dbService'), guild.guild_id);
-        assert.ok(w.content.includes(`<strong class="text-body">${zahlen.online}</strong> von ${zahlen.alle} laufen`), 'Zähler weicht ab');
+        assert.ok(w.content.includes(`data-fb-live-summe="online">${zahlen.online}</strong> von <span data-fb-live-summe="alle">${zahlen.alle}</span> laufen`), 'Zähler weicht ab');
         for (const s of liste.slice(0, 8)) {
             assert.ok(w.content.includes(`/plugins/gameserver/servers/${s.id}"`), `Server ${s.id} fehlt`);
             assert.ok(w.content.includes(`>${s.zustand.text}</span>`), `Zustand von ${s.id} fehlt`);
         }
+    });
+
+    await pruefe('zieht live nach: Modul eingereiht, Haken je Server', async () => {
+        eingereiht.length = 0;
+        const [w] = await lauf({});
+        assert.deepStrictEqual(eingereiht, ['gameserver-live'], 'Live-Modul nicht eingereiht');
+        assert.ok(w.content.includes(`data-fb-live-guild="${guild.guild_id}"`), 'ohne data-fb-live-guild startet das Modul nicht');
+        const { liste } = await ladeServerListe(ServiceManager.get('dbService'), guild.guild_id);
+        for (const s of liste.slice(0, 8)) {
+            for (const art of ['zustand-abzeichen', 'spieler-wenn']) {
+                assert.ok(new RegExp(`data-fb-live="${art}" data-fb-server="${s.id}"`).test(w.content), `${art} fehlt an Server ${s.id}`);
+            }
+        }
+        // Eine leere Guild hat nichts, das live werden könnte.
+        eingereiht.length = 0;
+        await lauf({ guildId: '1' });
+        assert.deepStrictEqual(eingereiht, []);
+    });
+
+    await pruefe('Statuswechsel: Abzeichen und Spieler ohne Neuladen', async () => {
+        const { LiveAnzeige } = require('../plugins/gameserver/dashboard/assets/js/gameserver-live.js');
+        const { baueZustand } = require('../plugins/gameserver/dashboard/helpers/Serverseite');
+        const abzeichen = { dataset: { fbLive: 'zustand-abzeichen' }, textContent: 'Aus', className: 'badge bg-secondary-lt' };
+        const spieler = { dataset: { fbLive: 'spieler-wenn' }, textContent: '', hidden: true };
+        global.CSS = { escape: String };
+        global.document = { querySelectorAll: (sel) => sel.includes('data-fb-server="222"') ? [abzeichen, spieler] : [] };
+        let status = 'offline';
+        // So antwortet /servers/status: mit der Beurteilung aus baueZustand.
+        global.fetch = async () => ({ ok: true, json: async () => ({ servers: [
+            { id: 222, status, zustand: baueZustand({ status }), current_players: null, max_players: 8 }] }) });
+        const hoerer = {};
+        const sse = { on: (n, fn) => { (hoerer[n] = hoerer[n] || []).push(fn); } };
+        const loese = (n, d) => (hoerer[n] || []).forEach(fn => fn(d));
+        const ruhe = (ms) => new Promise(f => setTimeout(f, ms));
+
+        new LiveAnzeige(sse, guild.guild_id);
+        await ruhe(20);
+        assert.strictEqual(abzeichen.textContent, 'Aus');
+
+        status = 'online';
+        loese('status_changed', { server_id: 222, status: 'online' });
+        await ruhe(320);
+        assert.strictEqual(abzeichen.textContent, 'Läuft', 'Abzeichen bleibt nach dem Statuswechsel stehen');
+        assert.strictEqual(abzeichen.className, 'badge bg-success-lt');
+
+        loese('resource_usage', { server_id: 222, current_players: 3, max_players: 8 });
+        assert.strictEqual(spieler.hidden, false, 'Spielerzahl erscheint nicht');
+        assert.strictEqual(spieler.textContent, '3 / 8');
+        global.document = { querySelectorAll: () => [] };   // ausstehendes Zeichnen der Summen trifft nichts
     });
 
     await pruefe('ohne GAMESERVER.VIEW oder ohne aktives Plugin kein Widget', async () => {

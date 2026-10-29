@@ -466,6 +466,8 @@
                     const b = s.bereitschaft || null;
                     this.uebernimm(s.id, {
                         status:  s.status,
+                        // Fertig beurteilt (baueZustand) — fürs Widget.
+                        zustand: s.zustand || undefined,
                         umzug:   Boolean(s.umzug),
                         // Für ein hängendes `stopping` (knopfZustand): wann der
                         // Zustand zuletzt wechselte, und die Frist vom Server.
@@ -632,6 +634,34 @@
                         // Gruen heisst hier "laeuft", genau wie serverseitig
                         // (`baueZustand().gut`).
                         el.className = 'fb-pille' + (z.status === 'online' ? ' fb-pille-gut' : '');
+                        break;
+                    }
+
+                    // ── Das Widget auf dem Hauptdashboard ───────────────────
+                    //
+                    // Tabler-Abzeichen statt `fb-pille` (deren Stile lädt nur
+                    // das Plugin auf seinen Seiten). Text und Farbe kommen
+                    // fertig vom Server (`baueZustand`), nicht aus ZUSTAende:
+                    // Die Vorlage zeichnet beim Laden aus derselben Rechnung.
+                    // Ein `status_changed` trägt nur den Rohwert; bis das
+                    // Nachholen (250 ms) die Beurteilung bringt, bleibt das
+                    // alte Abzeichen stehen — eine zweite Tafel hier hätte nach
+                    // dem Neuladen anders geheißen („Stoppt gerade" gegen
+                    // „Wird gestoppt").
+                    case 'zustand-abzeichen': {
+                        const e = z.zustand;
+                        if (!e) break;
+                        el.textContent = e.text;
+                        el.className = 'badge bg-' + (e.abzeichen || 'secondary') + '-lt';
+                        break;
+                    }
+
+                    // „3 / 8" wie `spieler-paar`, aber ohne „nicht gemessen":
+                    // Im Widget steht dann gar nichts, wie beim Laden.
+                    case 'spieler-wenn': {
+                        const da = z.spieler !== null && z.spieler !== undefined;
+                        el.hidden = !da;
+                        if (da) el.textContent = `${z.spieler} / ${(z.max === null || z.max === undefined) ? '?' : z.max}`;
                         break;
                     }
 
