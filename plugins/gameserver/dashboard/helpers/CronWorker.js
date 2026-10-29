@@ -250,12 +250,22 @@ class CronWorker {
                 await this._merkeStart(dbService, job.server_id);
                 break;
 
-            case 'stop':
-                await ipmServer.sendCommand(daemonId, 'gameserver.stop', {
-                    server_id: serverId,
-                    guild_id: String(job.guild_id),
-                }, 60000);
+            case 'stop': {
+                // Über ServerStopp wie Knopf und Discord (Baustelle 119, F5,
+                // 2026-10-29): „Stoppt…" erscheint sofort in Browser und
+                // Discord-Panel, und lehnt der Daemon ab, kehrt der Status zum
+                // vorigen zurück statt still stehenzubleiben. Ob gestoppt werden
+                // soll, hat `cronEntscheidung` vorher schon beantwortet.
+                const [server] = await dbService.query(
+                    'SELECT id, name, status, last_status_update FROM gameservers WHERE id = ?', [job.server_id]);
+                if (!server) throw new Error('Server nicht gefunden');
+                const stopp = await require('./ServerStopp').stoppe({
+                    server: { ...server, daemon_id: daemonId },
+                    guildId: String(job.guild_id),
+                });
+                if (!stopp.ok) throw new Error(stopp.grund || 'Stopp fehlgeschlagen');
                 break;
+            }
 
             case 'restart':
                 // Vollständiges Payload: der nächtliche Neustart ist der Weg, auf dem

@@ -43,9 +43,16 @@
  *
  * Der Discord-Befehl läuft seit 2026-10-28 hier durch: Der Kern
  * (`IPCServer.js`, `SERVER_STOP`) holt den Anbieter aus `ServersteuerungRegistry`
- * und `require`t das Plugin dafür nicht. Noch NICHT hier: CronWorker,
- * MigrationManager und der Plugin-Abbau. Das ist benannt, nicht vergessen:
- * siehe `docs/Baustellen.md`, Baustelle 119.
+ * und `require`t das Plugin dafür nicht. Seit 2026-10-29 auch der CronWorker
+ * (geplanter Stopp) und der Plugin-Abbau (`onGuildDisable`, über
+ * `stoppeFallsLaeuft`).
+ *
+ * **Ausnahme mit Grund: der Umzug** (`MigrationManager`). Er stoppt bewusst
+ * NICHT hier: Sein Server steht schon auf `updating`, und `pruefeAktion`
+ * lehnt einen Stopp daraus ab; außerdem stoppt der Umzug „immer, unabhängig
+ * vom DB-Status" (ein veralteter Status darf keinen laufenden Container
+ * übersehen) und wartet selbst auf das echte Ende (`_waitForServerStopped`),
+ * belegt am Umzug 217 (2026-10-28). Baustelle 119.
  *
  * @module helpers/ServerStopp
  */

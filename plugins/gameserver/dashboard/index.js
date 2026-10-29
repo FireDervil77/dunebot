@@ -413,24 +413,25 @@ class GameserverPlugin extends DashboardPlugin {
                     // zum 2026-09-14 stand hier `running`, und laufende Server
                     // wurden beim Abbau des Plugins deshalb nie gestoppt, bevor
                     // ihre Dateien weg waren (Baustelle 117).
-                    if (server.status === 'online' || server.status === 'starting') {
-                        try {
-                            Logger.info(`[Gameserver] Stoppe Server ${server.id} (${server.name})...`);
-                            
-                            await ipmServer.sendCommand(server.daemon_id, 'gameserver.stop', {
-                                server_id: server.id.toString(),
-                                rootserver_id: server.rootserver_id
-                            }, 30000);
-                            
-                            stoppedCount++;
-                            Logger.success(`[Gameserver] Server ${server.id} gestoppt`);
-                            
-                            // Kurz warten, bis Prozess beendet ist
-                            await new Promise(resolve => setTimeout(resolve, 2000));
-                        } catch (error) {
-                            Logger.warn(`[Gameserver] Konnte Server ${server.id} nicht stoppen:`, error.message);
-                            // Trotzdem weitermachen mit Deinstallation
-                        }
+                    // Über ServerStopp wie das Löschen eines einzelnen Servers
+                    // (Baustelle 119, F5, 2026-10-29). Vorher: Stopp schicken,
+                    // 2 s warten, Dateien löschen — auch wenn das Spiel noch
+                    // herunterfuhr und Spielstände schrieb (der Daemon antwortet
+                    // auf gameserver.stop mit `queued`, nicht mit „ist unten").
+                    // Jetzt wird gewartet, bis der Daemon „gestoppt" meldet
+                    // (höchstens STOPP_FRIST_MS), und Browser/Discord-Panel
+                    // sehen „Stoppt…" sofort.
+                    const ServerStopp = require('./helpers/ServerStopp');
+                    const stopp = await ServerStopp.stoppeFallsLaeuft({ server, guildId });
+                    if (stopp.gestoppt) {
+                        stoppedCount++;
+                        Logger.success(`[Gameserver] Server ${server.id} gestoppt`);
+                    } else if (!stopp.ok) {
+                        // Wie bisher: Der Abbau geht weiter. Aber es steht da,
+                        // dass die Dateien unter einem womöglich noch laufenden
+                        // Spiel gelöscht werden.
+                        Logger.warn(`[Gameserver] Server ${server.id} nicht sicher gestoppt (${stopp.grund}) — `
+                            + 'die Deinstallation folgt trotzdem');
                     }
                     
                     // ────────────────────────────────────────────────────────

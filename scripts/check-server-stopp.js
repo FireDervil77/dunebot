@@ -57,6 +57,11 @@ const db = {
             return { affectedRows: 1 };
         }
         if (/^DELETE FROM gameservers WHERE id = \?$/.test(t)) { this.geloescht = true; return { affectedRows: 1 }; }
+        // Geplanter Stopp (CronWorker, 2026-10-29): die Zeile für ServerStopp.
+        if (/^SELECT id, name, status, last_status_update FROM gameservers WHERE id = \?$/.test(t)) {
+            return this.server ? [{ id: this.server.id, name: this.server.name, status: this.server.status,
+                last_status_update: this.server.last_status_update || null }] : [];
+        }
         // Datenbanken des Servers (Stufe 11 S4): Die Löschroute fragt sie vor
         // dem Deinstallieren ab — dieser Server hat keine.
         if (/^SELECT nr, name, bytes, groesse_am, created_at FROM gameserver_datenbanken WHERE server_id = \? ORDER BY nr$/.test(t)) return [];
@@ -322,6 +327,43 @@ async function pruefe(name, fn) {
             assert.deepStrictEqual(r, { ok: true, grund: undefined, eingereiht: true });
             assert.strictEqual(gerufen.guildId, 'g1');
         } finally { ServerStopp.stoppe = echt; }
+    });
+
+    console.log('\nGeplanter Stopp und Plugin-Abbau (2026-10-29, Baustelle 119 / F5)');
+
+    await pruefe('Der CronWorker stoppt über ServerStopp — mit dem frisch aufgelösten Daemon', async () => {
+        const CronWorker = require(path.join(HELFER, 'CronWorker.js'));
+        const echt = ServerStopp.stoppe;
+        let gerufen = null;
+        ServerStopp.stoppe = async (auftrag) => { gerufen = auftrag; return { ok: true, eingereiht: true }; };
+        db.server = LAUFEND(); daemon.befehle = [];
+        try {
+            await new CronWorker()._dispatchAction({ id: 1, action: 'stop', server_id: 42, guild_id: 'g1' },
+                'daemon-neu', daemon, db, ServiceManager.get('Logger'));
+            assert.ok(gerufen, 'ServerStopp.stoppe nicht gerufen');
+            assert.strictEqual(gerufen.server.daemon_id, 'daemon-neu', 'nicht der frisch aufgelöste Daemon');
+            assert.strictEqual(gerufen.guildId, 'g1');
+            assert.deepStrictEqual(daemon.befehle, [], 'eigener gameserver.stop — zweiter Weg');
+            ServerStopp.stoppe = async () => ({ ok: false, status: 500, grund: 'Daemon lehnt ab' });
+            await assert.rejects(new CronWorker()._dispatchAction({ id: 1, action: 'stop', server_id: 42, guild_id: 'g1' },
+                'daemon-neu', daemon, db, ServiceManager.get('Logger')), /Daemon lehnt ab/, 'eine Ablehnung wird nicht zum Erfolg');
+        } finally { ServerStopp.stoppe = echt; }
+    });
+
+    await pruefe('Der Plugin-Abbau stoppt über stoppeFallsLaeuft, erst dann wird deinstalliert', async () => {
+        const { ohneKommentare } = require('./lib/quelltext');
+        const idx = ohneKommentare(require('fs').readFileSync(
+            path.join(__dirname, '../plugins/gameserver/dashboard/index.js'), 'utf8'));
+        const ab = idx.indexOf('async onGuildDisable(');
+        const abbau = idx.slice(ab, idx.indexOf("'gameserver.uninstall'", ab));
+        assert.match(abbau, /ServerStopp\.stoppeFallsLaeuft\(\{ server, guildId \}\)/);
+        assert.doesNotMatch(abbau, /'gameserver\.stop'/, 'eigener Stoppbefehl — zweiter Weg');
+        assert.doesNotMatch(abbau, /setTimeout\(resolve, 2000\)/, 'die 2 s Raten sind zurück');
+    });
+
+    await pruefe('Der Umzug ist als Ausnahme mit Grund benannt', async () => {
+        const kopf = require('fs').readFileSync(path.join(HELFER, 'ServerStopp.js'), 'utf8');
+        assert.match(kopf, /Ausnahme mit Grund: der Umzug/);
     });
 
     console.log(`\n${bestanden} Prüfung(en) bestanden.\n`);
