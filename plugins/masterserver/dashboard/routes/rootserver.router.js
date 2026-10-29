@@ -131,6 +131,10 @@ router.get('/events', requirePermission('MASTERSERVER.ROOTSERVER.VIEW'), (req, r
         });
 
         Logger.info(`[Masterserver SSE] Client ${clientId} connected (Guild: ${guildId})`);
+
+        // Jemand sieht zu: Live-Messwerte der Maschinen bestellen (alle 3 s,
+        // solange erneuert wird — Baustelle 207, helpers/Messwertbestellung).
+        require('../helpers/Messwertbestellung').zuschauerDa(guildId);
     } catch (error) {
         Logger.error('[Masterserver SSE] Fehler:', error);
         if (!res.headersSent) {

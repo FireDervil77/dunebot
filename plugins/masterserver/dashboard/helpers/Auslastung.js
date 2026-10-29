@@ -7,8 +7,9 @@
  * rechnet sie im Browser mit eigenen Schwellen. Seit 2026-10-28 (Baustelle 207)
  * zieht das Widget live nach: Damit dafür nicht eine dritte Kopie der Schwellen
  * im Browser entsteht, rechnet der Server hier, und das Widget zeichnet nur —
- * beim Laden aus der Zeile (`ausZeile`), danach aus dem Herzschlag des Daemons
- * (`IPMServer._handleHeartbeat` schickt `anzeige` in `host_stats` mit).
+ * beim Laden aus der Zeile (`ausZeile`), danach aus `host_stats`: Herzschlag
+ * (30 s) und Live-Takt (3 s, solange bestellt) gehen beide durch
+ * `IPMServer._sendeHostStats`, das `anzeige` mit `baue` rechnet.
  *
  * Zahlen aus MySQL kommen bei DECIMAL als Text; darum überall `Number()`.
  *
@@ -77,18 +78,4 @@ function ausZeile(rs) {
     });
 }
 
-/**
- * Aus `payload.hardware` des Herzschlags — wer ihn schickt, ist online.
- *
- * @param {Object} hw
- */
-function ausHerzschlag(hw) {
-    return baue({
-        online: true,
-        cpu_percent: hw?.cpu?.usage_percent,
-        ram_used_gb: hw?.ram?.used_gb, ram_total_gb: hw?.ram?.total_gb,
-        disk_used_gb: hw?.disk?.used_gb, disk_total_gb: hw?.disk?.total_gb,
-    });
-}
-
-module.exports = { baue, ausZeile, ausHerzschlag, SCHWELLEN };
+module.exports = { baue, ausZeile, SCHWELLEN };

@@ -9,11 +9,19 @@
  * (alle 30 s) schickt in `host_stats` eine fertig gerechnete `anzeige` mit
  * (`helpers/Auslastung`), eine Trennung schickt `anzeige.online = false`; das
  * Skript im Widget zeichnet nur.
+ * Teil 3 (Betreiber 2026-10-29: „3 Sekunden … nur senden, wenn jemand die
+ * Daten haben möchte"): Der Daemon schickt `system:stats` alle 3 s, solange
+ * das Dashboard es mit `system.messwerte` {sekunden} bestellt hat
+ * (helpers/Messwertbestellung, Daemon internal/websocket/hostmesswerte.go).
  *
  *   Felder    jedes `rs.<feld>` im Widget ist eine Spalte von `rootserver`
  *   Zustand   gerendert mit den echten Zeilen: Abzeichen und Balken = Auslastung
- *   Rechnung  Zeile und Herzschlag mit denselben Werten ergeben dieselbe Anzeige
- *   Strom     IPMServer schickt `anzeige` mit und meldet beide Offline-Wege
+ *   Rechnung  Zeile (DECIMAL als Text) und Messwerte ergeben dieselbe Anzeige
+ *   Strom     Herzschlag und Live-Takt gehen durch _sendeHostStats (ein Format,
+ *             mit `anzeige`); beide Offline-Wege melden sich
+ *   Bestellung nur für Guilds mit Zuschauern, nur deren Daemons; Detailseite nur
+ *             ihren; Ablehnung (alter Daemon) einmal gemeldet
+ *   Vertrag   Befehl, Ereignis und Frist gleich auf beiden Seiten (Go-Quelle gelesen)
  *   Recht     der Filter liefert das Widget nur mit MASTERSERVER.ROOTSERVER.VIEW
  *             (wie das Gameserver-Widget mit GAMESERVER.VIEW, Betreiber 2026-10-29)
  *   Skript    ausgeführt (vm, Attrappe wirft bei unbekannten Selektoren):
@@ -110,18 +118,39 @@ function attrappenBlock(daemonId) {
             { id: 2, name: 'b', daemon_id: 'b', daemon_status: 'offline' }])), ['Online', 'Offline']);
     });
 
-    await pruefe('eine Rechnung: Zeile (DECIMAL als Text) und Herzschlag ergeben dieselbe Anzeige', async () => {
+    await pruefe('eine Rechnung: Zeile (DECIMAL als Text) und Messwerte ergeben dieselbe Anzeige', async () => {
         const ausZeile = Auslastung.ausZeile({ daemon_status: 'online', cpu_usage_percent: '81.4',
             ram_usage_gb: '6.50', ram_total_gb: '10.00', disk_usage_gb: '20', disk_total_gb: '200' });
-        const ausHerz = Auslastung.ausHerzschlag({ cpu: { usage_percent: 81.4 }, ram: { used_gb: 6.5, total_gb: 10 },
-            disk: { used_gb: 20, total_gb: 200 } });
-        assert.deepStrictEqual(ausZeile, ausHerz);
+        const ausMesswert = Auslastung.baue({ online: true, cpu_percent: 81.4, ram_used_gb: 6.5, ram_total_gb: 10,
+            disk_used_gb: 20, disk_total_gb: 200 });
+        assert.deepStrictEqual(ausZeile, ausMesswert);
         assert.deepStrictEqual([ausZeile.cpu.farbe, ausZeile.ram.farbe, ausZeile.disk.farbe], ['danger', 'warning', 'primary']);
     });
 
-    await pruefe('IPMServer: host_stats trägt die Anzeige, beide Offline-Wege melden sich', async () => {
+    await pruefe('IPMServer: Herzschlag und Live-Takt durch _sendeHostStats, beide Offline-Wege melden sich', async () => {
         const ipm = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'apps/dashboard/helpers/IPMServer.js'), 'utf8'));
-        assert.match(ipm, /anzeige:\s*Auslastung\.ausHerzschlag\(hw\)/);
+        assert.match(ipm, /this\._sendeHostStats\(conn\.metadata\.guild_id, daemonId,/, 'Herzschlag geht nicht durch _sendeHostStats');
+        assert.match(ipm, /eventRouter\.register\('system', 'stats',[\s\S]{0,200}?this\._sendeHostStats\(context\.guildId, context\.daemonId,/,
+            'system:stats wird nicht an den Browser gereicht');
+        assert.strictEqual((ipm.match(/action: 'host_stats'/g) || []).length, 2, 'host_stats wird an mehr als zwei Stellen gebaut — zweites Format?');
+
+        // Verhalten: das gesendete Format
+        if (!ServiceManager.has('Logger')) {
+            const still = () => {};
+            ServiceManager.register('Logger', { debug: still, info: still, warn: still, error: still, success: still });
+        }
+        const IPMServer = require('../apps/dashboard/helpers/IPMServer');
+        const gesendet = [];
+        ServiceManager.register('sseManager', { broadcast: (g, ns, d) => gesendet.push({ g, ns, d }) });
+        IPMServer.prototype._sendeHostStats.call({}, 'g1', 'd1',
+            { cpu_percent: 50, ram_used_gb: 2, ram_total_gb: 8, disk_used_gb: 1, disk_total_gb: 10 });
+        assert.strictEqual(gesendet.length, 1);
+        assert.strictEqual(gesendet[0].ns, 'metrics');
+        assert.strictEqual(gesendet[0].d.action, 'host_stats');
+        assert.strictEqual(gesendet[0].d.cpu_percent, 50, 'Rohwert für die Detailseite fehlt');
+        assert.deepStrictEqual(gesendet[0].d.anzeige.ram, { pct: 25, farbe: 'info', text: '25%' });
+        IPMServer.prototype._sendeHostStats.call({}, null, 'd1', {});
+        assert.strictEqual(gesendet.length, 1, 'ohne Guild gesendet');
         const offline = ipm.match(/RootServer\.markOffline\(daemonId\)[\s\S]{0,300}?this\._meldeHostOffline\(daemonId,/g) || [];
         const alle = ipm.match(/RootServer\.markOffline\(daemonId\)/g) || [];
         assert.strictEqual(offline.length, alle.length, `${alle.length} markOffline, ${offline.length} davon melden es dem Browser`);
@@ -176,7 +205,7 @@ function attrappenBlock(daemonId) {
         assert.strictEqual(stroeme[0].url, '/strom');
         const sende = (d) => stroeme[0].hoerer.metrics({ data: JSON.stringify(d) });
 
-        const anzeige = Auslastung.ausHerzschlag({ cpu: { usage_percent: 85 }, ram: { used_gb: 1, total_gb: 4 }, disk: { used_gb: 95, total_gb: 100 } });
+        const anzeige = Auslastung.baue({ online: true, cpu_percent: 85, ram_used_gb: 1, ram_total_gb: 4, disk_used_gb: 95, disk_total_gb: 100 });
         sende({ action: 'host_stats', daemon_id: 'a', anzeige });
         assert.strictEqual(a.badge.textContent, 'Online');
         assert.strictEqual(a.badge.className, 'badge bg-success-lt');
@@ -191,6 +220,74 @@ function attrappenBlock(daemonId) {
         sende({ action: 'server_stats', server_id: 1 });   // andere Nachricht im selben Strom
         sende({ action: 'host_stats', daemon_id: 'a', cpu_percent: 1 });   // altes Format ohne anzeige
         assert.strictEqual(a.zeilen.cpu.text.textContent, '85%');
+    });
+
+    console.log('\nLive-Takt auf Bestellung');
+    const Bestellung = require('../plugins/masterserver/dashboard/helpers/Messwertbestellung');
+
+    await pruefe('Vertrag mit dem Daemon: Befehl, Ereignis und Frist auf beiden Seiten gleich', async () => {
+        const DAEMON = process.env.DAEMON_WURZEL || path.join(WURZEL, '../firebot_daemon');
+        const go = fs.readFileSync(path.join(DAEMON, 'internal/websocket/hostmesswerte.go'), 'utf8');
+        const proto = fs.readFileSync(path.join(DAEMON, 'pkg/protocol/messages.go'), 'utf8');
+        assert.match(go, new RegExp(`hostMesswertBefehl\\s*=\\s*"${Bestellung.BEFEHL.replace('.', '\\.')}"`), 'Befehlsname weicht ab');
+        assert.match(go, /protocol\.NewEvent\(protocol\.NSSystem, protocol\.SystemStats,/);
+        assert.match(proto, /NSSystem Namespace = "system"/);
+        assert.match(proto, /SystemStats\s*= "stats"/);
+        const hoechst = Number((go.match(/hostMesswertHoechst\s*=\s*(\d+) \* time\.Second/) || [])[1]);
+        assert.ok(Bestellung.FRIST_SEK <= hoechst, `Frist ${Bestellung.FRIST_SEK} s > Höchstfrist des Daemons ${hoechst} s`);
+        assert.ok(Bestellung.FRIST_SEK * 1000 >= 2 * Bestellung.TAKT_MS, 'Frist kürzer als zwei Erneuerungen — Lücken beim Zusehen');
+    });
+
+    await pruefe('gewünscht: Widget will alle Daemons der Guild, Detailseite nur ihren, fremde Quellen nichts', async () => {
+        const z = [
+            { guildId: 'g1', metadata: { source: 'masterserver', daemonId: null } },
+            { guildId: 'g2', metadata: { source: 'masterserver', daemonId: 'x' } },
+            { guildId: 'g3', metadata: { source: 'gameserver' } },
+        ];
+        assert.deepStrictEqual(Bestellung.gewuenscht(z, 'g1'), { alle: true, daemons: new Set() });
+        assert.deepStrictEqual(Bestellung.gewuenscht(z, 'g2'), { alle: false, daemons: new Set(['x']) });
+        assert.deepStrictEqual(Bestellung.gewuenscht(z, 'g3'), { alle: false, daemons: new Set() });
+    });
+
+    await pruefe('bestellt wird nur bei Zuschauern, nur an deren Daemons; Ablehnung einmal gemeldet', async () => {
+        const befehle = [];
+        let lehneAb = false;
+        const meldungen = [];
+        const still = () => {};
+        ServiceManager.register('Logger', { debug: still, warn: still, error: still, success: still, info: (m) => meldungen.push(m) });
+        ServiceManager.register('ipmServer', {
+            connections: new Map([['d1', { metadata: { guild_id: 'g1' } }], ['d2', { metadata: { guild_id: 'g1' } }],
+                ['d9', { metadata: { guild_id: 'g9' } }]]),
+            sendCommand: async (id, befehl, nutzlast) => { befehle.push([id, befehl, nutzlast.sekunden]); if (lehneAb) throw new Error('unknown action'); return {}; },
+        });
+        let zuschauer = [];
+        ServiceManager.register('sseManager', { getClientInfo: () => zuschauer });
+        const warte = () => new Promise(r => setImmediate(r));
+
+        Bestellung.runde(); await warte();
+        assert.deepStrictEqual(befehle, [], 'ohne Zuschauer bestellt');
+
+        zuschauer = [{ guildId: 'g1', metadata: { source: 'masterserver', daemonId: 'd2' } }];
+        Bestellung.runde(); await warte();
+        assert.deepStrictEqual(befehle, [['d2', Bestellung.BEFEHL, Bestellung.FRIST_SEK]], 'Detailseite: nur ihr Daemon');
+
+        befehle.length = 0;
+        zuschauer = [{ guildId: 'g1', metadata: { source: 'masterserver' } }];
+        Bestellung.runde(); await warte();
+        assert.deepStrictEqual(befehle.map(b => b[0]).sort(), ['d1', 'd2'], 'Widget: alle der Guild, keine fremden');
+
+        lehneAb = true;
+        Bestellung.runde(); await warte();
+        Bestellung.runde(); await warte();
+        assert.strictEqual(meldungen.filter(m => /d1 liefert keine Live-Messwerte/.test(m)).length, 1, 'Ablehnung nicht genau einmal gemeldet');
+    });
+
+    await pruefe('die SSE-Route bestellt beim Verbinden', async () => {
+        const r = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'plugins/masterserver/dashboard/routes/rootserver.router.js'), 'utf8'));
+        const ab = r.indexOf("router.get('/events'");
+        assert.ok(ab >= 0);
+        const route = r.slice(ab, r.indexOf('router.', ab + 20));
+        assert.match(route, /sseManager\.addClient\([\s\S]*Messwertbestellung'\)\.zuschauerDa\(guildId\)/);
     });
 
     await c.end();

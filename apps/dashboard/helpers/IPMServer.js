@@ -774,6 +774,30 @@ class IPMServer {
     }
 
     /**
+     * Auslastung einer Maschine an den Browser — EIN Format für zwei Quellen:
+     * den Herzschlag (30 s, geht auch in die Datenbank) und den Live-Takt
+     * `system:stats` (3 s, nur solange bestellt, Baustelle 207). Die Detailseite
+     * liest die Rohwerte, das Widget `anzeige` (Prozent, Farbe, Text aus
+     * helpers/Auslastung) — beide zeichnen nur. Wer sendet, ist online.
+     * @private
+     */
+    _sendeHostStats(guildId, daemonId, werte, zusatz = {}) {
+        if (!guildId || !ServiceManager.has('sseManager')) return;
+        ServiceManager.get('sseManager').broadcast(guildId, 'metrics', {
+            action: 'host_stats',
+            daemon_id: daemonId,
+            cpu_percent:   werte.cpu_percent ?? null,
+            ram_used_gb:   werte.ram_used_gb ?? null,
+            ram_total_gb:  werte.ram_total_gb ?? null,
+            disk_used_gb:  werte.disk_used_gb ?? null,
+            disk_total_gb: werte.disk_total_gb ?? null,
+            ...zusatz,
+            anzeige: Auslastung.baue({ online: true, ...werte }),
+            timestamp: Date.now()
+        });
+    }
+
+    /**
      * Dem Browser sagen, dass ein Daemon weg ist — dasselbe `host_stats` wie beim
      * Herzschlag, nur mit `anzeige.online = false` und ohne Messwerte. Ohne das
      * stand das Widget „RootServer" nach einer Trennung weiter auf „Online", bis
@@ -816,28 +840,14 @@ class IPMServer {
             }
 
             // ✅ SSE-Broadcast: Hardware-Metriken an Browser pushen
-            const guildId = conn.metadata.guild_id;
-            if (guildId) {
-                const sseManager = ServiceManager.get('sseManager');
-                if (sseManager) {
-                    const hw = payload.hardware;
-                    sseManager.broadcast(guildId, 'metrics', {
-                        action: 'host_stats',
-                        daemon_id: daemonId,
-                        cpu_percent:  hw.cpu?.usage_percent ?? null,
-                        ram_used_gb:  hw.ram?.used_gb ?? null,
-                        ram_total_gb: hw.ram?.total_gb ?? null,
-                        disk_used_gb: hw.disk?.used_gb ?? null,
-                        disk_total_gb: hw.disk?.total_gb ?? null,
-                        network:      hw.network ?? null,
-                        ping_ms:      pingMs,
-                        // Fertig gerechnet für das Widget „RootServer" (Baustelle 207):
-                        // Prozent, Farbe, Text — der Browser zeichnet nur.
-                        anzeige:      Auslastung.ausHerzschlag(hw),
-                        timestamp:    Date.now()
-                    });
-                }
-            }
+            const hw = payload.hardware;
+            this._sendeHostStats(conn.metadata.guild_id, daemonId, {
+                cpu_percent:   hw.cpu?.usage_percent,
+                ram_used_gb:   hw.ram?.used_gb,
+                ram_total_gb:  hw.ram?.total_gb,
+                disk_used_gb:  hw.disk?.used_gb,
+                disk_total_gb: hw.disk?.total_gb,
+            }, { network: hw.network ?? null, ping_ms: pingMs });
         }
 
         // Kein `updateInfo` mehr aus dem Herzschlag: Der Daemon schickt es nicht
@@ -1992,6 +2002,15 @@ class IPMServer {
         eventRouter.register('datenbank', 'befund', async (payload, message, context) => {
             if (!context?.daemonId) return;
             await RootServer.uebernimmDatenbank(context.daemonId, payload?.datenbank || null);
+        });
+
+        // Live-Takt der Maschine (3 s), nur solange bestellt — die Bestellung
+        // schickt helpers/Messwertbestellung im Masterserver-Plugin
+        // (Baustelle 207). Nur an den Browser, nicht in die Datenbank: Dorthin
+        // schreibt allein der Herzschlag.
+        eventRouter.register('system', 'stats', async (payload, message, context) => {
+            if (!context?.daemonId) return;
+            this._sendeHostStats(context.guildId, context.daemonId, payload || {});
         });
 
         // ✅ Handler für install.status (granulare Phasen: pulling_image, installing_game, cleanup)
