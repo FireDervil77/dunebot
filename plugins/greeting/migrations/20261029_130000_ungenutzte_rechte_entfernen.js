@@ -29,8 +29,13 @@ module.exports = {
     description: 'Greeting: vier Rechte ohne Route entfernen (Vorlagen, Testversand) — Baustelle 19b',
 
     async up(db) {
-        await db.query('DELETE FROM permission_definitions WHERE permission_key IN (?)', [SCHLUESSEL]);
-        await db.query('DELETE FROM guild_permission_seeds WHERE permission_key IN (?)', [SCHLUESSEL]);
+        // Ein Platzhalter je Schlüssel: Der Migrationslauf schickt vorbereitete
+        // Anweisungen (execute), und die klappen `IN (?)` mit einem Array nicht
+        // auf. Der erste Lauf am 2026-10-29 scheiterte genau daran
+        // („Incorrect arguments to mysqld_stmt_execute") und änderte nichts.
+        const platz = SCHLUESSEL.map(() => '?').join(', ');
+        await db.query(`DELETE FROM permission_definitions WHERE permission_key IN (${platz})`, SCHLUESSEL);
+        await db.query(`DELETE FROM guild_permission_seeds WHERE permission_key IN (${platz})`, SCHLUESSEL);
 
         const gruppen = await db.query(
             "SELECT id, permissions FROM guild_groups WHERE permissions LIKE '%GREETING.TEMPLATES.%' OR permissions LIKE '%GREETING.TEST.EXECUTE%'") || [];
