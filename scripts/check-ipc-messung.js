@@ -118,6 +118,49 @@ function bauen(handler) {
         'ein echtes rateLimited landet im Protokoll',
         'vorher hoerte hier niemand zu');
 
+    console.log('\nREST — was rateLimited nicht sieht (Baustelle 82, 2026-10-29)');
+
+    // Wieder ein echtes REST, diesmal mit echtem Durchlauf: Der erste Versuch
+    // haengt, bis die Frist ihn abbricht — @discordjs/rest wiederholt still.
+    // Nur das Ereignis `response` der zweiten Antwort traegt `retries: 1`.
+    let versuche = 0;
+    const rest2 = new REST({
+        version: '10', timeout: 40, retries: 3,
+        makeRequest: (url, init) => new Promise((ok, nein) => {
+            versuche++;
+            if (versuche === 1) {
+                init.signal.addEventListener('abort', () => {
+                    const e = new Error('abgebrochen'); e.name = 'AbortError'; nein(e);
+                });
+                return;   // haengt, bis die Frist abbricht
+            }
+            if (url.includes('/verboten')) {
+                ok(new Response(JSON.stringify({ message: 'Missing Access', code: 50001 }),
+                    { status: 403, headers: { 'content-type': 'application/json' } }));
+                return;
+            }
+            ok(new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } }));
+        }),
+    }).setToken('pruef');
+    const log2 = sammler();
+    Ratenbremse.anmelden(rest2, log2);
+    await rest2.patch('/channels/1/messages/2', { body: { content: 'x' } });
+    pruefe(versuche === 2, 'die Bibliothek hat still wiederholt', `${versuche} Versuche`);
+    pruefe(log2.hat('warn', 'PATCH /channels/1/messages/2 → 200, nach 1 Wiederholung'),
+        'die Wiederholung steht im Protokoll', 'vorher: keine Zeile');
+    await rest2.get('/verboten').catch(() => {});
+    pruefe(log2.hat('warn', '→ 403'), 'ein Fehlerstatus steht im Protokoll');
+    const vorher = log2.zeilen.length;
+    await rest2.get('/still');
+    pruefe(log2.zeilen.length === vorher, 'eine glatte Antwort schreibt nichts', 'sonst rauscht es je Anfrage');
+    pruefe(Ratenbremse.alsAntwort({ method: 'get', path: '/x', retries: 0 }, { status: 404 }) === null,
+        '404 ist Alltag (gelöschte Nachricht) und bleibt still');
+    pruefe(Ratenbremse.alsDebug('[REST x] Hash a for b swept due to lifetime being exceeded') === null
+        && Boolean(Ratenbremse.alsDebug('[REST x] Encountered unexpected 429 rate limit\n  Sublimit : 1200000ms')),
+        'aus restDebug nur 429 und Sublimits');
+    rest2.emit('invalidRequestWarning', { count: 120, remainingTime: 420000 });
+    pruefe(log2.hat('warn', '120 ungültige Anfragen'), 'die Warnung über ungültige Anfragen kommt an');
+
     console.log('\nIPC-Dauer — der schnelle Fall');
 
     const schnell = bauen(async () => ({ ok: true }));
