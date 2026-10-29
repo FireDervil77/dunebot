@@ -14,8 +14,10 @@
  *   Zustand   gerendert mit den echten Zeilen: Abzeichen und Balken = Auslastung
  *   Rechnung  Zeile und Herzschlag mit denselben Werten ergeben dieselbe Anzeige
  *   Strom     IPMServer schickt `anzeige` mit und meldet beide Offline-Wege
+ *   Recht     der Filter liefert das Widget nur mit MASTERSERVER.ROOTSERVER.VIEW
+ *             (wie das Gameserver-Widget mit GAMESERVER.VIEW, Betreiber 2026-10-29)
  *   Skript    ausgeführt (vm, Attrappe wirft bei unbekannten Selektoren):
- *             zeichnet online, offline, fremden Daemon nicht; ohne Recht kein Skript
+ *             zeichnet online, offline, fremden Daemon nicht
  *
  * Gelesen wird aus der Datenbank, geschrieben nichts.
  *
@@ -45,8 +47,8 @@ async function pruefe(was, tun) {
 }
 
 const quelle = fs.readFileSync(WIDGET, 'utf8');
-const zeichne = (rootservers, live = false) => ejs.render(quelle,
-    { guildId: 'g1', rootservers, auslastung: Auslastung.ausZeile, live }, { filename: WIDGET });
+const zeichne = (rootservers) => ejs.render(quelle,
+    { guildId: 'g1', rootservers, auslastung: Auslastung.ausZeile }, { filename: WIDGET });
 const abzeichen = (html) => [...html.matchAll(/data-rs-badge>\s*(Online|Offline)\s*</g)].map(m => m[1]);
 const texte = (html) => [...html.matchAll(/data-rs-text>([^<]*)</g)].map(m => m[1]);
 
@@ -127,15 +129,31 @@ function attrappenBlock(daemonId) {
     });
 
     const skript = (() => {
-        const m = zeichne([{ id: 1, name: 'a', daemon_id: 'a', daemon_status: 'offline' }], true).match(/<script>([\s\S]*?)<\/script>/);
+        const m = zeichne([{ id: 1, name: 'a', daemon_id: 'a', daemon_status: 'offline' }]).match(/<script>([\s\S]*?)<\/script>/);
         return m && m[1];
     })();
 
-    await pruefe('ohne Recht kein Strom und kein Skript, mit Recht beides', async () => {
-        const ohne = zeichne([{ id: 1, name: 'a', daemon_id: 'a', daemon_status: 'online' }], false);
-        assert.ok(!ohne.includes('<script') && !ohne.includes('data-rs-strom'));
-        assert.ok(skript, 'mit live kein Skript');
-        assert.ok(zeichne([{ id: 1, name: 'a', daemon_id: 'a' }], true).includes('data-rs-strom="/guild/g1/plugins/masterserver/rootservers/events"'));
+    await pruefe('der Filter: nur mit MASTERSERVER.ROOTSERVER.VIEW, nur bei aktivem Plugin — dann mit Strom', async () => {
+        const still = () => {};
+        ServiceManager.register('Logger', { debug: still, info: still, warn: still, error: (m, e) => { throw e || new Error(m); }, success: still });
+        let darf = true;
+        ServiceManager.register('permissionManager', { hasPermission: async (u, g, k) => darf && k === 'MASTERSERVER.ROOTSERVER.VIEW' });
+        const filter = [];
+        ServiceManager.register('pluginManager', { hooks: { addFilter: (n, fn) => { if (n === 'guild_dashboard_widgets') filter.push(fn); } } });
+        ServiceManager.register('themeManager', { renderWidgetPartial: async (name, data) => ejs.renderFile(WIDGET, data, { async: true }) });
+        const Plugin = require('../plugins/masterserver/dashboard/index.js');
+        Plugin.prototype._registerWidgets.call({});
+        assert.strictEqual(filter.length, 1);
+        const [g] = (await c.query('SELECT guild_id FROM rootserver GROUP BY guild_id ORDER BY COUNT(*) DESC LIMIT 1'))[0];
+        const lauf = (opt) => filter[0]([], { user: { info: { id: '1' } }, enabledPlugins: ['masterserver'], guildId: g.guild_id, ...opt });
+
+        const [w] = await lauf({});
+        assert.ok(w && w.id === 'masterserver-rootserver-status' && w.content, 'mit Recht kein Widget');
+        assert.ok(w.content.includes(`data-rs-strom="/guild/${g.guild_id}/plugins/masterserver/rootservers/events"`));
+        assert.ok(w.content.includes('<script>'));
+        darf = false; assert.strictEqual((await lauf({})).length, 0, 'ohne Recht trotzdem ein Widget'); darf = true;
+        assert.strictEqual((await lauf({ user: null })).length, 0, 'ohne Anmeldung ein Widget');
+        assert.strictEqual((await lauf({ enabledPlugins: ['gameserver'] })).length, 0, 'ohne aktives Plugin ein Widget');
     });
 
     await pruefe('Skript ausgeführt: zeichnet online und offline, fremden Daemon nicht', async () => {

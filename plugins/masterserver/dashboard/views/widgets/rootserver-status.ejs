@@ -3,7 +3,8 @@
     // auslastung:  helpers/Auslastung.ausZeile — Prozent, Farbe, Text rechnet der
     //              Server; dieselbe Rechnung schickt der Herzschlag als `anzeige`
     //              mit, das Skript unten zeichnet sie nur (Baustelle 207)
-    // live:        darf der Betrachter /rootservers/events öffnen?
+    // Gezeichnet wird nur mit MASTERSERVER.ROOTSERVER.VIEW (index.js) — dasselbe
+    // Recht öffnet /rootservers/events, also darf das Skript immer verbinden.
     const rsList = rootservers || [];
     const BALKEN = [['cpu', 'CPU'], ['ram', 'RAM'], ['disk', 'Disk']];
 %>
@@ -14,7 +15,7 @@
         <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers" class="ms-1">Jetzt einrichten →</a>
     </div>
 <% } else { %>
-  <div data-rs-widget<% if (live) { %> data-rs-strom="/guild/<%= guildId %>/plugins/masterserver/rootservers/events"<% } %>>
+  <div data-rs-widget data-rs-strom="/guild/<%= guildId %>/plugins/masterserver/rootservers/events">
     <% rsList.forEach((rs, i) => { const a = auslastung(rs); %>
     <div class="mb-3<%= i < rsList.length - 1 ? ' pb-3 border-bottom' : '' %>" data-rs-daemon="<%= rs.daemon_id %>">
         <!-- Header: Name + Badge -->
@@ -50,7 +51,6 @@
     </div>
     <% }) %>
   </div>
-  <% if (live) { %>
   <script>
   (function () {
       // Zeichnet nur, was der Herzschlag (alle 30 s) fertig gerechnet schickt.
@@ -92,5 +92,4 @@
       verbinde();
   })();
   </script>
-  <% } %>
 <% } %>
