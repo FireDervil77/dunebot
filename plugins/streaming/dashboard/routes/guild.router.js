@@ -1543,7 +1543,16 @@ router.post('/ziele/:id/probe', requirePermission('STREAMING.TEST'), async (req,
         }
 
         const art = req.body?.art === 'rueckschau' ? 'rueckschau' : 'live';
-        await modelle.probeVormerken(guildId, zielId, Boolean(req.body?.mit_erwaehnung), art);
+        const probe = await modelle.probeVormerken(guildId, zielId, Boolean(req.body?.mit_erwaehnung), art);
+        if (!probe.vorgemerkt) {
+            // Karenz (B71): eine Probe je Ziel alle 30 s. Eine Warnung, kein
+            // Fehler — es ist nichts kaputt, nur zu schnell geklickt.
+            return antworteFehler(req, res, {
+                zurueck, fehler: 'karenz', art: 'warning',
+                text: `Eben lief schon eine Probe für dieses Ziel — die nächste geht in ${probe.nochSek} s. `
+                    + 'Proben teilen sich die Schlange mit echten Ankündigungen aller Server.'
+            });
+        }
 
         Logger.info(`[Streaming] Probe fuer Ziel ${zielId} (Guild ${guildId}) vorgemerkt` +
             ` (${art}${req.body?.mit_erwaehnung ? ', mit Erwaehnung' : ''})`);

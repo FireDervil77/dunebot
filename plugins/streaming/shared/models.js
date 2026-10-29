@@ -566,7 +566,7 @@ async function liveRolleSetzen(guildId, rolleId) {
  * @param {number} zielId Ziel
  * @param {boolean} [mitErwaehnung=false] Rolle wirklich anpingen?
  * @param {string} [art='live'] 'live' = Ankuendigung, 'rueckschau' = Text nach dem Stream
- * @returns {Promise<void>}
+ * @returns {Promise<{vorgemerkt: boolean, nochSek: number}>} nicht vorgemerkt = Karenz, nochSek bis zur nächsten
  */
 async function probeVormerken(guildId, zielId, mitErwaehnung = false, art = 'live') {
     // **Die Art wird hier geprueft, nicht in der Route.** Wer sie spaeter von
@@ -574,11 +574,37 @@ async function probeVormerken(guildId, zielId, mitErwaehnung = false, art = 'liv
     // zu 'live' und nicht zu einem Absturz im Ausgang, wo ihn niemand sieht.
     const gueltig = art === 'rueckschau' ? 'rueckschau' : 'live';
 
+    // ── Karenz je Ziel (Baustelle 71, Betreiber 2026-10-29: F14) ──────────
+    //
+    // Proben laufen durch dieselbe Schlange wie echte Ankündigungen ALLER
+    // Guilds. Zwanzig Klicks auf „Probe" schoben die Live-Meldungen fremder
+    // Guilds nach hinten — die einzige Stelle, an der eine Guild die Zustellung
+    // einer anderen messbar verzögern konnte. Eine Probe je Ziel alle 30 s
+    // bremst das Klicken, ohne dem Einrichten eine Obergrenze zu setzen.
+    //
+    // Gezählt wird in der Schlange selbst (der letzte Auftrag 'probe' des
+    // Ziels), nicht in einem Zähler daneben: Das übersteht Neustarts und gilt
+    // für jeden Aufrufer. Prüfen und Eintragen sind zwei Anweisungen; ein
+    // Doppelklick im selben Augenblick kann zwei Proben durchlassen — harmlos.
+    const [letzte] = await db().query(
+        `SELECT TIMESTAMPDIFF(SECOND, MAX(angelegt_am), NOW(3)) AS her
+           FROM streaming_outbox
+          WHERE target_id = ? AND aktion = 'probe'`,
+        [zielId]);
+    const her = letzte && letzte.her !== null ? Number(letzte.her) : null;
+    if (her !== null && her < PROBE_KARENZ_SEK) {
+        return { vorgemerkt: false, nochSek: PROBE_KARENZ_SEK - her };
+    }
+
     await db().query(
         `INSERT INTO streaming_outbox (target_id, guild_id, aktion, nutzlast, zustand)
          VALUES (?, ?, 'probe', ?, 'offen')`,
         [zielId, guildId, JSON.stringify({ mit_erwaehnung: Boolean(mitErwaehnung), art: gueltig })]);
+    return { vorgemerkt: true, nochSek: 0 };
 }
+
+/** Abstand zwischen zwei Proben desselben Ziels (B71). */
+const PROBE_KARENZ_SEK = 30;
 
 /** Zeitzone, in der Ruhezeiten gelten, solange die Guild nichts anderes sagt. */
 const VORGABE_ZEITZONE = 'Europe/Berlin';
@@ -686,6 +712,7 @@ module.exports = {
     zielEntfernen,
     zielVorlageSetzen,
     probeVormerken,
+    PROBE_KARENZ_SEK,
     liveRolle,
     liveRolleSetzen,
     aboRolle,
