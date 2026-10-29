@@ -33,10 +33,9 @@ module.exports = async (req, res, next) => {
 
     // 🏥 Bot Health Check - NUR für Bot-Offline-Detection (nicht Guild-spezifisch)
     if (botHealthMonitor) {
-        const botStatus = botHealthMonitor.getStatus();
-        
-        // Bot offline nach mehreren Fehlversuchen
-        if (!botStatus.isOnline) {
+        // Offline heißt: getrennt, oder dreimal nicht geantwortet. In den
+        // ersten 15 s nach einem Start wird auf den Bot gewartet (B180).
+        if (!(await botHealthMonitor.onlineNachAnlauf())) {
             Logger.warn(`[Guild Middleware] ❌ Bot offline - Redirect zu /auth/server-selector`);
             req.session.errorMessage = 'BOT_OFFLINE';
             return res.redirect('/auth/server-selector');

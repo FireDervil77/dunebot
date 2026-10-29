@@ -153,12 +153,20 @@ class IPCServer {
     async initialize() {
         const Logger = ServiceManager.get('Logger');
 
+        // Der Bot-Zustand hängt an der Verbindung (Baustelle 180): Der Monitor
+        // prüft beim Verbinden sofort und meldet beim Trennen sofort offline.
+        const zustand = () => (ServiceManager.has('botHealthMonitor') ? ServiceManager.get('botHealthMonitor') : null);
+
         this.server.on("connect", (client) => {
             Logger.success(`[IPC] Client connected: ${client.name}`);
+            zustand()?.verbindungMelden('connect', client.name);
         });
 
         this.server.on("disconnect", (client) => {
             Logger.warn(`[IPC] Client disconnected: ${client.name}`);
+            const nochBots = Array.from(this.server.sockets.keys())
+                .filter((n) => n !== client.name && /^Bot #\d+$/.test(n)).length;
+            zustand()?.verbindungMelden('disconnect', client.name, nochBots);
         });
 
         this.server.on("error", (error, client) => {

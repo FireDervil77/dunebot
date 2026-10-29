@@ -23,6 +23,74 @@ class BotHealthMonitor {
         
         this.checkInterval = null;
         this.isChecking = false;
+
+        // Für den Anlauf nach einem Start (Baustelle 180): Wer in den ersten
+        // ANLAUF_MS fragt, wartet auf den Bot statt „offline" zu hören.
+        this.gestartetAm = Date.now();
+        this._wartende = [];
+    }
+
+    // ── Der Zustand kommt aus der Verbindung (Baustelle 180, 2026-10-29) ────
+    //
+    // Gemessen am 2026-10-12: Startete das Dashboard, prüfte die Überwachung
+    // eine Sekunde, BEVOR sich der Bot verband — „offline" — und dann erst
+    // wieder nach 60 s. Umgekehrt galt ein getrennter Bot erst nach drei
+    // verpassten Prüfungen als weg, also bis zu drei Minuten später.
+    // Betreiber: „korrekt so machen wir es" — Anmelden am IPC-Server heißt
+    // online (mit einer Prüfung sofort, für die Guild-Liste), Trennen heißt
+    // offline, beides in der Sekunde. Der 60-s-Takt bleibt als Gegenprobe für
+    // eine Verbindung, die steht, aber nicht antwortet.
+
+    /**
+     * Ein Client hat sich am IPC-Server verbunden oder getrennt.
+     *
+     * Nur `Bot #<Shard>` zählt — am Server melden sich auch Prüfskripte mit
+     * Zahlennamen an, und die sind kein Bot.
+     *
+     * @param {'connect'|'disconnect'} art
+     * @param {string} name Name des Clients
+     * @param {number} [nochBots] wie viele Bot-Verbindungen nach dem Trennen bleiben
+     */
+    verbindungMelden(art, name, nochBots = 0) {
+        if (!BotHealthMonitor.istBot(name)) return;
+        const Logger = ServiceManager.get('Logger');
+        if (art === 'connect') {
+            Logger.info(`[BotHealth] ${name} verbunden — prüfe sofort`);
+            // Kurz Luft lassen: Die Verbindung steht, der Bot meldet seine
+            // Zuhörer aber erst im selben Augenblick an.
+            setTimeout(() => this.checkBotHealth(), BotHealthMonitor.NACH_VERBINDUNG_MS);
+            return;
+        }
+        if (art === 'disconnect' && nochBots === 0 && this.botStatus.isOnline) {
+            this.botStatus.isOnline = false;
+            this.botStatus.lastPing = Date.now();
+            Logger.error(`❌ [BotHealth] ${name} getrennt — Bot offline`);
+        }
+    }
+
+    /**
+     * Online — und in den ersten Sekunden nach einem Start: warten statt Nein.
+     *
+     * Nach `pm2 restart` beider Dienste verbindet sich der Bot ein paar
+     * Sekunden nach dem Dashboard. Wer genau dann eine Guild-Seite öffnet,
+     * würde sonst auf „Bot offline" umgeleitet.
+     *
+     * @param {number} [anlaufMs]
+     * @returns {Promise<boolean>}
+     */
+    async onlineNachAnlauf(anlaufMs = BotHealthMonitor.ANLAUF_MS) {
+        if (this.botStatus.isOnline) return true;
+        const rest = this.gestartetAm + anlaufMs - Date.now();
+        if (rest <= 0) return false;
+        await new Promise((fertig) => {
+            const wecker = setTimeout(fertig, rest);
+            this._wartende.push(() => { clearTimeout(wecker); fertig(); });
+        });
+        return this.botStatus.isOnline;
+    }
+
+    static istBot(name) {
+        return /^Bot #\d+$/.test(String(name || ''));
     }
 
     /**
@@ -116,6 +184,9 @@ class BotHealthMonitor {
                 botPing: response.ping || null
             };
             
+            const wartende = this._wartende.splice(0);
+            wartende.forEach((weiter) => weiter());
+
             if (wasOffline) {
                 Logger.success(`✅ [BotHealth] Bot wieder online! ${this.botStatus.guildCount} Guilds, ${latency}ms`);
             } else {
@@ -192,5 +263,10 @@ class BotHealthMonitor {
         return Math.floor((Date.now() - this.botStatus.lastSuccessfulPing) / 1000);
     }
 }
+
+/** Wie lange nach dem Start des Dashboards auf den Bot gewartet wird (B180). */
+BotHealthMonitor.ANLAUF_MS = 15000;
+/** Pause zwischen Verbindung und erster Prüfung. */
+BotHealthMonitor.NACH_VERBINDUNG_MS = 500;
 
 module.exports = BotHealthMonitor;
