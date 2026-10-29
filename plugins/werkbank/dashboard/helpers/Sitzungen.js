@@ -2058,6 +2058,29 @@ async function eingabe(sitzung, zeile) {
 }
 
 /**
+ * Einen Befehl über die Fernsteuerung des laufenden Probestarts schicken und
+ * die Antwort holen (Baustelle 175, 2026-10-29) — um eine Befehlsliste beim
+ * Bauen auszuprobieren, statt sie erst am fertigen Server zu sehen.
+ *
+ * Derselbe Weg wie der Prüfbefehl im Durchlauf: Der Agent im Container meldet
+ * sich mit Port und Kennwort aus dem Auftrag an. Kam die Fernsteuerung erst
+ * nach dem Start in den Entwurf, kennt dieser Lauf sie nicht — die Meldung von
+ * fb-init geht unverändert durch („der Auftrag nennt keinen rcon-Abschnitt").
+ *
+ * @returns {Promise<string>} die Antwort des Spiels, leer ist eine Antwort
+ */
+async function rcon(sitzung, befehl) {
+    const text = String(befehl || '').replace(/[\r\n]+/g, ' ').trim();
+    if (!text) throw new Error('Leerer Befehl.');
+    if (!(await laufenderLauf(sitzung.kennung))) throw new Error('Es läuft kein Probestart.');
+    const daemon = await daemonFuer(sitzung);
+    // fb-init wartet je Versuch höchstens 10 s, der Daemon 15 s.
+    const antwort = await daemon.senden('werkbank.rcon', { befehl: text.slice(0, 1000) }, 20000);
+    if (!antwort?.success) throw new Error(antwort?.error || 'Der Daemon hat nicht geantwortet');
+    return String(antwort.data?.antwort ?? '');
+}
+
+/**
  * Einen beobachteten Port in den Entwurf nehmen. Ins Paket kommt der ZWECK
  * (I2), die Nummer bleibt bei der Sitzung — sie ist die, mit der das Spiel hier
  * gestartet wurde, und wird beim nächsten Start für `{{port:zweck}}` eingesetzt.
@@ -4761,7 +4784,7 @@ module.exports = {
     umgebungAusEinstellungen, belegteEinstellungen,
     HINWEIS, hinweisAusFormular, hinweisSpeichern, hinweisEntfernen,
     DURCHGEREICHT, IM_ENTWURF, imEntwurf, entwurfAusPaket, paketOeffnen, durchgereichtes, naechsteFassung, behalteUnbekanntes, mischeStart, mischeEinstellung, zieleAusPaket, uebernommeneZiele, vorlaeufigePortnummern, oeffenbarePakete, LAUFZEIT_TEILE,
-    werkbankTeil, ungenutztePorts, startSpeichern, startzeile, zustand, starten, stoppen, eingabe, laeufe, laufenderLauf,
+    werkbankTeil, ungenutztePorts, startSpeichern, startzeile, zustand, starten, stoppen, eingabe, rcon, laeufe, laufenderLauf,
     portUebernehmen, portEntfernen, bereitschaftszeile,
     portSpeichern, portAusFormular, kopplungVon, abfrageKennungen, abfrageStand, abfrageSpeichern, abfrageEntfernen,
     EIGENE, ordne, durchgereichteTeile, PORT,

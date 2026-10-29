@@ -15,6 +15,7 @@
  *   POST /:kennung/starten              speichern (wenn mitgeschickt) und starten
  *   POST /:kennung/stoppen              Stoppfolge des Entwurfs fahren
  *   POST /:kennung/eingabe              eine Zeile in die Konsole des Spiels
+ *   POST /:kennung/rcon                 ein Befehl über die Fernsteuerung, mit Antwort
  *   POST /:kennung/ports                beobachteten Port übernehmen
  *   POST /:kennung/ports/:zweck/entfernen
  *   POST /:kennung/bereitschaftszeile   Konsolenzeile als ready_when.log_line
@@ -557,6 +558,15 @@ router.post('/:kennung/eingabe', requirePermission('WERKBANK.BAUEN'), async (req
         return res.json({ success: true });
     } catch (error) {
         return fehler(res, error, 'Eingabe nicht zugestellt', 400);
+    }
+});
+
+router.post('/:kennung/rcon', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        const antwort = await Sitzungen.rcon(await offeneSitzung(req, res), req.body?.befehl);
+        return res.json({ success: true, antwort });
+    } catch (error) {
+        return fehler(res, error, 'RCON-Befehl nicht ausgeführt', 400);
     }
 });
 

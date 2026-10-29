@@ -610,8 +610,17 @@
             <div id="laufKonsole" class="mt-1 p-2 small font-monospace"
                  style="height:22rem;overflow:auto;white-space:pre-wrap;background:var(--tblr-bg-surface-secondary);color:var(--tblr-body-color);cursor:pointer"><%
               lesbar(lauf && lauf.konsole).split('\n').filter(Boolean).forEach(function (z) { %><div><%= z %></div><% }) %></div>
+            <%# RCON im Probestart (Baustelle 175, 2026-10-29): Die Wahl steht nur da,
+                wenn der Entwurf eine Fernsteuerung hat. Befehl und Antwort landen
+                als Hinweiszeilen in der Konsole (data-hinweis: kein Klick-Übernehmen). %>
             <form id="formEingabe" class="input-group mt-2">
-              <input class="form-control font-monospace" name="zeile" placeholder="Befehl an das Spiel (Standardeingabe)" <%= spielLaeuft ? '' : 'disabled' %>>
+              <% if (_fern.rcon) { %>
+                <select class="form-select" name="weg" style="max-width:8rem" aria-label="Weg des Befehls" <%= spielLaeuft ? '' : 'disabled' %>>
+                  <option value="konsole">Konsole</option>
+                  <option value="rcon">RCON</option>
+                </select>
+              <% } %>
+              <input class="form-control font-monospace" name="zeile" placeholder="Befehl an das Spiel (Standardeingabe oder RCON)" <%= spielLaeuft ? '' : 'disabled' %>>
               <button class="btn btn-outline-secondary" type="submit" <%= spielLaeuft ? '' : 'disabled' %>>Senden</button>
             </form>
 
@@ -3086,8 +3095,33 @@
   formEingabe.addEventListener('submit', async function (ev) {
     ev.preventDefault();
     var feld = formEingabe.zeile;
-    try { await schicke(hier + '/eingabe', { zeile: feld.value }); feld.value = ''; }
-    catch (fehler) { melde('error', fehler.message); }
+    var weg = formEingabe.weg ? formEingabe.weg.value : 'konsole';
+    if (weg !== 'rcon') {
+      try { await schicke(hier + '/eingabe', { zeile: feld.value }); feld.value = ''; }
+      catch (fehler) { melde('error', fehler.message); }
+      return;
+    }
+    // RCON: die Antwort kommt zurück und steht unter dem Befehl in der Konsole.
+    var befehl = feld.value;
+    var ausgabe = document.getElementById('laufKonsole');
+    function hinweis(text, farbe) {
+      var d = document.createElement('div');
+      d.setAttribute('data-hinweis', 'rcon');
+      d.textContent = text;
+      if (farbe) d.style.color = farbe;
+      ausgabe.appendChild(d);
+      ausgabe.scrollTop = ausgabe.scrollHeight;
+    }
+    hinweis('» RCON: ' + befehl, 'var(--tblr-primary)');
+    try {
+      var daten = await schicke(hier + '/rcon', { befehl: befehl });
+      feld.value = '';
+      var text = String(daten.antwort || '').trim();
+      (text ? text.split('\n') : ['(leere Antwort)']).forEach(function (z) { hinweis('  ' + z, 'var(--tblr-primary)'); });
+    } catch (fehler) {
+      hinweis('  ✗ ' + fehler.message, 'var(--tblr-danger)');
+      melde('error', fehler.message);
+    }
   });
 
   // Ports übernehmen / entfernen — Formulare entstehen auch per SSE neu,
