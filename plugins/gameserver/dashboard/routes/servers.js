@@ -30,7 +30,7 @@ const ServerState = require('../helpers/ServerState');
 const { baueUebersicht, baueServerListe, bauePaketAuswahl,
         baueMaschinenAuswahl, baueWerteSchritt,
         baueBereitschaftAuskunft, bauePlatz,
-        baueMesswerte } = require('../helpers/Serverseite');
+        baueMesswerte, baueZustand } = require('../helpers/Serverseite');
 const { resolveStatusConfig } = require('../helpers/StatusSchema');
 // ── Wieder eingehaengt am 2026-09-17 (Baustelle 137) ────────────────────────
 //
@@ -1397,6 +1397,8 @@ router.get('/status', requirePermission('GAMESERVER.VIEW'), async (req, res) => 
                     -- Die Live-Messwerte für den Streifen über den Bereichen.
                     cpu_percent, ram_used_mb, ram_total_mb, last_heartbeat,
                     net_rx_bytes, net_tx_bytes, net_rx_rate, net_tx_rate,
+                    -- Die Buchung, gegen die der CPU-Streifen rechnet (B211).
+                    allocated_cpu_percent,
                     -- Und der Install-Fortschritt (B44): Er reitet auf demselben
                     -- Weg, damit ein Nachholen nach einem Verbindungsabriss auch
                     -- die Bahn wieder richtig setzt.
@@ -1418,6 +1420,9 @@ router.get('/status', requirePermission('GAMESERVER.VIEW'), async (req, res) => 
                     status:          s.status,
                     // Läuft ein Umzug, zeigt die Pille „Wird verschoben" statt des Status.
                     umzug:           require('../helpers/Umzugsstand').laeuft(s.umzug_status),
+                    // Beurteilt wie in der Liste (Text, Ton, Abzeichen) — das
+                    // Widget auf dem Hauptdashboard zeichnet daraus.
+                    zustand:         baueZustand(s),
                     current_players: s.current_players,
                     max_players:     s.max_players,
                     // Roh — die Ansicht zeigt die gemeldete Stufe weiterhin an.
@@ -1888,6 +1893,8 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
                 gs.platz_ueber,
                 gs.platz_geschaetzt,
                 gs.cpu_percent,
+                -- Die Buchung, gegen die der CPU-Streifen rechnet (B211).
+                gs.allocated_cpu_percent,
                 gs.ram_used_mb,
                 gs.ram_total_mb,
                 gs.last_heartbeat,

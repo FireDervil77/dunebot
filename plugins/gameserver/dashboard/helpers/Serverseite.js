@@ -230,7 +230,8 @@ function baueZustand(server) {
     // Ein laufender Umzug schlägt den Status: Der steht währenddessen auf
     // `updating` oder schon auf `offline` (Umzugsstand, 2026-10-28).
     if (require('./Umzugsstand').laeuft(server.umzug_status)) {
-        return { schluessel: 'umzug', text: 'Wird verschoben', ton: 'blue', gut: false, stufe: null };
+        return { schluessel: 'umzug', text: 'Wird verschoben', ton: 'blue', gut: false, stufe: null,
+                 abzeichen: ABZEICHEN.blue };
     }
     const s = String(server.status || 'unbekannt');
     const tafel = {
@@ -244,8 +245,17 @@ function baueZustand(server) {
         error:      { text: 'Fehler',                   ton: 'red',    gut: false },
     };
     const e = tafel[s] || { text: s, ton: 'gray', gut: false };
-    return { schluessel: s, text: e.text, ton: e.ton, gut: e.gut, stufe: null };
+    return { schluessel: s, text: e.text, ton: e.ton, gut: e.gut, stufe: null,
+             abzeichen: ABZEICHEN[e.ton] || 'secondary' };
 }
+
+/**
+ * Der Ton als Tabler-Farbe (`bg-<farbe>-lt`) — für das Widget auf dem
+ * Hauptdashboard, wo die `fb-pille` des Plugins ungestaltet stünde. Hier und
+ * nicht in der Vorlage: Das Live-Modul zeichnet dasselbe Abzeichen nach und
+ * braucht dieselbe Tafel (Baustelle 211, Widget-Nachtrag).
+ */
+const ABZEICHEN = { green: 'success', yellow: 'warning', blue: 'info', red: 'danger', gray: 'secondary' };
 
 /**
  * Die Adresse zum Weitergeben — eine Zeile, kopierbar.
@@ -655,7 +665,48 @@ function baueKennzahlen(server) {
     const ram = zahlOderNull(server.ram_used_mb);
     const ramMax = zahlOderNull(server.ram_total_mb);
     if (cpu === null && ram === null) return null;
-    return { cpu, ram, ramMax };
+    // Derselbe Satz wie im Messstreifen, nicht eine zweite Formatierung.
+    const cpuText = cpu === null ? null : baueCpu(cpu, zahlOderNull(server.allocated_cpu_percent)).text;
+    return { cpu, cpuText, ram, ramMax };
+}
+
+/**
+ * Die CPU eines Servers gegen seine eigene Buchung (Baustelle 211, 2026-10-29).
+ *
+ * Der Daemon misst wie `docker stats`: 100 = ein voller Kern, zwei volle Kerne
+ * = 200. Gebucht wird in derselben Einheit (`allocated_cpu_percent`, 800 = 8
+ * Kerne), und Docker setzt genau diese Grenze (`NanoCPUs`). Also steht hier
+ * „2,6 von 8 Kernen", und der Balken zeigt, wie nah der Server an SEINER Grenze
+ * ist: 32 %, gekappt bei 100.
+ *
+ * Bis zum 2026-10-29 lieferte der Daemon unter cgroup v2 den Anteil an der
+ * ganzen Maschine (÷ 8), und hier stand die rohe Zahl mit Schwellen bei 70/90.
+ * Valheim mit 0,1 gebuchtem Kern lief am Anschlag und zeigte grüne 1,3 %.
+ *
+ * Ohne Buchung gibt es keine Grenze, gegen die ein Balken stehen könnte: Dann
+ * nur die Kerne, kein Balken (`prozent: null`). Seit das Anlegen die Buchung
+ * verlangt, trifft das keinen Server mehr.
+ *
+ * @param {number|null} cpu     gemessen, 100 = ein Kern
+ * @param {number|null} gebucht `allocated_cpu_percent`, 100 = ein Kern
+ * @returns {{prozent: number|null, kerne: number, grenzeKerne: number|null,
+ *            text: string, ton: string, farbe: string}|null}
+ */
+function baueCpu(cpu, gebucht) {
+    if (cpu === null || cpu === undefined) return null;
+    const kerne = cpu / 100;
+    const grenzeKerne = gebucht > 0 ? gebucht / 100 : null;
+    const prozent = grenzeKerne === null ? null : Math.min(100, Math.round((cpu / gebucht) * 1000) / 10);
+    const ton = prozent === null ? 'gruen' : prozent >= 90 ? 'rot' : prozent >= 70 ? 'orange' : 'gruen';
+    const text = grenzeKerne === null
+        ? `${kerneText(kerne)} ${kerne === 1 ? 'Kern' : 'Kerne'}`
+        : `${kerneText(kerne)} von ${kerneText(grenzeKerne)} ${grenzeKerne === 1 ? 'Kern' : 'Kernen'}`;
+    return { prozent, kerne, grenzeKerne, text, ton, farbe: TON_FARBE[ton] };
+}
+
+/** „2,6", unter einem Kern zwei Stellen („0,05"), sonst eine. */
+function kerneText(kerne) {
+    return kerne.toLocaleString('de-DE', { maximumFractionDigits: kerne < 1 ? 2 : 1 });
 }
 
 /**
@@ -780,16 +831,7 @@ function baueMesswerte(server) {
 
     if (!frisch) return ergebnis;
 
-    if (cpu !== null) {
-        // Über 100 % ist richtig und kein Fehler: 100 % = ein Kern, und ein
-        // Server darf mehrere haben.
-        ergebnis.cpu = {
-            prozent: Math.round(cpu * 10) / 10,
-            text: `${(Math.round(cpu * 10) / 10).toLocaleString('de-DE')} %`,
-            ton: cpu >= 90 ? 'rot' : cpu >= 70 ? 'orange' : 'gruen',
-            farbe: TON_FARBE[cpu >= 90 ? 'rot' : cpu >= 70 ? 'orange' : 'gruen'],
-        };
-    }
+    ergebnis.cpu = baueCpu(cpu, zahlOderNull(server.allocated_cpu_percent));
 
     if (ram !== null) {
         const anteil = (ramMax && ramMax > 0) ? Math.round((ram / ramMax) * 100) : null;
@@ -1621,6 +1663,8 @@ module.exports.baueMesswerte = baueMesswerte;
 module.exports.ZUSTAENDE_MIT_CONTAINER = ZUSTAENDE_MIT_CONTAINER;
 module.exports.PLATZ_FARBE = PLATZ_FARBE;
 module.exports.TON_FARBE = TON_FARBE;
+module.exports.baueCpu = baueCpu;
+module.exports.baueZustand = baueZustand;
 module.exports.INSTALL_PHASE = INSTALL_PHASE;
 module.exports.baueKnopfzeile = baueKnopfzeile;
 module.exports.baueVerbindung = baueVerbindung;

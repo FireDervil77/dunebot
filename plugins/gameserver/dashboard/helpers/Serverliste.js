@@ -45,6 +45,8 @@ const SERVER_LISTE_SQL = `
                 -- geholt — baueKennzahlen lieferte deshalb immer null.
                 -- (Keine Backticks in dieser Abfrage: Template-Literal.)
                 gs.cpu_percent,
+                -- Die Buchung, gegen die der CPU-Streifen rechnet (B211).
+                gs.allocated_cpu_percent,
                 gs.ram_used_mb,
                 gs.ram_total_mb,
                 gs.last_heartbeat,

@@ -1013,6 +1013,39 @@ class GameserverPlugin extends DashboardPlugin {
     }
 
     /**
+     * Die CPU-Buchung eines Servers für den 3-s-Push (Baustelle 211).
+     *
+     * Der Push setzt seine Zeile aus dem Ereignis zusammen, und dort steht die
+     * Buchung nicht. Sie alle drei Sekunden je Server abzufragen wäre genau die
+     * Runde, die unten für die Guild abgeschafft wurde, für einen Wert, der
+     * sich fast nie ändert. Also gemerkt, 60 s lang. Eine geänderte Buchung
+     * greift ohnehin erst beim nächsten Start des Servers.
+     *
+     * Nicht lesbar heißt `null`: Dann zeigt der Streifen die Kerne ohne Balken,
+     * statt gegen eine geratene Grenze zu rechnen.
+     *
+     * @param {number|string} serverId
+     * @returns {Promise<number|null>}
+     * @private
+     */
+    async _cpuBuchung(serverId) {
+        const id = String(serverId);
+        const merker = GameserverPlugin._cpuBuchungen || (GameserverPlugin._cpuBuchungen = new Map());
+        const alt = merker.get(id);
+        if (alt && Date.now() - alt.am < 60_000) return alt.wert;
+        try {
+            const [zeile] = await ServiceManager.get('dbService').query(
+                'SELECT allocated_cpu_percent FROM gameservers WHERE id = ?', [id]);
+            const wert = zeile && Number(zeile.allocated_cpu_percent) > 0 ? Number(zeile.allocated_cpu_percent) : null;
+            merker.set(id, { wert, am: Date.now() });
+            return wert;
+        } catch (error) {
+            ServiceManager.get('Logger').warn(`[Gameserver] CPU-Buchung von Server ${id} nicht lesbar:`, error);
+            return alt ? alt.wert : null;
+        }
+    }
+
+    /**
      * Handler: Gameserver Resource Usage
      * @private
      */
@@ -1066,6 +1099,7 @@ class GameserverPlugin extends DashboardPlugin {
                 status: 'online',
                 last_heartbeat: new Date(),
                 cpu_percent:  payload.cpu,
+                allocated_cpu_percent: await this._cpuBuchung(server_id),
                 ram_used_mb:  payload.ram,
                 ram_total_mb: payload.ram_total,
                 net_rx_bytes: payload.net_rx_bytes,
@@ -1568,6 +1602,14 @@ class GameserverPlugin extends DashboardPlugin {
                 const content = await themeManager.renderWidgetPartial('gameserver-uebersicht', {
                     guildId, liste, icons, plugin: 'gameserver',
                 });
+                // Das Live-Modul der Übersicht (samt SSE-Client) — eingereiht für
+                // DIESE Anfrage (AssetManager führt die Warteschlange je Anfrage).
+                // Der Strom verlangt GAMESERVER.VIEW, dasselbe Recht wie oben.
+                // Ohne ihn steht das Widget trotzdem da, nur ohne Live — gemeldet.
+                if (liste.liste.length) {
+                    if (ServiceManager.has('assetManager')) ServiceManager.get('assetManager').enqueueScript('gameserver-live');
+                    else Logger.warn('[Gameserver] Widget „Gameserver" ohne Live-Modul: kein assetManager registriert');
+                }
                 widgets.push({
                     id: 'gameserver-uebersicht',
                     title: 'Gameserver',
