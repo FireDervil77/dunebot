@@ -14,12 +14,12 @@ module.exports = async (mitglied) => {
 
     const aktuell = p.abspieler.aktuell;
 
-    // Wer ohnehin steuern darf, braucht keine Abstimmung
-    if (await p.manager.darfSteuern(mitglied)) {
-        p.abspieler.ueberspringen(1);
-        return antwort(`Übersprungen: ${aktuell ? titelZeile(aktuell) : '—'}`);
-    }
-
+    // Hier wird IMMER abgestimmt (Betreiber 2026-10-29, F26): Die DJ-Rolle gilt
+    // für die Grundsteuerung (play, skip, shuffle, loop …), `voteskip` heißt nur
+    // „skip" im Namen. Bis heute übersprang hier sofort, wer steuern darf — und
+    // ohne DJ-Rolle darf das jeder (`darfSteuern`), es kam also nie zu einer
+    // Abstimmung. Wer direkt überspringen will und darf, nimmt `/music skip`.
+    // Allein im Kanal reicht die eigene Stimme (mindestens 1, `abstimmen`).
     const zuhoerer = mitglied.voice.channel.members.filter(m => !m.user.bot).size;
     const ergebnis = p.abspieler.abstimmen(mitglied.id, zuhoerer, einstellungen.vote_skip_percent || 50);
 
