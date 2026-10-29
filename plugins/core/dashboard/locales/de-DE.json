@@ -16,8 +16,6 @@
   "DASH_DEFAULTS": "Dashboard-Einstellungen",
   "LOGO": "Logo",
   "LOGO_DESC": "Logo für das Dashboard",
-  "LOGO_URL": "Logo-URL",
-  "LOGO_URL_DESC": "URL zum Logo-Bild",
   "ENABLED": "Aktiviert",
   "DISABLED": "Deaktiviert",
   "PERM_SETTINGS_VIEW": "Einstellungen ansehen",

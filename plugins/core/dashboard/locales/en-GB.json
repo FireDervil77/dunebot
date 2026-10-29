@@ -16,8 +16,6 @@
   "DASH_DEFAULTS": "Dashboard Defaults",
   "LOGO": "Logo",
   "LOGO_DESC": "Logo for the dashboard",
-  "LOGO_URL": "Logo URL",
-  "LOGO_URL_DESC": "URL to the logo image",
   "ENABLED": "Enabled",
   "DISABLED": "Disabled",
   "PERM_SETTINGS_VIEW": "View Settings",
