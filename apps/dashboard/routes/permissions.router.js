@@ -17,7 +17,6 @@
  * - PUT  /permissions/groups/:groupId - Gruppe bearbeiten
  * - DELETE /permissions/groups/:groupId - Gruppe löschen
  * 
- * - GET /permissions/matrix - Berechtigungsmatrix anzeigen
  * 
  * @author FireDervil
  * @version 2.0.0
@@ -29,7 +28,6 @@ const router = express.Router();
 const { ServiceManager } = require('dunebot-core');
 const { 
     requirePermission, 
-    requireAnyPermission,
     requireGuildOwner,
     loadUserPermissions 
 } = require('../middlewares/permissions.middleware');
@@ -1245,167 +1243,6 @@ router.delete('/groups/:groupId', requirePermission('PERMISSIONS.GROUPS.DELETE')
         res.status(500).json({
             success: false,
             message: 'Fehler beim Löschen der Gruppe'
-        });
-    }
-});
-
-// ============================================================================
-// PERMISSION MATRIX ROUTE
-// ============================================================================
-
-/**
- * GET /permissions/matrix
- * Zeigt die Berechtigungsmatrix (Gruppen x Permissions)
- */
-router.get('/matrix', requireAnyPermission(['PERMISSIONS.GROUPS.VIEW', 'PERMISSIONS.USERS.VIEW']), async (req, res) => {
-    const Logger = ServiceManager.get('Logger');
-    const permissionManager = ServiceManager.get('permissionManager');
-    const dbService = ServiceManager.get('dbService');
-    const themeManager = ServiceManager.get('themeManager');
-    const guildId = res.locals.guildId;
-    
-    try {
-        // Hole alle Gruppen (permissions ist bereits als JSON in group.permissions enthalten)
-        const groups = await permissionManager.getGuildGroups(guildId);
-
-        // Stelle sicher dass group.permissions immer ein Objekt ist (mysql2 parst JSON automatisch)
-        for (const group of groups) {
-            if (!group.permissions || typeof group.permissions === 'string') {
-                try {
-                    group.permissions = group.permissions ? JSON.parse(group.permissions) : {};
-                } catch {
-                    group.permissions = {};
-                }
-            }
-        }
-
-        // Hole alle verfügbaren Permissions (global, kein guild_id-Filter)
-        const permissions = await dbService.query(`
-            SELECT * FROM permission_definitions
-            WHERE is_active = 1
-            ORDER BY category, sort_order, permission_key
-        `);
-
-        // SYSTEM & SUPERADMIN Kategorien nur auf der Control-Guild anzeigen
-        const filteredPermissions = filterRestrictedPermissions(permissions, guildId);
-
-        // Translation-Keys auflösen (Kern-Permissions nutzen 'core' Namespace)
-        const i18n = ServiceManager.get('i18n');
-        filteredPermissions.forEach(perm => {
-            if (perm.name_translation_key) {
-                let translated = i18n.tr(perm.name_translation_key);
-                if (translated === perm.name_translation_key) {
-                    translated = i18n.tr('core:' + perm.name_translation_key);
-                }
-                perm.resolved_name = translated;
-            }
-            if (perm.description_translation_key) {
-                let translated = i18n.tr(perm.description_translation_key);
-                if (translated === perm.description_translation_key) {
-                    translated = i18n.tr('core:' + perm.description_translation_key);
-                }
-                perm.resolved_description = translated;
-            }
-        });
-
-        // Gruppiere nach Kategorie
-        const permissionsByCategory = {};
-        filteredPermissions.forEach(perm => {
-            if (!permissionsByCategory[perm.category]) {
-                permissionsByCategory[perm.category] = [];
-            }
-            permissionsByCategory[perm.category].push(perm);
-        });
-        
-        await themeManager.renderView(res, 'guild/permissions/matrix', {
-            pageTitle: 'Berechtigungsmatrix',
-            groups: groups || [],
-            permissions: permissionsByCategory,
-            userPermissions: res.locals.userPermissions, // ← WICHTIG: Übergabe an View!
-            guildId
-        });
-        
-    } catch (error) {
-        Logger.error('[Permissions] Error loading matrix page:', error);
-        res.status(500).render('error', {
-            message: 'Fehler beim Laden der Berechtigungsmatrix',
-            error
-        });
-    }
-});
-
-/**
- * POST /permissions/matrix
- * Speichert Bulk-Updates für die Berechtigungsmatrix (RELATIONAL!)
- */
-router.post('/matrix', requirePermission('PERMISSIONS.ASSIGN'), async (req, res) => {
-    const Logger = ServiceManager.get('Logger');
-    const dbService = ServiceManager.get('dbService');
-    const permissionManager = ServiceManager.get('permissionManager');
-    const guildId = res.locals.guildId;
-    const { updates } = req.body;
-    
-    try {
-        if (!updates || typeof updates !== 'object') {
-            return res.status(400).json({
-                success: false,
-                message: 'Ungültige Update-Daten'
-            });
-        }
-        
-        // Für jede Gruppe: Permissions MERGEN (nicht ersetzen!)
-        const isControlGuild = guildId === process.env.CONTROL_GUILD_ID;
-
-        for (const [groupId, permissions] of Object.entries(updates)) {
-            // Prüfe ob Gruppe zu dieser Guild gehört
-            const groups = await dbService.query(
-                'SELECT guild_id, permissions FROM guild_groups WHERE id = ? AND guild_id = ?',
-                [groupId, guildId]
-            );
-            
-            if (!groups || groups.length === 0) {
-                Logger.warn(`[Permissions] Group ${groupId} not found or not in guild ${guildId}`);
-                continue;
-            }
-            
-            // Bestehende Permissions laden
-            let existingPerms = groups[0].permissions || {};
-            if (typeof existingPerms === 'string') {
-                try { existingPerms = JSON.parse(existingPerms); } catch { existingPerms = {}; }
-            }
-            
-            // Merge: Änderungen auf bestehende Permissions anwenden
-            const mergedPermissions = { ...existingPerms };
-            for (const [permKey, value] of Object.entries(permissions)) {
-                // SYSTEM/SUPERADMIN Permissions auf Nicht-Control-Guilds blocken
-                if (!isControlGuild && isRestrictedPermKey(permKey)) {
-                    Logger.warn(`[Permissions] Blocked restricted permission ${permKey} for non-control guild ${guildId}`);
-                    continue;
-                }
-                if (value === true || value === 'true' || value === '1') {
-                    mergedPermissions[permKey] = true;
-                } else {
-                    // false/unchecked → Permission entfernen
-                    delete mergedPermissions[permKey];
-                }
-            }
-            
-            // updateGroup mit vollständigem Permission-Set aufrufen
-            await permissionManager.updateGroup(parseInt(groupId), { permissions: mergedPermissions });
-            
-            Logger.info(`[Permissions] Updated permissions for group ${groupId} (RELATIONAL)`);
-        }
-        
-        res.json({
-            success: true,
-            message: 'Berechtigungen erfolgreich aktualisiert'
-        });
-        
-    } catch (error) {
-        Logger.error('[Permissions] Error updating matrix:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Fehler beim Aktualisieren der Berechtigungen'
         });
     }
 });

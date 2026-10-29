@@ -201,15 +201,6 @@
       "requires": null
     },
     {
-      "key": "PERMISSIONS.MATRIX.VIEW",
-      "name": "PERMISSIONS.MATRIX_VIEW",
-      "description": "PERMISSIONS.MATRIX_VIEW_DESC",
-      "category": "permissions",
-      "is_dangerous": 0,
-      "sort_order": 45,
-      "requires": "PERMISSIONS.VIEW"
-    },
-    {
       "key": "SYSTEM.ACCESS",
       "name": "SYSTEM.ACCESS",
       "description": "SYSTEM.ACCESS_DESC",

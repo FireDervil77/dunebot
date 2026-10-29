@@ -224,17 +224,6 @@ async function registerKernNavigation(guildId) {
                 visible: true,
                 guildId,
                 parent: `/guild/${guildId}/permissions`
-            },
-            {
-                title: 'NAV.PERMISSIONS_MATRIX',
-                url: `/guild/${guildId}/permissions/matrix`,
-                icon: 'fa-solid fa-table',
-                order: 30,
-                type: navigationManager.menuTypes.MAIN,
-                capability: 'PERMISSIONS.MATRIX.VIEW',
-                visible: true,
-                guildId,
-                parent: `/guild/${guildId}/permissions`
             }
         ];
 
