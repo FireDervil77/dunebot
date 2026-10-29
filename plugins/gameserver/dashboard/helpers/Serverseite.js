@@ -701,7 +701,19 @@ function baueCpu(cpu, gebucht) {
     const text = grenzeKerne === null
         ? `${kerneText(kerne)} ${kerne === 1 ? 'Kern' : 'Kerne'}`
         : `${kerneText(kerne)} von ${kerneText(grenzeKerne)} ${grenzeKerne === 1 ? 'Kern' : 'Kernen'}`;
-    return { prozent, kerne, grenzeKerne, text, ton, farbe: TON_FARBE[ton] };
+    return { prozent, kerne, grenzeKerne, text, fuss: fussText(prozent), ton, farbe: TON_FARBE[ton] };
+}
+
+/**
+ * Die Zeile unter CPU und Arbeitsspeicher: „3 % der Buchung" — dieselbe
+ * Bezugsgröße wie der Balken darüber. Stand bis 2026-10-29 als „100 % ist ein
+ * Kern" fest in der Vorlage (seit B211 falsch) bzw. beim RAM als Rechnung in
+ * der Vorlage, die live nie nachzog.
+ */
+function fussText(prozent) {
+    return prozent === null || prozent === undefined
+        ? 'keine Grenze gebucht'
+        : `${Math.round(prozent).toLocaleString('de-DE')} % der Buchung`;
 }
 
 /** „2,6", unter einem Kern zwei Stellen („0,05"), sonst eine. */
@@ -840,6 +852,7 @@ function baueMesswerte(server) {
             grenzeMB: ramMax,
             prozent: anteil,
             text: ramMax ? `${mib(ram)} von ${mib(ramMax)}` : mib(ram),
+            fuss: fussText(anteil),
             ton: anteil === null ? 'gruen' : anteil >= 90 ? 'rot' : anteil >= 75 ? 'orange' : 'gruen',
             farbe: TON_FARBE[anteil === null ? 'gruen' : anteil >= 90 ? 'rot' : anteil >= 75 ? 'orange' : 'gruen'],
         };

@@ -56,6 +56,24 @@ const lies = (rel) => fs.readFileSync(path.join(WURZEL, rel), 'utf8');
         assert.strictEqual(S.baueCpu(5, 800).text, '0,05 von 8 Kernen');
     });
 
+    await pruefe('Fuß „x % der Buchung" vom Server, live gezeichnet', async () => {
+        assert.strictEqual(S.baueCpu(24, 800).fuss, '3 % der Buchung');
+        assert.strictEqual(S.baueCpu(24, null).fuss, 'keine Grenze gebucht');
+        const v = lies('plugins/gameserver/dashboard/views/guild/server-detail.ejs');
+        assert.ok(!/100 % ist ein Kern/.test(v), 'der alte Fuß steht noch da');
+        assert.match(v, /data-fb-live="messfuss-cpu" data-fb-server="<%= server.id %>"><%= mw\.cpu \? mw\.cpu\.fuss/);
+        assert.match(v, /data-fb-live="messfuss-ram" data-fb-server="<%= server.id %>"><%= mw\.ram \? mw\.ram\.fuss/);
+        const { LiveAnzeige } = require('../plugins/gameserver/dashboard/assets/js/gameserver-live.js');
+        const fuss = { dataset: { fbLive: 'messfuss-cpu' }, textContent: '' };
+        global.CSS = { escape: String };
+        global.document = { querySelectorAll: (sel) => sel.includes('"7"') ? [fuss] : [] };
+        global.fetch = async () => ({ ok: false });
+        const a = new LiveAnzeige({ on: () => {} }, '1');
+        a.uebernimm(7, { messwerte: { frisch: true, cpu: S.baueCpu(400, 800) } }, true);
+        assert.strictEqual(fuss.textContent, '50 % der Buchung');
+        global.document = { querySelectorAll: () => [] };
+    });
+
     await pruefe('ohne Buchung: Kerne, kein Balken', async () => {
         const c = S.baueCpu(250, null);
         assert.strictEqual(c.text, '2,5 Kerne');

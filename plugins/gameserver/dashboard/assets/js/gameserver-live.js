@@ -801,6 +801,17 @@
                         break;
                     }
 
+                    // „3 % der Buchung" unter CPU und Arbeitsspeicher — fertig
+                    // vom Server (fussText), wie der Text darüber.
+                    case 'messfuss-cpu':
+                    case 'messfuss-ram': {
+                        const m = z.messwerte;
+                        if (!m || !m.frisch) break;
+                        const teil = el.dataset.fbLive === 'messfuss-cpu' ? m.cpu : m.ram;
+                        if (teil && teil.fuss) el.textContent = teil.fuss;
+                        break;
+                    }
+
                     case 'messfuss-netz': {
                         const m = z.messwerte;
                         if (!m || !m.frisch || !m.netz) break;

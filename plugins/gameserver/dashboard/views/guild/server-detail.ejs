@@ -240,7 +240,7 @@
         <div data-fb-live="messbalken-cpu" data-fb-server="<%= server.id %>"
              style="width:<%= mw.cpu && mw.cpu.prozent !== null ? Math.min(100, mw.cpu.prozent) : 0 %>%;background:<%= mw.cpu ? mw.cpu.farbe : 'transparent' %>"></div>
       </div>
-      <div class="fb-messzelle-fuss">100 % ist ein Kern</div>
+      <div class="fb-messzelle-fuss" data-fb-live="messfuss-cpu" data-fb-server="<%= server.id %>"><%= mw.cpu ? mw.cpu.fuss : '' %></div>
     </div>
 
     <div class="fb-messzelle" style="<%= mw.frisch ? '' : 'display:none' %>">
@@ -251,7 +251,7 @@
         <div data-fb-live="messbalken-ram" data-fb-server="<%= server.id %>"
              style="width:<%= mw.ram && mw.ram.prozent !== null ? Math.min(100, mw.ram.prozent) : 0 %>%;background:<%= mw.ram ? mw.ram.farbe : 'transparent' %>"></div>
       </div>
-      <div class="fb-messzelle-fuss"><%= mw.ram && mw.ram.prozent !== null ? mw.ram.prozent + ' % der Buchung' : 'keine Grenze gebucht' %></div>
+      <div class="fb-messzelle-fuss" data-fb-live="messfuss-ram" data-fb-server="<%= server.id %>"><%= mw.ram ? mw.ram.fuss : '' %></div>
     </div>
 
     <div class="fb-messzelle" style="<%= mw.frisch ? '' : 'display:none' %>">
