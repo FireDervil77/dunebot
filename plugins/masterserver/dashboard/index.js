@@ -412,10 +412,20 @@ class MasterserverDashboardPlugin extends DashboardPlugin {
                 const RootServer = require('./models/RootServer');
                 const rootservers = await RootServer.getByGuild(guildId);
 
+                // Live nachziehen darf nur, wer den Strom dahinter öffnen darf:
+                // `/rootservers/events` verlangt MASTERSERVER.ROOTSERVER.VIEW.
+                // Ohne das Recht liefe das Skript in einen 403 nach dem anderen.
+                const userId = options.user?.info?.id;
+                const permissionManager = ServiceManager.has('permissionManager') ? ServiceManager.get('permissionManager') : null;
+                const live = Boolean(userId && permissionManager
+                    && await permissionManager.hasPermission(userId, guildId, 'MASTERSERVER.ROOTSERVER.VIEW'));
+
                 const themeManager = tm || ServiceManager.get('themeManager');
                 const content = await themeManager.renderWidgetPartial('rootserver-status', {
                     guildId,
                     rootservers,
+                    auslastung: require('./helpers/Auslastung').ausZeile,
+                    live,
                     plugin: 'masterserver'
                 });
 

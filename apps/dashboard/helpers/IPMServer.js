@@ -28,6 +28,7 @@ const eventRouter = require('./IPMEventRouter');
 // fuer Hardware-Stats benutzt — ein Umbau, der nach der ersten Methode
 // steckengeblieben war.
 const RootServer = require('../../../plugins/masterserver/dashboard/models/RootServer');
+const Auslastung = require('../../../plugins/masterserver/dashboard/helpers/Auslastung');
 
 // Pfad zur version.json (Dashboard-Download-Verzeichnis)
 const VERSION_JSON_PATH = path.join(__dirname, '..', 'downloads', 'daemon', 'version.json');
@@ -376,6 +377,7 @@ class IPMServer {
 
         ws.on('close', () => {
             if (daemonId) {
+                const guildIdDerVerbindung = this.connections.get(daemonId)?.metadata?.guild_id;
                 this.connections.delete(daemonId);
 
                 // ✅ SECURITY: Connection-Count verringern
@@ -402,6 +404,7 @@ class IPMServer {
                 if (newCount === 0 && !this.wirdBeendet) {
                     RootServer.markOffline(daemonId)
                         .catch(err => this.Logger.error('[IPMServer] Statuswechsel auf offline fehlgeschlagen:', err));
+                    this._meldeHostOffline(daemonId, guildIdDerVerbindung);
 
                     // **Auch das gehoert ins Protokoll** (2026-09-08). Bis heute
                     // stand in `daemon_logs` ausschliesslich "verbunden" und
@@ -771,6 +774,23 @@ class IPMServer {
     }
 
     /**
+     * Dem Browser sagen, dass ein Daemon weg ist — dasselbe `host_stats` wie beim
+     * Herzschlag, nur mit `anzeige.online = false` und ohne Messwerte. Ohne das
+     * stand das Widget „RootServer" nach einer Trennung weiter auf „Online", bis
+     * jemand die Seite neu lud (Baustelle 207).
+     * @private
+     */
+    _meldeHostOffline(daemonId, guildId) {
+        if (!guildId || !ServiceManager.has('sseManager')) return;
+        ServiceManager.get('sseManager').broadcast(guildId, 'metrics', {
+            action: 'host_stats',
+            daemon_id: daemonId,
+            anzeige: { online: false },
+            timestamp: Date.now()
+        });
+    }
+
+    /**
      * Heartbeat verarbeiten
      * @private
      */
@@ -811,6 +831,9 @@ class IPMServer {
                         disk_total_gb: hw.disk?.total_gb ?? null,
                         network:      hw.network ?? null,
                         ping_ms:      pingMs,
+                        // Fertig gerechnet für das Widget „RootServer" (Baustelle 207):
+                        // Prozent, Farbe, Text — der Browser zeichnet nur.
+                        anzeige:      Auslastung.ausHerzschlag(hw),
                         timestamp:    Date.now()
                     });
                 }
@@ -1647,6 +1670,7 @@ class IPMServer {
                         .catch(err => this.Logger.error('[IPMServer] Heartbeat-Zähler nicht erhöht:', err));
                     RootServer.markOffline(daemonId)
                         .catch(err => this.Logger.error('[IPMServer] Statuswechsel auf offline fehlgeschlagen:', err));
+                    this._meldeHostOffline(daemonId, conn.metadata?.guild_id);
 
                     // Der Zaehler auf der Detailseite sagt WIE OFT, das Protokoll
                     // sagt WANN. Ohne diesen Eintrag ist ein Aussetzer nach einer

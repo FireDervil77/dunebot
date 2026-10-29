@@ -1,6 +1,11 @@
 <%
-    // rootservers: Array von RootServer-Objekten (aus dem Hook-Context)
+    // rootservers: Zeilen aus RootServer.getByGuild (Hook-Context)
+    // auslastung:  helpers/Auslastung.ausZeile — Prozent, Farbe, Text rechnet der
+    //              Server; dieselbe Rechnung schickt der Herzschlag als `anzeige`
+    //              mit, das Skript unten zeichnet sie nur (Baustelle 207)
+    // live:        darf der Betrachter /rootservers/events öffnen?
     const rsList = rootservers || [];
+    const BALKEN = [['cpu', 'CPU'], ['ram', 'RAM'], ['disk', 'Disk']];
 %>
 <% if (rsList.length === 0) { %>
     <div class="text-center text-secondary py-2" style="font-size:.85rem;">
@@ -9,23 +14,16 @@
         <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers" class="ms-1">Jetzt einrichten →</a>
     </div>
 <% } else { %>
-    <% for (const rs of rsList) {
-        const ramPct  = (rs.ram_usage_gb  && rs.ram_total_gb  && rs.ram_total_gb  > 0) ? Math.round(rs.ram_usage_gb  / rs.ram_total_gb  * 100) : null;
-        const diskPct = (rs.disk_usage_gb && rs.disk_total_gb && rs.disk_total_gb > 0) ? Math.round(rs.disk_usage_gb / rs.disk_total_gb * 100) : null;
-        const cpuPct  = rs.cpu_usage_percent != null ? Math.round(rs.cpu_usage_percent) : null;
-        const cpuCol  = cpuPct  >= 80 ? 'danger' : cpuPct  >= 60 ? 'warning' : 'success';
-        const ramCol  = ramPct  >= 85 ? 'danger' : ramPct  >= 65 ? 'warning' : 'info';
-        const diskCol = diskPct >= 90 ? 'danger' : diskPct >= 70 ? 'warning' : 'primary';
-        const online  = rs.daemon_status === 'online';
-    %>
-    <div class="mb-3<%= rsList.indexOf(rs) < rsList.length - 1 ? ' pb-3 border-bottom' : '' %>">
+  <div data-rs-widget<% if (live) { %> data-rs-strom="/guild/<%= guildId %>/plugins/masterserver/rootservers/events"<% } %>>
+    <% rsList.forEach((rs, i) => { const a = auslastung(rs); %>
+    <div class="mb-3<%= i < rsList.length - 1 ? ' pb-3 border-bottom' : '' %>" data-rs-daemon="<%= rs.daemon_id %>">
         <!-- Header: Name + Badge -->
         <div class="d-flex justify-content-between align-items-center mb-2">
             <span class="fw-bold text-truncate" style="max-width:60%;" title="<%= rs.name %>">
                 <i class="fa-solid fa-server me-1 text-secondary" style="font-size:.8rem;"></i><%= rs.name %>
             </span>
-            <span class="badge bg-<%= online ? 'success' : 'secondary' %>-lt" style="font-size:.7rem;">
-                <%= online ? 'Online' : 'Offline' %>
+            <span class="badge bg-<%= a.online ? 'success' : 'secondary' %>-lt" style="font-size:.7rem;" data-rs-badge>
+                <%= a.online ? 'Online' : 'Offline' %>
             </span>
         </div>
 
@@ -35,35 +33,64 @@
             </div>
         <% } %>
 
-        <!-- CPU -->
-        <div class="d-flex align-items-center mb-1">
-            <span class="text-secondary" style="width:36px;font-size:.75rem;">CPU</span>
+        <% BALKEN.forEach(([art, beschriftung], j) => { const b = a[art]; %>
+        <div class="d-flex align-items-center <%= j === BALKEN.length - 1 ? 'mb-2' : 'mb-1' %>" data-rs-balken="<%= art %>">
+            <span class="text-secondary" style="width:36px;font-size:.75rem;"><%= beschriftung %></span>
             <div class="progress flex-grow-1 mx-2" style="height:5px;">
-                <div class="progress-bar bg-<%= cpuCol %>" style="width:<%= cpuPct != null ? cpuPct : 0 %>%"></div>
+                <div class="progress-bar bg-<%= b.farbe %>" style="width:<%= b.pct != null ? b.pct : 0 %>%"></div>
             </div>
-            <span style="width:32px;text-align:right;font-size:.75rem;color:#6c757d;"><%= cpuPct != null ? cpuPct+'%' : '–' %></span>
+            <span style="width:32px;text-align:right;font-size:.75rem;color:#6c757d;" data-rs-text><%= b.text %></span>
         </div>
-        <!-- RAM -->
-        <div class="d-flex align-items-center mb-1">
-            <span class="text-secondary" style="width:36px;font-size:.75rem;">RAM</span>
-            <div class="progress flex-grow-1 mx-2" style="height:5px;">
-                <div class="progress-bar bg-<%= ramCol %>" style="width:<%= ramPct != null ? ramPct : 0 %>%"></div>
-            </div>
-            <span style="width:32px;text-align:right;font-size:.75rem;color:#6c757d;"><%= ramPct != null ? ramPct+'%' : '–' %></span>
-        </div>
-        <!-- Disk -->
-        <div class="d-flex align-items-center mb-2">
-            <span class="text-secondary" style="width:36px;font-size:.75rem;">Disk</span>
-            <div class="progress flex-grow-1 mx-2" style="height:5px;">
-                <div class="progress-bar bg-<%= diskCol %>" style="width:<%= diskPct != null ? diskPct : 0 %>%"></div>
-            </div>
-            <span style="width:32px;text-align:right;font-size:.75rem;color:#6c757d;"><%= diskPct != null ? diskPct+'%' : '–' %></span>
-        </div>
+        <% }) %>
 
         <a href="/guild/<%= guildId %>/plugins/masterserver/rootservers/<%= rs.id %>"
            class="btn btn-sm btn-outline-primary" style="font-size:.75rem;padding:.15em .55em;">
             <i class="fa-solid fa-arrow-right me-1"></i>Details
         </a>
     </div>
-    <% } %>
+    <% }) %>
+  </div>
+  <% if (live) { %>
+  <script>
+  (function () {
+      // Zeichnet nur, was der Herzschlag (alle 30 s) fertig gerechnet schickt.
+      var widget = document.querySelector('[data-rs-widget][data-rs-strom]');
+      if (!widget || widget.dataset.rsVerbunden) return;
+      widget.dataset.rsVerbunden = '1';
+
+      function zeichne(block, anzeige) {
+          var badge = block.querySelector('[data-rs-badge]');
+          badge.className = 'badge bg-' + (anzeige.online ? 'success' : 'secondary') + '-lt';
+          badge.textContent = anzeige.online ? 'Online' : 'Offline';
+          ['cpu', 'ram', 'disk'].forEach(function (art) {
+              var b = anzeige[art];
+              if (!b) return;   // offline: Messwerte bleiben stehen, nur das Abzeichen wechselt
+              var zeile = block.querySelector('[data-rs-balken="' + art + '"]');
+              var balken = zeile.querySelector('.progress-bar');
+              balken.className = 'progress-bar bg-' + b.farbe;
+              balken.style.width = (b.pct != null ? b.pct : 0) + '%';
+              zeile.querySelector('[data-rs-text]').textContent = b.text;
+          });
+      }
+
+      function verbinde() {
+          var strom = new EventSource(widget.dataset.rsStrom);
+          strom.addEventListener('metrics', function (e) {
+              var d;
+              try { d = JSON.parse(e.data); } catch (_) { return; }
+              if (d.action !== 'host_stats' || !d.anzeige) return;
+              widget.querySelectorAll('[data-rs-daemon]').forEach(function (block) {
+                  if (block.dataset.rsDaemon === d.daemon_id) zeichne(block, d.anzeige);
+              });
+          });
+          // Kurze Aussetzer verbindet der Browser selbst neu; ist der Strom zu
+          // (Neustart des Dashboards), nach 30 s noch einmal.
+          strom.onerror = function () {
+              if (strom.readyState === EventSource.CLOSED) setTimeout(verbinde, 30000);
+          };
+      }
+      verbinde();
+  })();
+  </script>
+  <% } %>
 <% } %>
