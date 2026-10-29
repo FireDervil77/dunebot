@@ -18,8 +18,11 @@
  * Takt, damit eine verspätete Erneuerung keine Lücke reißt.
  *
  * Ein Daemon vor dem Befehl (bis 1.0.151) lehnt ab — dann bleibt es beim
- * Herzschlag alle 30 s. Gemeldet einmal je Daemon und Dashboard-Lauf, nicht
- * alle 30 s.
+ * Herzschlag alle 30 s. Gemeldet wird der WECHSEL, nicht jede Runde: „liefert
+ * keine" beim ersten Ablehnen, „liefert" beim ersten Annehmen. Ohne die
+ * zweite Zeile ließ sich am 2026-10-29 nach dem Umstieg auf 1.0.152 nicht
+ * ablesen, ob der Takt läuft — die Messwerte selbst sind flüchtig, und um
+ * 08:21:25 lehnten noch die alten Daemons ab, sechs Sekunden vor ihrem Wechsel.
  *
  * @module helpers/Messwertbestellung
  */
@@ -31,7 +34,8 @@ const FRIST_SEK = 60;
 const BEFEHL = 'system.messwerte';
 
 let takt = null;
-const abgelehnt = new Set();
+/** daemonId → true (nimmt an) | false (lehnt ab); gemeldet wird nur ein Wechsel. */
+const stand = new Map();
 
 /**
  * Welche Daemons einer Guild gerade jemand sehen will.
@@ -63,10 +67,15 @@ function bestelleFuer(guildId) {
         if (conn.metadata?.guild_id !== guildId) continue;
         if (!alle && !daemons.has(daemonId)) continue;
         ipmServer.sendCommand(daemonId, BEFEHL, { sekunden: FRIST_SEK }, 10000)
-            .then(() => abgelehnt.delete(daemonId))
+            .then(() => {
+                if (stand.get(daemonId) === true) return;
+                stand.set(daemonId, true);
+                ServiceManager.get('Logger').info(
+                    `[Masterserver] Daemon ${daemonId} liefert Live-Messwerte (alle 3 s, solange jemand zusieht)`);
+            })
             .catch(fehler => {
-                if (abgelehnt.has(daemonId)) return;
-                abgelehnt.add(daemonId);
+                if (stand.get(daemonId) === false) return;
+                stand.set(daemonId, false);
                 ServiceManager.get('Logger').info(
                     `[Masterserver] Daemon ${daemonId} liefert keine Live-Messwerte (${fehler.message}) — `
                     + 'es bleibt beim Herzschlag alle 30 s');

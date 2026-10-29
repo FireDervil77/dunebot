@@ -276,10 +276,20 @@ function attrappenBlock(daemonId) {
         Bestellung.runde(); await warte();
         assert.deepStrictEqual(befehle.map(b => b[0]).sort(), ['d1', 'd2'], 'Widget: alle der Guild, keine fremden');
 
+        // Gemeldet wird der Wechsel, nicht jede Runde — der Ablauf vom
+        // 2026-10-29: erst nimmt er an, dann (alter Daemon) lehnt er ab, dann
+        // nach dem Umstieg wieder an.
+        const zaehle = (re) => meldungen.filter(m => re.test(m)).length;
+        Bestellung.runde(); await warte();
+        assert.strictEqual(zaehle(/d1 liefert Live-Messwerte/), 1, 'Annahme nicht genau einmal gemeldet');
         lehneAb = true;
         Bestellung.runde(); await warte();
         Bestellung.runde(); await warte();
-        assert.strictEqual(meldungen.filter(m => /d1 liefert keine Live-Messwerte/.test(m)).length, 1, 'Ablehnung nicht genau einmal gemeldet');
+        assert.strictEqual(zaehle(/d1 liefert keine Live-Messwerte/), 1, 'Ablehnung nicht genau einmal gemeldet');
+        lehneAb = false;
+        Bestellung.runde(); await warte();
+        Bestellung.runde(); await warte();
+        assert.strictEqual(zaehle(/d1 liefert Live-Messwerte/), 2, 'Wiederaufnahme nach dem Umstieg nicht gemeldet');
     });
 
     await pruefe('die SSE-Route bestellt beim Verbinden', async () => {
