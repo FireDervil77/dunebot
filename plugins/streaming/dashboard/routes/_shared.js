@@ -39,7 +39,10 @@ function makeTranslator(req, res) {
  * @returns {Promise<*>} Ergebnis des ThemeManagers
  */
 async function renderView(res, viewPath, data) {
-    return await ServiceManager.get('themeManager').renderView(res, viewPath, data);
+    // Die Ansichten rufen `vorWieLange(zeit)`; die Sprache steckt hier einmal drin.
+    const daten = data?.vorWieLange && data?.tr
+        ? { ...data, vorWieLange: (zeit) => vorWieLange(zeit, data.tr) } : data;
+    return await ServiceManager.get('themeManager').renderView(res, viewPath, daten);
 }
 
 /**
@@ -236,16 +239,17 @@ async function getMitglieder(guildId) {
  * @param {Date|string|null} zeitpunkt Zeitpunkt
  * @returns {string|null} Klartext oder null
  */
-function vorWieLange(zeitpunkt) {
+function vorWieLange(zeitpunkt, tr = null) {
     if (!zeitpunkt) return null;
     const dann = new Date(zeitpunkt).getTime();
     if (Number.isNaN(dann)) return null;
 
     const sek = Math.max(0, Math.round((Date.now() - dann) / 1000));
-    if (sek < 60)    return `vor ${sek} s`;
-    if (sek < 3600)  return `vor ${Math.round(sek / 60)} min`;
-    if (sek < 86400) return `vor ${Math.round(sek / 3600)} h`;
-    return `vor ${Math.round(sek / 86400)} Tagen`;
+    const text = (schluessel, deutsch, n) => tr ? tr(`streaming:COMMON.${schluessel}`, { n }) : deutsch(n);
+    if (sek < 60)    return text('VOR_S', n => `vor ${n} s`, sek);
+    if (sek < 3600)  return text('VOR_MIN', n => `vor ${n} min`, Math.round(sek / 60));
+    if (sek < 86400) return text('VOR_H', n => `vor ${n} h`, Math.round(sek / 3600));
+    return text('VOR_TAGE', n => `vor ${n} Tagen`, Math.round(sek / 86400));
 }
 
 module.exports = {

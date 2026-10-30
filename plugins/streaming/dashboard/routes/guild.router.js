@@ -213,9 +213,11 @@ require('../entwuerfe').namen()
             // Verweis wird hier aufgeloest und nicht in der Ansicht: Die
             // Guild-Kennung gehoert nicht in eine Datentabelle, die keine
             // Anfrage kennt.
+            const sprache = String(res.locals?.locale || '').startsWith('en') ? daten.en : null;
+            const fassung = sprache ? { ...daten, ...sprache } : daten;
             const seite = {
-                ...daten,
-                verweise: (daten.verweise || []).map(v => ({
+                ...fassung,
+                verweise: (fassung.verweise || []).map(v => ({
                     text: v.text,
                     url: v.url.startsWith('PLUGIN:')
                         ? `/guild/${guildId}/plugins/${v.url.slice(7)}`

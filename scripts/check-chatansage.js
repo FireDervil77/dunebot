@@ -358,7 +358,13 @@ pruefe(/unter deinem Namen/.test(registrierung),
     'ihr Hinweis sagt "unter deinem Namen" - im Dialog, vor dem Klick');
 pruefe(/unter meinem Namen/.test(profilKern),
     'das Profil traegt dieselbe Aussage als eigene Zeile');
-pruefe(/unter dem Namen \$\{name\}/.test(seite),
+// Der Satz steht seit 2026-10-30 in den Sprachdateien; die Pruefung bleibt: In
+// BEIDEN Fassungen steht der Name, und die Seite setzt ihn ein.
+const kastenSatz = (sprache) => JSON.parse(fs.readFileSync(path.join(__dirname,
+    `../plugins/streaming/dashboard/locales/${sprache}.json`), 'utf8')).CHATBOT.SCHREIBT_ALS;
+pruefe(/unter dem Namen \{\{name\}\}/.test(kastenSatz('de-DE'))
+    && /under the name \{\{name\}\}/.test(kastenSatz('en-GB'))
+    && /CHATBOT\.SCHREIBT_ALS', \{ name \}/.test(seite),
     'die Chatbot-Seite nennt den Namen im Kasten ueber dem Schalter',
     'eine Fussnote genuegt nach 17.5 ausdruecklich nicht');
 

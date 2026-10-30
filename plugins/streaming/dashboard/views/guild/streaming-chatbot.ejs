@@ -1,8 +1,8 @@
 <%- include('partials/streaming-kopf', {
   guildId, tr,
   icon: 'fa-solid fa-comments',
-  titel: 'Chatbot',
-  beschreibung: 'Der Twitch-Chat der Kanäle, die diesen Server als Heim gewählt haben.'
+  titel: tr('streaming:CHATBOT.TITLE'),
+  beschreibung: tr('streaming:CHATBOT.SUBTITLE')
 }) %>
 
 <%
@@ -24,19 +24,19 @@
   const darf  = hasPermission('STREAMING.CHAT.MANAGE');
 
   const meldungen = {
-    abgeglichen: 'Der Chat-Anschluss wurde abgeglichen.',
-    gespeichert: 'Übernommen.',
-    probe:       'Die Probe ist unterwegs. Steht sie nicht im Chat, sagt es die Karte gleich.'
+    abgeglichen: tr('streaming:CHATBOT.OK_ABGEGLICHEN'),
+    gespeichert: tr('streaming:CHATBOT.OK_GESPEICHERT'),
+    probe:       tr('streaming:CHATBOT.OK_PROBE')
   };
   const fehlerTexte = {
-    kein_heim:   'Dieser Server ist für keinen Kanal das Heim.',
-    abgebrochen: 'Es wurde nichts abgeglichen — der Grund steht in der Karte unten.',
-    kanal:       'Zu diesem Kanal fehlte die Kennung — es wurde nichts geändert.',
-    aus:         'Die Live-Ansage ist ausgeschaltet — es wurde nichts gesendet.',
-    zu_lang:     'Der Text ist zu lang. Twitch nimmt höchstens 500 Zeichen.',
-    platzhalter: 'Darin steht ein Platzhalter, den es nicht gibt. Er würde wörtlich im Chat stehen.',
-    nur_discord: '{rolle} und {dauer} gibt es nur in der Discord-Ankündigung — im Twitch-Chat wären sie nur Zeichen.',
-    technisch:   'Das hat technisch nicht geklappt. Der Grund steht im Protokoll.'
+    kein_heim:   tr('streaming:CHATBOT.F_KEIN_HEIM'),
+    abgebrochen: tr('streaming:CHATBOT.F_ABGEBROCHEN'),
+    kanal:       tr('streaming:CHATBOT.F_KANAL'),
+    aus:         tr('streaming:CHATBOT.F_AUS'),
+    zu_lang:     tr('streaming:CHATBOT.F_ZU_LANG'),
+    platzhalter: tr('streaming:CHATBOT.F_PLATZHALTER'),
+    nur_discord: tr('streaming:CHATBOT.F_NUR_DISCORD'),
+    technisch:   tr('streaming:CHATBOT.F_TECHNISCH')
   };
 
   /**
@@ -60,22 +60,17 @@
     <div class="card-body">
       <%- include('shared/leerzustand', {
             icon:  'fa-solid fa-comments',
-            titel: 'Kein Kanal hat diesen Server als Heim gewählt',
-            text:  'Der Chatbot eines Kanals wird an genau einem Discord verwaltet. '
-                 + 'Diese Wahl trifft der Kanalinhaber selbst, im Profil unter „Verbundene Konten“.'
+            titel: tr('streaming:CHATBOT.LEER_TITEL'),
+            text:  tr('streaming:CHATBOT.LEER_TEXT')
           }) %>
     </div>
   </div>
 <% } else { %>
 
   <%- include('shared/funktionskarte', {
-        titel:        'Warum hier',
+        titel:        tr('streaming:CHATBOT.WARUM_TITEL'),
         icon:         'fa-solid fa-circle-info',
-        koerper:      '<p class="mb-0">Der Chatbot eines Twitch-Kanals wird an <strong>genau einem</strong> '
-                    + 'Discord verwaltet — an dem, den der Kanalinhaber gewählt hat. '
-                    + 'Andere Server können seinen Stream verfolgen und ankündigen, aber nicht '
-                    + 'seinen Chat einstellen. So kann niemand an fremden Chat-Einstellungen drehen, '
-                    + 'nur weil er hier Rechte hat.</p>'
+        koerper:      '<p class="mb-0">' + tr('streaming:CHATBOT.WARUM_TEXT') + '</p>'
   }) %>
 
   <% kanaele.forEach(k => { %>
@@ -91,32 +86,31 @@
        */
       let leitungZeile;
       if (modZustand !== 'ja') {
-        leitungZeile = '<div class="text-secondary small">Der Chat wird erst abonniert, wenn der Bot '
-                     + 'Moderator ist.</div>';
+        leitungZeile = '<div class="text-secondary small">' + tr('streaming:CHATBOT.MOD_ZUERST') + '</div>';
       } else if (k.abo && k.abo.fehler) {
-        leitungZeile = `<div><span class="badge bg-red-lt">abgelehnt</span></div>
-                        <div class="text-secondary small mt-1">Twitch sagt: ${k.abo.fehler}</div>`;
+        leitungZeile = `<div><span class="badge bg-red-lt">${tr('streaming:CHATBOT.ABGELEHNT')}</span></div>
+                        <div class="text-secondary small mt-1">${tr('streaming:CHATBOT.TWITCH_SAGT', { grund: k.abo.fehler })}</div>`;
       } else if (k.abo) {
         const empfangen = k.empfangen
-          ? `${k.empfangen.anzahl} Nachricht${k.empfangen.anzahl === 1 ? '' : 'en'} seit dem Verbinden`
-          : 'noch nichts empfangen — der Kanal ist vermutlich still';
+          ? tr(k.empfangen.anzahl === 1 ? 'streaming:CHATBOT.EMPFANGEN_EINE' : 'streaming:CHATBOT.EMPFANGEN_VIELE', { n: k.empfangen.anzahl })
+          : tr('streaming:CHATBOT.NICHTS_EMPFANGEN');
         leitungZeile = `<div>${abzeichen(k.abo.zustand || 'unbekannt', 'bestaetigt', 'fehler')}</div>
                         <div class="text-secondary small mt-1">${empfangen}</div>`;
       } else {
-        leitungZeile = '<div><span class="badge bg-secondary-lt">nicht abonniert</span></div>'
-                     + '<div class="text-secondary small mt-1">Der nächste Abgleich holt das nach.</div>';
+        leitungZeile = '<div><span class="badge bg-secondary-lt">' + tr('streaming:CHATBOT.NICHT_ABONNIERT') + '</span></div>'
+                     + '<div class="text-secondary small mt-1">' + tr('streaming:CHATBOT.NAECHSTER_ABGLEICH') + '</div>';
       }
 
       const koerper = `
         <div class="d-flex align-items-center gap-2 mb-2">
-          <span class="fw-medium">Bot im Chat</span>
+          <span class="fw-medium">${tr('streaming:CHATBOT.BOT_IM_CHAT')}</span>
           ${abzeichen(modZustand, 'ja', 'nein')}
         </div>
         ${a && a.text    ? `<div class="text-secondary small">${a.text}</div>` : ''}
         ${a && a.hinweis ? `<div class="text-secondary small">${a.hinweis}</div>` : ''}
-        ${a && a.tat     ? `<div class="small mt-2">Zu tun: <code>${a.tat}</code></div>` : ''}
+        ${a && a.tat     ? `<div class="small mt-2">${tr('streaming:CHATBOT.ZU_TUN')} <code>${a.tat}</code></div>` : ''}
         <hr class="my-3">
-        <div class="fw-medium mb-2">Chat-Leitung</div>
+        <div class="fw-medium mb-2">${tr('streaming:CHATBOT.LEITUNG')}</div>
         ${leitungZeile}`;
     %>
     <%- include('shared/funktionskarte', {
@@ -140,18 +134,13 @@
       const darfSchreiben = k.darf_schreiben || { zustand: 'unbekannt', grund: null };
       const an = Number(k.chat_ansage_an) === 1;
 
-      let hinweisBlock = `<strong>Der Chatbot schreibt unter dem Namen ${name}</strong> —
-        nicht unter einem Botnamen. Wer die Ansage liest, sieht sie so, als hätte
-        ${name} sie selbst getippt.`;
+      let hinweisBlock = `${tr('streaming:CHATBOT.SCHREIBT_ALS', { name })}`;
 
       if (darfSchreiben.zustand === 'nein') {
-        hinweisBlock += `<hr class="my-2"><strong>Erlaubt ist das noch nicht.</strong>
-          Eingeschaltet passiert deshalb nichts: Nur ${name} selbst kann es erlauben,
-          im eigenen Profil unter <em>Verbundene Konten → Berechtigungen</em>.
+        hinweisBlock += `<hr class="my-2">${tr('streaming:CHATBOT.NOCH_NICHT_ERLAUBT', { name })}
           ${darfSchreiben.grund ? darfSchreiben.grund : ''}`;
       } else if (darfSchreiben.zustand === 'unbekannt') {
-        hinweisBlock += `<hr class="my-2">Ob es erlaubt ist, lässt sich gerade nicht
-          feststellen. ${darfSchreiben.grund || ''}`;
+        hinweisBlock += `<hr class="my-2">${tr('streaming:CHATBOT.ERLAUBT_UNKLAR')} ${darfSchreiben.grund || ''}`;
       }
 
       /*
@@ -163,16 +152,14 @@
       const l = k.letzte_ansage;
       let ausgang = '';
       if (l) {
-        const wann = vorWieLange(l.erledigt_am || l.faellig_ab) || 'gerade eben';
+        const wann = vorWieLange(l.erledigt_am || l.faellig_ab) || tr('streaming:CHATBOT.GERADE_EBEN');
         if (l.zustand === 'fertig') {
-          ausgang = `<div><span class="badge bg-green-lt">gesendet</span>
+          ausgang = `<div><span class="badge bg-green-lt">${tr('streaming:CHATBOT.GESENDET')}</span>
                      <span class="text-secondary small ms-1">${wann}${l.fehlertext ? ' — ' + l.fehlertext : ''}</span></div>`;
         } else if (l.zustand === 'aufgegeben') {
-          ausgang = `<div class="alert alert-warning mb-0"><strong>Die letzte Ansage kam nicht an.</strong><br>
-                     ${l.fehlertext || 'Ohne Angabe eines Grundes.'}
-                     <div class="small mt-1">${wann}. Es wird nicht noch einmal versucht —
-                     eine Chatnachricht lässt sich nicht zurückholen, und fünf gleiche
-                     wären schlimmer als keine.</div></div>`;
+          ausgang = `<div class="alert alert-warning mb-0">${tr('streaming:CHATBOT.NICHT_ANGEKOMMEN')}<br>
+                     ${l.fehlertext || tr('streaming:CHATBOT.OHNE_GRUND')}
+                     <div class="small mt-1">${tr('streaming:CHATBOT.NICHT_NOCHMAL', { wann })}</div></div>`;
         } else {
           /*
            * **„laeuft" bleibt nach einem Absturz stehen — mit Absicht.** Der
@@ -183,31 +170,30 @@
            */
           const alterMin = (Date.now() - new Date(l.faellig_ab).getTime()) / 60000;
           ausgang = (l.zustand === 'laeuft' && alterMin > 5)
-            ? `<div><span class="badge bg-secondary-lt">ungewiss</span>
-               <span class="text-secondary small ms-1">${wann} begonnen — ob sie ankam,
-               lässt sich nicht mehr feststellen. Es wird nichts nachgeholt.</span></div>`
-            : `<div><span class="badge bg-secondary-lt">unterwegs</span>
-               <span class="text-secondary small ms-1">${wann} vorgemerkt</span></div>`;
+            ? `<div><span class="badge bg-secondary-lt">${tr('streaming:CHATBOT.UNGEWISS')}</span>
+               <span class="text-secondary small ms-1">${tr('streaming:CHATBOT.UNGEWISS_TEXT', { wann })}</span></div>`
+            : `<div><span class="badge bg-secondary-lt">${tr('streaming:CHATBOT.UNTERWEGS')}</span>
+               <span class="text-secondary small ms-1">${tr('streaming:CHATBOT.VORGEMERKT', { wann })}</span></div>`;
         }
       } else {
-        ausgang = '<div class="text-secondary small">Noch nichts gesendet.</div>';
+        ausgang = '<div class="text-secondary small">' + tr('streaming:CHATBOT.NOCH_NICHTS') + '</div>';
       }
 
       const ansageKoerper = `
         <input type="hidden" name="streamer_id" value="${k.id}">
         <div class="mb-3">
-          <label class="form-label" for="ansage-${k.id}">Was im Chat stehen soll</label>
+          <label class="form-label" for="ansage-${k.id}">${tr('streaming:CHATBOT.WAS_IM_CHAT')}</label>
           <textarea class="form-control" id="ansage-${k.id}" name="ansage_text"
                     rows="2" maxlength="${chatMax}"
                     placeholder="${vorgabeAnsage}"
                     ${darf ? '' : 'disabled'}>${k.chat_ansage_text || ''}</textarea>
           <div class="form-hint">
-            Leer heißt: <code>${vorgabeAnsage}</code>.
-            Höchstens ${chatMax} Zeichen — mehr nimmt Twitch nicht an.
-            Platzhalter: ${platzhalter.map(p => '<code>' + p.name + '</code>').join(' ')}.
+            ${tr('streaming:CHATBOT.LEER_HEISST')} <code>${vorgabeAnsage}</code>.
+            ${tr('streaming:CHATBOT.HOECHSTENS', { n: chatMax })}
+            ${tr('streaming:CHATBOT.PLATZHALTER')} ${platzhalter.map(p => '<code>' + p.name + '</code>').join(' ')}.
           </div>
         </div>
-        <div class="fw-medium mb-1">Zuletzt</div>
+        <div class="fw-medium mb-1">${tr('streaming:CHATBOT.ZULETZT')}</div>
         ${ausgang}`;
     %>
 
@@ -224,8 +210,8 @@
     </form>
 
     <%- include('shared/funktionskarte', {
-          titel:        'Live-Ansage im Chat',
-          beschreibung: 'Wenn der Stream startet, sagt der Bot es im Twitch-Chat.',
+          titel:        tr('streaming:CHATBOT.ANSAGE_TITEL'),
+          beschreibung: tr('streaming:CHATBOT.ANSAGE_TEXT'),
           icon:         'fa-solid fa-bullhorn',
           id:           'chatansage-' + k.id,
           aktion:       basis + '/chatbot/ansage',
@@ -236,8 +222,8 @@
           koerper:      ansageKoerper,
           fuss:         (darf && an)
                           ? `<button type="submit" form="chatprobe-${k.id}"
-                               class="btn btn-outline-secondary">Probe in den Chat</button>
-                             <span class="text-secondary small">steht wirklich im Chat</span>`
+                               class="btn btn-outline-secondary">${tr('streaming:CHATBOT.PROBE')}</button>
+                             <span class="text-secondary small">${tr('streaming:CHATBOT.PROBE_HINWEIS')}</span>`
                           : ''
     }) %>
   <% }); %>
@@ -251,25 +237,22 @@
     const b = bericht;
     let berichtKoerper;
     if (!b) {
-      berichtKoerper = '<p class="text-secondary mb-0">Noch kein Abgleich gelaufen. '
-                     + 'Der Tageslauf holt das nach — oder du stößt ihn hier an.</p>';
+      berichtKoerper = '<p class="text-secondary mb-0">' + tr('streaming:CHATBOT.KEIN_ABGLEICH') + '</p>';
     } else {
-      const wann = vorWieLange(b.gelaufen_am) || 'gerade eben';
+      const wann = vorWieLange(b.gelaufen_am) || tr('streaming:CHATBOT.GERADE_EBEN');
       const zeilen = [];
       if (b.abgebrochen) {
-        zeilen.push(`<div class="alert alert-warning mb-2">Abgebrochen: ${b.abgebrochen}.
-                     Es wurde nichts bestellt und nichts abbestellt.</div>`);
+        zeilen.push(`<div class="alert alert-warning mb-2">${tr('streaming:CHATBOT.ABGEBROCHEN', { grund: b.abgebrochen })}</div>`);
       } else {
-        zeilen.push(`<div>${b.gewuenscht} Kanal-Chat(s) sollen anliegen, `
-                  + `${b.vorhanden} Abo(s) stehen bei Twitch.</div>`);
-        if (b.bestellt.length)   zeilen.push(`<div class="small text-secondary">neu angeschlossen: ${b.bestellt.join(', ')}</div>`);
-        if (b.abbestellt.length) zeilen.push(`<div class="small text-secondary">abgemeldet: ${b.abbestellt.join(', ')}</div>`);
+        zeilen.push(`<div>${tr('streaming:CHATBOT.SOLL_IST', { soll: b.gewuenscht, ist: b.vorhanden })}</div>`);
+        if (b.bestellt.length)   zeilen.push(`<div class="small text-secondary">${tr('streaming:CHATBOT.NEU', { liste: b.bestellt.join(', ') })}</div>`);
+        if (b.abbestellt.length) zeilen.push(`<div class="small text-secondary">${tr('streaming:CHATBOT.AB', { liste: b.abbestellt.join(', ') })}</div>`);
       }
       if (b.fehler && b.fehler.length) {
-        zeilen.push(`<div class="alert alert-danger mt-2 mb-0"><strong>Abgelehnt:</strong><br>`
+        zeilen.push(`<div class="alert alert-danger mt-2 mb-0"><strong>${tr('streaming:CHATBOT.ABGELEHNT_TITEL')}</strong><br>`
                   + b.fehler.map(f => String(f)).join('<br>') + '</div>');
       }
-      zeilen.push(`<div class="text-secondary small mt-2">Letzter Lauf: ${wann}.</div>`);
+      zeilen.push(`<div class="text-secondary small mt-2">${tr('streaming:CHATBOT.LETZTER_LAUF', { wann })}</div>`);
       berichtKoerper = zeilen.join('\n');
     }
 
@@ -282,35 +265,30 @@
     berichtKoerper += `
       <hr class="my-3">
       <div class="d-flex align-items-center gap-2">
-        <span class="fw-medium">Leitung zu Twitch</span>
+        <span class="fw-medium">${tr('streaming:CHATBOT.LEITUNG_TWITCH')}</span>
         ${l && l.verbunden
-          ? '<span class="badge bg-green-lt">verbunden</span>'
-          : '<span class="badge bg-red-lt">getrennt</span>'}
+          ? '<span class="badge bg-green-lt">' + tr('streaming:CHATBOT.VERBUNDEN') + '</span>'
+          : '<span class="badge bg-red-lt">' + tr('streaming:CHATBOT.GETRENNT') + '</span>'}
       </div>
       ${l && l.fehler ? `<div class="text-secondary small mt-1">${l.fehler}</div>` : ''}
-      ${l && !l.conduitId ? '<div class="text-secondary small mt-1">Ohne Conduit kann kein Chat abonniert werden.</div>' : ''}`;
+      ${l && !l.conduitId ? '<div class="text-secondary small mt-1">' + tr('streaming:CHATBOT.OHNE_CONDUIT') + '</div>' : ''}`;
   %>
 
   <%- include('shared/funktionskarte', {
-        titel:        'Anschluss abgleichen',
+        titel:        tr('streaming:CHATBOT.ABGLEICH_TITEL'),
         icon:         'fa-solid fa-rotate',
-        beschreibung: 'Wer gerade /mod getippt hat, muss nicht bis zum nächsten Tageslauf warten.',
+        beschreibung: tr('streaming:CHATBOT.ABGLEICH_TEXT'),
         id:           'chat-abgleich',
         aktion:       basis + '/chatbot/abgleich',
         csrfToken:    typeof csrfToken !== 'undefined' ? csrfToken : '',
         darf:         darf,
-        speichern:    'Jetzt abgleichen',
+        speichern:    tr('streaming:CHATBOT.ABGLEICH_KNOPF'),
         koerper:      berichtKoerper
   }) %>
 
   <div class="card">
     <div class="card-body text-secondary small">
-      <strong>Befehle und Chat-Filter kommen mit Stufe 15.</strong>
-      Heute liest der Bot mit, zählt — und sagt beim Streamstart Bescheid, wenn
-      das eingeschaltet ist. Was im Chat ankommt, wird dabei
-      <strong>nicht gespeichert</strong>: kein Text, kein Absender. Ob, wie lange
-      und wofür das zulässig wäre, gehört zur ausstehenden Rechtsprüfung und
-      wird nicht nebenbei in einem Zähler entschieden.
+      <%- tr('streaming:CHATBOT.FUSSNOTE') %>
     </div>
   </div>
 <% } %>

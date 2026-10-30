@@ -243,7 +243,54 @@ const SEITEN = {
                 + 'unverändert zu lassen</b>. Das ist eine eigene Stufe, kein Anbau.'
         },
 
-        verweise: [{ text: 'Automod öffnen', url: 'PLUGIN:automod' }]
+        verweise: [{ text: 'Automod öffnen', url: 'PLUGIN:automod' }],
+
+        // Die englische Fassung steht beim Entwurf und nicht in den
+        // Sprachdateien, aus demselben Grund wie die deutsche (Kopf dieser Datei).
+        en: {
+            titel: 'Chat protection',
+            untertitel: 'Your Discord rules, applied to Twitch chat',
+            wofuer: {
+                titel: 'One set of rules, all chats',
+                saetze: [
+                    'What you set up in Discord against caps, links and banned words should apply here too: '
+                    + 'the same rules, the same exceptions, the same escalation. You maintain them in one place.',
+                    'One set of rules for both chats also means that whoever changes them changes them '
+                    + 'everywhere, with no second rulebook to forget.'
+                ]
+            },
+            merkmale: [
+                { zustand: 'entwurf', icon: 'fa-solid fa-font', titel: 'Caps',
+                  text: 'The caps rule from Automod, for Twitch as well.' },
+                { zustand: 'entwurf', icon: 'fa-solid fa-link', titel: 'Links',
+                  text: 'Who may post links and who may not.' },
+                { zustand: 'entwurf', icon: 'fa-solid fa-ban', titel: 'Banned words',
+                  text: 'The same keyword list as in Discord.' },
+                { zustand: 'entwurf', icon: 'fa-solid fa-globe', titel: 'YouTube and Kick later on',
+                  text: 'The same set of rules with one more output, not a third rulebook.' }
+            ],
+            vorhanden: [
+                { was: 'The plain pattern match', wo: 'automod/shared/stichwortTreffer.js' },
+                { was: 'Rules, keywords, exceptions, escalation', wo: 'Plugin automod' },
+                { was: 'Checking whether a plugin is running', wo: 'pluginManager.isPluginEnabledForGuild()' }
+            ],
+            fehlt: [
+                { was: 'A check layer that only sees text',
+                  warum: '<code>automod/bot/events/messageCreate.js</code> is <b>472 lines in a single '
+                       + 'function</b> around the Discord message object, with 20 accesses to it. '
+                       + 'There is no place to call "check this text for this guild".' },
+                { was: 'An output for Twitch',
+                  warum: 'Deletions and timeouts use different calls than in Discord, and different '
+                       + 'permissions that nobody has granted yet.' }
+            ],
+            sperre: {
+                titel: 'The most expensive item on the list',
+                text: 'This page looked like the cheap lever. It is not: it first requires extracting the '
+                    + 'check layer from 472 lines <b>while leaving Discord behaviour unchanged</b>. That is a '
+                    + 'stage of its own, not an add-on.'
+            },
+            verweise: [{ text: 'Open Automod', url: 'PLUGIN:automod' }]
+        }
     },
 
     mitmachen: {

@@ -31,14 +31,15 @@ const modelle = require('../../shared/models');
  *
  * @param {Object|null} a Zeile aus `musikende.letzter`
  * @param {string} zeitzone IANA-Zeitzone der Guild
+ * @param {Function} tr Uebersetzung der Anfrage
  * @returns {string|null} Klartext
  */
-function streamendeZeile(a, zeitzone) {
+function streamendeZeile(a, zeitzone, tr) {
     if (!a) return null;
     const zeit = (d) => new Date(d).toLocaleString('de-DE', {
         timeZone: zeitzone, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
     });
-    if (a.zustand === 'offen') return `wartet bis ${zeit(a.faellig_ab)}`;
+    if (a.zustand === 'offen') return tr('streaming:MUSIK.WARTET_BIS', { zeit: zeit(a.faellig_ab) });
     return `${zeit(a.erledigt_am || a.faellig_ab)} — ${a.fehlertext || a.zustand}`;
 }
 
@@ -112,7 +113,7 @@ router.get('/', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => 
         return await renderView(res, 'guild/streaming-musik', {
             tr, guildId,
             streamende,
-            streamendeZuletzt: streamendeZeile(streamendeLetzter, zeitzone),
+            streamendeZuletzt: streamendeZeile(streamendeLetzter, zeitzone, tr),
             nachlaufGrenzen: { min: musikendeEntscheidung.NACHLAUF_MIN, max: musikendeEntscheidung.NACHLAUF_MAX },
             adresse: playerAdresse(req, zustand.schluessel),
             aktiv: Boolean(zustand.aktiv),
@@ -138,15 +139,16 @@ router.get('/', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => 
 router.post('/schluessel', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
     const guildId = res.locals.guildId;
     const basis = `/guild/${guildId}/plugins/streaming/musik`;
+    const tr = makeTranslator(req, res);
 
     try {
         await musik.schluesselNeu(guildId);
         ServiceManager.get('Logger').info(
             `[Streaming] Player-Schluessel neu erzeugt (Guild ${guildId})`);
-        return res.redirect(`${basis}?ok=${encodeURIComponent('Neue Adresse erzeugt — trag sie in OBS ein.')}`);
+        return res.redirect(`${basis}?ok=${encodeURIComponent(tr('streaming:MUSIK.R_ADRESSE_NEU'))}`);
     } catch (error) {
         ServiceManager.get('Logger').error('[Streaming] Schluessel nicht erneuerbar:', error);
-        return res.redirect(`${basis}?fehler=${encodeURIComponent('Die Adresse konnte nicht erneuert werden.')}`);
+        return res.redirect(`${basis}?fehler=${encodeURIComponent(tr('streaming:MUSIK.R_ADRESSE_FEHLER'))}`);
     }
 });
 
@@ -154,14 +156,15 @@ router.post('/schluessel', requirePermission('STREAMING.CHAT.MANAGE'), async (re
 router.post('/abspielen', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
     const guildId = res.locals.guildId;
     const basis = `/guild/${guildId}/plugins/streaming/musik`;
+    const tr = makeTranslator(req, res);
 
     try {
         const an = req.body?.an === '1';
         await musik.abspielen(guildId, an);
-        return res.redirect(`${basis}?ok=${encodeURIComponent(an ? 'Läuft.' : 'Angehalten.')}`);
+        return res.redirect(`${basis}?ok=${encodeURIComponent(tr(an ? 'streaming:MUSIK.R_LAEUFT' : 'streaming:MUSIK.R_ANGEHALTEN'))}`);
     } catch (error) {
         ServiceManager.get('Logger').error('[Streaming] Wiedergabe nicht schaltbar:', error);
-        return res.redirect(`${basis}?fehler=${encodeURIComponent('Das hat nicht geklappt.')}`);
+        return res.redirect(`${basis}?fehler=${encodeURIComponent(tr('streaming:MUSIK.R_FEHLER'))}`);
     }
 });
 
@@ -169,14 +172,14 @@ router.post('/abspielen', requirePermission('STREAMING.CHAT.MANAGE'), async (req
 router.post('/beenden', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
     const guildId = res.locals.guildId;
     const basis = `/guild/${guildId}/plugins/streaming/musik`;
+    const tr = makeTranslator(req, res);
 
     try {
         await musik.beenden(guildId);
-        return res.redirect(`${basis}?ok=${encodeURIComponent(
-            'Beendet — die Liste beginnt beim nächsten Start von vorn.')}`);
+        return res.redirect(`${basis}?ok=${encodeURIComponent(tr('streaming:MUSIK.R_BEENDET'))}`);
     } catch (error) {
         ServiceManager.get('Logger').error('[Streaming] Wiedergabe nicht beendbar:', error);
-        return res.redirect(`${basis}?fehler=${encodeURIComponent('Das hat nicht geklappt.')}`);
+        return res.redirect(`${basis}?fehler=${encodeURIComponent(tr('streaming:MUSIK.R_FEHLER'))}`);
     }
 });
 
@@ -190,16 +193,16 @@ router.post('/beenden', requirePermission('STREAMING.CHAT.MANAGE'), async (req, 
 router.post('/endlos', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
     const guildId = res.locals.guildId;
     const basis = `/guild/${guildId}/plugins/streaming/musik`;
+    const tr = makeTranslator(req, res);
 
     try {
         const an = req.body?.an === '1';
         await musik.endlosSchalten(guildId, an);
         return res.redirect(`${basis}?ok=${encodeURIComponent(
-            an ? 'Endlos an — es läuft weiter, auch ohne Wünsche.'
-               : 'Endlos aus — es läuft nur noch, was gewünscht wird.')}`);
+            tr(an ? 'streaming:MUSIK.R_ENDLOS_AN' : 'streaming:MUSIK.R_ENDLOS_AUS'))}`);
     } catch (error) {
         ServiceManager.get('Logger').error('[Streaming] Endlosmodus nicht schaltbar:', error);
-        return res.redirect(`${basis}?fehler=${encodeURIComponent('Das hat nicht geklappt.')}`);
+        return res.redirect(`${basis}?fehler=${encodeURIComponent(tr('streaming:MUSIK.R_FEHLER'))}`);
     }
 });
 
@@ -212,21 +215,22 @@ router.post('/endlos', requirePermission('STREAMING.CHAT.MANAGE'), async (req, r
 router.post('/streamende', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
     const guildId = res.locals.guildId;
     const basis = `/guild/${guildId}/plugins/streaming/musik`;
+    const tr = makeTranslator(req, res);
 
     const pruefung = musikendeEntscheidung.eingabePruefen(req.body || {});
     if (!pruefung.ok) {
         return res.redirect(`${basis}?fehler=${encodeURIComponent(
-            `Der Nachlauf muss zwischen ${musikendeEntscheidung.NACHLAUF_MIN} und ${musikendeEntscheidung.NACHLAUF_MAX} Minuten liegen.`)}`);
+            tr('streaming:MUSIK.R_NACHLAUF', { min: musikendeEntscheidung.NACHLAUF_MIN, max: musikendeEntscheidung.NACHLAUF_MAX }))}`);
     }
 
     try {
         await musikende.speichern(guildId, pruefung.werte);
         return res.redirect(`${basis}?ok=${encodeURIComponent(pruefung.werte.an
-            ? `Gespeichert — nach dem Stream endet die Musik nach ${pruefung.werte.nachlaufMin} Minuten.`
-            : 'Gespeichert — die Musik läuft nach dem Stream weiter.')}`);
+            ? tr('streaming:MUSIK.R_ENDE_AN', { n: pruefung.werte.nachlaufMin })
+            : tr('streaming:MUSIK.R_ENDE_AUS'))}`);
     } catch (error) {
         ServiceManager.get('Logger').error('[Streaming] Musikende nicht speicherbar:', error);
-        return res.redirect(`${basis}?fehler=${encodeURIComponent('Das hat nicht geklappt.')}`);
+        return res.redirect(`${basis}?fehler=${encodeURIComponent(tr('streaming:MUSIK.R_FEHLER'))}`);
     }
 });
 
@@ -234,22 +238,23 @@ router.post('/streamende', requirePermission('STREAMING.CHAT.MANAGE'), async (re
 router.post('/einreihen', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
     const guildId = res.locals.guildId;
     const basis = `/guild/${guildId}/plugins/streaming/musik`;
+    const tr = makeTranslator(req, res);
 
     try {
         const e = await musik.ablageEinreihen(guildId);
         if (e.ok) {
             return res.redirect(`${basis}?ok=${encodeURIComponent(
-                `${e.anzahl} Titel eingereiht — in zufälliger Reihenfolge.`)}`);
+                tr('streaming:MUSIK.R_EINGEREIHT', { n: e.anzahl }))}`);
         }
         // Jeder Grund bekommt seinen Satz: "hat nicht geklappt" liesse offen,
         // ob das Plugin fehlt oder nur keine Datei freigegeben ist.
         return res.redirect(`${basis}?fehler=${encodeURIComponent(
             e.grund === 'nichts_frei'
-                ? 'Es ist keine Datei für den Stream freigegeben.'
-                : 'Das Musik-Plugin ist in dieser Guild nicht aktiv.')}`);
+                ? tr('streaming:MUSIK.R_NICHTS_FREI')
+                : tr('streaming:MUSIK.R_KEIN_PLUGIN'))}`);
     } catch (error) {
         ServiceManager.get('Logger').error('[Streaming] Ablage nicht einreihbar:', error);
-        return res.redirect(`${basis}?fehler=${encodeURIComponent('Das hat nicht geklappt.')}`);
+        return res.redirect(`${basis}?fehler=${encodeURIComponent(tr('streaming:MUSIK.R_FEHLER'))}`);
     }
 });
 
@@ -257,13 +262,14 @@ router.post('/einreihen', requirePermission('STREAMING.CHAT.MANAGE'), async (req
 router.post('/leeren', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => {
     const guildId = res.locals.guildId;
     const basis = `/guild/${guildId}/plugins/streaming/musik`;
+    const tr = makeTranslator(req, res);
 
     try {
         const weg = await musik.leeren(guildId);
-        return res.redirect(`${basis}?ok=${encodeURIComponent(`Warteschlange geleert (${weg}).`)}`);
+        return res.redirect(`${basis}?ok=${encodeURIComponent(tr('streaming:MUSIK.R_GELEERT', { n: weg }))}`);
     } catch (error) {
         ServiceManager.get('Logger').error('[Streaming] Warteschlange nicht leerbar:', error);
-        return res.redirect(`${basis}?fehler=${encodeURIComponent('Das hat nicht geklappt.')}`);
+        return res.redirect(`${basis}?fehler=${encodeURIComponent(tr('streaming:MUSIK.R_FEHLER'))}`);
     }
 });
 

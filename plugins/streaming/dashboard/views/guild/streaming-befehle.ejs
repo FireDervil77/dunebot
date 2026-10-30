@@ -21,48 +21,48 @@ const zahlFertig = new Map((fertigZeilen || []).map(z => [z.wort, z.benutzt_anza
 const werFertig = new Map((fertigZeilen || []).map(z => [z.wort, z.wer]));
 
 const WER = [
-  ['alle',      'alle'],
-  ['abonnent',  'Abonnenten'],
-  ['moderator', 'Moderatoren'],
-  ['inhaber',   'nur ich']
+    ['alle',      tr('streaming:COMMON.WER_ALLE')],
+  ['abonnent',  tr('streaming:COMMON.WER_ABONNENT')],
+  ['moderator', tr('streaming:COMMON.WER_MODERATOR')],
+  ['inhaber',   tr('streaming:COMMON.WER_INHABER')]
 ];
 
 const fehlerTexte = {
-  wort:      'Das Wort darf nur Buchstaben, Ziffern, Bindestrich und Unterstrich enthalten — höchstens 32 Zeichen.',
-  antwort:   'Ohne Antwort hätte der Befehl nichts zu sagen.',
-  doppelt:   'Dieses Wort gibt es hier schon.',
-  belegt:    'So heißt bereits ein fertiger Befehl.',
-  weg:       'Diesen Befehl gibt es nicht mehr.',
-  technisch: 'Das hat technisch nicht geklappt. Der Grund steht im Protokoll.'
+  wort:      tr('streaming:BEFEHLE.F_WORT'),
+  antwort:   tr('streaming:BEFEHLE.F_ANTWORT'),
+  doppelt:   tr('streaming:BEFEHLE.F_DOPPELT'),
+  belegt:    tr('streaming:BEFEHLE.F_BELEGT'),
+  weg:       tr('streaming:BEFEHLE.F_WEG'),
+  technisch: tr('streaming:BEFEHLE.F_TECHNISCH')
 };
 const meldungen = {
-  neu:         'Befehl angelegt. Er antwortet ab sofort.',
-  baustein:    'Baustein angelegt. Du kannst ihn ab sofort in jedem Text benutzen.',
-  gespeichert: 'Gespeichert.',
-  entfernt:    'Entfernt.'
+  neu:         tr('streaming:BEFEHLE.OK_NEU'),
+  baustein:    tr('streaming:BEFEHLE.OK_BAUSTEIN'),
+  gespeichert: tr('streaming:BEFEHLE.OK_GESPEICHERT'),
+  entfernt:    tr('streaming:BEFEHLE.OK_ENTFERNT')
 };
 
 // Bausteinfehler tragen ein `b_`, weil beide Formulare auf dieser Seite landen
 // und `doppelt` sonst den falschen Satz zeigte.
 Object.assign(fehlerTexte, {
-  b_name:    'Ein Name darf nur Buchstaben, Ziffern, Bindestrich und Unterstrich enthalten — höchstens 32 Zeichen.',
-  b_belegt:  'Diesen Namen gibt es schon als eingebauten Platzhalter. Er würde ihn verdecken.',
-  b_wert:    'Ohne Wert wäre der Baustein leer.',
-  b_zu_lang: 'Ein Baustein kann nicht länger sein als eine Chatnachricht (500 Zeichen).',
-  b_doppelt: 'Diesen Baustein gibt es hier schon.',
-  b_zahl:    'Ein Zähler ist eine ganze Zahl ab 0.',
-  b_weg:     'Diesen Baustein gibt es nicht mehr.'
+  b_name:    tr('streaming:BEFEHLE.F_B_NAME'),
+  b_belegt:  tr('streaming:BEFEHLE.F_B_BELEGT'),
+  b_wert:    tr('streaming:BEFEHLE.F_B_WERT'),
+  b_zu_lang: tr('streaming:BEFEHLE.F_B_ZU_LANG'),
+  b_doppelt: tr('streaming:BEFEHLE.F_B_DOPPELT'),
+  b_zahl:    tr('streaming:BEFEHLE.F_B_ZAHL'),
+  b_weg:     tr('streaming:BEFEHLE.F_B_WEG')
 });
 %>
 
 <%- include('partials/streaming-kopf', {
   guildId, tr,
   icon: 'fa-solid fa-terminal',
-  titel: 'Meine Befehle',
-  beschreibung: 'Was der Bot antwortet, wenn jemand etwas in deinen Chat tippt.',
+  titel: tr('streaming:BEFEHLE.TITLE'),
+  beschreibung: tr('streaming:BEFEHLE.SUBTITLE'),
   aktion: darfAendern
     ? '<button class="btn btn-primary" type="button" data-bs-toggle="collapse" '
-      + 'data-bs-target="#befehl-anlegen">Befehl anlegen</button>'
+      + 'data-bs-target="#befehl-anlegen">' + tr('streaming:BEFEHLE.ANLEGEN_KNOPF') + '</button>'
     : ''
 }) %>
 
@@ -89,10 +89,9 @@ Object.assign(fehlerTexte, {
         <div class="kartenkopf">
           <span class="kartensymbol"><i class="fa-solid fa-plus"></i></span>
           <div class="kartenkopf__text">
-            <h3 class="kartenkopf__titel">Eigenen Befehl anlegen</h3>
+            <h3 class="kartenkopf__titel"><%= tr('streaming:BEFEHLE.EIGEN_TITEL') %></h3>
             <div class="kartenkopf__satz">
-              Du gibst das Wort vor — etwa <code><%= PRAEFIX %>regeln</code> —
-              und den Text, mit dem der Bot antwortet.
+              <%- tr('streaming:BEFEHLE.EIGEN_TEXT', { p: PRAEFIX }) %>
             </div>
           </div>
         </div>
@@ -103,41 +102,39 @@ Object.assign(fehlerTexte, {
           <div class="zeilen">
             <div class="zeile">
               <div class="zeile__bez">
-                Wort
-                <small>ohne <%= PRAEFIX %>, kleingeschrieben</small>
+                <%= tr('streaming:BEFEHLE.WORT') %>
+                <small><%= tr('streaming:BEFEHLE.WORT_HILFE', { p: PRAEFIX }) %></small>
               </div>
               <div>
                 <div class="input-group">
                   <span class="input-group-text"><%= PRAEFIX %></span>
                   <input type="text" class="form-control" name="wort" required
                          maxlength="32" pattern="[A-Za-z0-9_-]{1,32}"
-                         placeholder="regeln" autocomplete="off">
+                         placeholder="<%= tr('streaming:BEFEHLE.WORT_BEISPIEL') %>" autocomplete="off">
                 </div>
                 <div class="zeile__hilfe">
-                  Häufig: <code>regeln</code>, <code>discord</code>, <code>social</code>,
-                  <code>spenden</code>. <strong><%= PRAEFIX %>discord</strong> ist bewusst
-                  kein fertiger Befehl — deine Einladungsadresse kennt nur du.
+                  <%- tr('streaming:BEFEHLE.HAEUFIG', { p: PRAEFIX }) %>
                 </div>
               </div>
             </div>
 
             <div class="zeile">
-              <div class="zeile__bez">Antwort</div>
+              <div class="zeile__bez"><%= tr('streaming:BEFEHLE.ANTWORT') %></div>
               <div>
                 <textarea class="form-control" name="antwort" rows="2" required
-                          maxlength="500" placeholder="Sei nett zueinander."></textarea>
+                          maxlength="500" placeholder="<%= tr('streaming:BEFEHLE.ANTWORT_BEISPIEL') %>"></textarea>
                 <%# **Aus der Liste des Moduls, nicht danebengeschrieben.**
                     `PLATZHALTER` ist der Vertrag; eine Kopie hier waere beim
                     naechsten neuen Baustein still veraltet, und man saehe es
                     erst im Chat. %>
                 <div class="chips mt-2">
                   <% PLATZHALTER.forEach(p => { %>
-                    <span class="chip mono" title="<%= p.bedeutung %>"><%= p.name %></span>
+                    <span class="chip mono" title="<%= tr('streaming:PLATZHALTER.' + p.name.replace(/[{}]/g, ''), { defaultValue: p.bedeutung }) %>"><%= p.name %></span>
                   <% }); %>
                   <%# Die eigenen dahinter, damit sichtbar ist, was zur Verfügung
                       steht — sonst müsste man sie sich merken. %>
                   <% (bausteine || []).forEach(b => { %>
-                    <span class="chip mono" title="Eigener Baustein: <%= b.wert %>">{<%= b.name %>}</span>
+                    <span class="chip mono" title="<%= tr('streaming:BEFEHLE.EIGENER_BAUSTEIN', { wert: b.wert }) %>">{<%= b.name %>}</span>
                   <% }); %>
                 </div>
                 <% const nurLive = PLATZHALTER.filter(p => p.nurLive); %>
@@ -145,10 +142,7 @@ Object.assign(fehlerTexte, {
                   <div class="text-secondary small mt-1">
                     <i class="fa-solid fa-circle-info me-1"></i>
                     <%= nurLive.map(p => p.name).join(', ') %>
-                    <%= nurLive.length === 1 ? 'bleibt' : 'bleiben' %> leer, solange du nicht
-                    sendest. Bau den Satz so, dass er auch dann trägt —
-                    <span class="mono">Läuft seit {uptime}</span> statt bloß
-                    <span class="mono">{uptime}</span>.
+                    <%- tr(nurLive.length === 1 ? 'streaming:BEFEHLE.LIVE_EINS' : 'streaming:BEFEHLE.LIVE_VIELE') %>
                   </div>
                 <% } %>
               </div>
@@ -160,14 +154,14 @@ Object.assign(fehlerTexte, {
             <% if (zaehler.length) { %>
               <div class="zeile">
                 <div class="zeile__bez">
-                  Zählt hoch
-                  <small>bei jeder Benutzung</small>
+                  <%= tr('streaming:BEFEHLE.ZAEHLT') %>
+                  <small><%= tr('streaming:BEFEHLE.ZAEHLT_HILFE') %></small>
                 </div>
                 <div>
                   <select class="form-select" name="zaehler_name" style="max-width:14rem">
-                    <option value="">— nichts —</option>
+                    <option value=""><%= tr('streaming:BEFEHLE.NICHTS') %></option>
                     <% zaehler.forEach(z => { %>
-                      <option value="<%= z.name %>">{<%= z.name %>} (steht bei <%= z.zahl %>)</option>
+                      <option value="<%= z.name %>">{<%= z.name %>} <%= tr('streaming:BEFEHLE.STEHT_BEI', { n: z.zahl }) %></option>
                     <% }); %>
                   </select>
 
@@ -176,18 +170,14 @@ Object.assign(fehlerTexte, {
                       Rechte und zwei verschiedene Abkühlungen brauchen. Das
                       geht seit jeher — es stand nur nirgends. %>
                   <div class="zeile__hilfe mt-2">
-                    <b>Zählen und Anzeigen trennt man am besten:</b><br>
-                    <code>!tot</code> — zählt <code>{tode}</code> hoch, <b>nur Moderatoren</b>,
-                    Abkühlung <b>0</b>. Zweimal sterben heißt dann zweimal zählen.<br>
-                    <code>!tode</code> — zählt <b>nichts</b> hoch, sondern schreibt nur
-                    <code>{tode}</code> in die Antwort. Für alle, mit ein paar Sekunden Abkühlung.
+                    <%- tr('streaming:BEFEHLE.ZAEHLEN_MUSTER') %>
                   </div>
                 </div>
               </div>
             <% } %>
 
             <div class="zeile">
-              <div class="zeile__bez">Wer darf</div>
+              <div class="zeile__bez"><%= tr('streaming:BEFEHLE.WER_DARF') %></div>
               <div>
                 <select class="form-select" name="wer">
                   <% WER.forEach(w => { %><option value="<%= w[0] %>"><%= w[1] %></option><% }); %>
@@ -197,21 +187,21 @@ Object.assign(fehlerTexte, {
 
             <div class="zeile">
               <div class="zeile__bez">
-                Abkühlung
-                <small>Sekunden zwischen zwei Antworten</small>
+                <%= tr('streaming:BEFEHLE.ABKUEHLUNG') %>
+                <small><%= tr('streaming:BEFEHLE.ABKUEHLUNG_HILFE') %></small>
               </div>
               <div>
                 <input type="number" class="form-control" style="max-width:8rem"
                        name="abkuehlung_s" min="0" max="3600" step="1" value="5">
                 <div class="zeile__hilfe">
-                  Ohne sie macht ein einzelner Zuschauer aus einem Befehl eine Textwand.
+                  <%= tr('streaming:BEFEHLE.ABKUEHLUNG_TEXT') %>
                 </div>
               </div>
             </div>
           </div>
         </div>
         <div class="card-footer text-end">
-          <button type="submit" class="btn btn-primary">Anlegen</button>
+          <button type="submit" class="btn btn-primary"><%= tr('streaming:ANSAGEN.ANLEGEN') %></button>
         </div>
       </form>
     </div>
@@ -224,8 +214,8 @@ Object.assign(fehlerTexte, {
         <div class="kartenkopf">
           <span class="kartensymbol"><i class="fa-solid fa-bolt"></i></span>
           <div class="kartenkopf__text">
-            <h3 class="kartenkopf__titel">Fertige Befehle</h3>
-            <div class="kartenkopf__satz">Anschalten reicht — der Text kommt aus dem System.</div>
+            <h3 class="kartenkopf__titel"><%= tr('streaming:BEFEHLE.FERTIG_TITEL') %></h3>
+            <div class="kartenkopf__satz"><%= tr('streaming:BEFEHLE.FERTIG_TEXT') %></div>
           </div>
         </div>
       </div>
@@ -237,14 +227,14 @@ Object.assign(fehlerTexte, {
               <div class="zeile">
                 <div class="zeile__bez">
                   <code><%= PRAEFIX %><%= wort %></code>
-                  <small><%= FERTIG[wort].beschreibung %></small>
+                  <small><%= tr('streaming:BEFEHLE.FERTIG.' + wort, { defaultValue: FERTIG[wort].beschreibung }) %></small>
                   <%# Ein Befehl, der etwas bewirkt, braucht eine Erlaubnis —
                       und der Streamer soll das hier sehen, nicht erst wenn
                       Twitch ablehnt. Wo sie erteilt wird, sagt „Mitmachen". %>
                   <% if (FERTIG[wort].zusage) { %>
                     <div class="zeile__hilfe">
                       <i class="fa-solid fa-key me-1"></i>
-                      braucht deine Erlaubnis — siehe <b>Mitmachen</b>
+                      <%- tr('streaming:BEFEHLE.BRAUCHT_ERLAUBNIS') %>
                     </div>
                   <% } %>
                   <%# Ein Befehl, der ein anderes Plugin braucht, sagt das hier —
@@ -256,7 +246,7 @@ Object.assign(fehlerTexte, {
                       <%= verfuegbar[wort].grund %>
                       <% if (verfuegbar[wort].braucht) { %>
                         <a href="/guild/<%= guildId %>/plugins"
-                           class="ms-1">Plugins öffnen</a>
+                           class="ms-1"><%= tr('streaming:COMMON.PLUGINS_OEFFNEN') %></a>
                       <% } %>
                     </div>
                   <% } %>
@@ -279,11 +269,11 @@ Object.assign(fehlerTexte, {
                     <input type="checkbox" class="form-check-input" name="fertig" value="<%= wort %>"
                            <%= anFertig.has(wort) ? 'checked' : '' %>
                            <%= (darfAendern && (verfuegbar[wort] || {}).ok) ? '' : 'disabled' %>>
-                    <span class="form-check-label">an</span>
+                    <span class="form-check-label"><%= tr('streaming:ANSAGEN.AN') %></span>
                   </label>
 
                   <% if (zahlFertig.get(wort)) { %>
-                    <div class="zeile__hilfe"><%= zahlFertig.get(wort) %>× benutzt</div>
+                    <div class="zeile__hilfe"><%= tr('streaming:BEFEHLE.BENUTZT', { n: zahlFertig.get(wort) }) %></div>
                   <% } %>
                 </div>
               </div>
@@ -292,15 +282,12 @@ Object.assign(fehlerTexte, {
 
           <div class="text-secondary small mt-2">
             <i class="fa-solid fa-circle-info me-1"></i>
-            Die <b>Abkühlung</b> fertiger Befehle steht fest — sie hängt nicht am Geschmack,
-            sondern daran, was der Befehl auslöst
-            (<code><%= PRAEFIX %>clip</code> etwa 60&nbsp;Sekunden, weil dabei wirklich
-            ein Clip entsteht). Bei eigenen Befehlen stellst du sie selbst ein.
+            <%- tr('streaming:BEFEHLE.FERTIG_ABKUEHLUNG', { p: PRAEFIX }) %>
           </div>
         </div>
         <% if (darfAendern) { %>
           <div class="card-footer text-end">
-            <button type="submit" class="btn btn-primary">Speichern</button>
+            <button type="submit" class="btn btn-primary"><%= tr('streaming:COMMON.SAVE') %></button>
           </div>
         <% } %>
       </form>
@@ -314,8 +301,8 @@ Object.assign(fehlerTexte, {
         <div class="kartenkopf">
           <span class="kartensymbol"><i class="fa-solid fa-pen"></i></span>
           <div class="kartenkopf__text">
-            <h3 class="kartenkopf__titel">Eigene Befehle</h3>
-            <div class="kartenkopf__satz">Ein Wort, eine Antwort, und wer ihn benutzen darf.</div>
+            <h3 class="kartenkopf__titel"><%= tr('streaming:BEFEHLE.EIGENE_TITEL') %></h3>
+            <div class="kartenkopf__satz"><%= tr('streaming:BEFEHLE.EIGENE_TEXT') %></div>
           </div>
         </div>
       </div>
@@ -324,9 +311,8 @@ Object.assign(fehlerTexte, {
         <div class="card-body">
           <%- include('shared/leerzustand', {
                 icon:  'fa-solid fa-terminal',
-                titel: 'Noch kein eigener Befehl',
-                text:  'Leg einen an: Du gibst das Wort vor — etwa ' + PRAEFIX + 'regeln — '
-                     + 'und den Text, mit dem der Bot antwortet.'
+                titel: tr('streaming:BEFEHLE.LEER_TITEL'),
+                text:  tr('streaming:BEFEHLE.LEER_TEXT', { p: PRAEFIX })
               }) %>
         </div>
       <% } else { %>
@@ -342,8 +328,8 @@ Object.assign(fehlerTexte, {
                 <div class="zeile__bez">
                   <code><%= PRAEFIX %><%= b.wort %></code>
                   <small>
-                    <%= b.benutzt_anzahl %>× benutzt<%
-                      %><% if (b.benutzt_am) { %>, zuletzt <%= vorWieLange(b.benutzt_am) %><% } %>
+                    <%= tr('streaming:BEFEHLE.BENUTZT', { n: b.benutzt_anzahl }) %><%
+                      %><% if (b.benutzt_am) { %><%= tr('streaming:ANSAGEN.ZULETZT', { wann: vorWieLange(b.benutzt_am) }) %><% } %>
                   </small>
                 </div>
                 <div>
@@ -361,15 +347,15 @@ Object.assign(fehlerTexte, {
                     <% const zaehlerListe = (bausteine || []).filter(v => v.art === 'zaehler'); %>
                     <% if (zaehlerListe.length || b.zaehler_name) { %>
                       <select class="form-select form-select-sm" style="max-width:13rem"
-                              name="zaehler_name" title="Welchen Zähler dieser Befehl hochzählt"
+                              name="zaehler_name" title="<%= tr('streaming:BEFEHLE.ZAEHLER_TITEL') %>"
                               <%= darfAendern ? '' : 'disabled' %>>
-                        <option value="">— zählt nichts —</option>
+                        <option value=""><%= tr('streaming:BEFEHLE.ZAEHLT_NICHTS') %></option>
                         <%# Ein Zähler, den es nicht mehr gibt, bleibt trotzdem
                             in der Liste: Sonst verlöre das Speichern ihn still. %>
                         <% const namen = [...new Set([...zaehlerListe.map(v => v.name),
                              ...(b.zaehler_name ? [b.zaehler_name] : [])])]; %>
                         <% namen.forEach(n => { %>
-                          <option value="<%= n %>" <%= b.zaehler_name === n ? 'selected' : '' %>>zählt {<%= n %>}</option>
+                          <option value="<%= n %>" <%= b.zaehler_name === n ? 'selected' : '' %>>{<%= n %>} <%= tr('streaming:BEFEHLE.ZAEHLT_DIES') %></option>
                         <% }); %>
                       </select>
                     <% } %>
@@ -384,11 +370,11 @@ Object.assign(fehlerTexte, {
                     <label class="form-check form-switch mb-0">
                       <input type="checkbox" class="form-check-input" name="aktiv" value="1"
                              <%= b.aktiv ? 'checked' : '' %> <%= darfAendern ? '' : 'disabled' %>>
-                      <span class="form-check-label">an</span>
+                      <span class="form-check-label"><%= tr('streaming:ANSAGEN.AN') %></span>
                     </label>
 
                     <% if (darfAendern) { %>
-                      <button type="submit" class="btn btn-sm btn-primary ms-auto">Speichern</button>
+                      <button type="submit" class="btn btn-sm btn-primary ms-auto"><%= tr('streaming:COMMON.SAVE') %></button>
                     <% } %>
                   </div>
                 </div>
@@ -400,9 +386,9 @@ Object.assign(fehlerTexte, {
                     Absendeknopf neben "Speichern" eine Falle. %>
                 <form method="POST" class="text-end"
                       action="/guild/<%= guildId %>/plugins/streaming/befehle/<%= b.id %>/entfernen"
-                      onsubmit="return confirm('<%= PRAEFIX %><%= b.wort %> entfernen?');">
+                      onsubmit="return confirm(<%= JSON.stringify(tr('streaming:BEFEHLE.ENTFERNEN_FRAGE', { name: PRAEFIX + b.wort })) %>);">
                   <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
-                  <button type="submit" class="btn btn-sm btn-ghost-danger">Entfernen</button>
+                  <button type="submit" class="btn btn-sm btn-ghost-danger"><%= tr('streaming:COMMON.DELETE') %></button>
                 </form>
               <% } %>
             <% }); %>
@@ -422,10 +408,9 @@ Object.assign(fehlerTexte, {
         <div class="kartenkopf">
           <span class="kartensymbol"><i class="fa-solid fa-puzzle-piece"></i></span>
           <div class="kartenkopf__text">
-            <h3 class="kartenkopf__titel">Eigene Textbausteine</h3>
+            <h3 class="kartenkopf__titel"><%= tr('streaming:BEFEHLE.BAUSTEINE_TITEL') %></h3>
             <div class="kartenkopf__satz">
-              Einmal setzen, überall benutzen — in Befehlen <b>und</b> in Ansagen.
-              Ändert sich deine Einladung, änderst du sie an einer Stelle.
+              <%- tr('streaming:BEFEHLE.BAUSTEINE_TEXT') %>
             </div>
           </div>
         </div>
@@ -435,9 +420,8 @@ Object.assign(fehlerTexte, {
         <% if (!(bausteine || []).length) { %>
           <%- include('shared/leerzustand', {
                 icon:  'fa-solid fa-puzzle-piece',
-                titel: 'Noch kein Baustein',
-                text:  'Leg einen an — etwa {discord} mit deiner Einladungsadresse. '
-                     + 'Danach kannst du ihn in jeder Antwort und jeder Ansage schreiben.'
+                titel: tr('streaming:BEFEHLE.BAUSTEIN_LEER'),
+                text:  tr('streaming:BEFEHLE.BAUSTEIN_LEER_TEXT')
               }) %>
         <% } else { %>
           <div class="zeilen">
@@ -447,7 +431,7 @@ Object.assign(fehlerTexte, {
                 <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
                 <div class="zeile__bez">
                   <code>{<%= b.name %>}</code>
-                  <% if (b.art === 'zaehler') { %><small>Zähler</small><% } %>
+                  <% if (b.art === 'zaehler') { %><small><%= tr('streaming:BEFEHLE.ZAEHLER') %></small><% } %>
                 </div>
                 <div class="d-flex flex-wrap align-items-center gap-2">
                   <% if (b.art === 'zaehler') { %>
@@ -462,16 +446,16 @@ Object.assign(fehlerTexte, {
                            <%= darfAendern ? '' : 'disabled' %>>
                   <% } %>
                   <% if (darfAendern) { %>
-                    <button type="submit" class="btn btn-sm btn-primary">Speichern</button>
+                    <button type="submit" class="btn btn-sm btn-primary"><%= tr('streaming:COMMON.SAVE') %></button>
                   <% } %>
                 </div>
               </form>
               <% if (darfAendern) { %>
                 <form method="POST" class="text-end"
                       action="/guild/<%= guildId %>/plugins/streaming/bausteine/<%= b.id %>/entfernen"
-                      onsubmit="return confirm('{<%= b.name %>} entfernen? Texte, die ihn benutzen, zeigen ihn danach wörtlich.');">
+                      onsubmit="return confirm(<%= JSON.stringify(tr('streaming:BEFEHLE.BAUSTEIN_FRAGE', { name: b.name })) %>);">
                   <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
-                  <button type="submit" class="btn btn-sm btn-ghost-danger">Entfernen</button>
+                  <button type="submit" class="btn btn-sm btn-ghost-danger"><%= tr('streaming:COMMON.DELETE') %></button>
                 </form>
               <% } %>
             <% }); %>
@@ -485,7 +469,7 @@ Object.assign(fehlerTexte, {
           <div class="card-footer">
             <div class="d-flex flex-wrap align-items-end gap-2">
               <div>
-                <label class="form-label">Name</label>
+                <label class="form-label"><%= tr('streaming:BEFEHLE.NAME') %></label>
                 <div class="input-group" style="max-width:14rem">
                   <span class="input-group-text">{</span>
                   <input type="text" class="form-control" name="name" required
@@ -494,32 +478,29 @@ Object.assign(fehlerTexte, {
                 </div>
               </div>
               <div>
-                <label class="form-label">Art</label>
+                <label class="form-label"><%= tr('streaming:BEFEHLE.ART') %></label>
                 <select class="form-select" name="art" style="max-width:11rem"
                         onchange="this.closest('form').classList.toggle('ist-zaehler', this.value === 'zaehler')">
-                  <option value="text">Text</option>
-                  <option value="zaehler">Zähler</option>
+                  <option value="text"><%= tr('streaming:ANSAGEN.TEXT') %></option>
+                  <option value="zaehler"><%= tr('streaming:BEFEHLE.ZAEHLER') %></option>
                 </select>
               </div>
               <div class="flex-fill nur-text" style="min-width:14rem">
-                <label class="form-label">Wert</label>
+                <label class="form-label"><%= tr('streaming:BEFEHLE.WERT') %></label>
                 <input type="text" class="form-control" name="wert"
                        maxlength="500" placeholder="https://discord.gg/…">
               </div>
               <div class="nur-zaehler">
-                <label class="form-label">Startwert</label>
+                <label class="form-label"><%= tr('streaming:BEFEHLE.STARTWERT') %></label>
                 <input type="number" class="form-control" name="zahl"
                        style="max-width:9rem" min="0" step="1" value="0">
               </div>
-              <button type="submit" class="btn btn-primary">Anlegen</button>
+              <button type="submit" class="btn btn-primary"><%= tr('streaming:ANSAGEN.ANLEGEN') %></button>
             </div>
             <%# Der häufigste Fehlversuch: einen eingebauten Namen überschreiben.
                 Er wird abgewiesen — hier steht warum, bevor es passiert. %>
             <div class="text-secondary small mt-2">
-              Eingebaute Namen sind vergeben — <code>{spiel}</code>, <code>{rest}</code>
-              und die anderen oben lassen sich nicht überschreiben.
-              Ein <b>Zähler</b> wird von einem Befehl hochgezählt; welcher, stellst du
-              beim Befehl ein.
+              <%- tr('streaming:BEFEHLE.EINGEBAUT') %>
             </div>
           </div>
         </form>

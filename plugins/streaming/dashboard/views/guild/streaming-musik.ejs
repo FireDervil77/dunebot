@@ -14,8 +14,8 @@
 <%- include('partials/streaming-kopf', {
   guildId, tr,
   icon: 'fa-solid fa-music',
-  titel: 'Musikwunsch',
-  beschreibung: 'Was aus dem Chat gewünscht wird, spielt eine Browserquelle in OBS.'
+  titel: tr('streaming:MUSIK.TITLE'),
+  beschreibung: tr('streaming:MUSIK.SUBTITLE')
 }) %>
 
 <% if (meldung) { %>
@@ -27,14 +27,11 @@
 
 <% if (!hatAblage) { %>
   <div class="alert alert-warning">
-    <strong>Keine Musikablage.</strong> Das Musik-Plugin ist in dieser Guild nicht
-    aktiv — ohne es gibt es nichts abzuspielen.
+    <%- tr('streaming:MUSIK.KEINE_ABLAGE') %>
   </div>
 <% } else if (freigegeben === 0) { %>
   <div class="alert alert-warning">
-    <strong>Noch keine Datei für den Stream freigegeben.</strong>
-    Lade unter <em>Musik → Dateien</em> etwas hoch und setze den Schalter
-    „für den Stream frei". Vorher findet <code>!request</code> nichts.
+    <%- tr('streaming:MUSIK.NICHT_FREI') %>
   </div>
 <% } %>
 
@@ -44,12 +41,11 @@
   <div class="col-12">
     <div class="card">
       <div class="card-header">
-        <h3 class="card-title"><i class="fa-solid fa-satellite-dish me-2"></i>Adresse für OBS</h3>
+        <h3 class="card-title"><i class="fa-solid fa-satellite-dish me-2"></i><%= tr('streaming:MUSIK.OBS_TITEL') %></h3>
       </div>
       <div class="card-body">
         <p class="text-secondary">
-          In OBS: <strong>Quelle hinzufügen → Browser</strong>, diese Adresse einsetzen.
-          Der Ton kommt aus der Browserquelle — Discord wird dafür nicht gebraucht.
+          <%- tr('streaming:MUSIK.OBS_TEXT') %>
         </p>
 
         <%#
@@ -59,27 +55,20 @@
           anderen beiden bricht die Wiedergabe bei jedem Szenenwechsel ab.
         %>
         <div class="mb-3">
-          <div class="fw-bold mb-1">Drei Häkchen in der OBS-Maske</div>
+          <div class="fw-bold mb-1"><%= tr('streaming:MUSIK.HAEKCHEN') %></div>
           <ul class="mb-1">
             <li>
-              <strong>„Audio über OBS steuern" → an.</strong>
-              Sonst geht der Ton direkt ans Desktop-Gerät, statt einen eigenen
-              Kanal im Audiomixer zu bekommen — ohne eigenen Regler und ohne
-              Stummschaltung.
+              <%- tr('streaming:MUSIK.HAKEN_1') %>
             </li>
             <li>
-              <strong>„Quelle beenden, wenn nicht sichtbar" → aus.</strong>
-              Sonst hört die Musik bei jedem Szenenwechsel auf und der Titel
-              beginnt danach von vorn.
+              <%- tr('streaming:MUSIK.HAKEN_2') %>
             </li>
             <li>
-              <strong>„Browser aktualisieren, wenn Szene aktiv wird" → aus.</strong>
-              Dasselbe Ergebnis auf anderem Weg.
+              <%- tr('streaming:MUSIK.HAKEN_3') %>
             </li>
           </ul>
           <div class="text-secondary">
-            Die Lautstärke regelst du danach im Audiomixer — dort liegt die
-            Quelle als eigener Kanal neben Mikrofon und Spiel.
+            <%= tr('streaming:MUSIK.LAUTSTAERKE') %>
           </div>
         </div>
 
@@ -87,7 +76,7 @@
           <input type="text" class="form-control font-monospace" id="musik-adresse"
                  value="<%= adresse %>" data-basis="<%= adresse %>" readonly>
           <button class="btn" type="button" id="musik-kopieren">
-            <i class="fa-regular fa-copy me-1"></i>Kopieren
+            <i class="fa-regular fa-copy me-1"></i><%= tr('streaming:MUSIK.KOPIEREN') %>
           </button>
         </div>
 
@@ -100,22 +89,20 @@
         <label class="form-check form-switch mb-3">
           <input class="form-check-input" type="checkbox" id="musik-titel-zeigen">
           <span class="form-check-label">
-            Titel im Bild anzeigen
+            <%= tr('streaming:MUSIK.TITEL_ZEIGEN') %>
             <span class="text-secondary">
-              — sonst liefert die Quelle nur Ton und bleibt unsichtbar.
+              <%= tr('streaming:MUSIK.NUR_TON') %>
             </span>
           </span>
         </label>
 
         <div class="alert alert-info mb-0">
-          <strong>Wer diese Adresse hat, kann deine Bibliothek abspielen.</strong>
-          Sie ist der einzige Ausweis der Browserquelle — teile sie nicht im Stream
-          und blende sie beim Einrichten nicht ein.
+          <%- tr('streaming:MUSIK.ADRESSE_GEHEIM') %>
           <form method="post" action="/guild/<%= guildId %>/plugins/streaming/musik/schluessel"
                 class="mt-2"
-                onsubmit="return confirm('Neue Adresse erzeugen? Eine bereits laufende Browserquelle hört danach auf zu spielen, bis du die neue Adresse in OBS einträgst.');">
+                onsubmit="return confirm(<%= JSON.stringify(tr('streaming:MUSIK.ADRESSE_FRAGE')) %>);">
             <button class="btn btn-sm btn-outline-danger" type="submit">
-              Adresse neu erzeugen
+              <%= tr('streaming:MUSIK.ADRESSE_NEU') %>
             </button>
           </form>
         </div>
@@ -127,28 +114,28 @@
   <div class="col-md-6">
     <div class="card">
       <div class="card-header">
-        <h3 class="card-title"><i class="fa-solid fa-heart-pulse me-2"></i>Zustand</h3>
+        <h3 class="card-title"><i class="fa-solid fa-heart-pulse me-2"></i><%= tr('streaming:NAV.STATE') %></h3>
       </div>
       <div class="card-body">
         <div class="mb-3">
           <span class="badge <%= player.verbunden ? 'bg-success' : 'bg-secondary' %> me-2">
-            <%= player.verbunden ? 'Browserquelle verbunden' : 'Browserquelle meldet sich nicht' %>
+            <%= tr(player.verbunden ? 'streaming:MUSIK.QUELLE_DA' : 'streaming:MUSIK.QUELLE_WEG') %>
           </span>
           <% if (player.sekunden !== null && !player.verbunden) { %>
-            <span class="text-secondary">zuletzt vor <%= player.sekunden %> s</span>
+            <span class="text-secondary"><%= tr('streaming:MUSIK.ZULETZT_VOR', { n: player.sekunden }) %></span>
           <% } else if (player.sekunden === null) { %>
-            <span class="text-secondary">noch nie</span>
+            <span class="text-secondary"><%= tr('streaming:MUSIK.NOCH_NIE') %></span>
           <% } %>
         </div>
 
         <div class="mb-3">
           <% if (laeuft) { %>
-            <div><strong>Läuft:</strong> <%= laeuft.titel %></div>
+            <div><strong><%= tr('streaming:MUSIK.LAEUFT') %></strong> <%= laeuft.titel %></div>
             <% if (laeuft.gewuenscht_von) { %>
-              <div class="text-secondary">gewünscht von <%= laeuft.gewuenscht_von %></div>
+              <div class="text-secondary"><%= tr('streaming:MUSIK.GEWUENSCHT_VON', { name: laeuft.gewuenscht_von }) %></div>
             <% } %>
           <% } else { %>
-            <div class="text-secondary">Gerade läuft nichts.</div>
+            <div class="text-secondary"><%= tr('streaming:MUSIK.NICHTS_LAEUFT') %></div>
           <% } %>
         </div>
 
@@ -157,10 +144,10 @@
           <input type="hidden" name="an" value="<%= aktiv ? '0' : '1' %>">
           <button class="btn <%= aktiv ? 'btn-outline-secondary' : 'btn-primary' %>" type="submit">
             <i class="fa-solid <%= aktiv ? 'fa-pause' : 'fa-play' %> me-1"></i>
-            <%= aktiv ? 'Anhalten' : 'Weiterlaufen lassen' %>
+            <%= tr(aktiv ? 'streaming:MUSIK.ANHALTEN' : 'streaming:MUSIK.WEITER') %>
           </button>
           <span class="text-secondary ms-2">
-            <%= aktiv ? 'Wiedergabe ist an.' : 'Wiedergabe ist angehalten.' %>
+            <%= tr(aktiv ? 'streaming:MUSIK.IST_AN' : 'streaming:MUSIK.IST_AUS') %>
           </span>
         </form>
 
@@ -168,11 +155,11 @@
         <form method="post" action="/guild/<%= guildId %>/plugins/streaming/musik/beenden"
               class="mb-3">
           <button class="btn btn-sm btn-outline-danger" type="submit">
-            <i class="fa-solid fa-stop me-1"></i>Beenden
+            <i class="fa-solid fa-stop me-1"></i><%= tr('streaming:MUSIK.BEENDEN') %>
+
           </button>
           <span class="text-secondary ms-2">
-            Hält an <b>und</b> setzt zurück — danach beginnt die Liste von vorn.
-            Die Warteschlange bleibt.
+            <%- tr('streaming:MUSIK.BEENDEN_TEXT') %>
           </span>
         </form>
 
@@ -197,15 +184,13 @@
           <label class="form-check form-switch mb-1">
             <input class="form-check-input" type="checkbox" <%= endlos ? 'checked' : '' %>
                    onchange="document.getElementById('endlos-form').requestSubmit();">
-            <span class="form-check-label">Endlos weiterspielen</span>
+            <span class="form-check-label"><%= tr('streaming:MUSIK.ENDLOS') %></span>
           </label>
           <div class="form-hint">
             <% if (endlos) { %>
-              Ist die Warteschlange leer, läuft ein zufälliger freigegebener
-              Titel weiter — nicht zweimal derselbe hintereinander.
+              <%= tr('streaming:MUSIK.ENDLOS_AN') %>
             <% } else { %>
-              Es läuft nur, was jemand mit <code>!request</code> wünscht.
-              Danach ist Stille.
+              <%- tr('streaming:MUSIK.ENDLOS_AUS') %>
             <% } %>
           </div>
         </form>
@@ -221,28 +206,25 @@
           <label class="form-check form-switch mb-1">
             <input class="form-check-input" type="checkbox" name="an" value="1" <%= streamende.an ? 'checked' : '' %>
                    onchange="document.getElementById('streamende-form').requestSubmit();">
-            <span class="form-check-label">Nach dem Stream beenden</span>
+            <span class="form-check-label"><%= tr('streaming:MUSIK.NACH_STREAM') %></span>
           </label>
           <div class="input-group input-group-sm mt-2" style="max-width: 18rem;">
-            <span class="input-group-text">Nachlauf</span>
+            <span class="input-group-text"><%= tr('streaming:MUSIK.NACHLAUF') %></span>
             <input type="number" class="form-control" name="nachlauf_min"
                    min="<%= nachlaufGrenzen.min %>" max="<%= nachlaufGrenzen.max %>"
-                   value="<%= streamende.nachlaufMin %>" aria-label="Nachlauf in Minuten">
-            <span class="input-group-text">Min.</span>
-            <button class="btn btn-outline-primary" type="submit">Übernehmen</button>
+                   value="<%= streamende.nachlaufMin %>" aria-label="<%= tr('streaming:MUSIK.NACHLAUF_ARIA') %>">
+            <span class="input-group-text"><%= tr('streaming:ANSAGEN.MIN') %></span>
+            <button class="btn btn-outline-primary" type="submit"><%= tr('streaming:MUSIK.UEBERNEHMEN') %></button>
           </div>
           <div class="form-hint">
             <% if (streamende.an) { %>
-              Endet der Stream, wartet der Zusatz <%= streamende.nachlaufMin %> Minuten. Geht in der
-              Zeit wieder jemand live, bleibt die Musik an, sonst wird sie beendet — die Warteschlange
-              bleibt. Es zählt jeder Kanal, dessen Heim-Guild diese Guild ist. Läuft beim Streamende
-              keine Musik, passiert nichts.
+              <%= tr('streaming:MUSIK.ENDE_AN', { n: streamende.nachlaufMin }) %>
             <% } else { %>
-              Die Musik läuft nach dem Stream weiter, bis jemand sie anhält.
+              <%= tr('streaming:MUSIK.ENDE_AUS') %>
             <% } %>
           </div>
           <% if (streamendeZuletzt) { %>
-            <div class="text-secondary small mt-1">Zuletzt: <%= streamendeZuletzt %></div>
+            <div class="text-secondary small mt-1"><%= tr('streaming:MUSIK.ZULETZT', { was: streamendeZuletzt }) %></div>
           <% } %>
         </form>
       </div>
@@ -254,7 +236,8 @@
     <div class="card">
       <div class="card-header">
         <h3 class="card-title">
-          <i class="fa-solid fa-list-ol me-2"></i>Als nächstes
+          <i class="fa-solid fa-list-ol me-2"></i><%= tr('streaming:MUSIK.NAECHSTES') %>
+
           <span class="badge bg-secondary-lt ms-2"><%= offen.length %></span>
         </h3>
       </div>
@@ -270,15 +253,15 @@
           <button class="btn btn-primary" type="submit"
                   <%= (freigegeben === 0 || !hatAblage) ? 'disabled' : '' %>>
             <i class="fa-solid fa-shuffle me-1"></i>
-            Ablage einreihen<% if (freigegeben) { %> (<%= freigegeben %>)<% } %>
+            <%= tr('streaming:MUSIK.EINREIHEN') %><% if (freigegeben) { %> (<%= freigegeben %>)<% } %>
           </button>
           <div class="form-hint mt-1">
-            Hängt alle freigegebenen Titel in zufälliger Reihenfolge an.
+            <%= tr('streaming:MUSIK.EINREIHEN_TEXT') %>
           </div>
         </form>
 
         <% if (!offen.length) { %>
-          <div class="text-secondary">Die Warteschlange ist leer.</div>
+          <div class="text-secondary"><%= tr('streaming:MUSIK.LEER') %></div>
         <% } else { %>
           <ol class="mb-3 ps-3">
             <% offen.forEach(z => { %>
@@ -291,8 +274,8 @@
             <% }) %>
           </ol>
           <form method="post" action="/guild/<%= guildId %>/plugins/streaming/musik/leeren"
-                onsubmit="return confirm('Die ganze Warteschlange leeren?');">
-            <button class="btn btn-sm btn-outline-danger" type="submit">Warteschlange leeren</button>
+                onsubmit="return confirm(<%= JSON.stringify(tr('streaming:MUSIK.LEEREN_FRAGE')) %>);">
+            <button class="btn btn-sm btn-outline-danger" type="submit"><%= tr('streaming:MUSIK.LEEREN') %></button>
           </form>
         <% } %>
       </div>
@@ -303,26 +286,25 @@
   <div class="col-12">
     <div class="card">
       <div class="card-header">
-        <h3 class="card-title"><i class="fa-solid fa-terminal me-2"></i>Befehle im Chat</h3>
+        <h3 class="card-title"><i class="fa-solid fa-terminal me-2"></i><%= tr('streaming:MUSIK.BEFEHLE') %></h3>
       </div>
       <div class="card-body">
         <p class="text-secondary">
-          Wer sie benutzen darf, stellst du unter <em>Meine Befehle</em> je Befehl ein —
-          die Angaben hier sind die Vorgaben.
+          <%- tr('streaming:MUSIK.BEFEHLE_TEXT') %>
         </p>
         <div class="table-responsive">
           <table class="table table-sm">
-            <thead><tr><th>Befehl</th><th>Was er tut</th><th>Vorgabe</th></tr></thead>
+            <thead><tr><th><%= tr('streaming:MUSIK.SP_BEFEHL') %></th><th><%= tr('streaming:MUSIK.SP_TUT') %></th><th><%= tr('streaming:MUSIK.SP_VORGABE') %></th></tr></thead>
             <tbody>
-              <tr><td><code>!request &lt;Titel&gt;</code></td><td>Wünscht einen Titel aus der freigegebenen Ablage</td><td>alle</td></tr>
-              <tr><td><code>!song</code></td><td>Sagt, was gerade läuft</td><td>alle</td></tr>
-              <tr><td><code>!playlist</code></td><td>Zeigt die nächsten Titel</td><td>alle</td></tr>
-              <tr><td><code>!vote</code></td><td>Stimmt fürs Überspringen (<%= noetigeStimmen %> Stimmen)</td><td>alle</td></tr>
-              <tr><td><code>!skip</code></td><td>Überspringt sofort</td><td>Moderator</td></tr>
-              <tr><td><code>!prev</code></td><td>Einen Titel zurück</td><td>Moderator</td></tr>
-              <tr><td><code>!pause</code> / <code>!play</code></td><td>Hält an / lässt weiterlaufen — <em>an derselben Stelle</em></td><td>Moderator</td></tr>
-              <tr><td><code>!stop</code></td><td>Beendet — die Liste fängt danach von vorn an</td><td>Moderator</td></tr>
-              <tr><td><code>!clear</code></td><td>Leert die Warteschlange</td><td>Moderator</td></tr>
+              <tr><td><code>!request &lt;<%= tr('streaming:STATISTIK.TITEL') %>&gt;</code></td><td><%= tr('streaming:MUSIK.T_REQUEST') %></td><td><%= tr('streaming:COMMON.WER_ALLE') %></td></tr>
+              <tr><td><code>!song</code></td><td><%= tr('streaming:MUSIK.T_SONG') %></td><td><%= tr('streaming:COMMON.WER_ALLE') %></td></tr>
+              <tr><td><code>!playlist</code></td><td><%= tr('streaming:MUSIK.T_PLAYLIST') %></td><td><%= tr('streaming:COMMON.WER_ALLE') %></td></tr>
+              <tr><td><code>!vote</code></td><td><%= tr('streaming:MUSIK.T_VOTE', { n: noetigeStimmen }) %></td><td><%= tr('streaming:COMMON.WER_ALLE') %></td></tr>
+              <tr><td><code>!skip</code></td><td><%= tr('streaming:MUSIK.T_SKIP') %></td><td><%= tr('streaming:MUSIK.MODERATOR') %></td></tr>
+              <tr><td><code>!prev</code></td><td><%= tr('streaming:MUSIK.T_PREV') %></td><td><%= tr('streaming:MUSIK.MODERATOR') %></td></tr>
+              <tr><td><code>!pause</code> / <code>!play</code></td><td><%- tr('streaming:MUSIK.T_PAUSE') %></td><td><%= tr('streaming:MUSIK.MODERATOR') %></td></tr>
+              <tr><td><code>!stop</code></td><td><%= tr('streaming:MUSIK.T_STOP') %></td><td><%= tr('streaming:MUSIK.MODERATOR') %></td></tr>
+              <tr><td><code>!clear</code></td><td><%= tr('streaming:MUSIK.T_CLEAR') %></td><td><%= tr('streaming:MUSIK.MODERATOR') %></td></tr>
             </tbody>
           </table>
         </div>
@@ -359,16 +341,16 @@
         var fertig = function (text) {
             knopf.innerHTML = text;
             setTimeout(function () {
-                knopf.innerHTML = '<i class="fa-regular fa-copy me-1"></i>Kopieren';
+                knopf.innerHTML = '<i class="fa-regular fa-copy me-1"></i>' + <%- JSON.stringify(tr('streaming:MUSIK.KOPIEREN')) %>;
             }, 2000);
         };
 
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(feld.value)
-                .then(function () { fertig('Kopiert'); })
-                .catch(function () { fertig('Markiert — Strg+C'); });
+                .then(function () { fertig(<%- JSON.stringify(tr('streaming:MUSIK.KOPIERT')) %>); })
+                .catch(function () { fertig(<%- JSON.stringify(tr('streaming:MUSIK.MARKIERT')) %>); });
         } else {
-            fertig('Markiert — Strg+C');
+            fertig(<%- JSON.stringify(tr('streaming:MUSIK.MARKIERT')) %>);
         }
     });
 })();

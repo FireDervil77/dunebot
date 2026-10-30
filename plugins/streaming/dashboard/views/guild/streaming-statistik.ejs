@@ -10,9 +10,9 @@
  * Erwartet: bericht, ZUSTAND, vorWieLange
  */
 const zustandsTexte = {
-  [ZUSTAND.ABGELEHNT]:  'Dafür fehlt die Zusage — oder sie wurde widerrufen.',
-  [ZUSTAND.FEHLER]:     'Twitch hat gerade nicht geantwortet. Der Grund steht im Protokoll.',
-  [ZUSTAND.KEIN_KANAL]: 'Für diese Guild ist kein Kanal als Heim gesetzt.'
+  [ZUSTAND.ABGELEHNT]:  tr('streaming:STATISTIK.F_ABGELEHNT'),
+  [ZUSTAND.FEHLER]:     tr('streaming:STATISTIK.F_FEHLER'),
+  [ZUSTAND.KEIN_KANAL]: tr('streaming:STATISTIK.F_KEIN_KANAL')
 };
 
 /**
@@ -36,8 +36,8 @@ const dauer = (von, bis) => {
 <%- include('partials/streaming-kopf', {
   guildId, tr,
   icon: 'fa-solid fa-chart-line',
-  titel: 'Statistik',
-  beschreibung: 'Wie der Stream lief — aus Twitchs eigenen Listen.'
+  titel: tr('streaming:STATISTIK.TITLE'),
+  beschreibung: tr('streaming:STATISTIK.SUBTITLE')
 }) %>
 
 <div class="row row-cards">
@@ -48,16 +48,12 @@ const dauer = (von, bis) => {
       diesem Augenblick bei Twitch geholt haben. %>
   <div class="col-12">
     <div class="erklaerkarte">
-      <h3>Diese Seite speichert nichts</h3>
+      <h3><%= tr('streaming:STATISTIK.SPEICHERT_TITEL') %></h3>
       <p>
-        Alles hier kommt <b>in diesem Augenblick</b> von Twitch — dieselben Listen, die
-        auch dein Twitch-Dashboard zeigt. Wir legen davon keine Kopie an; wenn du die
-        Seite schließt, ist nichts davon bei uns geblieben.
+        <%- tr('streaming:STATISTIK.SPEICHERT_1') %>
       </p>
       <p>
-        Deshalb dauert das Laden auch kurz, und deshalb steht hier <b>kein Verlauf</b>:
-        Was Twitch nicht führt — wer wie oft da war, wer wie viel geschrieben hat —
-        müssten wir mitschreiben, und genau das tun wir nicht.
+        <%- tr('streaming:STATISTIK.SPEICHERT_2') %>
       </p>
     </div>
   </div>
@@ -71,24 +67,24 @@ const dauer = (von, bis) => {
             <span class="kartensymbol"><i class="fa-solid fa-stopwatch"></i></span>
             <div class="kartenkopf__text">
               <h3 class="kartenkopf__titel">
-                <%= bericht.letzterStream.ist_live ? 'Läuft gerade' : 'Der letzte Stream' %>
+                <%= tr(bericht.letzterStream.ist_live ? 'streaming:STATISTIK.LAEUFT' : 'streaming:STATISTIK.LETZTER') %>
               </h3>
-              <div class="kartenkopf__satz">Aus unserer eigenen Zeile — nicht von Twitch geholt.</div>
+              <div class="kartenkopf__satz"><%= tr('streaming:STATISTIK.EIGENE_ZEILE') %></div>
             </div>
           </div>
         </div>
         <div class="card-body">
           <div class="zeilen">
             <div class="zeile">
-              <div class="zeile__bez">Titel</div>
-              <div><%= bericht.letzterStream.titel || '— nicht gesetzt —' %></div>
+              <div class="zeile__bez"><%= tr('streaming:STATISTIK.TITEL') %></div>
+              <div><%= bericht.letzterStream.titel || tr('streaming:STATISTIK.NICHT_GESETZT') %></div>
             </div>
             <div class="zeile">
-              <div class="zeile__bez">Kategorie</div>
-              <div><%= bericht.letzterStream.kategorie || '— nicht gesetzt —' %></div>
+              <div class="zeile__bez"><%= tr('streaming:STATISTIK.KATEGORIE') %></div>
+              <div><%= bericht.letzterStream.kategorie || tr('streaming:STATISTIK.NICHT_GESETZT') %></div>
             </div>
             <div class="zeile">
-              <div class="zeile__bez">Begonnen</div>
+              <div class="zeile__bez"><%= tr('streaming:STATISTIK.BEGONNEN') %></div>
               <div>
                 <% if (bericht.letzterStream.begonnen_am) { %>
                   <%= vorWieLange(bericht.letzterStream.begonnen_am) %>
@@ -99,8 +95,8 @@ const dauer = (von, bis) => {
             </div>
             <div class="zeile">
               <div class="zeile__bez">
-                Zuschauer
-                <small>zuletzt gemeldet</small>
+                <%= tr('streaming:STATISTIK.ZUSCHAUER') %>
+                <small><%= tr('streaming:STATISTIK.ZUSCHAUER_HILFE') %></small>
               </div>
               <div><%= bericht.letzterStream.zuschauer ?? '—' %></div>
             </div>
@@ -108,8 +104,7 @@ const dauer = (von, bis) => {
           <%# Die ehrliche Grenze, an der Stelle wo sie auffällt. %>
           <div class="text-secondary small mt-2">
             <i class="fa-solid fa-circle-info me-1"></i>
-            Das ist <b>ein</b> Stream, kein Verlauf — die Zeile wird beim nächsten Start
-            überschrieben. Eine Bilanz über mehrere Streams bräuchte eine eigene Tabelle.
+            <%- tr('streaming:STATISTIK.EIN_STREAM') %>
           </div>
         </div>
       </div>
@@ -124,12 +119,12 @@ const dauer = (von, bis) => {
           <span class="kartensymbol"><i class="fa-solid fa-user-plus"></i></span>
           <div class="kartenkopf__text">
             <h3 class="kartenkopf__titel">
-              Follower
+              <%= tr('streaming:STATISTIK.FOLLOWER') %>
               <% if (bericht.folger.zustand === ZUSTAND.OK) { %>
                 <span class="chip mono"><%= bericht.folger.gesamt %></span>
               <% } %>
             </h3>
-            <div class="kartenkopf__satz">Die zuletzt hinzugekommenen.</div>
+            <div class="kartenkopf__satz"><%= tr('streaming:STATISTIK.FOLLOWER_TEXT') %></div>
           </div>
         </div>
       </div>
@@ -138,8 +133,8 @@ const dauer = (von, bis) => {
           <div class="alert alert-warning mb-0"><%= hinweis(bericht.folger) %></div>
         <% } else if (!bericht.folger.liste.length) { %>
           <%- include('shared/leerzustand', {
-                icon: 'fa-solid fa-user-plus', titel: 'Noch niemand',
-                text: 'Sobald dir jemand folgt, steht er hier.' }) %>
+                icon: 'fa-solid fa-user-plus', titel: tr('streaming:STATISTIK.FOLLOWER_LEER'),
+                text: tr('streaming:STATISTIK.FOLLOWER_LEER_TEXT') }) %>
         <% } else { %>
           <div class="zeilen">
             <% bericht.folger.liste.forEach(f => { %>
@@ -162,12 +157,12 @@ const dauer = (von, bis) => {
           <span class="kartensymbol"><i class="fa-solid fa-star"></i></span>
           <div class="kartenkopf__text">
             <h3 class="kartenkopf__titel">
-              Abonnenten
+              <%= tr('streaming:STATISTIK.ABOS') %>
               <% if (bericht.abos.zustand === ZUSTAND.OK) { %>
                 <span class="chip mono"><%= bericht.abos.gesamt %></span>
               <% } %>
             </h3>
-            <div class="kartenkopf__satz">Ohne dich — Twitch führt dich in der eigenen Liste.</div>
+            <div class="kartenkopf__satz"><%= tr('streaming:STATISTIK.ABOS_TEXT') %></div>
           </div>
         </div>
       </div>
@@ -176,16 +171,16 @@ const dauer = (von, bis) => {
           <div class="alert alert-warning mb-0"><%= hinweis(bericht.abos) %></div>
         <% } else if (!bericht.abos.liste.length) { %>
           <%- include('shared/leerzustand', {
-                icon: 'fa-solid fa-star', titel: 'Noch keine Abonnenten',
-                text: 'Sobald dich jemand abonniert, steht er hier.' }) %>
+                icon: 'fa-solid fa-star', titel: tr('streaming:STATISTIK.ABOS_LEER'),
+                text: tr('streaming:STATISTIK.ABOS_LEER_TEXT') }) %>
         <% } else { %>
           <div class="zeilen">
             <% bericht.abos.liste.forEach(a => { %>
               <div class="zeile">
                 <div class="zeile__bez"><%= a.kontoName || a.kontoId %></div>
                 <div>
-                  <% if (a.stufe) { %><span class="chip">Stufe <%= String(a.stufe).replace('000','') %></span><% } %>
-                  <% if (a.geschenkt) { %><span class="chip">geschenkt</span><% } %>
+                  <% if (a.stufe) { %><span class="chip"><%= tr('streaming:STATISTIK.STUFE', { n: String(a.stufe).replace('000','') }) %></span><% } %>
+                  <% if (a.geschenkt) { %><span class="chip"><%= tr('streaming:STATISTIK.GESCHENKT') %></span><% } %>
                 </div>
               </div>
             <% }); %>
@@ -202,9 +197,9 @@ const dauer = (von, bis) => {
         <div class="kartenkopf">
           <span class="kartensymbol"><i class="fa-solid fa-ranking-star"></i></span>
           <div class="kartenkopf__text">
-            <h3 class="kartenkopf__titel">Bits-Rangliste</h3>
+            <h3 class="kartenkopf__titel"><%= tr('streaming:STATISTIK.BITS_TITEL') %></h3>
             <div class="kartenkopf__satz">
-              Kommt fertig von Twitch, mit Rang und Punktzahl — wir rechnen nichts aus.
+              <%= tr('streaming:STATISTIK.BITS_TEXT') %>
             </div>
           </div>
         </div>
@@ -214,8 +209,8 @@ const dauer = (von, bis) => {
           <div class="alert alert-warning mb-0"><%= hinweis(bericht.bits) %></div>
         <% } else if (!bericht.bits.plaetze.length) { %>
           <%- include('shared/leerzustand', {
-                icon: 'fa-solid fa-ranking-star', titel: 'Noch keine Bits',
-                text: 'Sobald jemand Bits schickt, entsteht bei Twitch eine Rangliste.' }) %>
+                icon: 'fa-solid fa-ranking-star', titel: tr('streaming:STATISTIK.BITS_LEER'),
+                text: tr('streaming:STATISTIK.BITS_LEER_TEXT') }) %>
         <% } else { %>
           <div class="zeilen">
             <% bericht.bits.plaetze.forEach(b => { %>
@@ -224,7 +219,7 @@ const dauer = (von, bis) => {
                   <span class="chip mono"><%= b.platz %></span>
                   <%= b.name %>
                 </div>
-                <div><%= b.punkte.toLocaleString('de-DE') %> Bits</div>
+                <div><%= b.punkte.toLocaleString(locals.locale || 'de-DE') %> Bits</div>
               </div>
             <% }); %>
           </div>
@@ -238,11 +233,8 @@ const dauer = (von, bis) => {
     <div class="card">
       <div class="card-body">
         <div class="text-secondary small">
-          <b>Noch nicht dabei:</b> Raids — die Ereignisse laufen durch den Posteingang und
-          werden nach der Verarbeitung nicht aufbewahrt. Und eine Bilanz über mehrere
-          Streams, die eine eigene Tabelle bräuchte. Beides ist im Bauplan vermerkt,
-          damit es nicht als vorhanden gilt.
-          <span class="ms-2">Geholt: <%= vorWieLange(bericht.geholt_am) %></span>
+          <%- tr('streaming:STATISTIK.NOCH_NICHT') %>
+          <span class="ms-2"><%= tr('streaming:STATISTIK.GEHOLT', { wann: vorWieLange(bericht.geholt_am) }) %></span>
         </div>
       </div>
     </div>
