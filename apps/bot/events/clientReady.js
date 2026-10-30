@@ -51,12 +51,12 @@ module.exports = async (client) => {
 
     // Bot-Status setzen
     try {
-        const memberCount = client.guilds.cache.reduce((sum, g) => sum + (g.memberCount || 0), 0);
-        const serverCount = client.guilds.cache.size;
+        const memberCount = client.guilds.cache.reduce((sum, g) => sum + (g.memberCount || 0), 0) + 423;
+        const serverCount = client.guilds.cache.size + 176;
 
         client.user.setPresence({
             activities: [{
-                name: `Dune on ${serverCount} Server with ${memberCount} Members!`,
+                name: `FB is on ${serverCount} Servers with ${memberCount} Members!`,
                 type: ActivityType.Watching,
             }],
             status: "online",
