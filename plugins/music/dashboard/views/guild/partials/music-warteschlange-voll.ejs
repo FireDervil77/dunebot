@@ -1,0 +1,61 @@
+<%
+/**
+ * Der Inhalt der Karte auf `/warteschlange` — laufender Titel, Liste, Fuß.
+ *
+ * Wie `music-warteschlange-teil.ejs` (Karte „Als Nächstes" der Übersicht):
+ * einmal beschrieben, von zwei Stellen benutzt — von der Seite beim Aufbau und
+ * von `/steuerung/warteschlange-teil?voll=1` beim Nachziehen. Betreiber
+ * 2026-10-29 (F27, P15): „Live machen." Die Liste im Browser nachzubauen wäre
+ * der zweite Weg.
+ *
+ * Erwartet: zustand, tr, spielzeitText
+ */
+%>
+  <% if (zustand.aktuell) { %>
+    <div class="list-group-item bg-primary-lt">
+      <%- include('music-titelzeile', {
+            t: zustand.aktuell, tr,
+            aktionen: `<span class="badge bg-green-lt">${tr('music:DASHBOARD.NOW_PLAYING')}</span>`
+          }) %>
+    </div>
+  <% } %>
+
+  <% if (zustand.warteschlange && zustand.warteschlange.length > 0) { %>
+    <div class="list-group list-group-flush" id="music-warteschlange">
+      <% zustand.warteschlange.forEach((t, i) => { %>
+        <div class="list-group-item" data-position="<%= i %>">
+          <%- include('music-titelzeile', {
+                t, tr, nummer: i + 1,
+                aktionen: `
+                  <div class="btn-list flex-nowrap">
+                    <button type="button" class="btn btn-sm btn-icon btn-outline-secondary"
+                            onclick="musicVerschieben(${i}, 0)" title="${tr('music:QUEUE.TO_TOP')}">
+                      <i class="fa-solid fa-angles-up"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-icon btn-outline-danger"
+                            onclick="musicEntfernen(${i})" title="${tr('music:QUEUE.REMOVE')}">
+                      <i class="fa-solid fa-xmark"></i>
+                    </button>
+                  </div>`
+              }) %>
+        </div>
+      <% }); %>
+    </div>
+    <div class="card-footer text-secondary">
+      <%= tr('music:DASHBOARD.REMAINING', { zeit: spielzeitText(zustand.restspielzeitSek) }) %>
+    </div>
+  <% } else if (zustand.aktuell) { %>
+    <%# Ein Titel laeuft, es wartet nur keiner mehr. Die Seite darf hier nicht
+        "leer" sagen - oben steht sichtbar etwas drin. %>
+    <div class="card-footer text-secondary">
+      <%= tr('music:QUEUE.ONLY_CURRENT') %>
+    </div>
+  <% } else { %>
+    <div class="card-body">
+      <div class="empty">
+        <div class="empty-icon"><i class="fa-solid fa-list-ol fs-1 text-secondary"></i></div>
+        <p class="empty-title"><%= tr('music:QUEUE.EMPTY') %></p>
+        <p class="empty-subtitle text-secondary"><%= tr('music:QUEUE.EMPTY_HINT') %></p>
+      </div>
+    </div>
+  <% } %>

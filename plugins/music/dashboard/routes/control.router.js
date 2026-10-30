@@ -46,8 +46,11 @@ router.get('/state', requirePermission('MUSIC.VIEW'), async (req, res) => {
 router.get('/warteschlange-teil', requirePermission('MUSIC.VIEW'), async (req, res) => {
     try {
         const zustand = await zustandHolen(res.locals.guildId);
+        // `voll=1`: die ganze Karte der Seite `/warteschlange` (F27), sonst die
+        // kurze Karte „Als Nächstes" der Übersicht.
+        const voll = req.query.voll === '1';
         const vorlage = path.join(__dirname, '..', 'views', 'guild', 'partials',
-            'music-warteschlange-teil.ejs');
+            voll ? 'music-warteschlange-voll.ejs' : 'music-warteschlange-teil.ejs');
 
         // **Nicht `{ async: true }`.** Damit gibt `include()` ein Versprechen
         // zurueck statt HTML, und in der Liste stuende zweimal
@@ -61,7 +64,8 @@ router.get('/warteschlange-teil', requirePermission('MUSIC.VIEW'), async (req, r
             html,
             // Die Zahl im Kopf der Karte steht ausserhalb des getauschten
             // Stuecks - sie kommt als Zahl mit, nicht als zweites HTML.
-            anzahl: zustand.warteschlangeLaenge || 0
+            anzahl: zustand.warteschlangeLaenge || 0,
+            gesamt: zustand.titelGesamt || 0
         });
     } catch (error) {
         fehler(res, error, 'Die Warteschlange konnte nicht gelesen werden');

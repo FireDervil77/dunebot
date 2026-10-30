@@ -85,18 +85,30 @@
         anfrage('POST', '/steuerung/trennen').then(() => window.location.reload()).catch(fehlerMelden);
     };
 
+    /**
+     * Nach einem Eingriff in die Liste: nachziehen, wo die Seite das kann.
+     * Neu laden nimmt Rollstand und Meldung mit, also nur als Rückfall.
+     */
+    function listeAuffrischen() {
+        if (document.getElementById('music-warteschlange-voll')) {
+            zustandHolen().catch(function () { window.location.reload(); });
+        } else {
+            window.location.reload();
+        }
+    }
+
     window.musicEntfernen = function (position) {
         anfrage('DELETE', '/steuerung/warteschlange/' + position)
             .then(function () {
                 melden(text('ENTFERNT', 'Entfernt.'));
-                window.location.reload();
+                listeAuffrischen();
             })
             .catch(fehlerMelden);
     };
 
     window.musicVerschieben = function (von, nach) {
         anfrage('POST', '/steuerung/verschieben', { von: von, nach: nach })
-            .then(() => window.location.reload())
+            .then(listeAuffrischen)
             .catch(fehlerMelden);
     };
 
@@ -520,7 +532,10 @@
     let ersteRunde = true;
 
     async function zustandHolen() {
-        if (!document.getElementById('music-spieler')) return false;
+        // Zwei Seiten ziehen nach: die Übersicht mit dem Spieler und, seit
+        // 2026-10-29, `/warteschlange` (F27). Dort gibt es keinen Spieler.
+        const spieler = document.getElementById('music-spieler');
+        if (!spieler && !document.getElementById('music-warteschlange-voll')) return false;
 
         const antwort = await anfrage('GET', '/steuerung/state');
         const z = antwort.zustand;
@@ -536,7 +551,7 @@
         // ────────────────────────────────────────────────────────────────────
         const kennung = t ? String(t.url || t.title || '') : null;
 
-        if (kennung !== angezeigterTitel) {
+        if (spieler && kennung !== angezeigterTitel) {
             // Von "es laeuft nichts" auf "es laeuft etwas" (oder umgekehrt)
             // aendert sich der ganze Aufbau der Karte, nicht nur ihr Inhalt.
             // Das baut der Server sauberer als wir hier - einmal neu laden.
@@ -565,7 +580,9 @@
         kopfzeileSetzen(z);
         warteschlangeNachziehen(z);
 
-        return Boolean(t) && !z.pausiert;
+        // Ohne Spieler gibt es keinen Balken, der jede Sekunde wandern müsste:
+        // Die Liste ändert sich selten, dort reicht der ruhige Takt.
+        return Boolean(spieler) && Boolean(t) && !z.pausiert;
     }
 
     /**
@@ -595,11 +612,14 @@
      * @returns {void}
      */
     function warteschlangeNachziehen(z) {
-        const behaelter = document.getElementById('music-warteschlange-teil');
+        const voll = document.getElementById('music-warteschlange-voll');
+        const behaelter = voll || document.getElementById('music-warteschlange-teil');
         if (!behaelter) return;
 
-        const kennung = (z.warteschlange || [])
-            .map(function (t) { return t.url || t.title || ''; }).join('~');
+        // Die volle Karte zeigt auch den laufenden Titel — also zählt er mit.
+        const titel = (voll && z.aktuell ? [z.aktuell] : []).concat(z.warteschlange || []);
+        const kennung = (voll ? (z.aktuell ? 'laeuft~' : 'still~') : '')
+            + titel.map(function (t) { return t.url || t.title || ''; }).join('~');
 
         if (kennung === angezeigteWarteschlange) return;
         angezeigteWarteschlange = kennung;
@@ -609,11 +629,13 @@
         // eine Anfrage, die nichts aendert.
         if (ersteRunde) { ersteRunde = false; return; }
 
-        anfrage('GET', '/steuerung/warteschlange-teil')
+        anfrage('GET', '/steuerung/warteschlange-teil' + (voll ? '?voll=1' : ''))
             .then(function (antwort) {
                 behaelter.innerHTML = antwort.html;
                 const zahl = document.getElementById('music-warteschlange-zahl');
                 if (zahl) zahl.textContent = antwort.anzahl;
+                const gesamt = document.getElementById('music-warteschlange-gesamt');
+                if (gesamt) gesamt.textContent = antwort.gesamt;
             })
             .catch(function () {
                 // Nicht melden: Die Liste ist eine Anzeige, kein Vorgang des
@@ -801,7 +823,7 @@
         if (dateiKnopf) dateiKnopf.addEventListener('click', dateiHochladen);
 
         // Fortschritt nachfuehren, solange die Seite offen ist
-        if (document.getElementById('music-spieler')) {
+        if (document.getElementById('music-spieler') || document.getElementById('music-warteschlange-voll')) {
             fortschrittVerfolgen();
         }
     });
