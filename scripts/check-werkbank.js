@@ -1135,10 +1135,10 @@ async function pruefe(name, fn) {
         await assert.rejects(Sitzungen.einstellungSpeichern(s, formular({ key: 'name' })), /gibt es schon/);
     });
 
-    await pruefe('Entwurf: env-Ziel wird ins Wurzelfeld verdrahtet (B169), ein vorhandener Eintrag bleibt', async () => {
+    await pruefe('Entwurf: apply env braucht keine Zeile im Wurzelfeld (B169, F6), ein vorhandener Eintrag bleibt', async () => {
         const s = mitEinstellungen();
         let p = Sitzungen.entwurfAlsPaket(s, liste);
-        assert.deepStrictEqual(p.env, { RCON_PASSWORD: '{{setting:rcon_password}}' });
+        assert.strictEqual(p.env, undefined, 'der Daemon setzt apply env selbst — eine Zeile hier umginge `as`');
         assert.strictEqual(p.settings.length, 4);
         s.entwurf.env = { RCON_PASSWORD: 'fest' };
         p = Sitzungen.entwurfAlsPaket(s, liste);
@@ -1187,7 +1187,7 @@ async function pruefe(name, fn) {
         assert.ok(!router.includes("/einstellungen/:key/probewert'"), 'der Weg je Zeile steht noch da');
     });
 
-    await pruefe('Start und Durchlauf schicken Definitionen, Probewerte (Vorgabe, Ja/Nein als 1/0) und die Verdrahtung', async () => {
+    await pruefe('Start und Durchlauf schicken Definitionen und Probewerte (Vorgabe, Ja/Nein als 1/0)', async () => {
         const s = mitEinstellungen();
         s.entwurf.start.ready_when = { port: 'game' };
         s.entwurf.werkbank.werte = { name: 'Probe' };
@@ -1195,13 +1195,13 @@ async function pruefe(name, fn) {
         let n = daemon.befehle[0].nutzlast;
         assert.deepStrictEqual(n.settings, { max_players: '8', name: 'Probe', rcon_password: '', oeffentlich: '1' });
         assert.deepStrictEqual(n.einstellungen.map(x => x.key), ['max_players', 'name', 'rcon_password', 'oeffentlich']);
-        assert.deepStrictEqual(n.env, { RCON_PASSWORD: '{{setting:rcon_password}}' });
+        assert.ok(n.einstellungen.find(x => x.key === 'rcon_password').apply.some(z => z.target === 'env'),
+            'die Definition muss das Ziel tragen, sonst setzt der Daemon die Variable nicht');
         daemon.befehle = []; db.laeufe = []; Ereignisse._laeufe.clear();
         await Sitzungen.pruefen(s, liste);
         n = daemon.befehle[0].nutzlast;
         assert.strictEqual(n.settings.name, 'Probe');
         assert.strictEqual(n.einstellungen.length, 4);
-        assert.deepStrictEqual(n.env, { RCON_PASSWORD: '{{setting:rcon_password}}' });
     });
 
     const nachweis = (x) => [
@@ -1213,8 +1213,10 @@ async function pruefe(name, fn) {
     ];
     const mitNachweis = (s, liste, n) => { const g = gruenGeprueft(s, liste); g.ergebnis.einstellungen = n; return g; };
 
-    await pruefe('Belegt: nur angekommene Ziele, der Rest mit Grund — und seine env-Zeile geht mit', async () => {
+    await pruefe('Belegt: nur angekommene Ziele, der Rest mit Grund — und eine alte env-Zeile geht mit', async () => {
         const s = mitEinstellungen();
+        // Pakete von vor F6 tragen die Zeile im Wurzelfeld noch.
+        s.entwurf.env = { RCON_PASSWORD: '{{setting:rcon_password}}' };
         let b = Sitzungen.belegteEinstellungen(Sitzungen.entwurfAlsPaket(s, liste), { einstellungen: nachweis() });
         assert.deepStrictEqual(b.behalten.map(x => x.key), ['max_players', 'name', 'rcon_password']);
         assert.deepStrictEqual(b.weg, [{ key: 'oeffentlich', grund: 'file server-settings.json: visibility.public: nicht_gefunden — Schlüssel fehlt' }]);
@@ -1248,7 +1250,7 @@ async function pruefe(name, fn) {
         const echt = f.install.steps.map(schritt => ({ status: 'ok', schritt }));
         const paket = Sitzungen.veroeffentlichungsPaket(s, echt, mitNachweis(s, echt, nachweis()), 'firedervil');
         assert.deepStrictEqual(paket.settings.map(x => x.key), ['max_players', 'name', 'rcon_password']);
-        assert.deepStrictEqual(paket.env, { RCON_PASSWORD: '{{setting:rcon_password}}' });
+        assert.deepStrictEqual(paket.env || {}, {}, 'keine Zeile im Wurzelfeld');
         const offen = paket.status.open.join('\n');
         assert.match(offen, /Einstellungen: 3 im Durchlauf #3 als angekommen belegt/);
         assert.match(offen, /Nicht aufgenommen: Einstellung „oeffentlich"/);

@@ -633,7 +633,9 @@ function entwurfAlsPaket(sitzung, liste) {
     }
     if (e.start) paket.start = e.start;
     const settings = Array.isArray(e.settings) ? e.settings : [];
-    const env = { ...(e.env || {}), ...umgebungAusEinstellungen(settings, e.env || {}, uebernommeneZiele(sitzung)) };
+    // Nur, was im Wurzelfeld wirklich steht. `apply: env` setzt der Daemon selbst
+    // (Baustelle 169, F6); eine zweite Zeile hier umginge die Ja/Nein-Schreibweise.
+    const env = { ...(e.env || {}) };
     if (Object.keys(env).length) paket.env = env;
     if (settings.length) paket.settings = settings;
     // Hinweise sind Text für Menschen — sie reisen mit, zählen aber nicht zum
@@ -1344,10 +1346,9 @@ function durchgereichtes(sitzung) {
 // Wert geht (`apply`). Was heißt „wohin":
 //
 //   file   fb-init schreibt die Datei vor dem Start und meldet je Schlüssel.
-//   env    Wirksam NUR über das Wurzelfeld `env` — der Daemon setzt `apply: env`
-//          nicht selbst um (Baustelle 169). Die Werkbank schreibt die Zeile
-//          `VARIABLE: {{setting:key}}` deshalb selbst dazu; sonst erbte jedes
-//          neue Paket die Lücke der alten.
+//   env    Der Daemon setzt `apply: env` seit 2026-10-29 selbst (Baustelle 169,
+//          F6). Eine Zeile im Wurzelfeld `env` braucht es nicht mehr; steht
+//          dort dieselbe Variable, behält sie das letzte Wort.
 //   arg    Wirksam nur, wenn die Startzeile `{{setting:key}}` enthält. Die
 //          schreibt der Mensch in den Startteil; der Nachweis sagt, ob sie da ist.
 //   rcon   wirkt im laufenden Spiel; im Durchlauf nicht prüfbar (B3).
@@ -1412,19 +1413,14 @@ function pfadFehler(pfad) {
 }
 
 /**
- * Die Verdrahtung für `apply: env` — nur, was im Wurzelfeld noch fehlt.
- *
- * Ein Ziel, das unverändert aus einem geöffneten Paket stammt (`uebernommen`),
- * wird NICHT nachträglich verdrahtet: Stand die Variable dort nicht im
- * Wurzelfeld, soll sie es nach dem Öffnen auch nicht — Valheims `AUTO_UPDATE`
- * liest die Installation, nicht das Spiel. Verdrahten hiesse, das Paket beim
- * blossen Öffnen zu ändern.
+ * Welche Variablen der Daemon aus `apply: env` setzt, soweit das Wurzelfeld sie
+ * nicht schon nennt — für die Frage, woher eine Variable ihren Wert hat
+ * (`quelleDerVariable`). Ins Paket geschrieben wird das nicht mehr.
  */
-function umgebungAusEinstellungen(settings, env, uebernommen = {}) {
+function umgebungAusEinstellungen(settings, env) {
     const aus = {};
     for (const s of settings) {
         for (const z of s.apply || []) {
-            if (istUebernommen(uebernommen, s.key, z)) continue;
             if (z.target === 'env' && z.variable && !(z.variable in env) && !(z.variable in aus)) {
                 aus[z.variable] = `{{setting:${s.key}}}`;
             }
@@ -3049,7 +3045,7 @@ function rconPruefbefehl(sitzung) {
 function quelleDerVariable(sitzung, variable) {
     const e = sitzung.entwurf || {};
     const settings = Array.isArray(e.settings) ? e.settings : [];
-    const env = { ...(e.env || {}), ...umgebungAusEinstellungen(settings, e.env || {}, uebernommeneZiele(sitzung)) };
+    const env = { ...(e.env || {}), ...umgebungAusEinstellungen(settings, e.env || {}) };
     if (!variable || env[variable] === undefined) return null;
     const verweis = /^\{\{setting:([a-z][a-z0-9_]*)\}\}$/.exec(String(env[variable]).trim());
     if (!verweis) return { fest: true };                       // ein fester Wert kommt an
