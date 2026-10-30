@@ -12,6 +12,15 @@
 
 <%
 /**
+ * Was beim Abschalten gelöscht wird (F30, 2026-10-30). Die Liste nennt die
+ * Plugins, deren `onGuildDisable` Inhalte löscht, gemessen am Quelltext.
+ */
+const MIT_INHALTEN = ['gameserver', 'masterserver', 'giveaway', 'music', 'streaming', 'ticket', 'dunemap', 'greeting'];
+const abschaltenWeg = (name) => tr('ADMIN_PAGE.DISABLE_GOES_' + (MIT_INHALTEN.includes(name) ? name.toUpperCase() : 'DEFAULT'));
+%>
+
+<%
+/**
  * Abzeichen eines Plugins (NEU / BETA / UPDATE / DEPRECATED).
  *
  * Stand bisher dreimal wortgleich in dieser Datei — einmal je Ansicht. Die
@@ -153,10 +162,13 @@ function _stern(p) {
                                     <form action="/guild/<%= guildId %>/plugins"
                                           method="POST"
                                           class="guild-ajax-form"
-                                          data-form-type="plugin">
+                                          data-form-type="plugin"
+                                          data-abschalten="<%= p.name %>"
+                                          data-abschalten-weg="<%= abschaltenWeg(p.name) %>">
                                         <input type="hidden" name="_csrf" value="<%= locals.csrfToken %>">
                                         <input type="hidden" name="action" value="disable">
                                         <input type="hidden" name="plugins[]" value="<%= p.name %>">
+                                        <input type="hidden" name="bestaetigung" value="">
                                         <button type="submit" class="btn btn-danger">
                                             <i class="fas fa-power-off me-1"></i><%= tr('ADMIN_PAGE.DISABLE_ACTION') %>
                                         </button>
@@ -227,10 +239,13 @@ function _stern(p) {
                                                 <form action="/guild/<%= guildId %>/plugins"
                                                       method="POST"
                                                       class="guild-ajax-form d-inline"
-                                                      data-form-type="plugin">
+                                                      data-form-type="plugin"
+                                                      data-abschalten="<%= p.name %>"
+                                                      data-abschalten-weg="<%= abschaltenWeg(p.name) %>">
                                                     <input type="hidden" name="_csrf" value="<%= locals.csrfToken %>">
                                                     <input type="hidden" name="action" value="disable">
                                                     <input type="hidden" name="plugins[]" value="<%= p.name %>">
+                                                    <input type="hidden" name="bestaetigung" value="">
                                                     <button type="submit" class="btn btn-danger btn-sm" title="<%= tr('ADMIN_PAGE.DISABLE_ACTION') %>">
                                                         <i class="fas fa-power-off"></i>
                                                     </button>
@@ -463,4 +478,83 @@ $(document).ready(function() {
         });
     });
 });
+</script>
+
+<%# ── Abschalten löscht (F30, 2026-10-30) ──────────────────────────────────
+    Der Knopf „Deaktivieren" hatte keine Rückfrage: Ein Fehlklick bei Gameserver
+    stoppte und löschte alle Server der Guild samt Dateien. Dialog nach dem
+    Muster #paketEntfernenModal; der Controller lehnt ohne Namen ab. %>
+<div class="modal modal-blur fade" id="pluginAbschaltenModal" tabindex="-1" aria-labelledby="pluginAbschaltenTitel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content border border-danger border-2">
+            <div class="modal-status bg-danger"></div>
+            <div class="modal-header bg-danger-lt">
+                <h5 class="modal-title text-danger fw-bold" id="pluginAbschaltenTitel">
+                    <i class="fa-solid fa-triangle-exclamation me-2"></i><%= tr('ADMIN_PAGE.DISABLE_DIALOG_TITLE') %>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="<%= tr('ADMIN_PAGE.DISABLE_DIALOG_CANCEL') %>"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-danger fw-bold fs-3 mb-2">
+                    „<span id="pluginAbschaltenName"></span>" <%= tr('ADMIN_PAGE.DISABLE_DIALOG_NAME') %>
+                </p>
+                <% if (locals.istKontrollGuild) { %>
+                    <p class="fw-bold mb-3"><%= tr('ADMIN_PAGE.DISABLE_DIALOG_CONTROL') %></p>
+                <% } else { %>
+                    <p class="text-danger fw-bold mb-3"><%= tr('ADMIN_PAGE.DISABLE_DIALOG_IRREVERSIBLE') %></p>
+                    <div class="fw-bold mb-1"><%= tr('ADMIN_PAGE.DISABLE_DIALOG_GOES') %></div>
+                    <ul class="mb-3"><li id="pluginAbschaltenWeg"></li></ul>
+                <% } %>
+                <label class="form-label fw-bold" for="pluginAbschaltenEingabe">
+                    <%= tr('ADMIN_PAGE.DISABLE_DIALOG_TYPE') %> <span class="font-monospace text-danger" id="pluginAbschaltenSoll"></span>
+                </label>
+                <input type="text" class="form-control font-monospace" id="pluginAbschaltenEingabe" autocomplete="off" spellcheck="false">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal"><%= tr('ADMIN_PAGE.DISABLE_DIALOG_CANCEL') %></button>
+                <button type="button" class="btn btn-danger fw-bold" id="pluginAbschaltenKnopf" disabled>
+                    <i class="fa-solid fa-power-off me-1"></i><%= tr('ADMIN_PAGE.DISABLE_DIALOG_CONFIRM') %>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script data-abschalten-skript>
+(function () {
+    // Vor dem Formular-Helfer des Themes abfangen (Einfangphase am Dokument).
+    document.addEventListener('submit', function (ereignis) {
+        var form = ereignis.target;
+        if (!form || !form.dataset || !form.dataset.abschalten) return;
+        if (form.dataset.abschaltenBestaetigt === '1') {
+            delete form.dataset.abschaltenBestaetigt;
+            return;
+        }
+        ereignis.preventDefault();
+        ereignis.stopImmediatePropagation();
+
+        var soll = form.dataset.abschalten;
+        var dialog = document.getElementById('pluginAbschaltenModal');
+        var eingabe = document.getElementById('pluginAbschaltenEingabe');
+        var knopf = document.getElementById('pluginAbschaltenKnopf');
+        var weg = document.getElementById('pluginAbschaltenWeg');
+        document.getElementById('pluginAbschaltenName').textContent = soll;
+        document.getElementById('pluginAbschaltenSoll').textContent = soll;
+        if (weg) weg.textContent = form.dataset.abschaltenWeg || '';
+        eingabe.value = '';
+        knopf.disabled = true;
+        // Gesperrt, bis der Name GENAU dasteht: Ein Klick aus Versehen löscht nichts.
+        eingabe.oninput = function () { knopf.disabled = eingabe.value.trim() !== soll; };
+        var fenster = bootstrap.Modal.getOrCreateInstance(dialog);
+        knopf.onclick = function () {
+            if (eingabe.value.trim() !== soll) return;
+            form.elements.bestaetigung.value = soll;
+            form.dataset.abschaltenBestaetigt = '1';
+            fenster.hide();
+            form.requestSubmit();
+        };
+        fenster.show();
+        dialog.addEventListener('shown.bs.modal', function () { eingabe.focus(); }, { once: true });
+    }, true);
+})();
 </script>

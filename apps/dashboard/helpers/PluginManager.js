@@ -1220,7 +1220,15 @@ class PluginManager extends BasePluginManager {
             // 1. Plugin-spezifische Deaktivierung
             await this.hooks.doAction('before_plugin_guild_disable_method', plugin, guildId);
             
-            if (plugin.onGuildDisable && typeof plugin.onGuildDisable === 'function') {
+            // Die Kontroll-Guild behält ihre Inhalte (Betreiber 2026-10-29, F19/F30):
+            // `onGuildDisable` löscht in acht Plugins Inhalte, dort läuft es
+            // nicht; Menü und Rechte gehen wie überall (Schritte 5 und 6). Zentral
+            // hier statt in jedem Plugin, damit ein neues die Ausnahme nicht vergisst.
+            const inhalteBleiben = String(guildId) === String(process.env.CONTROL_GUILD_ID);
+
+            if (inhalteBleiben) {
+                Logger.warn(`Plugin ${pluginName}: Kontroll-Guild — Inhalte bleiben, nur Menü und Rechte gehen`);
+            } else if (plugin.onGuildDisable && typeof plugin.onGuildDisable === 'function') {
                 try {
                     await plugin.onGuildDisable(guildId);
                     Logger.debug(`Plugin ${pluginName}: onGuildDisable() erfolgreich für Guild ${guildId}`);
@@ -1237,7 +1245,7 @@ class PluginManager extends BasePluginManager {
             // 2. Plugin-Konfiguration entfernen
             try {
                 // Alle Konfigurationseinträge für dieses Plugin in dieser Guild löschen
-                await dbService.query(
+                if (!inhalteBleiben) await dbService.query(
                     "DELETE FROM configs WHERE plugin_name = ? AND guild_id = ?",
                     [pluginName, guildId]
                 );
@@ -1249,7 +1257,7 @@ class PluginManager extends BasePluginManager {
             // 3. Plugin-spezifische Daten bereinigen
             try {
                 // Plugin-Tabellen ermitteln
-                const pluginTables = plugin.getDatabaseTables?.() || [];
+                const pluginTables = inhalteBleiben ? [] : (plugin.getDatabaseTables?.() || []);
                 
                 // Für jede Tabelle Guild-spezifische Einträge löschen
                 for (const table of pluginTables) {

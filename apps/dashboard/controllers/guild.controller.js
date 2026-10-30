@@ -446,6 +446,7 @@ exports.getPlugins = async (req, res) => {
                 name: guildName
             },
             guildId,
+            istKontrollGuild: String(guildId) === String(process.env.CONTROL_GUILD_ID),
             enabledPlugins,
             availablePlugins,
             pendingUpdates,
@@ -554,6 +555,18 @@ exports.updatePlugins = async (req, res) => {
                 }
             }
         } else if (action === 'disable') { // Fix: else if statt if
+            // Abschalten löscht die Inhalte des Plugins in dieser Guild, ein
+            // Fehlklick wäre endgültig (F30, 2026-10-30). Der Dialog schickt den
+            // eingetippten Namen mit; ohne ihn geschieht nichts, auch nicht
+            // für eine Anfrage am Dialog vorbei.
+            const bestaetigung = String(req.body.bestaetigung || '').trim();
+            if (plugins.some(plugin => plugin !== bestaetigung)) {
+                return res.status(400).json({
+                    success: false,
+                    message: res.locals.tr?.('ADMIN_PAGE.DISABLE_NEEDS_CONFIRM')
+                        || 'Abschalten braucht die Bestätigung mit dem Namen des Plugins.'
+                });
+            }
             for (const plugin of plugins) {
                 try {
                     await pluginManager.disableInGuild(plugin, guildId, req);
