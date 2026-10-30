@@ -254,6 +254,13 @@ function pruefeInvarianten(paket) {
             if (z.target === 'file' && !(z.file && z.parser && z.path)) {
                 verstoesse.push(`Einstellung "${s.key}": Ziel "file" braucht file, parser und path.`);
             }
+            // Ein Datei-Ziel, das auf einen Punkt endet, ist keine Datei (B213):
+            // Icarus 1.0.6 schrieb nach „Script/Icarus.DedicatedServerSettings.",
+            // dem Abschnitt der INI. fb-init legte sie an, der Nachweis sagte
+            // „angekommen", und das Spiel las sie nie — samt Passwörtern.
+            if (z.target === 'file' && z.file && /(^|\/)[^/]*\.$/.test(z.file)) {
+                verstoesse.push(`Einstellung "${s.key}": "${z.file}" endet auf einen Punkt — das ist keine Datei.`);
+            }
             if (z.target === 'env' && !z.variable) {
                 verstoesse.push(`Einstellung "${s.key}": Ziel "env" braucht eine variable.`);
             }

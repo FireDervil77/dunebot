@@ -1135,6 +1135,26 @@ async function pruefe(name, fn) {
         await assert.rejects(Sitzungen.einstellungSpeichern(s, formular({ key: 'name' })), /gibt es schon/);
     });
 
+    await pruefe('Ein INI-Abschnitt als Dateiname wird abgewiesen (B213, Icarus 1.0.6)', async () => {
+        const icarus = (file, path) => formular({ key: 'join_password', apply: [{ target: 'file', file, parser: 'ini', path }] });
+        assert.throws(() => Sitzungen.einstellungAusFormular(icarus('Script/Icarus.DedicatedServerSettings.', 'JoinPassword')),
+            /endet auf einen Punkt/);
+        const gut = Sitzungen.einstellungAusFormular(icarus('Icarus/Saved/Config/WindowsServer/ServerSettings.ini',
+            '/Script/Icarus.DedicatedServerSettings.JoinPassword'));
+        assert.strictEqual(gut.apply[0].path, '/Script/Icarus.DedicatedServerSettings.JoinPassword');
+        // Dieselbe Regel in check-pakete, am selben Fall.
+        const os = require('os');
+        const d = fs.mkdtempSync(path.join(os.tmpdir(), 'wb-punkt-'));
+        try {
+            const paket = JSON.parse(JSON.stringify(require('../packages/fbpkg/beispiele/factorio.json')));
+            paket.settings[0].apply = [{ target: 'file', file: 'Script/Abschnitt.', parser: 'ini', path: 'X' }];
+            const datei = path.join(d, 'p.json');
+            fs.writeFileSync(datei, JSON.stringify(paket));
+            const r = require('child_process').spawnSync('node', [path.join(__dirname, 'check-pakete.js'), datei], { encoding: 'utf8' });
+            assert.match(r.stdout + r.stderr, /endet auf einen Punkt/);
+        } finally { fs.rmSync(d, { recursive: true, force: true }); }
+    });
+
     await pruefe('Entwurf: apply env braucht keine Zeile im Wurzelfeld (B169, F6), ein vorhandener Eintrag bleibt', async () => {
         const s = mitEinstellungen();
         let p = Sitzungen.entwurfAlsPaket(s, liste);

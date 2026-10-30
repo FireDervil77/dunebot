@@ -1611,6 +1611,10 @@ function einstellungAusFormular(b) {
         if (ziel.target === 'file') {
             if (!t('file') || !t('path')) throw new Error(`${nr}: Datei und Schlüssel darin gehören beide dazu.`);
             if (t('file').split('/').includes('..') || t('file').startsWith('/')) throw new Error(`${nr}: die Datei liegt relativ zu game/, ohne „..".`);
+            // Kein Abschnitt als Dateiname (B213): Der gehört in den Schlüssel.
+            if (t('file').endsWith('.')) {
+                throw new Error(`${nr}: „${t('file')}" endet auf einen Punkt, das ist keine Datei. Ein INI-Abschnitt gehört in den Schlüssel: /Script/Abschnitt.Schlüssel.`);
+            }
             if (!EINSTELLUNG.parser.includes(t('parser'))) throw new Error(`${nr}: Format der Datei — ${EINSTELLUNG.parser.join(', ')}.`);
             // Auswahl nach Feld (`liste[name=Admin].feld`) kennen nur json und
             // yaml; der Daemon prüft dieselbe Schreibweise.
