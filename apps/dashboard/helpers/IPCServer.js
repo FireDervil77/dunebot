@@ -6,6 +6,7 @@ const bcrypt = require("bcrypt");
 // ungünstigsten Moment geklickt werden – die Prüfung gehört deshalb hierher.
 const { pruefeAktion: pruefeServerAktion } =
     require("../../../plugins/gameserver/dashboard/helpers/ServerState");
+const Serverloeschung = require("../../../plugins/gameserver/dashboard/helpers/Loeschung");
 
 class IPCServer {
     constructor() {
@@ -766,6 +767,8 @@ class IPCServer {
                     const srv = await loadServerForStart(dbService, serverId, guildId);
                     if (!srv) return message.reply({ success: false, error: 'Gameserver nicht gefunden' });
 
+                    if (Serverloeschung.stand(srv).laeuft) return message.reply({ success: false, error: Serverloeschung.GESPERRT });
+
                     const startErlaubt = pruefeServerAktion('start', srv.status, srv.last_status_update);
                     if (!startErlaubt.erlaubt) return message.reply({ success: false, error: startErlaubt.grund });
 
@@ -837,6 +840,8 @@ class IPCServer {
 
                     const srv = await loadServerForStart(dbService, serverId, guildId);
                     if (!srv) return message.reply({ success: false, error: 'Gameserver nicht gefunden' });
+
+                    if (Serverloeschung.stand(srv).laeuft) return message.reply({ success: false, error: Serverloeschung.GESPERRT });
 
                     const restartErlaubt = pruefeServerAktion('restart', srv.status, srv.last_status_update);
                     if (!restartErlaubt.erlaubt) return message.reply({ success: false, error: restartErlaubt.grund });

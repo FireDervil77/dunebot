@@ -203,6 +203,7 @@ class CronWorker {
             aktion: job.action,
             serverStatus,
             daemonOnline: !!daemonId && !!ipmServer?.isDaemonOnline(daemonId),
+            wirdGeloescht: await this._wirdGeloescht(job.server_id, dbService),
         });
 
         if (!lage.ausfuehren) {
@@ -825,6 +826,12 @@ class CronWorker {
      * @param {Object} dbService
      * @returns {Promise<string>}
      */
+    async _wirdGeloescht(serverId, dbService) {
+        const [row] = await dbService.query(
+            'SELECT loeschung_seit, loeschung_fehler FROM gameservers WHERE id = ?', [serverId]);
+        return require('./Loeschung').stand(row).laeuft;
+    }
+
     async _serverStatus(serverId, dbService) {
         try {
             const [row] = await dbService.query(

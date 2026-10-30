@@ -31,7 +31,7 @@
     </div>
     <div class="list-group list-group-flush">
         <% eintraege.slice(0, MAX).forEach(function (s) { %>
-            <a href="<%= basis %>/<%= s.id %>" class="list-group-item list-group-item-action px-0 py-2 d-flex align-items-center gap-2">
+            <a href="<%= basis %>/<%= s.id %>" data-fb-live="server-zeile" data-fb-server="<%= s.id %>" class="<%= s.loeschung && s.loeschung.laeuft ? 'bg-danger-lt ' : '' %>list-group-item list-group-item-action px-0 py-2 d-flex align-items-center gap-2"<%- s.loeschung && s.loeschung.laeuft ? ' style="pointer-events:none"' : '' %>>
                 <% if (icons[s.id]) { %>
                     <img src="<%= icons[s.id] %>" alt="" width="28" height="28" style="border-radius:6px;object-fit:cover;flex:none;">
                 <% } else { %>

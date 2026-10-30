@@ -57,6 +57,14 @@ const db = {
             return { affectedRows: 1 };
         }
         if (/^DELETE FROM gameservers WHERE id = \?$/.test(t)) { this.geloescht = true; return { affectedRows: 1 }; }
+        // Das Löschen läuft im Hintergrund: Auftrag annehmen, Ausgang festhalten.
+        if (/^UPDATE gameservers SET loeschung_seit = NOW\(\), loeschung_fehler = NULL WHERE id = \? AND guild_id = \?/.test(t)) {
+            return { affectedRows: 1 };
+        }
+        if (/^UPDATE gameservers SET loeschung_fehler = \? WHERE id = \?$/.test(t)) {
+            this.server.loeschung_fehler = params[0];
+            return { affectedRows: 1 };
+        }
         // Geplanter Stopp (CronWorker, 2026-10-29): die Zeile für ServerStopp.
         if (/^SELECT id, name, status, last_status_update FROM gameservers WHERE id = \?$/.test(t)) {
             return this.server ? [{ id: this.server.id, name: this.server.name, status: this.server.status,
@@ -185,10 +193,13 @@ async function pruefe(name, fn) {
         return s.route.stack[s.route.stack.length - 1].handle;
     };
     const rufe = async (methode, pfad, { query = {} } = {}) => {
+        const body = methode === 'delete' ? { bestaetigung: 'löschen' } : {};
         let status = 200, antwort = null;
         const res = { locals: { guildId: 'g1' },
             status(x) { status = x; return this; }, json(o) { antwort = o; return this; } };
-        await handler(methode, pfad)({ params: { serverId: '42' }, query, body: {} }, res);
+        // Das Löschen antwortet 202 und läuft danach weiter; der Aufruf kehrt erst
+        // zurück, wenn es durch ist. So prüft dieser Lauf den ganzen Ablauf.
+        await handler(methode, pfad)({ params: { serverId: '42' }, query, body }, res);
         return { status, antwort };
     };
 
@@ -211,7 +222,7 @@ async function pruefe(name, fn) {
         daemon.sendCommand = async (d, b, n) => { ablauf.push(b); return vorher(d, b, n); };
         try {
             const r = await rufe('delete', '/:serverId');
-            assert.strictEqual(r.status, 200, JSON.stringify(r.antwort));
+            assert.strictEqual(r.status, 202, JSON.stringify(r.antwort));
             assert.deepStrictEqual(ablauf, ['gameserver.stop', 'gewartet', 'gameserver.uninstall'],
                 'die Dateien dürfen erst weg, wenn der Server unten ist');
             assert.strictEqual(db.geloescht, true);
@@ -226,8 +237,8 @@ async function pruefe(name, fn) {
             grund: 'Der Server steht nach 150 Sekunden noch auf „stopping"' });
         try {
             const r = await rufe('delete', '/:serverId');
-            assert.strictEqual(r.status, 504);
-            assert.match(r.antwort.message, /nichts gelöscht/);
+            assert.strictEqual(r.status, 202, 'angenommen, der Ausgang kommt danach');
+            assert.match(db.server.loeschung_fehler || '', /nichts gelöscht/, 'der Grund muss am Server stehen');
             assert.ok(!daemon.befehle.includes('gameserver.uninstall'), 'kein Deinstallieren');
             assert.strictEqual(db.geloescht, false, 'die Zeile bleibt');
         } finally { ServerStopp.warteBisGestoppt = echtesWarten; }
@@ -238,7 +249,7 @@ async function pruefe(name, fn) {
         ServerStopp.warteBisGestoppt = async () => { db.server.status = 'offline'; return { ok: true }; };
         try {
             const r = await rufe('delete', '/:serverId');
-            assert.strictEqual(r.status, 200, JSON.stringify(r.antwort));
+            assert.strictEqual(r.status, 202, JSON.stringify(r.antwort));
             assert.deepStrictEqual(daemon.befehle, ['gameserver.uninstall'], 'kein zweiter Stopp-Befehl');
         } finally { ServerStopp.warteBisGestoppt = echtesWarten; }
     });
@@ -249,7 +260,7 @@ async function pruefe(name, fn) {
         ServerStopp.warteBisGestoppt = async () => { gewartet = true; return { ok: true }; };
         try {
             const r = await rufe('delete', '/:serverId');
-            assert.strictEqual(r.status, 200, JSON.stringify(r.antwort));
+            assert.strictEqual(r.status, 202, JSON.stringify(r.antwort));
             assert.deepStrictEqual(daemon.befehle, ['gameserver.uninstall']);
             assert.strictEqual(gewartet, false);
         } finally { ServerStopp.warteBisGestoppt = echtesWarten; }

@@ -28,11 +28,18 @@ const BESCHAEFTIGT = ['installing', 'updating', 'starting', 'stopping'];
  * @param {'start'|'stop'|'restart'|'backup'|'command'} lage.aktion
  * @param {string} lage.serverStatus  Wert aus gameservers.status
  * @param {boolean} lage.daemonOnline
+ * @param {boolean} [lage.wirdGeloescht]  Loeschung.stand(...).laeuft
  * @returns {{ausfuehren: boolean, grund: string}}
  */
-function entscheide({ aktion, serverStatus, daemonOnline }) {
+function entscheide({ aktion, serverStatus, daemonOnline, wirdGeloescht = false }) {
     if (!daemonOnline) {
         return { ausfuehren: false, grund: 'Daemon ist offline' };
+    }
+
+    // Vor dem Status: Der steht beim Löschen auf `offline`, und ein geplanter
+    // Start führe mitten hinein, nachdem der Server gerade gestoppt wurde.
+    if (wirdGeloescht) {
+        return { ausfuehren: false, grund: 'Server wird gerade gelöscht' };
     }
 
     // Waehrend Installation, Update oder eines laufenden Wechsels wird nichts

@@ -1,0 +1,39 @@
+<%# Rückfrage vor dem Löschen eines Servers (2026-10-30), gebaut wie
+    #paketEntfernenModal. Geöffnet von `deleteServer` in server-actions.js, das
+    Wort kommt von dort: Dialog und Route prüfen dasselbe (Loeschung.WORT). %>
+<div class="modal modal-blur fade" id="serverLoeschenModal" tabindex="-1" aria-labelledby="serverLoeschenTitel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content border border-danger border-2">
+            <div class="modal-status bg-danger"></div>
+            <div class="modal-header bg-danger-lt">
+                <h5 class="modal-title text-danger fw-bold" id="serverLoeschenTitel">
+                    <i class="fa-solid fa-triangle-exclamation me-2"></i>Server ENDGÜLTIG löschen
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-danger fw-bold fs-3 mb-2">
+                    „<span id="serverLoeschenName"></span>" wird gelöscht.
+                </p>
+                <p class="text-danger fw-bold mb-3">Das lässt sich nicht zurücknehmen.</p>
+                <div class="fw-bold mb-1">Es gehen mit:</div>
+                <ul class="mb-3">
+                    <li>alle Dateien und Spielstände auf der Maschine</li>
+                    <li>alle Sicherungen des Servers</li>
+                    <li>seine Datenbanken</li>
+                    <li>SFTP-Zugang, Ports und geplante Aufgaben</li>
+                </ul>
+                <label class="form-label fw-bold" for="serverLoeschenEingabe">
+                    Zum Bestätigen eintippen: <span class="font-monospace text-danger" id="serverLoeschenSoll"></span>
+                </label>
+                <input type="text" class="form-control font-monospace text-danger border-danger" id="serverLoeschenEingabe" autocomplete="off" spellcheck="false">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-danger fw-bold" id="serverLoeschenKnopf" disabled>
+                    <i class="fa-solid fa-trash me-1"></i>Endgültig löschen
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

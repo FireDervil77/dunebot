@@ -27,6 +27,7 @@ const Textregel = require('../helpers/Textregel');
 const Quellen = require('../helpers/Quellen');
 const ServerStopp = require('../helpers/ServerStopp');
 const ServerState = require('../helpers/ServerState');
+const Loeschung = require('../helpers/Loeschung');
 const { baueUebersicht, baueServerListe, bauePaketAuswahl,
         baueMaschinenAuswahl, baueWerteSchritt,
         baueBereitschaftAuskunft, bauePlatz,
@@ -68,6 +69,9 @@ async function installLaeuftNoch(dbService, serverId) {
 
 // ✅ WICHTIG: Permission-Middleware für ALLE Guild-Routes laden!
 router.use(loadUserPermissions);
+
+// Wird ein Server gerade gelöscht, ändert niemand mehr etwas an ihm.
+router.param('serverId', Loeschung.sperre);
 
 /**
  * Formular-Wert in einen Boolean übersetzen.
@@ -1403,6 +1407,8 @@ router.get('/status', requirePermission('GAMESERVER.VIEW'), async (req, res) => 
                     -- Weg, damit ein Nachholen nach einem Verbindungsabriss auch
                     -- die Bahn wieder richtig setzt.
                     install_progress, install_phase,
+                    -- Ob gerade gelöscht wird (Loeschung).
+                    ${Loeschung.SPALTEN},
                     -- Ob ein Umzug läuft (Umzugsstand, gs.status sagt es nicht). Kein Fragezeichen hier: mysql2 hielte es für einen Platzhalter.
                     ${require('../helpers/Umzugsstand').SPALTE}
                FROM gameservers gs WHERE guild_id = ?`,
@@ -1420,6 +1426,8 @@ router.get('/status', requirePermission('GAMESERVER.VIEW'), async (req, res) => 
                     status:          s.status,
                     // Läuft ein Umzug, zeigt die Pille „Wird verschoben" statt des Status.
                     umzug:           require('../helpers/Umzugsstand').laeuft(s.umzug_status),
+                    // Läuft ein Löschen, ist die Zeile gesperrt und rot.
+                    loeschung:       Loeschung.stand(s),
                     // Beurteilt wie in der Liste (Text, Ton, Abzeichen) — das
                     // Widget auf dem Hauptdashboard zeichnet daraus.
                     zustand:         baueZustand(s),
@@ -1946,6 +1954,8 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
                 --  Template-Literal, und ein Backtick beendet es. Dritter
                 --  Treffer derselben Falle in diesem Haus.)
                 pv.fbpkg AS paket_json,
+                -- Ob gerade gelöscht wird, und warum es zuletzt scheiterte (Loeschung).
+                ${Loeschung.SPALTEN},
                 -- Ob ein Umzug läuft (Umzugsstand, 2026-10-28). Kein Fragezeichen hier: mysql2 hielte es für einen Platzhalter.
                 ${require('../helpers/Umzugsstand').SPALTE}
             FROM gameservers gs
@@ -1965,6 +1975,11 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
                 message: 'Server nicht gefunden',
                 description: 'Der angeforderte Server existiert nicht oder gehört nicht zu dieser Guild.'
             });
+        }
+
+        // Es gibt nichts mehr zu bedienen; die Übersicht zeigt, wie es steht.
+        if (Loeschung.stand(server).laeuft) {
+            return res.redirect(`/guild/${guildId}/plugins/gameserver/servers`);
         }
 
         // ports JSON parsen
@@ -2291,6 +2306,7 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
             title: `Server: ${server.name}`,
             uebersicht,
             umzug,
+            loeschFehler: Loeschung.stand(server).fehler,
             bereich,
             bereichName: bereich ? BEREICHE[bereich] : null,
             datenbanken,
@@ -2450,6 +2466,10 @@ router.get('/:serverId/edit', requirePermission('GAMESERVER.EDIT'), async (req, 
 /**
  * DELETE /guild/:guildId/plugins/gameserver/servers/:serverId
  * Server löschen (inkl. Dateien vom Daemon)
+ *
+ * Nimmt den Auftrag an und antwortet 202; Stoppen und Löschen laufen danach im
+ * Hintergrund (helpers/Loeschung.js). Was sofort geht, wird hier abgewiesen,
+ * damit die Antwort noch im Dialog ankommt.
  */
 router.delete('/:serverId', requirePermission('GAMESERVER.DELETE'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
@@ -2462,21 +2482,24 @@ router.delete('/:serverId', requirePermission('GAMESERVER.DELETE'), async (req, 
 
         Logger.info(`[Gameserver] Server-Löschung angefordert (ID: ${serverId})`);
 
-        // ════════════════════════════════════════════════════════════
-        // 1. Server-Daten mit Daemon-Info laden
-        // ════════════════════════════════════════════════════════════
+        if (!Loeschung.bestaetigt(req.body?.bestaetigung)) {
+            return res.status(400).json({
+                success: false,
+                message: `Zum Löschen muss „${Loeschung.WORT}" eingetippt werden.`
+            });
+        }
+
         const [server] = await dbService.query(`
             SELECT 
                 gs.id,
                 gs.name,
                 gs.status,
                 gs.last_status_update,
-                gs.install_path,
                 gs.rootserver_id,
                 r.daemon_id,
-                r.system_user,
-                r.guild_id,  -- ✅ NEU: Guild-ID für Pfad-Konstruktion im Daemon
-                am.slug as addon_slug
+                am.slug as addon_slug,
+                -- Ein Umzug trägt die Dateien gerade weg (Umzugsstand). Kein Fragezeichen hier: mysql2 hielte es für einen Platzhalter.
+                ${require('../helpers/Umzugsstand').SPALTE}
             FROM gameservers gs
             LEFT JOIN rootserver r ON gs.rootserver_id = r.id
             LEFT JOIN addon_marketplace am ON gs.addon_marketplace_id = am.id
@@ -2490,155 +2513,35 @@ router.delete('/:serverId', requirePermission('GAMESERVER.DELETE'), async (req, 
             });
         }
 
-        // ════════════════════════════════════════════════════════════
-        // 2. Status-Check: Server muss gestoppt sein
-        // ════════════════════════════════════════════════════════════
-        // ── Läuft er noch? Dann erst stoppen, dann löschen ──────────────────
-        //
-        // Betreiber, 2026-09-14: „Dass man den Server stoppen muss zum Löschen —
-        // das könnte diese Funktion ja auch von alleine machen." Bis dahin wies
-        // die Route hier nur ab (Baustelle 115: ein hängendes `starting` machte
-        // das Löschen ganz unmöglich).
-        //
-        // **Gewartet wird auf die Meldung des Daemons, nicht auf die Antwort
-        // des Befehls.** Der Daemon reiht den Stopp nur ein, und beim
-        // Deinstallieren stoppt er selbst NICHTS — er löscht Volume und
-        // Verzeichnis, auch unter einem noch laufenden Container. Deshalb gilt:
-        // Kommt der Server nicht sicher herunter, wird nichts gelöscht.
-        // Der Ablauf selbst steht seit 2026-09-24 in ServerStopp.stoppeFallsLaeuft
-        // — die Neuinstallation braucht denselben (Baustelle 155).
-        const stopp = await ServerStopp.stoppeFallsLaeuft({ server, guildId });
-        if (!stopp.ok) {
-            Logger.warn(`[Gameserver] Löschen von Server ${serverId} abgebrochen: ${stopp.grund}`);
-            return res.status(stopp.status).json({
+        if (require('../helpers/Umzugsstand').laeuft(server.umzug_status)) {
+            return res.status(409).json({
                 success: false,
-                message: `${stopp.grund}. Es wurde nichts gelöscht — der Server bleibt, bis er sicher unten ist.`
+                message: 'Der Server wird gerade verschoben. Lösche ihn, wenn der Umzug fertig ist.'
             });
         }
 
-        // ════════════════════════════════════════════════════════════
-        // 3. Daemon-Uninstall: Server-Dateien löschen
-        // ════════════════════════════════════════════════════════════
-        const forceDelete = req.query.force === 'true';
-        let uninstallSuccess = false;
-        let uninstallError = null;
-
-        // Datenbanken zuerst (Stufe 11 S4): Scheitert eine, ist noch nichts
-        // gelöscht — der Server bleibt, wie beim Deinstallieren lässt es sich
-        // erzwingen. Ohne diesen Schritt blieben Datenbank und Konto im
-        // Container stehen, und niemand wüsste mehr von ihnen.
-        const Datenbanken = require('../helpers/Datenbanken');
-        const dbLoeschung = await Datenbanken.allesLoeschen(
-            { id: Number(serverId), daemon_id: server.daemon_id }, { erzwingen: forceDelete });
-        if (dbLoeschung.fehler.length && !forceDelete) {
-            return res.status(500).json({
+        const erzwingen = req.query.force === 'true';
+        if (!erzwingen && !(server.daemon_id && ipmServer?.isDaemonOnline(server.daemon_id))) {
+            return res.status(503).json({
                 success: false,
-                message: `Datenbank nicht gelöscht (${dbLoeschung.fehler.join('; ')}). Server wurde NICHT gelöscht.`,
-                canForce: true
+                message: 'Daemon ist offline. Server kann nicht deinstalliert werden.'
             });
         }
-        // Ab hier sind die Datenbanken weg — scheitert danach die
-        // Deinstallation, muss die Meldung das sagen.
-        const dbHinweis = dbLoeschung.geloescht.length
-            ? ` Die Datenbank(en) ${dbLoeschung.geloescht.join(', ')} sind bereits gelöscht.` : '';
-        
-        if (server.daemon_id && ipmServer && ipmServer.isDaemonOnline(server.daemon_id)) {
-            try {
-                Logger.info(`[Gameserver] Sende Uninstall-Command an Daemon ${server.daemon_id}`, {
-                    serverId,
-                    installPath: server.install_path,
-                    daemonId: server.daemon_id,  // ✅ DEBUG
-                    rootserverId: server.rootserver_id
-                });
 
-                const uninstallPayload = {
-                    server_id: serverId.toString(),
-                    guild_id: guildId,
-                    rootserver_id: server.rootserver_id,
-                    daemon_id: server.daemon_id,
-                    addon_slug: server.addon_slug
-                };
-                
-                Logger.debug(`[Gameserver] 🔍 Uninstall Payload:`, uninstallPayload);
-
-                const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.uninstall', uninstallPayload, 60000); // 60s Timeout
-
-                if (response.success) {
-                    Logger.success(`[Gameserver] Server ${serverId} erfolgreich deinstalliert (${response.deleted_files || 0} Dateien gelöscht)`);
-                    uninstallSuccess = true;
-                } else {
-                    uninstallError = response.error || 'Uninstall fehlgeschlagen';
-                    Logger.error(`[Gameserver] Daemon-Uninstall fehlgeschlagen: ${uninstallError}`);
-                    if (!forceDelete) {
-                        return res.status(500).json({
-                            success: false,
-                            message: `Deinstallation fehlgeschlagen: ${uninstallError}. Server wurde NICHT aus der Datenbank gelöscht.${dbHinweis}`,
-                            canForce: true
-                        });
-                    }
-                    Logger.warn(`[Gameserver] Force-Delete aktiv, lösche aus DB trotz Daemon-Fehler`);
-                    uninstallSuccess = true;
-                }
-            } catch (ipmError) {
-                Logger.error(`[Gameserver] IPM-Fehler beim Uninstall:`, ipmError);
-                uninstallError = ipmError.message || 'IPM-Kommunikationsfehler';
-                if (!forceDelete) {
-                    return res.status(500).json({
-                        success: false,
-                        message: `IPM-Fehler: ${uninstallError}. Server wurde NICHT aus der Datenbank gelöscht.${dbHinweis}`,
-                        canForce: true
-                    });
-                }
-                Logger.warn(`[Gameserver] Force-Delete aktiv, lösche aus DB trotz IPM-Fehler`);
-                uninstallSuccess = true;
-            }
-        } else {
-            Logger.warn(`[Gameserver] Daemon ${server.daemon_id} offline`);
-            if (!forceDelete) {
-                return res.status(503).json({
-                    success: false,
-                    message: 'Daemon ist offline. Server kann nicht deinstalliert werden.' + dbHinweis,
-                    canForce: true
-                });
-            }
-            Logger.warn(`[Gameserver] Force-Delete aktiv, lösche aus DB ohne Daemon-Bestätigung`);
-            uninstallSuccess = true;
+        if (!await Loeschung.beginne(serverId, guildId)) {
+            return res.status(409).json({ success: false, message: Loeschung.GESPERRT });
         }
 
-        // ════════════════════════════════════════════════════════════
-        // 4. DB-Cleanup: Server aus Datenbank löschen (NUR wenn Daemon erfolgreich!)
-        // ════════════════════════════════════════════════════════════
-        if (uninstallSuccess) {
-            // ✅ Port-Allocations freigeben (server_id zurück auf NULL)
-            await dbService.query(
-                'UPDATE port_allocations SET server_id = NULL, assigned_at = NULL WHERE server_id = ?',
-                [serverId]
-            );
-            Logger.info(`[Gameserver] Port-Allocations für Server ${serverId} freigegeben`);
+        res.status(202).json({
+            success: true,
+            message: 'Server wird gelöscht. Läuft er noch, wird er vorher beendet.'
+        });
 
-            await dbService.query('DELETE FROM gameservers WHERE id = ?', [serverId]);
-            Logger.success(`[Gameserver] Server ${serverId} aus DB gelöscht`);
-
-            // Der SFTP-Zugang muss mit dem Server verschwinden. Er lebt in der
-            // Datenbank des Daemons weiter und würde sonst weiter angenommen:
-            // Der Pfad-Auflöser setzt den Verzeichnisnamen nur zusammen und
-            // meldet keinen Fehler, wenn es das Verzeichnis nicht mehr gibt.
-            //
-            // Der Abgleich schickt den verbliebenen Bestand des Rootservers und
-            // löscht dort alles andere — deshalb genügt ein Aufruf ohne
-            // eigenen Lösch-Befehl.
-            if (server.daemon_id && ipmServer?.isDaemonOnline(server.daemon_id)) {
-                ipmServer.syncSftpUsers(server.daemon_id)
-                    .catch(err => Logger.warn(`[Gameserver] SFTP-Abgleich nach Löschen fehlgeschlagen: ${err.message}`));
-            }
-
-            res.json({
-                success: true,
-                message: `Server "${server.name}" wurde erfolgreich gelöscht`
-            });
-        }
+        // Nach der Antwort: Den Ausgang erfährt der Browser über die Live-Anzeige.
+        await Loeschung.fuehreAus({ server, guildId, erzwingen });
     } catch (error) {
         Logger.error('[Gameserver] Fehler beim Löschen des Servers:', error);
+        if (res.headersSent) return;
         res.status(500).json({
             success: false,
             message: 'Serverfehler beim Löschen des Gameservers'

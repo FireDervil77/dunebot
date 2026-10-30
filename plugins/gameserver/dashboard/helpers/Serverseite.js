@@ -227,6 +227,12 @@ function baueKopf(server, paket) {
  * Ansicht, dass hier eine Auskunft FEHLT und nicht etwa alles geklärt ist.
  */
 function baueZustand(server) {
+    // Das Löschen schlägt alles: Der Server steht auf „Aus", ist aber nicht mehr
+    // zu bedienen (Loeschung, 2026-10-30).
+    if (require('./Loeschung').stand(server).laeuft) {
+        return { schluessel: 'loeschung', text: 'Wird gelöscht', ton: 'red', gut: false, stufe: null,
+                 abzeichen: ABZEICHEN.red };
+    }
     // Ein laufender Umzug schlägt den Status: Der steht währenddessen auf
     // `updating` oder schon auf `offline` (Umzugsstand, 2026-10-28).
     if (require('./Umzugsstand').laeuft(server.umzug_status)) {
@@ -1581,6 +1587,7 @@ function baueServerListe(zeilen, paketNachServer = {}) {
             name:    s.name,
             spiel:   paket?.identity?.name || s.game_name || s.template_name || '—',
             zustand,
+            loeschung: require('./Loeschung').stand(s),
             stufen,
             bereit:  auskunft.bereit,
             messbar: auskunft.messbar,

@@ -11,6 +11,9 @@
 
 const express = require('express');
 const router = express.Router({ mergeParams: true });
+
+// Wird ein Server gerade gelöscht, ändert niemand mehr etwas an ihm.
+router.param('serverId', require('../helpers/Loeschung').sperre);
 const ServiceManager = require('dunebot-core').ServiceManager;
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 const { validateCommand, rateLimiter } = require('../helpers/CommandFilter');

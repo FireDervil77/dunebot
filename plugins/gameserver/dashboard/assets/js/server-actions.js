@@ -181,83 +181,70 @@ async function copyToClipboard(text) {
     }
 }
 
+/** Der blaue Toast überlebt den Sprung in die Übersicht nur hier. */
+const TOAST_NACH_SPRUNG = 'gameserver-toast-nach-sprung';
+
+/** Was im Dialog einzutippen ist; die Route prüft dasselbe (Loeschung.WORT). */
+const LOESCH_WORT = 'löschen';
+
 /**
- * Server löschen/deinstallieren
+ * Server löschen: roter Dialog, Wort eintippen. Danach läuft es im Hintergrund
+ * (helpers/Loeschung.js), die Seite springt in die Übersicht und die Zeile
+ * bleibt dort gesperrt und rot, bis es fertig ist.
+ *
  * @param {string} serverId - Server-ID
  * @param {string} serverName - Server-Name (für Bestätigung)
  */
-async function deleteServer(serverId, serverName) {
-    console.log(`[ServerAction] Delete Server ${serverId} (${serverName})`);
+function deleteServer(serverId, serverName) {
+    const dialog = document.getElementById('serverLoeschenModal');
+    const eingabe = document.getElementById('serverLoeschenEingabe');
+    const knopf = document.getElementById('serverLoeschenKnopf');
+    document.getElementById('serverLoeschenName').textContent = serverName;
+    document.getElementById('serverLoeschenSoll').textContent = LOESCH_WORT;
+    eingabe.value = '';
+    knopf.disabled = true;
 
-    // Doppelte Bestätigung (wichtige Aktion!)
-    if (!confirm(`⚠️ WARNUNG: Möchtest du den Server "${serverName}" wirklich LÖSCHEN?\n\nDies wird:\n- Alle Server-Dateien löschen\n- Den systemd-Service entfernen\n- Alle DB-Einträge löschen\n\nDiese Aktion kann NICHT rückgängig gemacht werden!`)) {
-        console.log('[ServerAction] Delete abgebrochen durch Benutzer');
-        return;
-    }
+    // Wie Loeschung.bestaetigt: Großschreibung machen Handys von selbst.
+    const passt = () => eingabe.value.trim().toLowerCase() === LOESCH_WORT;
+    eingabe.oninput = () => { knopf.disabled = !passt(); };
+    eingabe.onkeydown = (e) => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        if (!knopf.disabled) knopf.click();
+    };
 
-    // Zweite Bestätigung
-    if (!confirm(`Letzte Bestätigung: Server "${serverName}" wirklich löschen?\n\nLäuft er noch, wird er vorher gestoppt — das kann bis zu zweieinhalb Minuten dauern.`)) {
-        console.log('[ServerAction] Delete abgebrochen (zweite Bestätigung)');
-        return;
-    }
+    const fenster = bootstrap.Modal.getOrCreateInstance(dialog);
+    knopf.onclick = async () => {
+        if (!passt()) return;
+        knopf.disabled = true;
+        const guildId = window.location.pathname.match(/\/guild\/(\d+)/)[1];
+        const uebersicht = `/guild/${guildId}/plugins/gameserver/servers`;
+        const meldung = 'Server wird gelöscht. Läuft er noch, wird er vorher beendet.';
 
-    // Guild-ID aus URL extrahieren
-    const pathParts = window.location.pathname.split('/');
-    const guildIdIndex = pathParts.indexOf('guild') + 1;
-    const guildId = pathParts[guildIdIndex];
+        // Vor der Anfrage: Die Live-Anzeige springt bei „wird gelöscht" schon
+        // selbst und kann der Antwort zuvorkommen.
+        try { sessionStorage.setItem(TOAST_NACH_SPRUNG, meldung); } catch (_) { /* dann ohne Toast */ }
 
-    if (!guildId) {
-        console.error('[ServerAction] ❌ Keine Guild-ID gefunden');
-        if (window.showToast) {
-            window.showToast('error', 'Fehler: Keine Guild-ID gefunden');
+        try {
+            const antwort = await fetch(`${uebersicht}/${serverId}`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bestaetigung: eingabe.value }),
+            });
+            const ergebnis = await antwort.json();
+            if (!antwort.ok || !ergebnis.success) throw new Error(ergebnis.message || `HTTP-Fehler ${antwort.status}`);
+            window.location.href = uebersicht;
+        } catch (fehler) {
+            // Der Dialog bleibt offen: Noch ist nichts passiert.
+            try { sessionStorage.removeItem(TOAST_NACH_SPRUNG); } catch (_) { /* nichts zu räumen */ }
+            console.error('[ServerAction] ❌ Löschen abgewiesen:', fehler);
+            window.showToast?.('error', fehler.message);
+            knopf.disabled = false;
         }
-        return;
-    }
+    };
 
-    // Loading-Toast
-    if (window.showToast) {
-        window.showToast('info', 'Server wird gelöscht … läuft er noch, wird er zuerst gestoppt.');
-    }
-
-    try {
-        const url = `/guild/${guildId}/plugins/gameserver/servers/${serverId}`;
-        console.log(`[ServerAction] DELETE ${url}`);
-
-        const response = await fetch(url, {
-            method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-        });
-
-        const result = await response.json();
-
-        if (!response.ok) {
-            throw new Error(result.message || `HTTP-Fehler ${response.status}`);
-        }
-
-        if (result.success) {
-            console.log(`[ServerAction] ✅ Server gelöscht:`, result);
-            
-            if (window.showToast) {
-                window.showToast('success', `Server "${serverName}" erfolgreich gelöscht!`);
-            }
-            
-            // Nach 1,5s zur Server-Liste zurückkehren
-            setTimeout(() => {
-                window.location.href = `/guild/${guildId}/plugins/gameserver/servers`;
-            }, 1500);
-            
-        } else {
-            throw new Error(result.message || 'Unbekannter Fehler');
-        }
-
-    } catch (error) {
-        console.error(`[ServerAction] ❌ Fehler beim Löschen:`, error);
-        if (window.showToast) {
-            window.showToast('error', `Fehler beim Löschen: ${error.message}`);
-        }
-    }
+    fenster.show();
+    dialog.addEventListener('shown.bs.modal', () => eingabe.focus(), { once: true });
 }
 
 /**
@@ -335,6 +322,14 @@ async function reinstallServer(serverId, serverName) {
 // Event-Delegation für Action-Buttons
 // ============================================
 document.addEventListener('DOMContentLoaded', () => {
+    try {
+        const nachSprung = sessionStorage.getItem(TOAST_NACH_SPRUNG);
+        if (nachSprung) {
+            sessionStorage.removeItem(TOAST_NACH_SPRUNG);
+            window.showToast?.('info', nachSprung);
+        }
+    } catch (_) { /* Speicher gesperrt: dann ohne Toast */ }
+
     console.log('[ServerAction] Event-Delegation initialisiert');
     console.log('[ServerAction] Nutzt globales Toast-System (window.showToast)');
     

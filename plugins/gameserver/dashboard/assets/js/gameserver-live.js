@@ -260,6 +260,7 @@
                 this.uebernimm(d.server_id, { status: 'error' });
                 this.holeBald();
             });
+            sse.on('loeschung', (d) => this.loeschungGemeldet(d));
             sse.on('readiness', (d) => {
                 this.uebernimm(d.server_id, { stufe: d.stufe, grund: d.grund });
                 this.holeBald();
@@ -341,6 +342,42 @@
             // Nach JEDEM Verbinden nachholen — auch nach einem Wiederverbinden.
             sse.on('connected', () => this.holeAlles());
             this.holeAlles();
+        }
+
+        /**
+         * Wie steht das Löschen eines Servers (helpers/Loeschung.js)?
+         *
+         * Der Ausgang kommt als Toast, weil die Seite sonst nur still eine Zeile
+         * verlöre oder ihre Sperre: Wer gelöscht hat, ist längst woanders. Nach
+         * einem Verbindungsabriss holt `holeAlles` den Stand nach, nur ohne Toast.
+         *
+         * Auf der Seite des Servers selbst gibt es nichts mehr zu bedienen.
+         */
+        loeschungGemeldet(d) {
+            const id = String(d.server_id);
+            const eigeneSeite = window.location.pathname.match(/\/plugins\/gameserver\/servers\/(\d+)/);
+            if (eigeneSeite && eigeneSeite[1] === id && d.stand !== 'gescheitert') {
+                window.location.href = `/guild/${this.guildId}/plugins/gameserver/servers`;
+                return;
+            }
+            if (d.stand === 'laeuft') this.uebernimm(id, { loeschung: { laeuft: true, fehler: null } });
+            if (d.stand === 'fertig') {
+                this.entferne(id);
+                window.showToast?.('success', `Server „${d.name}" ist gelöscht.`);
+            }
+            if (d.stand === 'gescheitert') {
+                this.uebernimm(id, { loeschung: { laeuft: false, fehler: d.grund } });
+                window.showToast?.('error', `„${d.name}" wurde nicht gelöscht: ${d.grund}`, { timeOut: 0 });
+            }
+            this.holeBald();
+        }
+
+        /** Einen Server vergessen, den es nicht mehr gibt — samt seiner Zeile. */
+        entferne(id) {
+            this.zustand.delete(id);
+            document.querySelectorAll(`[data-fb-live="server-zeile"][data-fb-server="${CSS.escape(id)}"]`)
+                .forEach((el) => el.remove());
+            this.summenBald();
         }
 
         /**
@@ -455,7 +492,7 @@
                 // Zaehlung, statt bis zum Neuladen mitzulaufen.
                 const genannt = new Set((d.servers || []).map(s => String(s.id)));
                 for (const id of [...this.zustand.keys()]) {
-                    if (!genannt.has(id)) { this.zustand.delete(id); this.summenBald(); }
+                    if (!genannt.has(id)) this.entferne(id);
                 }
                 for (const s of (d.servers || [])) {
                     // `bereitschaft` ist die BEURTEILUNG vom Server (seit
@@ -469,6 +506,7 @@
                         // Fertig beurteilt (baueZustand) — fürs Widget.
                         zustand: s.zustand || undefined,
                         umzug:   Boolean(s.umzug),
+                        loeschung: s.loeschung || undefined,
                         // Für ein hängendes `stopping` (knopfZustand): wann der
                         // Zustand zuletzt wechselte, und die Frist vom Server.
                         seit:    s.uebergang ? s.uebergang.seit : undefined,
@@ -627,13 +665,35 @@
                     }
 
                     case 'zustand-pille': {
-                        // Ein laufender Umzug schlägt den Status (Umzugsstand) —
-                        // sonst zeigte die Pille mitten im Umzug „Aus".
-                        const e = z.umzug ? { text: 'Wird verschoben' } : (ZUSTAende[z.status] || { text: z.status || '—' });
+                        // Ein laufendes Löschen (Loeschung) und ein Umzug
+                        // (Umzugsstand) schlagen den Status — sonst zeigte die
+                        // Pille mitten darin „Aus".
+                        const loescht = Boolean(z.loeschung && z.loeschung.laeuft);
+                        const e = loescht ? { text: 'Wird gelöscht' }
+                            : z.umzug ? { text: 'Wird verschoben' }
+                            : (ZUSTAende[z.status] || { text: z.status || '—' });
                         el.textContent = e.text;
                         // Gruen heisst hier "laeuft", genau wie serverseitig
                         // (`baueZustand().gut`).
-                        el.className = 'fb-pille' + (z.status === 'online' ? ' fb-pille-gut' : '');
+                        el.className = 'fb-pille' + (loescht ? ' fb-pille-rot'
+                            : z.status === 'online' ? ' fb-pille-gut' : '');
+                        break;
+                    }
+
+                    // Die ganze Zeile in Übersicht und Widget: rot und gesperrt,
+                    // solange gelöscht wird. Die Vorlage zeichnet beim Laden dasselbe.
+                    case 'server-zeile': {
+                        const loescht = Boolean(z.loeschung && z.loeschung.laeuft);
+                        el.classList.toggle('bg-danger-lt', loescht);
+                        el.style.pointerEvents = loescht ? 'none' : '';
+                        break;
+                    }
+
+                    // Der Grund eines gescheiterten Löschens unter dem Namen.
+                    case 'loeschung-fehler': {
+                        const fehler = z.loeschung ? z.loeschung.fehler : null;
+                        el.hidden = !fehler;
+                        el.textContent = fehler ? `Nicht gelöscht: ${fehler}` : '';
                         break;
                     }
 

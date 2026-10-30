@@ -333,15 +333,15 @@ const wirft = async (fn, muster, status) => {
         assert.ok(/if \(a\.d\.datenbank_fehler\)/.test(step3), 'Schritt 3 springt weiter und verschluckt den Fehler');
     });
 
-    await pruefe('Löschroute: Datenbanken vor dem Deinstallieren; scheitern → nichts gelöscht, erzwingbar', () => {
-        const q = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/routes/servers.js'), 'utf8'));
-        const start = q.indexOf("router.delete('/:serverId', requirePermission('GAMESERVER.DELETE')");
-        const r = q.slice(start, q.indexOf('router.', start + 20));
+    await pruefe('Löschen: Datenbanken vor dem Deinstallieren; scheitern → nichts gelöscht, erzwingbar', () => {
+        const q = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/helpers/Loeschung.js'), 'utf8'));
+        const start = q.indexOf('async function ablauf(');
+        const r = q.slice(start, q.indexOf('async function fuehreAus(', start));
         const db = r.indexOf('Datenbanken.allesLoeschen(');
         assert.ok(db > 0 && db < r.indexOf("'gameserver.uninstall'"), 'Datenbanken nicht vor dem Deinstallieren');
         assert.ok(db > r.indexOf('ServerStopp.stoppeFallsLaeuft('), 'Datenbank weg, während das Spiel noch läuft');
-        assert.ok(/erzwingen: forceDelete/.test(r) && /canForce: true/.test(r.slice(db, db + 900)), 'nicht erzwingbar');
-        assert.strictEqual((r.match(/dbHinweis/g) || []).length, 4, 'die drei Abbruchmeldungen danach sagen nicht, dass die Datenbank schon weg ist');
+        assert.ok(/\{ erzwingen \}/.test(r.slice(db, db + 200)), 'nicht erzwingbar');
+        assert.strictEqual((r.match(/dbHinweis/g) || []).length, 3, 'die zwei Abbruchmeldungen danach sagen nicht, dass die Datenbank schon weg ist');
     });
 
     await pruefe('allesLoeschen: alles weg; Fehler → Zeile bleibt; erzwungen → Zeilen weg, Rest im Log', async () => {

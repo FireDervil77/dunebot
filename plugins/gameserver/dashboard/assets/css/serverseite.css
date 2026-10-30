@@ -65,6 +65,7 @@
 }
 .fb-pille-gut  { background: #e9f7ec; color: #1a7f37; }
 .fb-pille-warn { background: #fdf0e6; color: #b35309; }
+.fb-pille-rot  { background: var(--fb-danger); color: #fff; }
 
 /* ── Die Wartemarke (Baustelle 134, Wunsch des Betreibers 2026-09-17) ───────
    „wenn da steht, es wurde noch nichts gemeldet, koennte man dort eine

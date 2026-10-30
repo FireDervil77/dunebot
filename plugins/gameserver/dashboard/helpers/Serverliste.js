@@ -72,6 +72,9 @@ const SERVER_LISTE_SQL = `
                 r.fqdn_gilt,
                 r.name as rootserver_name,
                 r.daemon_id,
+                -- Ob gerade gelöscht wird (Loeschung).
+                gs.loeschung_seit,
+                gs.loeschung_fehler,
                 -- Ob ein Umzug läuft, sagt seine Zeile, nicht gs.status (Umzugsstand). Kein Fragezeichen in diesem Kommentar: mysql2 hielte es für einen Platzhalter.
                 ${require('./Umzugsstand').SPALTE}
             FROM gameservers gs

@@ -88,10 +88,19 @@
                const f = locals.filter || 'alle';
                if (f === 'bereit' && !s.bereit) return;
                if (f === 'aus' && s.zustand.schluessel !== 'offline') return; %>
-            <tr onclick="location.href='/guild/<%= guildId %>/plugins/gameserver/servers/<%= s.id %>'" style="cursor:pointer">
+            <%# Rot und gesperrt, solange gelöscht wird (Loeschung). `server-zeile`
+                zeichnet dasselbe live, und über dieses Merkmal verschwindet die
+                Zeile, wenn der Server weg ist. %>
+            <% const loescht = Boolean(s.loeschung && s.loeschung.laeuft); %>
+            <tr onclick="location.href='/guild/<%= guildId %>/plugins/gameserver/servers/<%= s.id %>'"
+                data-fb-live="server-zeile" data-fb-server="<%= s.id %>"
+                class="<%= loescht ? 'bg-danger-lt' : '' %>"
+                style="cursor:pointer<%= loescht ? ';pointer-events:none' : '' %>">
               <td>
                 <div style="font-weight:600"><%= s.name %></div>
                 <div class="fb-muted fb-mono" style="font-size:12px">#<%= s.id %> · <%= s.spiel %></div>
+                <div class="text-danger" style="font-size:12px;max-width:340px;white-space:normal"
+                     data-fb-live="loeschung-fehler" data-fb-server="<%= s.id %>"<%= s.loeschung && s.loeschung.fehler ? '' : ' hidden' %>><%= s.loeschung && s.loeschung.fehler ? 'Nicht gelöscht: ' + s.loeschung.fehler : '' %></div>
               </td>
               <%# Die Balken zeigen dieselbe Leiter wie die Serverseite (B105).
                   Gelb ist die Stufe, auf die er GERADE wartet — ohne sie sieht
@@ -120,7 +129,7 @@
                      class="fb-warte" data-fb-pille="warte"<%= s.wartet ? '' : ' hidden' %>></span><span
                      data-fb-live-text><%= s.bereitschaftText %></span></div>
               </td>
-              <td><span class="fb-pille<%= s.zustand.gut ? ' fb-pille-gut' : '' %>"
+              <td><span class="fb-pille<%= loescht ? ' fb-pille-rot' : s.zustand.gut ? ' fb-pille-gut' : '' %>"
                         data-fb-live="zustand-pille" data-fb-server="<%= s.id %>"><%= s.zustand.text %></span></td>
               <td class="fb-mono" data-fb-live="spieler-paar" data-fb-server="<%= s.id %>">
                 <% if (s.spieler.jetzt !== null) { %>
