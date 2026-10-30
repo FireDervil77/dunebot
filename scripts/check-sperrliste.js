@@ -97,9 +97,21 @@ ServiceManager.register('Logger', { debug: still, info: still, warn: still, erro
             if (/FROM gameservers gs/.test(sql)) {
                 return [{ id: 7, guild_id: 'g1', rootserver_id: 3, daemon_id: 'd1', install_path: '', addon_marketplace_id: 1706 }];
             }
+            // Der Download läuft seit 2026-10-29 über den Abruf des Daemons (F4a).
+            if (/^SELECT host, abruf_port, api_key FROM rootserver WHERE id = \?$/.test(sql.trim())) {
+                return [{ host: '127.0.0.1', abruf_port: 9350, api_key: 'k' }];
+            }
             throw new Error(`Attrappe kennt die Abfrage nicht: ${sql.trim().slice(0, 80)}`);
         },
     });
+    // Der Abruf zählt als Griff zum Daemon: Ein gesperrter Pfad darf ihn nie
+    // erreichen, ein freier muss es.
+    const Abruf = require(path.join(WURZEL, 'plugins/gameserver/dashboard/helpers/Abruf.js'));
+    Abruf.reicheDurch = async (adresse, req, res) => {
+        daemonAufrufe.push({ befehl: 'abruf', nutzlast: adresse });
+        res.statusCode = 200;
+        return { status: 200, bytes: 1 };
+    };
     ServiceManager.register('ipmServer', {
         isDaemonOnline: () => true,
         sendCommand: async (daemon, befehl, nutzlast) => {

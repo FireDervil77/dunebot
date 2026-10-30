@@ -413,6 +413,13 @@ class FileManager {
             const response = await fetch(`${this.config.baseUrl}/servers/${this.config.serverId}/files/read?path=${encodeURIComponent(path)}`);
             const data = await response.json();
 
+            // Zu groß für den Editor (F4b): kein Fehler, sondern ein anderer Weg.
+            // Der Download kennt die Grenze nicht.
+            if (data.zuGross) {
+                this.showToast('warning', 'Zu groß für den Editor (höchstens 10 MB). Mit „Herunterladen" bekommst du die Datei.');
+                return;
+            }
+
             if (!data.success) {
                 throw new Error(data.error || 'Fehler beim Laden');
             }

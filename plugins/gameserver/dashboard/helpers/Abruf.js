@@ -88,10 +88,50 @@ function gibtFrei(paket) {
 // https-Seite. Bereichsanfragen (Range → 206) gehen mit, damit ein
 // abgebrochener Download weiterlaufen kann — der Daemon kann sie (ServeFile).
 
+const crypto = require('crypto');
 const http = require('http');
 
 /** Was vom Daemon an den Browser weitergeht — nichts sonst. */
 const DURCHGEREICHT = ['content-type', 'content-length', 'content-range', 'accept-ranges', 'last-modified', 'etag'];
+
+/**
+ * Der Kopf `Content-Disposition` für einen beliebigen Dateinamen.
+ *
+ * Sicherungen heißen immer gleich gebaut, Dateien aus dem Dateimanager nicht.
+ * Ein Zeichen über Latin-1 (`€`, `→`) in einem Kopf lässt `setHeader` WERFEN,
+ * und das mitten im Rückruf der Antwort. Darum zweimal: `filename` nur in
+ * druckbarem ASCII, `filename*` (RFC 5987) mit dem echten Namen.
+ */
+function anhangKopf(name) {
+    const echt = String(name);
+    const ascii = echt.replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '_');
+    const kodiert = encodeURIComponent(echt).replace(/['()*]/g,
+        (z) => `%${z.charCodeAt(0).toString(16).toUpperCase()}`);
+    return `attachment; filename="${ascii}"; filename*=UTF-8''${kodiert}`;
+}
+
+/**
+ * Die unterschriebene Adresse einer Datei aus dem Dateimanager (F4a).
+ *
+ * Gegenstück: `DateiUnterschrift` im Daemon (`sicherungsabruf/datei.go`). Die
+ * Zeile `datei` vorn trennt sie von der Unterschrift für `/sicherung`.
+ * Fünf Minuten: Abgeholt wird sofort, vom Dashboard selbst; eine Fortsetzung
+ * (Range) stellt der Browser als neue Anfrage und bekommt eine neue Adresse.
+ *
+ * @param {{host: string, abruf_port: number, api_key: string}} maschine
+ * @param {number|string} serverId
+ * @param {string} pfad wie der Dateimanager ihn nennt
+ * @returns {string}
+ */
+function dateiAdresse(maschine, serverId, pfad) {
+    const bis = Math.floor(Date.now() / 1000) + 300;
+    const unterschrift = crypto.createHmac('sha256', maschine.api_key)
+        .update(`datei\n${serverId}\n${pfad}\n${bis}`)
+        .digest('hex');
+    return `http://${wirtFuerBrowser(maschine)}:${maschine.abruf_port}/datei`
+        + `?server=${encodeURIComponent(serverId)}&pfad=${encodeURIComponent(pfad)}`
+        + `&bis=${bis}&sig=${unterschrift}`;
+}
 
 /**
  * Den Abruf beim Daemon holen und an `res` durchreichen.
@@ -126,7 +166,7 @@ function reicheDurch(adresse, req, res, dateiname) {
             for (const k of DURCHGEREICHT) {
                 if (antwort.headers[k]) res.setHeader(k, antwort.headers[k]);
             }
-            res.setHeader('Content-Disposition', `attachment; filename="${String(dateiname).replace(/["\\\r\n]/g, '_')}"`);
+            res.setHeader('Content-Disposition', anhangKopf(dateiname));
             res.setHeader('Cache-Control', 'no-store, no-transform');
             res.setHeader('X-Content-Type-Options', 'nosniff');
             antwort.on('data', (stueck) => { bytes += stueck.length; });
@@ -148,4 +188,44 @@ function reicheDurch(adresse, req, res, dateiname) {
     });
 }
 
-module.exports = { wirt, wirtFuerBrowser, basis, downloadAdresse, gibtFrei, reicheDurch };
+/**
+ * Die ersten Bytes einer Datei beim Daemon holen (F4c).
+ *
+ * Für große Logs: Der Ladestand braucht den Anfang, `gameserver.files.read`
+ * lehnt über 10 MB ab. Eine Bereichsanfrage an `/datei` holt nur, was gebraucht
+ * wird, und braucht keinen zweiten Lesebefehl.
+ *
+ * @param {object} maschine wie `dateiAdresse`
+ * @param {number|string} serverId
+ * @param {string} pfad
+ * @param {number} bytes wie viele höchstens
+ * @returns {Promise<Buffer>}
+ */
+function leseAnfang(maschine, serverId, pfad, bytes) {
+    return new Promise((fertig, nein) => {
+        const anfrage = http.get(dateiAdresse(maschine, serverId, pfad), {
+            headers: { Range: `bytes=0-${bytes - 1}` }, timeout: 15000,
+        }, (antwort) => {
+            if (antwort.statusCode !== 200 && antwort.statusCode !== 206) {
+                antwort.resume();
+                return nein(new Error(`Der Rootserver antwortete mit ${antwort.statusCode}.`));
+            }
+            const teile = [];
+            let laenge = 0;
+            antwort.on('data', (stueck) => {
+                teile.push(stueck);
+                laenge += stueck.length;
+                // Ein Dienst, der den Bereich nicht kennt, schickte die ganze Datei.
+                if (laenge >= bytes) antwort.destroy();
+            });
+            const ende = () => fertig(Buffer.concat(teile).subarray(0, bytes));
+            antwort.on('end', ende);
+            antwort.on('close', ende);
+            antwort.on('error', (e) => { if (laenge < bytes) nein(e); });
+        });
+        anfrage.on('timeout', () => anfrage.destroy(new Error('der Rootserver antwortet nicht')));
+        anfrage.on('error', nein);
+    });
+}
+
+module.exports = { wirt, wirtFuerBrowser, basis, downloadAdresse, gibtFrei, reicheDurch, dateiAdresse, anhangKopf, leseAnfang };

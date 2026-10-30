@@ -106,7 +106,7 @@ async function pruefe(name, fn) {
         assert.ok(!a.kopf.location, 'es wird noch umgeleitet: ' + a.kopf.location);
         assert.ok(a.inhalt.equals(INHALT), `Inhalt weicht ab (${a.inhalt.length} statt ${INHALT.length} Bytes)`);
         assert.strictEqual(a.kopf['content-type'], 'application/gzip');
-        assert.match(a.kopf['content-disposition'], /^attachment; filename="Probe_2026\.tar\.gz"$/);
+        assert.match(a.kopf['content-disposition'], /^attachment; filename="Probe_2026\.tar\.gz"; filename\*=UTF-8''Probe_2026\.tar\.gz$/);
         assert.strictEqual(Number(a.kopf['content-length']), INHALT.length);
     });
 

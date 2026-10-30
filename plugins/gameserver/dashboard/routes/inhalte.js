@@ -94,6 +94,9 @@ function wirkung(geladen) {
  */
 const { daemonVon } = InhalteHolen;
 
+/** Bis hierher nimmt `gameserver.files.read`; darüber nur der Anfang (F4c). */
+const LOG_GRENZE = 10 * 1024 * 1024;
+
 // ════════════════════════════════════════════════════════════════════════════
 // Lesen
 // ════════════════════════════════════════════════════════════════════════════
@@ -929,10 +932,31 @@ router.get('/:serverId/inhalte/ladestand', requirePermission('GAMESERVER.VIEW'),
         const eintrag = liste?.success ? (liste.data?.files || []).find(f => f.name === datei && !f.is_dir) : null;
         if (!eintrag) return nicht('Seit der Lader liegt, gab es noch keinen Start — die Logdatei fehlt.');
 
-        const gelesen = await ipmServer.sendCommand(daemonId, 'gameserver.files.read', { ...nutzlast, path: pfad }, 15000)
-            .catch(fehler => ({ success: false, error: fehler.message }));
-        if (!gelesen?.success) {
-            return nicht('Die Logdatei ließ sich nicht lesen: ' + (gelesen?.error || 'keine Antwort'));
+        // Ein Log über der Grenze des Lesebefehls (10 MB): nur sein Anfang, über
+        // den Abruf (F4c). Vollgelaufene Logs waren genau der Fall, in dem die
+        // Seite bisher „ließ sich nicht lesen" sagte; der Parser braucht den
+        // Anfang, dort steht das Laden. Was weiter hinten steht, sieht er dann
+        // nicht — darum `nurAnfang` in der Antwort.
+        const nurAnfang = Number(eintrag.size) > LOG_GRENZE;
+        let roh;
+        if (nurAnfang) {
+            const [maschine] = await dbService.query(
+                'SELECT host, abruf_port, api_key FROM rootserver WHERE id = ?', [geladen.server.rootserver_id]);
+            if (!maschine?.abruf_port || !maschine.api_key) {
+                return nicht('Die Logdatei ist größer als 10 MB, und die Maschine bietet keinen Abruf an.');
+            }
+            try {
+                roh = await require('../helpers/Abruf').leseAnfang(maschine, geladen.server.id, pfad, LOG_GRENZE);
+            } catch (fehler) {
+                return nicht('Die Logdatei ließ sich nicht lesen: ' + fehler.message);
+            }
+        } else {
+            const gelesen = await ipmServer.sendCommand(daemonId, 'gameserver.files.read', { ...nutzlast, path: pfad }, 15000)
+                .catch(fehler => ({ success: false, error: fehler.message }));
+            if (!gelesen?.success) {
+                return nicht('Die Logdatei ließ sich nicht lesen: ' + (gelesen?.error || 'keine Antwort'));
+            }
+            roh = Buffer.from(String(gelesen.data?.content || ''), 'base64');
         }
 
         // ── Der Daemon liefert Base64, immer (Baustelle 135, 2026-09-17) ────
@@ -948,15 +972,16 @@ router.get('/:serverId/inhalte/ladestand', requirePermission('GAMESERVER.VIEW'),
         // die wie eine richtige aussah — der Betreiber hat ihr geglaubt und
         // nach einem Mod-Fehler gesucht, den es an der Stelle nicht gab.
         //
-        // Die beiden anderen Aufrufer derselben Antwort (`routes/files.js`,
-        // Zeile 164 und 505) dekodieren seit jeher. Nur dieser nicht.
-        const text = Buffer.from(String(gelesen.data?.content || ''), 'base64').toString('utf8');
+        // Der andere Aufrufer derselben Antwort (`routes/files.js`, Editor)
+        // dekodierte seit jeher. Nur dieser nicht.
+        const text = roh.toString('utf8');
         const ergebnis = BepInExLog.werteAus(text);
         const zuordnung = BepInExLog.ordneZu(ergebnis, await Inhalte.fuerServer(req.params.serverId), eintrag.mod_time);
 
         return res.json({
             success: true, verfuegbar: true,
             stand: eintrag.mod_time || null,
+            nurAnfang,
             vollstaendig: ergebnis.vollstaendig,
             bepinex: ergebnis.bepinex,
             pack: ergebnis.pack,

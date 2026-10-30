@@ -168,6 +168,7 @@
       <div class="fb-muted" style="font-size:12px;margin:4px 0 8px">
         Ladestand vom letzten Start (${escape(wann)})${LADESTAND.bepinex ? ' · BepInEx ' + escape(LADESTAND.bepinex) : ''}${spiel}${LADESTAND.laeuft ? '' : ' · Server gestoppt'}
         ${LADESTAND.vollstaendig ? '' : ' · <span style="color:var(--fb-danger)">das Laden wurde nicht abgeschlossen</span>'}
+        ${LADESTAND.nurAnfang ? ' · Log über 10 MB: nur der Anfang gelesen' : ''}
         ${fremd.length ? `<br>Geladen, aber keinem Eintrag zugeordnet: ${escape(fremd.join(', '))}` : ''}
       </div>`;
   }

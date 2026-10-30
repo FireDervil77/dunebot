@@ -142,6 +142,11 @@ router.get('/servers/:serverId/files/read', requirePermission('GAMESERVER.FILES.
         const content = Buffer.from(response.data.content, 'base64').toString('utf8');
         res.json({ success: true, content, path: filePath });
     } catch (error) {
+        // Der Editor nimmt bis 10 MB (Daemon, HandleFileRead). Das ist kein
+        // Fehler der Datei: Die Seite bietet dann das Herunterladen an (F4b).
+        if (/zu groß/i.test(String(error.message))) {
+            return res.status(413).json({ success: false, zuGross: true, error: error.message });
+        }
         Logger.error('[Files] Read Error:', error);
         res.status(error.statusCode || 500).json({ success: false, error: error.message });
     }
@@ -460,38 +465,49 @@ router.post('/servers/:serverId/files/upload', requirePermission('GAMESERVER.FIL
  * GET /servers/:serverId/files/download
  * Datei herunterladen (als Attachment)
  * Query: ?path=/server.properties
+ *
+ * Über den Abruf des Daemons, wie Sicherungen (Baustelle 135, F4a, 2026-10-29).
+ * Bis dahin lief das über `gameserver.files.read`: die ganze Datei als Base64
+ * in einer Nachricht, und über 10 MB lehnte der Daemon ab. Große Logs und
+ * Welten ließen sich gar nicht herunterladen. Jetzt fließt ein Strom ohne
+ * Grenze, und ein abgebrochener Download lässt sich fortsetzen (Range).
+ *
+ * Rechte und Sperrliste bleiben hier; der Daemon prüft die Unterschrift und
+ * die Pfadregel (`filesystem.ImOrdner`).
  */
 router.get('/servers/:serverId/files/download', requirePermission('GAMESERVER.FILES.VIEW'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
-    const ipmServer = ServiceManager.get('ipmServer');
+    const dbService = ServiceManager.get('dbService');
     try {
         const { serverId } = req.params;
         const guildId = res.locals.guildId;
         const filePath = req.query.path;
-        if (!filePath) return res.status(400).json({ success: false, error: 'Pfad erforderlich' });
+        if (!filePath || typeof filePath !== 'string') {
+            return res.status(400).json({ success: false, error: 'Pfad erforderlich' });
+        }
 
         const server = await validateServerAccess(serverId, guildId);
         if (await sperrt(res, server, [filePath])) return;
-        const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.files.read', {
-            server_id: serverId.toString(),
-            rootserver_id: server.rootserver_id.toString(),
-            install_path: server.install_path,
-            path: filePath
-        });
 
-        if (!response.success) {
-            return res.status(500).json({ success: false, error: response.error || 'Datei konnte nicht gelesen werden' });
+        const [maschine] = await dbService.query(
+            'SELECT host, abruf_port, api_key FROM rootserver WHERE id = ?', [server.rootserver_id]);
+        if (!maschine?.abruf_port) {
+            return res.status(503).json({ success: false,
+                error: 'Die Maschine bietet keinen Abruf an — der Daemon ist zu alt oder sein Abruf-Zuhörer läuft nicht.' });
+        }
+        if (!maschine.api_key) {
+            return res.status(500).json({ success: false, error: 'Für diese Maschine ist kein Schlüssel hinterlegt.' });
         }
 
-        const fileBuffer = Buffer.from(response.data.content, 'base64');
-        const filename = path.basename(filePath);
-
-        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
-        res.setHeader('Content-Type', 'application/octet-stream');
-        res.setHeader('Content-Length', fileBuffer.length);
-        res.send(fileBuffer);
+        const Abruf = require('../helpers/Abruf');
+        const ergebnis = await Abruf.reicheDurch(
+            Abruf.dateiAdresse(maschine, serverId, filePath), req, res, path.basename(filePath));
+        if (ergebnis.fehler) {
+            Logger.warn(`[Files] Download von Server ${serverId} (${filePath}) nicht ausgeliefert: ${ergebnis.fehler}`);
+        }
     } catch (error) {
         Logger.error('[Files] Download Error:', error);
+        if (res.headersSent) return res.destroy(error);
         res.status(error.statusCode || 500).json({ success: false, error: error.message });
     }
 });
