@@ -433,6 +433,10 @@ function vonHandAbgeschlossen(s) {
  * und die Fassung, AUS der sie entstand, war freigegeben. Ein Umzug einer
  * Fassung, die selbst noch Entwurf war, wird hier nicht zur Freigabe angeboten
  * — dann gäbe der Sammelknopf etwas frei, das nie jemand freigeben wollte.
+ *
+ * `ueberholt`: Seit dem grünen Umzug kam eine weitere Fassung dazu. Sein Vermerk
+ * bleibt, ist aber keine Auskunft mehr über das Paket (2026-10-31: Icarus stand
+ * auf 1.1.2 und die Übersicht orange auf „umgezogen · 1.0.4 in test").
  */
 async function stand() {
     const alle = await umzugsSitzungen();
@@ -447,12 +451,13 @@ async function stand() {
             kennung: s.kennung, sitzung_offen: s.status === 'offen', guild_id: s.guild_id,
             am: u.am || null, begonnen: u.begonnen || null, beendet: u.beendet || null,
             image_tag: u.image_tag || null, image_digest: u.image_digest || null,
-            freigebbar: false, fassung_id: null, kanal: null };
+            freigebbar: false, ueberholt: false, fassung_id: null, kanal: null };
         if (u.stand === STAND.gruen) {
             const fassungen = await dienste.Paketfassung().fassungenZuPaket(dienste.db(), paketId);
             const f = fassungen.find(x => x.version === u.nach);
             zeile.fassung_id = f ? f.id : null;
             zeile.kanal = f ? f.channel : null;
+            zeile.ueberholt = Boolean(fassungen[0] && fassungen[0].version !== u.nach);
             // Von Hand veröffentlicht heißt: mehr als das Image ist anders. Das
             // gibt der Betreiber auf der Seite des Spiels frei, nicht der Sammelknopf.
             zeile.freigebbar = Boolean(!u.von_hand && f && f.channel === 'test' && f.test_passed_at

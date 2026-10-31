@@ -566,7 +566,10 @@ const AUFTRAG = { guildId: '1', userId: '42', autor: 'Betreiber', rootserverId: 
         // Nicht mehr die neueste Fassung: dann nicht über den Sammelknopf.
         await urteil(dritte, true);
         welt.pakete.get(3).fassungen.push({ id: 998, version: '99.0.0', channel: 'test', test_passed_at: '2026-10-10 12:00:00', fbpkg: kopie(C) });
-        assert.strictEqual((await Umzug.stand()).umzuege.find(u => u.paket_id === 3).freigebbar, false);
+        const ueberholt = (await Umzug.stand()).umzuege.find(u => u.paket_id === 3);
+        assert.strictEqual(ueberholt.freigebbar, false);
+        assert.strictEqual(ueberholt.ueberholt, true, 'die Übersicht zeigte weiter den alten Umzug, obwohl das Paket längst weiter ist');
+        assert.strictEqual(nach[1].ueberholt, false, 'ein Umzug, dessen Fassung die neueste ist, gilt nicht als überholt');
     });
 
     await pruefe('Roter Umzug, danach in der Sitzung von Hand veröffentlicht: gilt als umgezogen — auch verworfen, nie über den Sammelknopf', async () => {
@@ -705,8 +708,9 @@ const AUFTRAG = { guildId: '1', userId: '42', autor: 'Betreiber', rootserverId: 
         assert.doesNotMatch(skript, /innerHTML/, 'Namen und Gründe kommen aus Paketen und vom Daemon — als Text setzen');
         assert.match(skript, /'\/admin\/addons\/umzug\/freigeben'/);
         assert.match(skript, /pakete, rootserver_id/);
-        assert.match(skript, /u\.stand === 'gruen' && u\.image_digest && p\.neuester && p\.neuester\.digest === u\.image_digest\) zurueck\.delete\(id\)/,
+        assert.match(skript, /u\.stand === 'gruen' && !u\.ueberholt && u\.image_digest && p\.neuester && p\.neuester\.digest === u\.image_digest\) zurueck\.delete\(id\)/,
             'ein grün umgezogenes Paket gälte bis zum Neuladen weiter als „zurück"');
+        assert.match(skript, /u\.stand === 'gruen' && !u\.ueberholt && !liegtZurueck/, 'die Marke nennte einen Umzug, an dem das Paket längst vorbei ist');
         assert.match(skript, /if \(neuFertig\) ladeImageStand\(\)/, 'der Image-Stand würde erst am Ende der ganzen Reihe neu gefragt');
         assert.match(skript, /u\.von_hand \? ' von Hand' : ''/, 'die Seite sagt nicht, dass ein Umzug von Hand zu Ende gebracht wurde');
     });

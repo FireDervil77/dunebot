@@ -427,7 +427,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // (erster echter Lauf, 2026-10-10: Astro Colony).
         jePaket.forEach((u, id) => {
             const p = zurueck.get(id);
-            if (p && u.stand === 'gruen' && u.image_digest && p.neuester && p.neuester.digest === u.image_digest) zurueck.delete(id);
+            if (p && u.stand === 'gruen' && !u.ueberholt && u.image_digest && p.neuester && p.neuester.digest === u.image_digest) zurueck.delete(id);
         });
         let umziehbar = 0;
         document.querySelectorAll('[data-umzug]').forEach((zelle) => {
@@ -442,9 +442,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const m = el('span', 'badge bg-primary-lt', 'Prüfdurchlauf läuft · ' + (u.begonnen ? dauer(u.begonnen) : ''));
                 m.title = u.von + ' → ' + u.nach;
                 zelle.appendChild(m);
-            } else if (u && u.stand === 'gruen' && !liegtZurueck) {
-                // Nur solange das Paket NICHT wieder zurückliegt: Nach dem
-                // nächsten Bau ist der grüne Umzug von gestern keine Auskunft mehr.
+            } else if (u && u.stand === 'gruen' && !u.ueberholt && !liegtZurueck) {
+                // Nur solange das Paket NICHT wieder zurückliegt und keine neuere
+                // Fassung kam: Danach ist der grüne Umzug von gestern keine Auskunft mehr.
                 const m = el('span', 'badge ' + (u.kanal === 'stable' ? 'bg-success-lt' : 'bg-warning-lt'),
                     'umgezogen · ' + u.nach + (u.von_hand ? ' von Hand' : '') + (u.kanal === 'stable' ? ' freigegeben' : ' in test'));
                 if (u.von_hand) m.title = 'Der Umzug war rot' + (u.grund_vorher ? ' (' + u.grund_vorher + ')' : '') + ' — danach in der Sitzung von Hand veröffentlicht.';
