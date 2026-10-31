@@ -128,11 +128,14 @@ router.get('/:serverId/inhalte', requirePermission('GAMESERVER.VIEW'), async (re
             success: true,
             // Alle Anbieter dieses Spiels, in der Reihenfolge des Pakets — die
             // Karte baut daraus ihre Auswahl und ihre Adressen.
-            quellen: Quellen.ausPaket(inhalt).map(q => ({
-                kennung: q, titel: Quellen.fuer(q).TITEL,
-                raumName: Quellen.fuer(q).RAUM_NAME, raum: raeume[q] || null,
+            quellen: Quellen.katalogeAus(inhalt).map(q => ({
+                kennung: q, titel: Quellen.katalog(q).TITEL,
+                raumName: Quellen.katalog(q).RAUM_NAME, raum: Quellen.raumAus(inhalt, q),
                 // Womit Mitspieler die Mods bekommen — fuer die Liste (Stufe 10 S4).
-                manager: Quellen.fuer(q).MANAGER || null,
+                manager: Quellen.katalog(q).MANAGER || null,
+                // Nur suchen, nicht holen (Nexus.js) — die Karte sagt dann, wie
+                // die Datei auf den Server kommt.
+                nurKatalog: Quellen.istNurKatalog(q),
             })),
             raeume,
             // Was das PAKET sagt — ohne das weiss die Ansicht nicht, ob sie
@@ -345,9 +348,30 @@ function quelleWaehlen(res, inhalt, gewuenscht) {
             message: 'Dieses Spiel nimmt laut seinem Paket keine Inhalte auf.' });
         return { absage: true };
     }
-    const quelle = Quellen.waehle(inhalt, gewuenscht);
+    return raumZurQuelle(res, inhalt, gewuenscht, Quellen.waehle(inhalt, gewuenscht), Quellen.ausPaket(inhalt));
+}
+
+/**
+ * Wie `quelleWaehlen`, aber nur fuer die Suche: Hier duerfen auch reine Kataloge
+ * mit (Nexus.js). Alles, was etwas auf einen Server bringt, geht weiter ueber
+ * `quelleWaehlen` — dort kommt ein reiner Katalog nicht durch.
+ */
+function katalogWaehlen(res, inhalt, gewuenscht) {
+    if (!inhalt?.supported) {
+        res.status(409).json({ success: false,
+            message: 'Dieses Spiel nimmt laut seinem Paket keine Inhalte auf.' });
+        return { absage: true };
+    }
+    return raumZurQuelle(res, inhalt, gewuenscht, Quellen.waehleKatalog(inhalt, gewuenscht), Quellen.katalogeAus(inhalt));
+}
+
+function raumZurQuelle(res, inhalt, gewuenscht, quelle, moeglich) {
     if (!quelle) {
-        const moeglich = Quellen.ausPaket(inhalt);
+        if (Quellen.istNurKatalog(gewuenscht) && (inhalt?.sources || []).includes(String(gewuenscht).toLowerCase())) {
+            res.status(409).json({ success: false,
+                message: `${Quellen.katalog(gewuenscht).TITEL} lässt sich nur durchsuchen — die Datei kommt über „Datei hochladen" auf den Server.` });
+            return { absage: true };
+        }
         res.status(409).json({ success: false,
             message: gewuenscht
                 ? `Das Paket nennt ${gewuenscht} nicht als Quelle.`
@@ -357,7 +381,7 @@ function quelleWaehlen(res, inhalt, gewuenscht) {
     }
     const raum = Quellen.raumAus(inhalt, quelle);
     if (!raum) {
-        const anbieter = Quellen.fuer(quelle);
+        const anbieter = Quellen.katalog(quelle);
         res.status(409).json({ success: false,
             message: `Das Paket sagt nicht, welche ${anbieter.RAUM_NAME} bei ${anbieter.TITEL} `
                    + `zu diesem Spiel gehört (content.source_ids.${quelle}).` });
@@ -464,16 +488,20 @@ router.get('/mods/suche', requirePermission('GAMESERVER.CREATE'), async (req, re
  * aus dem Paket, und ohne sie landet man beim falschen Spiel.
  */
 async function sucheAntwort(inhalt, quelle, raum, begriff, seite, spielfassung = null) {
-    const anbieter = Quellen.fuer(quelle);
+    const anbieter = Quellen.katalog(quelle);
+    const nurKatalog = Quellen.istNurKatalog(quelle);
     const roh = await anbieter.suche(raum, begriff || '', { seite, spielfassung });
     return {
         success: true,
         // Was gefiltert wurde, gehoert in die Antwort: Sonst steht in der Karte
-        // eine Trefferzahl, und niemand weiss, wogegen sie gilt.
-        spielfassung: spielfassung || null,
+        // eine Trefferzahl, und niemand weiss, wogegen sie gilt. Ein reiner
+        // Katalog filtert nicht nach Spielfassung, also steht hier nichts.
+        spielfassung: nurKatalog ? null : (spielfassung || null),
         quelle,
         titel: anbieter.TITEL,
         raum,
+        nurKatalog,
+        hinweis: anbieter.HINWEIS || null,
         gestoebert: !String(begriff || '').trim(),
         lader: inhalt.loader?.packages?.[quelle] || null,
         // Wie viel es hier ueberhaupt gibt — die Frage stellt sich jeder, der
@@ -492,7 +520,9 @@ async function sucheAntwort(inhalt, quelle, raum, begriff, seite, spielfassung =
         verzeichnis: anbieter.verzeichnis(raum),
         treffer: roh.treffer.map(t => ({
             ...t,
-            url: Inhalte.paketAdresse({ quelle, kennung: t.kennung }, raum),
+            // Nicht `Inhalte.paketAdresse`: Die kennt nur Anbieter, reine
+            // Kataloge haben keine Zeilen in `gameserver_content`.
+            url: anbieter.adresse(raum, t.kennung),
         })),
     };
 }
@@ -562,7 +592,7 @@ router.get('/:serverId/inhalte/suche', requirePermission('GAMESERVER.VIEW'), asy
         if (!geladen) return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
 
         const inhalt = geladen.paket?.content || null;
-        const gewaehlt = quelleWaehlen(res, inhalt, req.query.quelle);
+        const gewaehlt = katalogWaehlen(res, inhalt, req.query.quelle);
         if (gewaehlt.absage) return;
 
         // Die Fassung dieses Servers geht mit — sonst zeigt die Suche Mods, die

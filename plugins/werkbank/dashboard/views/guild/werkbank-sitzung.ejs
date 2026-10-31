@@ -2015,8 +2015,8 @@
     // und werden hier genannt, damit man sieht, was die Karte NICHT zeigt.
     const mo = locals.mods || { vorhanden: false, supported: false, quellen: [], path: '', activation: '', order_matters: false, needs_restart: true, client_side: false, lader: null, jeEinstellung: null, varianten: [] };
     const MO = locals.MODS || { aktivierung: [], max: { pfad: 200, kennung: 80 } };
-    const QUELLE_NAME = { upload: 'Hochladen', thunderstore: 'Thunderstore', modrinth: 'Modrinth', curseforge: 'CurseForge', 'steam-workshop': 'Steam Workshop' };
-    const QUELLE_PLATZ = { thunderstore: 'valheim', modrinth: 'fabric', curseforge: '', 'steam-workshop': '892970' };
+    const QUELLE_NAME = { upload: 'Hochladen', thunderstore: 'Thunderstore', modrinth: 'Modrinth', nexus: 'Nexus Mods', curseforge: 'CurseForge', 'steam-workshop': 'Steam Workshop' };
+    const QUELLE_PLATZ = { thunderstore: 'valheim', modrinth: 'fabric', nexus: 'valheim', curseforge: '', 'steam-workshop': '892970' };
     const AKTIV_NAME = { file_present: 'die Datei liegt im Ordner', list: 'eine Liste nennt sie', setting: 'eine Einstellung nennt sie', start: 'der Lader verändert den Start' };
   %>
   <div class="col-12">
@@ -2056,8 +2056,8 @@
 
           <div class="form-label">Quellen<%- include('werkbank-hilfe', { text:
             'Woher Mods kommen dürfen. „Hochladen" heißt: Der Betreiber bringt die Datei selbst. '
-            + 'Bei einem Anbieter gehört die Kennung dazu, unter der das Spiel dort geführt wird — bei Thunderstore die Gemeinschaft aus der Adresse (thunderstore.io/c/valheim/), bei Modrinth der Lader (fabric, paper). '
-            + 'Ohne Kennung wüsste die Suche nicht, wo sie suchen soll. Angebunden sind heute Hochladen, Thunderstore, Modrinth und ficsit.app (Satisfactory); die anderen stehen im Paket, bieten im Panel aber noch nichts an.' }) %></div>
+            + 'Bei einem Anbieter gehört die Kennung dazu, unter der das Spiel dort geführt wird — bei Thunderstore die Gemeinschaft aus der Adresse (thunderstore.io/c/valheim/), bei Modrinth der Lader (fabric, paper), bei Nexus Mods die Spielkennung aus der Adresse (nexusmods.com/valheim/mods). '
+            + 'Ohne Kennung wüsste die Suche nicht, wo sie suchen soll. Angebunden sind heute Hochladen, Thunderstore, Modrinth und ficsit.app (Satisfactory). Nexus Mods lässt sich nur durchsuchen: Die Datei holt der Nutzer dort und lädt sie hoch. Die anderen stehen im Paket, bieten im Panel aber noch nichts an.' }) %></div>
           <div class="table-responsive">
             <table class="table table-sm table-vcenter mb-3">
               <thead><tr><th>Quelle</th><th>Kennung des Spiels dort</th></tr></thead>

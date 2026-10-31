@@ -1286,7 +1286,8 @@
               "curseforge",
               "steam-workshop",
               "upload",
-              "ficsit"
+              "ficsit",
+              "nexus"
             ]
           }
         },
@@ -1312,6 +1313,10 @@
             "ficsit": {
               "type": "string",
               "description": "ficsit.app fuehrt nur Satisfactory; der Wert ist ein Name fuer den Raum ('satisfactory'), die API fragt ihn nicht ab"
+            },
+            "nexus": {
+              "type": "string",
+              "description": "Spielkennung, wie in der Adresse: nexusmods.com/<hier>/mods. Nur Katalog: Das Panel sucht dort, laedt aber nichts."
             }
           }
         },

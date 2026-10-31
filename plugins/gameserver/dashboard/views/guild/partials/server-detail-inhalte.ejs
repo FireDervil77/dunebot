@@ -600,6 +600,17 @@
 
   // ── Thunderstore ──────────────────────────────────────────────────────────
 
+  // Haengt am gewaehlten Katalog: Bei einem reinen Katalog kommt nichts „bei der
+  // Installation mit", und das darf auch nach dem Umschalten nicht stehen bleiben.
+  function sucheErklaerung() {
+    const katalog = quellenListe().find(q => q.kennung === quelleJetzt()) || {};
+    return `Ohne Eingabe siehst du die beliebtesten — zum Schauen, was es für dieses
+      Spiel überhaupt gibt.${katalog.nurKatalog ? '' : ` Was ein Mod zum Laufen braucht, kommt bei der
+      Installation mit, der Lader meistens auch.`}
+      ${katalog.manager ? `<br>Nicht alles hier gehört auf einen Server: Mod-Manager wie
+      <span class="fb-mono">${escape(katalog.manager.name)}</span> laufen beim Spieler.` : ''}`;
+  }
+
   window.inhaltSuche = function () {
     const feld = document.getElementById('inhalte-suche');
     if (!feld) return;
@@ -626,13 +637,7 @@
           </div>
           <button class="btn btn-primary btn-sm" onclick="inhaltSuchen()">Suchen</button>
         </div>
-        <div class="fb-muted" style="font-size:12px;margin-top:8px">
-          Ohne Eingabe siehst du die beliebtesten — zum Schauen, was es für dieses
-          Spiel überhaupt gibt. Was ein Mod zum Laufen braucht, kommt bei der
-          Installation mit, der Lader meistens auch.
-          ${((quellenListe().find(q => q.kennung === quelleJetzt()) || {}).manager) ? `<br>Nicht alles hier gehört auf einen Server: Mod-Manager wie
-          <span class="fb-mono">${escape(quellenListe().find(q => q.kennung === quelleJetzt()).manager.name)}</span> laufen beim Spieler.` : ''}
-        </div>
+        <div id="ts-erklaerung" class="fb-muted" style="font-size:12px;margin-top:8px">${sucheErklaerung()}</div>
         <div id="ts-treffer" style="margin-top:8px"></div>
       </div>`;
     document.getElementById('ts-begriff').focus();
@@ -645,6 +650,8 @@
   // anderen, also wird neu gesucht statt gefiltert.
   window.inhaltQuelle = function (kennung) {
     QUELLE = kennung;
+    const erklaerung = document.getElementById('ts-erklaerung');
+    if (erklaerung) erklaerung.innerHTML = sucheErklaerung();
     window.inhaltSuchen();
   };
 
@@ -683,11 +690,12 @@
                 d.spielfassung
                   ? `, gefiltert auf <span class="fb-mono">${escape(d.spielfassung)}</span>`
                   : ''}</span>
-            ${d.spielfassung ? '' : `<span class="fb-muted" style="font-size:11px">
+            ${(d.spielfassung || d.nurKatalog) ? '' : `<span class="fb-muted" style="font-size:11px">
                  Ausgabe unbekannt — nicht nach Spielfassung gefiltert</span>`}
             ${d.verzeichnis ? `<a href="${escape(d.verzeichnis)}" target="_blank" rel="noopener noreferrer"
                                  style="margin-left:auto">alle bei ${escape(d.titel)} ansehen</a>` : ''}
-          </div>`;
+          </div>
+          ${d.hinweis ? `<div class="alert alert-info" style="font-size:12px;padding:8px 10px;margin:4px 0 8px">${escape(d.hinweis)}</div>` : ''}`;
         const blaettern = (d.zurueck || d.weiter) ? `
           <div style="display:flex;gap:8px;align-items:center;padding-top:8px;border-top:1px solid var(--fb-border)">
             <button class="btn btn-white btn-sm" ${d.zurueck ? '' : 'disabled'}
@@ -710,8 +718,11 @@
                 ${Number(t.downloads).toLocaleString('de-DE')} Downloads
                 ${t.url ? `· <a href="${escape(t.url)}" target="_blank" rel="noopener noreferrer">ansehen</a>` : ''}</div>
             </div>
-            ${DARF ? `<button class="btn btn-white btn-sm" style="flex:0 0 auto"
-                        onclick="inhaltVorschau('${escape(t.kennung)}', this)">Ansehen</button>` : ''}
+            ${d.nurKatalog
+              ? (t.url ? `<a class="btn btn-white btn-sm" style="flex:0 0 auto" href="${escape(t.url)}"
+                            target="_blank" rel="noopener noreferrer">Auf ${escape(d.titel)} öffnen</a>` : '')
+              : (DARF ? `<button class="btn btn-white btn-sm" style="flex:0 0 auto"
+                        onclick="inhaltVorschau('${escape(t.kennung)}', this)">Ansehen</button>` : '')}
           </div>`).join('') + blaettern;
       })
       .catch(e => {

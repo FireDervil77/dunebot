@@ -852,9 +852,51 @@ async function pruefe(name, fn) {
             [{ kennung: 'thunderstore', titel: 'Thunderstore',
                raumName: 'Gemeinschaft', raum: 'valheim',
                // Stufe 10 S4: womit Mitspieler die Mods bekommen.
-               manager: { name: 'r2modman', url: 'https://r2modman.com' } }]);
+               manager: { name: 'r2modman', url: 'https://r2modman.com' },
+               nurKatalog: false }]);
         assert.strictEqual(r.antwort.mods[0].url,
             'https://thunderstore.io/c/valheim/p/ValheimModding/Jotunn/');
+    });
+
+    // Baustelle 191: Der Wächter check-nexus.js prüft die Listen, hier geht es
+    // durch die echten Routen. Eine Absage, die nur in `Quellen.js` steht, nützt
+    // nichts, wenn eine Route an ihr vorbeiliest.
+    await pruefe('Nexus Mods: Suche mit Hinweis, und keine Route holt etwas von dort', async () => {
+        const Nexus = require('../plugins/gameserver/dashboard/helpers/Nexus');
+        db.inhaltErsatz = { ...INHALT, sources: ['upload', 'nexus', 'thunderstore'],
+                            source_ids: { ...INHALT.source_ids, nexus: 'valheim' } };
+        const echteSuche = Nexus.suche;
+        Nexus.suche = async (raum) => {
+            assert.strictEqual(raum, 'valheim', 'die Spielkennung kommt aus dem Paket');
+            return { treffer: [{ kennung: '1138', name: 'Jotunn', downloads: 908520 }],
+                     gesamt: 1, seite: 1, weiter: false, zurueck: false, proSeite: 20 };
+        };
+        try {
+            const liste = await rufe('get', '/:serverId/inhalte');
+            assert.deepStrictEqual(liste.antwort.quellen.map(q => [q.kennung, q.nurKatalog]),
+                [['thunderstore', false], ['nexus', true]], 'Anbieter zuerst, Nexus als Katalog');
+
+            const s = await rufe('get', '/:serverId/inhalte/suche', { query: { quelle: 'nexus', q: 'jotunn' } });
+            assert.strictEqual(s.status, 200, JSON.stringify(s.antwort));
+            assert.strictEqual(s.antwort.nurKatalog, true);
+            assert.strictEqual(s.antwort.spielfassung, null, 'gefiltert wird dort nicht, also steht es auch nicht da');
+            assert.ok(/Datei hochladen/.test(s.antwort.hinweis));
+            assert.strictEqual(s.antwort.treffer[0].url, 'https://www.nexusmods.com/valheim/mods/1138');
+            assert.strictEqual(s.antwort.lader, null);
+
+            const absagen = [
+                await rufe('get', '/:serverId/inhalte/vorschau', { query: { quelle: 'nexus', kennung: '1138' } }),
+                await rufe('get', '/:serverId/inhalte/fassungen', { query: { quelle: 'nexus', kennung: '1138' } }),
+                await rufe('post', '/:serverId/inhalte/holen', { body: { quelle: 'nexus', kennung: '1138' } }),
+            ];
+            for (const a of absagen) {
+                assert.strictEqual(a.status, 409, JSON.stringify(a.antwort));
+                assert.ok(/nur durchsuchen/.test(a.antwort.message), a.antwort.message);
+            }
+            assert.strictEqual(daemon.abrufe.length, 0, 'der Daemon wurde gerufen');
+        } finally {
+            Nexus.suche = echteSuche;
+        }
     });
 
     await pruefe('Der Umfang und die Seite gehen an die Ansicht', async () => {

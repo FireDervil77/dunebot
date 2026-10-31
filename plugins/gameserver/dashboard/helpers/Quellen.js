@@ -59,18 +59,34 @@
  *
  * Geraten wird nichts: Ohne Eintrag im Paket gibt es fuer dieses Spiel bei
  * diesem Anbieter keine Suche, und die Antwort sagt genau das.
+ *
+ * ── Kataloge ohne Datei ─────────────────────────────────────────────────────
+ *
+ * Nexus Mods hat eine Suche, gibt dem Panel aber keine Datei (`Nexus.js`). Es
+ * steht deshalb in NUR_KATALOG und ausdruecklich NICHT in ANBIETER: `fuer`,
+ * `gibtEs`, `ausPaket` und `waehle` kennen es nicht, und damit bleibt jeder Weg
+ * zu, der etwas auf einen Server bringt — Vorschau, Holen, Vormerken beim
+ * Anlegen, Aktualisieren. Nur wer ausdruecklich `katalog()` und `katalogeAus()`
+ * fragt, sieht es: die Suche im Reiter und die Werkbank.
  */
 
 const Thunderstore = require('./Thunderstore');
 const Modrinth = require('./Modrinth');
 // Satisfactory (Stufe 10, 2026-10-27).
 const Ficsit = require('./Ficsit');
+// Baustelle 191, 2026-10-31.
+const Nexus = require('./Nexus');
 
 /** Alle Anbieter, die diesen Weg gehen. `upload` ist keiner — da bringt der Betreiber die Datei. */
 const ANBIETER = {
     [Thunderstore.KENNUNG]: Thunderstore,
     [Modrinth.KENNUNG]: Modrinth,
     [Ficsit.KENNUNG]: Ficsit,
+};
+
+/** Kataloge, aus denen das Panel nichts holen kann (siehe oben). */
+const NUR_KATALOG = {
+    [Nexus.KENNUNG]: Nexus,
 };
 
 /** Alle erlaubten Herkuenfte zusammen — `scripts/check-herkunftsliste.js` liest sie hier. */
@@ -133,4 +149,35 @@ function waehle(inhalt, gewuenscht) {
     return moeglich.includes(name) ? name : null;
 }
 
-module.exports = { ANBIETER, HERKUNFT, fuer, gibtEs, ausPaket, raumAus, raeumeAus, waehle };
+/** Ist das ein Katalog, aus dem das Panel nichts holen kann? */
+function istNurKatalog(name) {
+    return Boolean(NUR_KATALOG[String(name || '').toLowerCase()]);
+}
+
+/** Der Katalog zu einem Namen, Anbieter eingeschlossen. Zum Suchen und Zeigen, nie zum Holen. */
+function katalog(name) {
+    return istNurKatalog(name) ? NUR_KATALOG[String(name).toLowerCase()] : fuer(name);
+}
+
+/**
+ * Alles, was sich fuer dieses Spiel durchsuchen laesst: erst die Anbieter, dann
+ * die reinen Kataloge. In dieser Reihenfolge, damit die Vorauswahl im Reiter
+ * ein Katalog ist, aus dem sich auch installieren laesst.
+ */
+function katalogeAus(inhalt) {
+    return [...ausPaket(inhalt), ...(inhalt?.sources || []).filter(istNurKatalog)];
+}
+
+/** Wie `waehle`, aber fuer die Suche: Reine Kataloge duerfen mit. */
+function waehleKatalog(inhalt, gewuenscht) {
+    const moeglich = katalogeAus(inhalt);
+    if (!moeglich.length) return null;
+    if (!gewuenscht) return moeglich[0];
+    const name = String(gewuenscht).toLowerCase();
+    return moeglich.includes(name) ? name : null;
+}
+
+module.exports = {
+    ANBIETER, NUR_KATALOG, HERKUNFT, fuer, gibtEs, ausPaket, raumAus, raeumeAus, waehle,
+    istNurKatalog, katalog, katalogeAus, waehleKatalog,
+};

@@ -3958,7 +3958,7 @@ async function konsolenfilterSpeichern(sitzung, b) {
 //   supported       die Mod-Verwaltung des Servers gibt es nur damit
 //   sources         welche Wege der Reiter „Inhalte" anbietet; angebunden sind
 //                   Upload, Thunderstore, Modrinth und seit 2026-10-27 ficsit.app
-//                   (helpers/Quellen.js) —
+//                   (helpers/Quellen.js), Nexus Mods nur als Katalog zum Suchen —
 //                   CurseForge und Workshop nennt das Schema, es gibt sie nicht
 //   source_ids      der „Raum" des Spiels beim Anbieter; ohne ihn gibt es dort
 //                   keine Suche
@@ -3968,7 +3968,7 @@ async function konsolenfilterSpeichern(sitzung, b) {
 //   activation      liest niemand; es beschreibt nur. `start` gehört zum Lader.
 
 const MODS = {
-    quellen: ['upload', 'thunderstore', 'modrinth', 'ficsit', 'curseforge', 'steam-workshop'],
+    quellen: ['upload', 'thunderstore', 'modrinth', 'ficsit', 'nexus', 'curseforge', 'steam-workshop'],
     aktivierung: ['file_present', 'list', 'setting', 'start'],
     // Der flache Teil — Lader und Varianten haben ihre eigenen Karten (LADER, variantenStand).
     felder: ['supported', 'sources', 'source_ids', 'path', 'activation', 'order_matters', 'needs_restart', 'client_side'],
@@ -3991,7 +3991,7 @@ function ohneOrdnerJeMod(pfad, was) {
     return ohne;
 }
 /** Hat das Panel diesen Weg? `upload` ist kein Anbieter — da bringt der Betreiber die Datei. */
-const modQuelleAngebunden = (q) => q === 'upload' || Quellen.gibtEs(q);
+const modQuelleAngebunden = (q) => q === 'upload' || Quellen.gibtEs(q) || Quellen.istNurKatalog(q);
 
 function modsAusFormular(b, hatVarianten) {
     const text = (v) => (typeof v === 'string' ? v.trim() : '');

@@ -249,7 +249,7 @@ function frisch(mehr = {}) {
         const mit = (mehr) => S.modsSpeichern(s, gut(mehr));
         await wirft(() => mit({ source_ids: {} }), /„thunderstore" braucht ihre Kennung/);
         await wirft(() => mit({ sources: ['upload'], source_ids: { thunderstore: 'valheim' } }), /nicht eingeschaltet/);
-        await wirft(() => mit({ sources: ['upload', 'nexus'] }), /gibt es nicht/);
+        await wirft(() => mit({ sources: ['upload', 'gibtsnicht'] }), /gibt es nicht/);
         await wirft(() => mit({ source_ids: { thunderstore: 'valheim', upload: 'x' } }), /kennt keine Kennung/);
         await wirft(() => mit({ source_ids: { thunderstore: 'c/valheim' } }), /wie sie beim Anbieter in der Adresse steht/);
         await wirft(() => mit({ source_ids: { thunderstore: 'x'.repeat(S.MODS.max.kennung + 1) } }), /wie sie beim Anbieter/);
@@ -463,14 +463,14 @@ function frisch(mehr = {}) {
         gleich(S.MODS.quellen.filter(q => q !== 'upload').sort(), mitKennung, 'das Schema kennt andere Kennungen als die Karte');
         for (const f of S.MODS.felder) assert.ok(schema.properties.content.properties[f], `content.${f} kennt das Schema nicht`);
     });
-    await pruefe('„angebunden" ist, was das Panel wirklich kann — Hochladen und die Anbieter aus Quellen.js', async () => {
+    await pruefe('„angebunden" ist, was das Panel wirklich kann — Hochladen, die Anbieter und die reinen Kataloge aus Quellen.js', async () => {
         const stand = S.modsStand(frisch());
         const angebunden = stand.quellen.filter(q => q.angebunden).map(q => q.kennung).sort();
-        gleich(angebunden, ['upload', ...Object.keys(Quellen.ANBIETER)].sort());
+        gleich(angebunden, ['upload', ...Object.keys(Quellen.ANBIETER), ...Object.keys(Quellen.NUR_KATALOG)].sort());
         assert.ok(stand.quellen.some(q => !q.angebunden), 'jede Quelle des Schemas ist angebunden — dann stimmt der Hilfetext der Karte nicht mehr');
         // Der Hilfetext nennt die drei beim Namen.
         const ansicht = ohneKommentareEjs(lies(WURZEL, 'plugins/werkbank/dashboard/views/guild/werkbank-sitzung.ejs'));
-        if (angebunden.join(',') === 'ficsit,modrinth,thunderstore,upload') assert.ok(ansicht.includes('Angebunden sind heute Hochladen, Thunderstore, Modrinth und ficsit.app'));
+        if (angebunden.join(',') === 'ficsit,modrinth,nexus,thunderstore,upload') assert.ok(ansicht.includes('Nexus Mods lässt sich nur durchsuchen') && ansicht.includes('Angebunden sind heute Hochladen, Thunderstore, Modrinth und ficsit.app'));
         else assert.fail(`angebunden sind jetzt ${angebunden.join(', ')} — der Hilfetext der Karte nennt noch die alten drei`);
     });
     await pruefe('die Leser sind da: der Reiter „Inhalte" liest Ablageort, Neustart und Raum aus dem Paket', async () => {

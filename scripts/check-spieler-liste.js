@@ -142,6 +142,48 @@ const warte = () => new Promise(r => setImmediate(r));
         assert.ok(/daten\.append\('ordner', ordner\.value\.trim\(\)\)/.test(quelle), 'der Ordner geht nicht mit');
     });
 
+    console.log('\nReiner Katalog (Baustelle 191)');
+
+    await pruefe('Nexus-Treffer: Hinweis und Link statt „Ansehen", Thunderstore bleibt wie es war', async () => {
+        const v = seite({ ...LISTE, quellen: [
+            { kennung: 'thunderstore', titel: 'Thunderstore', manager: { name: 'r2modman', url: 'https://r2modman.com' }, nurKatalog: false },
+            { kennung: 'nexus', titel: 'Nexus Mods', manager: null, nurKatalog: true },
+        ] });
+        await warte(); await warte();
+        const treffer = { kennung: '1138', name: 'Jotunn', beschreibung: '', downloads: 908520,
+                          url: 'https://www.nexusmods.com/valheim/mods/1138' };
+        const antwort = (mehr) => ({ success: true, titel: 'Nexus Mods', gesamt: 1, seite: 1, seiten: 1,
+                                     gestoebert: false, treffer: [treffer], ...mehr });
+        const felder = {};
+        const echt = v.w.document.getElementById;
+        v.w.document.getElementById = (id) => {
+            if (['inhalte-suche', 'ts-treffer', 'ts-erklaerung', 'ts-begriff'].includes(id)) {
+                felder[id] = felder[id] || { innerHTML: '', style: { display: 'none' }, value: '', focus() {} };
+                return felder[id];
+            }
+            return echt(id);
+        };
+
+        v.w.fetch = async () => ({ ok: true, status: 200, json: async () => antwort({ nurKatalog: true, hinweis: 'Lade die Mod dort herunter.' }) });
+        v.w.inhaltSuche();
+        assert.match(felder['inhalte-suche'].innerHTML, /kommt bei der\s+Installation mit/, 'Thunderstore ist vorgewählt');
+        v.w.inhaltQuelle('nexus');
+        assert.ok(!/Installation mit/.test(felder['ts-erklaerung'].innerHTML), 'bei Nexus kommt nichts mit');
+        await warte(); await warte();
+        const nexus = felder['ts-treffer'].innerHTML;
+        assert.ok(nexus.includes('Lade die Mod dort herunter.'), 'der Hinweis fehlt');
+        assert.ok(nexus.includes('Auf Nexus Mods öffnen'), 'der Link fehlt');
+        assert.ok(!nexus.includes('inhaltVorschau'), 'ein reiner Katalog bietet die Vorschau an');
+        assert.ok(!nexus.includes('Ausgabe unbekannt'), 'dort wird gar nicht gefiltert');
+
+        v.w.fetch = async () => ({ ok: true, status: 200, json: async () => antwort({ nurKatalog: false, hinweis: null }) });
+        v.w.inhaltQuelle('thunderstore');
+        await warte(); await warte();
+        const anbieter = felder['ts-treffer'].innerHTML;
+        assert.ok(anbieter.includes('inhaltVorschau'), 'der Anbieter verliert seine Vorschau');
+        assert.ok(!anbieter.includes('öffnen</a>'), 'der Anbieter bekommt den Katalog-Link');
+    });
+
     console.log('\nQuellen und Route');
 
     await pruefe('jede Quelle nennt ihren Manager; die Route reicht ihn weiter', () => {
@@ -151,7 +193,7 @@ const warte = () => new Promise(r => setImmediate(r));
         }
         assert.ok(!/smm\.ficsit\.app/.test(Quellen.fuer('ficsit').MANAGER.url), 'smm.ficsit.app startet einen Download');
         const route = fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/routes/inhalte.js'), 'utf8');
-        assert.ok(/manager: Quellen\.fuer\(q\)\.MANAGER \|\| null/.test(route));
+        assert.ok(/manager: Quellen\.katalog\(q\)\.MANAGER \|\| null/.test(route));
     });
 
     console.log(fehler ? `\n✗ ${fehler} gescheitert, ${bestanden} bestanden` : `\n✓ ${bestanden} bestanden`);
