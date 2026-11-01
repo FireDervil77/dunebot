@@ -1111,7 +1111,7 @@ function mischeEinstellung(vorher, neu) {
  *                      des Schemas bringt, reist dann mit, statt zu verschwinden.
  */
 const GANZ = '*';
-const EIGENE = { management: ['query', 'rcon', 'saves', 'persist', 'game_version'], files: ['denylist', 'public'], install: ['cache', 'entfernen'],
+const EIGENE = { management: ['query', 'rcon', 'saves', 'persist', 'game_version'], files: ['denylist', 'public', 'config_files'], install: ['cache', 'entfernen'],
     commands: GANZ, config: GANZ, requirements: GANZ, console: GANZ,
     content: ['supported', 'sources', 'source_ids', 'path', 'activation', 'order_matters', 'needs_restart', 'client_side',
         'loader', 'by_setting', 'variants'] };
@@ -1325,8 +1325,8 @@ async function oeffenbarePakete() {
  * 1.0.115 kennt das Feld nicht und übergeht es.
  *
  * `files` seit 2026-10-10: Der Daemon liest daraus `public` — was Spieler per
- * HTTP abrufen dürfen. Sperrliste und alte `patch`-Einträge gehen mit und
- * werden dort übergangen.
+ * HTTP abrufen dürfen. Sperrliste, `config_files` und alte `patch`-Einträge
+ * gehen mit und werden dort übergangen.
  */
 const LAUFZEIT_TEILE = ['management', 'content', 'config', 'console', 'requirements', 'files'];
 function laufzeitTeile(paket) {
@@ -2539,6 +2539,13 @@ function technisch(paket) {
     // feste Zeilen in Dateien). Nur wenn vorhanden: Eine Sitzung ohne diese
     // Teile behält ihren Fingerabdruck, und ihr grüner Durchlauf bleibt gültig.
     for (const k of DURCHGEREICHT) if (p[k] !== undefined) t[k] = p[k];
+    // Die Konfigurationsdateien nennen dem Betreiber nur, was er bearbeiten kann.
+    // Kein Durchlauf prüft sie, also reisen sie wie die Hinweise: Wer die Liste
+    // nach einem grünen Durchlauf ergänzt, prüft nicht neu.
+    if (t.files?.config_files !== undefined) {
+        const { config_files: _liste, ...rest } = t.files;
+        if (Object.keys(rest).length) t.files = rest; else delete t.files;
+    }
     return t;
 }
 
@@ -4424,6 +4431,7 @@ function paketTag(pruefung) {
 /** Das Paket, wie es eingeliefert wird. */
 function veroeffentlichungsPaket(sitzung, liste, pruefung, autor, imageVorher = null) {
     const e = entwurfAlsPaket(sitzung, liste);
+    const geprueft = technisch(pruefung.entwurf);
     const heute = new Date().toISOString().slice(0, 10);
     const am = pruefung.beendet_am ? new Date(pruefung.beendet_am).toISOString().slice(0, 16).replace('T', ' ') : heute;
     const identity = {
@@ -4437,7 +4445,11 @@ function veroeffentlichungsPaket(sitzung, liste, pruefung, autor, imageVorher = 
         format: 'FBPKG_v1', identity,
         // Der technische Teil aus dem GEPRÜFTEN Entwurf — gleich per Fingerabdruck,
         // aber so steht außer Frage, was eingeliefert wird.
-        ...technisch(pruefung.entwurf),
+        ...geprueft,
+        // Die Konfigurationsdateien aus dem Entwurf von JETZT — `technisch`
+        // nimmt sie heraus, sie gehören nicht zum Geprüften.
+        ...(Array.isArray(e.files?.config_files) && e.files.config_files.length
+            ? { files: { ...geprueft.files, config_files: e.files.config_files } } : {}),
         // Nur belegte Einstellungen (B1) — die übrigen bleiben in der Sitzung.
         ...(() => {
             const b = belegteEinstellungen(pruefung.entwurf, pruefung.ergebnis, uebernommeneZiele(sitzung));

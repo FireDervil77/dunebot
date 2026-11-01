@@ -6,6 +6,11 @@
  *
  *   - Die Werkbank nimmt nur Pfade unter game/ oder data/ an, nichts Gesperrtes.
  *   - Schema und Werkbank sind sich beim Pfad einig.
+ *   - Die Liste aus der Karte steht im Paket, das eingeliefert wird. Sie stand
+ *     dort nicht, und niemand sagte es: Die Karte las den Entwurf, das Paket
+ *     nahm aus `files` nur, was `EIGENE` nennt. ET Legacy 1.1.8 ging so ohne
+ *     seine Dateien hinaus (2026-11-01).
+ *   - Sie gehört nicht zum Geprüften und ändert den Fingerabdruck nicht.
  *   - Der Stand trennt: vorhanden, fehlt, nicht lesbar, gesperrt. Ein Ordner, den
  *     der Daemon nicht lesen konnte, ist kein leerer.
  *   - Was das Panel beim Start setzt, steht an der Datei.
@@ -107,6 +112,45 @@ const SERVER = { id: 7, rootserver_id: 55, daemon_id: 'd', install_path: '/x' };
         ajv.addSchema(schema, 'fbpkg');
         const gruppen = schema.properties.files.properties.config_files.items.properties.group.enum;
         assert.deepStrictEqual(gruppen, Object.keys(K.GRUPPEN), 'die Gruppen im Schema und im Panel laufen auseinander');
+    });
+
+    console.log('\nVom Entwurf ins Paket');
+    const LISTE = [{ path: 'game/etmain/mapvotecycle.cfg', group: 'votes', description: { de: 'Abstimmung' } }];
+    const sitzungMit = (config_files) => ({
+        id: 1, kennung: 'wbtest', status: 'offen', image: 'fb/quake:latest',
+        entwurf: { identity: { slug: 'et', version: '1.1.9' }, files: { public: ['etmain/*.pk3'], ...(config_files ? { config_files } : {}) }, werkbank: {} },
+    });
+    const durchlauf = (sitzung) => ({
+        id: 9, entwurf: S.entwurfAlsPaket(sitzung, []), beendet_am: '2026-11-01 12:14:39',
+        ergebnis: { image_digest: `sha256:${'a'.repeat(64)}`, image_tag: '2026.11', bereitschaft: 'query' },
+    });
+    await pruefe('die Liste aus der Karte steht im Paket, neben den übrigen Dateiangaben', async () => {
+        const paket = S.entwurfAlsPaket(sitzungMit(LISTE), []);
+        assert.deepStrictEqual(paket.files, { public: ['etmain/*.pk3'], config_files: LISTE });
+    });
+    await pruefe('die Liste zählt nicht zum Geprüften: ein grüner Durchlauf bleibt gültig', async () => {
+        assert.strictEqual(S.fingerabdruck(S.entwurfAlsPaket(sitzungMit(LISTE), [])), S.fingerabdruck(S.entwurfAlsPaket(sitzungMit(null), [])));
+        const ohneSonstiges = { start: null, files: { config_files: LISTE } };
+        assert.strictEqual(S.fingerabdruck(ohneSonstiges), S.fingerabdruck({ start: null }), 'ein leeres `files` änderte den Fingerabdruck');
+        const andereFreigabe = sitzungMit(LISTE);
+        andereFreigabe.entwurf.files.public = ['etmain/*.txt'];
+        assert.notStrictEqual(S.fingerabdruck(S.entwurfAlsPaket(andereFreigabe, [])), S.fingerabdruck(S.entwurfAlsPaket(sitzungMit(LISTE), [])),
+            '`files.public` muss weiter zählen');
+    });
+    await pruefe('eingeliefert wird die Liste von jetzt, nicht die des Durchlaufs', async () => {
+        const nachher = S.veroeffentlichungsPaket(sitzungMit(LISTE), [], durchlauf(sitzungMit(null)), 'waechter');
+        assert.deepStrictEqual(nachher.files, { public: ['etmain/*.pk3'], config_files: LISTE }, 'nach dem Durchlauf eingetragen');
+        const weg = S.veroeffentlichungsPaket(sitzungMit(null), [], durchlauf(sitzungMit(LISTE)), 'waechter');
+        assert.deepStrictEqual(weg.files, { public: ['etmain/*.pk3'] }, 'nach dem Durchlauf entfernt');
+        const frischeSitzung = { ...sitzungMit(LISTE), entwurf: { identity: { slug: 'et', version: '1.1.9' }, files: { config_files: LISTE }, werkbank: {} } };
+        const nurListe = S.veroeffentlichungsPaket(frischeSitzung, [], durchlauf(frischeSitzung), 'waechter');
+        assert.deepStrictEqual(nurListe.files, { config_files: LISTE }, 'ein Paket ohne weitere Dateiangaben');
+    });
+    await pruefe('beim Öffnen kommt die Liste in der Karte an und bleibt beim Zusammensetzen dieselbe', async () => {
+        const { entwurf } = S.entwurfAusPaket({ identity: { slug: 'et', version: '1.1.9' }, files: { public: ['etmain/*.pk3'], config_files: LISTE } });
+        assert.deepStrictEqual(entwurf.files.config_files, LISTE, 'die Karte liest aus entwurf.files');
+        assert.strictEqual(entwurf.durchgereicht?.files, undefined);
+        assert.deepStrictEqual(S.entwurfAlsPaket({ image: 'fb/quake:latest', entwurf }, []).files.config_files, LISTE);
     });
 
     console.log('\nStand im Panel');
