@@ -108,6 +108,10 @@
           "minLength": 1,
           "pattern": "^[^/.][^\\\\]*$",
           "description": "Der Port wird nur gebraucht, wenn eine Datei auf dieses Muster passt — Pfad ab der Wurzel des Volumes, * im letzten Teil (game/mods/voicechat-*.jar). Geprüft wird vor jedem Start: passt eine Datei, wird der Port nachgebucht, passt keine, wird er freigegeben. Für Ports, die erst ein Mod mitbringt (Sprachchat, Webkarte). Nur mit assign: pool und required: false (Baustelle 156, 2026-09-24)."
+        },
+        "internal_only": {
+          "type": "boolean",
+          "description": "Der Port lauscht im Container, wird aber nicht nach außen veröffentlicht. Für Dienste, die nur der Daemon benutzt, etwa RCON. Die Nummer gilt weiter für {{port:…}} (Baustelle 214, 2026-11-01)."
         }
       },
       "allOf": [

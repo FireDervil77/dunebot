@@ -2281,7 +2281,7 @@ async function portEntfernen(sitzung, zweck) {
 //   - Ports entstehen aus der BEOBACHTUNG. Von Hand anlegen lässt sich nur ein
 //     Port mit `needed_by` — den bringt ein Mod mit, ohne den Mod lauscht nichts.
 //   - Die Abfrage kommt auch unbelegt ins Paket, dann mit Vermerk (`abfrageVermerk`).
-const PORT_FELDER = ['purpose', 'protocol', 'assign', 'required', 'variable', 'description', 'needed_by'];
+const PORT_FELDER = ['purpose', 'protocol', 'assign', 'required', 'variable', 'description', 'needed_by', 'internal_only'];
 const RE_KOPPLUNG = /^([a-z][a-z0-9_]*)\+([0-9]+)$/;
 const RE_NUR_WENN = /^[^/.][^\\]*$/; // Schema: port.needed_by
 // Beschreibung: Die längste im Bestand hat 318 Zeichen (Minecrafts Sprachchat) —
@@ -2335,6 +2335,7 @@ function portAusFormular(b, vorher) {
     // aus einem geöffneten Paket bleibt stehen, geschrieben wird es sonst nicht.
     if (an('optional')) p.required = false;
     else if (vorher?.required === true) p.required = true;
+    if (an('nur_intern')) p.internal_only = true;
 
     if (text('variable')) {
         if (!RE_VARIABLE.test(text('variable'))) throw new Error('Variable: Buchstaben, Ziffern und _, nicht mit einer Ziffer beginnend (SERVER_PORT).');
@@ -2377,10 +2378,16 @@ async function portSpeichern(sitzung, b) {
         }
         if (!vorher) {
             if (liste.some(p => p.purpose === neu.purpose)) throw new Error(`Den Port „${neu.purpose}" gibt es schon.`);
-            if (!neu.needed_by) {
-                throw new Error('Von Hand anlegen lässt sich nur ein Port mit „nur wenn Datei" (den bringt ein Mod mit). '
+            if (!neu.needed_by && !neu.internal_only) {
+                throw new Error('Von Hand anlegen lässt sich nur ein Port mit „nur wenn Datei" (den bringt ein Mod mit) oder „nur intern". '
                     + 'Jeder andere kommt aus der Beobachtung: Spiel starten, Port übernehmen.');
             }
+        }
+        // Spieler und die Abfrage des Panels kommen von außen.
+        if (neu.internal_only) {
+            const spielport = liste.find(p => p.assign === 'pool') || neu;
+            if (neu.purpose === spielport.purpose) throw new Error(`„${neu.purpose}" ist der Spielport — über ihn verbinden sich die Spieler, er kann nicht nur intern sein.`);
+            if (e.management?.query?.port === neu.purpose) throw new Error(`„${neu.purpose}" trägt die Abfrage — die fragt das Panel von außen, der Port kann nicht nur intern sein.`);
         }
         const k = kopplungVon(neu);
         if (k) {
@@ -3070,6 +3077,7 @@ function rconStand(sitzung) {
         if (!RCON.gebaut.includes(r.protocol)) warnungen.push(`Das Protokoll „${r.protocol}" spricht der Daemon nicht — bekannt sind ${RCON.gebaut.join(', ')}.`);
         if (!port) warnungen.push(`Den Port „${r.port}" gibt es im Entwurf nicht.`);
         else if (port.protocol === 'udp') warnungen.push(`Der Port „${r.port}" ist udp — die Fernsteuerung läuft über tcp.`);
+        if (port && !port.internal_only) warnungen.push(`Der Port „${r.port}" ist von außen erreichbar, benutzt wird er nur vom Daemon. Unter „Ports" auf „Nur intern" stellen.`);
         if (!r.password_variable) warnungen.push('Es ist keine Variable für das Kennwort genannt.');
         else if (!gefuellt) warnungen.push(`Keine Einstellung schreibt „${r.password_variable}" in die Umgebung — das Kennwort käme nie an.`);
         else if (quelle && probewerte(sitzung)[quelle.key] === '') {

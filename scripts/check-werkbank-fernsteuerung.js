@@ -166,7 +166,13 @@ const RC = { protocol: 'source', port: 'rcon', password_variable: 'RCON_PASSWORD
                 // Vorgabe des Kennworts ist leer — die Karte sagt, dass der Durchlauf so scheitert.
                 assert.ok(stand.warnungen.some(w => /keinen Probewert/.test(w)), 'die Warnung zum leeren Kennwort fehlt');
                 sitzung.entwurf.werkbank.werte = { [stand.quelle]: 'geheim' };
+                // Ein Fernsteuerungs-Port, der nach außen offen ist, gehört gesagt.
+                assert.ok(S.rconStand(sitzung).warnungen.every(w => /von außen erreichbar/.test(w)) && S.rconStand(sitzung).warnungen.length === 1,
+                    'die Warnung zum offenen Port fehlt, oder es kam eine andere dazu');
+                const fernPort = sitzung.entwurf.ports.find(p => p.purpose === stand.rcon.port);
+                fernPort.internal_only = true;
                 assert.deepStrictEqual(S.rconStand(sitzung).warnungen, []);
+                delete fernPort.internal_only;
             });
         }
     }

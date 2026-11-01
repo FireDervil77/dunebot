@@ -1096,6 +1096,7 @@ function bauePorts(server, paket) {
             // Nur bei Bedarf gebucht (Baustelle 156): Die Ansicht sagt, wovon
             // es abhaengt — sonst steht dort ein „—" ohne Erklaerung.
             bedarf:   p.needed_by || null,
+            intern:   p.internal_only === true,
         });
     }
 

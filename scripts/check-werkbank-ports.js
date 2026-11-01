@@ -239,6 +239,23 @@ const UDP = (purpose, mehr = {}) => ({ purpose, protocol: 'udp', assign: 'pool',
         assert.ok(Number.isInteger(nr.voice) && nr.voice !== nr.game, 'der neue Port hat keine eigene Nummer');
         assert.strictEqual(s.entwurf.werkbank.beobachtet.voice, undefined, 'ein von Hand angelegter Port gilt als beobachtet');
     });
+    await pruefe('nur intern: von Hand möglich, nie für Spielport oder Abfrage, und der Daemon lässt ihn beim Veröffentlichen weg', async () => {
+        const s = frisch([UDP('game')], { game: 7777 });
+        const neu = (mehr) => ({ alt: '', zweck: 'rcon', protocol: 'tcp', basis: '', ...mehr });
+        await S.portSpeichern(s, neu({ nur_intern: 'on' }));
+        gleich(s.entwurf.ports[1], { purpose: 'rcon', protocol: 'tcp', assign: 'pool', internal_only: true });
+        assert.ok(Number.isInteger(s.entwurf.werkbank.portnummern.rcon), 'ohne Nummer gäbe es kein {{port:rcon}}');
+        await assert.rejects(S.portSpeichern(s, { alt: 'game', zweck: 'game', protocol: 'udp', basis: '', nur_intern: 'on' }), /Spielport/);
+        const mitAbfrage = frisch([UDP('game'), UDP('abfrage')], { game: 7777, abfrage: 7778 });
+        mitAbfrage.entwurf.management = { query: { protocol: 'a2s', port: 'abfrage' } };
+        await assert.rejects(S.portSpeichern(mitAbfrage, { alt: 'abfrage', zweck: 'abfrage', protocol: 'udp', basis: '', nur_intern: 'on' }), /trägt die Abfrage/);
+        await S.portSpeichern(s, { alt: 'rcon', zweck: 'rcon', protocol: 'tcp', basis: '' });
+        assert.ok(!('internal_only' in s.entwurf.ports[1]), 'der Schalter ist aus, das Feld steht aber noch im Port');
+        const start = ohneKommentare(fs.readFileSync(path.join(DAEMON, 'internal/gameserver/server_lifecycle_docker.go'), 'utf8'));
+        assert.match(start, /BuildPortMap\(paket\.OeffentlichePorts\(s\.ports\), bindIP\)/, 'der Daemon veröffentlicht interne Ports');
+        const bindung = start.match(/BuildPortMap\(/g) || [];
+        assert.strictEqual(bindung.length, 1, 'ein zweiter Weg bindet Ports');
+    });
     await pruefe('entfernen: nicht, solange Abfrage, Kopplung oder Fernsteuerung daran hängen', async () => {
         const s = frisch([UDP('game'), UDP('query', { assign: 'game+1' }), { purpose: 'rcon', protocol: 'tcp', assign: 'pool' }], { game: 7777, query: 7778, rcon: 7780 });
         // Beides liegt im Entwurf — die Fernsteuerung seit ihrer Karte (2026-10-08);
