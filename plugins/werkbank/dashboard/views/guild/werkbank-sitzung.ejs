@@ -2703,7 +2703,13 @@
           </div>
         </form>
         <% if (!veroeffentlichung.darf) { %>
-          <ul class="text-secondary small mt-3 mb-0"><% veroeffentlichung.gruende.forEach(function (g) { %><li><%= g %></li><% }) %></ul>
+          <% if (veroeffentlichung.fassungGrund) { %>
+            <div class="text-danger fs-3 fw-bold mt-3"><i class="fa-solid fa-triangle-exclamation me-2"></i><%= veroeffentlichung.fassungGrund %></div>
+          <% } %>
+          <% const uebrigeGruende = veroeffentlichung.gruende.filter(function (g) { return g !== veroeffentlichung.fassungGrund; }); %>
+          <% if (uebrigeGruende.length) { %>
+            <ul class="text-secondary small mt-3 mb-0"><% uebrigeGruende.forEach(function (g) { %><li><%= g %></li><% }) %></ul>
+          <% } %>
         <% } %>
         <% if (veroeffentlicht.length) { %>
           <div class="mt-3 small">

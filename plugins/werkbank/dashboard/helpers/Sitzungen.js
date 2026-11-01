@@ -2899,12 +2899,15 @@ async function veroeffentlichungsStand(sitzung, liste, pruefListe) {
     if (!id.slug) gruende.push('Slug fehlt.');
     if (!id.version) gruende.push('Fassung fehlt.');
     let neueste = null;
+    // Eigens geführt: Die Seite zeigt diesen Grund groß und rot über der Liste.
+    let fassungGrund = null;
     if (id.slug) {
         const zeilen = await db().query(
             `SELECT pv.version FROM package_versions pv JOIN packages p ON p.id = pv.package_id WHERE p.slug = ?`, [id.slug]);
         for (const z of zeilen) if (!neueste || fassungGroesser(z.version, neueste)) neueste = z.version;
         if (neueste && id.version && !fassungGroesser(id.version, neueste)) {
-            gruende.push(`„${id.slug}" gibt es schon bis ${neueste} — die Fassung muss höher sein.`);
+            fassungGrund = `„${id.slug}" gibt es schon bis ${neueste} — die kommende Fassung muss höher sein.`;
+            gruende.push(fassungGrund);
         }
         // Unter diesem Slug liegt schon ein Paket: Was es trägt und diese Sitzung
         // nicht, ginge mit dem Veröffentlichen verloren — beim nächsten Start
@@ -2941,7 +2944,7 @@ async function veroeffentlichungsStand(sitzung, liste, pruefListe) {
             }
         }
     }
-    return { darf: gruende.length === 0, gruende, neueste, pruefung: letzte };
+    return { darf: gruende.length === 0, gruende, fassungGrund, neueste, pruefung: letzte };
 }
 
 /**

@@ -750,9 +750,12 @@ async function pruefe(name, fn) {
         st = await Sitzungen.veroeffentlichungsStand(s, liste, [g]);
         assert.match(st.gruende.join(' '), /bis 1\.2\.0/);
         assert.strictEqual(st.neueste, '1.2.0', '1.2.0 > 1.0.0 — nicht lexikalisch, sondern als Zahlen');
+        assert.match(st.fassungGrund, /bis 1\.2\.0 — die kommende Fassung muss höher sein/, 'die Seite zeigt diesen Grund groß und rot');
+        assert.ok(st.gruende.includes(st.fassungGrund), 'er sperrt das Veröffentlichen wie jeder andere Grund');
         db.fassungen.factorio = ['1.0.0', '1.0.10'];
         st = await Sitzungen.veroeffentlichungsStand(s, liste, [g]);
         assert.strictEqual(st.darf, true, st.gruende.join(' '));
+        assert.strictEqual(st.fassungGrund, null);
         // Trägt das vorhandene Paket Teile, die diese Sitzung nicht hat, ginge das mit dem
         // Veröffentlichen verloren — abgewiesen, mit dem Rat, das Paket zu öffnen (2026-10-07).
         db.vorhandenesPaket.factorio = { management: { rcon: { port: 'rcon' } }, files: { denylist: ['bin'] } };
