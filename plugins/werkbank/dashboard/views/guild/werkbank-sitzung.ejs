@@ -500,7 +500,7 @@
                 <div id="startZeilen"></div>
                 <button class="btn btn-sm btn-outline-primary mt-1" type="button" id="knopfZeileNeu">+ Parameter</button>
                 <div class="form-hint mt-1">
-                  <strong>Form</strong> wie auf der Kommandozeile: <code>-port {{Wert}}</code>, <code>-Xmx{{Wert}}M</code>, <code>--start-server saves/welt.zip</code>.
+                  <strong>Form</strong> wie auf der Kommandozeile: <code>-port {{Wert}}</code>, <code>-Xmx{{Wert}}M</code>, <code>--start-server saves/welt.zip</code>, <code>+exec server.cfg</code>.
                   Leerzeichen trennen Argumente, <code>"…"</code> hält eins mit Leerzeichen zusammen.
                   <code>{{Wert}}</code> ist der Wert der <strong>Quelle</strong> (Einstellung oder Port).
                   „Text mit Verweisen" ist genau <em>ein</em> Argument, z. B. <code>-QueryPort={{port:query}}</code>.
@@ -1990,6 +1990,7 @@
               <div class="form-label"><label for="fzKey">Schlüssel in der Datei</label><%- include('werkbank-hilfe', { text:
                 'ini: Abschnitt.Schlüssel, etwa Host.port. properties: der Name vor dem Gleichheitszeichen, etwa server-port. '
                 + 'xml: der Name der Eigenschaft, etwa ServerPort. json und yaml: der Pfad mit Punkten, etwa server.port. '
+                + 'cfg: der Name der Variable; exec als Schlüssel und die Datei als Wert lädt eine weitere cfg, vorhandene exec-Zeilen bleiben stehen. '
                 + 'Dieselbe Schreibweise wie beim Ziel „Datei" einer Einstellung.' }) %></div>
               <input class="form-control font-monospace" id="fzKey" name="key" maxlength="<%= FZ.max.schluessel %>" placeholder="Host.port" required>
             </div>

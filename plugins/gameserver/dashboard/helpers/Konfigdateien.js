@@ -174,7 +174,7 @@ async function stand({ server, paket, ipmServer, sperrliste = [] }) {
             // Lädt die Wurzel diese Datei, gilt: Was sie setzt, kann das Panel überschreiben.
             if (z !== wurzel) {
                 const hier = cfgSchluessel(inhalt);
-                z.ueberschreibt = wurzel.panelSchluessel.filter(k => hier.has(k.toLowerCase()));
+                z.ueberschreibt = wurzel.panelSchluessel.filter(k => k.toLowerCase() !== 'exec' && hier.has(k.toLowerCase()));
             }
 
             const ordnerHier = path.posix.dirname(z.pfad);
