@@ -52,9 +52,11 @@
 .fb-muted { color: var(--fb-text-muted); }
 .fb-mono  { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .fb-abschnitt {
-  font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
-  color: var(--fb-text-muted); font-weight: 700; margin: 18px 0 2px;
+  font-size: 15px; font-weight: 700;
+  margin: 24px 0 6px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--fb-border);
 }
+.fb-abschnitt:first-child { margin-top: 0; }
 
 /* ── Pille: 100rem, wie in der Vorlage ──────────────────────────────────── */
 .fb-pille {

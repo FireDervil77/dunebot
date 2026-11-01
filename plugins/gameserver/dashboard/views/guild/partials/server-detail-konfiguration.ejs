@@ -54,7 +54,7 @@
 
       function zeile(z) {
           const reihe = el('div');
-          reihe.style.cssText = 'display:flex;gap:12px;padding:10px 0;align-items:center;border-top:1px solid var(--tblr-border-color)';
+          reihe.style.cssText = 'display:flex;gap:12px;padding:10px 0;align-items:center';
           const links = el('div');
           links.style.flex = '1 1 auto';
           links.style.minWidth = '0';
@@ -89,10 +89,8 @@
                   wurzel.appendChild(el('div', 'fb-muted', 'Das Paket nennt keine Dateien.')).style.fontSize = '13px';
                   return;
               }
-              daten.gruppen.forEach((g, i) => {
-                  const kopf = el('div', '', g.name);
-                  kopf.style.cssText = 'font-weight:600;padding:' + (i ? '16px' : '0') + ' 0 6px';
-                  wurzel.appendChild(kopf);
+              daten.gruppen.forEach((g) => {
+                  wurzel.appendChild(el('div', 'fb-abschnitt', g.name));
                   g.dateien.forEach(z => wurzel.appendChild(zeile(z)));
               });
           } catch (fehler) {
