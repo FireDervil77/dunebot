@@ -29,6 +29,7 @@ const eventRouter = require('./IPMEventRouter');
 // steckengeblieben war.
 const RootServer = require('../../../plugins/masterserver/dashboard/models/RootServer');
 const Auslastung = require('../../../plugins/masterserver/dashboard/helpers/Auslastung');
+const FireBusZaehler = require('./FireBusZaehler');
 
 // Pfad zur version.json (Dashboard-Download-Verzeichnis)
 const VERSION_JSON_PATH = path.join(__dirname, '..', 'downloads', 'daemon', 'version.json');
@@ -51,7 +52,8 @@ class IPMServer {
         this.wss = null;
         this.connections = new Map(); // daemon_id -> {ws, lastHeartbeat, sessionId, metadata}
         this.connectionCounts = new Map(); // daemon_id -> connection_count (für Limit-Tracking)
-        this.pendingCommands = new Map(); // commandId -> {resolve, reject, timeout}
+        this.pendingCommands = new Map(); // commandId -> {resolve, reject, timeout, command, gesendetAm}
+        this.zaehler = new FireBusZaehler();
         this.Logger = null;
         this.dbService = null;
         // Wird in stop() gesetzt: Ab da schreiben die close-Handler nicht mehr in
@@ -171,6 +173,7 @@ class IPMServer {
 
         // Heartbeat-Monitor (alle 30s prüfen)
         this._startHeartbeatMonitor();
+        this.zaehler.starte();
         
         // ✅ Event-Handler für gameserver.status_changed registrieren
         this._registerEventHandlers();
@@ -184,6 +187,12 @@ class IPMServer {
     async stop() {
         if (this.heartbeatInterval) {
             clearInterval(this.heartbeatInterval);
+        }
+
+        try {
+            await this.zaehler.beende();
+        } catch (error) {
+            this.Logger.error('[FireBus] Letzte Zählung nicht geschrieben', error);
         }
 
         // Der Zustandswechsel gehört HIER hin, in einen Rutsch und abgewartet —
@@ -248,6 +257,7 @@ class IPMServer {
                     if (result.success) {
                         this.registerFailures.delete(rateKey);
                         daemonId = result.daemonId;
+                        this.zaehler.zaehle(daemonId, 'register', 'ein', data.length);
                         authenticated = true;
                         
                         // ✅ SECURITY: Connection-Limit prüfen
@@ -365,6 +375,8 @@ class IPMServer {
                     ws.close(4001, 'Authentication required');
                     return;
                 }
+
+                this._zaehleEingang(daemonId, message, data.length);
 
                 // Message-Routing
                 await this._routeMessage(daemonId, message);
@@ -698,6 +710,25 @@ class IPMServer {
     }
 
     /**
+     * Zählt eine Nachricht vom Daemon. Muss vor dem Routing laufen: Danach ist
+     * der offene Befehl schon gelöscht, und eine Antwort hätte keinen Namen mehr.
+     * @private
+     */
+    _zaehleEingang(daemonId, message, bytes) {
+        const typ = message.type?.toLowerCase();
+        if (typ === 'command_response' || typ === 'response') {
+            const offen = this.pendingCommands.get(message.id ?? message.payload?.commandId);
+            this.zaehler.zaehle(daemonId, offen ? offen.command : 'antwort.unbekannt', 'ein', bytes,
+                offen ? Date.now() - offen.gesendetAm : null);
+            return;
+        }
+        const name = message.namespace && message.action
+            ? `${message.namespace}.${message.action}`
+            : (typ === 'event' ? message.payload?.event : typ);
+        this.zaehler.zaehle(daemonId, name, 'ein', bytes);
+    }
+
+    /**
      * Message-Routing
      * @private
      */
@@ -824,6 +855,9 @@ class IPMServer {
 
         conn.lastHeartbeat = Date.now();
 
+        this.zaehler.lesefaden(daemonId, payload.lesefaden);
+        this.zaehler.last(daemonId, { druck: payload.druck, hardware: payload.hardware });
+
         // Latenz aus Heartbeat-Timestamp berechnen (Daemon sendet Unix-Timestamp in Sekunden)
         const pingMs = payload.timestamp ? Math.max(0, Date.now() - (payload.timestamp * 1000)) : null;
 
@@ -861,10 +895,12 @@ class IPMServer {
         await RootServer.processHeartbeat(daemonId, pingMs);
 
         // ACK senden
-        conn.ws.send(JSON.stringify({ 
+        const bestaetigung = JSON.stringify({
             type: 'heartbeat_ack',
             timestamp: Date.now()
-        }));
+        });
+        conn.ws.send(bestaetigung);
+        this.zaehler.zaehle(daemonId, 'heartbeat_ack', 'aus', bestaetigung.length);
 
         // Optional: Server-Registry-Status aktualisieren + SSE-Broadcast pro Gameserver
         if (payload.servers) {
@@ -1557,6 +1593,7 @@ class IPMServer {
             // Timeout
             const timeoutHandle = setTimeout(() => {
                 this.pendingCommands.delete(commandId);
+                this.zaehler.frist(daemonId, command);
                 reject(new Error(`Command timeout after ${timeout}ms`));
             }, timeout);
 
@@ -1576,16 +1613,20 @@ class IPMServer {
                     clearTimeout(timeoutHandle);
                     reject(error);
                 },
-                timeout: timeoutHandle
+                timeout: timeoutHandle,
+                command,
+                gesendetAm: Date.now()
             });
 
             // Command senden
-            conn.ws.send(JSON.stringify({
+            const nachricht = JSON.stringify({
                 type: 'command',
                 id: commandId,
                 command,
                 payload
-            }));
+            });
+            conn.ws.send(nachricht);
+            this.zaehler.zaehle(daemonId, command, 'aus', Buffer.byteLength(nachricht));
 
             this.Logger.debug(`[IPMServer] Command sent to Daemon ${daemonId}: ${command} (ID: ${commandId})`);
         });
@@ -1806,11 +1847,13 @@ class IPMServer {
         
         for (const [daemonId, conn] of this.connections.entries()) {
             if (conn.metadata.guild_id === guildId) {
-                conn.ws.send(JSON.stringify({
+                const nachricht = JSON.stringify({
                     type: 'broadcast',
                     event,
                     data
-                }));
+                });
+                conn.ws.send(nachricht);
+                this.zaehler.zaehle(daemonId, 'broadcast', 'aus', Buffer.byteLength(nachricht));
                 sent++;
             }
         }

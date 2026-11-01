@@ -48,6 +48,7 @@ function ipm() {
     const o = Object.create(IPMServer.prototype);
     o.Logger = { debug: still, info: still, warn: still, error: still, success: still };
     o.pendingCommands = new Map();
+    o.zaehler = { zaehle() {}, frist() {} };
     o.gesendet = [];
     o.connections = new Map([['d1', { ws: { send: (t) => o.gesendet.push(JSON.parse(t)) } }]]);
     return o;
