@@ -319,6 +319,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Auskünfte, und „unbekannt" ist eine eigene — nie „aktuell", ohne gefragt
     // zu haben. Namen kommen aus Paketen: als Text gesetzt, nie als HTML.
     let imageDaten = null;
+    let seiteGehtWeg = false;
+    window.addEventListener('beforeunload', () => { seiteGehtWeg = true; });
     async function ladeImageStand() {
         const zellen = document.querySelectorAll('[data-image-stand]');
         if (!zellen.length) return;
@@ -341,7 +343,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (fehler) {
             zellen.forEach((z) => setze(z, 'bg-secondary-lt', 'unbekannt', fehler.message));
             if (kopf) kopf.textContent = 'nicht abfragbar';
-            if (window.showToast) window.showToast('error', 'Image-Stand: ' + fehler.message);
+            // Wer die Seite verlässt, bricht die Abfrage selbst ab. Das ist kein Fehler.
+            if (window.showToast && !seiteGehtWeg) window.showToast('error', 'Image-Stand: ' + fehler.message);
             return;
         }
         const jePaket = new Map((daten.pakete || []).map((p) => [String(p.paket_id), p]));
