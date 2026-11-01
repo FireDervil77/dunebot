@@ -2016,6 +2016,84 @@
     </div>
   </div>
 
+  <!-- ── Konfigurationsdateien (`files.config_files`, Baustelle 215) ─────── -->
+  <%
+    const konfigListe = locals.konfigdateien || [];
+    const KD = locals.KONFIGDATEI || { gruppen: {}, max: { pfad: 200, name: 80, beschreibung: 300 } };
+  %>
+  <div class="col-12">
+    <div class="card" id="karteKonfigdateien">
+      <div class="card-header">
+        <h3 class="card-title">Konfigurationsdateien</h3>
+        <div class="card-actions"><span class="text-secondary small"><%= konfigListe.length %> im Entwurf</span></div>
+      </div>
+      <div class="card-body">
+        <p class="text-secondary small">
+          Ganze Dateien, die der Betreiber im Panel unter „Konfiguration" bearbeitet: Mapcycles, Voting-Cfgs, Admin-Listen.<%- include('werkbank-hilfe', { text:
+            'Das Panel öffnet sie im Editor und versteht ihren Inhalt nicht. Einzelne Werte gehören in die Einstellungen, Festgelegtes in die festen Zeilen. '
+            + 'Mit * im letzten Teil zeigt das Panel alle Dateien, die dazu passen. Die Datei muss hier nicht existieren: Fehlt sie auf einem Server, steht sie dort als „noch nicht vorhanden".' }) %>
+        </p>
+        <% if (konfigListe.length) { %>
+          <div class="table-responsive mb-3">
+            <table class="table table-vcenter table-sm">
+              <thead><tr><th>Datei</th><th>Gruppe</th><th>Name</th><th class="w-1"></th></tr></thead>
+              <tbody>
+                <% konfigListe.forEach(function (d) { %>
+                  <tr>
+                    <td class="font-monospace small"><%= d.path %></td>
+                    <td><%= KD.gruppen[d.group] || d.group %></td>
+                    <td><%= (d.name && (d.name.de || d.name.en)) || '—' %></td>
+                    <td class="text-nowrap">
+                      <button class="btn btn-sm btn-outline-secondary" type="button" data-konfigdatei-bearbeiten="<%= JSON.stringify(d) %>" <%= beschaeftigt ? 'disabled' : '' %>>Bearbeiten</button>
+                      <button class="btn btn-sm btn-outline-danger" type="button" data-konfigdatei-entfernen="<%= d.path %>" <%= beschaeftigt ? 'disabled' : '' %>>Entfernen</button>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+
+        <details id="konfigdateiDetails" <%= konfigListe.length ? '' : 'open' %>>
+          <summary class="mb-2"><span id="konfigdateiUeberschrift">Neue Datei</span></summary>
+          <form id="formKonfigdatei" class="row g-2" autocomplete="off">
+            <input type="hidden" name="alt" value="">
+            <div class="col-md-8">
+              <label class="form-label" for="kdPfad">Pfad (ab der Wurzel des Volumes)</label>
+              <input class="form-control font-monospace" id="kdPfad" name="path" maxlength="<%= KD.max.pfad %>" placeholder="game/etmain/mapvotecycle.cfg" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="kdGruppe">Gruppe</label>
+              <select class="form-select" id="kdGruppe" name="group">
+                <% Object.keys(KD.gruppen).forEach(function (g) { %><option value="<%= g %>"><%= KD.gruppen[g] %></option><% }) %>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="kdNameDe">Name (deutsch)</label>
+              <input class="form-control" id="kdNameDe" name="name_de" maxlength="<%= KD.max.name %>" placeholder="leer = Dateiname">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="kdNameEn">Name (englisch)</label>
+              <input class="form-control" id="kdNameEn" name="name_en" maxlength="<%= KD.max.name %>">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="kdTextDe">Beschreibung (deutsch)</label>
+              <input class="form-control" id="kdTextDe" name="beschreibung_de" maxlength="<%= KD.max.beschreibung %>">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="kdTextEn">Beschreibung (englisch)</label>
+              <input class="form-control" id="kdTextEn" name="beschreibung_en" maxlength="<%= KD.max.beschreibung %>">
+            </div>
+            <div class="col-12 d-flex gap-2">
+              <button class="btn btn-primary" type="submit" <%= beschaeftigt ? 'disabled' : '' %>><i class="fa-solid fa-floppy-disk me-1"></i>Datei speichern</button>
+              <button class="btn btn-outline-secondary" type="button" id="knopfKonfigdateiNeu">Leeren</button>
+            </div>
+          </form>
+        </details>
+      </div>
+    </div>
+  </div>
+
   <!-- ── Mods (`content`, Stufe 1, 2026-10-09) ──────────────────────────── -->
   <%
     // Der flache Teil von `content`. Lader und Varianten (Stufe 2) reisen mit
@@ -4024,6 +4102,57 @@
         k.disabled = true;
         try {
           await schicke(hier + '/festzeilen/entfernen', z);
+          window.location.reload();
+        } catch (fehler) {
+          k.disabled = false;
+          melde('error', fehler.message);
+        }
+      });
+    });
+  }
+
+  // ── Konfigurationsdateien (`files.config_files`, Baustelle 215) ────────
+  var formKd = document.getElementById('formKonfigdatei');
+  if (formKd) {
+    function konfigdateiLeeren() {
+      formKd.reset();
+      formKd.alt.value = '';
+      document.getElementById('konfigdateiUeberschrift').textContent = 'Neue Datei';
+    }
+    document.getElementById('knopfKonfigdateiNeu').addEventListener('click', konfigdateiLeeren);
+    document.querySelectorAll('[data-konfigdatei-bearbeiten]').forEach(function (k) {
+      k.addEventListener('click', function () {
+        var d = JSON.parse(k.dataset.konfigdateiBearbeiten);
+        konfigdateiLeeren();
+        formKd.alt.value = d.path;
+        formKd.path.value = d.path;
+        formKd.group.value = d.group;
+        formKd.name_de.value = (d.name && d.name.de) || '';
+        formKd.name_en.value = (d.name && d.name.en) || '';
+        formKd.beschreibung_de.value = (d.description && d.description.de) || '';
+        formKd.beschreibung_en.value = (d.description && d.description.en) || '';
+        document.getElementById('konfigdateiUeberschrift').textContent = '„' + d.path + '" bearbeiten';
+        document.getElementById('konfigdateiDetails').open = true;
+        formKd.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    });
+    formKd.addEventListener('submit', async function (ev) {
+      ev.preventDefault();
+      var knopf = formKd.querySelector('button[type=submit]');
+      knopf.disabled = true;
+      try {
+        await schicke(hier + '/konfigdateien', Object.fromEntries(new FormData(formKd)));
+        window.location.reload();
+      } catch (fehler) {
+        knopf.disabled = false;
+        melde('error', fehler.message);
+      }
+    });
+    document.querySelectorAll('[data-konfigdatei-entfernen]').forEach(function (k) {
+      k.addEventListener('click', async function () {
+        k.disabled = true;
+        try {
+          await schicke(hier + '/konfigdateien/entfernen', { path: k.dataset.konfigdateiEntfernen });
           window.location.reload();
         } catch (fehler) {
           k.disabled = false;

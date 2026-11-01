@@ -287,6 +287,7 @@
   <% const bereiche = [
        [null,           'Server'],
        ['dateien',      'Dateien'],
+       ...(locals.hatKonfigdateien ? [['konfiguration', 'Konfiguration']] : []),
        ['sicherungen',  'Sicherungen'],
        ['inhalte',      'Mods'],
        ['konsole',      'Konsole'],
@@ -347,6 +348,8 @@
       <div class="fb-koerper">
         <% if (bereich === 'dateien') { %>
           <%- include('partials/server-detail-files', { server, guildId, userPermissions }) %>
+        <% } else if (bereich === 'konfiguration') { %>
+          <%- include('partials/server-detail-konfiguration', { server, guildId, userPermissions }) %>
         <% } else if (bereich === 'sicherungen') { %>
           <%- include('partials/server-detail-backups', { server, guildId, userPermissions }) %>
         <% } else if (bereich === 'inhalte') { %>

@@ -1498,6 +1498,42 @@
           },
           "description": "Dateien, die SPIELER per HTTP abrufen duerfen — Muster relativ zu game/, etwa `etmain/*.pk3`. Der Daemon liefert sie ohne Anmeldung aus (Weg /dl/<server>/…), fuer den schnellen Kartendownload der Quake- und der Source-Familie (`sv_wwwBaseURL`, `sv_downloadurl`). Die Adresse erfaehrt das Spiel als Umgebungsvariable: `{{env:FB_DOWNLOAD_URL}}`, etwa in einer festen Zeile unter `config`.\n\nDer Stern steht fuer ein Stueck Name und ueberschreitet keinen Ordner. Ein Muster MUSS eine Endung nennen; Konfiguration, Geheimnisse, Datenbanken und Programme (cfg, ini, json, db, so …) sind gesperrt — neben den Karten liegt die Konfiguration des Servers mit seinen Kennwoertern. Die vollstaendige Regel steht in packages/fbpkg/lib/oeffentlich.js und, fuer das Ausliefern, im Daemon (pkgspec.PruefeOeffentlich)."
         },
+        "config_files": {
+          "type": "array",
+          "maxItems": 40,
+          "description": "Dateien, die das Panel dem Betreiber im Bereich „Konfiguration“ zum Bearbeiten nennt: Mapcycles, Voting-Cfgs, Admin-Listen. Pfad ab der Wurzel des Volumes, ein * nur im letzten Teil (Baustelle 215, 2026-11-01).",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "group"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "maxLength": 200,
+                "pattern": "^(?!.*\\.\\.)(game|data)(/[^/*\\\\]+)*/[^/\\\\]+$"
+              },
+              "group": {
+                "enum": [
+                  "server",
+                  "votes",
+                  "maps",
+                  "players",
+                  "mods",
+                  "other"
+                ]
+              },
+              "name": {
+                "$ref": "#/definitions/text"
+              },
+              "description": {
+                "$ref": "#/definitions/text"
+              }
+            }
+          }
+        },
         "patch": {
           "description": "Dateien, die vor dem Start gesetzt werden — bewährte Parser-Syntax, unverändert übernommen.",
           "type": "object",

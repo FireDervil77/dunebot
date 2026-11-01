@@ -49,8 +49,8 @@ class FileManager {
         // Keyboard Shortcuts
         this.setupKeyboardShortcuts();
         
-        // Initial Load
-        await this.navigateTo('/');
+        // Initial Load. Der Bereich „Konfiguration" braucht nur das Editor-Fenster.
+        if (!this.config.nurEditor) await this.navigateTo('/');
         
         console.log('[FileManager] Initialized successfully');
     }
@@ -183,7 +183,7 @@ class FileManager {
     setupKeyboardShortcuts() {
         document.addEventListener('keydown', (e) => {
             // Ctrl+R: Reload
-            if (e.ctrlKey && e.key === 'r') {
+            if (e.ctrlKey && e.key === 'r' && !this.config.nurEditor) {
                 e.preventDefault();
                 this.reload();
             }
@@ -487,7 +487,8 @@ class FileManager {
             }
             
             this.showToast('success', 'Datei gespeichert');
-            await this.reload();
+            if (this.config.nurEditor) document.dispatchEvent(new CustomEvent('fb:datei-gespeichert'));
+            else await this.reload();
             
         } catch (error) {
             console.error('[FileManager] Save error:', error);

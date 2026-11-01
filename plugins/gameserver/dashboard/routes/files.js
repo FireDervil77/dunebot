@@ -14,6 +14,8 @@ router.param('serverId', require('../helpers/Loeschung').sperre);
 const { ServiceManager } = require('dunebot-core');
 const path = require('path');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
+const Paketfassung = require('../helpers/Paketfassung');
+const Konfigdateien = require('../helpers/Konfigdateien');
 // Grenze und Annahme liegen im Helfer — die Inhalte-Seite benutzt dieselben.
 const { nimmDatei, MAX_UPLOAD_BYTES } = require('../helpers/DateiAnnahme');
 const { gesperrt, ladeSperrliste } = require('../helpers/Sperrliste');
@@ -76,6 +78,24 @@ async function sperrt(res, server, pfade) {
 }
 
 // ROUTES
+
+// Die Dateien, die das Paket dem Betreiber nennt (Baustelle 215).
+router.get('/servers/:serverId/konfiguration', requirePermission('GAMESERVER.FILES.VIEW'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    try {
+        const { serverId } = req.params;
+        const server = await validateServerAccess(serverId, res.locals.guildId);
+        const zeile = await Paketfassung.ladePaketFuerServer(dbService, server.id);
+        const paket = zeile ? (typeof zeile.paket_json === 'string' ? JSON.parse(zeile.paket_json) : zeile.paket_json) : null;
+        const sperrliste = await ladeSperrliste(dbService, server);
+        const gruppen = await Konfigdateien.stand({ server, paket, ipmServer: ServiceManager.get('ipmServer'), sperrliste });
+        res.json({ success: true, gruppen });
+    } catch (error) {
+        Logger.error('[Files] Konfiguration:', error);
+        res.status(error.statusCode || 500).json({ success: false, error: error.message });
+    }
+});
 router.get('/servers/:serverId/files', requirePermission('GAMESERVER.FILES.VIEW'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const ipmServer = ServiceManager.get('ipmServer');

@@ -27,6 +27,8 @@ const Abruf = require('../../../gameserver/dashboard/helpers/Abruf');
 const Bitmaske = require('../../../gameserver/dashboard/helpers/Bitmaske');
 const { DB_SCHLUESSEL } = require('../../../gameserver/dashboard/helpers/Datenbanken');
 const Liste = require('../../../gameserver/dashboard/helpers/Liste');
+const Konfigdateien = require('../../../gameserver/dashboard/helpers/Konfigdateien');
+const { gesperrt } = require('../../../gameserver/dashboard/helpers/Sperrliste');
 const Textregel = require('../../../gameserver/dashboard/helpers/Textregel');
 const { gehoertDemServer } = require('../../../gameserver/dashboard/helpers/StartPayload');
 const Oeffentlich = require('../../../../packages/fbpkg/lib/oeffentlich');
@@ -3402,6 +3404,70 @@ async function festzeileEntfernen(sitzung, b) {
     });
 }
 
+// ── Konfigurationsdateien (`files.config_files`, Baustelle 215, 2026-11-01) ──
+//
+// Ganze Dateien, die der Betreiber im Bereich „Konfiguration" bearbeitet. Das
+// Panel versteht ihren Inhalt nicht; das Paket nennt nur, welche es gibt und
+// wozu. Anders als eine feste Zeile schreibt das Paket hier nichts.
+const KONFIGDATEI = { gruppen: Konfigdateien.GRUPPEN, max: { eintraege: 40, pfad: 200, name: 80, beschreibung: 300 } };
+const KONFIGDATEI_FELDER = ['path', 'group', 'name', 'description'];
+
+function konfigdateienStand(sitzung) {
+    const liste = sitzung.entwurf?.files?.config_files;
+    return Array.isArray(liste) ? liste : [];
+}
+
+function konfigdateiAusFormular(b, e) {
+    const text = (k) => (typeof b?.[k] === 'string' ? b[k].trim() : '');
+    const path = text('path').replace(/^\/+/, '');
+    if (path.length > KONFIGDATEI.max.pfad || !Konfigdateien.RE_PFAD.test(path)) {
+        throw new Error('Pfad: ab der Wurzel des Volumes, also game/… oder data/…, ohne „..", ein * nur im letzten Teil. Etwa game/etmain/mapvotecycle.cfg.');
+    }
+    if (!Object.keys(KONFIGDATEI.gruppen).includes(text('group'))) {
+        throw new Error(`Gruppe: ${Object.keys(KONFIGDATEI.gruppen).join(', ')}.`);
+    }
+    // Der Dateimanager gäbe sie nicht heraus — der Bereich zeigte nur „gesperrt".
+    const sperrliste = Array.isArray(e.files?.denylist) ? e.files.denylist : [];
+    if (gesperrt(path, sperrliste)) throw new Error(`„${path}" steht in der Sperrliste — sie ließe sich nicht öffnen.`);
+
+    const neu = { path, group: text('group') };
+    const nameDe = text('name_de'), nameEn = text('name_en'), textDe = text('beschreibung_de'), textEn = text('beschreibung_en');
+    for (const t of [nameDe, nameEn]) if (t.length > KONFIGDATEI.max.name) throw new Error(`Name: höchstens ${KONFIGDATEI.max.name} Zeichen.`);
+    for (const t of [textDe, textEn]) if (t.length > KONFIGDATEI.max.beschreibung) throw new Error(`Beschreibung: höchstens ${KONFIGDATEI.max.beschreibung} Zeichen.`);
+    if (nameDe || nameEn) neu.name = { ...(nameDe ? { de: nameDe } : {}), ...(nameEn ? { en: nameEn } : {}) };
+    if (textDe || textEn) neu.description = { ...(textDe ? { de: textDe } : {}), ...(textEn ? { en: textEn } : {}) };
+    return neu;
+}
+
+async function konfigdateiSpeichern(sitzung, b) {
+    await pruefeFrei(sitzung);
+    const alt = typeof b?.alt === 'string' ? b.alt.trim() : '';
+    return entwurfSchreiben(sitzung, (e) => {
+        const neu = konfigdateiAusFormular(b, e);
+        const liste = Array.isArray(e.files?.config_files) ? [...e.files.config_files] : [];
+        const platz = alt ? liste.findIndex(d => d.path === alt) : -1;
+        if (alt && platz < 0) throw new Error(`Die Datei „${alt}" gibt es im Entwurf nicht.`);
+        if (liste.some((d, i) => d.path === neu.path && i !== platz)) throw new Error(`„${neu.path}" steht schon in der Liste.`);
+        if (platz < 0 && liste.length >= KONFIGDATEI.max.eintraege) throw new Error(`Höchstens ${KONFIGDATEI.max.eintraege} Dateien.`);
+        const fertig = behalteUnbekanntes(platz >= 0 ? liste[platz] : null, neu, KONFIGDATEI_FELDER);
+        if (platz >= 0) liste[platz] = fertig; else liste.push(fertig);
+        e.files = { ...(e.files || {}), config_files: liste };
+    });
+}
+
+async function konfigdateiEntfernen(sitzung, b) {
+    await pruefeFrei(sitzung);
+    const path = typeof b?.path === 'string' ? b.path.trim() : '';
+    return entwurfSchreiben(sitzung, (e) => {
+        const liste = Array.isArray(e.files?.config_files) ? e.files.config_files : [];
+        if (!liste.some(d => d.path === path)) throw new Error(`Die Datei „${path}" gibt es im Entwurf nicht.`);
+        const rest = liste.filter(d => d.path !== path);
+        const files = { ...e.files };
+        if (rest.length) files.config_files = rest; else delete files.config_files;
+        if (Object.keys(files).length) e.files = files; else delete e.files;
+    });
+}
+
 // ── Voraussetzungen (`requirements`, 2026-10-09) ─────────────────────────────
 //
 // Was das SPIEL vom Image verlangt. Anlass war Core Keeper: Der Server stürzte
@@ -4770,6 +4836,7 @@ module.exports = {
     uebernommeneAusfuehren, ketteFortsetzen, offeneUebernommene,
     angabenTags, tagsUebergeben, portBild, konsolenZeileZu, laufPortsMerken,
     FESTZEILE, festzeilenStand, festzeileSpeichern, festzeileEntfernen,
+    KONFIGDATEI, konfigdateienStand, konfigdateiSpeichern, konfigdateiEntfernen,
     VORAUSSETZUNG, voraussetzungenStand, voraussetzungenSpeichern, voraussetzungenPruefen,
     DATEITEIL, dateiteilStand, dateiteilSpeichern, dateiteilAusFormular, umleitungsVorschlaege,
     downloadVerweise, downloadBasis, downloadNutzlast, downloadAdresse,

@@ -30,6 +30,8 @@
  * Karte „Feste Zeilen in Dateien" (2026-10-08) — der Abschnitt `config`:
  *   POST /:kennung/festzeilen              eine Zeile speichern (Datei, Format, Schlüssel, Wert)
  *   POST /:kennung/festzeilen/entfernen
+ *   POST /:kennung/konfigdateien           eine Datei für den Bereich „Konfiguration" speichern
+ *   POST /:kennung/konfigdateien/entfernen
  *
  * Karte „Voraussetzungen" (2026-10-09) — der Abschnitt `requirements`:
  *   POST /:kennung/voraussetzungen         Systempakete und Bildschirm speichern, am Image nachzählen
@@ -393,6 +395,8 @@ router.get('/:kennung', requirePermission('WERKBANK.VIEW'), async (req, res) => 
             VERBINDUNG: Sitzungen.VERBINDUNG,
             festzeilen: Sitzungen.festzeilenStand(sitzung),
             FESTZEILE: Sitzungen.FESTZEILE,
+            konfigdateien: Sitzungen.konfigdateienStand(sitzung),
+            KONFIGDATEI: Sitzungen.KONFIGDATEI,
             voraussetzungen: Sitzungen.voraussetzungenStand(sitzung),
             imageName: Sitzungen.imageName,
             VORAUSSETZUNG: Sitzungen.VORAUSSETZUNG,
@@ -808,6 +812,25 @@ router.post('/:kennung/festzeilen/entfernen', requirePermission('WERKBANK.BAUEN'
         return res.json({ success: true });
     } catch (error) {
         return fehler(res, error, 'Feste Zeile nicht entfernt', 400);
+    }
+});
+
+// ── Konfigurationsdateien (`files.config_files`, Baustelle 215) ───────────────
+router.post('/:kennung/konfigdateien', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.konfigdateiSpeichern(await offeneSitzung(req, res), req.body || {});
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Datei nicht gespeichert', 400);
+    }
+});
+
+router.post('/:kennung/konfigdateien/entfernen', requirePermission('WERKBANK.BAUEN'), async (req, res) => {
+    try {
+        await Sitzungen.konfigdateiEntfernen(await offeneSitzung(req, res), req.body || {});
+        return res.json({ success: true });
+    } catch (error) {
+        return fehler(res, error, 'Datei nicht entfernt', 400);
     }
 });
 

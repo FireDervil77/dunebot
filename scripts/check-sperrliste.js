@@ -174,6 +174,8 @@ ServiceManager.register('Logger', { debug: still, info: still, warn: still, erro
                 });
                 continue;
             }
+            // Nimmt keinen Pfad an. Die Liste sagt nur „gesperrt", geprüft in check-konfigdateien.js.
+            if (name === 'get /servers/:serverId/konfiguration') continue;
             const fall = ROUTEN[name];
             await check(`${name}: im Wächter beschrieben`, () => assert.ok(fall, 'neue Route — Fall in ROUTEN ergänzen'));
             if (!fall) continue;

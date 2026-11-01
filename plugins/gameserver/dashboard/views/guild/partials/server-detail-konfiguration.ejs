@@ -1,0 +1,108 @@
+<%#
+  * Bereich „Konfiguration": die Dateien, die das Paket dem Betreiber nennt
+  * (`files.config_files`, Baustelle 215). Geöffnet wird im Editor des
+  * Dateimanagers; das Paket entscheidet, was hier steht.
+  %>
+<% const canView = userPermissions.permissions['GAMESERVER.FILES.VIEW']; %>
+<% const canManage = userPermissions.permissions['GAMESERVER.FILES.MANAGE']; %>
+
+<% if (!canView) { %>
+  <div class="alert alert-danger">
+    <i class="fas fa-lock me-2"></i>
+    <strong>Keine Berechtigung:</strong> Du benötigst <code>GAMESERVER.FILES.VIEW</code> um Dateien anzusehen.
+  </div>
+<% } else { %>
+  <div id="konfiguration-wurzel"><div class="fb-muted" style="font-size:13px">Lädt …</div></div>
+
+  <%- include('server-detail-editor', { canManage }) %>
+
+  <% if (locals.assetManager) { %>
+    <% assetManager.enqueueScript('monaco-loader'); %>
+    <% assetManager.enqueueScript('gameserver-file-manager'); %>
+  <% } %>
+
+  <script>
+  window.FILE_MANAGER_CONFIG = {
+      serverId: '<%= server.id %>',
+      guildId: '<%= guildId %>',
+      serverName: <%- JSON.stringify(server.name).replace(/</g, '\\u003c') %>,
+      baseUrl: '/guild/<%= guildId %>/plugins/gameserver',
+      // Nur das Fenster: Eine Dateiliste gibt es auf dieser Seite nicht.
+      nurEditor: true,
+      permissions: { canView: true, canManage: <%= canManage ? 'true' : 'false' %> },
+  };
+
+  (function () {
+      const wurzel = document.getElementById('konfiguration-wurzel');
+      const adresse = window.FILE_MANAGER_CONFIG.baseUrl + '/servers/' + window.FILE_MANAGER_CONFIG.serverId + '/konfiguration';
+      const el = (tag, klasse, inhalt) => {
+          const e = document.createElement(tag);
+          if (klasse) e.className = klasse;
+          if (inhalt !== undefined) e.textContent = inhalt;
+          return e;
+      };
+      const hinweisZu = (schluessel) => (schluessel.length
+          ? 'Das Panel setzt beim Start: ' + schluessel.join(', ') + '. Änderungen an diesen Werten gehen dabei verloren, sie gehören in die Einstellungen.'
+          : '');
+
+      function oeffne(zeile) {
+          const feld = document.getElementById('editor-hinweis');
+          feld.textContent = hinweisZu(zeile.panelSchluessel);
+          feld.hidden = !feld.textContent;
+          fileManager.editFile(zeile.pfad);
+      }
+
+      function zeile(z) {
+          const reihe = el('div');
+          reihe.style.cssText = 'display:flex;gap:12px;padding:10px 0;align-items:center;border-top:1px solid var(--tblr-border-color)';
+          const links = el('div');
+          links.style.flex = '1 1 auto';
+          links.style.minWidth = '0';
+          links.appendChild(el('div', '', z.name));
+          links.appendChild(el('div', 'fb-muted fb-mono', z.pfad)).style.fontSize = '12px';
+          if (z.beschreibung) links.appendChild(el('div', 'fb-muted', z.beschreibung)).style.fontSize = '12px';
+          if (z.panelSchluessel.length) links.appendChild(el('div', 'text-warning', hinweisZu(z.panelSchluessel))).style.fontSize = '12px';
+          reihe.appendChild(links);
+
+          if (z.fehler) {
+              reihe.appendChild(el('span', 'text-danger small', 'Nicht lesbar: ' + z.fehler));
+          } else if (z.gesperrt) {
+              reihe.appendChild(el('span', 'fb-muted small', 'Vom Paket gesperrt'));
+          } else if (!z.vorhanden) {
+              reihe.appendChild(el('span', 'fb-muted small', 'Noch nicht vorhanden'));
+          } else {
+              const knopf = el('button', 'btn btn-white btn-sm', '<%= canManage ? 'Bearbeiten' : 'Ansehen' %>');
+              knopf.type = 'button';
+              knopf.addEventListener('click', () => oeffne(z));
+              reihe.appendChild(knopf);
+          }
+          return reihe;
+      }
+
+      async function lade() {
+          try {
+              const antwort = await fetch(adresse, { headers: { Accept: 'application/json' } });
+              const daten = await antwort.json();
+              if (!antwort.ok || !daten.success) throw new Error(daten.error || ('HTTP ' + antwort.status));
+              wurzel.textContent = '';
+              if (!daten.gruppen.length) {
+                  wurzel.appendChild(el('div', 'fb-muted', 'Das Paket nennt keine Dateien.')).style.fontSize = '13px';
+                  return;
+              }
+              daten.gruppen.forEach((g, i) => {
+                  const kopf = el('div', '', g.name);
+                  kopf.style.cssText = 'font-weight:600;padding:' + (i ? '16px' : '0') + ' 0 6px';
+                  wurzel.appendChild(kopf);
+                  g.dateien.forEach(z => wurzel.appendChild(zeile(z)));
+              });
+          } catch (fehler) {
+              wurzel.textContent = '';
+              wurzel.appendChild(el('div', 'alert alert-danger', 'Die Dateien ließen sich nicht laden: ' + fehler.message));
+          }
+      }
+
+      document.addEventListener('fb:datei-gespeichert', lade);
+      lade();
+  })();
+  </script>
+<% } %>

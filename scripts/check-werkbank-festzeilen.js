@@ -317,9 +317,9 @@ const PORT_ZEILE = { file: 'ServerSetting.ini', parser: 'ini', key: 'Host.port',
         assert.match(router, /router\.post\('\/:kennung\/festzeilen', requirePermission\('WERKBANK\.BAUEN'\)/);
         assert.match(router, /router\.post\('\/:kennung\/festzeilen\/entfernen', requirePermission\('WERKBANK\.BAUEN'\)/);
         const ansicht = ohneKommentareEjs(fs.readFileSync(path.join(WURZEL, 'plugins/werkbank/dashboard/views/guild/werkbank-sitzung.ejs'), 'utf8'));
-        // Die nächste Karte im Reiter ist seit dem 2026-10-09 „Mods" — bis dorthin reicht diese.
-        const von = ansicht.indexOf('id="karteFestzeilen"'), bis = ansicht.indexOf('id="karteMods"');
-        assert.ok(von > 0 && bis > von, 'die Karte steht nicht vor der Karte „Mods"');
+        // Die nächste Karte im Reiter ist seit dem 2026-11-01 „Konfigurationsdateien" — bis dorthin reicht diese.
+        const von = ansicht.indexOf('id="karteFestzeilen"'), bis = ansicht.indexOf('id="karteKonfigdateien"');
+        assert.ok(von > 0 && bis > von, 'die Karte steht nicht vor der Karte „Konfigurationsdateien"');
         assert.ok(ansicht.indexOf('id="karteHinweise"') > bis, 'die Hinweise stehen nicht mehr hinter den Karten des Reiters');
         const karte = ansicht.slice(von, bis);
         assert.ok(karte.includes('id="formFestzeile"'));

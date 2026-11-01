@@ -20,6 +20,7 @@ const { FASSUNG_FUER_SERVER, ladePaketFuerServer, ladePaketFuerAnlegen, ladePake
         ladePaketeFuerAnlegen, kanalSetzen, istKontrollGuild } = require('../helpers/Paketfassung');
 const { vergibPortsAusPaket } = require('../helpers/Portvergabe');
 const Inhalte = require('../helpers/Inhalte');
+const Konfigdateien = require('../helpers/Konfigdateien');
 const Bitmaske = require('../helpers/Bitmaske');
 const Liste = require('../helpers/Liste');
 const { SERVER_LISTE_SQL } = require('../helpers/Serverliste');
@@ -2260,6 +2261,9 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
             oeffentlich: 'Öffentliche Seite',
             datenbanken: 'Datenbanken',
         };
+        // Nur, wenn das Paket Dateien nennt: Ein leerer Bereich sagte nichts.
+        const hatKonfigdateien = Konfigdateien.eintraege(paketFuerKonsole).length > 0;
+        if (hatKonfigdateien) BEREICHE.konfiguration = 'Konfiguration';
         const bereich = BEREICHE[req.query.bereich] ? req.query.bereich : null;
 
         // Datenbanken (Stufe 11 S3): Liste und Stand gleich mitgeben — die
@@ -2309,6 +2313,7 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
             loeschFehler: Loeschung.stand(server).fehler,
             bereich,
             bereichName: bereich ? BEREICHE[bereich] : null,
+            hatKonfigdateien,
             datenbanken,
             activeMenu: `/guild/${guildId}/plugins/gameserver/servers`,
             server,
