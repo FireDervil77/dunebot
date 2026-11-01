@@ -48,11 +48,16 @@ const lies = (...t) => fs.readFileSync(path.join(WURZEL, ...t), 'utf8');
 const frisch = (files) => ({ id: 1, kennung: 'wbtest', status: 'offen', entwurf: { files, werkbank: {} } });
 
 /** Ein Daemon als Attrappe: je Ordner eine Antwort. */
-function daemon(ordner) {
+function daemon(ordner, dateien = {}) {
     const fragen = [];
     return {
         fragen,
         sendCommand: async (id, befehl, nutzlast) => {
+            if (befehl === 'gameserver.files.read') {
+                const inhalt = dateien[nutzlast.path];
+                if (inhalt === undefined) throw new Error('nicht lesbar');
+                return { success: true, data: { content: Buffer.from(inhalt).toString('base64') } };
+            }
             assert.strictEqual(befehl, 'gameserver.files.list');
             fragen.push(nutzlast.path);
             const a = ordner[nutzlast.path];
@@ -145,6 +150,42 @@ const SERVER = { id: 7, rootserver_id: 55, daemon_id: 'd', install_path: '/x' };
             ipmServer: daemon({ '/game': [{ name: 'a.cfg' }] }), sperrliste: ['game/a.cfg'] });
         assert.strictEqual(g[0].dateien[0].gesperrt, true);
         assert.deepStrictEqual(await K.stand({ server: SERVER, paket: null, ipmServer: daemon({}) }), []);
+    });
+
+    console.log('\nexec');
+    await pruefe('Verweise: Kommentare zählen nicht, ohne Endung ist .cfg gemeint', async () => {
+        assert.deepStrictEqual(K.execVerweise('exec a.cfg\n  exec "b.cfg" // x\n//exec c.cfg\nexec d\nexec a.cfg\nvstr exec'), ['a.cfg', 'b.cfg', 'd.cfg']);
+        const s = K.cfgSchluessel('set G_a "1"\nhostname "x"\n// sv_x 1\nseta b 2');
+        assert.ok(s.has('g_a') && s.has('hostname') && s.has('b') && !s.has('sv_x'));
+    });
+    await pruefe('die geladene Datei steht unter der ladenden, mit Warnung — fehlende bleiben sichtbar, Kreise enden', async () => {
+        const paket = {
+            settings: [{ key: 'name', apply: [{ target: 'file', file: 'etmain/etl_server.cfg', path: 'sv_hostname' }] }],
+            files: { config_files: [{ path: 'game/etmain/etl_server.cfg', group: 'server' }] },
+        };
+        const d = daemon({ '/game/etmain': [{ name: 'etl_server.cfg' }, { name: 'extra.cfg' }, { name: 'tief.cfg' }] }, {
+            '/game/etmain/etl_server.cfg': 'set sv_hostname "a"\nexec extra.cfg\nexec fehlt.cfg',
+            '/game/etmain/extra.cfg': 'set SV_HOSTNAME "b"\nexec tief.cfg\nexec etl_server.cfg',
+            '/game/etmain/tief.cfg': 'set g_x 1\nexec extra.cfg',
+        });
+        const [g] = await K.stand({ server: SERVER, paket, ipmServer: d });
+        assert.deepStrictEqual(g.dateien.map(z => z.datei).sort(), ['etl_server.cfg', 'extra.cfg', 'fehlt.cfg', 'tief.cfg']);
+        const nach = Object.fromEntries(g.dateien.map(z => [z.datei, z]));
+        assert.deepStrictEqual(nach['extra.cfg'].ueberschreibt, ['sv_hostname'], 'die Überschreibung bleibt ungesagt');
+        assert.strictEqual(nach['extra.cfg'].geladenVon, 'etl_server.cfg');
+        assert.strictEqual(nach['tief.cfg'].geladenVon, 'extra.cfg');
+        assert.strictEqual(nach['fehlt.cfg'].vorhanden, false);
+        assert.strictEqual(g.dateien[0].datei, 'etl_server.cfg');
+    });
+    await pruefe('nur .cfg wird gelesen; eine nicht lesbare Datei wird gesagt, kein Weg führt aus dem Spiel', async () => {
+        const nurTxt = { files: { config_files: [{ path: 'game/a.txt', group: 'server' }] } };
+        const lesen = daemon({ '/game': [{ name: 'a.txt' }] });
+        await K.stand({ server: SERVER, paket: nurTxt, ipmServer: lesen });
+        const cfg = { files: { config_files: [{ path: 'game/a.cfg', group: 'server' }] } };
+        const [g] = await K.stand({ server: SERVER, paket: cfg, ipmServer: daemon({ '/game': [{ name: 'a.cfg' }] }) });
+        assert.strictEqual(g.dateien[0].execOffen, true);
+        const [h] = await K.stand({ server: SERVER, paket: cfg, ipmServer: daemon({ '/game': [{ name: 'a.cfg' }] }, { '/game/a.cfg': 'exec ../../etc/passwd' }) });
+        assert.strictEqual(h.dateien.length, 1, 'exec führte aus dem Volume heraus');
     });
 
     console.log('\nVerdrahtung');

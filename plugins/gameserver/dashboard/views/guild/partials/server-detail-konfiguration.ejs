@@ -45,9 +45,12 @@
           ? 'Das Panel setzt beim Start: ' + schluessel.join(', ') + '. Änderungen an diesen Werten gehen dabei verloren, sie gehören in die Einstellungen.'
           : '');
 
+      const ueberschreibtZu = (schluessel) => 'Diese Datei setzt auch: ' + schluessel.join(', ')
+          + '. Das Spiel nimmt den zuletzt geladenen Wert, die Einstellung im Panel kann dadurch wirkungslos sein.';
+
       function oeffne(zeile) {
           const feld = document.getElementById('editor-hinweis');
-          feld.textContent = hinweisZu(zeile.panelSchluessel);
+          feld.textContent = [hinweisZu(zeile.panelSchluessel), (zeile.ueberschreibt || []).length ? ueberschreibtZu(zeile.ueberschreibt) : ''].filter(Boolean).join(' ');
           feld.hidden = !feld.textContent;
           fileManager.editFile(zeile.pfad);
       }
@@ -61,7 +64,10 @@
           links.appendChild(el('div', '', z.name));
           links.appendChild(el('div', 'fb-muted fb-mono', z.pfad)).style.fontSize = '12px';
           if (z.beschreibung) links.appendChild(el('div', 'fb-muted', z.beschreibung)).style.fontSize = '12px';
+          if (z.geladenVon) links.appendChild(el('div', 'fb-muted', 'Geladen von ' + z.geladenVon)).style.fontSize = '12px';
           if (z.panelSchluessel.length) links.appendChild(el('div', 'text-warning', hinweisZu(z.panelSchluessel))).style.fontSize = '12px';
+          if ((z.ueberschreibt || []).length) links.appendChild(el('div', 'text-warning', ueberschreibtZu(z.ueberschreibt))).style.fontSize = '12px';
+          if (z.execOffen) links.appendChild(el('div', 'fb-muted', 'Welche Dateien sie mit exec lädt, ließ sich nicht prüfen.')).style.fontSize = '12px';
           reihe.appendChild(links);
 
           if (z.fehler) {
