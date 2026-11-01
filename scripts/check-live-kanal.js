@@ -93,7 +93,7 @@ pruefe(senderBlock && !/bufferEvent/.test(senderBlock),
 pruefe(senderBlock && !/log\.Printf/.test(senderBlock),
     'und schreibt keine Zeile je Nachricht',
     'Bei zwei Servern im 3-Sekunden-Takt sind das 2400 Zeilen die Stunde, die nichts aussagen.');
-pruefe(senderBlock && /!c\.connected \|\| c\.conn == nil/.test(senderBlock),
+pruefe(senderBlock && /!c\.verbunden\(\)/.test(senderBlock),
     'ohne Leitung fällt die Messung weg (statt sich zu stauen)');
 
 const manager = ohneKommentare(roh(path.join(DAEMON, 'internal/gameserver/manager.go')) || '');

@@ -98,11 +98,16 @@ class FireBusZaehler {
         this._zeile(daemonId, name, 'aus').fristen++;
     }
 
-    /** Was der Herzschlag über die Belegung des Lesefadens mitbringt. */
-    lesefaden(daemonId, stand) {
+    /**
+     * Was der Herzschlag an Dauern je Befehl mitbringt.
+     * @param {string} daemonId
+     * @param {'lesefaden'|'warten'|'arbeit'} art
+     * @param {Object} [stand]
+     */
+    belegung(daemonId, art, stand) {
         if (!stand || typeof stand !== 'object') return;
         for (const [name, w] of Object.entries(stand)) {
-            const zeile = this._zeile(daemonId, name, 'lesefaden');
+            const zeile = this._zeile(daemonId, name, art);
             zeile.anzahl += Number(w?.anzahl) || 0;
             zeile.dauerSumme += Number(w?.summe_ms) || 0;
             zeile.dauerMax = Math.max(zeile.dauerMax, Number(w?.max_ms) || 0);

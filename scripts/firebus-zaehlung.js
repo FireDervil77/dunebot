@@ -37,7 +37,7 @@ const wert = (x) => (x === null || x === undefined ? 'nicht gemessen' : `${Numbe
     if (!zeilen.length) console.log('Keine Zeilen. Läuft das Dashboard schon mit der Zählung?\n');
 
     const verkehr = new Map();
-    for (const z of zeilen.filter(x => x.art !== 'lesefaden')) {
+    for (const z of zeilen.filter(x => x.art === 'ein' || x.art === 'aus')) {
         const v = verkehr.get(z.name) || { anzahl: 0, bytes: 0, groesste: 0, fristen: 0, summe: 0, maxi: 0, antworten: 0 };
         v.anzahl += zahl(z.anzahl); v.bytes += zahl(z.bytes); v.groesste = Math.max(v.groesste, zahl(z.groesste));
         v.fristen += zahl(z.fristen); v.maxi = Math.max(v.maxi, zahl(z.maxi));
@@ -77,6 +77,15 @@ const wert = (x) => (x === null || x === undefined ? 'nicht gemessen' : `${Numbe
     if (!faden.length) console.log('  keine Zahlen, der Daemon ist noch nicht neu gebaut');
     for (const z of faden.slice(0, 15)) {
         console.log(`  ${(maschine.get(z.daemon_id) || z.daemon_id).padEnd(14)} ${z.name.padEnd(32)} max ${String(zahl(z.maxi)).padStart(7)} ms  zusammen ${String(zahl(z.summe)).padStart(8)} ms  ${zahl(z.anzahl)}×`);
+    }
+
+    for (const [art, titel] of [['warten', 'Wartezeit an der Haltestelle'], ['arbeit', 'Arbeit an der Haltestelle']]) {
+        console.log(`\n${titel}`);
+        const halt = zeilen.filter(z => z.art === art).sort((a, b) => zahl(b.maxi) - zahl(a.maxi));
+        if (!halt.length) console.log('  keine Zahlen, der Daemon ist noch nicht neu gebaut');
+        for (const z of halt.slice(0, 15)) {
+            console.log(`  ${(maschine.get(z.daemon_id) || z.daemon_id).padEnd(14)} ${z.name.padEnd(32)} max ${String(zahl(z.maxi)).padStart(7)} ms  zusammen ${String(zahl(z.summe)).padStart(8)} ms  ${zahl(z.anzahl)}×`);
+        }
     }
 
     console.log('\nMaschinenlast');

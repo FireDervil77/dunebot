@@ -10,6 +10,7 @@
  *   - Jedes Ereignis, das der Daemon sendet oder das Dashboard abonniert, steht
  *     im Fahrplan, und umgekehrt.
  *   - `arbeit: frei` stimmt: Der Handler gibt die Arbeit wirklich ab.
+ *   - Jeder Befehl hat seine Reihe, und die Frist reist mit dem Befehl.
  *   - Die Kopie im Daemon gleicht der Datei hier aufs Byte.
  *   - Die Zählung rechnet richtig und bleibt begrenzt.
  *
@@ -65,7 +66,7 @@ function funktion(text, kopf) {
     return text.slice(start, ende);
 }
 
-const verteiler = funktion(clientText, 'func (c *Client) handleCommand(');
+const verteiler = funktion(clientText, 'func (c *Client) fuehreBefehlAus(');
 const hostBefehl = /hostMesswertBefehl\s*=\s*"([^"]+)"/.exec(goAlle)?.[1];
 const daemonBefehle = new Set([
     ...[...verteiler.matchAll(/action == "([^"]+)"/g)].map(m => m[1]),
@@ -141,7 +142,11 @@ pruefe(`${zeilen.length} Zeilen, jede vollständig, kein Name doppelt`, () => {
         assert.ok(['befehl', 'ereignis', 'steuerung'].includes(z.art), `${z.name}: Art ${z.art}`);
         assert.ok(['dashboard', 'daemon'].includes(z.von), `${z.name}: von ${z.von}`);
         assert.ok(['nie', 'erlaubt'].includes(z.verlust), `${z.name}: Verlust ${z.verlust}`);
-        if (z.art === 'befehl') assert.ok(['frei', 'bindet'].includes(z.arbeit), `${z.name}: Arbeit ${z.arbeit}`);
+        if (z.art === 'befehl') {
+            assert.ok(['frei', 'bindet'].includes(z.arbeit), `${z.name}: Arbeit ${z.arbeit}`);
+            assert.ok(['server', 'dateien', 'konsole', 'sitzung', 'maschine', 'keine'].includes(z.reihe), `${z.name}: Reihe ${z.reihe}`);
+            assert.ok(z.schwer === undefined || z.schwer === true, `${z.name}: schwer ${z.schwer}`);
+        }
     }
 });
 pruefe('Befehle und `crashed` dürfen nie verloren gehen', () => {
@@ -177,7 +182,7 @@ pruefe('`arbeit: frei` stimmt: Der Handler gibt die Arbeit ab', () => {
         const stelle = verteiler.indexOf(`"${z.name}"`);
         assert.ok(stelle >= 0, `${z.name} nicht im Verteiler`);
         const zweig = verteiler.slice(stelle, stelle + 700).split(/\n\s*(?:if action ==|case ")/)[0];
-        if (/imHintergrund|\bgo\s/.test(zweig)) continue;
+        if (/\bgo\s/.test(zweig)) continue;
         const handler = /c\.(handle\w+)\(/.exec(zweig)?.[1];
         const kopf = handler && `func (c *Client) ${handler}(`;
         const koerper = kopf && texte.includes(kopf) ? funktion(texte, kopf) : '';
@@ -258,13 +263,21 @@ pruefe('ohne PSI steht NULL da, nicht 0', () => {
     z.last('d', { hardware: null });
     assert.strictEqual(z.lasten[1].druckIo, null);
 });
-pruefe('der Lesefaden addiert sich und nimmt das größte Maximum', () => {
+pruefe('die Belegung addiert sich je Art und nimmt das größte Maximum', () => {
     const { z } = zaehler();
-    z.lesefaden('d', { 'gameserver.logs': { anzahl: 2, summe_ms: 50, max_ms: 40 } });
-    z.lesefaden('d', { 'gameserver.logs': { anzahl: 1, summe_ms: 5, max_ms: 5 } });
-    z.lesefaden('d', undefined);
-    const [l] = z.zeilen.values();
+    z.belegung('d', 'lesefaden', { 'gameserver.logs': { anzahl: 2, summe_ms: 50, max_ms: 40 } });
+    z.belegung('d', 'lesefaden', { 'gameserver.logs': { anzahl: 1, summe_ms: 5, max_ms: 5 } });
+    z.belegung('d', 'warten', { 'gameserver.logs': { anzahl: 1, summe_ms: 7, max_ms: 7 } });
+    z.belegung('d', 'arbeit', undefined);
+    const [l, w] = z.zeilen.values();
     assert.deepStrictEqual([l.art, l.anzahl, l.dauerSumme, l.dauerMax], ['lesefaden', 3, 55, 40]);
+    assert.deepStrictEqual([w.art, w.anzahl], ['warten', 1]);
+    assert.strictEqual(z.zeilen.size, 2);
+});
+pruefe('die Frist reist mit dem Befehl', () => {
+    const quelle = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'apps/dashboard/helpers/IPMServer.js'), 'utf8'));
+    assert.match(quelle, /frist_ms: timeout/);
+    assert.match(fs.readFileSync(path.join(DAEMON, 'internal/websocket/fahrer.go'), 'utf8'), /msg\["frist_ms"\]/);
 });
 
 (async () => {

@@ -7,7 +7,8 @@
  * Kopie derselben Datei ein (`pkg/firebus/fahrplan.json`); `scripts/check-fahrplan.js`
  * vergleicht beide und den Code beider Seiten mit der Tabelle.
  *
- * Bisher zählt nur die Zählung mit. Linie und Verlust wirken erst ab Etappe 3.
+ * Hier zählt bisher nur die Zählung mit. Der Daemon stellt seine Befehle nach
+ * `reihe` und `schwer` ab (Etappe 1). Linie und Verlust wirken erst ab Etappe 3.
  */
 const fahrplan = require('./fahrplan.json');
 

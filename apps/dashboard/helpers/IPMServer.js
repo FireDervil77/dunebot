@@ -855,7 +855,9 @@ class IPMServer {
 
         conn.lastHeartbeat = Date.now();
 
-        this.zaehler.lesefaden(daemonId, payload.lesefaden);
+        this.zaehler.belegung(daemonId, 'lesefaden', payload.lesefaden);
+        this.zaehler.belegung(daemonId, 'warten', payload.warten);
+        this.zaehler.belegung(daemonId, 'arbeit', payload.arbeit);
         this.zaehler.last(daemonId, { druck: payload.druck, hardware: payload.hardware });
 
         // Latenz aus Heartbeat-Timestamp berechnen (Daemon sendet Unix-Timestamp in Sekunden)
@@ -1623,7 +1625,10 @@ class IPMServer {
                 type: 'command',
                 id: commandId,
                 command,
-                payload
+                payload,
+                // Was der Daemon bis dahin nicht begonnen hat, verwirft er: Hier ist
+                // der Befehl dann schon als gescheitert gemeldet.
+                frist_ms: timeout
             });
             conn.ws.send(nachricht);
             this.zaehler.zaehle(daemonId, command, 'aus', Buffer.byteLength(nachricht));

@@ -302,7 +302,9 @@ ServiceManager.register('Logger', { debug: still, info: still, warn: still, erro
     console.log('\nVertrag mit Daemon und bauen.sh');
     await pruefe('der Daemon kennt `image.auspraegungen`; Proton trägt „nachfolge", dotnet nicht', async () => {
         const verteiler = ohneKommentare(lies(DAEMON, 'internal/websocket/client.go'));
-        assert.match(verteiler, /case "image\.auspraegungen":\s*c\.imHintergrund\(ctx, commandID, action, func\(\) \{ c\.handleImageAuspraegungen\(/);
+        assert.match(verteiler, /case "image\.auspraegungen":\s*c\.handleImageAuspraegungen\(/);
+        // Fragt je Tag bei Docker nach: wartet auf niemanden und hält niemanden auf.
+        assert.strictEqual(require('../packages/firebus').zeile('image.auspraegungen').reihe, 'keine');
         const handler = ohneKommentare(lies(DAEMON, 'internal/websocket/werkbank.go'));
         assert.ok(handler.includes('"auspraegungen": liste'), 'die Antwort steht nicht unter „auspraegungen"');
         const go = ohneKommentare(lies(DAEMON, 'internal/gameserver/docker/auspraegungen.go'));
@@ -315,7 +317,8 @@ ServiceManager.register('Logger', { debug: still, info: still, warn: still, erro
     });
     await pruefe('der Daemon kennt `image.stand`, antwortet unter „images" und nennt Digest und Fassung', async () => {
         const verteiler = ohneKommentare(lies(DAEMON, 'internal/websocket/client.go'));
-        assert.match(verteiler, /case "image\.stand":\s*c\.imHintergrund\(ctx, commandID, action, func\(\) \{ c\.handleImageStand\(/);
+        assert.match(verteiler, /case "image\.stand":\s*c\.handleImageStand\(/);
+        assert.strictEqual(require('../packages/firebus').zeile('image.stand').reihe, 'keine');
         assert.ok(verteiler.includes('"Gameserver nicht gefunden"'), 'ein Daemon ohne den Befehl antwortet anders als die Übersicht erwartet');
         const ws = ohneKommentare(lies(DAEMON, 'internal/websocket/werkbank.go'));
         assert.match(ws, /ausNutzlast\(payload\["images"\], &bilder\)/);
