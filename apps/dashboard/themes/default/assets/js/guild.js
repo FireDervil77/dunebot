@@ -809,7 +809,7 @@ class GuildAjaxHandler {
 
                 // daemon.yaml Template generieren
                 const dashUrl = window.location.origin.replace('http://', 'ws://').replace('https://', 'wss://');
-                const wsPort  = 9340;
+                const wsPort  = 9341; // Busbahnhof
                 if (elYaml) {
                     const bindIpLine = d.host ? `  bind_ip: "${d.host}"` : '  bind_ip: ""  # Leer = alle Interfaces (0.0.0.0)';
                     elYaml.value = [
