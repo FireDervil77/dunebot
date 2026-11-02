@@ -129,7 +129,7 @@
                      class="fb-warte" data-fb-pille="warte"<%= s.wartet ? '' : ' hidden' %>></span><span
                      data-fb-live-text><%= s.bereitschaftText %></span></div>
               </td>
-              <td><span class="fb-pille<%= loescht ? ' fb-pille-rot' : s.zustand.gut ? ' fb-pille-gut' : '' %>"
+              <td><span class="fb-pille<%= loescht || s.zustand.ton === 'red' && s.zustand.schluessel === 'verbindung' ? ' fb-pille-rot' : s.zustand.gut ? ' fb-pille-gut' : '' %>"
                         data-fb-live="zustand-pille" data-fb-server="<%= s.id %>"><%= s.zustand.text %></span></td>
               <td class="fb-mono" data-fb-live="spieler-paar" data-fb-server="<%= s.id %>">
                 <% if (s.spieler.jetzt !== null) { %>

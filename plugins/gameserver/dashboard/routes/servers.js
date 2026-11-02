@@ -1411,7 +1411,9 @@ router.get('/status', requirePermission('GAMESERVER.VIEW'), async (req, res) => 
                     -- Ob gerade gelöscht wird (Loeschung).
                     ${Loeschung.SPALTEN},
                     -- Ob ein Umzug läuft (Umzugsstand, gs.status sagt es nicht). Kein Fragezeichen hier: mysql2 hielte es für einen Platzhalter.
-                    ${require('../helpers/Umzugsstand').SPALTE}
+                    ${require('../helpers/Umzugsstand').SPALTE},
+                    -- Ob die Leitung zur Maschine steht (Verbindung).
+                    ${require('../helpers/Verbindung').SPALTEN}
                FROM gameservers gs WHERE guild_id = ?`,
             [guildId]
         );
@@ -1432,6 +1434,7 @@ router.get('/status', requirePermission('GAMESERVER.VIEW'), async (req, res) => 
                     // Beurteilt wie in der Liste (Text, Ton, Abzeichen) — das
                     // Widget auf dem Hauptdashboard zeichnet daraus.
                     zustand:         baueZustand(s),
+                    verbindung:      s.verbindung || 'da',
                     current_players: s.current_players,
                     max_players:     s.max_players,
                     // Roh — die Ansicht zeigt die gemeldete Stufe weiterhin an.
@@ -1958,7 +1961,8 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
                 -- Ob gerade gelöscht wird, und warum es zuletzt scheiterte (Loeschung).
                 ${Loeschung.SPALTEN},
                 -- Ob ein Umzug läuft (Umzugsstand, 2026-10-28). Kein Fragezeichen hier: mysql2 hielte es für einen Platzhalter.
-                ${require('../helpers/Umzugsstand').SPALTE}
+                ${require('../helpers/Umzugsstand').SPALTE},
+                ${require('../helpers/Verbindung').SPALTEN}
             FROM gameservers gs
             LEFT JOIN addon_marketplace am ON gs.addon_marketplace_id = am.id
             LEFT JOIN rootserver r ON gs.rootserver_id = r.id

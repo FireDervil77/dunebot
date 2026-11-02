@@ -32,6 +32,7 @@
  * @module helpers/Serverseite
  */
 
+const Verbindung = require('./Verbindung');
 const { lesePortzwecke } = require('./Portvergabe');
 const { istKontrollGuild } = require('./Paketfassung');
 const Bitmaske = require('./Bitmaske');
@@ -239,21 +240,28 @@ function baueZustand(server) {
         return { schluessel: 'umzug', text: 'Wird verschoben', ton: 'blue', gut: false, stufe: null,
                  abzeichen: ABZEICHEN.blue };
     }
+    // Ohne Leitung ist der Status nur der letzte bekannte Stand (Verbindung).
+    const leitung = Verbindung.pille(server.verbindung);
+    if (leitung) {
+        return { schluessel: 'verbindung', text: leitung.text, ton: leitung.ton, gut: false, stufe: null,
+                 abzeichen: ABZEICHEN[leitung.ton] };
+    }
     const s = String(server.status || 'unbekannt');
-    const tafel = {
-        online:     { text: 'Läuft',                    ton: 'green',  gut: true  },
-        starting:   { text: 'Startet gerade',           ton: 'yellow', gut: false },
-        stopping:   { text: 'Wird gestoppt',            ton: 'yellow', gut: false },
-        offline:    { text: 'Aus',                      ton: 'gray',   gut: false },
-        installing: { text: 'Wird installiert',         ton: 'blue',   gut: false },
-        installed:  { text: 'Installiert, nie gestartet', ton: 'gray', gut: false },
-        updating:   { text: 'Wird aktualisiert',        ton: 'blue',   gut: false },
-        error:      { text: 'Fehler',                   ton: 'red',    gut: false },
-    };
-    const e = tafel[s] || { text: s, ton: 'gray', gut: false };
+    const e = STATUS_TAFEL[s] || { text: s, ton: 'gray', gut: false };
     return { schluessel: s, text: e.text, ton: e.ton, gut: e.gut, stufe: null,
              abzeichen: ABZEICHEN[e.ton] || 'secondary' };
 }
+
+const STATUS_TAFEL = {
+    online:     { text: 'Läuft',                    ton: 'green',  gut: true  },
+    starting:   { text: 'Startet gerade',           ton: 'yellow', gut: false },
+    stopping:   { text: 'Wird gestoppt',            ton: 'yellow', gut: false },
+    offline:    { text: 'Aus',                      ton: 'gray',   gut: false },
+    installing: { text: 'Wird installiert',         ton: 'blue',   gut: false },
+    installed:  { text: 'Installiert, nie gestartet', ton: 'gray', gut: false },
+    updating:   { text: 'Wird aktualisiert',        ton: 'blue',   gut: false },
+    error:      { text: 'Fehler',                   ton: 'red',    gut: false },
+};
 
 /**
  * Der Ton als Tabler-Farbe (`bg-<farbe>-lt`) — für das Widget auf dem
@@ -810,7 +818,10 @@ function baueMesswerte(server) {
         : null;
     // Der Herzschlag kommt alle 30 s. Ab 120 s ist er nicht „etwas spät",
     // sondern weg — dann steht die Leitung, nicht der Server.
-    const frisch = laeuft && alterSekunden !== null && alterSekunden <= 120;
+    const leitungGrund = Verbindung.grund(server,
+        (STATUS_TAFEL[server.status] || { text: String(server.status || 'unbekannt') }).text);
+    const frisch = !leitungGrund && laeuft && alterSekunden !== null && alterSekunden <= 120;
+    const ausfall = laeuft ? null : Verbindung.beendet(server);
 
     const cpu   = zahlOderNull(server.cpu_percent);
     const ram   = zahlOderNull(server.ram_used_mb);
@@ -837,11 +848,17 @@ function baueMesswerte(server) {
         // dem Log, die ihn erklärt.
         // „Fehler" und nicht „Abgestürzt": Auch eine gescheiterte Installation
         // landet hier, und der Grund sagt selbst, welches von beiden.
-        grund: server.status === 'error'
+        grund: leitungGrund
+            ? leitungGrund
+            : server.status === 'error'
                 ? 'Fehler — ' + (server.error_message || 'der Daemon hat keinen Grund gemeldet.')
+            : ausfall ? ausfall
             : !laeuft ? 'Der Server läuft nicht — es wird nichts gemessen.'
             : (alterSekunden === null ? 'Noch keine Messung angekommen.'
             : (!frisch ? `Letzte Meldung vor ${alterSekunden} s — die Maschine meldet sich nicht.` : null)),
+        // Das soll auffallen: Hier ist etwas schiefgegangen, und niemand hat es so gewollt.
+        warnung: Verbindung.weg(server.verbindung) || Boolean(ausfall)
+            || (laeuft && !frisch && !leitungGrund && alterSekunden !== null),
         cpu:  null,
         ram:  null,
         netz: null,
@@ -1509,6 +1526,7 @@ function bauePille(paket, server) {
     const a = baueBereitschaftAuskunft(paket, server);
     return pillenZustand({
         status:  server.status,
+        verbindung: server.verbindung,
         bereit:  a.bereit,
         messbar: a.messbar,
         text:    a.text,
@@ -1520,6 +1538,7 @@ function baueKnopfzeile(paket, server) {
     const a = baueBereitschaftAuskunft(paket, server);
     return knopfZustand({
         status:  server.status,
+        verbindung: server.verbindung,
         bereit:  a.bereit,
         messbar: a.messbar,
         text:    a.text,

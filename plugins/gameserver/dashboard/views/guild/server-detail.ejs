@@ -220,7 +220,7 @@
       nicht (dieselbe Falle wie bei den Knoepfen, Baustelle 134). %>
   <div class="fb-messstreifen" data-fb-live="messstreifen" data-fb-server="<%= server.id %>">
 
-    <div class="fb-messstreifen-grund" data-fb-live="messwerte-grund" data-fb-server="<%= server.id %>"
+    <div class="fb-messstreifen-grund<%= mw.warnung ? ' fb-messstreifen-warnung' : '' %>" data-fb-live="messwerte-grund" data-fb-server="<%= server.id %>"
          style="<%= mw.frisch ? 'display:none' : '' %>"><%= mw.grund || 'Keine Messwerte.' %></div>
 
     <%# Die Installationsbahn (Baustelle 44). Sie steht IMMER im Text, nur

@@ -30,6 +30,7 @@ const eventRouter = require('./IPMEventRouter');
 const RootServer = require('../../../plugins/masterserver/dashboard/models/RootServer');
 const Auslastung = require('../../../plugins/masterserver/dashboard/helpers/Auslastung');
 const FireBusZaehler = require('./FireBusZaehler');
+const VerbindungsWache = require('./VerbindungsWache');
 
 // Pfad zur version.json (Dashboard-Download-Verzeichnis)
 const VERSION_JSON_PATH = path.join(__dirname, '..', 'downloads', 'daemon', 'version.json');
@@ -52,6 +53,7 @@ class IPMServer {
         this.wss = null;
         this.connections = new Map(); // daemon_id -> {ws, lastHeartbeat, sessionId, metadata}
         this.connectionCounts = new Map(); // daemon_id -> connection_count (für Limit-Tracking)
+        this.wache = new VerbindungsWache({ istVerbunden: (id) => this.connections.has(id) });
         this.pendingCommands = new Map(); // commandId -> {resolve, reject, timeout, command, gesendetAm}
         this.zaehler = new FireBusZaehler();
         this.Logger = null;
@@ -154,6 +156,8 @@ class IPMServer {
         } catch (error) {
             this.Logger.error('[IPMServer] Zurücksetzen der Daemon-Zustände fehlgeschlagen:', error);
         }
+        await this.wache.beimStart().catch(error =>
+            this.Logger.error('[IPMServer] Verbindungsstand beim Start nicht gesetzt:', error));
 
         this.wss = new WebSocket.Server({
             port: this.port,
@@ -204,6 +208,7 @@ class IPMServer {
         // nachlaufende Handler schrieb in einen bereits geschlossenen Pool:
         // "Pool is closed." beim Beenden des Dashboards.
         this.wirdBeendet = true;
+        this.wache.beende();
         try {
             await RootServer.markAllOffline();
         } catch (error) {
@@ -282,6 +287,8 @@ class IPMServer {
                         
                         // Connection-Count erhöhen
                         this.connectionCounts.set(daemonId, currentConnections + 1);
+                        this.wache.angemeldet(daemonId)
+                            .catch(err => this.Logger.error('[IPMServer] Anmeldung nicht vermerkt:', err));
                         
                         this.Logger.info(`[IPMServer] Daemon ${daemonId} registriert (Guild: ${result.metadata.guild_id}, Connections: ${currentConnections + 1}/${this.maxConnectionsPerDaemon})`);
 
@@ -417,6 +424,8 @@ class IPMServer {
                     RootServer.markOffline(daemonId)
                         .catch(err => this.Logger.error('[IPMServer] Statuswechsel auf offline fehlgeschlagen:', err));
                     this._meldeHostOffline(daemonId, guildIdDerVerbindung);
+                    this.wache.getrennt(daemonId)
+                        .catch(err => this.Logger.error('[IPMServer] Trennung nicht vermerkt:', err));
 
                     // **Auch das gehoert ins Protokoll** (2026-09-08). Bis heute
                     // stand in `daemon_logs` ausschliesslich "verbunden" und
@@ -908,6 +917,7 @@ class IPMServer {
         if (payload.servers) {
             await this._updateServerRegistry(daemonId, payload.servers, conn.metadata.guild_id,
                                              payload.platzstaende);
+            await this.wache.herzschlag(daemonId, payload.servers);
         }
     }
 

@@ -77,8 +77,9 @@
         const laeuft = z.status === 'online' || z.status === 'starting';
 
         // Steht der Server, sagt die Bereitschaft nichts ueber jetzt. Eine
-        // Pille mit dem Stand von vorhin waere schlimmer als keine.
-        if (!laeuft) {
+        // Pille mit dem Stand von vorhin waere schlimmer als keine. Dasselbe
+        // gilt ohne Leitung: Dann weiss niemand, ob Spieler rein koennen.
+        if (!laeuft || z.verbindung === 'daemon_weg' || z.verbindung === 'maschine_weg') {
             return { sichtbar: false, text: '', klasse: 'fb-pille', titel: '', wartet: false };
         }
 
@@ -153,6 +154,18 @@
      * @returns {{start: object, restart: object, stop: object}}
      */
     function knopfZustand(z = {}) {
+        // Ohne Leitung kommt kein Befehl an. Sichtbar bleibt, was zum letzten
+        // Stand passt, damit die Zeile nicht leer ist.
+        if (z.verbindung && z.verbindung !== 'da') {
+            const grund = 'Keine Verbindung zum Rootserver.';
+            const laeuftZuletzt = z.status === 'online' || z.status === 'starting';
+            return {
+                start:   { sichtbar: !laeuftZuletzt, aktiv: false, grund },
+                restart: { sichtbar: laeuftZuletzt,  aktiv: false, grund },
+                stop:    { sichtbar: laeuftZuletzt,  aktiv: false, grund },
+            };
+        }
+
         const seitMs  = z.seit ? new Date(z.seit).getTime() : NaN;
         const haengt  = z.status === 'stopping'
                      && Number.isFinite(seitMs) && Number.isFinite(z.frist)
@@ -261,6 +274,8 @@
                 this.holeBald();
             });
             sse.on('loeschung', (d) => this.loeschungGemeldet(d));
+            // Text, Knöpfe und Grund rechnet der Server, das betrifft alle Server der Maschine.
+            sse.on('verbindung', () => this.holeBald());
             sse.on('readiness', (d) => {
                 this.uebernimm(d.server_id, { stufe: d.stufe, grund: d.grund });
                 this.holeBald();
@@ -507,6 +522,7 @@
                         zustand: s.zustand || undefined,
                         umzug:   Boolean(s.umzug),
                         loeschung: s.loeschung || undefined,
+                        verbindung: s.verbindung || 'da',
                         // Für ein hängendes `stopping` (knopfZustand): wann der
                         // Zustand zuletzt wechselte, und die Frist vom Server.
                         seit:    s.uebergang ? s.uebergang.seit : undefined,
@@ -669,14 +685,16 @@
                         // (Umzugsstand) schlagen den Status — sonst zeigte die
                         // Pille mitten darin „Aus".
                         const loescht = Boolean(z.loeschung && z.loeschung.laeuft);
+                        const leitung = z.zustand && z.zustand.schluessel === 'verbindung' ? z.zustand : null;
                         const e = loescht ? { text: 'Wird gelöscht' }
                             : z.umzug ? { text: 'Wird verschoben' }
+                            : leitung ? { text: leitung.text }
                             : (ZUSTAende[z.status] || { text: z.status || '—' });
                         el.textContent = e.text;
                         // Gruen heisst hier "laeuft", genau wie serverseitig
                         // (`baueZustand().gut`).
-                        el.className = 'fb-pille' + (loescht ? ' fb-pille-rot'
-                            : z.status === 'online' ? ' fb-pille-gut' : '');
+                        el.className = 'fb-pille' + (loescht || (leitung && leitung.ton === 'red') ? ' fb-pille-rot'
+                            : !leitung && z.status === 'online' ? ' fb-pille-gut' : '');
                         break;
                     }
 
@@ -837,6 +855,7 @@
                         if (!m) break;
                         el.textContent = m.grund || 'Keine Messwerte.';
                         el.style.display = m.frisch ? 'none' : '';
+                        el.classList.toggle('fb-messstreifen-warnung', Boolean(m.warnung));
                         break;
                     }
 

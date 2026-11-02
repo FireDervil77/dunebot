@@ -213,6 +213,7 @@ router.post('/daemon/trigger-update', requirePermission('MASTERSERVER.DAEMON.MAN
 
         // Command an Daemon senden
         Logger.info(`[Masterserver] Triggere Daemon-Update für ${daemon.daemon_id}`);
+        ipmServer.wache.kuendigeAn(daemon.daemon_id);
         
         const response = await ipmServer.sendCommand(daemon.daemon_id, 'daemon.update', {});
         
