@@ -85,7 +85,9 @@ pruefe(/func \(c \*Client\) SendeMesswerte\(/.test(client),
 // Gegenstands hinausliest, misst den Nachbarn.
 const iSende = client.indexOf('func (c *Client) SendeMesswerte(');
 const iNaechste = iSende > -1 ? client.indexOf('\nfunc ', iSende + 1) : -1;
-const senderBlock = (iSende > -1 && iNaechste > -1) ? client.slice(iSende, iNaechste) : '';
+// Seit FireBus Etappe 3 gehört das Paket dazu: Dort entscheidet sich, ob gesendet wird.
+const senderBlock = (iSende > -1 && iNaechste > -1)
+    ? client.slice(iSende, iNaechste) + ohneKommentare(roh(path.join(DAEMON, 'internal/websocket/messwerte_paket.go')) || '') : '';
 pruefe(senderBlock && !/bufferEvent/.test(senderBlock),
     'er puffert NICHT bei Verbindungsabriss',
     'Ein Messwert ist verderblich: nachgeliefert gibt er eine Momentaufnahme als „jetzt" aus, '
@@ -110,7 +112,7 @@ pruefe(/SetzeMesswertKanal\(/.test(main) && /SendeMesswerte\(/.test(main),
 console.log('\nDashboard — weitergeben, nicht wegschreiben');
 // ════════════════════════════════════════════════════════════════════════════
 const plugin = ohneKommentare(roh(path.join(WURZEL, 'plugins/gameserver/dashboard/index.js')) || '');
-const iHandler = plugin.indexOf('async _handleResourceUsage(');
+const iHandler = plugin.indexOf('async _gibMesswertWeiter(');
 const handler = iHandler > -1 ? plugin.slice(iHandler, plugin.indexOf('\n    async ', iHandler + 10)) : '';
 
 pruefe(handler && !/UPDATE gameservers/.test(handler),
