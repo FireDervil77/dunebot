@@ -299,6 +299,39 @@ router.delete('/plugin-badges/:pluginName', async (req, res) => {
 });
 
 // ================================================================
+// FIREBUS: KONTROLLE
+// ================================================================
+
+router.get('/firebus', async (req, res) => {
+    const themeManager = ServiceManager.get('themeManager');
+    const dbService = ServiceManager.get('dbService');
+    const Logger = ServiceManager.get('Logger');
+
+    try {
+        const zeilen = await dbService.query(
+            `SELECT daemon_id, name, grund, SUM(anzahl) AS anzahl, MAX(zuletzt) AS zuletzt
+               FROM firebus_kontrolle
+              GROUP BY daemon_id, name, grund
+              ORDER BY zuletzt DESC
+              LIMIT 200`);
+        // In JavaScript, nicht per JOIN: Die Kollationen von Kern und Plugin passen nicht.
+        const maschinen = await dbService.query('SELECT daemon_id, name FROM rootserver');
+        const namen = new Map(maschinen.map(m => [m.daemon_id, m.name]));
+
+        await themeManager.renderView(res, 'admin/firebus', {
+            title: 'FireBus: Kontrolle',
+            activeMenu: '/admin/firebus',
+            zeilen: zeilen.map(z => ({ ...z, maschine: namen.get(z.daemon_id) || z.daemon_id })),
+            gruende: require('../helpers/FireBusKontrolle').GRUENDE,
+            fassung: require('../../../packages/firebus').fassung,
+        });
+    } catch (error) {
+        Logger.error('[Admin] FireBus-Kontrolle nicht lesbar:', error);
+        res.status(500).send('Die Kontrolle ließ sich nicht lesen.');
+    }
+});
+
+// ================================================================
 // TOAST-HISTORY
 // ================================================================
 

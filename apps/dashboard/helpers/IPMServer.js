@@ -30,6 +30,7 @@ const eventRouter = require('./IPMEventRouter');
 const RootServer = require('../../../plugins/masterserver/dashboard/models/RootServer');
 const Auslastung = require('../../../plugins/masterserver/dashboard/helpers/Auslastung');
 const FireBusZaehler = require('./FireBusZaehler');
+const FireBusKontrolle = require('./FireBusKontrolle');
 const VerbindungsWache = require('./VerbindungsWache');
 
 // Pfad zur version.json (Dashboard-Download-Verzeichnis)
@@ -45,6 +46,14 @@ const VERSION_JSON_PATH = path.join(__dirname, '..', 'downloads', 'daemon', 'ver
  */
 const MAX_NACHRICHT_BYTES = 4 * 1024 * 1024;
 
+/** Der Name einer Nachricht vom Daemon, so wie der Fahrplan ihn führt. */
+function nachrichtenName(message) {
+    const typ = message.type?.toLowerCase();
+    return message.namespace && message.action
+        ? `${message.namespace}.${message.action}`
+        : (typ === 'event' ? message.payload?.event : typ);
+}
+
 class IPMServer {
     /**
      * @param {number} port - WebSocket Port (Standard: 9340)
@@ -57,6 +66,7 @@ class IPMServer {
         this.wache = new VerbindungsWache({ istVerbunden: (id) => this.connections.has(id) });
         this.pendingCommands = new Map(); // commandId -> {resolve, reject, timeout, command, gesendetAm}
         this.zaehler = new FireBusZaehler();
+        this.kontrolle = new FireBusKontrolle();
         this.Logger = null;
         this.dbService = null;
         // Wird in stop() gesetzt: Ab da schreiben die close-Handler nicht mehr in
@@ -179,6 +189,7 @@ class IPMServer {
         // Heartbeat-Monitor (alle 30s prüfen)
         this._startHeartbeatMonitor();
         this.zaehler.starte();
+        this.kontrolle.starte();
         
         // ✅ Event-Handler für gameserver.status_changed registrieren
         this._registerEventHandlers();
@@ -196,6 +207,7 @@ class IPMServer {
 
         try {
             await this.zaehler.beende();
+            await this.kontrolle.beende();
         } catch (error) {
             this.Logger.error('[FireBus] Letzte Zählung nicht geschrieben', error);
         }
@@ -385,6 +397,9 @@ class IPMServer {
                 }
 
                 this._zaehleEingang(daemonId, message, data.length);
+
+                // Die Fahrkartenkontrolle (Linie V): Was durchfällt, fährt nicht mit.
+                if (!this._kontrolliere(daemonId, message, data.length)) return;
 
                 // Message-Routing
                 await this._routeMessage(daemonId, message);
@@ -734,10 +749,18 @@ class IPMServer {
                 offen ? Date.now() - offen.gesendetAm : null);
             return;
         }
-        const name = message.namespace && message.action
-            ? `${message.namespace}.${message.action}`
-            : (typ === 'event' ? message.payload?.event : typ);
-        this.zaehler.zaehle(daemonId, name, 'ein', bytes);
+        this.zaehler.zaehle(daemonId, nachrichtenName(message), 'ein', bytes);
+    }
+
+    /**
+     * Antworten tragen keinen Namen und fahren immer: Ohne sie bliebe ein Befehl bis
+     * zu seiner Frist offen.
+     * @private
+     */
+    _kontrolliere(daemonId, message, bytes) {
+        const typ = message.type?.toLowerCase();
+        if (typ === 'command_response' || typ === 'response') return true;
+        return this.kontrolle.pruefe(daemonId, nachrichtenName(message), bytes);
     }
 
     /**
