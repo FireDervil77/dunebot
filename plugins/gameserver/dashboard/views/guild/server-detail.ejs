@@ -291,6 +291,7 @@
        ['sicherungen',  'Sicherungen'],
        ['inhalte',      'Mods'],
        ['konsole',      'Konsole'],
+       ['logs',         'Logs'],
        // „RCON" statt „Fernsteuerung": Betreiber am 2026-09-22 — „das kennen
        // alle". Der PFAD bleibt `fernsteuerung`, damit Lesezeichen und Verweise
        // weiter treffen; nur der Name aendert sich.
@@ -356,6 +357,8 @@
           <%- include('partials/server-detail-inhalte', { server, guildId, userPermissions }) %>
         <% } else if (bereich === 'konsole') { %>
           <%- include('partials/server-detail-console', { server, guildId, userPermissions, consoleTransport: locals.consoleTransport }) %>
+        <% } else if (bereich === 'logs') { %>
+          <%- include('partials/server-detail-logs', { server, guildId, userPermissions }) %>
         <% } else if (bereich === 'fernsteuerung') { %>
           <%- include('partials/server-detail-rcon', { server, guildId, userPermissions }) %>
         <% } else if (bereich === 'aufgaben') { %>

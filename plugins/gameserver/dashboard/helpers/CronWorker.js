@@ -541,7 +541,7 @@ class CronWorker {
                 backup_name: backupName,
                 install_path: job.install_path,
                 datenbanken: await Datenbanken.nummern(job.server_id),
-            }, 300000);
+            }, require('./Sicherung').FRIST_MS);
 
             const sizeBytes = response?.size_bytes || 0;
 

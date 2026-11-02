@@ -27,6 +27,7 @@ const { SERVER_LISTE_SQL } = require('../helpers/Serverliste');
 const Textregel = require('../helpers/Textregel');
 const Quellen = require('../helpers/Quellen');
 const ServerStopp = require('../helpers/ServerStopp');
+const Sicherung = require('../helpers/Sicherung');
 const ServerState = require('../helpers/ServerState');
 const Loeschung = require('../helpers/Loeschung');
 const { baueUebersicht, baueServerListe, bauePaketAuswahl,
@@ -2263,7 +2264,7 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
         // Welcher Bereich gezeigt wird — was frueher ein Reiter war.
         // Kein Bereich heisst: die Serverseite selbst.
         const BEREICHE = {
-            dateien: 'Dateien', sicherungen: 'Sicherungen', inhalte: 'Mods', konsole: 'Konsole',
+            dateien: 'Dateien', sicherungen: 'Sicherungen', inhalte: 'Mods', konsole: 'Konsole', logs: 'Logs',
             fernsteuerung: 'RCON',
             aufgaben: 'Wiederkehrende Aufgaben', panels: 'Discord-Panels',
             oeffentlich: 'Öffentliche Seite',
@@ -4155,7 +4156,7 @@ router.post('/:serverId/backups', requirePermission('GAMESERVER.BACKUPS.CREATE')
                 backup_name: backupName,
                 install_path: server.install_path,
                 datenbanken: await Datenbanken.nummern(serverId),
-            }, 300000)
+            }, Sicherung.FRIST_MS)
                 .then(async (r) => {
                     const size = r?.size_bytes || 0;
                     await dbService.query(
@@ -4302,7 +4303,7 @@ router.post('/:serverId/backups/:backupId/restore', requirePermission('GAMESERVE
             backup_name: backup.name,
             install_path: server.install_path,
             datenbanken: await Datenbanken.nummern(serverId),
-        }, 300000)
+        }, Sicherung.FRIST_MS)
             .then(async (r) => {
                 await dbService.query(
                     "UPDATE gameserver_backups SET status = 'completed', wiederhergestellt = ? WHERE id = ?",
