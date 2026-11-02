@@ -199,8 +199,9 @@ async function pruefe(name, fn) {
     await pruefe('Liegengebliebenes wird aufgeräumt, Fertiges bleibt, und der Start hängt daran', async () => {
         await roh.query('CREATE TEMPORARY TABLE kopie_b LIKE gameserver_backups');
         await roh.query('CREATE TEMPORARY TABLE gameserver_backups LIKE kopie_b');
-        await roh.query(`INSERT INTO gameserver_backups (server_id, guild_id, name, status) VALUES
-            (1, 'g', 'lief', 'running'), (1, 'g', 'wartete', 'pending'), (1, 'g', 'stellte', 'restoring'), (1, 'g', 'fertig', 'completed')`);
+        await roh.query(`INSERT INTO gameserver_backups (server_id, guild_id, name, status, created_by) VALUES
+            (1, 'g', 'lief', 'running', 'u'), (1, 'g', 'wartete', 'pending', 'u'),
+            (1, 'g', 'stellte', 'restoring', 'u'), (1, 'g', 'fertig', 'completed', 'u')`);
         await Sicherung.nachNeustart({ query: (sql, p) => roh.query(sql, p).then(r => r[0]) });
         const [z] = await roh.query('SELECT name, status, error_message, wiederhergestellt FROM gameserver_backups ORDER BY id');
         assert.deepStrictEqual(z.map(x => x.status), ['failed', 'failed', 'completed', 'completed']);
