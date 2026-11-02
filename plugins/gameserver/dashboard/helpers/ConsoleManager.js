@@ -351,6 +351,19 @@ class ConsoleManager {
      * @private
      */
     async _handleConsoleOutput(payload, message, context) {
+        // Der Daemon bündelt seit FireBus Etappe 3 alle 100 ms. Zu den Browsern geht
+        // weiter Zeile für Zeile, die Konsole dort kennt nichts anderes.
+        const zeilen = Array.isArray(payload.lines) ? [...payload.lines] : [];
+        if (typeof payload.line === 'string') zeilen.push(payload.line);
+        const ausgelassen = Number(payload.ausgelassen) || 0;
+        if (ausgelassen > 0) zeilen.push(`[FireDaemon] ${ausgelassen} Zeilen ausgelassen`);
+        for (const line of zeilen) {
+            await this._gibZeileAus({ ...payload, line });
+        }
+    }
+
+    /** Eine Zeile in die History und an alle Browser. */
+    async _gibZeileAus(payload) {
         let { server_id, line, timestamp } = payload;
         
         try {
