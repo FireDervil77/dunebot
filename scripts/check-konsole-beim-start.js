@@ -104,11 +104,15 @@ function browser() {
         },
         EventSource: class {
             constructor(url) { this.url = url; this.horcher = {}; quellen.push(this); }
-            addEventListener(art, fn) { this.horcher[art] = fn; }
+            addEventListener(art, fn) { (this.horcher[art] = this.horcher[art] || []).push(fn); }
             close() {}
         },
     };
     vm.createContext(kontext);
+    kontext.window = kontext;
+    // Die Konsole empfängt über den Kanal der Seite (Baustelle 217).
+    vm.runInContext(fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/assets/js/gameserver-sse.js'), 'utf8')
+        + '\nthis.GameserverSSEClient = GameserverSSEClient;', kontext);
     vm.runInContext(quelle + '\nthis.GameserverConsoleClient = GameserverConsoleClient;', kontext);
 
     const k = Object.create(kontext.GameserverConsoleClient.prototype);
@@ -119,9 +123,9 @@ function browser() {
     k._ptyAttached = false;
     k.setupSSE();
 
-    const melde = (status) => quellen[0].horcher.gameserver({
+    const melde = (status) => quellen[0].horcher.gameserver.forEach(fn => fn({
         data: JSON.stringify({ data: { action: 'status_changed', server_id: '216', status } })
-    });
+    }));
     const warte = () => new Promise(r => setImmediate(r));
     return { k, anfragen, zeitgeber, melde, warte, setzeAntwort: (a) => { antwort = a; } };
 }

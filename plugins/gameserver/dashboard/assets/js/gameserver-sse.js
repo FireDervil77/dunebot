@@ -27,14 +27,38 @@ const STROM_AKTIONEN = new Set(['console', 'install_output']);
 
 class GameserverSSEClient {
     /**
+     * Der Kanal dieser Seite. Mehr als einen gibt es nicht (Baustelle 217).
+     *
+     * Bis zum 2026-11-02 oeffneten Live-Anzeige, Serverseite, Konsole und
+     * Uebersicht je einen eigenen Kanal, eine Serverseite also drei. Alle Tabs
+     * teilen sich eine HTTP/2-Verbindung, und schon drei Tabs liessen das Panel
+     * fuer diesen Browser stehen.
+     *
+     * Der Kanal ist ungefiltert. Eine Seite, die nur einen Server zeigt, nimmt
+     * `fuerServer()`.
+     *
      * @param {string} guildId - Discord Guild ID
-     * @param {Object} [options] - Optionen
-     * @param {string} [options.serverId] - Optional: Filter für bestimmten Server
+     * @returns {GameserverSSEClient}
      */
-    constructor(guildId, options = {}) {
+    static fuerSeite(guildId) {
+        if (!window.gameserverSSE) {
+            window.gameserverSSE = new GameserverSSEClient(guildId);
+        }
+        return window.gameserverSSE;
+    }
+
+    /**
+     * @param {string} guildId - Discord Guild ID
+     */
+    constructor(guildId) {
         this.guildId = guildId;
-        this.serverId = options.serverId || null;
         this.eventSource = null;
+
+        /**
+         * Rohe Zuhoerer je SSE-Ereignisname, siehe `hoere()`.
+         * @type {Map<string, Set<Function>>}
+         */
+        this.hoerer = new Map();
         
         /**
          * Event-Handler: Map<action, Array<HandlerFunction>>
@@ -50,6 +74,7 @@ class GameserverSSEClient {
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 10;
         this.reconnectTimer = null;
+        this.aufgegebenGemeldet = false;
         
         /**
          * Connection-Status
@@ -73,23 +98,20 @@ class GameserverSSEClient {
      * Verbindung herstellen
      */
     connect() {
-        if (this.eventSource) {
-            console.warn('[GameserverSSE] Bereits verbunden');
-            return;
-        }
+        // Jeder Nutzer der Seite ruft das, der erste oeffnet den Kanal.
+        if (this.eventSource) return;
 
         this.manuallyDisconnected = false;
 
         // SSE-Endpoint URL
-        let url = `/guild/${this.guildId}/plugins/gameserver/servers/events`;
-        if (this.serverId) {
-            url += `?server_id=${this.serverId}`;
-        }
+        const url = `/guild/${this.guildId}/plugins/gameserver/servers/events`;
 
         console.log('[GameserverSSE] Verbinde zu:', url);
 
         try {
             this.eventSource = new EventSource(url);
+            this.gebunden = new Set();
+            for (const typ of this.hoerer.keys()) this._binde(typ);
 
             // Connection-Event (Custom von Server)
             this.eventSource.addEventListener('connected', (e) => {
@@ -98,6 +120,7 @@ class GameserverSSEClient {
                 this.connected = true;
                 this.reconnectDelay = 1000; // Reset delay
                 this.reconnectAttempts = 0;
+                this.aufgegebenGemeldet = false;
             });
 
             // Gameserver-Events
@@ -137,11 +160,12 @@ class GameserverSSEClient {
                 }
             });
 
-            // Shutdown-Event
+            // Shutdown-Event: Das Dashboard startet neu. Die Leitung reisst gleich,
+            // und `onerror` baut sie wieder auf. Bis 2026-11-02 trennte das hier
+            // endgueltig, die Seite blieb nach jedem Neustart ohne Live-Daten.
             this.eventSource.addEventListener('shutdown', (e) => {
                 const data = JSON.parse(e.data);
                 console.warn('[GameserverSSE] Server shutdown:', data.message);
-                this.disconnect();
             });
 
             // Metrics-Event (CPU, RAM, Players pro Gameserver)
@@ -209,6 +233,59 @@ class GameserverSSEClient {
             this.eventSource.close();
             this.eventSource = null;
         }
+    }
+
+    /**
+     * Hoert roh auf ein SSE-Ereignis, fuer Nutzer, die `e.data` selbst lesen.
+     * Bleibt ueber Neuverbindungen bestehen.
+     *
+     * @param {string} typ - SSE-Ereignisname (z.B. 'console')
+     * @param {Function} fn - Bekommt das MessageEvent
+     * @returns {Function} Abmelden
+     */
+    hoere(typ, fn) {
+        if (!this.hoerer.has(typ)) this.hoerer.set(typ, new Set());
+        this.hoerer.get(typ).add(fn);
+        if (this.eventSource) this._binde(typ);
+        return () => this.hoerer.get(typ).delete(fn);
+    }
+
+    /**
+     * @private
+     * @param {string} typ - SSE-Ereignisname
+     */
+    _binde(typ) {
+        if (this.gebunden.has(typ)) return;
+        this.gebunden.add(typ);
+        this.eventSource.addEventListener(typ, (e) => {
+            for (const fn of this.hoerer.get(typ)) {
+                try {
+                    fn(e);
+                } catch (error) {
+                    console.error(`[GameserverSSE] Zuhoerer-Fehler (${typ}):`, error);
+                }
+            }
+        });
+    }
+
+    /**
+     * Der Kanal, gesehen von einer Seite, die nur einen Server zeigt.
+     *
+     * Dieselbe Regel, die bisher `?server_id=` im Dashboard anwandte: Durch geht
+     * nur, was diese Kennung traegt.
+     *
+     * @param {string|number} serverId
+     * @returns {{on: Function, connect: Function, disconnect: Function}}
+     */
+    fuerServer(serverId) {
+        const id = String(serverId);
+        return {
+            on: (action, handler) => this.on(action, (message) => {
+                if (String(message.server_id) === id) handler(message);
+            }),
+            connect: () => this.connect(),
+            disconnect: () => this.disconnect()
+        };
     }
 
     /**
@@ -290,9 +367,12 @@ class GameserverSSEClient {
             return;
         }
 
-        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+        // Der Nutzer erfaehrt es einmal, der Kanal versucht es weiter: Die
+        // Uebersicht verband sich schon immer ohne Grenze neu.
+        if (this.reconnectAttempts >= this.maxReconnectAttempts && !this.aufgegebenGemeldet) {
             console.error('[GameserverSSE] Max Reconnect-Versuche erreicht');
-            return;
+            this.aufgegebenGemeldet = true;
+            (this.handlers.get('verbindung_verloren') || []).forEach(handler => handler());
         }
 
         this.reconnectAttempts++;
@@ -336,10 +416,5 @@ class GameserverSSEClient {
 // Export für global
 window.GameserverSSEClient = GameserverSSEClient;
 
-// ℹ️ Keine automatische Instanziierung mehr!
-// Die Instanz wird im jeweiligen EJS-Template erstellt:
-//   const guildId = '<%= guildId %>';
-//   window.gameserverSSE = new GameserverSSEClient(guildId);
-//
-// Grund: guildId ist beim Laden dieser Datei noch nicht verfügbar,
-// da EJS-Template-Variablen erst im Inline-Script im HTML verfügbar sind.
+// ℹ️ Keine automatische Instanziierung: guildId ist beim Laden dieser Datei noch
+// nicht bekannt. Den Kanal holt sich jeder Nutzer mit `fuerSeite(guildId)`.

@@ -127,7 +127,7 @@ class GameserverPlugin extends DashboardPlugin {
         // Console Client Script (für Live-Console mit xterm.js)
         assetManager.registerScript('gameserver-console', 'js/console-client.js', {
             plugin: 'gameserver',
-            deps: ['xterm-core', 'xterm-addon-fit'], // Abhängigkeiten zu xterm.js
+            deps: ['xterm-core', 'xterm-addon-fit', 'gameserver-sse'], // xterm.js und der Kanal der Seite
             version: this.version,
             inFooter: true,
             defer: false
@@ -153,7 +153,7 @@ class GameserverPlugin extends DashboardPlugin {
 
         assetManager.registerScript('gameserver-overview', 'js/servers-overview.js', {
             plugin: 'gameserver',
-            deps: [], 
+            deps: ['gameserver-sse'], 
             version: this.version,
             inFooter: true,
             defer: false

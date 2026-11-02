@@ -398,7 +398,7 @@ window.gameserverServerId = '<%= server.id %>';
 <% } %>
 
 <script>
-// Minimaler SSE-Listener für Status-Updates (gefiltert auf diesen Server)
+// Minimaler SSE-Listener für Status-Updates (nur dieser Server, über den Kanal der Seite)
 document.addEventListener('DOMContentLoaded', function() {
     if (typeof GameserverSSEClient === 'undefined') {
         console.warn('[Detail] GameserverSSEClient nicht verfügbar – Status-Updates werden nicht live empfangen.');
@@ -407,7 +407,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const guildId = window.gameserverGuildId;
     const serverId = window.gameserverServerId;
-    const sse = new GameserverSSEClient(guildId, { serverId });
+    const sse = GameserverSSEClient.fuerSeite(guildId).fuerServer(serverId);
 
     // Initialen Status vom Server (EJS) tracken, um Übergänge zu erkennen
     let lastKnownStatus = '<%= server.status %>';

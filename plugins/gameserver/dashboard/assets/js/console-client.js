@@ -16,7 +16,6 @@ class GameserverConsoleClient {
         this.resizeObserver = null;
         this.clientId = null;
         this.connected = false;
-        this.eventSource = null;  // SSE EventSource
         this.commandHistory = [];
         this.historyIndex = -1;
         this.currentCommand = '';
@@ -250,27 +249,32 @@ class GameserverConsoleClient {
     }
 
     /**
-     * SSE-Verbindung für Live-Output aufbauen
-     * Eigene EventSource-Connection für Console (wie Pterodactyl)
+     * Meldet die Konsole vom Kanal der Seite ab. `setupSSE` setzt das je Anmeldung.
+     */
+    trenneSSE() {}
+
+    /**
+     * Live-Output über den Kanal der Seite empfangen
      */
     setupSSE() {
         console.log('[Console] Setup SSE...');
 
-        // Eigene EventSource für diese Console
-        let sseUrl = `/guild/${this.config.guildId}/plugins/gameserver/servers/events`;
-        if (this.config.serverId) {
-            sseUrl += `?server_id=${encodeURIComponent(this.config.serverId)}`;
+        if (typeof window.GameserverSSEClient !== 'function') {
+            console.error('[Console] GameserverSSEClient nicht geladen, die Konsole empfängt keine Ausgabe');
+            this.updateStatus('Verbindung verloren', 'danger');
+            return;
         }
-        console.log('[Console] Verbinde zu SSE:', sseUrl);
+
+        // setupSSE läuft mehrmals, etwa nach einem neuen Attach.
+        this.trenneSSE();
+        const kanal = window.GameserverSSEClient.fuerSeite(this.config.guildId);
+        const abmelden = [];
+        const hoere = (typ, fn) => abmelden.push(kanal.hoere(typ, fn));
+        this.trenneSSE = () => abmelden.splice(0).forEach(ab => ab());
 
         try {
-            this.eventSource = new EventSource(sseUrl);
-
             // Connection-Event
-            this.eventSource.addEventListener('connected', (e) => {
-                const data = JSON.parse(e.data);
-                console.log('[Console] SSE verbunden:', data);
-                this._sseRetries = 0; // Retry-Counter zurücksetzen
+            const refit = () => {
                 // Bei erfolgreichem SSE-Connect sicherheitshalber refitten
                 try {
                     this.fitAddon.fit();
@@ -279,10 +283,11 @@ class GameserverConsoleClient {
                 } catch (err) {
                     console.debug('[Console] fit/refresh nach SSE-connect fehlgeschlagen (ignoriere):', err?.message || err);
                 }
-            });
+            };
+            hoere('connected', refit);
 
             // Gameserver-Events (für Status-Echos)
-            this.eventSource.addEventListener('gameserver', (e) => {
+            hoere('gameserver', (e) => {
                 try {
                     const message = JSON.parse(e.data);
 
@@ -375,7 +380,7 @@ class GameserverConsoleClient {
             });
 
             // OK Console-Events (namespace='console')
-            this.eventSource.addEventListener('console', (e) => {
+            hoere('console', (e) => {
                 try {
                     const message = JSON.parse(e.data);
                     console.log('[Console][SSE] Console Event empfangen:', message);
@@ -403,7 +408,7 @@ class GameserverConsoleClient {
             });
 
             // Install-Events (namespace='install') → gleicher xterm-Buffer
-            this.eventSource.addEventListener('install', (e) => {
+            hoere('install', (e) => {
                 try {
                     const message = JSON.parse(e.data);
                     const payload = message.data || message;
@@ -450,31 +455,13 @@ class GameserverConsoleClient {
                 }
             });
 
-            // Error-Handler mit Auto-Reconnect (Exponential Backoff)
-            this.eventSource.onerror = (error) => {
-                console.error('[Console] SSE Connection error:', error);
-                
-                // Connection schließen
-                this.eventSource.close();
-                this.eventSource = null;
-                
-                // Auto-Reconnect mit Backoff (wenn noch connected)
-                if (this.connected) {
-                    this._sseRetries = (this._sseRetries || 0) + 1;
-                    if (this._sseRetries > 10) {
-                        console.warn('[Console] Max SSE-Retries erreicht, stoppe Reconnect');
-                        this.updateStatus('Verbindung verloren', 'danger');
-                        return;
-                    }
-                    const delay = Math.min(1000 * Math.pow(2, this._sseRetries - 1), 30000);
-                    console.log(`[Console] SSE Reconnect #${this._sseRetries} in ${delay}ms...`);
-                    setTimeout(() => {
-                        if (this.connected) {
-                            this.setupSSE();
-                        }
-                    }, delay);
-                }
-            };
+            // Neu verbinden tut der Kanal selbst, hier zählt nur das Anzeigen.
+            abmelden.push(kanal.on('verbindung_verloren', () => {
+                this.updateStatus('Verbindung verloren', 'danger');
+            }));
+
+            kanal.connect();
+            if (kanal.isConnected()) refit();
 
             console.log('[Console] SSE-Connection etabliert');
 
@@ -575,12 +562,8 @@ class GameserverConsoleClient {
         this.updateStatus('Trenne...', 'warning');
 
         try {
-            // SSE-Connection schließen
-            if (this.eventSource) {
-                console.log('[Console] Schließe SSE-Connection...');
-                this.eventSource.close();
-                this.eventSource = null;
-            }
+            // Den Kanal der Seite lässt die Konsole offen, er gehört nicht ihr allein.
+            this.trenneSSE();
 
             // Detach-Request an API (nur wenn clientId existiert)
             if (this.clientId) {

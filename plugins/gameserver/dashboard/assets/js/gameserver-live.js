@@ -914,29 +914,25 @@
     // die Dashboard-Seite in ihrem eigenen Inline-Skript. Das ganze Modul lief
     // also nie - lautlos, so wie ein `return` es tut.
     //
-    // Jetzt reicht der Haken in der Vorlage. Ist noch kein Empfaenger da, baut
-    // dieses Modul ihn aus der Guild-Kennung, die am Haken steht; ist schon
-    // einer da (Dashboard-Seite), wird er MITBENUTZT - zwei Verbindungen fuer
-    // dieselben Ereignisse waeren zwei Wege.
+    // Jetzt reicht der Haken in der Vorlage. Der Empfaenger ist der eine Kanal
+    // der Seite, den sich alle Nutzer teilen.
     document.addEventListener('DOMContentLoaded', () => {
         const wurzel = document.querySelector('[data-fb-live-guild]');
         if (!wurzel) return;
 
         const guildId = wurzel.dataset.fbLiveGuild;
 
-        if (!window.gameserverSSE) {
-            if (typeof window.GameserverSSEClient !== 'function') {
-                // Melden statt ausweichen: Ohne Empfaenger bleibt die Seite
-                // stehen, und genau dieses Schweigen hat das Modul ein Jahr
-                // lang unbemerkt gelassen.
-                console.error('[Gameserver] Live-Anzeige: GameserverSSEClient ist nicht geladen — '
-                    + 'die Seite zeigt den Stand vom Aufruf und aktualisiert sich nicht.');
-                return;
-            }
-            window.gameserverSSE = new window.GameserverSSEClient(guildId);
-            window.gameserverSSE.connect();
+        if (typeof window.GameserverSSEClient !== 'function') {
+            // Melden statt ausweichen: Ohne Empfaenger bleibt die Seite
+            // stehen, und genau dieses Schweigen hat das Modul ein Jahr
+            // lang unbemerkt gelassen.
+            console.error('[Gameserver] Live-Anzeige: GameserverSSEClient ist nicht geladen — '
+                + 'die Seite zeigt den Stand vom Aufruf und aktualisiert sich nicht.');
+            return;
         }
 
-        window.gameserverLive = new LiveAnzeige(window.gameserverSSE, guildId);
+        const kanal = window.GameserverSSEClient.fuerSeite(guildId);
+        kanal.connect();
+        window.gameserverLive = new LiveAnzeige(kanal, guildId);
     });
 })();

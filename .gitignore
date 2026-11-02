@@ -87,8 +87,6 @@ apps/dashboard/downloads/launcher/
 #docs and docs folder
 docs/
 docs/*
-docs_OLD/
-docs_OLD/*
 !apps/dashboard/themes/default/views/admin/docs/
 
 streamerbot_must_haves/

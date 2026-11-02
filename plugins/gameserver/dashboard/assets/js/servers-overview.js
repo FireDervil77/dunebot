@@ -21,12 +21,8 @@ class GameserverOverview {
         }
 
         this.guildId = guildId;
-        this.eventSource = null;
-        this.reconnectDelay = 1000;
-        this.maxReconnectDelay = 30000;
-        this.isConnected = false;
+        this.kanal = null;
         this.isTabVisible = true;
-        this.reconnectTimeout = null;
 
         // ✅ SINGLETON: Speichere Instanz
         if (!GameserverOverview.instances) {
@@ -42,7 +38,7 @@ class GameserverOverview {
      */
     init() {
         // ✅ SINGLETON: Verhindere doppelte Initialisierung
-        if (this.isConnected || this.eventSource) {
+        if (this.kanal) {
             console.log('[GameserverOverview] ⚠️ Bereits verbunden, überspringe init()');
             return;
         }
@@ -52,15 +48,16 @@ class GameserverOverview {
         // Page Visibility API: Pausiere SSE bei inaktivem Tab
         document.addEventListener('visibilitychange', () => {
             this.isTabVisible = !document.hidden;
+            if (!this.kanal) return;
             
             if (this.isTabVisible) {
                 console.log('[GameserverOverview] 👁️ Tab aktiv → SSE fortsetzen');
                 // Bei Tab-Aktivierung: Reconnect wenn disconnected
-                if (!this.isConnected && !this.reconnectTimeout) {
+                if (!this.kanal.isConnected()) {
                     // Kleine Verzögerung um doppelte Reconnects zu vermeiden
                     setTimeout(() => {
-                        if (this.isTabVisible && !this.isConnected) {
-                            this.connectSSE();
+                        if (this.isTabVisible && !this.kanal.isConnected()) {
+                            this.kanal.connect();
                             
                             // ✅ NEU: Nach Reconnect → Status-Refresh für alle Server
                             // (Fall: Installation lief während Tab inaktiv)
@@ -70,17 +67,9 @@ class GameserverOverview {
                 }
             } else {
                 console.log('[GameserverOverview] 😴 Tab inaktiv → SSE pausieren');
-                // Bei Tab-Deaktivierung: Gracefully disconnect
-                if (this.eventSource) {
-                    this.eventSource.close();
-                    this.eventSource = null;
-                    this.isConnected = false;
-                }
-                // Cancel pending reconnects
-                if (this.reconnectTimeout) {
-                    clearTimeout(this.reconnectTimeout);
-                    this.reconnectTimeout = null;
-                }
+                // Bei Tab-Deaktivierung: Gracefully disconnect. Das gilt für den
+                // Kanal der Seite, ein verdeckter Tab hält also keinen offen.
+                this.kanal.disconnect();
             }
         });
         
@@ -88,39 +77,33 @@ class GameserverOverview {
     }
 
     /**
-     * Stellt SSE-Verbindung her
+     * Meldet die Übersicht am Kanal der Seite an
      */
     connectSSE() {
-        const url = `/guild/${this.guildId}/plugins/gameserver/servers/events`;
-        console.log(`[GameserverOverview] Verbinde zu SSE: ${url}`);
+        if (typeof window.GameserverSSEClient !== 'function') {
+            console.error('[GameserverOverview] GameserverSSEClient nicht geladen, die Übersicht aktualisiert sich nicht');
+            return;
+        }
+
+        this.kanal = window.GameserverSSEClient.fuerSeite(this.guildId);
 
         try {
-            this.eventSource = new EventSource(url);
-
-            // Connection-Event (Server-bestätigt)
-            this.eventSource.addEventListener('connected', (e) => {
-                const data = JSON.parse(e.data);
-                console.log('[GameserverOverview] ✅ SSE-Verbindung hergestellt:', data);
-                this.isConnected = true;
-                this.reconnectDelay = 1000; // Reset delay bei erfolgreicher Verbindung
-            });
-
             // Gameserver-Events (Status, Resources, etc.)
-            this.eventSource.addEventListener('gameserver', (e) => {
+            this.kanal.hoere('gameserver', (e) => {
                 const data = JSON.parse(e.data);
                 console.log('[GameserverOverview] Event empfangen:', data);
                 this.handleGameserverEvent(data);
             });
 
             // Install-Events (Status, Completed, Failed)
-            this.eventSource.addEventListener('install', (e) => {
+            this.kanal.hoere('install', (e) => {
                 const data = JSON.parse(e.data);
                 console.log('[GameserverOverview] Install-Event empfangen:', data);
                 this.handleInstallEvent(data);
             });
 
             // Metrics-Events (CPU, RAM, Players pro Gameserver)
-            this.eventSource.addEventListener('metrics', (e) => {
+            this.kanal.hoere('metrics', (e) => {
                 const data = JSON.parse(e.data);
                 if (data.action === 'server_stats') {
                     console.log('[GameserverOverview] Metrics empfangen:', data);
@@ -135,48 +118,11 @@ class GameserverOverview {
                 }
             });
 
-            // Error-Handling
-            this.eventSource.onerror = (e) => {
-                console.error('[GameserverOverview] ❌ SSE-Fehler:', e);
-                this.isConnected = false;
-                this.eventSource.close();
-                this.reconnect();
-            };
+            this.kanal.connect();
 
         } catch (error) {
             console.error('[GameserverOverview] Fehler beim Aufbau der SSE-Connection:', error);
-            this.reconnect();
         }
-    }
-
-    /**
-     * Reconnect mit Exponential Backoff
-     */
-    reconnect() {
-        // Reconnect nur wenn Tab aktiv ist
-        if (!this.isTabVisible) {
-            console.log('[GameserverOverview] ⏸️ Tab inaktiv → Reconnect übersprungen');
-            return;
-        }
-        
-        console.log(`[GameserverOverview] Reconnect in ${this.reconnectDelay}ms...`);
-        
-        // Cancel existing timeout
-        if (this.reconnectTimeout) {
-            clearTimeout(this.reconnectTimeout);
-        }
-        
-        this.reconnectTimeout = setTimeout(() => {
-            console.log('[GameserverOverview] Reconnecting...');
-            this.reconnectTimeout = null;
-            this.connectSSE();
-            
-            // Exponential Backoff
-            this.reconnectDelay = Math.min(
-                this.reconnectDelay * 2,
-                this.maxReconnectDelay
-            );
-        }, this.reconnectDelay);
     }
 
     /**
@@ -627,10 +573,9 @@ class GameserverOverview {
      * Trennt SSE-Verbindung
      */
     disconnect() {
-        if (this.eventSource) {
+        if (this.kanal) {
             console.log('[GameserverOverview] Trenne SSE-Verbindung...');
-            this.eventSource.close();
-            this.isConnected = false;
+            this.kanal.disconnect();
         }
     }
 }
