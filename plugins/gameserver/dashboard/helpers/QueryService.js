@@ -16,6 +16,26 @@
 
 const { GameDig, games: GAMEDIG_KATALOG } = require('gamedig');
 
+/**
+ * Legt den UDP-Socket von GameDig an, bevor die erste Abfrage läuft.
+ *
+ * GameDig merkt sich seinen Socket erst nach dem `bind`. Zwei Abfragen zugleich
+ * legen deshalb zwei an, und im Cluster von pm2 beendet das zweite `bind` den ganzen
+ * Prozess (`assert` in `internal/cluster/child`). Am 2026-11-02 stürzte das Dashboard
+ * so alle 12 Sekunden ab, sobald beim Start zwei Server liefen: Der StatusPoller
+ * fragt sie gleichzeitig ab. Steht der Socket einmal, ist alles Weitere sicher.
+ */
+let udpSocketAngelegt = null;
+function udpSocketBereit() {
+    if (!udpSocketAngelegt) {
+        udpSocketAngelegt = GameDig.getInstance().queryRunner.udpSocket._getSocket().catch((fehler) => {
+            udpSocketAngelegt = null;
+            throw fehler;
+        });
+    }
+    return udpSocketAngelegt;
+}
+
 /** Timeout für eine einzelne Query in ms */
 const QUERY_TIMEOUT_MS = 5000;
 /** Maximale Verbindungsversuche */
@@ -116,6 +136,7 @@ class QueryService {
         }
 
         try {
+            await udpSocketBereit();
             const state = await GameDig.query({
                 type: gameType,
                 host,
