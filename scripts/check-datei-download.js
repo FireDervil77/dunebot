@@ -17,6 +17,9 @@ const assert = require('assert');
 const crypto = require('crypto');
 const fs = require('fs');
 const http = require('http');
+const https = require('https');
+const os = require('os');
+const { execFileSync } = require('child_process');
 const path = require('path');
 const WURZEL = path.join(__dirname, '..');
 const { ohneKommentare } = require('./lib/quelltext');
@@ -31,11 +34,40 @@ const lies = (rel) => fs.readFileSync(path.join(WURZEL, rel), 'utf8');
 
 (async () => {
     const SCHLUESSEL = 'schluessel';
+    // Wie der Daemon: ein selbst unterschriebenes Zertifikat, dem genau dieses Dashboard vertraut.
+    const zertifikat = (name) => {
+        const ordner = fs.mkdtempSync(path.join(os.tmpdir(), 'abruf-'));
+        const [schluessel, zert] = ['k.pem', 'z.pem'].map(d => path.join(ordner, d));
+        execFileSync('openssl', ['req', '-x509', '-newkey', 'ec', '-pkeyopt', 'ec_paramgen_curve:prime256v1', '-nodes',
+            '-keyout', schluessel, '-out', zert, '-days', '2', '-subj', `/CN=${name}`,
+            '-addext', 'basicConstraints=critical,CA:TRUE'], { stdio: 'ignore' });
+        const paar = { key: fs.readFileSync(schluessel, 'utf8'), cert: fs.readFileSync(zert, 'utf8') };
+        fs.rmSync(ordner, { recursive: true });
+        return paar;
+    };
+    const eigenes = zertifikat('FireBot Abruf');
+    const angekommen = [];
     const inhalt = Buffer.alloc(3 * 1024 * 1024, 0x61);
     const anfragen = [];
-    const daemon = http.createServer((req, res) => {
+    const daemon = https.createServer(eigenes, (req, res) => {
         const u = new URL(req.url, 'http://x');
         anfragen.push({ pfad: u.searchParams.get('pfad'), range: req.headers.range });
+        if (req.method === 'PUT') {
+            const teile = [];
+            req.on('data', d => teile.push(d));
+            req.on('end', () => {
+                const q = u.searchParams;
+                const sig = u.pathname === '/inhalt'
+                    ? `inhalt\n${q.get('server')}\n${q.get('ziel')}\n${q.get('dateiname')}\n${q.get('entpacken')}\n${q.get('marker')}\n${q.get('bis')}`
+                    : `datei-schreiben\n${q.get('server')}\n${q.get('pfad')}\n${q.get('bis')}`;
+                if (q.get('sig') !== crypto.createHmac('sha256', SCHLUESSEL).update(sig).digest('hex')) { res.statusCode = 404; return res.end(); }
+                if (q.get('pfad') === '/voll') { res.statusCode = 422; return res.end('Platzgrenze erreicht'); }
+                angekommen.push({ q, inhalt: Buffer.concat(teile) });
+                if (u.pathname === '/inhalt') return res.end(JSON.stringify({ dateien: [`${q.get('ziel')}/A.dll`] }));
+                res.statusCode = 204; res.end();
+            });
+            return;
+        }
         const erwartet = crypto.createHmac('sha256', SCHLUESSEL)
             .update(`datei\n${u.searchParams.get('server')}\n${u.searchParams.get('pfad')}\n${u.searchParams.get('bis')}`).digest('hex');
         if (u.pathname !== '/datei' || u.searchParams.get('sig') !== erwartet) { res.statusCode = 404; return res.end(); }
@@ -48,12 +80,12 @@ const lies = (rel) => fs.readFileSync(path.join(WURZEL, rel), 'utf8');
         res.end(inhalt);
     });
     await new Promise(r => daemon.listen(0, '127.0.0.1', r));
-    const maschine = { host: '127.0.0.1', abruf_port: daemon.address().port, api_key: SCHLUESSEL };
+    const maschine = { host: '127.0.0.1', abruf_port: daemon.address().port, api_key: SCHLUESSEL, abruf_zertifikat: eigenes.cert };
 
     const app = require('express')();
     app.use(async (req, res) => {
         const pfad = decodeURIComponent(req.url.slice(1));
-        await Abruf.reicheDurch(Abruf.dateiAdresse(maschine, 209, pfad), req, res, path.basename(pfad));
+        await Abruf.reicheDurch(Abruf.dateiAdresse(maschine, 209, pfad), req, res, path.basename(pfad), maschine);
     });
     const dashboard = http.createServer(app);
     await new Promise(r => dashboard.listen(0, '127.0.0.1', r));
@@ -102,7 +134,38 @@ const lies = (rel) => fs.readFileSync(path.join(WURZEL, rel), 'utf8');
         await assert.rejects(Abruf.leseAnfang({ ...maschine, api_key: 'falsch' }, 209, 'x', 10), /antwortete mit 404/);
     });
 
-    await pruefe('Route: kein files.read mehr im Download, Sperrliste davor', async () => {
+    console.log('\nLinie D: über TLS, mit genau diesem Zertifikat');
+    Abruf.maschineVon = async () => maschine;
+
+    await pruefe('ein anderes Zertifikat wird abgewiesen, ohne dass etwas gesendet wird', async () => {
+        const vorher = anfragen.length;
+        const fremd = { ...maschine, abruf_zertifikat: zertifikat('Fremd').cert };
+        await assert.rejects(Abruf.leseAnfang(fremd, 209, 'x', 10), /certificate|self.signed/i);
+        Abruf.maschineVon = async () => fremd;
+        await assert.rejects(Abruf.schreibe(55, 209, '/server.properties', Buffer.from('rcon')), /certificate|self.signed/i);
+        Abruf.maschineVon = async () => maschine;
+        assert.strictEqual(anfragen.length, vorher, 'die Anfrage ging trotzdem hinaus');
+    });
+
+    await pruefe('Lesen: ganze Datei, darüber der Wurf mit 413', async () => {
+        assert.strictEqual((await Abruf.lies(55, 209, 'a.log', inhalt.length)).length, inhalt.length);
+        await assert.rejects(Abruf.lies(55, 209, 'a.log', 1024), (e) => e.statusCode === 413 && /zu groß/.test(e.message));
+    });
+
+    await pruefe('Schreiben: eigene Unterschrift, Inhalt kommt an, Absage des Daemons mit Grund', async () => {
+        await Abruf.schreibe(55, 209, '/server.properties', Buffer.from('rcon=1'));
+        assert.strictEqual(angekommen.at(-1).inhalt.toString(), 'rcon=1');
+        await assert.rejects(Abruf.schreibe(55, 209, '/voll', Buffer.from('x')), (e) => e.statusCode === 422 && /Platzgrenze/.test(e.message));
+    });
+
+    await pruefe('Hochladen: Auftrag ist unterschrieben, Pfade kommen zurück', async () => {
+        const pfade = await Abruf.legeAb(55, { serverId: 209, ziel: 'game/Mods', dateiname: 'Mein Mod €.zip', entpacken: true, marker: 'ModInfo.xml' }, Buffer.from('zip'));
+        assert.deepStrictEqual(pfade, ['game/Mods/A.dll']);
+        assert.strictEqual(angekommen.at(-1).q.get('dateiname'), 'Mein Mod €.zip');
+        assert.strictEqual(angekommen.at(-1).q.get('entpacken'), '1');
+    });
+
+    await pruefe('Route: kein Lesebefehl mehr im Download, Sperrliste davor', async () => {
         const r = ohneKommentare(lies('plugins/gameserver/dashboard/routes/files.js'));
         const ab = r.indexOf("router.get('/servers/:serverId/files/download'");
         const route = r.slice(ab, r.indexOf('module.exports', ab));

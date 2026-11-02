@@ -55,14 +55,13 @@ const frisch = (files) => ({ id: 1, kennung: 'wbtest', status: 'offen', entwurf:
 /** Ein Daemon als Attrappe: je Ordner eine Antwort. */
 function daemon(ordner, dateien = {}) {
     const fragen = [];
+    require('../plugins/gameserver/dashboard/helpers/Abruf').lies = async (_rootserver, _server, pfad) => {
+        if (dateien[pfad] === undefined) throw new Error('nicht lesbar');
+        return Buffer.from(dateien[pfad]);
+    };
     return {
         fragen,
         sendCommand: async (id, befehl, nutzlast) => {
-            if (befehl === 'gameserver.files.read') {
-                const inhalt = dateien[nutzlast.path];
-                if (inhalt === undefined) throw new Error('nicht lesbar');
-                return { success: true, data: { content: Buffer.from(inhalt).toString('base64') } };
-            }
             assert.strictEqual(befehl, 'gameserver.files.list');
             fragen.push(nutzlast.path);
             const a = ordner[nutzlast.path];

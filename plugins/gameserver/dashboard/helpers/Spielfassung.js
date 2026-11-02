@@ -23,7 +23,7 @@
  *
  * ── Wer liest ───────────────────────────────────────────────────────────────
  *
- * Das Dashboard, über `gameserver.files.read` — derselbe Weg wie der
+ * Das Dashboard, über den Abruf (`Abruf.lies`) — derselbe Weg wie der
  * Merkzettel von Minecraft. Im Entwurf stand „der Daemon liest und meldet";
  * das wäre ein zweiter Weg zur selben Auskunft gewesen. Gelesen wird nach der
  * Installation und bei jedem Start (ein Update gibt es nur beim Start), und
@@ -32,6 +32,10 @@
  */
 
 const { ServiceManager } = require('dunebot-core');
+const Abruf = require('./Abruf');
+
+/** Merkzettel und Spieldateien, die hier gelesen werden, sind klein. */
+const MERKZETTEL_GRENZE = 10 * 1024 * 1024;
 
 /** Wie lang ein gelesener Wert höchstens sein darf — eine Fassung, kein Text. */
 const MAX = { build: 40, label: 60 };
@@ -58,14 +62,9 @@ async function leseDatei(server, pfad) {
     const ipmServer = ServiceManager.has('ipmServer') ? ServiceManager.get('ipmServer') : null;
     const daemonId = await daemonVon(dbService, server);
     if (!daemonId || !ipmServer?.isDaemonOnline(daemonId)) return { text: null, grund: 'Daemon nicht erreichbar' };
-    const gelesen = await ipmServer.sendCommand(daemonId, 'gameserver.files.read', {
-        server_id: String(server.id),
-        rootserver_id: String(server.rootserver_id),
-        install_path: server.install_path,
-        path: pfad,
-    }, 8000).catch(fehler => ({ success: false, error: fehler.message }));
-    if (!gelesen?.success) return { text: null, grund: gelesen?.error || 'keine Antwort' };
-    return { text: Buffer.from(String(gelesen.data?.content || ''), 'base64').toString('utf8'), grund: null };
+    return Abruf.lies(server.rootserver_id, server.id, pfad, MERKZETTEL_GRENZE).then(
+        inhalt => ({ text: inhalt.toString('utf8'), grund: null }),
+        fehler => ({ text: null, grund: fehler.message }));
 }
 
 /** Das erste Wort eines Merkzettels aus `.fb` (Minecraft) — oder null. */

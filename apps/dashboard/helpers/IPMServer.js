@@ -39,10 +39,11 @@ const VERSION_JSON_PATH = path.join(__dirname, '..', 'downloads', 'daemon', 'ver
  * Groesste Nachricht, die ueber die Daemon-Verbindung passt.
  *
  * Muss mit `MaxNachrichtBytes` im Daemon uebereinstimmen
- * (internal/websocket/client.go). 64 MiB tragen eine base64-kodierte Datei von
- * rund 47 MB Rohgroesse — deshalb begrenzt die Upload-Route auf 45 MB.
+ * (internal/websocket/client.go). Dateien fahren seit FireBus Etappe 2 nicht mehr
+ * im Bus. Die groesste Nachricht war in 48 Stunden Zaehlung 135 KB, eine
+ * Modpack-Antwort mit 2.269 Dateien; 4 MiB lassen Luft fuer groessere Pakete.
  */
-const MAX_NACHRICHT_BYTES = 64 * 1024 * 1024;
+const MAX_NACHRICHT_BYTES = 4 * 1024 * 1024;
 
 class IPMServer {
     /**
@@ -516,7 +517,7 @@ class IPMServer {
 
     async _handleRegister(ws, payload, clientIp) {
         const { token, daemon_id, version, hardware, sftp_fingerprint, sftp_port, sftp_grund,
-                abruf_port, base_directory } = payload;
+                abruf_port, abruf_zertifikat, base_directory } = payload;
 
         if (!token || !daemon_id) {
             return { success: false, error: 'Missing token or daemon_id' };
@@ -570,6 +571,7 @@ class IPMServer {
                         // `?? null` und nicht `|| null`: Der Wert soll auch
                         // dann gesetzt werden, wenn er fehlt — dann als NULL.
                         abrufPort:       abruf_port ?? null,
+                        abrufZertifikat: abruf_zertifikat ?? null,
                     });
                     // SFTP: Port oder Grund, gegen den Wunsch am Rootserver (2026-10-27).
                     await RootServer.uebernimmSftp(daemon_id, { port: sftp_port || null, grund: sftp_grund || null })
@@ -676,6 +678,7 @@ class IPMServer {
                 sftpPort:        sftp_port || null,
                 baseDirectory:   base_directory || null,
                 abrufPort:       abruf_port ?? null,
+                abrufZertifikat: abruf_zertifikat ?? null,
             });
             // SFTP: Port oder Grund, gegen den Wunsch am Rootserver (2026-10-27).
             await RootServer.uebernimmSftp(daemon_id, { port: sftp_port || null, grund: sftp_grund || null })

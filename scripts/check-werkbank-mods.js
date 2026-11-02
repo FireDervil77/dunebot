@@ -279,7 +279,7 @@ function frisch(mehr = {}) {
         gleich(Inhalte.modMarker({ mod_marker: 'ModInfo.xml' }, Inhalte.ART_LADER), {});
         gleich(Inhalte.modMarker({}, Inhalte.ART_MOD), {});
         for (const d of ['routes/inhalte.js', 'helpers/InhalteHolen.js']) {
-            assert.match(lies(WURZEL, 'plugins/gameserver/dashboard', d), /\.\.\.Inhalte\.modMarker\(inhalt, art\),/, d);
+            assert.match(lies(WURZEL, 'plugins/gameserver/dashboard', d), /Inhalte\.modMarker\(inhalt, art\)/, d);
         }
         gleich(Inhalte.modOrdnerAus(['game/Mods/A/ModInfo.xml', 'game/Mods/A/a.dll', 'game/Mods/B/ModInfo.xml'], 'game/Mods', 'ModInfo.xml'),
             ['game/Mods/A', 'game/Mods/B']);

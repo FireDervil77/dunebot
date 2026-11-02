@@ -128,7 +128,7 @@ const db = {
 
 const daemon = {
     abrufe: [],          // gameserver.content.fetch
-    hochgeladen: [],     // gameserver.content.install
+    hochgeladen: [],     // Abruf.legeAb
     geloescht: [],       // gameserver.files.delete
     gelistet: [], gelesen: [], logInhalt: '', logFehlt: false,
     leer: new Set(),     // Ordner, die beim Listen leer sind
@@ -143,11 +143,6 @@ const daemon = {
             const wurzel = nutzlast.ziel ? nutzlast.ziel + '/' : '';
             return { success: true, data: { dateien: [wurzel + 'A.dll', wurzel + 'B.dll'] } };
         }
-        // Hochladen (Stufe 10 S2): nur was ankam, nicht was es tut.
-        if (befehl === 'gameserver.content.install') {
-            this.hochgeladen.push(nutzlast);
-            return { success: true, data: { dateien: [(nutzlast.ziel ? nutzlast.ziel + '/' : '') + nutzlast.dateiname] } };
-        }
         if (befehl === 'gameserver.files.delete') {
             this.geloescht.push(nutzlast.path);
             return { success: true };
@@ -158,13 +153,20 @@ const daemon = {
             return { success: true, data: { files: this.logFehlt ? [] : [
                 { name: 'LogOutput.log', is_dir: false, size: this.logInhalt.length, mod_time: '2026-09-13T14:26:42Z' }] } };
         }
-        if (befehl === 'gameserver.files.read') {
-            this.gelesen.push(nutzlast.path);
-            // Wie `HandleFileRead` im Daemon: immer Base64 (Baustelle 135).
-            return { success: true, data: { content: Buffer.from(this.logInhalt, 'utf8').toString('base64') } };
-        }
         throw new Error('Unerwarteter Befehl: ' + befehl);
     },
+};
+
+// Hochladen (Stufe 10 S2): nur was ankam, nicht was es tut.
+const Abruf = require(path.join(HELFER, 'Abruf.js'));
+Abruf.legeAb = async (_rootserver, auftrag) => {
+    daemon.hochgeladen.push(auftrag);
+    return [(auftrag.ziel ? auftrag.ziel + '/' : '') + auftrag.dateiname];
+};
+Abruf.maschineVon = async () => ({});
+Abruf.leseAnfang = async (_maschine, _server, pfad) => {
+    daemon.gelesen.push(pfad);
+    return Buffer.from(daemon.logInhalt, 'utf8');
 };
 
 if (!ServiceManager.has('dbService')) ServiceManager.register('dbService', db);

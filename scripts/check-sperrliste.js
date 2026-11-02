@@ -98,8 +98,8 @@ ServiceManager.register('Logger', { debug: still, info: still, warn: still, erro
                 return [{ id: 7, guild_id: 'g1', rootserver_id: 3, daemon_id: 'd1', install_path: '', addon_marketplace_id: 1706 }];
             }
             // Der Download läuft seit 2026-10-29 über den Abruf des Daemons (F4a).
-            if (/^SELECT host, abruf_port, api_key FROM rootserver WHERE id = \?$/.test(sql.trim())) {
-                return [{ host: '127.0.0.1', abruf_port: 9350, api_key: 'k' }];
+            if (/^SELECT host, abruf_port, api_key, abruf_zertifikat FROM rootserver WHERE id = \?$/.test(sql.trim())) {
+                return [{ host: '127.0.0.1', abruf_port: 9350, api_key: 'k', abruf_zertifikat: 'pem' }];
             }
             throw new Error(`Attrappe kennt die Abfrage nicht: ${sql.trim().slice(0, 80)}`);
         },
@@ -112,6 +112,13 @@ ServiceManager.register('Logger', { debug: still, info: still, warn: still, erro
         res.statusCode = 200;
         return { status: 200, bytes: 1 };
     };
+    Abruf.lies = async (_rootserver, _server, pfad) => {
+        daemonAufrufe.push({ befehl: 'abruf', nutzlast: pfad });
+        return Buffer.from('x');
+    };
+    Abruf.schreibe = async (_rootserver, _server, pfad) => {
+        daemonAufrufe.push({ befehl: 'abruf', nutzlast: pfad });
+    };
     ServiceManager.register('ipmServer', {
         isDaemonOnline: () => true,
         sendCommand: async (daemon, befehl, nutzlast) => {
@@ -121,7 +128,6 @@ ServiceManager.register('Logger', { debug: still, info: still, warn: still, erro
                     { name: 'bin', is_dir: true, size: 0 }, { name: 'saves', is_dir: true, size: 0 },
                 ] } };
             }
-            if (befehl === 'gameserver.files.read') return { success: true, data: { content: Buffer.from('x').toString('base64') } };
             return { success: true, data: {} };
         },
     });

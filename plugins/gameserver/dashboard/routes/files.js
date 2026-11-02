@@ -16,8 +16,12 @@ const path = require('path');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 const Paketfassung = require('../helpers/Paketfassung');
 const Konfigdateien = require('../helpers/Konfigdateien');
+const Abruf = require('../helpers/Abruf');
 // Grenze und Annahme liegen im Helfer — die Inhalte-Seite benutzt dieselben.
 const { nimmDatei, MAX_UPLOAD_BYTES } = require('../helpers/DateiAnnahme');
+
+/** Bis hierher öffnet der Editor eine Datei, darüber bietet die Seite das Herunterladen an. */
+const EDITOR_GRENZE = 10 * 1024 * 1024;
 const { gesperrt, ladeSperrliste } = require('../helpers/Sperrliste');
 
 // Helper Functions
@@ -140,7 +144,6 @@ router.get('/servers/:serverId/files', requirePermission('GAMESERVER.FILES.VIEW'
 
 router.get('/servers/:serverId/files/read', requirePermission('GAMESERVER.FILES.VIEW'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
-    const ipmServer = ServiceManager.get('ipmServer');
     try {
         const { serverId } = req.params;
         const guildId = res.locals.guildId;
@@ -151,23 +154,12 @@ router.get('/servers/:serverId/files/read', requirePermission('GAMESERVER.FILES.
 
         if (await sperrt(res, server, [filePath])) return;
 
-        const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.files.read', {
-            server_id: serverId.toString(),
-            rootserver_id: server.rootserver_id.toString(),
-            install_path: server.install_path,
-            path: filePath
-        });
-        
-        if (!response.success) {
-            return res.status(500).json({ success: false, error: response.error });
-        }
-        
-        const content = Buffer.from(response.data.content, 'base64').toString('utf8');
-        res.json({ success: true, content, path: filePath });
+        const inhalt = await Abruf.lies(server.rootserver_id, serverId, filePath, EDITOR_GRENZE);
+        res.json({ success: true, content: inhalt.toString('utf8'), path: filePath });
     } catch (error) {
-        // Der Editor nimmt bis 10 MB (Daemon, HandleFileRead). Das ist kein
-        // Fehler der Datei: Die Seite bietet dann das Herunterladen an (F4b).
-        if (/zu groß/i.test(String(error.message))) {
+        // Der Editor nimmt bis 10 MB. Das ist kein Fehler der Datei: Die Seite
+        // bietet dann das Herunterladen an (F4b).
+        if (error.statusCode === 413) {
             return res.status(413).json({ success: false, zuGross: true, error: error.message });
         }
         Logger.error('[Files] Read Error:', error);
@@ -177,7 +169,6 @@ router.get('/servers/:serverId/files/read', requirePermission('GAMESERVER.FILES.
 
 router.post('/servers/:serverId/files/write', requirePermission('GAMESERVER.FILES.MANAGE'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
-    const ipmServer = ServiceManager.get('ipmServer');
     try {
         const { serverId } = req.params;
         const guildId = res.locals.guildId;
@@ -190,31 +181,15 @@ router.post('/servers/:serverId/files/write', requirePermission('GAMESERVER.FILE
 
         if (await sperrt(res, server, [filePath])) return;
 
-        const contentBase64 = Buffer.from(content, 'utf8').toString('base64');
-
-        // Dieselbe Grenze wie beim Upload: Der Inhalt geht in einer einzigen
-        // Nachricht zum Daemon. Wird sie zu gross, schliesst die Gegenseite die
-        // Verbindung, statt zu antworten.
-        if (Buffer.byteLength(contentBase64) > MAX_UPLOAD_BYTES) {
+        const inhalt = Buffer.from(content, 'utf8');
+        if (inhalt.length > MAX_UPLOAD_BYTES) {
             return res.status(413).json({
                 success: false,
                 error: `Datei zu gross zum Speichern (Grenze: ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)} MB).`
             });
         }
 
-        
-        const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.files.write', {
-            server_id: serverId.toString(),
-            rootserver_id: server.rootserver_id.toString(),
-            install_path: server.install_path,
-            path: filePath,
-            content: contentBase64
-        });
-        
-        if (!response.success) {
-            return res.status(500).json({ success: false, error: response.error });
-        }
-        
+        await Abruf.schreibe(server.rootserver_id, serverId, filePath, inhalt);
         res.json({ success: true, message: 'Datei gespeichert' });
     } catch (error) {
         Logger.error('[Files] Write Error:', error);
@@ -444,7 +419,6 @@ router.post('/servers/:serverId/files/bulk-move', requirePermission('GAMESERVER.
 
 router.post('/servers/:serverId/files/upload', requirePermission('GAMESERVER.FILES.MANAGE'), nimmDatei, async (req, res) => {
     const Logger = ServiceManager.get('Logger');
-    const ipmServer = ServiceManager.get('ipmServer');
     try {
         const { serverId } = req.params;
         const guildId = res.locals.guildId;
@@ -463,20 +437,7 @@ router.post('/servers/:serverId/files/upload', requirePermission('GAMESERVER.FIL
 
         if (await sperrt(res, server, [targetPath])) return;
 
-        const contentBase64 = req.file.buffer.toString('base64');
-
-        const response = await ipmServer.sendCommand(server.daemon_id, 'gameserver.files.write', {
-            server_id: serverId.toString(),
-            rootserver_id: server.rootserver_id.toString(),
-            install_path: server.install_path,
-            path: targetPath,
-            content: contentBase64
-        });
-
-        if (!response.success) {
-            return res.status(500).json({ success: false, error: response.error });
-        }
-
+        await Abruf.schreibe(server.rootserver_id, serverId, targetPath, req.file.buffer);
         res.json({ success: true, message: `${req.file.originalname} hochgeladen` });
     } catch (error) {
         Logger.error('[Files] Upload Error:', error);
@@ -490,8 +451,8 @@ router.post('/servers/:serverId/files/upload', requirePermission('GAMESERVER.FIL
  * Query: ?path=/server.properties
  *
  * Über den Abruf des Daemons, wie Sicherungen (Baustelle 135, F4a, 2026-10-29).
- * Bis dahin lief das über `gameserver.files.read`: die ganze Datei als Base64
- * in einer Nachricht, und über 10 MB lehnte der Daemon ab. Große Logs und
+ * Bis dahin lief das als Befehl: die ganze Datei als Base64 in einer
+ * Nachricht, und über 10 MB lehnte der Daemon ab. Große Logs und
  * Welten ließen sich gar nicht herunterladen. Jetzt fließt ein Strom ohne
  * Grenze, und ein abgebrochener Download lässt sich fortsetzen (Range).
  *
@@ -500,7 +461,6 @@ router.post('/servers/:serverId/files/upload', requirePermission('GAMESERVER.FIL
  */
 router.get('/servers/:serverId/files/download', requirePermission('GAMESERVER.FILES.VIEW'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
-    const dbService = ServiceManager.get('dbService');
     try {
         const { serverId } = req.params;
         const guildId = res.locals.guildId;
@@ -512,19 +472,9 @@ router.get('/servers/:serverId/files/download', requirePermission('GAMESERVER.FI
         const server = await validateServerAccess(serverId, guildId);
         if (await sperrt(res, server, [filePath])) return;
 
-        const [maschine] = await dbService.query(
-            'SELECT host, abruf_port, api_key FROM rootserver WHERE id = ?', [server.rootserver_id]);
-        if (!maschine?.abruf_port) {
-            return res.status(503).json({ success: false,
-                error: 'Die Maschine bietet keinen Abruf an — der Daemon ist zu alt oder sein Abruf-Zuhörer läuft nicht.' });
-        }
-        if (!maschine.api_key) {
-            return res.status(500).json({ success: false, error: 'Für diese Maschine ist kein Schlüssel hinterlegt.' });
-        }
-
-        const Abruf = require('../helpers/Abruf');
+        const maschine = await Abruf.maschineVon(server.rootserver_id);
         const ergebnis = await Abruf.reicheDurch(
-            Abruf.dateiAdresse(maschine, serverId, filePath), req, res, path.basename(filePath));
+            Abruf.dateiAdresse(maschine, serverId, filePath), req, res, path.basename(filePath), maschine);
         if (ergebnis.fehler) {
             Logger.warn(`[Files] Download von Server ${serverId} (${filePath}) nicht ausgeliefert: ${ergebnis.fehler}`);
         }

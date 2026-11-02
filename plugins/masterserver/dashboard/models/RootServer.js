@@ -233,6 +233,11 @@ class RootServer {
             fields.push('abruf_port = ?');
             values.push(Number.isInteger(port) && port > 0 ? port : null);
         }
+        // Dasselbe beim Zertifikat: Ein altes darf nicht stehenbleiben.
+        if (daten.abrufZertifikat !== undefined) {
+            fields.push('abruf_zertifikat = ?');
+            values.push(daten.abrufZertifikat ? String(daten.abrufZertifikat).slice(0, 8192) : null);
+        }
         if (daten.installStatus) { fields.push('install_status = ?'); values.push(daten.installStatus); }
         if (daten.sessionToken) {
             fields.push('session_token = ?');

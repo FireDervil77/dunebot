@@ -4025,7 +4025,7 @@ router.get('/:serverId/backups/:backupId/download',
 
         const [zeile] = await dbService.query(
             `SELECT b.name, b.status,
-                    r.host, r.fqdn, r.fqdn_gilt, r.abruf_port, r.api_key
+                    r.host, r.fqdn, r.fqdn_gilt, r.abruf_port, r.api_key, r.abruf_zertifikat
                FROM gameserver_backups b
                JOIN gameservers gs ON gs.id = b.server_id
                JOIN rootserver r  ON r.id = gs.rootserver_id
@@ -4041,7 +4041,7 @@ router.get('/:serverId/backups/:backupId/download',
                 message: 'Diese Sicherung ist noch nicht fertig.'
             });
         }
-        if (!zeile.abruf_port) {
+        if (!zeile.abruf_port || !zeile.abruf_zertifikat) {
             // Kein stiller Fehlschlag: Der Betreiber soll den Grund lesen
             // koennen, sonst sucht er ihn beim Browser.
             return res.status(503).json({
@@ -4074,7 +4074,7 @@ router.get('/:serverId/backups/:backupId/download',
         const Abruf = require('../helpers/Abruf');
         const wirt = Abruf.wirtFuerBrowser(zeile);
 
-        const adresse = `http://${wirt}:${zeile.abruf_port}/sicherung`
+        const adresse = `${Abruf.gesichert(zeile)}/sicherung`
             + `?server=${encodeURIComponent(serverId)}`
             + `&datei=${encodeURIComponent(datei)}`
             + `&bis=${bis}`
@@ -4084,7 +4084,7 @@ router.get('/:serverId/backups/:backupId/download',
             + `Dashboard ausgeliefert, von ${wirt}:${zeile.abruf_port}`
             + (req.headers.range ? ` (Bereich ${req.headers.range})` : ''));
 
-        const ergebnis = await Abruf.reicheDurch(adresse, req, res, datei);
+        const ergebnis = await Abruf.reicheDurch(adresse, req, res, datei, zeile);
         if (ergebnis.fehler) {
             Logger.warn(`[Gameserver/Backups] Sicherung ${backupId} nicht ausgeliefert: ${ergebnis.fehler}`);
         } else {

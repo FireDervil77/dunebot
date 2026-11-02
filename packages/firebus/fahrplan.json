@@ -1,5 +1,5 @@
 {
-  "fassung": 3,
+  "fassung": 4,
   "linien": {"S": "Steuerung", "L": "Live", "O": "Output", "V": "Verify", "E": "Events", "D": "Datei"},
   "zeilen": [
     {"name": "register", "art": "steuerung", "von": "daemon", "linie": "V", "verlust": "nie"},
@@ -53,7 +53,6 @@
     {"name": "daemon.update", "art": "befehl", "von": "dashboard", "linie": "S", "verlust": "nie", "reihe": "keine", "arbeit": "frei"},
     {"name": "gameserver.content.modpack", "art": "befehl", "von": "dashboard", "linie": "S", "verlust": "nie", "reihe": "server", "schwer": true, "arbeit": "bindet"},
     {"name": "gameserver.content.fetch", "art": "befehl", "von": "dashboard", "linie": "S", "verlust": "nie", "reihe": "server", "schwer": true, "arbeit": "bindet"},
-    {"name": "gameserver.content.install", "art": "befehl", "von": "dashboard", "linie": "S", "verlust": "nie", "reihe": "server", "schwer": true, "arbeit": "bindet"},
     {"name": "gameserver.uninstall", "art": "befehl", "von": "dashboard", "linie": "S", "verlust": "nie", "reihe": "server", "schwer": true, "arbeit": "bindet"},
     {"name": "virtual.create", "art": "befehl", "von": "dashboard", "linie": "S", "verlust": "nie", "reihe": "maschine", "schwer": true, "arbeit": "bindet"},
     {"name": "virtual.delete", "art": "befehl", "von": "dashboard", "linie": "S", "verlust": "nie", "reihe": "maschine", "schwer": true, "arbeit": "bindet"},
@@ -89,8 +88,6 @@
     {"name": "task:list", "art": "befehl", "von": "dashboard", "linie": "S", "verlust": "nie", "reihe": "keine", "arbeit": "bindet"},
     {"name": "task:cancel", "art": "befehl", "von": "dashboard", "linie": "S", "verlust": "nie", "reihe": "keine", "arbeit": "bindet"},
     {"name": "system.messwerte", "art": "befehl", "von": "dashboard", "linie": "S", "verlust": "nie", "reihe": "keine", "arbeit": "bindet"},
-    {"name": "gameserver.files.read", "art": "befehl", "von": "dashboard", "linie": "D", "verlust": "nie", "reihe": "keine", "arbeit": "bindet"},
-    {"name": "gameserver.files.write", "art": "befehl", "von": "dashboard", "linie": "D", "verlust": "nie", "reihe": "dateien", "arbeit": "bindet"},
     {"name": "sftp.anwenden", "art": "befehl", "von": "dashboard", "linie": "V", "verlust": "nie", "reihe": "maschine", "arbeit": "bindet"},
     {"name": "sftp.user.sync", "art": "befehl", "von": "dashboard", "linie": "V", "verlust": "nie", "reihe": "maschine", "arbeit": "bindet"},
     {"name": "sftp.users.replace", "art": "befehl", "von": "dashboard", "linie": "V", "verlust": "nie", "reihe": "maschine", "arbeit": "bindet"},

@@ -14,17 +14,11 @@
 const multer = require('multer');
 
 /**
- * Groesste Datei, die durch die Daemon-Verbindung passt.
+ * Groesste Datei, die das Panel annimmt.
  *
- * Der Inhalt geht base64-kodiert in EINER WebSocket-Nachricht zum Daemon, wird
- * dabei also um ein Drittel groesser. Die Nachrichtengrenze liegt bei 64 MiB
- * (MAX_NACHRICHT_BYTES im IPMServer, MaxNachrichtBytes im Daemon) — 45 MB
- * Rohgroesse landen bei rund 60 MiB und bleiben sicher darunter.
- *
- * Bis zum 2026-08-04 stand hier 500 MB. Das war eine Zusage, die die Leitung
- * nicht halten konnte: Ueberschreitet eine Nachricht die Grenze der Gegenseite,
- * schliesst diese die Verbindung (Status 1009), statt zu antworten. Der Daemon
- * verschwand also mitten im Upload und galt als offline.
+ * Seit FireBus Etappe 2 geht sie per PUT zum Daemon, nicht mehr im Bus. Die Zahl
+ * blieb: Die Datei liegt beim Annehmen im Speicher des Dashboards, und der
+ * Daemon nimmt bis `MaxSchreibBytes`.
  */
 const MAX_UPLOAD_BYTES = 45 * 1024 * 1024;
 
@@ -39,7 +33,7 @@ function nimmDatei(req, res, next) {
         if (err && err.code === 'LIMIT_FILE_SIZE') {
             return res.status(413).json({
                 success: false,
-                error: `Datei zu gross. Ueber die Daemon-Verbindung passen hoechstens ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)} MB.`
+                error: `Datei zu gross. Das Panel nimmt hoechstens ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)} MB.`
             });
         }
         if (err) return next(err);

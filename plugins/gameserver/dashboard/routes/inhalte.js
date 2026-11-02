@@ -22,6 +22,7 @@
 const express = require('express');
 const router = express.Router();
 const Modpackstand = require('../helpers/Modpackstand');
+const Abruf = require('../helpers/Abruf');
 
 // Wird ein Server gerade gelöscht, ändert niemand mehr etwas an ihm.
 router.param('serverId', require('../helpers/Loeschung').sperre);
@@ -100,7 +101,7 @@ function wirkung(geladen) {
  */
 const { daemonVon } = InhalteHolen;
 
-/** Bis hierher nimmt `gameserver.files.read`; darüber nur der Anfang (F4c). */
+/** Vom Log wird nur der Anfang gelesen (F4c), dort steht das Laden. */
 const LOG_GRENZE = 10 * 1024 * 1024;
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -266,16 +267,11 @@ router.post('/:serverId/inhalte', requirePermission('GAMESERVER.FILES.MANAGE'), 
         }
         const entpacken = /\.zip$/i.test(req.file.originalname);
 
-        const antwort = await ipmServer.sendCommand(daemonId, 'gameserver.content.install', {
-            server_id:     String(serverId),
-            rootserver_id: String(geladen.server.rootserver_id),
-            install_path:  geladen.server.install_path,
-            ziel,
-            dateiname:     req.file.originalname,
-            inhalt:        req.file.buffer.toString('base64'),
-            entpacken,
-            ...Inhalte.modMarker(inhalt, art),
-        }, 120000);
+        const antwort = await Abruf.legeAb(geladen.server.rootserver_id, {
+            serverId, ziel, dateiname: req.file.originalname, entpacken,
+            marker: Inhalte.modMarker(inhalt, art).mod_marker || '',
+        }, req.file.buffer).then(dateien => ({ success: true, data: { dateien } }),
+            fehler => ({ success: false, error: fehler.message }));
 
         if (!antwort?.success) {
             // **Die Zeile wird trotzdem geschrieben** — als fehlgeschlagen, mit
@@ -1023,31 +1019,16 @@ router.get('/:serverId/inhalte/ladestand', requirePermission('GAMESERVER.VIEW'),
         const eintrag = liste?.success ? (liste.data?.files || []).find(f => f.name === datei && !f.is_dir) : null;
         if (!eintrag) return nicht('Seit der Lader liegt, gab es noch keinen Start — die Logdatei fehlt.');
 
-        // Ein Log über der Grenze des Lesebefehls (10 MB): nur sein Anfang, über
-        // den Abruf (F4c). Vollgelaufene Logs waren genau der Fall, in dem die
-        // Seite bisher „ließ sich nicht lesen" sagte; der Parser braucht den
-        // Anfang, dort steht das Laden. Was weiter hinten steht, sieht er dann
-        // nicht — darum `nurAnfang` in der Antwort.
+        // Vollgelaufene Logs waren genau der Fall, in dem die Seite bisher „ließ
+        // sich nicht lesen" sagte. Der Parser braucht den Anfang; was weiter
+        // hinten steht, sieht er nicht — darum `nurAnfang` in der Antwort.
         const nurAnfang = Number(eintrag.size) > LOG_GRENZE;
         let roh;
-        if (nurAnfang) {
-            const [maschine] = await dbService.query(
-                'SELECT host, abruf_port, api_key FROM rootserver WHERE id = ?', [geladen.server.rootserver_id]);
-            if (!maschine?.abruf_port || !maschine.api_key) {
-                return nicht('Die Logdatei ist größer als 10 MB, und die Maschine bietet keinen Abruf an.');
-            }
-            try {
-                roh = await require('../helpers/Abruf').leseAnfang(maschine, geladen.server.id, pfad, LOG_GRENZE);
-            } catch (fehler) {
-                return nicht('Die Logdatei ließ sich nicht lesen: ' + fehler.message);
-            }
-        } else {
-            const gelesen = await ipmServer.sendCommand(daemonId, 'gameserver.files.read', { ...nutzlast, path: pfad }, 15000)
-                .catch(fehler => ({ success: false, error: fehler.message }));
-            if (!gelesen?.success) {
-                return nicht('Die Logdatei ließ sich nicht lesen: ' + (gelesen?.error || 'keine Antwort'));
-            }
-            roh = Buffer.from(String(gelesen.data?.content || ''), 'base64');
+        try {
+            const maschine = await Abruf.maschineVon(geladen.server.rootserver_id);
+            roh = await Abruf.leseAnfang(maschine, geladen.server.id, pfad, LOG_GRENZE);
+        } catch (fehler) {
+            return nicht('Die Logdatei ließ sich nicht lesen: ' + fehler.message);
         }
 
         // ── Der Daemon liefert Base64, immer (Baustelle 135, 2026-09-17) ────

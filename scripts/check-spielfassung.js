@@ -57,16 +57,13 @@ ServiceManager.register('dbService', {
         throw new Error(`Attrappe kennt die Abfrage nicht: ${t.slice(0, 90)}`);
     },
 });
-ServiceManager.register('ipmServer', {
-    isDaemonOnline: () => spur.online,
-    async sendCommand(daemonId, befehl, n) {
-        assert.strictEqual(befehl, 'gameserver.files.read');
-        spur.gelesen.push(n.path);
-        const text = spur.dateien[n.path];
-        if (text === undefined) return { success: false, error: 'Datei nicht gefunden' };
-        return { success: true, data: { content: Buffer.from(text, 'utf8').toString('base64') } };
-    },
-});
+ServiceManager.register('ipmServer', { isDaemonOnline: () => spur.online });
+require(path.join(HELFER, 'Abruf.js')).lies = async (_rootserver, _server, pfad) => {
+    spur.gelesen.push(pfad);
+    const text = spur.dateien[pfad];
+    if (text === undefined) throw new Error('Datei nicht gefunden');
+    return Buffer.from(text, 'utf8');
+};
 
 const Spielfassung = require(path.join(HELFER, 'Spielfassung.js'));
 const SERVER = { id: 222, rootserver_id: 55, install_path: '222-satisfactory' };

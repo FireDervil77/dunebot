@@ -14,9 +14,12 @@
  *   Port   der, auf dem der Daemon WIRKLICH lauscht (`abruf_port`, von ihm
  *          gemeldet). 0 oder leer heisst: der Dienst läuft nicht.
  *
- * http, nicht https: Der Dienst des Daemons hat kein Zertifikat. Für
- * Sicherungen trägt die Unterschrift, für freigegebene Spieldateien braucht es
- * keine Geheimhaltung (Absprache 2026-10-10).
+ * Freigegebene Spieldateien (`/dl/`) bleiben http: Spielclients sprechen nichts
+ * anderes, und Geheimhaltung braucht es dafür nicht (Absprache 2026-10-10).
+ * Alles Unterschriebene läuft seit FireBus Etappe 2 über TLS: Jeder Daemon hat sein
+ * eigenes Zertifikat, meldet es bei der Anmeldung (`rootserver.abruf_zertifikat`), und
+ * das Dashboard vertraut genau diesem. Der Dateiweg steht damit neben dem Bus, die
+ * Linie D aus dem Fahrplan: Lesen, Schreiben und Hochladen fahren nicht mehr im Befehl.
  */
 
 /** Name oder IP, unter der die Maschine erreichbar ist — oder ''. */
@@ -89,7 +92,33 @@ function gibtFrei(paket) {
 // abgebrochener Download weiterlaufen kann — der Daemon kann sie (ServeFile).
 
 const crypto = require('crypto');
-const http = require('http');
+const https = require('https');
+const { ServiceManager } = require('dunebot-core');
+
+/** Genau das eine Zertifikat dieser Maschine. Der Name zählt nicht, die Adresse ist eine IP. */
+function tlsOptionen(maschine) {
+    return { ca: maschine.abruf_zertifikat, checkServerIdentity: () => undefined, minVersion: 'TLSv1.3' };
+}
+
+function fehlerMit(statusCode, meldung) {
+    return Object.assign(new Error(meldung), { statusCode });
+}
+
+/**
+ * Host, Port, Schlüssel und Zertifikat einer Maschine — oder ein Wurf mit Grund.
+ *
+ * @param {number|string} rootserverId
+ * @returns {Promise<{host: string, abruf_port: number, api_key: string, abruf_zertifikat: string}>}
+ */
+async function maschineVon(rootserverId) {
+    const [maschine] = await ServiceManager.get('dbService').query(
+        'SELECT host, abruf_port, api_key, abruf_zertifikat FROM rootserver WHERE id = ?', [rootserverId]);
+    if (!maschine?.abruf_port || !maschine.abruf_zertifikat) {
+        throw fehlerMit(503, 'Die Maschine bietet keinen gesicherten Abruf an — der Daemon ist zu alt oder sein Abruf-Zuhörer läuft nicht.');
+    }
+    if (!maschine.api_key) throw fehlerMit(500, 'Für diese Maschine ist kein Schlüssel hinterlegt.');
+    return maschine;
+}
 
 /** Was vom Daemon an den Browser weitergeht — nichts sonst. */
 const DURCHGEREICHT = ['content-type', 'content-length', 'content-range', 'accept-ranges', 'last-modified', 'etag'];
@@ -121,16 +150,34 @@ function anhangKopf(name) {
  * @param {{host: string, abruf_port: number, api_key: string}} maschine
  * @param {number|string} serverId
  * @param {string} pfad wie der Dateimanager ihn nennt
+ * @param {string} [zeile] `datei-schreiben` für PUT: Eine Adresse zum Lesen darf nie schreiben
  * @returns {string}
  */
-function dateiAdresse(maschine, serverId, pfad) {
+function dateiAdresse(maschine, serverId, pfad, zeile = 'datei') {
     const bis = Math.floor(Date.now() / 1000) + 300;
     const unterschrift = crypto.createHmac('sha256', maschine.api_key)
-        .update(`datei\n${serverId}\n${pfad}\n${bis}`)
+        .update(`${zeile}\n${serverId}\n${pfad}\n${bis}`)
         .digest('hex');
-    return `http://${wirtFuerBrowser(maschine)}:${maschine.abruf_port}/datei`
+    return `${gesichert(maschine)}/datei`
         + `?server=${encodeURIComponent(serverId)}&pfad=${encodeURIComponent(pfad)}`
         + `&bis=${bis}&sig=${unterschrift}`;
+}
+
+/** Der Anfang jeder unterschriebenen Adresse. */
+function gesichert(maschine) {
+    return `https://${wirtFuerBrowser(maschine)}:${maschine.abruf_port}`;
+}
+
+/** Die unterschriebene Adresse, um einen Inhalt abzulegen. Gegenstück: `InhaltUnterschrift`. */
+function inhaltAdresse(maschine, { serverId, ziel, dateiname, entpacken, marker }) {
+    const bis = Math.floor(Date.now() / 1000) + 300;
+    const schalter = entpacken ? 1 : 0;
+    const unterschrift = crypto.createHmac('sha256', maschine.api_key)
+        .update(`inhalt\n${serverId}\n${ziel}\n${dateiname}\n${schalter}\n${marker}\n${bis}`)
+        .digest('hex');
+    const teil = encodeURIComponent;
+    return `${gesichert(maschine)}/inhalt?server=${teil(serverId)}&ziel=${teil(ziel)}&dateiname=${teil(dateiname)}`
+        + `&entpacken=${schalter}&marker=${teil(marker)}&bis=${bis}&sig=${unterschrift}`;
 }
 
 /**
@@ -140,18 +187,19 @@ function dateiAdresse(maschine, serverId, pfad) {
  * mit Grund (502), keine halbe Datei. Bricht der Browser ab, wird die Anfrage
  * beim Daemon abgebrochen.
  *
- * @param {string} adresse    die unterschriebene http-Adresse beim Daemon
+ * @param {string} adresse    die unterschriebene Adresse beim Daemon
  * @param {object} req,res    Express
  * @param {string} dateiname  für Content-Disposition
+ * @param {object} maschine   wegen des Zertifikats
  * @returns {Promise<{status:number, bytes:number}|{fehler:string}>}
  */
-function reicheDurch(adresse, req, res, dateiname) {
+function reicheDurch(adresse, req, res, dateiname, maschine) {
     return new Promise((fertig) => {
         let bytes = 0;
         const kopf = {};
         if (req.headers.range) kopf.Range = req.headers.range;
 
-        const anfrage = http.get(adresse, { headers: kopf, timeout: 15000 }, (antwort) => {
+        const anfrage = https.get(adresse, { ...tlsOptionen(maschine), headers: kopf, timeout: 15000 }, (antwort) => {
             if (antwort.statusCode !== 200 && antwort.statusCode !== 206) {
                 antwort.resume();
                 const grund = antwort.statusCode === 404
@@ -191,9 +239,8 @@ function reicheDurch(adresse, req, res, dateiname) {
 /**
  * Die ersten Bytes einer Datei beim Daemon holen (F4c).
  *
- * Für große Logs: Der Ladestand braucht den Anfang, `gameserver.files.read`
- * lehnt über 10 MB ab. Eine Bereichsanfrage an `/datei` holt nur, was gebraucht
- * wird, und braucht keinen zweiten Lesebefehl.
+ * Für Logs: Der Ladestand braucht den Anfang. Eine Bereichsanfrage an `/datei`
+ * holt nur, was gebraucht wird, ein kürzeres Log kommt ganz.
  *
  * @param {object} maschine wie `dateiAdresse`
  * @param {number|string} serverId
@@ -203,8 +250,8 @@ function reicheDurch(adresse, req, res, dateiname) {
  */
 function leseAnfang(maschine, serverId, pfad, bytes) {
     return new Promise((fertig, nein) => {
-        const anfrage = http.get(dateiAdresse(maschine, serverId, pfad), {
-            headers: { Range: `bytes=0-${bytes - 1}` }, timeout: 15000,
+        const anfrage = https.get(dateiAdresse(maschine, serverId, pfad), {
+            ...tlsOptionen(maschine), headers: { Range: `bytes=0-${bytes - 1}` }, timeout: 15000,
         }, (antwort) => {
             if (antwort.statusCode !== 200 && antwort.statusCode !== 206) {
                 antwort.resume();
@@ -228,4 +275,89 @@ function leseAnfang(maschine, serverId, pfad, bytes) {
     });
 }
 
-module.exports = { wirt, wirtFuerBrowser, basis, downloadAdresse, gibtFrei, reicheDurch, dateiAdresse, anhangKopf, leseAnfang };
+/**
+ * Eine Datei lesen, ganz oder gar nicht.
+ *
+ * @param {number|string} rootserverId
+ * @param {number|string} serverId
+ * @param {string} pfad
+ * @param {number} grenze Über dieser Größe gibt es einen Wurf mit 413. Der Inhalt
+ *        landet im Speicher, große Dateien gehören in `reicheDurch`.
+ * @returns {Promise<Buffer>}
+ */
+async function lies(rootserverId, serverId, pfad, grenze) {
+    const maschine = await module.exports.maschineVon(rootserverId);
+    return new Promise((fertig, nein) => {
+        const anfrage = https.get(dateiAdresse(maschine, serverId, pfad), {
+            ...tlsOptionen(maschine), timeout: 15000,
+        }, (antwort) => {
+            if (antwort.statusCode !== 200) {
+                antwort.resume();
+                return nein(fehlerMit(antwort.statusCode === 404 ? 404 : 502, antwort.statusCode === 404
+                    ? `Datei nicht gefunden: ${pfad}` : `Der Rootserver antwortete mit ${antwort.statusCode}.`));
+            }
+            const zuGross = () => fehlerMit(413, `Datei zu groß (max ${Math.round(grenze / 1024 / 1024)} MB).`);
+            if (Number(antwort.headers['content-length']) > grenze) {
+                antwort.destroy();
+                return nein(zuGross());
+            }
+            const teile = [];
+            let laenge = 0;
+            antwort.on('data', (stueck) => {
+                teile.push(stueck);
+                laenge += stueck.length;
+                if (laenge > grenze) { antwort.destroy(); nein(zuGross()); }
+            });
+            antwort.on('end', () => fertig(Buffer.concat(teile)));
+            antwort.on('error', nein);
+        });
+        anfrage.on('timeout', () => anfrage.destroy(new Error('der Rootserver antwortet nicht')));
+        anfrage.on('error', nein);
+    });
+}
+
+/** Ein PUT an den Abruf. Was der Daemon ablehnt, kommt mit seinem Grund als Wurf zurück. */
+function sende(adresse, maschine, inhalt) {
+    return new Promise((fertig, nein) => {
+        const anfrage = https.request(adresse, {
+            ...tlsOptionen(maschine), method: 'PUT', timeout: 120000,
+            headers: { 'content-type': 'application/octet-stream', 'content-length': inhalt.length },
+        }, (antwort) => {
+            const teile = [];
+            antwort.on('data', (stueck) => teile.push(stueck));
+            antwort.on('error', nein);
+            antwort.on('end', () => {
+                const text = Buffer.concat(teile).toString('utf8').trim();
+                if (antwort.statusCode >= 200 && antwort.statusCode < 300) return fertig(text);
+                nein(fehlerMit(antwort.statusCode, antwort.statusCode === 422 && text
+                    ? text : `Der Rootserver antwortete mit ${antwort.statusCode}.`));
+            });
+        });
+        anfrage.on('timeout', () => anfrage.destroy(new Error('der Rootserver antwortet nicht')));
+        anfrage.on('error', nein);
+        anfrage.end(inhalt);
+    });
+}
+
+/** Eine Datei schreiben. Die Regeln (Platzgrenze, geschützte Dateien) prüft der Daemon. */
+async function schreibe(rootserverId, serverId, pfad, inhalt) {
+    const maschine = await module.exports.maschineVon(rootserverId);
+    await sende(dateiAdresse(maschine, serverId, pfad, 'datei-schreiben'), maschine, inhalt);
+}
+
+/**
+ * Einen Mod oder Lader ablegen.
+ *
+ * @param {number|string} rootserverId
+ * @param {{serverId: number|string, ziel: string, dateiname: string, entpacken: boolean, marker: string}} auftrag
+ * @param {Buffer} inhalt
+ * @returns {Promise<string[]>} die geschriebenen Pfade
+ */
+async function legeAb(rootserverId, auftrag, inhalt) {
+    const maschine = await module.exports.maschineVon(rootserverId);
+    const antwort = await sende(inhaltAdresse(maschine, auftrag), maschine, inhalt);
+    return JSON.parse(antwort).dateien || [];
+}
+
+module.exports = { wirt, wirtFuerBrowser, basis, downloadAdresse, gibtFrei, reicheDurch, dateiAdresse, anhangKopf,
+    leseAnfang, maschineVon, gesichert, lies, schreibe, legeAb };

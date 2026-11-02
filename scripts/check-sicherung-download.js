@@ -19,6 +19,10 @@
 const assert = require('assert');
 const crypto = require('crypto');
 const http = require('http');
+const https = require('https');
+const fs = require('fs');
+const os = require('os');
+const { execFileSync } = require('child_process');
 const path = require('path');
 const express = require('express');
 
@@ -33,7 +37,18 @@ let daemonAntwort = null; // erzwingt einen Status (404, 500), sonst normal
 let daemonSah = [];
 
 // ── Der nachgebaute Daemon ──────────────────────────────────────────────────
-const daemon = http.createServer((req, res) => {
+// Wie der Daemon: ein selbst unterschriebenes Zertifikat, dem das Dashboard vertraut.
+const zertifikat = (() => {
+    const ordner = fs.mkdtempSync(path.join(os.tmpdir(), 'abruf-'));
+    const [schluessel, zert] = ['k.pem', 'z.pem'].map(d => path.join(ordner, d));
+    execFileSync('openssl', ['req', '-x509', '-newkey', 'ec', '-pkeyopt', 'ec_paramgen_curve:prime256v1', '-nodes',
+        '-keyout', schluessel, '-out', zert, '-days', '2', '-subj', '/CN=FireBot Abruf',
+        '-addext', 'basicConstraints=critical,CA:TRUE'], { stdio: 'ignore' });
+    const paar = { key: fs.readFileSync(schluessel, 'utf8'), cert: fs.readFileSync(zert, 'utf8') };
+    fs.rmSync(ordner, { recursive: true });
+    return paar;
+})();
+const daemon = https.createServer(zertifikat, (req, res) => {
     const u = new URL(req.url, 'http://x');
     daemonSah.push({ pfad: u.pathname, range: req.headers.range || null });
     const server = u.searchParams.get('server'), datei = u.searchParams.get('datei');
@@ -60,7 +75,7 @@ const db = {
     async query(sql) {
         if (/FROM gameserver_backups b\s+JOIN gameservers gs/.test(sql)) {
             return [{ name: 'Probe_2026', status: 'completed', host: '127.0.0.1', fqdn: 'node1.firenetworks.de',
-                fqdn_gilt: 1, abruf_port: daemonPort, api_key: SCHLUESSEL }];
+                fqdn_gilt: 1, abruf_port: daemonPort, api_key: SCHLUESSEL, abruf_zertifikat: zertifikat.cert }];
         }
         throw new Error('Unerwartete Abfrage: ' + sql.trim().slice(0, 80));
     },

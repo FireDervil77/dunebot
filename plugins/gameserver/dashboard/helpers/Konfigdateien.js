@@ -33,6 +33,7 @@
 const path = require('path');
 const { zerlegeMuster } = require('./Zusatzports');
 const { gesperrt } = require('./Sperrliste');
+const Abruf = require('./Abruf');
 
 const GRUPPEN = {
     server:  'Server',
@@ -47,7 +48,7 @@ const GRUPPEN = {
 const RE_PFAD = /^(?!.*\.\.)(game|data)(\/[^/*\\]+)*\/[^/\\]+$/;
 
 /** Bis hierher wird `exec` verfolgt: Tiefe je Kette, gelesene Dateien je Abruf. */
-const EXEC_MAX = { tiefe: 4, dateien: 40 };
+const EXEC_MAX = { tiefe: 4, dateien: 40, bytes: 10 * 1024 * 1024 };
 
 const text = (t) => (t && typeof t === 'object' ? (t.de || t.en || '') : '');
 
@@ -155,9 +156,8 @@ async function stand({ server, paket, ipmServer, sperrliste = [] }) {
 
     // ── exec folgen ──────────────────────────────────────────────────────────
     const lies = async (pfad) => {
-        const antwort = await ipmServer.sendCommand(server.daemon_id, 'gameserver.files.read', nutzlast(pfad), 15000)
-            .catch(fehler => ({ success: false, error: fehler.message }));
-        return antwort?.success ? Buffer.from(antwort.data?.content || '', 'base64').toString('utf8') : null;
+        const inhalt = await Abruf.lies(server.rootserver_id, server.id, pfad, EXEC_MAX.bytes).catch(() => null);
+        return inhalt === null ? null : inhalt.toString('utf8');
     };
     const bekannt = new Set([...gruppen.values()].flat().map(z => z.pfad));
     let gelesen = 0;
