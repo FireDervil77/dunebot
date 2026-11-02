@@ -94,6 +94,10 @@ async function pruefe(was, tun) {
     await pruefe('die Karte nennt, wann das Paket installiert wurde', () => {
         assert.match(seite, /Zuletzt installiert: \$\{escape\(modpackZeit\(m\.installiert_am\)\)\}/);
     });
+    await pruefe('aussortierte Client-Mods werden genannt', () => {
+        assert.match(lies('plugins/gameserver/dashboard/helpers/InhalteHolen.js'), /nurClient: daten\.nur_client \|\| \[\]/);
+        assert.match(seite, /d\.nurClient\.join\(', '\)/);
+    });
     await pruefe('das Ergebnis kommt über den Live-Kanal, nicht aus der Antwort', () => {
         assert.match(seite, /m\.stand === 'fertig' && m\.ergebnis\) modpackAusgang\(m\.ergebnis\)/);
         assert.match(seite, /sicht\.on\('modpack_stand'/);

@@ -808,6 +808,8 @@ async function installiereModpack({ server, guildId, paket, laderDesServers, bei
         spielfassung: daten.spielfassung || null,
         dateien: dateien.length,
         ausgelassen: daten.ausgelassen || 0,
+        // Vom Daemon in den Jars erkannt: Sie liessen den Server abstuerzen.
+        nurClient: daten.nur_client || [],
         // Der Abgleich mit Modrinth: wie viele Dateien DESHALB wegblieben
         // (null: der Daemon kennt ihn noch nicht), welche Mods es sind, und ob
         // die Nachfrage ueberhaupt gelang.

@@ -1411,6 +1411,10 @@
       + (d.ausgelassen ? `, ${d.ausgelassen} reine Client-Datei(en) ausgelassen` : '')
       + (ab.ausgelassen ? ` (davon ${ab.ausgelassen}, die nur Modrinth als Client-Mods führt)` : '') + '.',
       12000);
+    if (d.nurClient && d.nurClient.length) {
+      melde('warning', `${d.nurClient.length} Mod(s) aus dem Paket nicht auf den Server gelegt, sie laufen nur `
+        + `im Spiel und hätten ihn abstürzen lassen: ${d.nurClient.join(', ')}.`, 15000);
+    }
     if (ab.fehler) {
       melde('warning', 'Der Abgleich mit Modrinth war nicht möglich — ausgelassen wurde nur, was das Paket '
         + 'selbst als Client-Datei ausweist. Startet der Server nicht, liegt es vermutlich daran.', 15000);
