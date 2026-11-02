@@ -77,7 +77,7 @@ const formular = (stand) => ({
     supported: stand.supported ? '1' : '',
     sources: stand.quellen.filter(q => q.an).map(q => q.kennung),
     source_ids: Object.fromEntries(stand.quellen.filter(q => q.kennung !== 'upload').map(q => [q.kennung, q.id])),
-    path: stand.path, activation: stand.activation,
+    path: stand.path, mod_marker: stand.mod_marker, activation: stand.activation,
     needs_restart: stand.needs_restart ? '1' : '', client_side: stand.client_side ? '1' : '', order_matters: stand.order_matters ? '1' : '',
 });
 const formularLader = (stand) => ({
@@ -258,6 +258,33 @@ function frisch(mehr = {}) {
         // Ohne Kennung fände die Suche im Panel nichts — dieselbe Auskunft gibt Quellen.raumAus.
         assert.strictEqual(Quellen.raumAus({ sources: ['thunderstore'], source_ids: {} }, 'thunderstore'), null);
         assert.strictEqual(Quellen.raumAus({ sources: ['thunderstore'], source_ids: { thunderstore: 'valheim' } }, 'thunderstore'), 'valheim');
+    });
+    await pruefe('Kennungsdatei: steht im Paket, gilt nach dem Schema, geht wieder weg, nicht neben {{content:key}}', async () => {
+        const s = frisch();
+        await S.modsSpeichern(s, gut({ path: 'game/Mods', mod_marker: 'ModInfo.xml' }));
+        assert.strictEqual(s.entwurf.content.mod_marker, 'ModInfo.xml');
+        assert.ok(giltContent(s.entwurf.content), JSON.stringify(giltContent.errors));
+        assert.strictEqual(S.modsStand(s).mod_marker, 'ModInfo.xml');
+        await S.modsSpeichern(s, formular(S.modsStand(s)));
+        assert.strictEqual(s.entwurf.content.mod_marker, 'ModInfo.xml', 'Speichern ohne Änderung hat sie verloren');
+        await S.modsSpeichern(s, gut({ path: 'game/Mods', mod_marker: '' }));
+        assert.ok(!('mod_marker' in s.entwurf.content));
+        await wirft(() => S.modsSpeichern(frisch(), gut({ mod_marker: 'Mods/ModInfo.xml' })), /ein Dateiname/);
+        await wirft(() => S.modsSpeichern(frisch(), gut({ path: 'game/Mods/{{content:key}}', mod_marker: 'ModInfo.xml' })), /schließen sich aus/);
+        assert.ok(S.EIGENE.content.includes('mod_marker'), 'ohne Eintrag fällt das Feld still aus dem Paket');
+    });
+    await pruefe('Kennungsdatei: beide Wege senden sie, nur für Mods, und Entfernen nimmt nur echte Mod-Ordner mit', () => {
+        const Inhalte = require('../plugins/gameserver/dashboard/helpers/Inhalte');
+        gleich(Inhalte.modMarker({ mod_marker: 'ModInfo.xml' }, Inhalte.ART_MOD), { mod_marker: 'ModInfo.xml' });
+        gleich(Inhalte.modMarker({ mod_marker: 'ModInfo.xml' }, Inhalte.ART_LADER), {});
+        gleich(Inhalte.modMarker({}, Inhalte.ART_MOD), {});
+        for (const d of ['routes/inhalte.js', 'helpers/InhalteHolen.js']) {
+            assert.match(lies(WURZEL, 'plugins/gameserver/dashboard', d), /\.\.\.Inhalte\.modMarker\(inhalt, art\),/, d);
+        }
+        gleich(Inhalte.modOrdnerAus(['game/Mods/A/ModInfo.xml', 'game/Mods/A/a.dll', 'game/Mods/B/ModInfo.xml'], 'game/Mods', 'ModInfo.xml'),
+            ['game/Mods/A', 'game/Mods/B']);
+        // Zeilen von vor der Regel liegen flach: Config/ ist dort kein Mod.
+        gleich(Inhalte.modOrdnerAus(['game/Mods/ModInfo.xml', 'game/Mods/Config/x.xml'], 'game/Mods', 'ModInfo.xml'), []);
     });
     await pruefe('abgewiesen: Mods ohne Quelle, ohne Ablageort, mit einem Ort neben dem Spiel', async () => {
         const s = frisch();

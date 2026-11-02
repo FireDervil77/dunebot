@@ -1328,6 +1328,11 @@
           "type": "string",
           "description": "Wohin Mods gelegt werden — RELATIV ZUR VOLUME-WURZEL, nicht zum Spielverzeichnis. Wer sie neben das Spiel legen will (Unity/BepInEx), schreibt das \"game/\" ausdruecklich hin: \"game/BepInEx/plugins\". Gemessen am 2026-09-12 an Server 188: Ohne den Praefix landet der Lader in der Volume-Wurzel, das Spiel laeuft aber in game/ — und Doorstop sucht seine Dateien relativ zum Arbeitsverzeichnis. Die Dateien liegen dann da, und nichts laedt."
         },
+        "mod_marker": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "description": "Die Datei, die einen Mod ausmacht (7 Days to Die: ModInfo.xml). Gesetzt: Der Ordner im Archiv, in dem sie liegt, ist der Mod, und er landet als <path>/<Ordner>/<Inhalt>, egal wie tief er im Archiv steckt. Ein Archiv ohne sie wird abgelehnt. Nicht zusammen mit {{content:key}} im Ablageort: Dort nennt der Mensch den Ordner, hier das Archiv."
+        },
         "activation": {
           "enum": [
             "file_present",

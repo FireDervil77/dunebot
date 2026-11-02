@@ -274,6 +274,7 @@ router.post('/:serverId/inhalte', requirePermission('GAMESERVER.FILES.MANAGE'), 
             dateiname:     req.file.originalname,
             inhalt:        req.file.buffer.toString('base64'),
             entpacken,
+            ...Inhalte.modMarker(inhalt, art),
         }, 120000);
 
         if (!antwort?.success) {

@@ -393,6 +393,30 @@ function ablageFuer(pfad, kennung) {
     return p.split(PLATZHALTER).join(k);
 }
 
+/**
+ * Was der Daemon über die Form eines Mods wissen muss. Nur für Mods: Ein Lader
+ * bringt seine Struktur mit und hat keine Kennungsdatei.
+ */
+function modMarker(inhalt, art) {
+    return art === ART_MOD && inhalt?.mod_marker ? { mod_marker: inhalt.mod_marker } : {};
+}
+
+/**
+ * Die Mod-Ordner in einer Dateiliste: die direkt unter dem Ablageort, in denen die
+ * Kennungsdatei liegt. Zeilen von vor der Regel liegen flach, dort ist `Config/`
+ * kein Mod, und der Ordner darf nicht mit.
+ */
+function modOrdnerAus(dateien, pfad, marker) {
+    const vorne = `${String(pfad).replace(/\/+$/, '')}/`;
+    const klein = new Set(dateien.map(d => String(d).toLowerCase()));
+    const ordner = dateien
+        .filter(d => String(d).startsWith(vorne))
+        .map(d => String(d).slice(vorne.length).split('/'))
+        .filter(teile => teile.length > 1)
+        .map(teile => `${vorne}${teile[0]}`);
+    return [...new Set(ordner)].filter(o => klein.has(`${o}/${marker}`.toLowerCase()));
+}
+
 /** Für die Anzeige: `game/FactoryGame/Mods/<Mod>` statt des Platzhalters. */
 function pfadAnzeige(pfad) {
     return pfad ? String(pfad).split(PLATZHALTER).join('<Mod>') : pfad;
@@ -402,5 +426,5 @@ module.exports = {
     fuerServer, laderAktiv, eintragen, entfernen, schalten, dateienAus, paketAdresse,
     laderUeberStart, waisenVon, brauchtAus,
     ART_LADER, ART_MOD, ART_MODPACK,
-    PLATZHALTER, jeMod, ablageFuer, pfadAnzeige,
+    PLATZHALTER, jeMod, ablageFuer, pfadAnzeige, modMarker, modOrdnerAus,
 };

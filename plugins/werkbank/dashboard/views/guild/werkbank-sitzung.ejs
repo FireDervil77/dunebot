@@ -2099,7 +2099,7 @@
   <%
     // Der flache Teil von `content`. Lader und Varianten (Stufe 2) reisen mit
     // und werden hier genannt, damit man sieht, was die Karte NICHT zeigt.
-    const mo = locals.mods || { vorhanden: false, supported: false, quellen: [], path: '', activation: '', order_matters: false, needs_restart: true, client_side: false, lader: null, jeEinstellung: null, varianten: [] };
+    const mo = locals.mods || { vorhanden: false, supported: false, quellen: [], path: '', mod_marker: '', activation: '', order_matters: false, needs_restart: true, client_side: false, lader: null, jeEinstellung: null, varianten: [] };
     const MO = locals.MODS || { aktivierung: [], max: { pfad: 200, kennung: 80 } };
     const QUELLE_NAME = { upload: 'Hochladen', thunderstore: 'Thunderstore', modrinth: 'Modrinth', nexus: 'Nexus Mods', curseforge: 'CurseForge', 'steam-workshop': 'Steam Workshop' };
     const QUELLE_PLATZ = { thunderstore: 'valheim', modrinth: 'fabric', nexus: 'valheim', curseforge: '', 'steam-workshop': '892970' };
@@ -2176,6 +2176,12 @@
                 'Der Ordner, in den Mods gelegt werden — ab der Wurzel des Volumes, also mit game/ davor: game/BepInEx/plugins, game/mods. '
                 + 'Ohne game/ landen die Dateien neben dem Spiel statt darin: Sie liegen da, und nichts lädt sie.' }) %></div>
               <input class="form-control font-monospace" id="modsPfad" name="path" value="<%= mo.path %>" maxlength="<%= MO.max.pfad %>" spellcheck="false" placeholder="game/mods">
+            </div>
+            <div class="col-md-5">
+              <div class="form-label"><label for="modsKennung">Kennungsdatei</label><%- include('werkbank-hilfe', { text:
+                'Für Spiele, die genau einen Ordner je Mod verlangen. Der Ordner im Archiv, in dem diese Datei liegt, ist der Mod und landet als Ablageort/Ordner/Inhalt, egal wie tief er im Archiv steckt. '
+                + 'Ein Archiv ohne die Datei wird abgelehnt. Leer lassen, wenn das Spiel das nicht braucht. 7 Days to Die: ModInfo.xml.' }) %></div>
+              <input class="form-control font-monospace" id="modsKennung" name="mod_marker" value="<%= mo.mod_marker %>" maxlength="<%= MO.max.kennung %>" spellcheck="false" placeholder="ModInfo.xml">
             </div>
             <div class="col-md-5">
               <div class="form-label"><label for="modsAktivierung">Wie ein Mod scharf wird</label><%- include('werkbank-hilfe', { text:
@@ -4348,6 +4354,7 @@
       sources: q.sources,
       source_ids: q.source_ids,
       path: form.path.value,
+      mod_marker: form.mod_marker.value,
       activation: form.activation.value,
       needs_restart: form.needs_restart.checked ? '1' : '',
       client_side: form.client_side.checked ? '1' : '',

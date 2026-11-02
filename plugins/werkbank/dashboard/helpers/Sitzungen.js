@@ -1113,7 +1113,7 @@ function mischeEinstellung(vorher, neu) {
 const GANZ = '*';
 const EIGENE = { management: ['query', 'rcon', 'saves', 'persist', 'game_version'], files: ['denylist', 'public', 'config_files'], install: ['cache', 'entfernen'],
     commands: GANZ, config: GANZ, requirements: GANZ, console: GANZ,
-    content: ['supported', 'sources', 'source_ids', 'path', 'activation', 'order_matters', 'needs_restart', 'client_side',
+    content: ['supported', 'sources', 'source_ids', 'path', 'mod_marker', 'activation', 'order_matters', 'needs_restart', 'client_side',
         'loader', 'by_setting', 'variants'] };
 /** Die Stücke eines Teils, die eine Karte haben — bei GANZ alle, die `objekt` trägt. */
 const eigeneFelder = (teil, objekt) => (EIGENE[teil] === GANZ ? Object.keys(objekt || {}) : EIGENE[teil]);
@@ -4048,6 +4048,8 @@ async function konsolenfilterSpeichern(sitzung, b) {
 //                   keine Suche
 //   path            wohin Mods gelegt werden, ab der Wurzel des Volumes — ohne
 //                   ihn weist der Reiter jede Installation ab
+//   mod_marker      die Datei, die einen Mod ausmacht: Ihr Ordner im Archiv ist der
+//                   Mod und landet als <path>/<Ordner>/<Inhalt> (7 Days: ModInfo.xml)
 //   needs_restart, client_side, order_matters   Hinweise im Reiter „Inhalte"
 //   activation      liest niemand; es beschreibt nur. `start` gehört zum Lader.
 
@@ -4055,7 +4057,7 @@ const MODS = {
     quellen: ['upload', 'thunderstore', 'modrinth', 'ficsit', 'nexus', 'curseforge', 'steam-workshop'],
     aktivierung: ['file_present', 'list', 'setting', 'start'],
     // Der flache Teil — Lader und Varianten haben ihre eigenen Karten (LADER, variantenStand).
-    felder: ['supported', 'sources', 'source_ids', 'path', 'activation', 'order_matters', 'needs_restart', 'client_side'],
+    felder: ['supported', 'sources', 'source_ids', 'path', 'mod_marker', 'activation', 'order_matters', 'needs_restart', 'client_side'],
     max: { pfad: 200, kennung: 80 },
 };
 const RE_MOD_KENNUNG = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
@@ -4110,6 +4112,11 @@ function modsAusFormular(b, hatVarianten) {
         // der Wurzel des Volumes, das Spiel läuft in game/ — und nichts lädt.
         if (!/^(game|data)\/[^/]/.test(ohne)) throw new Error('Ablageort: ab der Wurzel des Volumes, also mit „game/" davor (game/BepInEx/plugins) — sonst liegen die Mods neben dem Spiel statt darin.');
     }
+    const mod_marker = text(b?.mod_marker);
+    if (mod_marker) {
+        if (mod_marker.length > MODS.max.kennung || !RE_MOD_KENNUNG.test(mod_marker)) throw new Error('Kennungsdatei: ein Dateiname wie ModInfo.xml, ohne Ordner.');
+        if (path.includes('{{content:key}}')) throw new Error('Kennungsdatei und {{content:key}} im Ablageort schließen sich aus: Einmal nennt das Archiv den Ordner, einmal der Mensch.');
+    }
     const activation = text(b?.activation);
     if (activation && !MODS.aktivierung.includes(activation)) throw new Error(`Aktivierung: ${MODS.aktivierung.join(', ')}.`);
     // Die Varianten bringen Quellen und Ablageort selbst mit (Minecraft).
@@ -4117,7 +4124,7 @@ function modsAusFormular(b, hatVarianten) {
         if (!sources.length) throw new Error('Mods sind eingeschaltet, aber keine Quelle — wenigstens „upload", sonst kommt kein Mod auf den Server.');
         if (!path) throw new Error('Mods sind eingeschaltet, aber ohne Ablageort — der Server wüsste nicht, wohin damit.');
     }
-    return { supported, sources, source_ids, path, activation,
+    return { supported, sources, source_ids, path, mod_marker, activation,
         order_matters: istWahr(b?.order_matters), needs_restart: istWahr(b?.needs_restart), client_side: istWahr(b?.client_side) };
 }
 
@@ -4130,6 +4137,7 @@ function modsStand(sitzung) {
         supported: c?.supported === true,
         quellen: MODS.quellen.map(q => ({ kennung: q, an: quellen.includes(q), id: c?.source_ids?.[q] || '', angebunden: modQuelleAngebunden(q) })),
         path: c?.path || '',
+        mod_marker: c?.mod_marker || '',
         activation: c?.activation || '',
         order_matters: c?.order_matters === true,
         // Fehlt die Angabe, gilt sie als eingeschaltet — wie im Schema und im Daemon.
@@ -4170,10 +4178,11 @@ async function modsSpeichern(sitzung, b) {
     const neu = modsAusFormular(b, Boolean(sitzung.entwurf?.content?.variants));
     return entwurfSchreiben(sitzung, (e) => {
         const c = { ...(e.content || {}) };
-        const leer = !neu.supported && !neu.sources.length && !neu.path && !neu.activation
+        const leer = !neu.supported && !neu.sources.length && !neu.path && !neu.mod_marker && !neu.activation
             && !neu.order_matters && neu.needs_restart && !neu.client_side;
         if (e.content === undefined && rest === undefined && leer) return; // ein Spiel ohne Mods: kein Teil
         setzeQuellenUndOrt(c, neu);
+        if (neu.mod_marker) c.mod_marker = neu.mod_marker; else delete c.mod_marker;
         if (neu.activation) c.activation = neu.activation; else delete c.activation;
         if (neu.order_matters || 'order_matters' in c) c.order_matters = neu.order_matters;
         if (!neu.needs_restart || 'needs_restart' in c) c.needs_restart = neu.needs_restart;

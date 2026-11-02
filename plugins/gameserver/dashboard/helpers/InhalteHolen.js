@@ -294,6 +294,7 @@ async function legeAb({ server, inhalt, guildId, quelle, pakete, fehlend = [], w
             entpacken:     true,
             // Nur ficsit.app nennt sie (2026-10-27); der Daemon prueft vor dem Auspacken.
             ...(p.sha256 ? { sha256: p.sha256 } : {}),
+            ...Inhalte.modMarker(inhalt, art),
         }, FRIST_MS).catch(fehler => ({ success: false, error: fehler.message }));
 
         if (!antwort?.success) {
@@ -454,6 +455,8 @@ async function entferneDateien({ server, zeile, inhalt = null, beiDatei = null }
     const pfad = !inhalt ? '' : zeile.art === Inhalte.ART_LADER ? (inhalt.loader?.path || '') : (inhalt.path || '');
     if (Inhalte.jeMod(pfad)) {
         try { dateien = [...dateien, Inhalte.ablageFuer(pfad, zeile.kennung)]; } catch { /* kein gültiger Ordnername: nur die Dateien */ }
+    } else if (zeile.art === Inhalte.ART_MOD && inhalt?.mod_marker) {
+        dateien = [...dateien, ...Inhalte.modOrdnerAus(dateien, pfad, inhalt.mod_marker)];
     }
 
     let bestaetigt = 0;
