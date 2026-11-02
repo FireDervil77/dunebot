@@ -31,4 +31,23 @@ function laeuft(zeile, jetzt = Date.now()) {
     return jetzt - new Date(zeile.created_at).getTime() < FRIST_MS;
 }
 
-module.exports = { FRIST_MS, laeuft };
+/**
+ * Beim Start: Was im vorigen Prozess lief, meldet niemand mehr zurück.
+ *
+ * Die Antwort des Daemons kam nur beim wartenden Befehl an, und den gibt es nach einem
+ * Neustart nicht mehr. Die Zeile blieb auf `running`, und das Archiv kann fehlen
+ * (Sicherung 149, 2026-11-02). Ob der Daemon noch daran arbeitet, wissen wir nicht,
+ * aber fertig wird die Zeile nie mehr. Löschen räumt ein halbes Archiv mit weg.
+ */
+async function nachNeustart(dbService) {
+    await dbService.query(
+        `UPDATE gameserver_backups SET status = 'failed', error_message = ?
+          WHERE status IN ('running', 'pending')`,
+        ['Das Dashboard wurde währenddessen neu gestartet. Die Sicherung ist nicht fertig geworden.']);
+    await dbService.query(
+        `UPDATE gameserver_backups SET status = 'completed', wiederhergestellt = ?
+          WHERE status = 'restoring'`,
+        ['Wiederherstellung gescheitert oder unbekannt: Das Dashboard wurde währenddessen neu gestartet.']);
+}
+
+module.exports = { FRIST_MS, laeuft, nachNeustart };

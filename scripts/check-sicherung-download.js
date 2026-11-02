@@ -190,6 +190,28 @@ async function pruefe(name, fn) {
         assert.match(routen, /laeuft: Sicherung\.laeuft\(b\)/);
     });
 
+    console.log('\nNach einem Neustart, an einer Kopie');
+    require('dotenv').config({ path: path.join(WURZEL, 'apps/dashboard/.env'), quiet: true });
+    const roh = await require('mysql2/promise').createConnection({
+        host: process.env.MYSQL_HOST, port: process.env.MYSQL_PORT, user: process.env.MYSQL_USER,
+        password: process.env.MYSQL_PASSWORD, database: process.env.MYSQL_DATABASE,
+    });
+    await pruefe('Liegengebliebenes wird aufgeräumt, Fertiges bleibt, und der Start hängt daran', async () => {
+        await roh.query('CREATE TEMPORARY TABLE kopie_b LIKE gameserver_backups');
+        await roh.query('CREATE TEMPORARY TABLE gameserver_backups LIKE kopie_b');
+        await roh.query(`INSERT INTO gameserver_backups (server_id, guild_id, name, status) VALUES
+            (1, 'g', 'lief', 'running'), (1, 'g', 'wartete', 'pending'), (1, 'g', 'stellte', 'restoring'), (1, 'g', 'fertig', 'completed')`);
+        await Sicherung.nachNeustart({ query: (sql, p) => roh.query(sql, p).then(r => r[0]) });
+        const [z] = await roh.query('SELECT name, status, error_message, wiederhergestellt FROM gameserver_backups ORDER BY id');
+        assert.deepStrictEqual(z.map(x => x.status), ['failed', 'failed', 'completed', 'completed']);
+        assert.match(z[0].error_message, /neu gestartet/);
+        assert.match(z[2].wiederhergestellt, /gescheitert/, 'die Liste färbt nur „gescheitert" rot');
+        assert.strictEqual(z[3].error_message, null);
+        assert.strictEqual(Sicherung.laeuft(z[0]), false, 'die Zeile muss sich löschen lassen');
+        assert.match(fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/index.js'), 'utf8'), /helpers\/Sicherung'\)\.nachNeustart\(dbService\)/);
+    });
+    await roh.end();
+
     console.log(`\n${bestanden} Prüfung(en) bestanden.`);
     dash.close(); daemon.close();
     process.exit(process.exitCode || 0);
