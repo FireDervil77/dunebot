@@ -31,6 +31,7 @@ const RootServer = require('../../../plugins/masterserver/dashboard/models/RootS
 const Auslastung = require('../../../plugins/masterserver/dashboard/helpers/Auslastung');
 const FireBusZaehler = require('./FireBusZaehler');
 const FireBusKontrolle = require('./FireBusKontrolle');
+const BusDock = require('./BusDock');
 const VerbindungsWache = require('./VerbindungsWache');
 
 // Pfad zur version.json (Dashboard-Download-Verzeichnis)
@@ -190,6 +191,11 @@ class IPMServer {
         this._startHeartbeatMonitor();
         this.zaehler.starte();
         this.kontrolle.starte();
+        // Leitungen über den Busbahnhof, neben den direkten (FireBus Etappe 4).
+        if (process.env.FIREBUS_DOCK) {
+            this.dock = new BusDock(this, process.env.FIREBUS_DOCK);
+            this.dock.starte();
+        }
         
         // ✅ Event-Handler für gameserver.status_changed registrieren
         this._registerEventHandlers();
@@ -229,6 +235,8 @@ class IPMServer {
         }
 
         // Alle Verbindungen sauber schließen
+        // Zuerst das Dock: Die Leitungen am Bahnhof sollen diesen Neustart überleben.
+        this.dock?.beende();
         for (const [daemonId, conn] of this.connections.entries()) {
             conn.ws.close(1000, 'Server shutdown');
         }
