@@ -2322,6 +2322,10 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
             loeschFehler: Loeschung.stand(server).fehler,
             bereich,
             bereichName: bereich ? BEREICHE[bereich] : null,
+            modStand: await Inhalte.fuerServer(server.id).then(Inhalte.kurzstand, (fehler) => {
+                Logger.warn(`[Gameserver] Mod-Stand von Server ${server.id} nicht lesbar: ${fehler.message}`);
+                return null;
+            }),
             hatKonfigdateien,
             datenbanken,
             activeMenu: `/guild/${guildId}/plugins/gameserver/servers`,

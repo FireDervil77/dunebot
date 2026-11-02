@@ -218,6 +218,17 @@
       Und der Grund-Kasten wird IMMER gerendert, nur versteckt: Ein Element,
       das es je nach Zustand gar nicht gibt, findet das Live-Modul spaeter
       nicht (dieselbe Falle wie bei den Knoepfen, Baustelle 134). %>
+  <%# Mods auf diesem Server, ohne dass man den Bereich öffnen muss. Sagt, was installiert
+      ist: Ob das Spiel es geladen hat, steht im Bereich Logs. %>
+  <% const modStand = locals.modStand; if (modStand) { %>
+    <div class="mb-2" style="font-size:13px">
+      <a class="fb-pille" href="?ansicht=<%= hoehe %>&bereich=inhalte"
+         title="<%= modStand.namen.join(', ') %>">
+        <i class="fa-solid fa-puzzle-piece me-1"></i><%= modStand.modpack ? 'Modpack ' + modStand.modpack : '' %><%= modStand.modpack && modStand.anzahl ? ' + ' : '' %><%= modStand.anzahl ? (modStand.anzahl === 1 ? '1 Mod' : modStand.anzahl + ' Mods') : '' %> installiert
+      </a>
+    </div>
+  <% } %>
+
   <div class="fb-messstreifen" data-fb-live="messstreifen" data-fb-server="<%= server.id %>">
 
     <div class="fb-messstreifen-grund<%= mw.warnung ? ' fb-messstreifen-warnung' : '' %>" data-fb-live="messwerte-grund" data-fb-server="<%= server.id %>"

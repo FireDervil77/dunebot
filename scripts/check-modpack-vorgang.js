@@ -131,6 +131,19 @@ async function pruefe(was, tun) {
         assert.strictEqual(Modpackstand.stand({ id: 77, modpack_seit: new Date() }).fortschritt, null);
     });
 
+    console.log('\nAnzeige auf der Serverseite');
+    await pruefe('die Serverseite nennt, was installiert ist, und schweigt ohne Mods', () => {
+        const { kurzstand } = require('../plugins/gameserver/dashboard/helpers/Inhalte');
+        assert.strictEqual(kurzstand({ modpack: null, mods: [] }), null);
+        assert.strictEqual(kurzstand({ modpack: null, mods: [{ status: 'fehlgeschlagen', name: 'A' }] }), null);
+        assert.deepStrictEqual(kurzstand({ modpack: { status: 'installiert', name: 'NanoMagic' },
+            mods: [{ status: 'installiert', name: 'A' }, { status: 'geplant', name: 'B' }] }),
+            { modpack: 'NanoMagic', anzahl: 1, namen: ['A'] });
+        const seite = lies('plugins/gameserver/dashboard/views/guild/server-detail.ejs');
+        require('ejs').compile(seite, { filename: 'server-detail.ejs' });
+        assert.match(lies('plugins/gameserver/dashboard/routes/servers.js'), /Inhalte\.fuerServer\(server\.id\)\.then\(Inhalte\.kurzstand/);
+    });
+
     console.log('\nErst stoppen');
     const ServerStopp = require('../plugins/gameserver/dashboard/helpers/ServerStopp');
     const echterStopp = ServerStopp.stoppeFallsLaeuft;

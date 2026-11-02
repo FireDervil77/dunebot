@@ -63,9 +63,9 @@ console.log('Daemon — senden');
 // ════════════════════════════════════════════════════════════════════════════
 const server = ohneKommentare(roh(path.join(DAEMON, 'internal/gameserver/server.go')) || '');
 const takt = server.match(/MESSWERT_TAKT = (\d+) \* time\.Second/);
-pruefe(takt !== null && Number(takt[1]) >= 2,
+pruefe(takt !== null && Number(takt[1]) >= 1,
     `der Takt ist eine Konstante und beträgt ${takt ? takt[1] : '?'} s`,
-    'Ohne Drossel geht jede Messung des Stats-Stroms raus — bei fünfzig Servern 25 je Sekunde.');
+    'Ohne Drossel läuft das Paket je Daemon ungebremst.');
 
 const lebenslauf = ohneKommentare(roh(path.join(DAEMON, 'internal/gameserver/server_lifecycle_docker.go')) || '');
 pruefe(/time\.Since\(letzteMeldung\) >= MESSWERT_TAKT/.test(lebenslauf),

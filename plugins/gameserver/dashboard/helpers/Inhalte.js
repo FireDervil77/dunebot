@@ -417,6 +417,21 @@ function modOrdnerAus(dateien, pfad, marker) {
     return [...new Set(ordner)].filter(o => klein.has(`${o}/${marker}`.toLowerCase()));
 }
 
+/**
+ * Was auf dem Server an Mods liegt, für die Serverseite. Sagt, was installiert ist,
+ * nicht, was das Spiel geladen hat: Das steht im Log.
+ *
+ * @param {{modpack: object|null, mods: object[]}} liste  aus `fuerServer`
+ * @returns {{modpack: string|null, anzahl: number, namen: string[]}|null} null: keine Mods
+ */
+function kurzstand(liste) {
+    const installiert = (z) => z && z.status === 'installiert';
+    const modpack = installiert(liste?.modpack) ? (liste.modpack.name || liste.modpack.kennung) : null;
+    const mods = (liste?.mods || []).filter(installiert);
+    if (!modpack && !mods.length) return null;
+    return { modpack, anzahl: mods.length, namen: mods.map(m => m.name || m.kennung) };
+}
+
 /** Für die Anzeige: `game/FactoryGame/Mods/<Mod>` statt des Platzhalters. */
 function pfadAnzeige(pfad) {
     return pfad ? String(pfad).split(PLATZHALTER).join('<Mod>') : pfad;
@@ -426,5 +441,5 @@ module.exports = {
     fuerServer, laderAktiv, eintragen, entfernen, schalten, dateienAus, paketAdresse,
     laderUeberStart, waisenVon, brauchtAus,
     ART_LADER, ART_MOD, ART_MODPACK,
-    PLATZHALTER, jeMod, ablageFuer, pfadAnzeige, modMarker, modOrdnerAus,
+    PLATZHALTER, jeMod, ablageFuer, pfadAnzeige, modMarker, modOrdnerAus, kurzstand,
 };
