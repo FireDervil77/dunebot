@@ -425,7 +425,7 @@ async function holeGeplante({ server, inhalt, guildId, spielfassung = null }) {
  *
  * @returns {Promise<{bestaetigt: number, gesamt: number, blieb: string[], ohneListe: boolean}>}
  */
-async function entferneDateien({ server, zeile, inhalt = null }) {
+async function entferneDateien({ server, zeile, inhalt = null, beiDatei = null }) {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     const ipmServer = ServiceManager.get('ipmServer');
@@ -473,6 +473,7 @@ async function entferneDateien({ server, zeile, inhalt = null }) {
             Logger.warn(`[Gameserver/Inhalte] Datei blieb liegen (${datei}): `
                 + `${antwort?.error || 'keine Antwort'}`);
         }
+        if (beiDatei) beiDatei(bestaetigt + blieb.length, dateien.length);
     }
 
     // Ordner je Mod geht oben als Ganzes; sonst bleiben die Ordner, die das
@@ -681,7 +682,7 @@ async function aktualisiere({ server, inhalt, guildId, zeile, spielfassung = nul
  */
 const MODPACK_FRIST_MS = 1800000; // 30 Minuten
 
-async function installiereModpack({ server, guildId, paket, laderDesServers }) {
+async function installiereModpack({ server, guildId, paket, laderDesServers, beiFortschritt = () => {} }) {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     const ipmServer = ServiceManager.get('ipmServer');
@@ -727,7 +728,8 @@ async function installiereModpack({ server, guildId, paket, laderDesServers }) {
     const { modpack: altes } = await Inhalte.fuerServer(server.id);
     if (altes && altes.status === 'installiert') {
         const inhalt = { path: '' };
-        aufgeraeumt = await entferneDateien({ server, zeile: altes, inhalt });
+        aufgeraeumt = await entferneDateien({ server, zeile: altes, inhalt,
+            beiDatei: (fertig, gesamt) => beiFortschritt({ phase: 'entfernen', fertig, gesamt }) });
         Logger.info(`[Gameserver/Modpack] ${altes.kennung} ${altes.fassung} weicht `
             + `${paket.kennung} ${paket.fassung}: ${aufgeraeumt.bestaetigt} von `
             + `${aufgeraeumt.gesamt} Datei(en) bestaetigt weg`);
@@ -746,6 +748,7 @@ async function installiereModpack({ server, guildId, paket, laderDesServers }) {
     // installiert — wie vor dem Abgleich, nur mit dem, was das Paket selbst
     // sagt. Das steht dann im Protokoll UND im Ergebnis: Ein Abgleich, der
     // still ausfaellt, saehe aus wie einer, der nichts gefunden hat.
+    beiFortschritt({ phase: 'abgleich' });
     let abgleich = { sha1: [], namen: [], geprueft: 0, ohneAuskunft: 0 };
     let abgleichFehler = null;
     try {
@@ -820,6 +823,43 @@ async function installiereModpack({ server, guildId, paket, laderDesServers }) {
     };
 }
 
+/** Hier legen Modpacks ihre Mods ab (Daemon: `modpackWurzel` + `mods/`). */
+const MOD_ORDNER = 'game/mods';
+
+/**
+ * Was liegt in `game/mods`, das zu keinem Eintrag gehört?
+ *
+ * Entfernt wird beim Wechsel nur, was in der Paketliste steht. Ein Mod wie
+ * ModDirector lädt beim Start weitere nach, die in keiner Liste stehen: Am
+ * 2026-11-02 brach FTBQuests aus NanoMagic den Start von Parasites Reloaded ab.
+ *
+ * @returns {Promise<{verfuegbar: boolean, dateien: string[], grund?: string}>}
+ */
+async function fremdeModDateien(server) {
+    const dbService = ServiceManager.get('dbService');
+    const ipmServer = ServiceManager.get('ipmServer');
+    const daemonId = await daemonVon(dbService, server);
+    if (!daemonId || !ipmServer?.isDaemonOnline(daemonId)) {
+        return { verfuegbar: false, dateien: [], grund: 'Der Daemon ist gerade nicht erreichbar.' };
+    }
+    const liste = await ipmServer.sendCommand(daemonId, 'gameserver.files.list', {
+        server_id: String(server.id), rootserver_id: String(server.rootserver_id),
+        install_path: server.install_path, path: `/${MOD_ORDNER}`,
+    }, 15000).catch(fehler => ({ success: false, error: fehler.message }));
+    if (!liste?.success) return { verfuegbar: false, dateien: [], grund: liste?.error || 'Keine Antwort' };
+
+    const { lader, modpack, mods } = await Inhalte.fuerServer(server.id);
+    if (!modpack || modpack.status !== 'installiert') return { verfuegbar: true, dateien: [] };
+
+    const bekannt = new Set([lader, modpack, ...mods].filter(Boolean).flatMap(z => Inhalte.dateienAus(z)));
+    const dateien = (liste.data?.files || [])
+        .filter(f => !f.is_dir && /\.jar$/i.test(f.name))
+        .map(f => f.name)
+        .filter(name => !bekannt.has(`${MOD_ORDNER}/${name}`))
+        .sort();
+    return { verfuegbar: true, dateien };
+}
+
 /**
  * Das beim Anlegen gewaehlte Modpack holen — nach der Grundinstallation.
  *
@@ -879,5 +919,5 @@ async function holeGeplantesModpack({ server, guildId }) {
 module.exports = {
     daemonVon, istLader,
     vorschau, installiere, holeGeplante, aktualisiere, entferneDateien, entferneMitWaisen,
-    installiereModpack, holeGeplantesModpack,
+    installiereModpack, holeGeplantesModpack, fremdeModDateien, MOD_ORDNER,
 };

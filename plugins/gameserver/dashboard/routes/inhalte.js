@@ -722,25 +722,67 @@ router.post('/:serverId/inhalte/modpack', requirePermission('GAMESERVER.FILES.MA
         if (!await Modpackstand.beginne(geladen.server.id, guildId, paket.name || paket.kennung)) {
             return res.status(409).json({ success: false, message: Modpackstand.GESPERRT });
         }
-        let ergebnis;
-        try {
-            ergebnis = await InhalteHolen.installiereModpack({
-                server: geladen.server, guildId, paket, laderDesServers: lader,
-            });
-        } finally {
-            await Modpackstand.beende(geladen.server.id, guildId, paket.name || paket.kennung);
-        }
 
-        if (!ergebnis.success) {
-            return res.status(502).json({ success: false, message: ergebnis.fehler, ...wirkung(geladen) });
-        }
+        // Die Antwort wartet nicht auf das Ende. Ein Paket darf 30 Minuten dauern,
+        // der Apache gibt nach 10 auf und meldete einen Fehler, während es weiterlief.
+        // Wie es ausgeht, erfahren alle Tabs über den Live-Kanal.
+        res.status(202).json({ success: true, gestartet: true });
 
-        Logger.info(`[Gameserver/Inhalte] Modpack ${paket.kennung} ${paket.fassung} `
-            + `auf Server ${req.params.serverId}`);
-        return res.json({ success: true, ...ergebnis, ...wirkung(geladen) });
+        InhalteHolen.installiereModpack({
+            server: geladen.server, guildId, paket, laderDesServers: lader,
+            beiFortschritt: (teil) => Modpackstand.fortschritt(geladen.server.id, teil),
+        }).then((ergebnis) => {
+            if (ergebnis.success) {
+                Logger.info(`[Gameserver/Inhalte] Modpack ${paket.kennung} ${paket.fassung} `
+                    + `auf Server ${geladen.server.id}`);
+            }
+            return ergebnis;
+        }, (fehler) => {
+            Logger.error('[Gameserver/Inhalte] Modpack-Installation fehlgeschlagen:', fehler);
+            return { success: false, fehler: fehler.message };
+        }).then(ergebnis => Modpackstand.beende(geladen.server.id, guildId, paket.name || paket.kennung, {
+            ...ergebnis,
+            // Die Liste kann Tausende Namen lang sein, die Browser brauchen die Zahl.
+            aufgeraeumt: { blieb: (ergebnis.aufgeraeumt?.blieb || []).length },
+            ...wirkung(geladen),
+        })).catch(fehler => Logger.error('[Gameserver/Inhalte] Modpack-Stand nicht beendet:', fehler));
+        return undefined;
     } catch (error) {
         Logger.error('[Gameserver/Inhalte] Modpack-Installation fehlgeschlagen:', error);
         return res.status(502).json({ success: false, message: error.message });
+    }
+});
+
+router.get('/:serverId/inhalte/fremde', requirePermission('GAMESERVER.VIEW'), async (req, res) => {
+    const dbService = ServiceManager.get('dbService');
+    try {
+        const geladen = await ladeServerUndPaket(dbService, req.params.serverId, res.locals.guildId);
+        if (!geladen) return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
+        return res.json({ success: true, ...await InhalteHolen.fremdeModDateien(geladen.server) });
+    } catch (error) {
+        ServiceManager.get('Logger').error('[Gameserver/Inhalte] Fremde Mods nicht lesbar:', error);
+        return res.status(500).json({ success: false, message: 'Serverfehler' });
+    }
+});
+
+router.post('/:serverId/inhalte/fremde/entfernen', requirePermission('GAMESERVER.FILES.MANAGE'), async (req, res) => {
+    const dbService = ServiceManager.get('dbService');
+    try {
+        const geladen = await ladeServerUndPaket(dbService, req.params.serverId, res.locals.guildId);
+        if (!geladen) return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
+
+        // Was der Browser schickt, ist ein Vorschlag: Weg darf nur, was jetzt noch fremd ist.
+        const { dateien } = await InhalteHolen.fremdeModDateien(geladen.server);
+        const gewollt = new Set(Array.isArray(req.body?.dateien) ? req.body.dateien.map(String) : []);
+        const weg = dateien.filter(name => gewollt.has(name));
+        const ergebnis = await InhalteHolen.entferneDateien({
+            server: geladen.server,
+            zeile: { dateien: weg.map(name => `${InhalteHolen.MOD_ORDNER}/${name}`) },
+        });
+        return res.json({ success: true, entfernt: ergebnis.bestaetigt, blieben: ergebnis.blieb.length, ...wirkung(geladen) });
+    } catch (error) {
+        ServiceManager.get('Logger').error('[Gameserver/Inhalte] Fremde Mods nicht entfernt:', error);
+        return res.status(500).json({ success: false, message: 'Serverfehler' });
     }
 });
 

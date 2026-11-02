@@ -615,6 +615,13 @@ class GameserverPlugin extends DashboardPlugin {
             // Gameserver Resource Usage
             // ════════════════════════════════════════════════════════════
             eventRouter.register(
+                MessageTypes.NS_GAMESERVER,
+                'modpack_stand',
+                (payload) => require('./helpers/Modpackstand').fortschritt(payload?.server_id, payload || {}),
+                { priority: 5 }
+            );
+
+            eventRouter.register(
                 MessageTypes.NS_GAMESERVER, 
                 MessageTypes.GAMESERVER_RESOURCE_USAGE, 
                 this._handleResourceUsage.bind(this),

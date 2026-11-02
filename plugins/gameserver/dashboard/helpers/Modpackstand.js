@@ -18,7 +18,17 @@ const SPALTEN = 'gs.modpack_seit, gs.modpack_name';
 
 const GESPERRT = 'Das Modpack wird gerade eingespielt, das geht gleich wieder.';
 
-const KEINE = Object.freeze({ laeuft: false, name: null, seit: null });
+const KEINE = Object.freeze({ laeuft: false, name: null, seit: null, fortschritt: null });
+
+/** So oft geht ein Fortschritt an die Browser. Der Daemon drosselt selbst, das Entfernen nicht. */
+const FORTSCHRITT_TAKT_MS = 500;
+
+/**
+ * Laufende Vorgänge dieses Prozesses, serverId → { guildId, fortschritt, gemeldet }.
+ * Nur im Speicher: Ein Fortschritt ist nach Sekunden überholt, und ein Neustart
+ * beendet den Vorgang hier ohnehin (`nachNeustart`).
+ */
+const laufend = new Map();
 
 /**
  * Reine Rechnung.
@@ -29,7 +39,12 @@ const KEINE = Object.freeze({ laeuft: false, name: null, seit: null });
 function stand(server, jetzt = Date.now()) {
     const seit = server?.modpack_seit ? new Date(server.modpack_seit).getTime() : NaN;
     if (!Number.isFinite(seit) || jetzt - seit > FRIST_MS) return KEINE;
-    return { laeuft: true, name: server.modpack_name || null, seit: server.modpack_seit };
+    return {
+        laeuft: true,
+        name: server.modpack_name || null,
+        seit: server.modpack_seit,
+        fortschritt: laufend.get(String(server.id))?.fortschritt || null,
+    };
 }
 
 /** Für Routen, die ändern: Lesen und Stoppen bleiben möglich. */
@@ -45,10 +60,32 @@ async function sperre(req, res, next) {
     next();
 }
 
-function melde(guildId, serverId, wie, name) {
+function melde(guildId, serverId, wie, name, ergebnis = null) {
     if (!ServiceManager.has('sseManager')) return;
     ServiceManager.get('sseManager').broadcast(guildId, 'gameserver', {
-        action: 'modpack', server_id: String(serverId), stand: wie, name, timestamp: Date.now(),
+        action: 'modpack', server_id: String(serverId), stand: wie, name, ergebnis, timestamp: Date.now(),
+    });
+}
+
+/**
+ * Wie weit ist der Vorgang? Kommt vom Daemon (`mods`, `beigaben`, `paket`) und vom
+ * Dashboard selbst (`entfernen`, `abgleich`). Ohne laufenden Vorgang verfällt es:
+ * So landet eine nachgelieferte Meldung des Daemons nicht in der Anzeige.
+ *
+ * @param {string|number} serverId
+ * @param {{phase: string, fertig?: number, gesamt?: number}} teil
+ */
+function fortschritt(serverId, { phase, fertig = 0, gesamt = 0 }) {
+    const vorgang = laufend.get(String(serverId));
+    if (!vorgang) return;
+    const jetzt = Date.now();
+    const neuePhase = vorgang.fortschritt?.phase !== phase;
+    vorgang.fortschritt = { phase, fertig, gesamt };
+    if (!neuePhase && fertig < gesamt && jetzt - vorgang.gemeldet < FORTSCHRITT_TAKT_MS) return;
+    vorgang.gemeldet = jetzt;
+    if (!ServiceManager.has('sseManager')) return;
+    ServiceManager.get('sseManager').broadcast(vorgang.guildId, 'gameserver', {
+        action: 'modpack_stand', server_id: String(serverId), phase, fertig, gesamt, timestamp: jetzt,
     });
 }
 
@@ -65,14 +102,22 @@ async function beginne(serverId, guildId, name) {
             AND (modpack_seit IS NULL OR modpack_seit < NOW() - INTERVAL ${FRIST_MS / 60000} MINUTE)`,
         [String(name).slice(0, 190), serverId, guildId]);
     if (ergebnis.affectedRows !== 1) return false;
+    laufend.set(String(serverId), { guildId, fortschritt: null, gemeldet: 0 });
     melde(guildId, serverId, 'laeuft', name);
     return true;
 }
 
-async function beende(serverId, guildId, name) {
+/**
+ * @param {string|number} serverId
+ * @param {string} guildId
+ * @param {string} name
+ * @param {object} [ergebnis] Geht an die Browser, sie sagen damit, wie es ausging.
+ */
+async function beende(serverId, guildId, name, ergebnis = null) {
+    laufend.delete(String(serverId));
     await ServiceManager.get('dbService').query(
         'UPDATE gameservers SET modpack_seit = NULL, modpack_name = NULL WHERE id = ?', [serverId]);
-    melde(guildId, serverId, 'fertig', name);
+    melde(guildId, serverId, 'fertig', name, ergebnis);
 }
 
 /** Beim Start: Der Vorgang lief im vorigen Prozess, niemand beendet ihn mehr. */
@@ -80,4 +125,4 @@ async function nachNeustart(dbService) {
     await dbService.query('UPDATE gameservers SET modpack_seit = NULL, modpack_name = NULL WHERE modpack_seit IS NOT NULL');
 }
 
-module.exports = { FRIST_MS, SPALTEN, GESPERRT, stand, sperre, beginne, beende, nachNeustart };
+module.exports = { FRIST_MS, SPALTEN, GESPERRT, stand, sperre, beginne, beende, fortschritt, nachNeustart };

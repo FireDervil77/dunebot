@@ -23,7 +23,7 @@
  * wo sie auch angezeigt werden. Fehlt ein Handler, ist das kein Hinweis auf
  * einen Verdrahtungsfehler — anders als bei allen uebrigen Ereignissen.
  */
-const STROM_AKTIONEN = new Set(['console', 'install_output']);
+const STROM_AKTIONEN = new Set(['console', 'install_output', 'modpack_stand']);
 
 class GameserverSSEClient {
     /**

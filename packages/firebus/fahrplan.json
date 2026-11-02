@@ -1,5 +1,5 @@
 {
-  "fassung": 2,
+  "fassung": 3,
   "linien": {"S": "Steuerung", "L": "Live", "O": "Output", "V": "Verify", "E": "Events", "D": "Datei"},
   "zeilen": [
     {"name": "register", "art": "steuerung", "von": "daemon", "linie": "V", "verlust": "nie"},
@@ -14,6 +14,7 @@
     {"name": "gameserver.readiness", "art": "ereignis", "von": "daemon", "linie": "L", "verlust": "nie"},
     {"name": "gameserver.quota_status", "art": "ereignis", "von": "daemon", "linie": "L", "verlust": "nie"},
     {"name": "gameserver.platzstand", "art": "ereignis", "von": "daemon", "linie": "L", "verlust": "nie"},
+    {"name": "gameserver.modpack_stand", "art": "ereignis", "von": "daemon", "linie": "L", "verlust": "erlaubt"},
     {"name": "gameserver.resource_usage", "art": "ereignis", "von": "daemon", "linie": "L", "verlust": "erlaubt"},
     {"name": "system.stats", "art": "ereignis", "von": "daemon", "linie": "L", "verlust": "erlaubt"},
     {"name": "console.output", "art": "ereignis", "von": "daemon", "linie": "O", "verlust": "erlaubt"},

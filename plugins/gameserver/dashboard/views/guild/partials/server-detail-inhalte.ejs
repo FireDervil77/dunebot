@@ -79,6 +79,8 @@
       <div class="modal-body">
         <p class="text-danger fw-bold fs-3 mb-2" id="modpackErsetzenSatz"></p>
         <p class="text-danger fw-bold mb-3">Das lässt sich nicht zurücknehmen.</p>
+        <ul class="mb-3" id="modpackErsetzenDateien" hidden></ul>
+        <div id="modpackErsetzenPaket">
         <div class="fw-bold mb-1">Es gehen mit:</div>
         <ul class="mb-3">
           <li>alle Dateien, die dieses Paket mitgebracht hat, auch deine Änderungen daran</li>
@@ -89,6 +91,7 @@
           <li>die Welt und alles, was nicht zum Paket gehört</li>
           <li>Dateien, die das Spiel oder ein Mod erst beim Start angelegt hat. Sie stehen in keiner Liste und können das neue Paket stören.</li>
         </ul>
+        </div>
         <label class="form-label fw-bold" for="modpackErsetzenEingabe">
           Zum Bestätigen eintippen: <span class="font-monospace text-danger" id="modpackErsetzenSoll"></span>
         </label>
@@ -253,6 +256,24 @@
     return tage > 0
       ? `Fassung vom ${wann} — ${tage} Tage vor den Spieldateien`
       : `Fassung vom ${wann} — ${-tage} Tage nach den Spieldateien`;
+  }
+
+  const MODPACK_PHASE = {
+    entfernen: 'Altes Paket wird entfernt',
+    abgleich: 'Modrinth wird befragt',
+    paket: 'Paket wird geladen',
+    mods: 'Mods werden geladen',
+    beigaben: 'Beilagen werden entpackt',
+  };
+
+  function modpackFortschritt(f) {
+    if (!f || !MODPACK_PHASE[f.phase]) return '';
+    const gesamt = Number(f.gesamt) || 0;
+    const fertig = Number(f.fertig) || 0;
+    return `<div style="font-size:12px;margin-top:4px">${MODPACK_PHASE[f.phase]}${
+      gesamt ? ` (${fertig} von ${gesamt})` : ' …'}</div>${
+      gesamt ? `<div class="progress progress-sm mt-1"><div class="progress-bar"
+        style="width:${Math.min(100, Math.round((fertig / gesamt) * 100))}%"></div></div>` : ''}`;
   }
 
   function modpackZeit(wert) {
@@ -460,7 +481,7 @@
                   einzeln verwaltet: Wer eine davon austauscht, zerlegt das Paket.
                 </div>
                 ${m.status === 'installiert' && !v.laeuft ? `<div class="fb-muted" style="font-size:12px;margin-top:2px">
-                  Zuletzt installiert: ${escape(modpackZeit(m.updated_at))}${m.ablage ? ' · ' + escape(m.ablage) : ''}</div>` : ''}
+                  Zuletzt installiert: ${escape(modpackZeit(m.installiert_am))}${m.ablage ? ' · ' + escape(m.ablage) : ''}</div>` : ''}
                 ${m.fehler ? `<div style="font-size:12px;color:var(--fb-danger);margin-top:2px">${escape(m.fehler)}</div>` : ''}`
               : `
                 <div style="font-weight:500">Kein Modpack</div>
@@ -479,7 +500,14 @@
           ${v.laeuft ? `<div class="alert alert-info mt-2 mb-0 py-2" role="status">
             <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
             <strong>„${escape(v.name || 'Modpack')}" wird eingespielt</strong>, seit ${escape(modpackZeit(v.seit))}.
-            Bis es fertig ist, lässt sich der Server nicht starten.</div>` : ''}
+            Bis es fertig ist, lässt sich der Server nicht starten.
+            <div id="modpack-fortschritt">${modpackFortschritt(v.fortschritt)}</div></div>` : ''}
+          ${FREMD.length ? `<div class="alert alert-warning mt-2 mb-0 py-2" role="alert">
+            <strong>${FREMD.length} Datei(en) in mods/ gehören zu keinem Paket.</strong>
+            Sie können von einem früheren Modpack stammen und den Start stören:
+            <span class="font-monospace">${FREMD.map(escape).join(', ')}</span>
+            ${DARF ? `<div class="mt-2"><button class="btn btn-danger btn-sm" onclick="fremdeEntfernen()">Entfernen</button></div>` : ''}
+          </div>` : ''}
           <div id="modpack-suche" style="display:none"></div>
         </div>`;
     }
@@ -545,6 +573,7 @@
         ZULETZT = d;
         zeichne(d);
         ladestandLaden();
+        fremdeLaden(d);
       })
       .catch(e => {
         wurzel.innerHTML = `<div class="fb-muted" style="font-size:13px;color:var(--fb-danger)">
@@ -1229,8 +1258,17 @@
   // kommt im Seitenfuß.
   document.addEventListener('DOMContentLoaded', () => {
     if (!window.GameserverSSEClient) return;
-    window.GameserverSSEClient.fuerSeite(window.gameserverGuildId)
-      .fuerServer(window.gameserverServerId).on('modpack', () => window.inhalteLaden());
+    const sicht = window.GameserverSSEClient.fuerSeite(window.gameserverGuildId)
+      .fuerServer(window.gameserverServerId);
+    sicht.on('modpack', (m) => {
+      if (m.stand === 'fertig' && m.ergebnis) modpackAusgang(m.ergebnis);
+      window.inhalteLaden();
+    });
+    // Nur die Zeile: Die ganze Liste neu zu zeichnen schlösse eine offene Suche.
+    sicht.on('modpack_stand', (m) => {
+      const zeile = document.getElementById('modpack-fortschritt');
+      if (zeile) zeile.innerHTML = modpackFortschritt(m);
+    });
   });
 
   window.modpackInstallieren = function (kennung, fassung, knopf) {
@@ -1244,19 +1282,31 @@
 
     const name = altes.getAttribute('data-modpack');
     const dasselbe = altes.getAttribute('data-modpack-kennung') === kennung;
+    roteRueckfrage({
+      kopf: dasselbe ? 'Modpack ENDGÜLTIG neu installieren' : 'Modpack ENDGÜLTIG ersetzen',
+      satz: dasselbe
+        ? `„${name}" wird entfernt und neu geholt.`
+        : `„${name}" wird entfernt und durch „${kennung}" ersetzt.`,
+      soll: name,
+      ja: () => modpackEinspielen(kennung, fassung, knopf),
+    });
+  };
+
+  function roteRueckfrage({ kopf, satz, soll, dateien = null, ja }) {
     const eingabe = document.getElementById('modpackErsetzenEingabe');
     const bestaetigen = document.getElementById('modpackErsetzenKnopf');
-    document.getElementById('modpackErsetzenKopf').textContent =
-      dasselbe ? 'Modpack ENDGÜLTIG neu installieren' : 'Modpack ENDGÜLTIG ersetzen';
-    document.getElementById('modpackErsetzenSatz').textContent = dasselbe
-      ? `„${name}" wird entfernt und neu geholt.`
-      : `„${name}" wird entfernt und durch „${kennung}" ersetzt.`;
-    document.getElementById('modpackErsetzenSoll').textContent = name;
+    document.getElementById('modpackErsetzenKopf').textContent = kopf;
+    document.getElementById('modpackErsetzenSatz').textContent = satz;
+    document.getElementById('modpackErsetzenSoll').textContent = soll;
+    document.getElementById('modpackErsetzenPaket').hidden = Boolean(dateien);
+    const liste = document.getElementById('modpackErsetzenDateien');
+    liste.hidden = !dateien;
+    liste.innerHTML = (dateien || []).map(d => `<li class="font-monospace">${escape(d)}</li>`).join('');
     eingabe.value = '';
     bestaetigen.disabled = true;
 
     // Wie beim Löschen: Großschreibung machen Handys von selbst.
-    const passt = () => eingabe.value.trim().toLowerCase() === name.trim().toLowerCase();
+    const passt = () => eingabe.value.trim().toLowerCase() === soll.trim().toLowerCase();
     eingabe.oninput = () => { bestaetigen.disabled = !passt(); };
     eingabe.onkeydown = (e) => {
       if (e.key !== 'Enter') return;
@@ -1267,9 +1317,56 @@
     bestaetigen.onclick = () => {
       if (!passt()) return;
       fenster.hide();
-      modpackEinspielen(kennung, fassung, knopf);
+      ja();
     };
     fenster.show();
+  }
+
+  // ── Dateien in mods/, die zu keinem Paket gehören ───────────────────────
+  //
+  // Beim Wechsel geht nur, was in der Paketliste steht. Was ein Mod beim Start
+  // nachgeladen hat, bleibt liegen und kann das neue Paket abstürzen lassen.
+  let FREMD = [];
+
+  function fremdeLaden(d) {
+    if (!d.modpack || (d.modpackVorgang && d.modpackVorgang.laeuft)) { FREMD = []; return; }
+    fetch(`${BASIS}/fremde`, { headers: { Accept: 'application/json' } })
+      .then(r => r.json())
+      .then(a => {
+        const neu = (a.success && a.dateien) || [];
+        if (neu.join() === FREMD.join()) return;
+        FREMD = neu;
+        if (ZULETZT) zeichne(ZULETZT);
+      })
+      .catch(() => { /* Eine Beigabe: Ohne sie steht die Karte wie vorher. */ });
+  }
+
+  window.fremdeEntfernen = function () {
+    roteRueckfrage({
+      kopf: 'Dateien ENDGÜLTIG entfernen',
+      satz: `${FREMD.length} Datei(en) werden aus mods/ gelöscht.`,
+      soll: 'entfernen',
+      dateien: FREMD,
+      ja: () => {
+        fetch(`${BASIS}/fremde/entfernen`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ dateien: FREMD }),
+        })
+          .then(async (a) => {
+            const d = await a.json().catch(() => null);
+            if (!a.ok || !d || !d.success) throw new Error((d && d.message) || `HTTP ${a.status}`);
+            return d;
+          })
+          .then(d => {
+            melde(d.blieben ? 'warning' : 'success',
+              `${d.entfernt} Datei(en) entfernt` + (d.blieben ? `, ${d.blieben} blieben liegen.` : '.'));
+            wirkungMelden(d);
+          })
+          .catch(e => melde('error', 'Nicht entfernt: ' + e.message))
+          .finally(() => window.inhalteLaden());
+      },
+    });
   };
 
   function modpackEinspielen(kennung, fassung, knopf) {
@@ -1293,37 +1390,43 @@
         if (!a.ok || !d || !d.success) throw new Error((d && d.message) || `HTTP ${a.status}`);
         return d;
       })
-      .then(d => {
-        // Das Weggelassene wird GENANNT. Sonst hält jemand das Paket für halb
-        // installiert: Bei „Create+" fehlen 49 von 155 Dateien — alles reine
-        // Client-Mods, die einen Server nicht starten ließen.
-        // Seit 2026-10-12 kommt ein zweiter Grund dazu: Mods, die das Paket
-        // als nötig führt, Modrinth aber als reine Client-Mods („One block
-        // horror" brachte so Oculus auf den Server). Auch die werden genannt.
-        const ab = d.abgleich || {};
-        melde('success', `„${d.name}“ ist installiert: ${d.dateien} Datei(en)`
-          + (d.ausgelassen ? `, ${d.ausgelassen} reine Client-Datei(en) ausgelassen` : '')
-          + (ab.ausgelassen ? ` (davon ${ab.ausgelassen}, die nur Modrinth als Client-Mods führt)` : '') + '.',
-          12000);
-        if (ab.fehler) {
-          melde('warning', 'Der Abgleich mit Modrinth war nicht möglich — ausgelassen wurde nur, was das Paket '
-            + 'selbst als Client-Datei ausweist. Startet der Server nicht, liegt es vermutlich daran.', 15000);
-        } else if (ab.ausgelassen === null && ab.namen && ab.namen.length) {
-          melde('warning', `Modrinth führt ${ab.namen.length} enthaltene Mod(s) als reine Client-Mods — `
-            + 'der Daemon dieser Maschine kann sie noch nicht auslassen (Daemon-Update nötig).', 15000);
-        }
-        if (ab.ohneAuskunft) {
-          melde('info', `${ab.ohneAuskunft} Datei(en) legt das Paket lose bei — zu ihnen gibt es bei Modrinth `
-            + 'keine Auskunft, sie wurden ungeprüft übernommen.', 12000);
-        }
-        if (d.aufgeraeumt && d.aufgeraeumt.blieb && d.aufgeraeumt.blieb.length) {
-          melde('warning', `${d.aufgeraeumt.blieb.length} Datei(en) des alten Pakets `
-            + 'blieben liegen — sie stehen im Dateimanager.', 12000);
-        }
-        wirkungMelden(d);
-      })
       .catch(e => melde('error', 'Modpack nicht installiert: ' + e.message, 15000))
       .finally(() => { knopf.disabled = false; window.inhalteLaden(); });
+  }
+
+  // Wie es ausging, kommt über den Live-Kanal, in jedem offenen Tab.
+  function modpackAusgang(d) {
+    if (!d.success) {
+      melde('error', 'Modpack nicht installiert: ' + (d.fehler || 'unbekannter Grund'), 15000);
+      return;
+    }
+    // Das Weggelassene wird GENANNT. Sonst hält jemand das Paket für halb
+    // installiert: Bei „Create+" fehlen 49 von 155 Dateien — alles reine
+    // Client-Mods, die einen Server nicht starten ließen.
+    // Seit 2026-10-12 kommt ein zweiter Grund dazu: Mods, die das Paket
+    // als nötig führt, Modrinth aber als reine Client-Mods („One block
+    // horror" brachte so Oculus auf den Server). Auch die werden genannt.
+    const ab = d.abgleich || {};
+    melde('success', `„${d.name}“ ist installiert: ${d.dateien} Datei(en)`
+      + (d.ausgelassen ? `, ${d.ausgelassen} reine Client-Datei(en) ausgelassen` : '')
+      + (ab.ausgelassen ? ` (davon ${ab.ausgelassen}, die nur Modrinth als Client-Mods führt)` : '') + '.',
+      12000);
+    if (ab.fehler) {
+      melde('warning', 'Der Abgleich mit Modrinth war nicht möglich — ausgelassen wurde nur, was das Paket '
+        + 'selbst als Client-Datei ausweist. Startet der Server nicht, liegt es vermutlich daran.', 15000);
+    } else if (ab.ausgelassen === null && ab.namen && ab.namen.length) {
+      melde('warning', `Modrinth führt ${ab.namen.length} enthaltene Mod(s) als reine Client-Mods — `
+        + 'der Daemon dieser Maschine kann sie noch nicht auslassen (Daemon-Update nötig).', 15000);
+    }
+    if (ab.ohneAuskunft) {
+      melde('info', `${ab.ohneAuskunft} Datei(en) legt das Paket lose bei — zu ihnen gibt es bei Modrinth `
+        + 'keine Auskunft, sie wurden ungeprüft übernommen.', 12000);
+    }
+    if (d.aufgeraeumt && d.aufgeraeumt.blieb) {
+      melde('warning', `${d.aufgeraeumt.blieb} Datei(en) des alten Pakets `
+        + 'blieben liegen — sie stehen im Dateimanager.', 12000);
+    }
+    wirkungMelden(d);
   }
 
   // ── Liste für Mitspieler (Stufe 10 S4) ─────────────────────────────────────
