@@ -359,6 +359,10 @@ async enablePlugin(pluginName) {
      * @returns {Promise<boolean>} Erfolgsstatus
      */
     async enableInGuild(pluginName, guildId) {
+        if (!this.istVerfuegbar(pluginName, guildId)) {
+            throw new Error(`Plugin ${pluginName} ist nur in der Kontroll-Guild verfügbar.`);
+        }
+
         const Logger = ServiceManager.get("Logger");
         const dbService = ServiceManager.get("dbService");
 

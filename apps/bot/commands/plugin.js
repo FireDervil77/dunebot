@@ -114,7 +114,7 @@ module.exports = {
  */
 async function listPlugins({ client, guild }) {
     const dbService = ServiceManager.get("dbService");
-    const plugins = client.pluginManager.plugins.filter(p => !p.ownerOnly);
+    const plugins = client.pluginManager.plugins.filter(p => !p.ownerOnly && client.pluginManager.istVerfuegbar(p.name, guild.id));
     
     // NEU: Aktivierte Plugins aus guild_plugins laden
     const enabled_plugins = await dbService.getEnabledPlugins(guild.id);
@@ -149,7 +149,7 @@ async function pluginInfo({ client, guild }, plugin) {
     if (!plugin) return guild.getT("core:PLUGIN.INFO_MISSING_PLUGIN");
 
     const p = client.pluginManager.plugins
-        .filter(p => !p.ownerOnly)
+        .filter(p => !p.ownerOnly && client.pluginManager.istVerfuegbar(p.name, guild.id))
         .find(p => p.name === plugin);
     if (!p) return guild.getT("core:PLUGIN.NOT_FOUND", { plugin });
 
@@ -184,7 +184,7 @@ async function pluginStatus(arg0) {
     const enabled_plugins = await dbService.getEnabledPlugins(guild.id);
 
     const options = [];
-    for (const p of client.pluginManager.plugins.filter((p) => !p.ownerOnly)) {
+    for (const p of client.pluginManager.plugins.filter((p) => !p.ownerOnly && client.pluginManager.istVerfuegbar(p.name, guild.id))) {
         const isEnabled = enabled_plugins.includes(p.name);
         options.push({
             label: `${isEnabled ? "✅" : "🔴"} ${p.name}`,
@@ -236,7 +236,7 @@ async function pluginStatus(arg0) {
         components: [],
     });
 
-    const allPlugins = client.pluginManager.plugins.filter(p => !p.ownerOnly && p.name !== 'core');
+    const allPlugins = client.pluginManager.plugins.filter(p => !p.ownerOnly && p.name !== 'core' && client.pluginManager.istVerfuegbar(p.name, guild.id));
     const enabledList = [];
     const disabledList = [];
 

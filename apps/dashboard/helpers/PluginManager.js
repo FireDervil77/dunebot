@@ -1060,6 +1060,10 @@ class PluginManager extends BasePluginManager {
      * @returns {Promise<boolean>} Erfolg der Aktivierung
      */
     async enableInGuild(pluginName, guildId, req = null) {
+        if (!this.istVerfuegbar(pluginName, guildId)) {
+            throw new Error(`Plugin ${pluginName} ist nur in der Kontroll-Guild verfügbar.`);
+        }
+
         const Logger = ServiceManager.get("Logger");
         const themeManager = ServiceManager.get('themeManager'); 
         const dbService = ServiceManager.get('dbService');

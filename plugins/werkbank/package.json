@@ -5,6 +5,7 @@
     "version": "1.0.0",
     "author": "FireBot Team",
     "license": "none",
+    "nurKontrollGuild": true,
     "type": "commonjs",
     "peerDependencies": {
         "express": "^5.1.0",

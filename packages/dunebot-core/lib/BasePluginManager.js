@@ -301,6 +301,31 @@ class BasePluginManager {
     }
 
     /**
+     * Darf dieses Plugin in dieser Guild erscheinen?
+     *
+     * Ein Plugin mit `"nurKontrollGuild": true` in seiner package.json gibt es nur
+     * in der Kontroll-Guild. Die Regel steht hier, weil Bot und Dashboard je eigene
+     * Manager haben und ein Plugin auf vielen Wegen eingeschaltet wird. Ohne
+     * gesetzte Kontroll-Guild gibt es so ein Plugin nirgends.
+     *
+     * @param {string} pluginName - Name des Plugins
+     * @param {string} guildId - Guild-ID
+     * @returns {boolean}
+     */
+    istVerfuegbar(pluginName, guildId) {
+        let pkg = {};
+        try {
+            pkg = JSON.parse(fs.readFileSync(path.join(this.pluginsDir, pluginName, "package.json"), "utf-8"));
+        } catch (_) {
+            // Ein Plugin ohne package.json meldet sein Laden selbst.
+            return true;
+        }
+        if (pkg.nurKontrollGuild !== true) return true;
+        const kontrollGuild = process.env.CONTROL_GUILD_ID;
+        return Boolean(kontrollGuild) && String(guildId) === String(kontrollGuild);
+    }
+
+    /**
      * Aktiviert ein Plugin in einer Guild
      * @param {string} pluginName - Name des Plugins
      * @param {string} guildId - Guild-ID

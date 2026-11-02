@@ -143,6 +143,9 @@ module.exports.getIndex = async (req, res) => {
                         const packagePath = path.join(pluginsDir, folder, 'package.json');
                         const packageData = fs.readFileSync(packagePath, 'utf8');
                         const packageJson = JSON.parse(packageData);
+
+                        // Interne Plugins gehören nicht auf die Startseite.
+                        if (packageJson.nurKontrollGuild === true) return null;
                         
                         return {
                             name: packageJson.name || folder,

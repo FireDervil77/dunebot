@@ -322,31 +322,8 @@ exports.getPlugins = async (req, res) => {
                         continue;
                     }
 
-                    // Owner-only Plugins filtern (prüfe config.json)
-                    const configPath = path.join(pluginPath, "config.json");
-                    if (fs.existsSync(configPath)) {
-                        try {
-                            const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-                            if (config.BOT_OWNER_ID) {
-                                const currentUser = req.session?.user;
-                                const controlGuildId = process.env.CONTROL_GUILD_ID;
-                                
-                                // Prüfe Owner-ID
-                                if (!currentUser || currentUser.info.id !== config.BOT_OWNER_ID) {
-                                    Logger.debug(`[Plugins] Überspringe Owner-only Plugin ${pluginName} für User ${currentUser?.info.id}`);
-                                    continue;
-                                }
-                                
-                                // Prüfe Control Guild
-                                if (controlGuildId && guildId !== controlGuildId) {
-                                    Logger.debug(`[Plugins] Überspringe ${pluginName} - nur in Control Guild verfügbar`);
-                                    continue;
-                                }
-                            }
-                        } catch (configErr) {
-                            Logger.error(`[Plugins] Fehler beim Parsen der config.json von ${pluginName}:`, configErr);
-                        }
-                    }
+                    // Interne Plugins gibt es nur in der Kontroll-Guild.
+                    if (!pluginManager.istVerfuegbar(pluginName, guildId)) continue;
 
                     // Heuristiken für Guild-Features/Settings
                     const hasBot = fs.existsSync(path.join(pluginPath, "bot"));
@@ -500,39 +477,16 @@ exports.updatePlugins = async (req, res) => {
             });
         }
         
-        // Owner-only Plugins prüfen
-        const pluginsDir = path.resolve(__dirname, "../../../plugins");
+        // Interne Plugins gibt es nur in der Kontroll-Guild.
         for (const pluginName of plugins) {
-            const configPath = path.join(pluginsDir, pluginName, "config.json");
-            if (fs.existsSync(configPath)) {
-                try {
-                    const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-                    if (config.BOT_OWNER_ID) {
-                        const currentUser = req.session?.user;
-                        const controlGuildId = process.env.CONTROL_GUILD_ID;
-                        
-                        // Prüfe Owner-ID
-                        if (!currentUser || currentUser.info.id !== config.BOT_OWNER_ID) {
-                            return res.status(403).json({
-                                success: false,
-                                message: `Plugin "${pluginName}" ist nur für den Bot-Owner verfügbar.`
-                            });
-                        }
-                        
-                        // Prüfe Control Guild
-                        if (controlGuildId && guildId !== controlGuildId) {
-                            return res.status(403).json({
-                                success: false,
-                                message: `Plugin "${pluginName}" ist nur in der Control Guild verfügbar.`
-                            });
-                        }
-                    }
-                } catch (configErr) {
-                    Logger.error(`[Plugins] Fehler beim Prüfen der config.json von ${pluginName}:`, configErr);
-                }
+            if (!pluginManager.istVerfuegbar(pluginName, guildId)) {
+                return res.status(403).json({
+                    success: false,
+                    message: `Plugin "${pluginName}" ist nur in der Kontroll-Guild verfügbar.`
+                });
             }
         }
-        
+
         // Aktion durchführen
         const results = [];
         

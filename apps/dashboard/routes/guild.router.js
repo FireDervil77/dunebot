@@ -87,6 +87,12 @@ router.use("/:guildId/plugins/:pluginName", CheckAuth, CheckGuildAccess, pluginM
     const plugin = res.locals.plugin;
     const Logger = ServiceManager.get('Logger');
 
+    // Die Rechte eines internen Plugins gibt es in einer fremden Guild nicht, aber
+    // die Route soll dort gar nicht erst da sein.
+    if (plugin && !ServiceManager.get('pluginManager').istVerfuegbar(plugin.name, req.params.guildId)) {
+        return res.status(404).render("error", { message: "Plugin nicht gefunden", error: { status: 404 } });
+    }
+
     if (!plugin || !plugin.guildRouter) {
         Logger.error('Plugin oder Router nicht gefunden:', {
             plugin: plugin ? plugin.name : 'nicht gefunden',
