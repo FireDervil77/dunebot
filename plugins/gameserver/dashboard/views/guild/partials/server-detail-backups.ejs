@@ -181,7 +181,9 @@
                                     <i class="fas fa-undo"></i>
                                 </button>` : ''}
                             ${CAN_DELETE ? `
-                                <button class="btn btn-danger btn-sm" onclick="deleteBackup(${b.id}, '${escHtml(b.name)}')" title="Löschen">
+                                <button class="btn btn-danger btn-sm" ${b.laeuft ? 'disabled' : ''}
+                                        onclick="deleteBackup(${b.id}, '${escHtml(b.name)}')"
+                                        title="${b.laeuft ? 'Gerade in Arbeit, Löschen geht, sobald sie fertig ist' : 'Löschen'}">
                                     <i class="fas fa-trash"></i>
                                 </button>` : ''}
                         </div>
@@ -271,6 +273,13 @@
             if (typeof showToast === 'function') showToast('error', 'Netzwerkfehler');
         }
     };
+
+    // Ist eine Sicherung durch, gibt die Liste den Löschen-Knopf wieder frei.
+    document.addEventListener('DOMContentLoaded', () => {
+        if (!window.GameserverSSEClient) return;
+        window.GameserverSSEClient.fuerSeite(window.gameserverGuildId)
+            .fuerServer(window.gameserverServerId).on('backup_completed', () => loadBackups());
+    });
 
     // Beim Tab-Aktivieren automatisch laden (einmalige Registrierung via ID)
     const backupsTabLink = document.getElementById('backups-tab') ||

@@ -3985,7 +3985,7 @@ router.get('/:serverId/backups', requirePermission('GAMESERVER.BACKUPS.VIEW'), a
 
         return res.json({
             success: true,
-            backups: backups || [],
+            backups: (backups || []).map(b => ({ ...b, laeuft: Sicherung.laeuft(b) })),
             abruf: Boolean(maschine && maschine.abruf_port)
         });
     } catch (error) {
@@ -4175,6 +4175,9 @@ router.post('/:serverId/backups', requirePermission('GAMESERVER.BACKUPS.CREATE')
                         [err.message || 'Backup fehlgeschlagen', backupId]
                     );
                     Logger.error(`[Gameserver/Backups] Backup ${backupId} fehlgeschlagen:`, err);
+                    ServiceManager.get('sseManager')?.broadcast(guildId, 'gameserver', {
+                        action: 'backup_completed', server_id: serverId, backup_id: backupId, backup_name: backupName, fehler: true
+                    });
                 });
         } else {
             // Daemon offline → als fehlgeschlagen markieren
@@ -4205,10 +4208,15 @@ router.delete('/:serverId/backups/:backupId', requirePermission('GAMESERVER.BACK
         const guildId = res.locals.guildId;
 
         const [backup] = await dbService.query(
-            'SELECT id, name FROM gameserver_backups WHERE id = ? AND server_id = ? AND guild_id = ?',
+            'SELECT id, name, status, created_at FROM gameserver_backups WHERE id = ? AND server_id = ? AND guild_id = ?',
             [backupId, serverId, guildId]
         );
         if (!backup) return res.status(404).json({ success: false, message: 'Backup nicht gefunden' });
+
+        if (Sicherung.laeuft(backup)) {
+            return res.status(409).json({ success: false,
+                message: 'Diese Sicherung ist gerade in Arbeit. Löschen geht, sobald sie fertig ist.' });
+        }
 
         // Erst die Datei, dann die Zeile.
         //

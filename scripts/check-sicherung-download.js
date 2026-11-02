@@ -71,8 +71,10 @@ const daemon = https.createServer(zertifikat, (req, res) => {
 });
 
 let daemonPort = 0;
+let sicherung = null;
 const db = {
     async query(sql) {
+        if (/^SELECT id, name, status, created_at FROM gameserver_backups/.test(sql)) return [sicherung];
         if (/FROM gameserver_backups b\s+JOIN gameservers gs/.test(sql)) {
             return [{ name: 'Probe_2026', status: 'completed', host: '127.0.0.1', fqdn: 'node1.firenetworks.de',
                 fqdn_gilt: 1, abruf_port: daemonPort, api_key: SCHLUESSEL, abruf_zertifikat: zertifikat.cert }];
@@ -152,6 +154,40 @@ async function pruefe(name, fn) {
         daemonPort = alt;
         assert.strictEqual(a.status, 502);
         assert.match(JSON.parse(a.inhalt).message, /nicht erreichbar/);
+    });
+
+    console.log('\nLöschen, während die Sicherung läuft');
+    const Sicherung = require(path.join(WURZEL, 'plugins/gameserver/dashboard/helpers/Sicherung.js'));
+    const loeschen = router.stack.find(l => l.route && l.route.path === '/:serverId/backups/:backupId' && l.route.methods.delete)
+        .route.stack.at(-1).handle;
+    const rufeLoeschen = (zeile) => new Promise((fertig) => {
+        sicherung = zeile;
+        const res = { locals: { guildId: 'g1' }, status(c) { this.code = c; return this; }, json(d) { fertig({ code: this.code, d }); } };
+        loeschen({ params: { serverId: '231', backupId: '149' } }, res);
+    });
+    const jetzt = new Date();
+    const alt = new Date(Date.now() - Sicherung.FRIST_MS - 1000);
+
+    await pruefe('laufende Sicherung und Wiederherstellung: 409, der Daemon wird nicht gefragt', async () => {
+        for (const status of ['running', 'pending', 'restoring']) {
+            const a = await rufeLoeschen({ id: 149, name: 'x', status, created_at: jetzt });
+            assert.strictEqual(a.code, 409, status);
+            assert.match(a.d.message, /gerade in Arbeit/);
+        }
+    });
+    await pruefe('fertig, fehlgeschlagen und Leichen nach der Frist kommen an der Sperre vorbei', async () => {
+        for (const zeile of [{ status: 'completed', created_at: jetzt }, { status: 'failed', created_at: jetzt }, { status: 'running', created_at: alt }]) {
+            assert.strictEqual(Sicherung.laeuft(zeile), false, JSON.stringify(zeile));
+            const a = await rufeLoeschen({ id: 149, name: 'x', ...zeile }).catch(e => ({ code: 0, e }));
+            assert.notStrictEqual(a.code, 409, JSON.stringify(zeile));
+        }
+    });
+    await pruefe('die Liste nennt `laeuft`, der Knopf ist dann gesperrt, Fertigmeldung gibt ihn frei', async () => {
+        const seite = fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/views/guild/partials/server-detail-backups.ejs'), 'utf8');
+        assert.match(seite, /\$\{b\.laeuft \? 'disabled' : ''\}/);
+        assert.match(seite, /\.on\('backup_completed', \(\) => loadBackups\(\)\)/);
+        const routen = fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/routes/servers.js'), 'utf8');
+        assert.match(routen, /laeuft: Sicherung\.laeuft\(b\)/);
     });
 
     console.log(`\n${bestanden} Prüfung(en) bestanden.`);

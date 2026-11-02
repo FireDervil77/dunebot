@@ -14,4 +14,21 @@
  */
 const FRIST_MS = 60 * 60 * 1000;
 
-module.exports = { FRIST_MS };
+/**
+ * Arbeitet gerade jemand an dieser Sicherung? Dann darf sie niemand löschen: Der
+ * Daemon schreibt oder liest das Archiv noch, und das Panel kennt keinen Abbruch.
+ *
+ * Nach der Frist gilt `running` nicht mehr: Ein Neustart des Dashboards lässt die
+ * Zeile stehen, und eine Leiche muss sich löschen lassen. `restoring` hat kein eigenes
+ * Datum, `created_at` nennt dort nur den Tag der Sicherung.
+ *
+ * @param {{status: string, created_at?: Date|string}} zeile
+ * @returns {boolean}
+ */
+function laeuft(zeile, jetzt = Date.now()) {
+    if (zeile?.status === 'restoring') return true;
+    if (zeile?.status !== 'running' && zeile?.status !== 'pending') return false;
+    return jetzt - new Date(zeile.created_at).getTime() < FRIST_MS;
+}
+
+module.exports = { FRIST_MS, laeuft };
