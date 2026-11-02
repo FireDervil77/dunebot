@@ -184,8 +184,6 @@ class GameserverPlugin extends DashboardPlugin {
             GameserverPlugin.modpackGeraeumt = true;
             await require('./helpers/Modpackstand').nachNeustart(dbService)
                 .catch(e => ServiceManager.get('Logger').error('[Gameserver] Modpack-Stand nicht geräumt:', e));
-            await require('./helpers/Sicherung').nachNeustart(dbService)
-                .catch(e => ServiceManager.get('Logger').error('[Gameserver] Sicherungen nicht geräumt:', e));
         }
         const Logger = ServiceManager.get('Logger');
         const path = require('path');
@@ -622,6 +620,15 @@ class GameserverPlugin extends DashboardPlugin {
                 (payload) => require('./helpers/Modpackstand').fortschritt(payload?.server_id, payload || {}),
                 { priority: 5 }
             );
+
+            // Das Ende von Sicherung und Wiederherstellung meldet der Daemon selbst.
+            const Sicherung = require('./helpers/Sicherung');
+            eventRouter.register(MessageTypes.NS_GAMESERVER, 'backup_fertig',
+                (payload) => Sicherung.fertig(payload), { priority: 5 });
+            eventRouter.register(MessageTypes.NS_GAMESERVER, 'restore_fertig',
+                (payload) => Sicherung.wiederhergestellt(payload), { priority: 5 });
+            // Der Herzschlag kommt im Kern an, der das Plugin nicht kennt.
+            ServiceManager.register('sicherungsAbgleich', Sicherung.abgleich);
 
             eventRouter.register(
                 MessageTypes.NS_GAMESERVER, 

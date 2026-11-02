@@ -92,6 +92,8 @@ const daemonEreignisse = new Set([...goAlle.matchAll(RE_SENDEN)].map(m => `${wer
  * sieht sie nicht, deshalb stehen die Namen hier mit ihrem Ort.
  */
 const VARIABEL = {
+    'gameserver.backup_fertig': 'websocket/sicherungen.go, `aktion` wird durchgereicht',
+    'gameserver.restore_fertig': 'websocket/sicherungen.go, `aktion` wird durchgereicht',
     'install.status': 'gameserver/install_paket.go, `ns` ist install oder werkbank',
     'install.output': 'gameserver/install_paket.go, `ns` ist install oder werkbank',
     'werkbank.status': 'gameserver/install_paket.go, `ns` ist install oder werkbank',

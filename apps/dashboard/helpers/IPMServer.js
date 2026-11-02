@@ -899,6 +899,12 @@ class IPMServer {
         conn.lastHeartbeat = Date.now();
 
         this.zaehler.belegung(daemonId, 'lesefaden', payload.lesefaden);
+
+        // Woran der Daemon arbeitet, sagt nur er (gameserver/helpers/Sicherung.js).
+        if (Array.isArray(payload.sicherungen) && ServiceManager.has('sicherungsAbgleich')) {
+            ServiceManager.get('sicherungsAbgleich')(daemonId, payload.sicherungen)
+                .catch(err => this.Logger.error('[IPMServer] Sicherungen nicht abgeglichen:', err));
+        }
         this.zaehler.belegung(daemonId, 'warten', payload.warten);
         this.zaehler.belegung(daemonId, 'arbeit', payload.arbeit);
         this.zaehler.last(daemonId, { druck: payload.druck, hardware: payload.hardware });

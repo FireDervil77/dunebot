@@ -4154,35 +4154,17 @@ router.post('/:serverId/backups', requirePermission('GAMESERVER.BACKUPS.CREATE')
 
             // Die Datenbanken des Servers kommen mit ins Archiv (Stufe 11 S6).
             const Datenbanken = require('../helpers/Datenbanken');
+            // Angenommen heißt nicht fertig: Das Ende meldet der Daemon als Ereignis
+            // (helpers/Sicherung.js). Scheitert nur die Übergabe, bleibt nichts zu warten.
+            Sicherung.beginne(backupId);
             ipmServer.sendCommand(rootserver.daemon_id, 'gameserver.backup', {
                 server_id: String(serverId),
                 backup_id: String(backupId),
                 backup_name: backupName,
                 install_path: server.install_path,
                 datenbanken: await Datenbanken.nummern(serverId),
-            }, Sicherung.FRIST_MS)
-                .then(async (r) => {
-                    const size = r?.size_bytes || 0;
-                    await dbService.query(
-                        "UPDATE gameserver_backups SET status = 'completed', size_bytes = ?, datenbanken = ?, completed_at = NOW() WHERE id = ?",
-                        [size, Datenbanken.sicherungsSpalte(r), backupId]
-                    );
-                    // SSE-Broadcast
-                    const sseManager = ServiceManager.get('sseManager');
-                    sseManager?.broadcast(guildId, 'gameserver', {
-                        action: 'backup_completed', server_id: serverId, backup_id: backupId, backup_name: backupName
-                    });
-                })
-                .catch(async (err) => {
-                    await dbService.query(
-                        "UPDATE gameserver_backups SET status = 'failed', error_message = ? WHERE id = ?",
-                        [err.message || 'Backup fehlgeschlagen', backupId]
-                    );
-                    Logger.error(`[Gameserver/Backups] Backup ${backupId} fehlgeschlagen:`, err);
-                    ServiceManager.get('sseManager')?.broadcast(guildId, 'gameserver', {
-                        action: 'backup_completed', server_id: serverId, backup_id: backupId, backup_name: backupName, fehler: true
-                    });
-                });
+            }, 30000).catch(err => Sicherung.fertig({ backup_id: backupId, success: false, error: err.message })
+                .catch(fehler => Logger.error('[Gameserver/Backups] Sicherung nicht vermerkt:', fehler)));
         } else {
             // Daemon offline → als fehlgeschlagen markieren
             await dbService.query(
@@ -4309,33 +4291,15 @@ router.post('/:serverId/backups/:backupId/restore', requirePermission('GAMESERVE
         // Die Datenbanken, die der Server JETZT hat — nur sie spielt der Daemon
         // aus dem Archiv ein (Stufe 11 S6).
         const Datenbanken = require('../helpers/Datenbanken');
+        Sicherung.beginne(backupId);
         ipmServer.sendCommand(server.daemon_id, 'gameserver.restore', {
             server_id: String(serverId),
             backup_id: String(backupId),
             backup_name: backup.name,
             install_path: server.install_path,
             datenbanken: await Datenbanken.nummern(serverId),
-        }, Sicherung.FRIST_MS)
-            .then(async (r) => {
-                await dbService.query(
-                    "UPDATE gameserver_backups SET status = 'completed', wiederhergestellt = ? WHERE id = ?",
-                    [Datenbanken.wiederherstellungsText(r), backupId]
-                );
-                const sseManager = ServiceManager.get('sseManager');
-                sseManager?.broadcast(guildId, 'gameserver', {
-                    action: 'restore_completed', server_id: serverId, backup_id: backupId
-                });
-            })
-            .catch(async (err) => {
-                // Bis zum 2026-10-28 nur ins Log — im Panel sah ein
-                // gescheitertes Wiederherstellen aus wie keines. Seit S6 kann
-                // es heißen „Dateien zurück, Datenbank leer"; das muss dort stehen.
-                await dbService.query(
-                    "UPDATE gameserver_backups SET status = 'completed', wiederhergestellt = ? WHERE id = ?",
-                    [`Wiederherstellung gescheitert: ${err.message || 'unbekannt'}`, backupId]
-                );
-                Logger.error(`[Gameserver/Backups] Restore ${backupId} fehlgeschlagen:`, err);
-            });
+        }, 30000).catch(err => Sicherung.wiederhergestellt({ backup_id: backupId, success: false, error: err.message })
+            .catch(fehler => Logger.error('[Gameserver/Backups] Wiederherstellung nicht vermerkt:', fehler)));
 
         return res.json({ success: true, message: 'Wiederherstellung gestartet' });
     } catch (error) {

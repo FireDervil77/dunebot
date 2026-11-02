@@ -1,5 +1,5 @@
 {
-  "fassung": 4,
+  "fassung": 5,
   "linien": {"S": "Steuerung", "L": "Live", "O": "Output", "V": "Verify", "E": "Events", "D": "Datei"},
   "zeilen": [
     {"name": "register", "art": "steuerung", "von": "daemon", "linie": "V", "verlust": "nie"},
@@ -22,6 +22,8 @@
     {"name": "install.completed", "art": "ereignis", "von": "daemon", "linie": "E", "verlust": "nie"},
     {"name": "install.failed", "art": "ereignis", "von": "daemon", "linie": "E", "verlust": "nie"},
     {"name": "install.output", "art": "ereignis", "von": "daemon", "linie": "O", "verlust": "erlaubt"},
+    {"name": "gameserver.backup_fertig", "art": "ereignis", "von": "daemon", "linie": "E", "verlust": "nie"},
+    {"name": "gameserver.restore_fertig", "art": "ereignis", "von": "daemon", "linie": "E", "verlust": "nie"},
     {"name": "sftp.befund", "art": "ereignis", "von": "daemon", "linie": "E", "verlust": "nie"},
     {"name": "datenbank.befund", "art": "ereignis", "von": "daemon", "linie": "E", "verlust": "nie"},
     {"name": "werkbank.status", "art": "ereignis", "von": "daemon", "linie": "E", "verlust": "nie"},

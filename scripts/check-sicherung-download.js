@@ -190,27 +190,57 @@ async function pruefe(name, fn) {
         assert.match(routen, /laeuft: Sicherung\.laeuft\(b\)/);
     });
 
-    console.log('\nNach einem Neustart, an einer Kopie');
+    console.log('\nDer Daemon weiß, was läuft, an einer Kopie');
     require('dotenv').config({ path: path.join(WURZEL, 'apps/dashboard/.env'), quiet: true });
     const roh = await require('mysql2/promise').createConnection({
         host: process.env.MYSQL_HOST, port: process.env.MYSQL_PORT, user: process.env.MYSQL_USER,
         password: process.env.MYSQL_PASSWORD, database: process.env.MYSQL_DATABASE,
     });
-    await pruefe('Liegengebliebenes wird aufgeräumt, Fertiges bleibt, und der Start hängt daran', async () => {
-        await roh.query('CREATE TEMPORARY TABLE kopie_b LIKE gameserver_backups');
-        await roh.query('CREATE TEMPORARY TABLE gameserver_backups LIKE kopie_b');
-        await roh.query(`INSERT INTO gameserver_backups (server_id, guild_id, name, status, created_by) VALUES
-            (1, 'g', 'lief', 'running', 'u'), (1, 'g', 'wartete', 'pending', 'u'),
-            (1, 'g', 'stellte', 'restoring', 'u'), (1, 'g', 'fertig', 'completed', 'u')`);
-        await Sicherung.nachNeustart({ query: (sql, p) => roh.query(sql, p).then(r => r[0]) });
-        const [z] = await roh.query('SELECT name, status, error_message, wiederhergestellt FROM gameserver_backups ORDER BY id');
-        assert.deepStrictEqual(z.map(x => x.status), ['failed', 'failed', 'completed', 'completed']);
-        assert.match(z[0].error_message, /neu gestartet/);
-        assert.match(z[2].wiederhergestellt, /gescheitert/, 'die Liste färbt nur „gescheitert" rot');
-        assert.strictEqual(z[3].error_message, null);
-        assert.strictEqual(Sicherung.laeuft(z[0]), false, 'die Zeile muss sich löschen lassen');
-        assert.match(fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/index.js'), 'utf8'), /helpers\/Sicherung'\)\.nachNeustart\(dbService\)/);
+    const echteDb = db.query;
+    db.query = (sql, p) => roh.query(sql, p).then(r => r[0]);
+    const stand = async () => (await db.query('SELECT name, status, error_message, wiederhergestellt FROM gameserver_backups ORDER BY id'));
+    await pruefe('Herzschlag: Was der Daemon nennt, läuft weiter, auch nach einem Neustart des Dashboards', async () => {
+        await db.query('CREATE TEMPORARY TABLE kopie_b LIKE gameserver_backups');
+        await db.query('CREATE TEMPORARY TABLE gameserver_backups LIKE kopie_b');
+        await db.query('CREATE TEMPORARY TABLE gameservers (id INT, rootserver_id INT)');
+        await db.query('CREATE TEMPORARY TABLE rootserver (id INT, daemon_id VARCHAR(64))');
+        await db.query("INSERT INTO rootserver (id, daemon_id) VALUES (5, 'd1')");
+        await db.query("INSERT INTO gameservers (id, rootserver_id) VALUES (231, 5)");
+        await db.query(`INSERT INTO gameserver_backups (id, server_id, guild_id, name, status, created_by) VALUES
+            (1, 231, 'g', 'lief', 'running', 'u'), (2, 231, 'g', 'stellte', 'restoring', 'u'), (3, 231, 'g', 'fertig', 'completed', 'u')`);
+        await Sicherung.abgleich('d1', ['1', '2']);
+        assert.deepStrictEqual((await stand()).map(z => z.status), ['running', 'restoring', 'completed']);
     });
+    await pruefe('Nennt er sie nicht mehr, wird sie nie fertig, und sie lässt sich löschen', async () => {
+        await Sicherung.abgleich('d1', []);
+        const z = await stand();
+        assert.deepStrictEqual(z.map(x => x.status), ['failed', 'completed', 'completed']);
+        assert.match(z[0].error_message, /nicht mehr daran/);
+        assert.match(z[1].wiederhergestellt, /gescheitert/, 'die Liste färbt nur „gescheitert" rot');
+        assert.strictEqual(Sicherung.laeuft(z[0]), false);
+    });
+    await pruefe('Eine eben gestartete Sicherung übersteht den ersten Herzschlag, ohne ihn zu kennen', async () => {
+        await db.query("UPDATE gameserver_backups SET status = 'running' WHERE id = 1");
+        Sicherung.beginne(1);
+        await Sicherung.abgleich('d1', []);
+        assert.strictEqual((await stand())[0].status, 'running');
+        await Sicherung.abgleich('d1', [], Date.now() + Sicherung.ANLAUF_MS + 1000);
+        assert.strictEqual((await stand())[0].status, 'failed');
+    });
+    await pruefe('Die Meldung des Daemons stellt eine falsche Fehlermeldung richtig', async () => {
+        await Sicherung.fertig({ backup_id: 1, success: true, size_bytes: 12, datenbanken: [] });
+        const z = (await stand())[0];
+        assert.strictEqual(z.status, 'completed');
+    });
+    await pruefe('Der Cronjob wartet auf das Ereignis, und ein Fehler kommt bei ihm an', async () => {
+        const gut = Sicherung.warte(1, 2000);
+        await Sicherung.fertig({ backup_id: 1, success: true, size_bytes: 5 });
+        assert.strictEqual((await gut).size_bytes, 5);
+        const schlecht = Sicherung.warte(1, 2000);
+        await Sicherung.fertig({ backup_id: 1, success: false, error: 'Platte voll' });
+        await assert.rejects(schlecht, /Platte voll/);
+    });
+    db.query = echteDb;
     await roh.end();
 
     console.log(`\n${bestanden} Prüfung(en) bestanden.`);

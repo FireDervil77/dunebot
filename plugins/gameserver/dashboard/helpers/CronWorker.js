@@ -535,32 +535,22 @@ class CronWorker {
             // Die Datenbanken des Servers kommen mit ins Archiv (Stufe 11 S6) —
             // derselbe Weg wie die Sicherung von Hand.
             const Datenbanken = require('./Datenbanken');
-            const response = await ipmServer.sendCommand(daemonId, 'gameserver.backup', {
+            const Sicherung = require('./Sicherung');
+            Sicherung.beginne(backupId);
+            const ende = Sicherung.warte(backupId);
+            await ipmServer.sendCommand(daemonId, 'gameserver.backup', {
                 server_id: String(job.server_id),
                 backup_id: String(backupId),
                 backup_name: backupName,
                 install_path: job.install_path,
                 datenbanken: await Datenbanken.nummern(job.server_id),
-            }, require('./Sicherung').FRIST_MS);
+            }, 30000);
 
+            // Die Zeile schreibt `Sicherung.fertig`, sobald der Daemon das Ende meldet.
+            const response = await ende;
             const sizeBytes = response?.size_bytes || 0;
 
-            await dbService.query(
-                "UPDATE gameserver_backups SET status = 'completed', size_bytes = ?, datenbanken = ?, completed_at = NOW() WHERE id = ?",
-                [sizeBytes, Datenbanken.sicherungsSpalte(response), backupId]
-            );
-
             Logger.info(`[CronWorker] Cronjob-Backup abgeschlossen: ${backupName} (${sizeBytes} Bytes)`);
-
-            // SSE-Broadcast
-            const sseManager = ServiceManager.get('sseManager');
-            sseManager?.broadcast(String(job.guild_id), 'gameserver', {
-                action: 'backup_completed',
-                server_id: job.server_id,
-                backup_id: backupId,
-                backup_name: backupName,
-                source: 'cron',
-            });
 
             // Aufbewahrung erst NACH dem erfolgreichen Backup anwenden. Wer
             // vorher aufraeumt, steht ohne Kopie da, wenn das neue Backup

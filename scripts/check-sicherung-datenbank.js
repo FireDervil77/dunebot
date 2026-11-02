@@ -41,6 +41,9 @@ const db = {
             this.backups.push({ id, name: p[2], status: 'pending' });
             return { insertId: id };
         }
+        if (/^SELECT guild_id, server_id, name FROM gameserver_backups WHERE id = \?$/.test(String(sql).trim())) {
+            return this.backups.filter(b => b.id === Number(p[0])).map(b => ({ guild_id: 'g1', server_id: 7, name: b.name }));
+        }
         if (/UPDATE gameserver_backups SET status = 'running'/.test(sql)) return {};
         if (/UPDATE gameserver_backups SET status = 'restoring'/.test(sql)) return {};
         if (/UPDATE gameserver_backups SET status = 'completed', size_bytes = \?, datenbanken = \?/.test(sql)) {
@@ -72,13 +75,20 @@ const daemon = {
     async sendCommand(id, befehl, nutzlast) {
         this.auftraege.push({ befehl, nutzlast });
         if (this.scheitern) throw new Error(this.scheitern);
-        return this.antwort[befehl] || {};
+        // Der Daemon sagt „angenommen", das Ende kommt als Ereignis.
+        setImmediate(() => {
+            const ergebnis = { backup_id: nutzlast.backup_id, success: true, ...this.antwort[befehl] };
+            if (befehl === 'gameserver.backup') Sicherung.fertig(ergebnis);
+            if (befehl === 'gameserver.restore') Sicherung.wiederhergestellt(ergebnis);
+        });
+        return { success: true };
     },
 };
 ServiceManager.register('dbService', db);
 ServiceManager.register('ipmServer', daemon);
 ServiceManager.register('sseManager', { broadcast: still });
 
+const Sicherung = require(path.join(WURZEL, 'plugins/gameserver/dashboard/helpers/Sicherung.js'));
 const router = require(path.join(WURZEL, 'plugins/gameserver/dashboard/routes/servers.js'));
 const CronWorker = require(path.join(WURZEL, 'plugins/gameserver/dashboard/helpers/CronWorker.js'));
 const Datenbanken = require(path.join(WURZEL, 'plugins/gameserver/dashboard/helpers/Datenbanken.js'));
