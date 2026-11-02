@@ -1063,6 +1063,16 @@ class GameserverPlugin extends DashboardPlugin {
      * @private
      */
     async _handleResourceUsage(payload, message, context) {
+        // Ein Paket je Daemon seit FireBus Etappe 3. Zu den Browsern geht weiter eine
+        // Meldung je Server, die Seiten kennen nichts anderes.
+        const einzelne = Array.isArray(payload?.server) ? payload.server : [payload];
+        for (const messung of einzelne) {
+            await this._gibMesswertWeiter(messung, context);
+        }
+    }
+
+    /** Eine Messung an die Seiten dieser Guild. */
+    async _gibMesswertWeiter(payload, context) {
         const Logger = ServiceManager.get('Logger');
 
         const { server_id } = payload;

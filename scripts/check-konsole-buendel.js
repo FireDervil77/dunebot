@@ -10,6 +10,9 @@
  */
 'use strict';
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+const { ohneKommentare } = require('./lib/quelltext');
 const ConsoleManager = require('../plugins/gameserver/dashboard/helpers/ConsoleManager');
 const Klasse = ConsoleManager.ConsoleManager || ConsoleManager;
 
@@ -56,6 +59,20 @@ function attrappe(mitWs) {
         await m._handleConsoleOutput({ server_id: '231', lines: ['{"topic":"console output","data":"innen"}'] });
         assert.deepStrictEqual(spur.history, ['innen']);
     });
+    console.log('\nMesswerte als Paket');
+    await pruefe('ein Paket wird zu einer Meldung je Server, die Einzelmeldung geht noch', async () => {
+        const quelle = ohneKommentare(fs.readFileSync(path.join(__dirname, '../plugins/gameserver/dashboard/index.js'), 'utf8'));
+        const anfang = quelle.indexOf('async _handleResourceUsage(');
+        const koerper = quelle.slice(anfang, quelle.indexOf('async _gibMesswertWeiter(', anfang));
+        const gesehen = [];
+        const handler = new Function('payload', 'context', 'return (async function () {'
+            + koerper.slice(koerper.indexOf('{') + 1, koerper.lastIndexOf('}')) + '}).call(this);');
+        const ziel = { _gibMesswertWeiter: async (m) => gesehen.push(m.server_id) };
+        await handler.call(ziel, { server: [{ server_id: '1' }, { server_id: '2' }] }, {});
+        await handler.call(ziel, { server_id: '3' }, {});
+        assert.deepStrictEqual(gesehen, ['1', '2', '3']);
+    });
+
     console.log(fehler ? `\n✗ ${fehler} Prüfung(en) rot` : '\n✅ Die Konsole kommt gebündelt an');
     process.exit(fehler ? 1 : 0);
 })();
