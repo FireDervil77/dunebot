@@ -180,6 +180,11 @@ class GameserverPlugin extends DashboardPlugin {
      * @param {Object} dbService - Datenbank-Service
      */
     async onEnable(app, dbService) {
+        if (!GameserverPlugin.modpackGeraeumt) {
+            GameserverPlugin.modpackGeraeumt = true;
+            await require('./helpers/Modpackstand').nachNeustart(dbService)
+                .catch(e => ServiceManager.get('Logger').error('[Gameserver] Modpack-Stand nicht geräumt:', e));
+        }
         const Logger = ServiceManager.get('Logger');
         const path = require('path');
         const express = require('express');

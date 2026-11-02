@@ -21,9 +21,12 @@
 
 const express = require('express');
 const router = express.Router();
+const Modpackstand = require('../helpers/Modpackstand');
 
 // Wird ein Server gerade gelöscht, ändert niemand mehr etwas an ihm.
 router.param('serverId', require('../helpers/Loeschung').sperre);
+// Während ein Modpack getauscht wird, ändert niemand die Mods nebenbei.
+router.param('serverId', Modpackstand.sperre);
 const { ServiceManager } = require('dunebot-core');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 const { nimmDatei } = require('../helpers/DateiAnnahme');
@@ -45,7 +48,7 @@ async function ladeServerUndPaket(dbService, serverId, guildId) {
     // gewaehlten Lader (Minecraft), und der steht dort.
     const [server] = await dbService.query(
         `SELECT id, name, guild_id, rootserver_id, install_path, addon_marketplace_id, status,
-                paket_werte, spielfassung_build
+                paket_werte, spielfassung_build, modpack_seit, modpack_name
            FROM gameservers WHERE id = ? AND guild_id = ?`,
         [serverId, guildId]
     );
@@ -178,6 +181,7 @@ router.get('/:serverId/inhalte', requirePermission('GAMESERVER.VIEW'), async (re
             // Kennt dieses Spiel Modpacks? Die Karte bietet den Abschnitt nur
             // dann an — und zwar auch, wenn noch keines liegt (2026-09-23).
             modpackMoeglich: kenntModpacks(geladen.paket),
+            modpackVorgang: Modpackstand.stand(geladen.server),
             ...liste,
         });
     } catch (error) {
@@ -713,10 +717,19 @@ router.post('/:serverId/inhalte/modpack', requirePermission('GAMESERVER.FILES.MA
             String(req.body.kennung), req.body.fassung ? String(req.body.fassung) : null);
 
         const lader = await laderVonServer(ipmServer, dbService, geladen);
-        const ergebnis = await InhalteHolen.installiereModpack({
-            server: geladen.server, guildId: res.locals.guildId,
-            paket, laderDesServers: lader,
-        });
+
+        const guildId = res.locals.guildId;
+        if (!await Modpackstand.beginne(geladen.server.id, guildId, paket.name || paket.kennung)) {
+            return res.status(409).json({ success: false, message: Modpackstand.GESPERRT });
+        }
+        let ergebnis;
+        try {
+            ergebnis = await InhalteHolen.installiereModpack({
+                server: geladen.server, guildId, paket, laderDesServers: lader,
+            });
+        } finally {
+            await Modpackstand.beende(geladen.server.id, guildId, paket.name || paket.kennung);
+        }
 
         if (!ergebnis.success) {
             return res.status(502).json({ success: false, message: ergebnis.fehler, ...wirkung(geladen) });

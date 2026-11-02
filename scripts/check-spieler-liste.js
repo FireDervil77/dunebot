@@ -67,7 +67,7 @@ function seite(liste = LISTE) {
     k('inhalte-spieler-inhalt'); k('inhalte-spieler-modal'); k('inhalte-formular', { style: { display: 'none' } });
     const spur = { toasts: [], kopiert: null, geladen: null, gezeigt: 0, geklickt: [] };
     const umgebung = {
-        document: {
+        document: { addEventListener() {},
             getElementById: (id) => knoten[id] || null,
             querySelectorAll: () => [], querySelector: () => null,
             createElement: () => ({ click() { spur.geklickt.push({ href: this.href, download: this.download }); }, remove() {} }),

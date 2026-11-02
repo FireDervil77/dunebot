@@ -77,7 +77,8 @@ const SERVER_LISTE_SQL = `
                 gs.loeschung_fehler,
                 -- Ob ein Umzug läuft, sagt seine Zeile, nicht gs.status (Umzugsstand). Kein Fragezeichen in diesem Kommentar: mysql2 hielte es für einen Platzhalter.
                 ${require('./Umzugsstand').SPALTE},
-                ${require('./Verbindung').SPALTEN}
+                ${require('./Verbindung').SPALTEN},
+                ${require('./Modpackstand').SPALTEN}
             FROM gameservers gs
             LEFT JOIN addon_marketplace am ON gs.addon_marketplace_id = am.id
             LEFT JOIN rootserver r ON gs.rootserver_id = r.id

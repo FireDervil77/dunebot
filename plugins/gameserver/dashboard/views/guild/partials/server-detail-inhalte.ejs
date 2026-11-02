@@ -64,6 +64,46 @@
   </div>
 </div>
 
+<%# Ein Modpack ersetzen entfernt seine Dateien endgültig, gebaut wie
+    server-loeschen-dialog.ejs. Geöffnet von `modpackInstallieren`. %>
+<div class="modal modal-blur fade" id="modpackErsetzenModal" tabindex="-1" aria-labelledby="modpackErsetzenTitel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content border border-danger border-2">
+      <div class="modal-status bg-danger"></div>
+      <div class="modal-header bg-danger-lt">
+        <h5 class="modal-title text-danger fw-bold" id="modpackErsetzenTitel">
+          <i class="fa-solid fa-triangle-exclamation me-2"></i><span id="modpackErsetzenKopf"></span>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-danger fw-bold fs-3 mb-2" id="modpackErsetzenSatz"></p>
+        <p class="text-danger fw-bold mb-3">Das lässt sich nicht zurücknehmen.</p>
+        <div class="fw-bold mb-1">Es gehen mit:</div>
+        <ul class="mb-3">
+          <li>alle Dateien, die dieses Paket mitgebracht hat, auch deine Änderungen daran</li>
+          <li>alle Einstellungen des Pakets unter <span class="font-monospace">config/</span></li>
+        </ul>
+        <div class="fw-bold mb-1">Es bleibt:</div>
+        <ul class="mb-3">
+          <li>die Welt und alles, was nicht zum Paket gehört</li>
+          <li>Dateien, die das Spiel oder ein Mod erst beim Start angelegt hat. Sie stehen in keiner Liste und können das neue Paket stören.</li>
+        </ul>
+        <label class="form-label fw-bold" for="modpackErsetzenEingabe">
+          Zum Bestätigen eintippen: <span class="font-monospace text-danger" id="modpackErsetzenSoll"></span>
+        </label>
+        <input type="text" class="form-control font-monospace text-danger border-danger" id="modpackErsetzenEingabe" autocomplete="off">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal">Abbrechen</button>
+        <button type="button" class="btn btn-danger fw-bold" id="modpackErsetzenKnopf" disabled>
+          <i class="fa-solid fa-rotate me-1"></i>Endgültig ersetzen
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
   'use strict';
@@ -213,6 +253,14 @@
     return tage > 0
       ? `Fassung vom ${wann} — ${tage} Tage vor den Spieldateien`
       : `Fassung vom ${wann} — ${-tage} Tage nach den Spieldateien`;
+  }
+
+  function modpackZeit(wert) {
+    const d = new Date(wert);
+    if (Number.isNaN(d.getTime())) return '—';
+    const zeit = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    return d.toDateString() === new Date().toDateString()
+      ? `heute, ${zeit}` : `${d.toLocaleDateString('de-DE')}, ${zeit}`;
   }
 
   function marke(text, ton, titel) {
@@ -395,6 +443,7 @@
     // wer hier suchte, fand nichts und erfuhr auch nicht, warum.
     if (d.modpackMoeglich) {
       const m = d.modpack;
+      const v = d.modpackVorgang || { laeuft: false };
       html += `
         <div style="margin:8px 0;padding:10px 12px;border:1px solid var(--fb-border);border-radius:6px"
              ${m ? `data-modpack="${escape(m.name || m.kennung)}" data-modpack-kennung="${escape(m.kennung)}"
@@ -410,6 +459,8 @@
                   Die Mods dieses Pakets liegen auf der Platte, werden aber nicht
                   einzeln verwaltet: Wer eine davon austauscht, zerlegt das Paket.
                 </div>
+                ${m.status === 'installiert' && !v.laeuft ? `<div class="fb-muted" style="font-size:12px;margin-top:2px">
+                  Zuletzt installiert: ${escape(modpackZeit(m.updated_at))}${m.ablage ? ' · ' + escape(m.ablage) : ''}</div>` : ''}
                 ${m.fehler ? `<div style="font-size:12px;color:var(--fb-danger);margin-top:2px">${escape(m.fehler)}</div>` : ''}`
               : `
                 <div style="font-weight:500">Kein Modpack</div>
@@ -418,13 +469,17 @@
                   Mods und ihre Einstellungen in einem Stück mit.
                 </div>`}
             </div>
-            ${DARF && m ? `<button class="btn btn-white btn-sm" style="flex:0 0 auto"
+            ${DARF && m ? `<button class="btn btn-white btn-sm" style="flex:0 0 auto" ${v.laeuft ? 'disabled' : ''}
                         title="Die Dateien dieses Pakets werden entfernt und neu geholt."
                         onclick="modpackInstallieren('${escape(m.kennung)}', '${escape(m.fassung || '')}', this)"
                       >Neu installieren</button>` : ''}
-            ${DARF ? `<button class="btn btn-white btn-sm" style="flex:0 0 auto"
+            ${DARF ? `<button class="btn btn-white btn-sm" style="flex:0 0 auto" ${v.laeuft ? 'disabled' : ''}
                         onclick="modpackSuche()">${m ? 'Anderes Modpack' : 'Modpack wählen'}</button>` : ''}
           </div>
+          ${v.laeuft ? `<div class="alert alert-info mt-2 mb-0 py-2" role="status">
+            <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+            <strong>„${escape(v.name || 'Modpack')}" wird eingespielt</strong>, seit ${escape(modpackZeit(v.seit))}.
+            Bis es fertig ist, lässt sich der Server nicht starten.</div>` : ''}
           <div id="modpack-suche" style="display:none"></div>
         </div>`;
     }
@@ -1170,6 +1225,14 @@
       });
   };
 
+  // Auch in Tabs, die den Wechsel nicht angestoßen haben. Erst hier: Der Client
+  // kommt im Seitenfuß.
+  document.addEventListener('DOMContentLoaded', () => {
+    if (!window.GameserverSSEClient) return;
+    window.GameserverSSEClient.fuerSeite(window.gameserverGuildId)
+      .fuerServer(window.gameserverServerId).on('modpack', () => window.inhalteLaden());
+  });
+
   window.modpackInstallieren = function (kennung, fassung, knopf) {
     // ── Eine Rückfrage, und zwar nur, wenn schon eines liegt ────────────────
     //
@@ -1177,13 +1240,39 @@
     // einzige Stelle hier, an der etwas Vorhandenes verschwindet — beim ersten
     // Modpack gibt es nichts zu bestätigen.
     const altes = document.querySelector('#inhalte-wurzel [data-modpack]');
-    const dasselbe = altes && altes.getAttribute('data-modpack-kennung') === kennung;
-    if (altes && !window.confirm(dasselbe
-        ? `„${altes.getAttribute('data-modpack')}" wird neu installiert: Seine Dateien `
-          + `werden entfernt und neu geholt. Weiter?`
-        : `„${altes.getAttribute('data-modpack')}" wird samt seinen Dateien entfernt `
-          + `und durch dieses Paket ersetzt. Weiter?`)) return;
+    if (!altes) { modpackEinspielen(kennung, fassung, knopf); return; }
 
+    const name = altes.getAttribute('data-modpack');
+    const dasselbe = altes.getAttribute('data-modpack-kennung') === kennung;
+    const eingabe = document.getElementById('modpackErsetzenEingabe');
+    const bestaetigen = document.getElementById('modpackErsetzenKnopf');
+    document.getElementById('modpackErsetzenKopf').textContent =
+      dasselbe ? 'Modpack ENDGÜLTIG neu installieren' : 'Modpack ENDGÜLTIG ersetzen';
+    document.getElementById('modpackErsetzenSatz').textContent = dasselbe
+      ? `„${name}" wird entfernt und neu geholt.`
+      : `„${name}" wird entfernt und durch „${kennung}" ersetzt.`;
+    document.getElementById('modpackErsetzenSoll').textContent = name;
+    eingabe.value = '';
+    bestaetigen.disabled = true;
+
+    // Wie beim Löschen: Großschreibung machen Handys von selbst.
+    const passt = () => eingabe.value.trim().toLowerCase() === name.trim().toLowerCase();
+    eingabe.oninput = () => { bestaetigen.disabled = !passt(); };
+    eingabe.onkeydown = (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      if (!bestaetigen.disabled) bestaetigen.click();
+    };
+    const fenster = bootstrap.Modal.getOrCreateInstance(document.getElementById('modpackErsetzenModal'));
+    bestaetigen.onclick = () => {
+      if (!passt()) return;
+      fenster.hide();
+      modpackEinspielen(kennung, fassung, knopf);
+    };
+    fenster.show();
+  };
+
+  function modpackEinspielen(kennung, fassung, knopf) {
     knopf.disabled = true;
     const raum = document.getElementById('mp-treffer');
     if (raum) {
@@ -1235,7 +1324,7 @@
       })
       .catch(e => melde('error', 'Modpack nicht installiert: ' + e.message, 15000))
       .finally(() => { knopf.disabled = false; window.inhalteLaden(); });
-  };
+  }
 
   // ── Liste für Mitspieler (Stufe 10 S4) ─────────────────────────────────────
   //

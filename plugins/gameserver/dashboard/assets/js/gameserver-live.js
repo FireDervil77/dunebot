@@ -178,7 +178,9 @@
         // Server nie neu startbar.
         const steht = z.bereit === true || z.messbar === false;
 
-        const neustartbar = z.status === 'online' && steht;
+        // Während Dateien getauscht werden, startet niemand. Stoppen geht weiter.
+        const tausch = z.modpack ? 'Das Modpack wird gerade eingespielt.' : '';
+        const neustartbar = z.status === 'online' && steht && !tausch;
 
         // `grund` steht nur an einem GESPERRTEN Knopf. Ein Grund neben einem
         // aktiven Knopf waere ein Hinweis auf ein Hindernis, das es nicht gibt.
@@ -190,13 +192,14 @@
             // mit Begruendung sagt "gleich wieder".
             start: {
                 sichtbar: !laeuft,
-                aktiv:    !werkelt,
-                grund:    werkelt ? 'Der Server ist gerade beschäftigt.' : '',
+                aktiv:    !werkelt && !tausch,
+                grund:    tausch || (werkelt ? 'Der Server ist gerade beschäftigt.' : ''),
             },
             restart: {
                 sichtbar: laeuft,
                 aktiv:    neustartbar,
                 grund:    neustartbar ? ''
+                        : tausch ? tausch
                         : haengt
                             ? 'Der Server hat sich nach dem Stoppen nicht zurückgemeldet — erst stoppen.'
                         : z.status === 'starting'
@@ -276,6 +279,7 @@
             sse.on('loeschung', (d) => this.loeschungGemeldet(d));
             // Text, Knöpfe und Grund rechnet der Server, das betrifft alle Server der Maschine.
             sse.on('verbindung', () => this.holeBald());
+            sse.on('modpack', () => this.holeBald());
             sse.on('readiness', (d) => {
                 this.uebernimm(d.server_id, { stufe: d.stufe, grund: d.grund });
                 this.holeBald();
@@ -523,6 +527,7 @@
                         umzug:   Boolean(s.umzug),
                         loeschung: s.loeschung || undefined,
                         verbindung: s.verbindung || 'da',
+                        modpack: Boolean(s.modpack && s.modpack.laeuft),
                         // Für ein hängendes `stopping` (knopfZustand): wann der
                         // Zustand zuletzt wechselte, und die Frist vom Server.
                         seit:    s.uebergang ? s.uebergang.seit : undefined,
@@ -685,7 +690,8 @@
                         // (Umzugsstand) schlagen den Status — sonst zeigte die
                         // Pille mitten darin „Aus".
                         const loescht = Boolean(z.loeschung && z.loeschung.laeuft);
-                        const leitung = z.zustand && z.zustand.schluessel === 'verbindung' ? z.zustand : null;
+                        const leitung = z.zustand && ['verbindung', 'modpack'].includes(z.zustand.schluessel)
+                            ? z.zustand : null;
                         const e = loescht ? { text: 'Wird gelöscht' }
                             : z.umzug ? { text: 'Wird verschoben' }
                             : leitung ? { text: leitung.text }

@@ -33,6 +33,7 @@
  */
 
 const Verbindung = require('./Verbindung');
+const Modpackstand = require('./Modpackstand');
 const { lesePortzwecke } = require('./Portvergabe');
 const { istKontrollGuild } = require('./Paketfassung');
 const Bitmaske = require('./Bitmaske');
@@ -245,6 +246,10 @@ function baueZustand(server) {
     if (leitung) {
         return { schluessel: 'verbindung', text: leitung.text, ton: leitung.ton, gut: false, stufe: null,
                  abzeichen: ABZEICHEN[leitung.ton] };
+    }
+    if (Modpackstand.stand(server).laeuft) {
+        return { schluessel: 'modpack', text: 'Modpack wird eingespielt', ton: 'blue', gut: false, stufe: null,
+                 abzeichen: ABZEICHEN.blue };
     }
     const s = String(server.status || 'unbekannt');
     const e = STATUS_TAFEL[s] || { text: s, ton: 'gray', gut: false };
@@ -822,6 +827,7 @@ function baueMesswerte(server) {
         (STATUS_TAFEL[server.status] || { text: String(server.status || 'unbekannt') }).text);
     const frisch = !leitungGrund && laeuft && alterSekunden !== null && alterSekunden <= 120;
     const ausfall = laeuft ? null : Verbindung.beendet(server);
+    const modpack = Modpackstand.stand(server);
 
     const cpu   = zahlOderNull(server.cpu_percent);
     const ram   = zahlOderNull(server.ram_used_mb);
@@ -852,6 +858,7 @@ function baueMesswerte(server) {
             ? leitungGrund
             : server.status === 'error'
                 ? 'Fehler — ' + (server.error_message || 'der Daemon hat keinen Grund gemeldet.')
+            : modpack.laeuft && !laeuft ? `Das Modpack „${modpack.name || '?'}" wird eingespielt, danach lässt sich der Server starten.`
             : ausfall ? ausfall
             : !laeuft ? 'Der Server läuft nicht — es wird nichts gemessen.'
             : (alterSekunden === null ? 'Noch keine Messung angekommen.'
@@ -1539,6 +1546,7 @@ function baueKnopfzeile(paket, server) {
     return knopfZustand({
         status:  server.status,
         verbindung: server.verbindung,
+        modpack: Modpackstand.stand(server).laeuft,
         bereit:  a.bereit,
         messbar: a.messbar,
         text:    a.text,

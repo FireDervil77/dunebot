@@ -1413,7 +1413,9 @@ router.get('/status', requirePermission('GAMESERVER.VIEW'), async (req, res) => 
                     -- Ob ein Umzug läuft (Umzugsstand, gs.status sagt es nicht). Kein Fragezeichen hier: mysql2 hielte es für einen Platzhalter.
                     ${require('../helpers/Umzugsstand').SPALTE},
                     -- Ob die Leitung zur Maschine steht (Verbindung).
-                    ${require('../helpers/Verbindung').SPALTEN}
+                    ${require('../helpers/Verbindung').SPALTEN},
+                    -- Ob gerade ein Modpack eingespielt wird (Modpackstand).
+                    ${require('../helpers/Modpackstand').SPALTEN}
                FROM gameservers gs WHERE guild_id = ?`,
             [guildId]
         );
@@ -1435,6 +1437,7 @@ router.get('/status', requirePermission('GAMESERVER.VIEW'), async (req, res) => 
                     // Widget auf dem Hauptdashboard zeichnet daraus.
                     zustand:         baueZustand(s),
                     verbindung:      s.verbindung || 'da',
+                    modpack:         require('../helpers/Modpackstand').stand(s),
                     current_players: s.current_players,
                     max_players:     s.max_players,
                     // Roh — die Ansicht zeigt die gemeldete Stufe weiterhin an.
@@ -1962,7 +1965,8 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
                 ${Loeschung.SPALTEN},
                 -- Ob ein Umzug läuft (Umzugsstand, 2026-10-28). Kein Fragezeichen hier: mysql2 hielte es für einen Platzhalter.
                 ${require('../helpers/Umzugsstand').SPALTE},
-                ${require('../helpers/Verbindung').SPALTEN}
+                ${require('../helpers/Verbindung').SPALTEN},
+                ${require('../helpers/Modpackstand').SPALTEN}
             FROM gameservers gs
             LEFT JOIN addon_marketplace am ON gs.addon_marketplace_id = am.id
             LEFT JOIN rootserver r ON gs.rootserver_id = r.id
@@ -2844,7 +2848,7 @@ router.post('/:serverId/retry-installation', requirePermission('GAMESERVER.CREAT
  * POST /guild/:guildId/plugins/gameserver/servers/:serverId/start
  * Startet einen Gameserver
  */
-router.post('/:serverId/start', requirePermission('GAMESERVER.START'), async (req, res) => {
+router.post('/:serverId/start', require('../helpers/Modpackstand').sperre, requirePermission('GAMESERVER.START'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     
@@ -3105,7 +3109,7 @@ router.post('/:serverId/stop', requirePermission('GAMESERVER.STOP'), async (req,
  * POST /guild/:guildId/plugins/gameserver/servers/:serverId/restart
  * Startet einen Gameserver neu
  */
-router.post('/:serverId/restart', requirePermission('GAMESERVER.RESTART'), async (req, res) => {
+router.post('/:serverId/restart', require('../helpers/Modpackstand').sperre, requirePermission('GAMESERVER.RESTART'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     
@@ -3216,7 +3220,7 @@ router.post('/:serverId/restart', requirePermission('GAMESERVER.RESTART'), async
  * POST /guild/:guildId/plugins/gameserver/servers/:serverId/reinstall
  * Installiert einen Gameserver neu (bei error-Status)
  */
-router.post('/:serverId/reinstall', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
+router.post('/:serverId/reinstall', require('../helpers/Modpackstand').sperre, requirePermission('GAMESERVER.CREATE'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
 
