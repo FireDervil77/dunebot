@@ -728,10 +728,10 @@ router.post('/:serverId/inhalte/modpack', requirePermission('GAMESERVER.FILES.MA
         // Wie es ausgeht, erfahren alle Tabs über den Live-Kanal.
         res.status(202).json({ success: true, gestartet: true });
 
-        InhalteHolen.installiereModpack({
+        Modpackstand.nachStopp(geladen.server.id, guildId, () => InhalteHolen.installiereModpack({
             server: geladen.server, guildId, paket, laderDesServers: lader,
             beiFortschritt: (teil) => Modpackstand.fortschritt(geladen.server.id, teil),
-        }).then((ergebnis) => {
+        })).then((ergebnis) => {
             if (ergebnis.success) {
                 Logger.info(`[Gameserver/Inhalte] Modpack ${paket.kennung} ${paket.fassung} `
                     + `auf Server ${geladen.server.id}`);
@@ -745,6 +745,8 @@ router.post('/:serverId/inhalte/modpack', requirePermission('GAMESERVER.FILES.MA
             // Die Liste kann Tausende Namen lang sein, die Browser brauchen die Zahl.
             aufgeraeumt: { blieb: (ergebnis.aufgeraeumt?.blieb || []).length },
             ...wirkung(geladen),
+            // `geladen` kennt den Status von vor dem Stopp.
+            laeuft: false,
         })).catch(fehler => Logger.error('[Gameserver/Inhalte] Modpack-Stand nicht beendet:', fehler));
         return undefined;
     } catch (error) {

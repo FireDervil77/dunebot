@@ -1,6 +1,7 @@
 'use strict';
 
 const { ServiceManager } = require('dunebot-core');
+const ServerStopp = require('./ServerStopp');
 
 /**
  * Wird auf diesem Server gerade ein Modpack eingespielt? (2026-11-02, B218)
@@ -69,7 +70,7 @@ function melde(guildId, serverId, wie, name, ergebnis = null) {
 
 /**
  * Wie weit ist der Vorgang? Kommt vom Daemon (`mods`, `beigaben`, `paket`) und vom
- * Dashboard selbst (`entfernen`, `abgleich`). Ohne laufenden Vorgang verfällt es:
+ * Dashboard selbst (`stoppen`, `entfernen`, `abgleich`). Ohne laufenden Vorgang verfällt es:
  * So landet eine nachgelieferte Meldung des Daemons nicht in der Anzeige.
  *
  * @param {string|number} serverId
@@ -120,9 +121,39 @@ async function beende(serverId, guildId, name, ergebnis = null) {
     melde(guildId, serverId, 'fertig', name, ergebnis);
 }
 
+/**
+ * Erst stoppen, dann `arbeit`. Ein Modpack tauscht die Dateien unter dem Server,
+ * dafür gilt dieselbe Regel wie beim Neuinstallieren (`ServerStopp.stoppeFallsLaeuft`).
+ * Bis zum 2026-11-02 lief Java weiter, während 292 Jars eines alten Pakets gingen.
+ *
+ * Der Status wird hier frisch gelesen: Zwischen Klick und Vorgang kann der Server
+ * gestartet sein. Er bleibt danach aus, wie nach der Neuinstallation. Kommt er nicht
+ * sicher herunter, wird nichts angefasst.
+ *
+ * @param {string|number} serverId
+ * @param {string} guildId
+ * @param {() => Promise<object>} arbeit
+ * @returns {Promise<object>} Das Ergebnis von `arbeit`, dazu `gestoppt`.
+ */
+async function nachStopp(serverId, guildId, arbeit) {
+    const [server] = await ServiceManager.get('dbService').query(
+        `SELECT gs.*, r.daemon_id
+           FROM gameservers gs
+           LEFT JOIN rootserver r ON gs.rootserver_id = r.id
+          WHERE gs.id = ? AND gs.guild_id = ?`,
+        [serverId, guildId]);
+    if (!server) return { success: false, fehler: 'Der Server ist nicht mehr vorhanden.' };
+
+    if (server.status !== 'offline') fortschritt(serverId, { phase: 'stoppen' });
+    const stopp = await ServerStopp.stoppeFallsLaeuft({ server, guildId });
+    if (!stopp.ok) return { success: false, fehler: `${stopp.grund}. Es wurde nichts eingespielt.` };
+
+    return { ...await arbeit(), gestoppt: Boolean(stopp.gestoppt) };
+}
+
 /** Beim Start: Der Vorgang lief im vorigen Prozess, niemand beendet ihn mehr. */
 async function nachNeustart(dbService) {
     await dbService.query('UPDATE gameservers SET modpack_seit = NULL, modpack_name = NULL WHERE modpack_seit IS NOT NULL');
 }
 
-module.exports = { FRIST_MS, SPALTEN, GESPERRT, stand, sperre, beginne, beende, fortschritt, nachNeustart };
+module.exports = { FRIST_MS, SPALTEN, GESPERRT, stand, sperre, beginne, beende, fortschritt, nachStopp, nachNeustart };

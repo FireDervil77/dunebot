@@ -91,6 +91,7 @@
           <li>die Welt und alles, was nicht zum Paket gehört</li>
           <li>Dateien, die das Spiel oder ein Mod erst beim Start angelegt hat. Sie stehen in keiner Liste und können das neue Paket stören.</li>
         </ul>
+        <p class="mb-3">Läuft der Server, wird er vorher gestoppt und bleibt danach aus.</p>
         </div>
         <label class="form-label fw-bold" for="modpackErsetzenEingabe">
           Zum Bestätigen eintippen: <span class="font-monospace text-danger" id="modpackErsetzenSoll"></span>
@@ -259,6 +260,7 @@
   }
 
   const MODPACK_PHASE = {
+    stoppen: 'Server wird gestoppt',
     entfernen: 'Altes Paket wird entfernt',
     abgleich: 'Modrinth wird befragt',
     paket: 'Paket wird geladen',
@@ -1430,6 +1432,7 @@
       melde('warning', `${d.aufgeraeumt.blieb} Datei(en) des alten Pakets `
         + 'blieben liegen — sie stehen im Dateimanager.', 12000);
     }
+    if (d.gestoppt) melde('info', 'Der Server wurde dafür gestoppt und bleibt aus.', 12000);
     wirkungMelden(d);
   }
 

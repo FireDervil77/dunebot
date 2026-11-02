@@ -131,6 +131,46 @@ async function pruefe(was, tun) {
         assert.strictEqual(Modpackstand.stand({ id: 77, modpack_seit: new Date() }).fortschritt, null);
     });
 
+    console.log('\nErst stoppen');
+    const ServerStopp = require('../plugins/gameserver/dashboard/helpers/ServerStopp');
+    const echterStopp = ServerStopp.stoppeFallsLaeuft;
+    const lauf = async (zeile, stopp) => {
+        const ablauf = [];
+        ServiceManager.register('dbService', { query: async () => Object.assign(zeile, { affectedRows: 1 }) });
+        ServerStopp.stoppeFallsLaeuft = async ({ server }) => { ablauf.push(`stopp ${server.status}`); return stopp; };
+        await Modpackstand.beginne(78, 'g', 'P');
+        gesendet.length = 0;
+        const ergebnis = await Modpackstand.nachStopp(78, 'g', async () => { ablauf.push('einspielen'); return { success: true }; });
+        const phasen = gesendet.map(x => x.phase);
+        await Modpackstand.beende(78, 'g', 'P');
+        ServerStopp.stoppeFallsLaeuft = echterStopp;
+        return { ablauf, ergebnis, phasen };
+    };
+    await pruefe('ein laufender Server wird gestoppt, bevor Dateien gehen, und die Seite erfährt es', async () => {
+        const { ablauf, ergebnis, phasen } = await lauf([{ id: 78, status: 'online' }], { ok: true, gestoppt: true });
+        assert.deepStrictEqual(ablauf, ['stopp online', 'einspielen']);
+        assert.deepStrictEqual(phasen, ['stoppen']);
+        assert.deepStrictEqual(ergebnis, { success: true, gestoppt: true });
+    });
+    await pruefe('kommt er nicht herunter, wird nichts angefasst, und der Grund steht im Ergebnis', async () => {
+        const { ablauf, ergebnis } = await lauf([{ id: 78, status: 'online' }], { ok: false, grund: 'Der Server steht noch' });
+        assert.deepStrictEqual(ablauf, ['stopp online']);
+        assert.strictEqual(ergebnis.success, false);
+        assert.match(ergebnis.fehler, /Der Server steht noch\. Es wurde nichts eingespielt\./);
+    });
+    await pruefe('ein gestoppter Server meldet keinen Stopp', async () => {
+        const { ablauf, ergebnis, phasen } = await lauf([{ id: 78, status: 'offline' }], { ok: true, gestoppt: false });
+        assert.deepStrictEqual(ablauf, ['stopp offline', 'einspielen']);
+        assert.deepStrictEqual(phasen, []);
+        assert.strictEqual(ergebnis.gestoppt, false);
+    });
+    await pruefe('die Seite kennt die Phase, und die Route spielt nur über den Stopp ein', () => {
+        assert.match(seite, /stoppen: 'Server wird gestoppt'/);
+        assert.match(seite, /if \(d\.gestoppt\) melde\(/);
+        assert.match(lies('plugins/gameserver/dashboard/routes/inhalte.js'),
+            /Modpackstand\.nachStopp\(geladen\.server\.id, guildId, \(\) => InhalteHolen\.installiereModpack\(\{/);
+    });
+
     console.log('\nSQL, an einer Kopie');
     const roh = await mysql.createConnection({
         host: process.env.MYSQL_HOST, port: process.env.MYSQL_PORT, user: process.env.MYSQL_USER,
