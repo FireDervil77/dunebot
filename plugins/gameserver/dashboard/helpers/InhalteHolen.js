@@ -731,6 +731,10 @@ async function installiereModpack({ server, guildId, paket, laderDesServers }) {
         Logger.info(`[Gameserver/Modpack] ${altes.kennung} ${altes.fassung} weicht `
             + `${paket.kennung} ${paket.fassung}: ${aufgeraeumt.bestaetigt} von `
             + `${aufgeraeumt.gesamt} Datei(en) bestaetigt weg`);
+        // Seine Zeile geht mit: Ein Server hat ein Modpack. Blieb sie stehen,
+        // zeigte die Seite weiter das alte Paket, dessen Dateien es nicht mehr gibt.
+        // Ein Paket gleichen Namens überschreibt sie selbst.
+        if (altes.kennung !== paket.kennung) await Inhalte.entfernen(altes.id, server.id);
     }
 
     await Inhalte.eintragen({ ...grundzeile, status: 'geplant' });

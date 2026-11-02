@@ -307,6 +307,10 @@ const Modrinth = require(path.join(WURZEL, 'plugins/gameserver/dashboard/helpers
     // schlimmer als keiner.
     const nurModpack = holen.slice(holen.indexOf('async function installiereModpack'));
     const iWeg  = nurModpack.indexOf('entferneDateien({ server, zeile: altes');
+    const iZeile = nurModpack.indexOf('Inhalte.entfernen(altes.id, server.id)');
+    pruefe(iWeg > 0 && iZeile > iWeg && iZeile < nurModpack.indexOf("status: 'geplant'"),
+        'die Zeile des alten Pakets geht mit seinen Dateien, sonst zeigt die Seite es weiter',
+        'Betreiber 2026-11-02: nanomagic stand nach dem Wechsel weiter auf `installiert`');
     const iNeu  = nurModpack.indexOf("status: 'geplant'");
     pruefe(iWeg > -1 && iNeu > -1 && iWeg < iNeu,
         'ein altes Modpack wird entfernt, BEVOR das neue eintraegt',
