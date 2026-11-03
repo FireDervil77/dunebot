@@ -1,9 +1,11 @@
 {
-  "fassung": 5,
+  "fassung": 6,
   "linien": {"S": "Steuerung", "L": "Live", "O": "Output", "V": "Verify", "E": "Events", "D": "Datei"},
   "zeilen": [
     {"name": "register", "art": "steuerung", "von": "daemon", "linie": "V", "verlust": "nie"},
     {"name": "registered", "art": "steuerung", "von": "dashboard", "linie": "V", "verlust": "nie"},
+    {"name": "dock", "art": "steuerung", "von": "bahnhof", "linie": "V", "verlust": "nie"},
+    {"name": "bahnhof_neustart", "art": "steuerung", "von": "bahnhof", "linie": "V", "verlust": "erlaubt"},
     {"name": "error", "art": "steuerung", "von": "dashboard", "linie": "V", "verlust": "nie"},
     {"name": "heartbeat", "art": "steuerung", "von": "daemon", "linie": "L", "verlust": "erlaubt"},
     {"name": "heartbeat_ack", "art": "steuerung", "von": "dashboard", "linie": "L", "verlust": "erlaubt"},
@@ -25,6 +27,7 @@
     {"name": "gameserver.backup_fertig", "art": "ereignis", "von": "daemon", "linie": "E", "verlust": "nie"},
     {"name": "gameserver.restore_fertig", "art": "ereignis", "von": "daemon", "linie": "E", "verlust": "nie"},
     {"name": "sftp.befund", "art": "ereignis", "von": "daemon", "linie": "E", "verlust": "nie"},
+    {"name": "adresse.befund", "art": "ereignis", "von": "daemon", "linie": "E", "verlust": "nie"},
     {"name": "datenbank.befund", "art": "ereignis", "von": "daemon", "linie": "E", "verlust": "nie"},
     {"name": "werkbank.status", "art": "ereignis", "von": "daemon", "linie": "E", "verlust": "nie"},
     {"name": "werkbank.fertig", "art": "ereignis", "von": "daemon", "linie": "E", "verlust": "nie"},

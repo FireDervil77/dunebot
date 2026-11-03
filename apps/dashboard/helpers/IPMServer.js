@@ -32,6 +32,7 @@ const FireBusZaehler = require('./FireBusZaehler');
 const FireBusKontrolle = require('./FireBusKontrolle');
 const BusDock = require('./BusDock');
 const VerbindungsWache = require('./VerbindungsWache');
+const { busAdresse } = require('./BusAdresse');
 
 // Pfad zur version.json (Dashboard-Download-Verzeichnis)
 const VERSION_JSON_PATH = path.join(__dirname, '..', 'downloads', 'daemon', 'version.json');
@@ -478,6 +479,9 @@ class IPMServer {
             // 0 = Vorgabe 2022. Der Daemon (ab 1.0.139) wendet beides bei
             // jeder Anmeldung an — die daemon.yaml fasst niemand mehr an.
             sftp_port:     Number(zeile.sftp_port_wunsch) || 0,
+            // Weicht sie von der eigenen ab, zieht der Daemon um (ab 1.1.12,
+            // internal/websocket/adresse.go). Ältere lassen das Feld liegen.
+            bus_adresse:   busAdresse(),
         };
     }
 
@@ -1551,6 +1555,13 @@ class IPMServer {
                     satz: 'Verbindung zum Daemon beendet' },
                 heartbeat_lost:     { typ: 'heartbeat_lost', stufe: 'warn',
                     satz: 'Kein Herzschlag mehr - Verbindung getrennt' },
+                // Busadresse aus dem Panel (adresse.befund, FireBus Etappe 4)
+                adresse_gewechselt: { typ: 'status_change',  stufe: 'info',
+                    satz: 'Daemon ist zum genannten Busbahnhof umgezogen' },
+                adresse_zurueck:    { typ: 'error',          stufe: 'warn',
+                    satz: 'Neuer Busbahnhof antwortete nicht, Daemon blieb beim alten' },
+                adresse_abgelehnt:  { typ: 'error',          stufe: 'warn',
+                    satz: 'Daemon hat die genannte Busadresse abgelehnt' },
             };
             const eintrag = TAFEL[event]
                 || { typ: 'status_change', stufe: 'info', satz: `Daemon-Ereignis: ${event}` };
@@ -2071,6 +2082,21 @@ class IPMServer {
         eventRouter.register('datenbank', 'befund', async (payload, message, context) => {
             if (!context?.daemonId) return;
             await RootServer.uebernimmDatenbank(context.daemonId, payload?.datenbank || null);
+        });
+
+        // Busadresse aus dem Panel: Was der Daemon daraus gemacht hat
+        // (internal/websocket/adresse.go). Ins Protokoll der Maschine, damit ein
+        // Umzug oder sein Scheitern nicht nur im Log von 54 oder 55 steht.
+        eventRouter.register('adresse', 'befund', async (payload, message, context) => {
+            if (!context?.daemonId) return;
+            const ergebnis = ['gewechselt', 'zurueck', 'abgelehnt'].includes(payload?.ergebnis) ? payload.ergebnis : 'abgelehnt';
+            const zeile = `[Busadresse] ${context.daemonId}: ${ergebnis}, ${payload?.alt} → ${payload?.neu}${payload?.grund ? ` (${payload.grund})` : ''}`;
+            if (ergebnis === 'gewechselt' && payload?.gespeichert !== false) this.Logger.info(zeile);
+            else this.Logger.warn(zeile);
+            await this._logDaemonEvent(context.daemonId, `adresse_${ergebnis}`, {
+                alt: payload?.alt || null, neu: payload?.neu || null,
+                grund: payload?.grund || null, gespeichert: payload?.gespeichert ?? null,
+            });
         });
 
         // Live-Takt der Maschine (3 s), nur solange bestellt — die Bestellung

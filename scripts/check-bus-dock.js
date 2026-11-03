@@ -91,6 +91,27 @@ function dashboard() {
         assert.doesNotMatch(start, /IPM_SERVER_PORT/);
     });
 
+    // Die Busadresse kommt aus einer Stelle (helpers/BusAdresse.js): die Anmeldung
+    // nennt sie jedem Daemon, die Vorlage neuer Maschinen trägt dieselbe (2026-11-03).
+    await pruefe('die Busadresse entsteht an einer Stelle und kommt bei Daemon und Vorlage an', async () => {
+        const { busAdresse } = require('../apps/dashboard/helpers/BusAdresse');
+        assert.strictEqual(busAdresse({ DASHBOARD_BASE_URL: 'https://firenetworks.de' }), 'wss://firenetworks.de:9341');
+        assert.strictEqual(busAdresse({ DASHBOARD_BASE_URL: 'https://firenetworks.de', FIREBUS_ADRESSE: ' wss://bahnhof2.firenetworks.de:9341 ' }),
+            'wss://bahnhof2.firenetworks.de:9341');
+        assert.strictEqual(busAdresse({}), null);
+        const ipm = ohneKommentare(fs.readFileSync(path.join(__dirname, '../apps/dashboard/helpers/IPMServer.js'), 'utf8'));
+        assert.match(ipm, /bus_adresse:\s*busAdresse\(\)/);
+        assert.match(ipm, /eventRouter\.register\('adresse', 'befund'/);
+        const vorlage = ohneKommentare(fs.readFileSync(path.join(__dirname, '../apps/dashboard/themes/default/assets/js/guild.js'), 'utf8'));
+        assert.match(vorlage, /const busAdresse = d\.busAdresse/);
+        assert.doesNotMatch(vorlage, /9341/, 'die Vorlage rechnet die Adresse wieder selbst aus');
+        const route = ohneKommentare(fs.readFileSync(path.join(__dirname, '../plugins/masterserver/dashboard/routes/rootserver.router.js'), 'utf8'));
+        assert.match(route, /busAdresse: require\([^)]*BusAdresse'\)\.busAdresse\(\)/);
+        // Und der Wizard des Daemons nennt neuen Maschinen denselben Bahnhof.
+        const wizard = ohneKommentare(fs.readFileSync(path.join(DAEMON, 'internal/config/wizard.go'), 'utf8'));
+        assert.strictEqual(/const BusAdresse = "([^"]+)"/.exec(wizard)?.[1], busAdresse({ DASHBOARD_BASE_URL: 'https://firenetworks.de' }));
+    });
+
     console.log('\nNormalbetrieb');
     await pruefe('die Anmeldung läuft durch und ist für den Code dahinter eine normale Leitung', async () => {
         daemon.send(JSON.stringify({ type: 'register', payload: { daemon_id: 'd1', token: 'alt' } }));
@@ -130,7 +151,10 @@ function dashboard() {
         assert.strictEqual(zweites.nachrichten[0].payload.token, 'neu', 'die Anmeldung trägt den neuen Schlüssel');
         assert.strictEqual(zweites.nachrichten[1].nr, 1);
         await warte(100);
-        assert.strictEqual(eingang.length, vorher, 'der Daemon hat etwas vom Neustart gesehen');
+        // Vom Neustart hört der Daemon genau eins: „Dock da", er liefert dann nach.
+        // „Dock weg" kam beim Abdocken (Paket 3, 2026-11-03).
+        assert.deepStrictEqual(eingang.slice(vorher), [{ type: 'dock', da: true }], 'der Daemon hat mehr vom Neustart gesehen als die Ansage');
+        assert.ok(eingang.some(n => n.type === 'dock' && n.da === false), '„Dock weg" kam nie an');
         assert.strictEqual(getrennt, false);
 
         daemon.send(JSON.stringify({ type: 'event', namespace: 'gameserver', action: 'status_changed', nr: 2 }));
@@ -139,9 +163,10 @@ function dashboard() {
         await bis('Rückweg', () => eingang.some(n => n.id === '2'));
 
         console.log('\nBahnhof weg');
-        await pruefe('das Dashboard erfährt die Trennung, und der Daemon auch', async () => {
+        await pruefe('das Dashboard erfährt die Trennung, und der Daemon auch, nach der Ansage', async () => {
             assert.strictEqual(zweites.dock.angedockt, true);
             bahnhof.kill('SIGTERM');
+            await bis('Ansage', () => eingang.some(n => n.type === 'bahnhof_neustart'));
             await bis('Daemon getrennt', () => getrennt);
             await bis('Dashboard getrennt', () => zweites.leitungen[0].istZu === true);
         });

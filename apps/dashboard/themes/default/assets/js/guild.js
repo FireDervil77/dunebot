@@ -808,8 +808,9 @@ class GuildAjaxHandler {
                 if (elKey) elKey.value = d.apiKey     || '';
 
                 // daemon.yaml Template generieren
-                const dashUrl = window.location.origin.replace('http://', 'ws://').replace('https://', 'wss://');
-                const wsPort  = 9341; // Busbahnhof
+                // Die Busadresse kommt vom Panel (helpers/BusAdresse.js), dieselbe,
+                // die es jedem Daemon bei der Anmeldung nennt.
+                const busAdresse = d.busAdresse || '';
                 if (elYaml) {
                     const bindIpLine = d.host ? `  bind_ip: "${d.host}"` : '  bind_ip: ""  # Leer = alle Interfaces (0.0.0.0)';
                     elYaml.value = [
@@ -828,7 +829,7 @@ class GuildAjaxHandler {
                         `  token: "${d.apiKey || ''}"`,
                         '',
                         'dashboard:',
-                        `  url: "${dashUrl.replace(/:\d+$/, '')}:${wsPort}"`,
+                        `  url: "${busAdresse}"`,
                         '',
                         'logging:',
                         '  level: "info"',

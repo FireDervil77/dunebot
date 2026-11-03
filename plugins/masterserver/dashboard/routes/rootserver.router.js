@@ -360,6 +360,7 @@ router.post('/', requirePermission('MASTERSERVER.ROOTSERVER.CREATE'), async (req
                 daemonId: result.daemonId,
                 apiKey: result.apiKey,
                 host: host || null,
+                busAdresse: require('../../../../apps/dashboard/helpers/BusAdresse').busAdresse(),
                 redirectUrl: `/guild/${guildId}/plugins/masterserver/rootservers/${result.id}`
             }
         });

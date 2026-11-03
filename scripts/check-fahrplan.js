@@ -142,7 +142,7 @@ pruefe(`${zeilen.length} Zeilen, jede vollständig, kein Name doppelt`, () => {
     for (const z of zeilen) {
         assert.ok(firebus.linien[z.linie], `${z.name}: Linie ${z.linie}`);
         assert.ok(['befehl', 'ereignis', 'steuerung'].includes(z.art), `${z.name}: Art ${z.art}`);
-        assert.ok(['dashboard', 'daemon'].includes(z.von), `${z.name}: von ${z.von}`);
+        assert.ok(['dashboard', 'daemon', 'bahnhof'].includes(z.von), `${z.name}: von ${z.von}`);
         assert.ok(['nie', 'erlaubt'].includes(z.verlust), `${z.name}: Verlust ${z.verlust}`);
         if (z.art === 'befehl') {
             assert.ok(['frei', 'bindet'].includes(z.arbeit), `${z.name}: Arbeit ${z.arbeit}`);
