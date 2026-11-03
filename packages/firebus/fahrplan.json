@@ -1,11 +1,12 @@
 {
-  "fassung": 6,
+  "fassung": 7,
   "linien": {"S": "Steuerung", "L": "Live", "O": "Output", "V": "Verify", "E": "Events", "D": "Datei"},
   "zeilen": [
     {"name": "register", "art": "steuerung", "von": "daemon", "linie": "V", "verlust": "nie"},
     {"name": "registered", "art": "steuerung", "von": "dashboard", "linie": "V", "verlust": "nie"},
     {"name": "dock", "art": "steuerung", "von": "bahnhof", "linie": "V", "verlust": "nie"},
     {"name": "bahnhof_neustart", "art": "steuerung", "von": "bahnhof", "linie": "V", "verlust": "erlaubt"},
+    {"name": "bus_adresse", "art": "steuerung", "von": "dashboard", "linie": "V", "verlust": "nie"},
     {"name": "error", "art": "steuerung", "von": "dashboard", "linie": "V", "verlust": "nie"},
     {"name": "heartbeat", "art": "steuerung", "von": "daemon", "linie": "L", "verlust": "erlaubt"},
     {"name": "heartbeat_ack", "art": "steuerung", "von": "dashboard", "linie": "L", "verlust": "erlaubt"},

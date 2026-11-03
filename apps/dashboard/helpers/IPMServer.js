@@ -486,6 +486,20 @@ class IPMServer {
     }
 
     /**
+     * Die Busadresse noch einmal als eigene Nachricht, gleich nach `registered`.
+     *
+     * Nach einem Neustart des Dashboards stellt der Bahnhof die Anmeldungen selbst
+     * und behält die Antwort für sich, der Daemon sieht `absicht.bus_adresse` dann
+     * nicht. Diese Nachricht reicht der Bahnhof durch: Eine neue Adresse kommt so
+     * schon mit dem Dashboard-Neustart an, nicht erst mit der nächsten eigenen
+     * Anmeldung des Daemons (ab 1.1.13, `handleBusAdresse`).
+     */
+    _sendeBusAdresse(ws) {
+        const adresse = busAdresse();
+        if (adresse) ws.send(JSON.stringify({ type: 'bus_adresse', adresse }));
+    }
+
+    /**
      * Die Server-Registry für die Anmeldeantwort — beide Wege (Wiederanmeldung,
      * Erstanmeldung) aus einer Stelle.
      *
@@ -592,6 +606,7 @@ class IPMServer {
                         },
                         serverRegistry: reconnectServers || []
                     }));
+                    this._sendeBusAdresse(ws);
                     
                     return { 
                         success: true, 
@@ -700,6 +715,7 @@ class IPMServer {
                 },
                 serverRegistry: firstRegServers || []
             }));
+            this._sendeBusAdresse(ws);
 
             return { 
                 success: true, 

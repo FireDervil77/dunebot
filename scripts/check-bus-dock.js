@@ -102,6 +102,9 @@ function dashboard() {
         const ipm = ohneKommentare(fs.readFileSync(path.join(__dirname, '../apps/dashboard/helpers/IPMServer.js'), 'utf8'));
         assert.match(ipm, /bus_adresse:\s*busAdresse\(\)/);
         assert.match(ipm, /eventRouter\.register\('adresse', 'befund'/);
+        // Nach JEDER Anmeldung auch als eigene Nachricht: Die Antwort auf eine vom
+        // Bahnhof wiederholte Anmeldung sieht der Daemon nicht (2026-11-03).
+        assert.strictEqual((ipm.match(/this\._sendeBusAdresse\(ws\)/g) || []).length, 2, 'Erst- und Wiederanmeldung');
         const vorlage = ohneKommentare(fs.readFileSync(path.join(__dirname, '../apps/dashboard/themes/default/assets/js/guild.js'), 'utf8'));
         assert.match(vorlage, /const busAdresse = d\.busAdresse/);
         assert.doesNotMatch(vorlage, /9341/, 'die Vorlage rechnet die Adresse wieder selbst aus');
