@@ -644,7 +644,7 @@ module.exports = class App {
         //   - **nach** helmet und Exploit-Blocker: Der
         //     Exploit-Blocker prueft nur `req.path`, kostet also nichts und
         //     bleibt wirksam.
-        //   - **vor** `generalLimiter`: Der laesst in Produktion 60 Anfragen
+        //   - **vor** `generalLimiter`: Der laesst in Produktion 200 Anfragen
         //     je Minute und IP zu. Twitch stellt aus wenigen Adressen zu; ein
         //     grosser Streamer reicht, um das zu reissen. Die Antwort waere
         //     429, Twitch wertet das als Fehlzustellung — und nach genug davon
@@ -691,19 +691,18 @@ module.exports = class App {
             }
         );
 
-        // 5. Rate Limiting - Allgemeines Limit
-        const { generalLimiter } = require('./middlewares/security/rate-limiter.middleware');
-        this.app.use(generalLimiter);
-        
-        this.app.use(express.json());
-        this.app.use(express.urlencoded({ extended: true }));
-        
-        // Cookie Parser (für CSRF Double-Submit-Cookie)
-        const cookieParser = require('cookie-parser');
-        this.app.use(cookieParser());
-        
-        this.app.use(expressLayouts);
-        
+        // 4. Statische Dateien — VOR dem allgemeinen Begrenzer
+        //
+        // Bis 2026-11-03 standen sie dahinter, und jedes Bild, jedes Skript,
+        // jede Schrift zog vom selben Budget ab wie eine Seite. Die Startseite
+        // kostete so gut 40 Abrufe; fuenf schnelle Seitenwechsel rissen die
+        // 200 je Minute, und ein normaler Besucher las "Bitte verlangsame dich".
+        // (Die Theme-Dateien zaehlten nie: `ThemeManager.registerThemeAssets`
+        // haengt `/themes` schon frueher ein.)
+        // Hier liefern die Mounts aus, was es gibt — ein Fehlgriff faellt per
+        // `next()` durch und zaehlt beim Begrenzer weiter mit. Ein Scanner, der
+        // Pfade raet, bleibt also begrenzt; wer Seiten ansieht, nicht.
+        //
         // Theme Assets (JS, CSS, Images, Fonts)
         // Beispiel: /themes/default/assets/js/guild.js
         this.app.use('/themes', express.static(path.join(__dirname, 'themes')));
@@ -796,6 +795,19 @@ module.exports = class App {
 
             next();
         });
+
+        // 5. Rate Limiting - Allgemeines Limit
+        const { generalLimiter } = require('./middlewares/security/rate-limiter.middleware');
+        this.app.use(generalLimiter);
+        
+        this.app.use(express.json());
+        this.app.use(express.urlencoded({ extended: true }));
+        
+        // Cookie Parser (für CSRF Double-Submit-Cookie)
+        const cookieParser = require('cookie-parser');
+        this.app.use(cookieParser());
+        
+        this.app.use(expressLayouts);
         
         // Session & Auth
         this.app.use(sessionMiddleware);
