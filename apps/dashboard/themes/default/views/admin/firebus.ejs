@@ -38,4 +38,33 @@
       <% } %>
     </div>
   </div>
+
+  <div class="card mt-3">
+    <div class="card-header">
+      <h3 class="card-title mb-0"><i class="fa-solid fa-lock me-2"></i>Innenhaut</h3>
+    </div>
+    <div class="card-body">
+      <p class="text-secondary mb-3">Versiegelt kann der Busbahnhof nur den Umschlag lesen, nicht den Inhalt. Eine Maschine im Klartext läuft noch mit einem Daemon von vor Paket 5. Sobald keine mehr im Klartext steht, fällt der Klartext weg.</p>
+      <% const staende = {
+           versiegelt:          ['bg-success', 'versiegelt'],
+           klartext:            ['bg-warning text-dark', 'Klartext'],
+           getrennt_versiegelt: ['bg-secondary', 'getrennt, zuletzt versiegelt'],
+           getrennt_klartext:   ['bg-secondary', 'getrennt, noch nie versiegelt'],
+         }; %>
+      <div class="table-responsive">
+        <table class="table table-sm table-vcenter mb-0">
+          <thead><tr><th>Rootserver</th><th>Daemon</th><th>Innenhaut</th></tr></thead>
+          <tbody>
+            <% innenhaut.forEach(function (m) { const [farbe, text] = staende[m.stand]; %>
+              <tr>
+                <td><%= m.name %></td>
+                <td class="font-monospace small"><%= m.daemon_id %></td>
+                <td><span class="badge <%= farbe %>"><%= text %></span></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </div>

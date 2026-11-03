@@ -100,7 +100,9 @@ pruefe('Daemon: Unterschriebenes nur auf dem TLS-Zweig, FastDL nur im Klartext',
 pruefe('die Anmeldung trägt das Zertifikat bis in die Spalte', () => {
     assert.match(lies(DAEMON, 'internal/websocket/client.go'), /registerPayload\["abruf_zertifikat"\]/);
     const ipm = lies(WURZEL, 'apps/dashboard/helpers/IPMServer.js');
-    assert.strictEqual((ipm.match(/abrufZertifikat: abruf_zertifikat \?\? null/g) || []).length, 2);
+    // Drei Anmeldewege im Übergang nach F20: Klartext mit JWT, Klartext mit Token,
+    // versiegelt. Fällt der Klartext weg, bleibt einer.
+    assert.strictEqual((ipm.match(/abrufZertifikat: abruf_zertifikat \?\? null/g) || []).length, 3);
     assert.match(lies(WURZEL, 'plugins/masterserver/dashboard/models/RootServer.js'), /fields\.push\('abruf_zertifikat = \?'\)/);
 });
 

@@ -32,6 +32,7 @@ const FireBusZaehler = require('./FireBusZaehler');
 const FireBusKontrolle = require('./FireBusKontrolle');
 const BusDock = require('./BusDock');
 const VerbindungsWache = require('./VerbindungsWache');
+const Innenhaut = require('./Innenhaut');
 const { busAdresse } = require('./BusAdresse');
 
 // Pfad zur version.json (Dashboard-Download-Verzeichnis)
@@ -61,6 +62,8 @@ class IPMServer {
         this.pendingCommands = new Map(); // commandId -> {resolve, reject, timeout, command}
         this.zaehler = new FireBusZaehler();
         this.kontrolle = new FireBusKontrolle();
+        /** Die Innenhaut (FireBus Paket 5), gesetzt in start(). */
+        this.innenhaut = null;
         this.Logger = null;
         this.dbService = null;
         // Wird in stop() gesetzt: Ab da schreiben die close-Handler nicht mehr in
@@ -159,6 +162,10 @@ class IPMServer {
         this.zaehler.starte();
         this.kontrolle.starte();
 
+        // Vor dem Dock: Die Halle des Bahnhofs kommt gleich nach dem Andocken.
+        this.innenhaut = new Innenhaut({ db: () => this.dbService, Logger: this.Logger });
+        await this.innenhaut.starte();
+
         // Der einzige Weg zu den Daemons (FireBus Etappe 4). Der WebSocket-Server
         // auf 9340 ist seit 2026-11-03 abgeschaltet, am Tag zuvor hing dort
         // niemand mehr.
@@ -191,6 +198,10 @@ class IPMServer {
         } catch (error) {
             this.Logger.error('[FireBus] Letzte Zählung nicht geschrieben', error);
         }
+        // Die Marken der Innenhaut: Ohne sie gälten nach dem Neustart die Zähler seit dem
+        // letzten Heartbeat noch einmal.
+        await this.innenhaut?.merkeAlle().catch(error =>
+            this.Logger.error('[Innenhaut] Marken beim Beenden nicht geschrieben', error));
 
         // Ab hier schreiben die close-Handler nicht mehr in die Datenbank: Der Pool
         // wird gleich geschlossen ("Pool is closed." beim Beenden).
@@ -226,20 +237,62 @@ class IPMServer {
 
         ws.on('message', async (data) => {
             try {
-                const message = JSON.parse(data.toString());
-                
+                let geoeffnet;
+                try {
+                    geoeffnet = await this._oeffne(ws, data);
+                } catch (error) {
+                    if (!error.innenhaut) throw error;
+                    // Ein falsches Siegel zählt wie ein falscher Token. Eine Wiederholung
+                    // nicht: Die kann nach einem Absturz aus der Halle kommen.
+                    this.Logger.warn(`[Innenhaut] Nachricht von ${clientIp} abgewiesen: ${error.message}`);
+                    if ((error.innenhaut === 'siegel' || error.innenhaut === 'unbekannt') && !authenticated) {
+                        this._recordRegisterFailure(this._registerRateKey(clientIp, error.daemonId), clientIp);
+                        // Ohne Siegel, denn ohne den richtigen Token gibt es keins. Der
+                        // Wizard liest daraus „Token abgelehnt".
+                        ws.send(JSON.stringify({ type: 'error', error: 'Siegel passt nicht: Token oder Daemon-ID falsch' }));
+                        ws.close(4001, 'Siegel passt nicht');
+                    }
+                    return;
+                }
+                const message = geoeffnet.nachricht;
+                if (geoeffnet.klartext && ws.haut) {
+                    this.Logger.warn(`[Innenhaut] Klartext auf der versiegelten Leitung von ${ws.haut.daemonId} abgewiesen`);
+                    return;
+                }
+                if (!geoeffnet.klartext) {
+                    // Eine Leitung gehört einem Daemon-Prozess, also einer Sitzung.
+                    if (ws.haut && (ws.haut.daemonId !== geoeffnet.daemonId || ws.haut.an !== geoeffnet.sitzung)) {
+                        this.Logger.warn(`[Innenhaut] Fremde Sitzung auf der Leitung von ${ws.haut.daemonId} abgewiesen`);
+                        return;
+                    }
+                    ws.haut = { daemonId: geoeffnet.daemonId, an: geoeffnet.sitzung };
+                }
+
+                // Vor der Anmeldung: Nach einem Neustart liefert der Bahnhof die Halle
+                // einer versiegelten Leitung, bevor ihr Daemon sich neu anmeldet
+                // (`meldeNeuAn`). Das Siegel weist sie schon aus, verarbeitet werden sie
+                // nach der Anmeldung.
+                if (!authenticated && !geoeffnet.klartext && message.type !== 'register') {
+                    ws.wartend = ws.wartend || [];
+                    if (ws.wartend.length < IPMServer.WARTEND_MAX) ws.wartend.push(message);
+                    else this.Logger.warn(`[Innenhaut] ${geoeffnet.daemonId}: mehr als ${IPMServer.WARTEND_MAX} Nachrichten vor der Anmeldung, verworfen`);
+                    return;
+                }
+
                 // Registrierung (erste Nachricht)
                 if (message.type === 'register' && !authenticated) {
                     // ✅ SECURITY: Brute-Force-Bremse — gesperrte Keys sofort abweisen
                     const rateKey = this._registerRateKey(clientIp, message.payload?.daemon_id);
                     if (this._isRegisterLocked(rateKey)) {
                         this.Logger.warn(`[IPMServer Security] Registrierung abgelehnt (Lockout aktiv): ${rateKey} (IP: ${clientIp})`);
-                        ws.send(JSON.stringify({ type: 'error', error: 'Too many failed registration attempts. Try again later.' }));
+                        this._sende(ws, { type: 'error', error: 'Too many failed registration attempts. Try again later.' });
                         ws.close(4429, 'Too many failed registration attempts');
                         return;
                     }
 
-                    const result = await this._handleRegister(ws, message.payload, clientIp);
+                    const result = geoeffnet.klartext
+                        ? await this._handleRegister(ws, message.payload, clientIp)
+                        : await this._anmeldungVersiegelt(ws, message.payload, clientIp, geoeffnet);
                     if (result.success) {
                         this.registerFailures.delete(rateKey);
                         daemonId = result.daemonId;
@@ -249,10 +302,10 @@ class IPMServer {
                         const currentConnections = this.connectionCounts.get(daemonId) || 0;
                         if (currentConnections >= this.maxConnectionsPerDaemon) {
                             this.Logger.warn(`[IPMServer Security] Daemon ${daemonId} hat zu viele Verbindungen: ${currentConnections}/${this.maxConnectionsPerDaemon}`);
-                            ws.send(JSON.stringify({ 
-                                type: 'error', 
-                                error: `Zu viele Verbindungen (max: ${this.maxConnectionsPerDaemon})` 
-                            }));
+                            this._sende(ws, {
+                                type: 'error',
+                                error: `Zu viele Verbindungen (max: ${this.maxConnectionsPerDaemon})`
+                            });
                             ws.close(4429, 'Too many connections');
                             return;
                         }
@@ -269,6 +322,13 @@ class IPMServer {
                         this.connectionCounts.set(daemonId, currentConnections + 1);
                         this.wache.angemeldet(daemonId)
                             .catch(err => this.Logger.error('[IPMServer] Anmeldung nicht vermerkt:', err));
+
+                        // Was vor der Anmeldung kam, in seiner Reihenfolge und vor allem,
+                        // was ab jetzt kommt: Darum hier, vor dem ersten await.
+                        for (const wartend of (ws.wartend || []).splice(0)) {
+                            this._routeMessage(daemonId, wartend).catch(err =>
+                                this.Logger.error(`[IPMServer] Nachricht aus der Halle von ${daemonId} nicht verarbeitet:`, err));
+                        }
                         
                         this.Logger.info(`[IPMServer] Daemon ${daemonId} registriert (Guild: ${result.metadata.guild_id}, Connections: ${currentConnections + 1}/${this.maxConnectionsPerDaemon})`);
 
@@ -350,7 +410,7 @@ class IPMServer {
                     } else {
                         // ✅ SECURITY: Fehlversuch zählen (Brute-Force-Bremse)
                         this._recordRegisterFailure(rateKey, clientIp);
-                        ws.send(JSON.stringify({ type: 'error', error: result.error }));
+                        this._sende(ws, { type: 'error', error: result.error });
                         ws.close(4001, result.error);
                     }
                     return;
@@ -358,7 +418,7 @@ class IPMServer {
 
                 // Alle weiteren Nachrichten erfordern Authentifizierung
                 if (!authenticated) {
-                    ws.send(JSON.stringify({ type: 'error', error: 'Not authenticated' }));
+                    this._sende(ws, { type: 'error', error: 'Not authenticated' });
                     ws.close(4001, 'Authentication required');
                     return;
                 }
@@ -370,7 +430,7 @@ class IPMServer {
 
             } catch (error) {
                 this.Logger.error('[IPMServer] Message Parse Error:', error);
-                ws.send(JSON.stringify({ type: 'error', error: 'Invalid message format' }));
+                this._sende(ws, { type: 'error', error: 'Invalid message format' });
             }
         });
 
@@ -485,7 +545,7 @@ class IPMServer {
      */
     _sendeBusAdresse(ws) {
         const adresse = busAdresse();
-        if (adresse) ws.send(JSON.stringify({ type: 'bus_adresse', adresse }));
+        if (adresse) this._sende(ws, { type: 'bus_adresse', adresse });
     }
 
     /**
@@ -516,12 +576,107 @@ class IPMServer {
         }));
     }
 
+    /**
+     * Öffnet, was eine Leitung bringt, der Reihe nach: Der Zähler eines Daemons steigt in
+     * der Reihenfolge, in der seine Nachrichten kamen, und das erste Öffnen wartet auf
+     * die Datenbank.
+     * @private
+     */
+    _oeffne(ws, data) {
+        const dran = (ws.innenReihe || Promise.resolve()).then(() => this.innenhaut.oeffne(data.toString()));
+        // Die Kette selbst darf an keinem Fehler hängen bleiben. Den Fehler bekommt der
+        // Aufrufer über `dran`, hier wird er nicht verschluckt.
+        ws.innenReihe = dran.catch(() => {});
+        return dran;
+    }
+
+    /**
+     * Die einzige Stelle, die an einen Daemon schreibt. Eine versiegelte Leitung bekommt
+     * alles versiegelt, eine im Klartext (Übergang nach F20) als JSON.
+     * @private
+     */
+    _sende(ws, nachricht) {
+        ws.send(ws.haut ? this.innenhaut.siegle(ws.haut.daemonId, ws.haut.an, nachricht) : JSON.stringify(nachricht));
+    }
+
+    /**
+     * Anmeldung mit Innenhaut (FireBus Paket 5). Dass sie sich öffnen ließ, weist den
+     * Token schon nach: Er fährt nicht mit, und eine Sitzungs-JWT gibt es nicht mehr.
+     * @private
+     */
+    async _anmeldungVersiegelt(ws, payload, clientIp, geoeffnet) {
+        const { daemon_id, version, hardware, sftp_fingerprint, sftp_port, sftp_grund,
+                abruf_port, abruf_zertifikat, base_directory } = payload || {};
+        if (daemon_id !== geoeffnet.daemonId) {
+            return { success: false, error: 'daemon_id passt nicht zum Umschlag' };
+        }
+        try {
+            const daemon = await RootServer.getByDaemonId(daemon_id);
+            if (!daemon) return { success: false, error: 'Daemon not found' };
+            const rootserver = {
+                id:             daemon.id,
+                name:           daemon.name,
+                base_directory: daemon.base_directory,
+                system_user:    daemon.system_user,
+                absicht:        this._absichtFuer(daemon),
+            };
+
+            // Der Einrichtungs-Vorlauf ändert nichts am Zustand, siehe _handleRegister.
+            if (geoeffnet.probe) {
+                this.Logger.info(`[IPMServer] Einrichtungs-Vorlauf für Daemon ${daemon_id} (IP: ${clientIp}, Innenhaut)`);
+                this._sende(ws, { type: 'probe_ok', rootserver });
+                this.innenhaut.vergiss(daemon_id, geoeffnet.sitzung);
+                return { success: false, error: 'probe', istVorlauf: true };
+            }
+
+            const erste = daemon.install_status !== 'completed';
+            await RootServer.markOnline(daemon_id, {
+                version:         version || daemon.daemon_version || 'unknown',
+                installStatus:   erste ? 'completed' : undefined,
+                sftpFingerprint: sftp_fingerprint || null,
+                sftpPort:        sftp_port || null,
+                baseDirectory:   base_directory || null,
+                abrufPort:       abruf_port ?? null,
+                abrufZertifikat: abruf_zertifikat ?? null,
+            });
+            await RootServer.uebernimmSftp(daemon_id, { port: sftp_port || null, grund: sftp_grund || null })
+                .catch(e => this.Logger.warn(`[IPMServer] SFTP-Befund für ${daemon_id} nicht übernommen: ${e.message}`));
+            await this._logDaemonEvent(daemon_id, erste ? 'first_registration' : 'reconnected', { version, innenhaut: true });
+
+            const servers = await this._serverRegistry(daemon.id);
+            this._sende(ws, { type: 'registered', rootserver, serverRegistry: servers || [] });
+            this._sendeBusAdresse(ws);
+
+            return {
+                success: true,
+                daemonId: daemon_id,
+                sessionId: null,
+                isReconnect: !erste,
+                metadata: {
+                    guild_id: daemon.guild_id,
+                    display_name: daemon.name,
+                    version: version || daemon.daemon_version,
+                    hardware: hardware || null
+                }
+            };
+        } catch (error) {
+            this.Logger.error('[IPMServer] Register Error:', error);
+            return { success: false, error: 'Internal server error' };
+        }
+    }
+
     async _handleRegister(ws, payload, clientIp) {
         const { token, daemon_id, version, hardware, sftp_fingerprint, sftp_port, sftp_grund,
                 abruf_port, abruf_zertifikat, base_directory } = payload;
 
         if (!token || !daemon_id) {
             return { success: false, error: 'Missing token or daemon_id' };
+        }
+
+        // Wer einmal versiegelt gesprochen hat, für den gilt kein Klartext mehr: Sonst
+        // ginge eine alte Sitzungs-JWT aus einem Mitschnitt noch durch.
+        if (await this.innenhaut?.sprichtSie(daemon_id)) {
+            return { success: false, error: 'Diese Maschine spricht die Innenhaut, eine Anmeldung im Klartext gilt nicht mehr' };
         }
         
         // ✅ SECURITY: IP-Logging für Audit
@@ -583,7 +738,7 @@ class IPMServer {
                     // Server-Registry für diesen RootServer laden
                     const reconnectServers = await this._serverRegistry(daemon.id);
                     
-                    ws.send(JSON.stringify({ 
+                    this._sende(ws, {
                         type: 'registered', 
                         sessionToken: newSessionToken,
                         rootserver: {
@@ -594,7 +749,7 @@ class IPMServer {
                             absicht: this._absichtFuer(daemon)
                         },
                         serverRegistry: reconnectServers || []
-                    }));
+                    });
                     this._sendeBusAdresse(ws);
                     
                     return { 
@@ -650,7 +805,7 @@ class IPMServer {
             // sofort auf, statt später als Dienst, der nicht hochkommt.
             if (payload.probe === true) {
                 this.Logger.info(`[IPMServer] Einrichtungs-Vorlauf für Daemon ${daemon_id} (IP: ${clientIp})`);
-                ws.send(JSON.stringify({
+                this._sende(ws, {
                     type: 'probe_ok',
                     rootserver: {
                         id:             rootserverByToken.id,
@@ -659,7 +814,7 @@ class IPMServer {
                         system_user:    rootserverByToken.system_user,
                         absicht:        this._absichtFuer(rootserverByToken),
                     },
-                }));
+                });
                 return { success: false, error: 'probe', istVorlauf: true };
             }
 
@@ -692,7 +847,7 @@ class IPMServer {
             // Server-Registry für diesen RootServer laden (kann leer sein bei Erst-Registrierung)
             const firstRegServers = await this._serverRegistry(rootserverByToken.id);
 
-            ws.send(JSON.stringify({ 
+            this._sende(ws, {
                 type: 'registered', 
                 sessionToken,
                 rootserver: {
@@ -703,7 +858,7 @@ class IPMServer {
                     absicht: this._absichtFuer(rootserverByToken)
                 },
                 serverRegistry: firstRegServers || []
-            }));
+            });
             this._sendeBusAdresse(ws);
 
             return { 
@@ -911,11 +1066,12 @@ class IPMServer {
         await RootServer.processHeartbeat(daemonId, pingMs);
 
         // ACK senden
-        const bestaetigung = JSON.stringify({
+        this._sende(conn.ws, {
             type: 'heartbeat_ack',
             timestamp: Date.now()
         });
-        conn.ws.send(bestaetigung);
+        this.innenhaut?.merke(daemonId).catch(error =>
+            this.Logger.error(`[Innenhaut] Marke von ${daemonId} nicht geschrieben`, error));
 
         // Optional: Server-Registry-Status aktualisieren + SSE-Broadcast pro Gameserver
         if (payload.servers) {
@@ -1644,7 +1800,7 @@ class IPMServer {
             });
 
             // Command senden
-            const nachricht = JSON.stringify({
+            this._sende(conn.ws, {
                 type: 'command',
                 id: commandId,
                 command,
@@ -1653,7 +1809,6 @@ class IPMServer {
                 // der Befehl dann schon als gescheitert gemeldet.
                 frist_ms: timeout
             });
-            conn.ws.send(nachricht);
 
             this.Logger.debug(`[IPMServer] Command sent to Daemon ${daemonId}: ${command} (ID: ${commandId})`);
         });
@@ -1668,6 +1823,8 @@ class IPMServer {
     // bekommt sie beim Öffnen nachgeliefert. Nur im Speicher: Ein Anmeldecode
     // gilt Minuten, kein Neustart des Dashboards.
     static INSTALL_ZEILEN = 300;
+    /** So viele Nachrichten hält eine versiegelte Leitung bis zu ihrer Anmeldung, wie die Halle. */
+    static WARTEND_MAX = 5000;
     static INSTALL_ZEILE_LAENGE = 4000;
 
     installZeileMerken(serverId, guildId, zeile) {
@@ -1874,12 +2031,11 @@ class IPMServer {
         
         for (const [daemonId, conn] of this.connections.entries()) {
             if (conn.metadata.guild_id === guildId) {
-                const nachricht = JSON.stringify({
+                this._sende(conn.ws, {
                     type: 'broadcast',
                     event,
                     data
                 });
-                conn.ws.send(nachricht);
                 sent++;
             }
         }

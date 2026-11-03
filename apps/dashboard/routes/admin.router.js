@@ -315,14 +315,24 @@ router.get('/firebus', async (req, res) => {
               ORDER BY zuletzt DESC
               LIMIT 200`);
         // In JavaScript, nicht per JOIN: Die Kollationen von Kern und Plugin passen nicht.
-        const maschinen = await dbService.query('SELECT daemon_id, name FROM rootserver');
+        const maschinen = await dbService.query('SELECT daemon_id, name, innenhaut_sitzung FROM rootserver ORDER BY name');
         const namen = new Map(maschinen.map(m => [m.daemon_id, m.name]));
+        // Die Innenhaut je Maschine (Paket 5): Klartext gilt nur im Übergang (F20), bis
+        // 54 und 55 versiegelt sprechen.
+        const ipm = ServiceManager.has('ipmServer') ? ServiceManager.get('ipmServer') : null;
+        const innenhaut = maschinen.map(m => {
+            const leitung = ipm?.connections.get(m.daemon_id);
+            const stand = leitung ? (leitung.ws.haut ? 'versiegelt' : 'klartext')
+                : (m.innenhaut_sitzung ? 'getrennt_versiegelt' : 'getrennt_klartext');
+            return { name: m.name, daemon_id: m.daemon_id, stand };
+        });
 
         await themeManager.renderView(res, 'admin/firebus', {
             title: 'FireBus: Kontrolle',
             activeMenu: '/admin/firebus',
             zeilen: zeilen.map(z => ({ ...z, maschine: namen.get(z.daemon_id) || z.daemon_id })),
             gruende: require('../helpers/FireBusKontrolle').GRUENDE,
+            innenhaut,
             fassung: require('../../../packages/firebus').fassung,
             // Die Tür prüft seit Paket 4 nach dem Fahrplan des Bahnhofs, nicht nach dem hier.
             bahnhof: ServiceManager.has('ipmServer') ? (ServiceManager.get('ipmServer').dock?.bahnhof || null) : null,

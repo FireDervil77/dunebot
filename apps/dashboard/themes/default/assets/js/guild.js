@@ -825,7 +825,7 @@ class GuildAjaxHandler {
                         `  daemon_id: "${d.daemonId || ''}"`,
                         '',
                         '  # Setup-Token vom Dashboard – NUR EINMAL SICHTBAR!',
-                        '  # Nach erster Verbindung wird automatisch ein JWT session_token gespeichert.',
+                        '  # Er fährt nie über die Leitung: Aus ihm entsteht der Schlüssel, mit dem Daemon und Dashboard ihre Nachrichten versiegeln.',
                         `  token: "${d.apiKey || ''}"`,
                         '',
                         'dashboard:',
