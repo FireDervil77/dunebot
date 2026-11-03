@@ -42,6 +42,9 @@ const freierPort = () => new Promise((fertig) => {
 });
 
 /** Dashboard-Attrappe: nimmt Anmeldungen an wie `_handleConnection`, merkt sich alles. */
+/** Eine Anmeldung, wie der Bahnhof sie sieht: nur der Umschlag, die Nutzlast ist versiegelt. */
+const anmeldung = (daemon, n) => JSON.stringify({ type: 'register', daemon, s: '0000019a4b2c3d4e9f8e7d6c5b4a3928', n, inhalt: 'QUJD' });
+
 function dashboard() {
     const fehlerLog = [];
     const ipm = { Logger: { ...stille, error: (t) => fehlerLog.push(t) }, fehlerLog, leitungen: [], nachrichten: [], ips: [], angedockt: 0, gemeldet: [] };
@@ -54,7 +57,7 @@ function dashboard() {
         ws.on('message', (daten) => {
             const n = JSON.parse(daten.toString());
             ipm.nachrichten.push(n);
-            if (n.type === 'register') ws.send(JSON.stringify({ type: 'registered', sessionToken: 'neu' }));
+            if (n.type === 'register') ws.send(JSON.stringify({ type: 'registered' }));
             if (n.type === 'heartbeat') ws.send(JSON.stringify({ type: 'heartbeat_ack', von: 'dashboard' }));
         });
     };
@@ -106,9 +109,9 @@ function dashboard() {
         const ipm = ohneKommentare(fs.readFileSync(path.join(__dirname, '../apps/dashboard/helpers/IPMServer.js'), 'utf8'));
         assert.match(ipm, /bus_adresse:\s*busAdresse\(\)/);
         assert.match(ipm, /eventRouter\.register\('adresse', 'befund'/);
-        // Nach JEDER Anmeldung auch als eigene Nachricht: Die Antwort auf eine vom
-        // Bahnhof wiederholte Anmeldung sieht der Daemon nicht (2026-11-03).
-        assert.strictEqual((ipm.match(/this\._sendeBusAdresse\(ws\)/g) || []).length, 3, 'Erst-, Wieder- und versiegelte Anmeldung (Übergang nach F20)');
+        // Nach jeder Anmeldung auch als eigene Nachricht (seit 1.1.13). Seit F20 gibt es
+        // eine Anmeldung, die versiegelte.
+        assert.strictEqual((ipm.match(/this\._sendeBusAdresse\(ws\)/g) || []).length, 1, 'die Anmeldung schickt die Busadresse nicht');
         const vorlage = ohneKommentare(fs.readFileSync(path.join(__dirname, '../apps/dashboard/themes/default/assets/js/guild.js'), 'utf8'));
         assert.match(vorlage, /const busAdresse = d\.busAdresse/);
         assert.doesNotMatch(vorlage, /9341/, 'die Vorlage rechnet die Adresse wieder selbst aus');
@@ -121,7 +124,7 @@ function dashboard() {
 
     console.log('\nNormalbetrieb');
     await pruefe('die Anmeldung läuft durch und ist für den Code dahinter eine normale Leitung', async () => {
-        daemon.send(JSON.stringify({ type: 'register', payload: { daemon_id: 'd1', token: 'alt' } }));
+        daemon.send(anmeldung('d1', 1));
         await bis('registered', () => eingang.some(n => n.type === 'registered'));
         assert.strictEqual(erstes.leitungen.length, 1);
         assert.strictEqual(erstes.ips[0], '127.0.0.1', 'die echte Adresse fehlt, die Namensprüfung braucht sie');
@@ -191,16 +194,20 @@ function dashboard() {
 
         const zweites = dashboard();
         zweites.andocken();
-        await bis('Anmeldung beim neuen Dashboard', () => zweites.nachrichten.length >= 3);
-        assert.deepStrictEqual(zweites.nachrichten.map(n => n.type), ['register', 'event', 'command_response']);
-        assert.strictEqual(zweites.nachrichten[0].payload.token, 'neu', 'die Anmeldung trägt den neuen Schlüssel');
-        assert.strictEqual(zweites.nachrichten[1].nr, 1);
+        // Seit Paket 5 wiederholt der Bahnhof keine Anmeldung: erst die Halle, in Folge.
+        await bis('Halle beim neuen Dashboard', () => zweites.nachrichten.length >= 2);
+        assert.deepStrictEqual(zweites.nachrichten.map(n => n.type), ['event', 'command_response']);
+        assert.strictEqual(zweites.nachrichten[0].nr, 1);
         await warte(100);
-        // Vom Neustart hört der Daemon genau eins: „Dock da", er liefert dann nach.
-        // „Dock weg" kam beim Abdocken (Paket 3, 2026-11-03).
+        // Vom Neustart hört der Daemon genau eins: „Dock da". „Dock weg" kam beim
+        // Abdocken (Paket 3, 2026-11-03).
         assert.deepStrictEqual(eingang.slice(vorher), [{ type: 'dock', da: true }], 'der Daemon hat mehr vom Neustart gesehen als die Ansage');
         assert.ok(eingang.some(n => n.type === 'dock' && n.da === false), '„Dock weg" kam nie an');
         assert.strictEqual(getrennt, false);
+        // Darauf meldet er sich selbst neu an, und die Antwort gehört ihm.
+        daemon.send(anmeldung('d1', 2));
+        await bis('neue Anmeldung', () => zweites.nachrichten.some(n => n.type === 'register'));
+        await bis('ihre Antwort', () => eingang.slice(vorher).some(n => n.type === 'registered'));
 
         daemon.send(JSON.stringify({ type: 'event', namespace: 'gameserver', action: 'status_changed', nr: 2 }));
         await bis('wieder durch', () => zweites.nachrichten.some(n => n.nr === 2));
@@ -232,7 +239,7 @@ function dashboard() {
             let zweiterZu = false;
             zweiter.on('close', () => { zweiterZu = true; });
             await new Promise(r => zweiter.on('open', r));
-            zweiter.send(JSON.stringify({ type: 'register', payload: { daemon_id: 'd2', token: 't' } }));
+            zweiter.send(anmeldung('d2', 1));
             await bis('zweite Leitung', () => zweites.leitungen.length === 2);
             const leitung = zweites.leitungen[1];
             zweites.dock.beende();
@@ -278,6 +285,6 @@ function dashboard() {
 
     bahnhof.kill('SIGKILL');
     fs.rmSync(ordner, { recursive: true, force: true });
-    console.log(fehler ? `\n✗ ${fehler} Prüfung(en) rot` : '\n✅ Das Dashboard startet neu, und der Daemon merkt nichts');
+    console.log(fehler ? `\n✗ ${fehler} Prüfung(en) rot` : '\n✅ Das Dashboard startet neu, die Leitung bleibt, und der Daemon meldet sich selbst neu an');
     process.exit(fehler ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });

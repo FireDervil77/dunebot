@@ -214,15 +214,9 @@ class Innenhaut {
         return this.laden.get(daemonId);
     }
 
-    /** Hat dieser Daemon schon einmal versiegelt gesprochen? Dann gilt sein Klartext nicht mehr. */
-    async sprichtSie(daemonId) {
-        const d = await this._daemon(daemonId);
-        return Boolean(d && d.marke.sitzung);
-    }
-
     /**
-     * Öffnet eine Nachricht vom Bahnhof. Klartext kommt als `{klartext: true, nachricht}`,
-     * der Aufrufer entscheidet. Wirft mit `fehler.innenhaut` = umschlag, siegel,
+     * Öffnet eine Nachricht vom Bahnhof. Klartext kommt als `{klartext: true, nachricht}`:
+     * Der IPMServer weist ihn ab (F20), braucht aber die Nachricht für seine Meldung. Wirft mit `fehler.innenhaut` = umschlag, siegel,
      * unbekannt, wiederholung oder alt.
      */
     async oeffne(text) {

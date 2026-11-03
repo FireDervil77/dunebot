@@ -4,7 +4,7 @@
  * 
  * Verwaltet Verbindungen zu User-seitigen Daemons (Go-basiert)
  * - Leitungen über den Busbahnhof (BusDock, FireBus Etappe 4)
- * - Token-basierte Authentifizierung
+ * - Innenhaut: alles versiegelt, der Token weist die Daemons nach (helpers/Innenhaut.js)
  * - Heartbeat-Monitoring
  * - Command-Routing (Dashboard/Bot → Daemon)
  * - Event-Broadcasting (Daemon → Dashboard/Bot)
@@ -14,7 +14,6 @@
  */
 
 const crypto = require('crypto');
-const jwt = require('jsonwebtoken');
 const fs = require('fs');
 const path = require('path');
 const { ServiceManager } = require('dunebot-core');
@@ -52,7 +51,7 @@ const DOCK_STANDARD = '/run/firebot-bahnhof/dock.sock';
 class IPMServer {
     constructor() {
         this.dock = null;
-        this.connections = new Map(); // daemon_id -> {ws, lastHeartbeat, sessionId, metadata}
+        this.connections = new Map(); // daemon_id -> {ws, lastHeartbeat, metadata}
         this.connectionCounts = new Map(); // daemon_id -> connection_count (für Limit-Tracking)
         this.wache = new VerbindungsWache({
             istVerbunden: (id) => this.connections.has(id),
@@ -69,10 +68,7 @@ class IPMServer {
         // Wird in stop() gesetzt: Ab da schreiben die close-Handler nicht mehr in
         // die Datenbank — der Pool wird gleich geschlossen. Siehe stop().
         this.wirdBeendet = false;
-        
-        // JWT Secret aus ENV (oder generieren falls nicht vorhanden)
-        this.jwtSecret = process.env.JWT_SECRET || crypto.randomBytes(64).toString('hex');
-        this.jwtExpiry = '30d'; // Session-Token gültig für 30 Tage
+
         
         // ✅ SECURITY: Connection-Limits
         this.maxConnectionsPerDaemon = 3; // Max 3 parallele Verbindungen pro Daemon
@@ -264,30 +260,34 @@ class IPMServer {
                         this._recordRegisterFailure(this._registerRateKey(clientIp, error.daemonId), clientIp);
                         // Ohne Siegel, denn ohne den richtigen Token gibt es keins. Der
                         // Wizard liest daraus „Token abgelehnt".
-                        ws.send(JSON.stringify({ type: 'error', error: 'Siegel passt nicht: Token oder Daemon-ID falsch' }));
+                        this._sende(ws, { type: 'error', error: 'Siegel passt nicht: Token oder Daemon-ID falsch' });
                         ws.close(4001, 'Siegel passt nicht');
                     }
                     return;
                 }
                 const message = geoeffnet.nachricht;
-                if (geoeffnet.klartext && ws.haut) {
-                    this.Logger.warn(`[Innenhaut] Klartext auf der versiegelten Leitung von ${ws.haut.daemonId} abgewiesen`);
+                // Klartext gibt es seit F20 nicht mehr. Ein Daemon vor 1.1.14 meldet sich
+                // so an, er braucht sein Update von Hand.
+                if (geoeffnet.klartext) {
+                    this.Logger.warn(`[Innenhaut] Klartext von ${clientIp} abgewiesen (${ws.haut ? ws.haut.daemonId : message.payload?.daemon_id || 'unbekannt'})`);
+                    if (!authenticated) {
+                        this._sende(ws, { type: 'error', error: 'Dieser Daemon spricht keine Innenhaut. Er braucht eine Fassung ab 1.1.14, von Hand aktualisieren.' });
+                        ws.close(4001, 'Klartext');
+                    }
                     return;
                 }
-                if (!geoeffnet.klartext) {
-                    // Eine Leitung gehört einem Daemon-Prozess, also einer Sitzung.
-                    if (ws.haut && (ws.haut.daemonId !== geoeffnet.daemonId || ws.haut.an !== geoeffnet.sitzung)) {
-                        this.Logger.warn(`[Innenhaut] Fremde Sitzung auf der Leitung von ${ws.haut.daemonId} abgewiesen`);
-                        return;
-                    }
-                    ws.haut = { daemonId: geoeffnet.daemonId, an: geoeffnet.sitzung };
+                // Eine Leitung gehört einem Daemon-Prozess, also einer Sitzung.
+                if (ws.haut && (ws.haut.daemonId !== geoeffnet.daemonId || ws.haut.an !== geoeffnet.sitzung)) {
+                    this.Logger.warn(`[Innenhaut] Fremde Sitzung auf der Leitung von ${ws.haut.daemonId} abgewiesen`);
+                    return;
                 }
+                ws.haut = { daemonId: geoeffnet.daemonId, an: geoeffnet.sitzung };
 
                 // Vor der Anmeldung: Nach einem Neustart liefert der Bahnhof die Halle
                 // einer versiegelten Leitung, bevor ihr Daemon sich neu anmeldet
                 // (`meldeNeuAn`). Das Siegel weist sie schon aus, verarbeitet werden sie
                 // nach der Anmeldung.
-                if (!authenticated && !geoeffnet.klartext && message.type !== 'register') {
+                if (!authenticated && message.type !== 'register') {
                     ws.wartend = ws.wartend || [];
                     if (ws.wartend.length < IPMServer.WARTEND_MAX) ws.wartend.push(message);
                     else this.Logger.warn(`[Innenhaut] ${geoeffnet.daemonId}: mehr als ${IPMServer.WARTEND_MAX} Nachrichten vor der Anmeldung, verworfen`);
@@ -305,9 +305,7 @@ class IPMServer {
                         return;
                     }
 
-                    const result = geoeffnet.klartext
-                        ? await this._handleRegister(ws, message.payload, clientIp)
-                        : await this._anmeldungVersiegelt(ws, message.payload, clientIp, geoeffnet);
+                    const result = await this._anmeldung(ws, message.payload, clientIp, geoeffnet);
                     if (result.success) {
                         this.registerFailures.delete(rateKey);
                         daemonId = result.daemonId;
@@ -329,7 +327,6 @@ class IPMServer {
                         this.connections.set(daemonId, {
                             ws,
                             lastHeartbeat: Date.now(),
-                            sessionId: result.sessionId,
                             metadata: result.metadata
                         });
                         
@@ -504,18 +501,6 @@ class IPMServer {
     }
 
     /**
-     * Daemon-Registrierung mit 2-Token-System (Setup-Token + JWT Session-Token)
-     * 
-     * Flow:
-     * 1. Erste Registrierung: Setup-Token (bcrypt) → JWT Session-Token generieren
-     * 2. Reconnect: JWT validieren → Neuen JWT generieren (Token-Rotation)
-     * 
-     * @param {WebSocket} ws - WebSocket Connection
-     * @param {object} payload - Register-Payload
-     * @param {string} clientIp - Client IP-Adresse
-     * @private
-     */
-    /**
      * Was der Betreiber für diese Maschine WOLLTE — auf dem Weg zur Maschine.
      *
      * ── Warum das mit der Anmeldeantwort geht und nicht in einem eigenen Kanal ──
@@ -606,8 +591,9 @@ class IPMServer {
     }
 
     /**
-     * Die einzige Stelle, die an einen Daemon schreibt. Eine versiegelte Leitung bekommt
-     * alles versiegelt, eine im Klartext (Übergang nach F20) als JSON.
+     * Die einzige Stelle, die an einen Daemon schreibt, versiegelt. Ohne Siegel nur,
+     * solange auf der Leitung noch nichts geöffnet wurde: Dann gibt es keinen Schlüssel,
+     * etwa für die Ablehnung eines falschen Tokens oder eines Daemons ohne Innenhaut.
      * @private
      */
     _sende(ws, nachricht) {
@@ -616,7 +602,7 @@ class IPMServer {
 
     /**
      * Knopf „Token erneuern" (FireBus Paket 5). Der neue Token fährt versiegelt unter dem
-     * alten zum Daemon, über eine Leitung im Klartext nie. Bis der Daemon unter dem neuen
+     * alten zum Daemon. Bis der Daemon unter dem neuen
      * spricht, gelten beide (`Innenhaut._neuerTokenGilt`).
      * @returns {Promise<{success: boolean, error?: string}>}
      */
@@ -624,9 +610,6 @@ class IPMServer {
         const conn = this.connections.get(daemonId);
         if (!conn) {
             return { success: false, error: 'Der Daemon ist nicht verbunden. Der neue Token kommt nur über seine Leitung zu ihm.' };
-        }
-        if (!conn.ws.haut) {
-            return { success: false, error: 'Der Daemon spricht noch Klartext. Erst den Daemon aktualisieren, sonst führe der neue Token lesbar durch den Busbahnhof.' };
         }
         const neu = crypto.randomBytes(32).toString('hex');
         await this.dbService.query('UPDATE rootserver SET api_key_neu = ? WHERE daemon_id = ?', [neu, daemonId]);
@@ -649,11 +632,12 @@ class IPMServer {
     }
 
     /**
-     * Anmeldung mit Innenhaut (FireBus Paket 5). Dass sie sich öffnen ließ, weist den
-     * Token schon nach: Er fährt nicht mit, und eine Sitzungs-JWT gibt es nicht mehr.
+     * Die Anmeldung, versiegelt (FireBus Paket 5). Dass sie sich öffnen ließ, weist den
+     * Token schon nach: Er fährt nicht mit, eine Sitzungs-JWT gibt es nicht mehr (F20).
+     * Bis dahin stand hier der Klartext-Weg mit Einrichtungs-Token und JWT.
      * @private
      */
-    async _anmeldungVersiegelt(ws, payload, clientIp, geoeffnet) {
+    async _anmeldung(ws, payload, clientIp, geoeffnet) {
         const { daemon_id, version, hardware, sftp_fingerprint, sftp_port, sftp_grund,
                 abruf_port, abruf_zertifikat, base_directory } = payload || {};
         if (daemon_id !== geoeffnet.daemonId) {
@@ -670,7 +654,14 @@ class IPMServer {
                 absicht:        this._absichtFuer(daemon),
             };
 
-            // Der Einrichtungs-Vorlauf ändert nichts am Zustand, siehe _handleRegister.
+            // ── Der Einrichtungs-Vorlauf (probe) ─────────────────────────────
+            //
+            // Der Setup-Wizard fragt hier einmal an, WÄHREND der Betreiber noch am
+            // Terminal sitzt: Stimmt der Token, und was wurde für diese Maschine
+            // angefordert? Er ändert bewusst NICHTS am Zustand: kein `markOnline`, kein
+            // `install_status = completed`. Eine Maschine, auf der der Wizard gerade
+            // läuft, IST nicht online, und wer abbricht, soll keine Zeile hinterlassen,
+            // die das Gegenteil behauptet.
             if (geoeffnet.probe) {
                 this.Logger.info(`[IPMServer] Einrichtungs-Vorlauf für Daemon ${daemon_id} (IP: ${clientIp}, Innenhaut)`);
                 this._sende(ws, { type: 'probe_ok', rootserver });
@@ -699,7 +690,6 @@ class IPMServer {
             return {
                 success: true,
                 daemonId: daemon_id,
-                sessionId: null,
                 isReconnect: !erste,
                 metadata: {
                     guild_id: daemon.guild_id,
@@ -708,220 +698,6 @@ class IPMServer {
                     hardware: hardware || null
                 }
             };
-        } catch (error) {
-            this.Logger.error('[IPMServer] Register Error:', error);
-            return { success: false, error: 'Internal server error' };
-        }
-    }
-
-    async _handleRegister(ws, payload, clientIp) {
-        const { token, daemon_id, version, hardware, sftp_fingerprint, sftp_port, sftp_grund,
-                abruf_port, abruf_zertifikat, base_directory } = payload;
-
-        if (!token || !daemon_id) {
-            return { success: false, error: 'Missing token or daemon_id' };
-        }
-
-        // Wer einmal versiegelt gesprochen hat, für den gilt kein Klartext mehr: Sonst
-        // ginge eine alte Sitzungs-JWT aus einem Mitschnitt noch durch.
-        if (await this.innenhaut?.sprichtSie(daemon_id)) {
-            return { success: false, error: 'Diese Maschine spricht die Innenhaut, eine Anmeldung im Klartext gilt nicht mehr' };
-        }
-        
-        // ✅ SECURITY: IP-Logging für Audit
-        this.Logger.info(`[IPMServer] Registrierungsversuch von Daemon ${daemon_id} (IP: ${clientIp})`);
-
-
-        try {
-            // Prüfen ob Token ein JWT ist (Session-Token)
-            const isJWT = token.startsWith('eyJ'); // JWT startet immer mit "eyJ"
-            
-            // ======================================
-            // FALL 1: JWT Session-Token (Reconnect)
-            // ======================================
-            if (isJWT) {
-                try {
-                    // JWT validieren
-                    const decoded = jwt.verify(token, this.jwtSecret);
-                    
-                    // Prüfen ob daemon_id übereinstimmt
-                    if (decoded.daemon_id !== daemon_id) {
-                        return { success: false, error: 'Token daemon_id mismatch' };
-                    }
-                    
-                    // Daemon aus DB laden
-                    const daemon = await RootServer.getByDaemonId(daemon_id);
-                    
-                    if (!daemon) {
-                        return { success: false, error: 'Daemon not found' };
-                    }
-                    
-                    // Neuen Session-Token generieren (Token-Rotation!)
-                    const newSessionToken = jwt.sign({
-                        daemon_id: daemon.daemon_id,
-                        guild_id: daemon.guild_id,
-                        version: version || daemon.daemon_version
-                    }, this.jwtSecret, { expiresIn: this.jwtExpiry });
-                    
-                    // Daemon-Status aktualisieren
-                    await RootServer.markOnline(daemon_id, {
-                        version:      version || daemon.daemon_version,
-                        sessionToken: newSessionToken,
-                        sftpFingerprint: sftp_fingerprint || null,
-                        sftpPort:        sftp_port || null,
-                        // Der Daemon meldet sein Basis-Verzeichnis seit 1.0.75
-                        // (B143). Ein älterer meldet nichts — dann bleibt der
-                        // Wert stehen, statt durch NULL ersetzt zu werden.
-                        baseDirectory:   base_directory || null,
-                        // `?? null` und nicht `|| null`: Der Wert soll auch
-                        // dann gesetzt werden, wenn er fehlt — dann als NULL.
-                        abrufPort:       abruf_port ?? null,
-                        abrufZertifikat: abruf_zertifikat ?? null,
-                    });
-                    // SFTP: Port oder Grund, gegen den Wunsch am Rootserver (2026-10-27).
-                    await RootServer.uebernimmSftp(daemon_id, { port: sftp_port || null, grund: sftp_grund || null })
-                        .catch(e => this.Logger.warn(`[IPMServer] SFTP-Befund für ${daemon_id} nicht übernommen: ${e.message}`));
-                    
-                    await this._logDaemonEvent(daemon_id, 'reconnected', { version });
-                    
-                    // Server-Registry für diesen RootServer laden
-                    const reconnectServers = await this._serverRegistry(daemon.id);
-                    
-                    this._sende(ws, {
-                        type: 'registered', 
-                        sessionToken: newSessionToken,
-                        rootserver: {
-                            id: daemon.id,
-                            name: daemon.name,
-                            base_directory: daemon.base_directory,
-                            system_user: daemon.system_user,
-                            absicht: this._absichtFuer(daemon)
-                        },
-                        serverRegistry: reconnectServers || []
-                    });
-                    this._sendeBusAdresse(ws);
-                    
-                    return { 
-                        success: true, 
-                        daemonId: daemon_id, 
-                        sessionId: newSessionToken,
-                        isReconnect: true,
-                        metadata: {
-                            guild_id: daemon.guild_id,
-                            display_name: daemon.name,
-                            version: version || daemon.daemon_version,
-                            hardware: hardware || null
-                        }
-                    };
-                    
-                } catch (jwtError) {
-                    // JWT ungültig/abgelaufen
-                    if (jwtError.name === 'TokenExpiredError') {
-                        this.Logger.warn(`[IPMServer] Session token expired for daemon ${daemon_id}`);
-                        return { success: false, error: 'Session token expired - use setup token' };
-                    }
-                    this.Logger.error('[IPMServer] JWT verification failed:', jwtError);
-                    return { success: false, error: 'Invalid session token' };
-                }
-            }
-            
-            // ================================================
-            // FALL 2: Setup-Token / API-Key (Erste Registrierung)
-            // ================================================
-
-            // RootServer anhand daemon_id + api_key laden
-            const rootserverByToken = await RootServer.getByDaemonIdAndApiKey(daemon_id, token);
-
-            if (!rootserverByToken) {
-                return { success: false, error: 'Invalid or expired token' };
-            }
-
-            // ── Der Einrichtungs-Vorlauf (probe) ─────────────────────────────
-            //
-            // Der Setup-Wizard fragt hier einmal an, WÄHREND der Betreiber noch
-            // am Terminal sitzt: Stimmt der Token, und was wurde für diese
-            // Maschine angefordert? Erst mit dieser Antwort kann er die
-            // richtigen Rückfragen stellen — „FastDL angefordert, hier ist kein
-            // Webserver, soll ich nginx installieren?".
-            //
-            // Er ändert bewusst NICHTS am Zustand: kein `markOnline`, kein
-            // Sitzungsschlüssel, kein `install_status = completed`. Eine
-            // Maschine, auf der der Wizard gerade läuft, IST nicht online — und
-            // wer den Wizard abbricht, soll keine Zeile hinterlassen, die
-            // behauptet, die Installation sei fertig.
-            //
-            // Der Token wird trotzdem echt geprüft: Ein Vertipper fällt damit
-            // sofort auf, statt später als Dienst, der nicht hochkommt.
-            if (payload.probe === true) {
-                this.Logger.info(`[IPMServer] Einrichtungs-Vorlauf für Daemon ${daemon_id} (IP: ${clientIp})`);
-                this._sende(ws, {
-                    type: 'probe_ok',
-                    rootserver: {
-                        id:             rootserverByToken.id,
-                        name:           rootserverByToken.name,
-                        base_directory: rootserverByToken.base_directory,
-                        system_user:    rootserverByToken.system_user,
-                        absicht:        this._absichtFuer(rootserverByToken),
-                    },
-                });
-                return { success: false, error: 'probe', istVorlauf: true };
-            }
-
-            // JWT Session-Token generieren
-            const sessionToken = jwt.sign({
-                daemon_id,
-                guild_id: rootserverByToken.guild_id,
-                version: version || 'unknown'
-            }, this.jwtSecret, { expiresIn: this.jwtExpiry });
-
-            // Daemon-Status + Session-Token in rootserver aktualisieren
-            // install_status → 'completed' bei erster erfolgreicher Verbindung
-            await RootServer.markOnline(daemon_id, {
-                version:         version || 'unknown',
-                sessionToken:    sessionToken,
-                installStatus:   'completed',
-                sftpFingerprint: sftp_fingerprint || null,
-                sftpPort:        sftp_port || null,
-                baseDirectory:   base_directory || null,
-                abrufPort:       abruf_port ?? null,
-                abrufZertifikat: abruf_zertifikat ?? null,
-            });
-            // SFTP: Port oder Grund, gegen den Wunsch am Rootserver (2026-10-27).
-            await RootServer.uebernimmSftp(daemon_id, { port: sftp_port || null, grund: sftp_grund || null })
-                .catch(e => this.Logger.warn(`[IPMServer] SFTP-Befund für ${daemon_id} nicht übernommen: ${e.message}`));
-
-            // Audit-Log
-            await this._logDaemonEvent(daemon_id, 'first_registration', { version });
-
-            // Server-Registry für diesen RootServer laden (kann leer sein bei Erst-Registrierung)
-            const firstRegServers = await this._serverRegistry(rootserverByToken.id);
-
-            this._sende(ws, {
-                type: 'registered', 
-                sessionToken,
-                rootserver: {
-                    id: rootserverByToken.id,
-                    name: rootserverByToken.name,
-                    base_directory: rootserverByToken.base_directory,
-                    system_user: rootserverByToken.system_user,
-                    absicht: this._absichtFuer(rootserverByToken)
-                },
-                serverRegistry: firstRegServers || []
-            });
-            this._sendeBusAdresse(ws);
-
-            return { 
-                success: true, 
-                daemonId: daemon_id, 
-                sessionId: sessionToken,
-                metadata: {
-                    guild_id: rootserverByToken.guild_id,
-                    display_name: rootserverByToken.name,
-                    version,
-                    hardware: hardware || null
-                }
-            };
-
         } catch (error) {
             this.Logger.error('[IPMServer] Register Error:', error);
             return { success: false, error: 'Internal server error' };

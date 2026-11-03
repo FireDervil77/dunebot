@@ -96,8 +96,8 @@ async function pruefe(was, tun) {
         assert.ok(/sftp_port:\s*Number\(zeile\.sftp_port_wunsch\) \|\| 0/.test(ipm), 'die Absicht nennt den Port nicht');
         assert.ok(/eventRouter\.register\('sftp', 'befund'/.test(ipm), 'der Befund nach dem Anwenden wird nicht übernommen');
         assert.ok(/sftp_port, sftp_grund,/.test(ipm), 'sftp_grund wird nicht gelesen');
-        assert.strictEqual((ipm.match(/await RootServer\.uebernimmSftp\(daemon_id, \{ port: sftp_port \|\| null, grund: sftp_grund \|\| null \}\)/g) || []).length, 3,
-            'Wiederanmeldung, Erstanmeldung UND versiegelte Anmeldung übernehmen den Befund (Übergang nach F20)');
+        assert.strictEqual((ipm.match(/await RootServer\.uebernimmSftp\(daemon_id, \{ port: sftp_port \|\| null, grund: sftp_grund \|\| null \}\)/g) || []).length, 1,
+            'die Anmeldung übernimmt den Befund');
     });
 
     console.log('\nFormular und Recht');

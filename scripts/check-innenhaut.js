@@ -10,7 +10,7 @@
  *
  *   1. dieselbe Rechnung wie der Daemon, an den Testwerten aus `vektor_test.go`
  *   2. die Regeln von `helpers/Innenhaut.js`
- *   3. die Leitung im echten IPMServer: Anmeldung, Halle vor der Anmeldung, Klartext
+ *   3. die Leitung im echten IPMServer: Anmeldung, Halle vor der Anmeldung, kein Klartext (F20)
  *   4. Token erneuern: der neue gilt neben dem alten, bis der Daemon unter ihm spricht
  *   5. die Migrationen an temporären Kopien, Marke und Sitzungsnummer in der Datenbank
  *
@@ -37,6 +37,7 @@ const IPMServer = require('../apps/dashboard/helpers/IPMServer');
 const migrationRootserver = require('../plugins/masterserver/migrations/20261103_170000_rootserver_innenhaut');
 const migrationSitzung = require('../migrations/kern/20261103_170000_firebus_sitzung');
 const migrationTokenNeu = require('../plugins/masterserver/migrations/20261103_180000_rootserver_api_key_neu');
+const migrationOhneJwt = require('../plugins/masterserver/migrations/20261103_190000_rootserver_ohne_session_token');
 const { ohneKommentare } = require('./lib/quelltext');
 
 let fehler = 0;
@@ -182,8 +183,7 @@ async function neueHaut(zeilen, jetzt = () => 1_000_000, tokenGilt) {
         const zweite = await neueHaut([z]);
         await assert.rejects(zweite.h.oeffne(alteNachrichten[2]), (e) => e.innenhaut === 'wiederholung');
         await zweite.h.oeffne(d.siegle({ type: 'heartbeat' }));
-        assert.ok(await zweite.h.sprichtSie('d1'));
-        assert.ok(!(await (await neueHaut([zeile()])).h.sprichtSie('d1')), 'ohne Marke gilt noch Klartext');
+        assert.strictEqual(zweite.h.daemons.get('d1').marke.sitzung, d.sitzung);
     });
     await pruefe('merke schreibt nur, was sich geändert hat', async () => {
         const { h, speicher } = await neueHaut([zeile()]);
@@ -250,7 +250,6 @@ async function neueHaut(zeilen, jetzt = () => 1_000_000, tokenGilt) {
     Object.assign(RootServer, {
         getByDaemonId: async (id) => ({ id: 54, daemon_id: id, name: 'Maschine', guild_id: 'g', install_status: 'completed', base_directory: '/v', system_user: 'u' }),
         markOnline: async () => {}, uebernimmSftp: async () => {}, uebernimmDatenbank: async () => {}, uebernimmMaschinenbefund: async () => null,
-        getByDaemonIdAndApiKey: async () => null,
     });
     const leitung = () => {
         const ws = new EventEmitter();
@@ -304,11 +303,14 @@ async function neueHaut(zeilen, jetzt = () => 1_000_000, tokenGilt) {
         assert.match(JSON.parse(ws.gesendet[0]).error, /Siegel passt nicht/);
         assert.strictEqual(ipm.registerFailures.size, 1);
     });
-    await pruefe('wer versiegelt gesprochen hat, kommt im Klartext nicht mehr an', async () => {
-        const ws = leitung();
-        await bringe(ws, JSON.stringify({ type: 'register', payload: { daemon_id: 'd2', token: 'eyJ.alt.jwt' } }));
-        assert.ok(!ipm.connections.has('d2'));
-        assert.match(JSON.parse(ws.gesendet[0]).error, /spricht die Innenhaut/);
+    await pruefe('Klartext kommt nie an, auch nicht mit richtigem Token (F20)', async () => {
+        for (const [id, token] of [['d1', 'token'], ['d2', 'eyJ.alt.jwt']]) {
+            const ws = leitung();
+            await bringe(ws, JSON.stringify({ type: 'register', payload: { daemon_id: id, token } }));
+            assert.ok(!ipm.connections.has(id), `${id} im Klartext angemeldet`);
+            assert.match(JSON.parse(ws.gesendet[0]).error, /keine Innenhaut/);
+            assert.strictEqual(ws.zu, 4001);
+        }
     });
     await pruefe('Befehle gehen versiegelt an die Sitzung der Leitung', async () => {
         const d = daemonSeite('token', 'd1', 500);
@@ -366,10 +368,8 @@ async function neueHaut(zeilen, jetzt = () => 1_000_000, tokenGilt) {
         const d = daemonSeite('token', 'd1', 100);
         await tokenIpm.innenhaut.oeffne(d.siegle({ type: 'heartbeat' }));
         const ws = { gesendet: [], send(t) { this.gesendet.push(t); } };
-        await pruefe('nicht verbunden oder im Klartext: kein neuer Token', async () => {
+        await pruefe('nicht verbunden: kein neuer Token', async () => {
             assert.match((await tokenIpm.erneuereToken('d1')).error, /nicht verbunden/);
-            tokenIpm.connections.set('d1', { ws: { send() {} }, metadata: {} });
-            assert.match((await tokenIpm.erneuereToken('d1')).error, /Klartext/);
             assert.deepStrictEqual(sql, [], 'trotzdem geschrieben');
         });
         tokenIpm.connections.set('d1', { ws: Object.assign(ws, { haut: { daemonId: 'd1', an: d.sitzung } }), metadata: {} });
@@ -422,7 +422,7 @@ async function neueHaut(zeilen, jetzt = () => 1_000_000, tokenGilt) {
     console.log('\nVerdrahtung');
     await pruefe('eine Sendestelle, Innenhaut vor dem Dock, Marken bei Heartbeat und Halt', () => {
         const q = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'apps/dashboard/helpers/IPMServer.js'), 'utf8'));
-        assert.strictEqual((q.match(/ws\.send\(/g) || []).length, 2, 'ws.send nur in _sende und für die Ablehnung ohne Siegel');
+        assert.strictEqual((q.match(/ws\.send\(/g) || []).length, 1, 'ws.send nur in _sende');
         assert.ok(q.indexOf('await this.innenhaut.starte()') < q.indexOf('new BusDock('), 'die Innenhaut startet nach dem Dock');
         assert.match(q, /this\.innenhaut\?\.merke\(daemonId\)/);
         // Angedockt wird erst nach Migrationen und Plugins: Der Bahnhof stellt die
@@ -443,10 +443,18 @@ async function neueHaut(zeilen, jetzt = () => 1_000_000, tokenGilt) {
         assert.match(vorlauf, /haut\.Siegle\(/);
         assert.doesNotMatch(vorlauf, /"token":/);
     });
-    await pruefe('der Bahnhof wiederholt keine versiegelte Anmeldung', () => {
+    await pruefe('der Bahnhof wiederholt keine bestätigte Anmeldung und merkt sich keinen Schlüssel', () => {
         const b = ohneKommentare(fs.readFileSync(path.join(DAEMON, 'internal/bahnhof/bahnhof.go'), 'utf8'));
-        assert.match(b, /l\.versiegelt = k\.Sitzung != ""/);
-        assert.match(b, /selbst := l\.versiegelt && l\.bestaetigt/);
+        assert.match(b, /if bestaetigt \{\s*b\.gibHalleFrei\(l\)/);
+        assert.doesNotMatch(b, /merkeToken|wiederholt|SessionToken/);
+        const u = ohneKommentare(fs.readFileSync(path.join(DAEMON, 'internal/bahnhof/umschlag.go'), 'utf8'));
+        assert.doesNotMatch(u, /sessionToken/);
+    });
+    await pruefe('kein Klartext-Weg und keine JWT mehr im Dashboard (F20)', () => {
+        const q = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'apps/dashboard/helpers/IPMServer.js'), 'utf8'));
+        assert.doesNotMatch(q, /jsonwebtoken|jwt\.|sessionToken|_handleRegister/);
+        const modell = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'plugins/masterserver/dashboard/models/RootServer.js'), 'utf8'));
+        assert.doesNotMatch(modell, /session_token|getByDaemonIdAndApiKey/);
     });
 
     console.log('\nDatenbank, an temporären Kopien');
@@ -475,6 +483,16 @@ async function neueHaut(zeilen, jetzt = () => 1_000_000, tokenGilt) {
             await migrationTokenNeu.up(db);
             const [spalte] = await db.query("SHOW COLUMNS FROM rootserver LIKE 'api_key_neu'");
             assert.deepStrictEqual([spalte.Type, spalte.Null], ['varchar(255)', 'YES']);
+        });
+        await pruefe('die JWT-Spalten fallen weg, ein zweites Mal ändert nichts, down legt sie leer an', async () => {
+            const spalten = async () => (await db.query("SHOW COLUMNS FROM rootserver LIKE 'session_token%'")).map(s => s.Field);
+            assert.deepStrictEqual(await spalten(), ['session_token', 'session_token_expires_at']);
+            await migrationOhneJwt.up(db);
+            await migrationOhneJwt.up(db);
+            assert.deepStrictEqual(await spalten(), []);
+            await migrationOhneJwt.down(db);
+            assert.deepStrictEqual(await spalten(), ['session_token', 'session_token_expires_at']);
+            await migrationOhneJwt.up(db);
         });
         await pruefe('Marke schreiben und nach einem Neustart wieder lesen', async () => {
             await db.query(`INSERT INTO rootserver (guild_id, owner_user_id, daemon_id, name, host, api_key)

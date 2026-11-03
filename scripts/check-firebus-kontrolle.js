@@ -111,8 +111,8 @@ const gemeldet = (k) => [...k.meldungen].map(([s, n]) => [...JSON.parse(s), n]);
         const datei = path.join(WURZEL, 'apps/dashboard/themes/default/views/admin/firebus.ejs');
         const vorlage = fs.readFileSync(datei, 'utf8');
         const gruende = FireBusKontrolle.GRUENDE;
-        assert.match(ejs.render(vorlage, { innenhaut: [], zeilen: [], gruende, fassung: 4 }), /Keine Meldungen/);
-        const html = ejs.render(vorlage, { innenhaut: [], fassung: 4, gruende, zeilen: [{ zuletzt: new Date(), maschine: '<b>x</b>', name: 'a.b', grund: 'tempo', anzahl: '12' }] });
+        assert.match(ejs.render(vorlage, { zeilen: [], gruende, fassung: 4 }), /Keine Meldungen/);
+        const html = ejs.render(vorlage, { fassung: 4, gruende, zeilen: [{ zuletzt: new Date(), maschine: '<b>x</b>', name: 'a.b', grund: 'tempo', anzahl: '12' }] });
         assert.match(html, /Absender zu schnell/);
         assert.ok(!html.includes('<b>x</b>'), 'nicht escapet');
     });
@@ -120,28 +120,13 @@ const gemeldet = (k) => [...k.meldungen].map(([s, n]) => [...JSON.parse(s), n]);
         const ejs = require('ejs');
         const vorlage = fs.readFileSync(path.join(WURZEL, 'apps/dashboard/themes/default/views/admin/firebus.ejs'), 'utf8');
         const gruende = FireBusKontrolle.GRUENDE;
-        const gleich = ejs.render(vorlage, { innenhaut: [], zeilen: [], gruende, fassung: 7, bahnhof: { fassung: 7, stand: '<i>abc</i>' } });
+        const gleich = ejs.render(vorlage, { zeilen: [], gruende, fassung: 7, bahnhof: { fassung: 7, stand: '<i>abc</i>' } });
         assert.match(gleich, /Bahnhof &lt;i&gt;abc&lt;\/i&gt;, Fahrplan 7/);
         assert.doesNotMatch(gleich, /Dashboard 7|nicht angedockt/);
-        assert.match(ejs.render(vorlage, { innenhaut: [], zeilen: [], gruende, fassung: 8, bahnhof: { fassung: 7, stand: 'abc' } }), /Dashboard 8/);
-        assert.match(ejs.render(vorlage, { innenhaut: [], zeilen: [], gruende, fassung: 8, bahnhof: null }), /Bahnhof nicht angedockt/);
+        assert.match(ejs.render(vorlage, { zeilen: [], gruende, fassung: 8, bahnhof: { fassung: 7, stand: 'abc' } }), /Dashboard 8/);
+        assert.match(ejs.render(vorlage, { zeilen: [], gruende, fassung: 8, bahnhof: null }), /Bahnhof nicht angedockt/);
         const route = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'apps/dashboard/routes/admin.router.js'), 'utf8'));
         assert.match(route, /bahnhof: ServiceManager\.has\('ipmServer'\) \? \(ServiceManager\.get\('ipmServer'\)\.dock\?\.bahnhof/);
-    });
-    await pruefe('die Seite zeigt die Innenhaut je Maschine (Paket 5)', () => {
-        const ejs = require('ejs');
-        const vorlage = fs.readFileSync(path.join(WURZEL, 'apps/dashboard/themes/default/views/admin/firebus.ejs'), 'utf8');
-        const html = ejs.render(vorlage, { zeilen: [], gruende: FireBusKontrolle.GRUENDE, fassung: 7, bahnhof: null, innenhaut: [
-            { name: '<b>54</b>', daemon_id: 'd1', stand: 'versiegelt' },
-            { name: '55', daemon_id: 'd2', stand: 'klartext' },
-            { name: '56', daemon_id: 'd3', stand: 'getrennt_klartext' },
-        ] });
-        assert.match(html, /bg-success">versiegelt/);
-        assert.match(html, /bg-warning text-dark">Klartext/);
-        assert.match(html, /getrennt, noch nie versiegelt/);
-        assert.ok(!html.includes('<b>54</b>'), 'nicht escapet');
-        const route = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'apps/dashboard/routes/admin.router.js'), 'utf8'));
-        assert.match(route, /leitung\.ws\.haut \? 'versiegelt' : 'klartext'/);
     });
     await pruefe('die Seite steht in der Navigation', () => {
         assert.match(fs.readFileSync(path.join(WURZEL, 'apps/dashboard/themes/default/partials/guild/sidebar.ejs'), 'utf8'), /url: '\/admin\/firebus'/);

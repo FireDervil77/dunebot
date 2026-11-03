@@ -190,15 +190,14 @@ class RootServer {
     /**
      * Setzt einen Daemon auf "online" — beim Register und beim Reconnect.
      *
-     * Bewusst ein einziges UPDATE statt drei Einzelaufrufe: Version,
-     * Sitzungsschlüssel und Status gehören zu einem Vorgang und sollen nicht
-     * halb geschrieben stehen bleiben, wenn etwas dazwischen fehlschlägt.
+     * Bewusst ein einziges UPDATE statt mehrerer Einzelaufrufe: Version, Befund
+     * und Status gehören zu einem Vorgang und sollen nicht halb geschrieben
+     * stehen bleiben, wenn etwas dazwischen fehlschlägt. Einen Sitzungsschlüssel
+     * (JWT) gibt es seit FireBus Paket 5 nicht mehr.
      *
      * @param {string} daemonId
      * @param {object} daten
      * @param {string} [daten.version]           vom Daemon gemeldete Version
-     * @param {string} [daten.sessionToken]      neuer JWT
-     * @param {number} [daten.sessionTageGueltig] Gültigkeit in Tagen (Standard 30)
      * @param {string} [daten.installStatus]     z.B. 'completed' bei Erstregistrierung
      */
     static async markOnline(daemonId, daten = {}) {
@@ -239,11 +238,6 @@ class RootServer {
             values.push(daten.abrufZertifikat ? String(daten.abrufZertifikat).slice(0, 8192) : null);
         }
         if (daten.installStatus) { fields.push('install_status = ?'); values.push(daten.installStatus); }
-        if (daten.sessionToken) {
-            fields.push('session_token = ?');
-            values.push(daten.sessionToken);
-            fields.push(`session_token_expires_at = DATE_ADD(NOW(), INTERVAL ${parseInt(daten.sessionTageGueltig, 10) || 30} DAY)`);
-        }
 
         values.push(daemonId);
         await dbService.query(
@@ -275,26 +269,6 @@ class RootServer {
      * der nicht zurückkommt, setzt jetzt die `VerbindungsWache` nach ihrer Frist
      * offline (`ausgefallen` → `markOffline`), geprüft in `check-verbindung.js`.
      */
-
-    /**
-     * Lädt einen RootServer anhand von daemon_id UND API-Key.
-     *
-     * Für die Erstanmeldung: Der IPMServer braucht nicht nur die Auskunft
-     * "Schlüssel stimmt", sondern den Datensatz selbst (guild_id,
-     * base_directory, system_user). Das frühere `validateApiKey()` gab nur
-     * true/false zurück und war deshalb an dieser Stelle nicht verwendbar —
-     * genau deswegen stand dort ein eigenes SELECT.
-     *
-     * @returns {Promise<object|null>}
-     */
-    static async getByDaemonIdAndApiKey(daemonId, apiKey) {
-        const dbService = ServiceManager.get('dbService');
-        const [row] = await dbService.query(
-            'SELECT * FROM rootserver WHERE daemon_id = ? AND api_key = ? LIMIT 1',
-            [daemonId, apiKey]
-        );
-        return row || null;
-    }
 
     static async processHeartbeat(daemonId, latencyMs = null) {
         const dbService = ServiceManager.get('dbService');
@@ -481,11 +455,10 @@ class RootServer {
         return row !== undefined;
     }
 
-    // `validateApiKey()` stand hier bis zum 2026-08-02 und gab nur true/false
-    // zurück. Die einzige Stelle, die einen API-Key prüft — die Erstanmeldung im
-    // IPMServer — braucht den Datensatz selbst und hatte deshalb ein eigenes
-    // SELECT. Übrig bleibt `getByDaemonIdAndApiKey()` weiter oben, das beides
-    // leistet.
+    // `validateApiKey()` stand hier bis zum 2026-08-02, `getByDaemonIdAndApiKey()`
+    // bis zum 2026-11-03. Seit FireBus Paket 5 prüft niemand mehr einen
+    // mitgeschickten API-Key: Der Token fährt nicht mehr, die Innenhaut weist den
+    // Daemon nach (apps/dashboard/helpers/Innenhaut.js).
 
     static async getStatusSummary() {
         const dbService = ServiceManager.get('dbService');

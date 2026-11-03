@@ -54,7 +54,7 @@ const ipm = {
         leitung.on('message', (data) => {
             const message = JSON.parse(data);
             if (message.type === 'register') {
-                leitung.send(JSON.stringify({ type: 'registered', sessionToken: 'probe' }));
+                leitung.send(JSON.stringify({ type: 'registered' }));
                 return;
             }
             const s = stufe(message.payload?.stufe || '-');
