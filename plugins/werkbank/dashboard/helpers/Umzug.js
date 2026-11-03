@@ -270,13 +270,15 @@ async function erbeProbewerte(sitzung, paket) {
  * gehören der Sitzung — sie stehen nicht im Paket und nicht im Fingerabdruck.
  *
  * Welche Einstellung es ist, sagt die Werkbank (`rconStand`), nicht ein
- * Feldname. Hat sie schon einen Wert, bleibt er stehen.
+ * Feldname. Erzeugt wird immer, auch wenn die Sitzung schon einen Wert hat: Die
+ * Umzugssitzung ist frisch, ihr Wert kann nur die Vorgabe des Pakets sein, und die
+ * gilt für das Kennwort nie (StartPayload.paketWerteAnlegen, 2026-11-03).
  */
 async function kennwortDerFernsteuerung(sitzung) {
     const S = dienste.S();
     if (!sitzung.entwurf?.management?.rcon?.password_variable) return;
     const key = S.rconStand(sitzung).quelle;
-    if (!key || S.probewerte(sitzung)[key] !== '') return;
+    if (!key) return;
     await S.probewerteSetzen(sitzung, { [key]: crypto.randomBytes(18).toString('base64url') });
 }
 

@@ -486,9 +486,10 @@ function paketWerteAnlegen(paket, eingaben = {}, serverName = null) {
     //
     // Die Regel ist eng gefasst und folgt dem Paket statt einer Vermutung ueber
     // Feldnamen: Genommen wird genau die Einstellung, die die Variable fuellt,
-    // die `management.rcon.password_variable` nennt. Hat sie schon einen Wert
-    // (weil das Paket eine Vorgabe hat oder jemand einen eingetippt hat), bleibt
-    // er stehen.
+    // die `management.rcon.password_variable` nennt. Hat jemand einen Wert
+    // eingetippt, bleibt er stehen. Eine Vorgabe des Pakets zaehlt NICHT
+    // (2026-11-03): Minecraft 1.5.15 trug „teste", und jeder neue Server haette
+    // es bekommen. Ein Kennwort gehoert in kein Paket, also gilt es hier nie.
     //
     // base64url, weil `server.properties` ein Zeichen wie `\` oder `:` nicht
     // verzeiht und die Datei zeilenweise gelesen wird.
@@ -505,7 +506,8 @@ function paketWerteAnlegen(paket, eingaben = {}, serverName = null) {
         const eintrag = (paket.settings || []).find(e =>
             Array.isArray(e.apply) && e.apply.some(a => a.target === 'env' && a.variable === rconVariable))
             || (verweis ? (paket.settings || []).find(e => e.key === verweis[1]) : null);
-        if (eintrag && !werte[eintrag.key]) {
+        const eingetippt = eintrag ? String(eingaben[eintrag.key] ?? '').trim() : '';
+        if (eintrag && !eingetippt) {
             werte[eintrag.key] = crypto.randomBytes(18).toString('base64url');
         }
     }

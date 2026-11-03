@@ -3015,6 +3015,12 @@ function umgebungsEinstellungen(entwurf) {
     return aus;
 }
 
+/** Trägt die Einstellung eine Vorgabe? Leer und `null` zählen nicht. */
+function hatVorgabe(entwurf, key) {
+    const s = (entwurf?.settings || []).find(x => x.key === key);
+    return Boolean(s) && s.default !== undefined && s.default !== null && String(s.default).trim() !== '';
+}
+
 /** Was an der Fernsteuerung hängt — solange etwas davon da ist, bleibt sie. */
 function rconAbhaengige(entwurf) {
     const aus = [];
@@ -3094,6 +3100,10 @@ function rconStand(sitzung) {
         else if (!gefuellt) warnungen.push(`Keine Einstellung schreibt „${r.password_variable}" in die Umgebung — das Kennwort käme nie an.`);
         else if (quelle && probewerte(sitzung)[quelle.key] === '') {
             warnungen.push(`„${quelle.key}" hat keinen Probewert — ohne Kennwort scheitert die Anmeldung im Durchlauf. Unter „Einstellungen" einen setzen.`);
+        }
+        // Seit 2026-11-03 nimmt kein Server sie mehr, sie stünde aber im Paket.
+        if (quelle && hatVorgabe(e, quelle.key)) {
+            warnungen.push(`„${quelle.key}" hat eine Vorgabe. Ein Kennwort gehört in kein Paket: Jeder Server bekommt ein erzeugtes, die Vorgabe wird nie benutzt. Unter „Einstellungen" leeren.`);
         }
     }
     return {

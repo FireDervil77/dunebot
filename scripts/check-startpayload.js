@@ -370,6 +370,13 @@ function ohneEgg(payload) {
         assert.ok(w.rcon_password && w.rcon_password.length >= 16, `rcon_password = ${JSON.stringify(w.rcon_password)}`);
         assert.ok(!('game_password' in w), 'ein Kennwort, das nicht die Fernsteuerung füllt, wurde miterzeugt');
         assert.strictEqual(paketWerteAnlegen(pk, { rcon_password: 'von-hand' }, 'x').rcon_password, 'von-hand');
+        // Minecraft 1.5.15 trug die Vorgabe „teste" (2026-11-03). Eine Vorgabe
+        // des Pakets gilt für dieses Kennwort nie, auch kein leeres Eingabefeld.
+        const mitVorgabe = { ...pk, settings: pk.settings.map(e => e.key === 'rcon_password' ? { ...e, default: 'teste' } : e) };
+        for (const eingabe of [{}, { rcon_password: '' }, { rcon_password: '  ' }]) {
+            const v = paketWerteAnlegen(mitVorgabe, eingabe, 'x').rcon_password;
+            assert.ok(v !== 'teste' && v.length >= 16, `mit Vorgabe und ${JSON.stringify(eingabe)}: ${v}`);
+        }
         // Ein fester Wert im Wurzelfeld ist kein Verweis — dann wird nichts erzeugt.
         const fest = { ...pk, env: { RCON_PASSWORD: 'fest' } };
         assert.ok(!('rcon_password' in paketWerteAnlegen(fest, {}, 'x')));
