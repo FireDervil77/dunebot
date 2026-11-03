@@ -150,6 +150,20 @@ ServiceManager.register('Logger', { info: (t) => meldungen.push(t), warn: () => 
             const [rest] = await roh.query('SELECT daemon_id FROM daemon_logs');
             assert.deepStrictEqual(rest.map(z => z.daemon_id), ['fremd']);
         });
+        // Am 2026-11-03 kam kein einziges DELETE an: Ein `</script>` in einem
+        // Kommentar beendete den Block, der Löschteil stand als Text auf der Seite.
+        await pruefe('die gerenderte Seite trägt den Löschteil in einem Skript, wie der Browser schneidet', async () => {
+            const d = (await rufe('get', '/logs')).ansicht.d;
+            const ejs = require('ejs');
+            const datei = path.join(WURZEL, 'plugins/masterserver/dashboard/views/guild/masterserver-logs.ejs');
+            const html = ejs.render(require('fs').readFileSync(datei, 'utf8'),
+                { ...d, tr: (k) => k, userPermissions: { is_owner: true, permissions: {} } }, { filename: datei });
+            const skripte = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(m => m[1]).join('\n');
+            assert.match(skripte, /method: 'DELETE'/, 'der Löschteil steht nicht im Skript');
+            assert.match(skripte, /getElementById\('logsLoeschenKnopf'\)/);
+            assert.ok(html.includes('id="logsLoeschenOeffnen"') && html.includes('id="logsLoeschenModal"'));
+            new (require('vm').Script)(skripte);
+        });
         await pruefe('Löschen verlangt das Recht DAEMON.MANAGE, Export das Recht LOGS.VIEW', async () => {
             const schicht = (m, p) => router.stack.find(l => l.route?.path === p && l.route.methods[m]).route.stack;
             assert.ok(schicht('delete', '/logs').length > 1 && schicht('get', '/logs/export').length > 1, 'keine Rechteprüfung davor');

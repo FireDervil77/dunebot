@@ -312,7 +312,7 @@
 // fenster() kommt aus guild.js — dort ist es die einzige Definition im Projekt.
 // Eine Kopie an dieser Stelle ueberschrieb sie je nach Ladereihenfolge.
 
-// `<` als \u003c: Eine Meldung mit `</script>` beendete sonst diesen Block.
+// `<` als \u003c: Ein schließendes Skript-Tag in einer Meldung beendete sonst diesen Block.
 const logsData = <%- JSON.stringify(logs).replace(/</g, '\\u003c') %>;
 
 /** Text für innerHTML: Meldungen und Metadaten kommen vom Daemon und von außen. */

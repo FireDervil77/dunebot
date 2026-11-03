@@ -106,6 +106,28 @@ for (const ort of ORTE) {
         if (!quelle.includes('<script')) continue;
         gepruefteDateien++;
 
+        // Ein `</script>` als Text im Skript (Kommentar, Zeichenkette) beendet den
+        // Block schon dort. Der Rest landet als Text auf der Seite und wird nie
+        // ausgefuehrt; der abgeschnittene Teil uebersetzt sich trotzdem, wenn er
+        // in einem Kommentar endet. So lief am 2026-11-03 das Loeschen der
+        // Daemon-Logs nie: Der Kommentar, der vor genau dieser Falle warnte,
+        // nannte das Tag woertlich.
+        //
+        // Nachgespielt wie im Browser: Ein `<script` oeffnet nur, wenn keiner offen
+        // ist (im Skript ist es Text, `server-detail.ejs` nennt es in einem
+        // Kommentar), das erste `</script>` schliesst. Ein Ende ohne offenen Block
+        // ist das Stueck, das zu frueh geschlossen hat.
+        let offen = false;
+        for (const tag of quelle.matchAll(/<script\b|<\/script>/gi)) {
+            const schliesst = tag[0].startsWith('</');
+            if (!schliesst) { offen = true; continue; }
+            if (offen) { offen = false; continue; }
+            fehler++;
+            const zeile = quelle.slice(0, tag.index).split('\n').length;
+            console.log(`  ❌ ${path.relative(WURZEL, datei)}:${zeile}: </script> ohne offenen Block`);
+            console.log('       ⚠ Ein Block davor endete zu frueh. Im Skript `<\\/script>` schreiben.');
+        }
+
         const muster = /<script([^>]*)>([\s\S]*?)<\/script>/gi;
         let treffer;
         while ((treffer = muster.exec(quelle)) !== null) {
