@@ -10,11 +10,12 @@ const WebSocket = require('ws');
  * Socket. Jede Leitung kommt hier als `DockLeitung` an und läuft durch denselben
  * `_handleConnection` wie eine direkte: Der Code dahinter merkt keinen Unterschied.
  *
- * Solange noch Daemons direkt verbinden, laufen beide Wege nebeneinander. Das ist der
- * Übergang, zuerst zieht nur Maschine 55 um.
+ * Seit 2026-11-03 ist das der einzige Weg zu den Daemons, der WebSocket-Server auf 9340
+ * ist abgeschaltet. Der Pfad des Sockets kommt aus `FIREBUS_DOCK`. Fehlt der Bahnhof,
+ * versucht es das Dock alle paar Sekunden weiter.
  *
- * Eingeschaltet wird das Dock über `FIREBUS_DOCK` mit dem Pfad des Sockets. Fehlt der
- * Bahnhof, versucht es das Dock alle paar Sekunden weiter, direkte Leitungen stört das nicht.
+ * Reißt das Dock, tragen die Leitungen `bahnhofWeg`: Ihre Daemons laufen weiter, nur der
+ * Weg zu ihnen fehlt. Wer sie schließt, setzt deshalb keine Maschine auf offline.
  */
 
 const NEUER_VERSUCH_MS = 2000;
@@ -27,6 +28,7 @@ class DockLeitung extends EventEmitter {
         this.dock = dock;
         this.kanal = kanal;
         this.zu = false;
+        this.bahnhofWeg = false;
     }
 
     send(text) {
@@ -49,7 +51,7 @@ class DockLeitung extends EventEmitter {
 
 class BusDock {
     /**
-     * @param {{_handleConnection: Function, Logger: object}} ipm
+     * @param {{_handleConnection: Function, Logger: object, _angedockt?: Function}} ipm
      * @param {string} pfad Socket des Bahnhofs
      */
     constructor(ipm, pfad) {
@@ -59,6 +61,7 @@ class BusDock {
         this.socket = null;
         this.beendet = false;
         this.gemeldet = false;
+        this.angedockt = false;
     }
 
     starte() {
@@ -83,7 +86,9 @@ class BusDock {
 
         socket.on('open', () => {
             this.gemeldet = false;
+            this.angedockt = true;
             this.ipm.Logger.info('[BusDock] Am Bahnhof angedockt');
+            this.ipm._angedockt?.();
         });
         socket.on('message', (daten) => {
             try {
@@ -98,8 +103,15 @@ class BusDock {
             this.gemeldet = true;
         });
         socket.on('close', () => {
+            if (this.angedockt && !this.beendet) this.ipm.Logger.warn('[BusDock] Vom Bahnhof abgedockt, die Daemons sind nicht erreichbar');
+            this.angedockt = false;
             // Ohne Dock gibt es keinen Weg zu diesen Daemons, das sagt die Trennung.
-            if (!this.beendet) for (const leitung of [...this.leitungen.values()]) leitung.geschlossen();
+            if (!this.beendet) {
+                for (const leitung of [...this.leitungen.values()]) {
+                    leitung.bahnhofWeg = true;
+                    leitung.geschlossen();
+                }
+            }
             if (!this.beendet) this.wartet = setTimeout(() => this._verbinde(), NEUER_VERSUCH_MS);
         });
     }

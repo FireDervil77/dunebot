@@ -1,9 +1,9 @@
 /**
- * IPM Server - WebSocket Server für Daemon-Kommunikation
+ * IPM Server - Verbindung zu den Daemons
  * (Inter-Process-Message Server für externe Go-Daemons)
  * 
  * Verwaltet Verbindungen zu User-seitigen Daemons (Go-basiert)
- * - WebSocket-Server für bidirektionale Kommunikation
+ * - Leitungen über den Busbahnhof (BusDock, FireBus Etappe 4)
  * - Token-basierte Authentifizierung
  * - Heartbeat-Monitoring
  * - Command-Routing (Dashboard/Bot → Daemon)
@@ -13,7 +13,6 @@
  * @author FireBot Team
  */
 
-const WebSocket = require('ws');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const fs = require('fs');
@@ -37,15 +36,15 @@ const VerbindungsWache = require('./VerbindungsWache');
 // Pfad zur version.json (Dashboard-Download-Verzeichnis)
 const VERSION_JSON_PATH = path.join(__dirname, '..', 'downloads', 'daemon', 'version.json');
 
-/**
- * Groesste Nachricht, die ueber die Daemon-Verbindung passt.
- *
- * Muss mit `MaxNachrichtBytes` im Daemon uebereinstimmen
- * (internal/websocket/client.go). Dateien fahren seit FireBus Etappe 2 nicht mehr
- * im Bus. Die groesste Nachricht war in 48 Stunden Zaehlung 135 KB, eine
- * Modpack-Antwort mit 2.269 Dateien; 4 MiB lassen Luft fuer groessere Pakete.
+/*
+ * Hier stand bis 2026-11-03 `MAX_NACHRICHT_BYTES` (4 MiB) fuer den eigenen
+ * WebSocket-Server auf 9340. Seit der abgeschaltet ist, liest der Bahnhof die
+ * Leitungen, und die Grenze steht dort (`maxNachrichtBytes` in
+ * internal/bahnhof/bahnhof.go). `check-linie-d.js` vergleicht sie mit dem Daemon.
  */
-const MAX_NACHRICHT_BYTES = 4 * 1024 * 1024;
+
+/** Hier dockt das Dashboard am Bahnhof an, wenn `FIREBUS_DOCK` nichts anderes sagt. */
+const DOCK_STANDARD = '/run/firebot-bahnhof/dock.sock';
 
 /** Der Name einer Nachricht vom Daemon, so wie der Fahrplan ihn führt. */
 function nachrichtenName(message) {
@@ -56,15 +55,15 @@ function nachrichtenName(message) {
 }
 
 class IPMServer {
-    /**
-     * @param {number} port - WebSocket Port (Standard: 9340)
-     */
-    constructor(port = 9340) {
-        this.port = port;
-        this.wss = null;
+    constructor() {
+        this.dock = null;
         this.connections = new Map(); // daemon_id -> {ws, lastHeartbeat, sessionId, metadata}
         this.connectionCounts = new Map(); // daemon_id -> connection_count (für Limit-Tracking)
-        this.wache = new VerbindungsWache({ istVerbunden: (id) => this.connections.has(id) });
+        this.wache = new VerbindungsWache({
+            istVerbunden: (id) => this.connections.has(id),
+            bahnhofDa: () => Boolean(this.dock?.angedockt),
+            ausgefallen: (id) => RootServer.markOffline(id),
+        });
         this.pendingCommands = new Map(); // commandId -> {resolve, reject, timeout, command, gesendetAm}
         this.zaehler = new FireBusZaehler();
         this.kontrolle = new FireBusKontrolle();
@@ -149,58 +148,39 @@ class IPMServer {
         this.Logger = ServiceManager.get('Logger');
         this.dbService = ServiceManager.get('dbService');
 
-        // Altzustand aus dem vorigen Prozessleben verwerfen, BEVOR der Server
-        // lauscht: Dieser Prozess hat noch keine Verbindung, also ist kein Daemon
-        // online. Wer läuft, meldet sich in Sekunden zurück.
+        // Bis 2026-11-03 setzte der Start hier alle Daemons auf offline
+        // (`markAllOffline`): Ein neuer Prozess hatte keine Leitungen. Seit die
+        // Leitungen im Bahnhof enden, überleben sie den Neustart, und der Bahnhof
+        // stellt ihre Anmeldungen gleich selbst. Alles auf offline zu setzen hieß
+        // nur, dass das Panel bei jedem Neustart kurz alles als offline zeigte.
         //
-        // Ohne das blieb ein Daemon, der sich nach einem Dashboard-Neustart nicht
-        // mehr meldete, für immer als "online" verzeichnet — die Übersicht zeigte
-        // Online, während jede Aktion mit "Daemon nicht verbunden" scheiterte.
-        //
-        // Die Reihenfolge ist wichtig: Liefe das Zurücksetzen erst nach dem
-        // Öffnen des Ports, könnte es einen Daemon treffen, der sich in genau
-        // dieser Millisekunde angemeldet hat.
-        try {
-            const zurueckgesetzt = await RootServer.markAllOffline();
-            if (zurueckgesetzt > 0) {
-                this.Logger.info(`[IPMServer] ${zurueckgesetzt} Daemon(s) auf offline gesetzt — warte auf Anmeldung`);
-            }
-        } catch (error) {
-            this.Logger.error('[IPMServer] Zurücksetzen der Daemon-Zustände fehlgeschlagen:', error);
-        }
+        // Wer nicht zurückkommt, fällt jetzt durch die Wache: Sie gibt jedem eine
+        // Frist und setzt ihn danach offline (`ausgefallen`). Sie läuft VOR dem
+        // Andocken, sonst überschriebe sie eine Anmeldung, die schon da ist.
         await this.wache.beimStart().catch(error =>
             this.Logger.error('[IPMServer] Verbindungsstand beim Start nicht gesetzt:', error));
-
-        this.wss = new WebSocket.Server({
-            port: this.port,
-            perMessageDeflate: false, // Performance
-            // Ausdruecklich gesetzt, damit beide Seiten dieselbe Grenze kennen:
-            // Der Standard von `ws` waere 100 MiB, der Daemon liest
-            // MaxNachrichtBytes (internal/websocket/client.go). Laufen die Werte
-            // auseinander, stirbt die Verbindung mitten in der Uebertragung,
-            // statt eine saubere Fehlermeldung zu liefern.
-            maxPayload: MAX_NACHRICHT_BYTES
-        });
-
-        this.wss.on('connection', this._handleConnection.bind(this));
-        this.wss.on('error', (error) => {
-            this.Logger.error('[IPMServer] WebSocket Server Error:', error);
-        });
 
         // Heartbeat-Monitor (alle 30s prüfen)
         this._startHeartbeatMonitor();
         this.zaehler.starte();
         this.kontrolle.starte();
-        // Leitungen über den Busbahnhof, neben den direkten (FireBus Etappe 4).
-        if (process.env.FIREBUS_DOCK) {
-            this.dock = new BusDock(this, process.env.FIREBUS_DOCK);
-            this.dock.starte();
-        }
-        
+
+        // Der einzige Weg zu den Daemons (FireBus Etappe 4). Der WebSocket-Server
+        // auf 9340 ist seit 2026-11-03 abgeschaltet, am Tag zuvor hing dort
+        // niemand mehr.
+        this.dock = new BusDock(this, process.env.FIREBUS_DOCK || DOCK_STANDARD);
+        this.dock.starte();
+
         // ✅ Event-Handler für gameserver.status_changed registrieren
         this._registerEventHandlers();
 
-        this.Logger.info(`[IPMServer] WebSocket Server gestartet auf Port ${this.port}`);
+        this.Logger.info(`[IPMServer] Dockt am Bahnhof an: ${this.dock.pfad}`);
+    }
+
+    /** Das Dock hängt (wieder) am Bahnhof, siehe `BusDock`. */
+    _angedockt() {
+        this.wache.angedockt().catch(error =>
+            this.Logger.error('[IPMServer] Wartende Daemons nicht neu eingeplant:', error));
     }
 
     /**
@@ -218,37 +198,23 @@ class IPMServer {
             this.Logger.error('[FireBus] Letzte Zählung nicht geschrieben', error);
         }
 
-        // Der Zustandswechsel gehört HIER hin, in einen Rutsch und abgewartet —
-        // nicht in die close-Handler der einzelnen Verbindungen.
+        // Ab hier schreiben die close-Handler nicht mehr in die Datenbank: Der Pool
+        // wird gleich geschlossen ("Pool is closed." beim Beenden).
         //
-        // `ws.close()` beendet die Verbindung nicht sofort, das 'close'-Ereignis
-        // kommt erst einen Tick später. Bis dahin ist der Aufräumpfad in
-        // index.js schon bei `dbService.close()` angekommen, und der
-        // nachlaufende Handler schrieb in einen bereits geschlossenen Pool:
-        // "Pool is closed." beim Beenden des Dashboards.
+        // Bis 2026-11-03 setzte das Beenden hier alle Daemons auf offline. Ihre
+        // Leitungen bleiben aber beim Bahnhof offen, sie sind also nicht weg.
         this.wirdBeendet = true;
         this.wache.beende();
-        try {
-            await RootServer.markAllOffline();
-        } catch (error) {
-            this.Logger.error('[IPMServer] Zurücksetzen der Daemon-Zustände beim Beenden fehlgeschlagen:', error);
-        }
 
-        // Alle Verbindungen sauber schließen
-        // Zuerst das Dock: Die Leitungen am Bahnhof sollen diesen Neustart überleben.
+        // Zuerst das Dock: Danach schickt `close()` einer Leitung kein `zu` mehr an
+        // den Bahnhof, die Leitungen dort überleben diesen Neustart.
         this.dock?.beende();
         for (const [daemonId, conn] of this.connections.entries()) {
             conn.ws.close(1000, 'Server shutdown');
         }
         this.connections.clear();
 
-        if (this.wss) {
-            await new Promise((resolve) => {
-                this.wss.close(() => resolve());
-            });
-        }
-
-        this.Logger.info('[IPMServer] WebSocket Server gestoppt');
+        this.Logger.info('[IPMServer] Vom Bahnhof abgedockt');
     }
 
     /**
@@ -441,13 +407,18 @@ class IPMServer {
                 // stimmte trotzdem, weil sie `isDaemonOnline()` fragt; falsch
                 // waren die Zählungen, die gegen die Spalte rechnen (Übersicht,
                 // Ressourcen-Seite, Gameserver-Detail).
-                // Beim Herunterfahren hat stop() den Zustand bereits gesetzt und
-                // abgewartet; ein Schreibversuch von hier träfe den geschlossenen
-                // Datenbank-Pool.
+                // Beim Herunterfahren schreibt niemand mehr: Ein Schreibversuch von
+                // hier träfe den geschlossenen Datenbank-Pool, siehe stop().
+                //
+                // Ist nur das Dock gerissen (`bahnhofWeg`), läuft der Daemon weiter,
+                // es fehlt nur der Weg zu ihm. Dann bleibt die Maschine, was sie war,
+                // und die Wache führt sie als `bahnhof_weg`.
                 if (newCount === 0 && !this.wirdBeendet) {
-                    RootServer.markOffline(daemonId)
-                        .catch(err => this.Logger.error('[IPMServer] Statuswechsel auf offline fehlgeschlagen:', err));
-                    this._meldeHostOffline(daemonId, guildIdDerVerbindung);
+                    if (!ws.bahnhofWeg) {
+                        RootServer.markOffline(daemonId)
+                            .catch(err => this.Logger.error('[IPMServer] Statuswechsel auf offline fehlgeschlagen:', err));
+                        this._meldeHostOffline(daemonId, guildIdDerVerbindung);
+                    }
                     this.wache.getrennt(daemonId)
                         .catch(err => this.Logger.error('[IPMServer] Trennung nicht vermerkt:', err));
 
@@ -2252,6 +2223,3 @@ class IPMServer {
 }
 
 module.exports = IPMServer;
-// Auch einzeln, damit Routen ihre Upload-Grenze aus derselben Quelle nehmen
-// koennen statt sie ein zweites Mal hinzuschreiben.
-module.exports.MAX_NACHRICHT_BYTES = MAX_NACHRICHT_BYTES;

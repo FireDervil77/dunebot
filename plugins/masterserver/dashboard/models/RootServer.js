@@ -266,31 +266,15 @@ class RootServer {
         );
     }
 
-    /**
-     * Setzt alle Daemons auf "offline" — beim Start des IPMServers.
-     *
-     * Ein frisch gestarteter Prozess hat keine Verbindungen. Alles, was in der
-     * Datenbank noch auf `online` steht, stammt aus dem vorigen Leben des
-     * Dashboards und ist unbelegt: Beim Beenden läuft der `close`-Handler nicht
-     * mehr zuverlässig, und der Heartbeat-Monitor kann es nicht nachholen, weil
-     * er nur über bestehende Verbindungen läuft.
-     *
-     * Ohne dieses Zurücksetzen blieb ein Daemon, der sich nach einem Neustart
-     * des Dashboards nie wieder meldete, dauerhaft als `online` verzeichnet —
-     * die Übersicht zeigte "Online", während jede Aktion mit "Daemon nicht
-     * verbunden" scheiterte. Zwei Wahrheiten, die auseinanderlaufen.
-     *
-     * Wer wirklich läuft, meldet sich innerhalb von Sekunden zurück.
-     *
-     * @returns {Promise<number>} Anzahl der zurückgesetzten Einträge
+    /*
+     * Hier stand bis 2026-11-03 `markAllOffline()`: Beim Start und Beenden des
+     * Dashboards setzte sie alle Daemons auf offline, weil ein neuer Prozess keine
+     * Leitungen hatte und ein Daemon, der nie zurückkam, sonst ewig `online` blieb.
+     * Seit die Leitungen im Busbahnhof enden, überleben sie den Neustart, und das
+     * Zurücksetzen zeigte nur bei jedem Neustart alles kurz als offline. Den Daemon,
+     * der nicht zurückkommt, setzt jetzt die `VerbindungsWache` nach ihrer Frist
+     * offline (`ausgefallen` → `markOffline`), geprüft in `check-verbindung.js`.
      */
-    static async markAllOffline() {
-        const dbService = ServiceManager.get('dbService');
-        const ergebnis = await dbService.query(
-            "UPDATE rootserver SET daemon_status = 'offline' WHERE daemon_status <> 'offline'"
-        );
-        return ergebnis?.affectedRows || 0;
-    }
 
     /**
      * Lädt einen RootServer anhand von daemon_id UND API-Key.

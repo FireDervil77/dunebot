@@ -23,12 +23,14 @@ const AUSFALL_GRUND = 'Beim Ausfall der Maschine beendet.';
 const PILLE = {
     maschine_weg: { text: 'Maschine nicht erreichbar', ton: 'red' },
     daemon_weg:   { text: 'Daemon nicht erreichbar',   ton: 'red' },
+    // Der Daemon läuft, nur der Weg zu ihm fehlt (FireBus Etappe 4).
+    bahnhof_weg:  { text: 'Busbahnhof nicht erreichbar', ton: 'red' },
     angekuendigt: { text: 'Daemon wird aktualisiert',  ton: 'blue' },
 };
 
 /** Die Frist ist um: Über den Server lässt sich nichts mehr sagen. */
 function weg(verbindung) {
-    return verbindung === 'daemon_weg' || verbindung === 'maschine_weg';
+    return verbindung === 'daemon_weg' || verbindung === 'maschine_weg' || verbindung === 'bahnhof_weg';
 }
 
 /** Überstimmt die Verbindung den Status? Dann steht hier, was die Pille sagt. */

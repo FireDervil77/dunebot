@@ -103,9 +103,9 @@ process.on('uncaughtException', (error) => {
         Logger.success("IPC-Server initialisiert");
         ServiceManager.register("ipcServer", ipcServer);
         
-        // IPM Server initialisieren (WebSocket für Daemons)
-        Logger.info("Starte IPM-Server (WebSocket Port 9340)...");
-        const ipmServer = new IPMServer(parseInt(process.env.IPM_SERVER_PORT || '9340'));
+        // IPM Server initialisieren (Daemons über den Busbahnhof)
+        Logger.info("Starte IPM-Server (Dock am Busbahnhof)...");
+        const ipmServer = new IPMServer();
         await ipmServer.start();
         Logger.success("IPM-Server gestartet");
         ServiceManager.register('ipmServer', ipmServer);

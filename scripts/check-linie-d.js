@@ -66,11 +66,12 @@ pruefe('der Fahrplan kennt sie nicht, und beide Kopien sind gleich', () => {
     for (const name of ALT) assert.ok(!hier.includes(`"${name}"`), name);
 });
 
-pruefe('dieselbe Nachrichtengrenze auf beiden Seiten', () => {
-    const { MAX_NACHRICHT_BYTES } = { MAX_NACHRICHT_BYTES:
-        eval(/const MAX_NACHRICHT_BYTES = ([0-9 *]+);/.exec(lies(WURZEL, 'apps/dashboard/helpers/IPMServer.js'))[1]) };
+// Seit 2026-11-03 liest der Bahnhof die Leitungen, nicht mehr das Dashboard. Die
+// Grenze, die dort gilt, steht in `internal/bahnhof/bahnhof.go`.
+pruefe('dieselbe Nachrichtengrenze in Daemon und Bahnhof', () => {
+    const bahnhof = eval(/maxNachrichtBytes = ([0-9 <]+)/.exec(lies(DAEMON, 'internal/bahnhof/bahnhof.go'))[1]);
     const daemon = eval(/const MaxNachrichtBytes = ([0-9 *]+)/.exec(lies(DAEMON, 'internal/websocket/client.go'))[1]);
-    assert.strictEqual(MAX_NACHRICHT_BYTES, GRENZE);
+    assert.strictEqual(bahnhof, GRENZE);
     assert.strictEqual(daemon, GRENZE);
 });
 

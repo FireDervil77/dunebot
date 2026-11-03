@@ -79,7 +79,7 @@
         // Steht der Server, sagt die Bereitschaft nichts ueber jetzt. Eine
         // Pille mit dem Stand von vorhin waere schlimmer als keine. Dasselbe
         // gilt ohne Leitung: Dann weiss niemand, ob Spieler rein koennen.
-        if (!laeuft || z.verbindung === 'daemon_weg' || z.verbindung === 'maschine_weg') {
+        if (!laeuft || z.verbindung === 'daemon_weg' || z.verbindung === 'maschine_weg' || z.verbindung === 'bahnhof_weg') {
             return { sichtbar: false, text: '', klasse: 'fb-pille', titel: '', wartet: false };
         }
 

@@ -35,6 +35,7 @@ const { baueZustand, baueMesswerte } = require('../plugins/gameserver/dashboard/
 global.window = undefined;
 const { knopfZustand, pillenZustand } = require('../plugins/gameserver/dashboard/assets/js/gameserver-live.js');
 const migration = require('../plugins/masterserver/migrations/20261102_100000_rootserver_verbindung');
+const bahnhofMigration = require('../plugins/masterserver/migrations/20261103_100000_rootserver_bahnhof_weg');
 
 let fehler = 0;
 async function pruefe(was, tun) {
@@ -120,6 +121,9 @@ async function pruefe(was, tun) {
         }
         const [da] = await db.query("SHOW COLUMNS FROM rootserver LIKE 'verbindung'");
         if (!da) await migration.up(db);
+        // Zweimal: Die Migration läuft bei jedem Start und darf beim zweiten Mal nichts tun.
+        await bahnhofMigration.up(db);
+        await bahnhofMigration.up(db);
         await db.query("UPDATE rootserver SET verbindung = 'da', verbindung_seit = NULL");
 
         const [m] = await db.query('SELECT id, daemon_id, guild_id FROM rootserver WHERE daemon_id IS NOT NULL ORDER BY id LIMIT 1');
@@ -227,6 +231,74 @@ async function pruefe(was, tun) {
                 const [s] = await db.query('SELECT verbindung FROM rootserver WHERE id = ?', [andere.id]);
                 assert.strictEqual(s.verbindung, 'neu_verbinden');
             }
+        });
+
+        console.log('\nBusbahnhof weg (seit 9340 abgeschaltet ist, 2026-11-03)');
+        let bahnhof = true;
+        let geklopft = 0;
+        const ausgefallen = [];
+        const bwache = new VerbindungsWache({
+            db: () => db, istVerbunden: () => verbunden, bahnhofDa: () => bahnhof,
+            pruefe: async () => { geklopft++; return true; },
+            ausgefallen: async (id) => { ausgefallen.push(id); },
+        });
+        await db.query("UPDATE rootserver SET verbindung = 'da', verbindung_seit = NULL WHERE id = ?", [m.id]);
+        await db.query("UPDATE gameservers SET status = 'online', last_crash_reason = NULL WHERE id IN (?, ?)", [g.id, h.id]);
+
+        await pruefe('ohne Bahnhof wird nicht angeklopft und nichts offline gesetzt', async () => {
+            bahnhof = false;
+            verbunden = false;
+            await bwache.getrennt(m.daemon_id);
+            await bwache._pruefeNach(m.daemon_id);
+            bwache.beende();
+            assert.strictEqual((await stand()).verbindung, 'bahnhof_weg');
+            assert.strictEqual(geklopft, 0, 'die Maschine wurde gefragt');
+            assert.deepStrictEqual(ausgefallen, []);
+        });
+        await pruefe('die Serverzeile sagt, dass der Bahnhof fehlt, rot, Knöpfe gesperrt', async () => {
+            const z = await zeile(g.id);
+            assert.deepStrictEqual([baueZustand(z).text, baueZustand(z).ton], ['Busbahnhof nicht erreichbar', 'red']);
+            assert.match(baueMesswerte(z).grund, /Busbahnhof nicht erreichbar seit .* letzter Stand: Läuft/);
+            assert.strictEqual(knopfZustand({ status: 'online', verbindung: 'bahnhof_weg' }).stop.aktiv, false);
+            assert.strictEqual(pillenZustand({ status: 'online', verbindung: 'bahnhof_weg' }).sichtbar, false);
+        });
+        await pruefe('kommt der Bahnhof mit dem Daemon zurück: da, und der Abgleich läuft einmal', async () => {
+            bahnhof = true;
+            await bwache.angedockt();
+            verbunden = true;
+            await bwache.angemeldet(m.daemon_id);
+            bwache.beende();
+            assert.strictEqual((await stand()).verbindung, 'da');
+            await bwache.herzschlag(m.daemon_id, [{ server_id: g.id, status: 'running' }, { server_id: h.id, status: 'running' }]);
+            assert.strictEqual(bwache.nachAusfall.has(m.daemon_id), false);
+            assert.deepStrictEqual(ausgefallen, []);
+        });
+        await pruefe('kommt der Bahnhof ohne den Daemon zurück: nach der Frist ein Ausfall, offline genau einmal', async () => {
+            bahnhof = false;
+            verbunden = false;
+            await bwache.getrennt(m.daemon_id);
+            await bwache._pruefeNach(m.daemon_id);
+            bahnhof = true;
+            await bwache.angedockt();
+            assert.ok(bwache.uhren.has(m.daemon_id), 'keine neue Frist nach dem Andocken');
+            bwache.beende();
+            await bwache._pruefeNach(m.daemon_id);
+            await bwache._pruefeNach(m.daemon_id);
+            bwache.beende();
+            assert.strictEqual((await stand()).verbindung, 'daemon_weg');
+            assert.deepStrictEqual(ausgefallen, [m.daemon_id]);
+        });
+        await pruefe('ein gewöhnlicher Ausfall setzt den Daemon nach der Frist offline', async () => {
+            ausgefallen.length = 0;
+            verbunden = true;
+            await bwache.angemeldet(m.daemon_id);
+            verbunden = false;
+            await bwache.getrennt(m.daemon_id);
+            await bwache._pruefeNach(m.daemon_id);
+            bwache.beende();
+            assert.deepStrictEqual(ausgefallen, [m.daemon_id]);
+            verbunden = true;
+            await bwache.angemeldet(m.daemon_id);
         });
     } finally {
         await roh.end();

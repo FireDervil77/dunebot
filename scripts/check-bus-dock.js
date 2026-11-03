@@ -19,6 +19,7 @@ const assert = require('assert');
 const { spawn, execFileSync } = require('child_process');
 const WebSocket = require('ws');
 const BusDock = require('../apps/dashboard/helpers/BusDock');
+const { ohneKommentare } = require('./lib/quelltext');
 
 const DAEMON = path.join(__dirname, '..', '..', 'firebot_daemon');
 const ordner = fs.mkdtempSync(path.join(os.tmpdir(), 'bahnhof-'));
@@ -42,7 +43,8 @@ const freierPort = () => new Promise((fertig) => {
 
 /** Dashboard-Attrappe: nimmt Anmeldungen an wie `_handleConnection`, merkt sich alles. */
 function dashboard() {
-    const ipm = { Logger: stille, leitungen: [], nachrichten: [], ips: [] };
+    const ipm = { Logger: stille, leitungen: [], nachrichten: [], ips: [], angedockt: 0 };
+    ipm._angedockt = () => { ipm.angedockt++; };
     ipm._handleConnection = (ws, req) => {
         ipm.leitungen.push(ws);
         ipm.ips.push(req.headers['x-forwarded-for']);
@@ -62,7 +64,7 @@ function dashboard() {
     const bin = path.join(ordner, 'firebot-bahnhof');
     execFileSync('go', ['build', '-o', bin, './cmd/bahnhof'], { cwd: DAEMON, stdio: 'ignore' });
     const port = await freierPort();
-    const bahnhof = spawn(bin, ['-adresse', `127.0.0.1:${port}`, '-dock', SOCKET], { stdio: 'ignore' });
+    let bahnhof = spawn(bin, ['-adresse', `127.0.0.1:${port}`, '-dock', SOCKET], { stdio: 'ignore' });
     await bis('Socket', () => fs.existsSync(SOCKET));
 
     const erstes = dashboard();
@@ -75,6 +77,19 @@ function dashboard() {
     daemon.on('message', (d) => eingang.push(JSON.parse(d.toString())));
     daemon.on('close', () => { getrennt = true; });
     await new Promise(r => daemon.on('open', r));
+
+    // Seit 2026-11-03 der einzige Weg: Ein zweiter käme still zurück, wenn jemand den
+    // WebSocket-Server wieder aufmacht, und das Panel setzte beim Start wieder alles
+    // auf offline.
+    console.log('\nEin Weg');
+    await pruefe('das Dashboard lauscht nicht selbst, es dockt nur an', async () => {
+        const ipm = ohneKommentare(fs.readFileSync(path.join(__dirname, '../apps/dashboard/helpers/IPMServer.js'), 'utf8'));
+        assert.doesNotMatch(ipm, /WebSocket\.Server|require\('ws'\)/);
+        assert.doesNotMatch(ipm, /markAllOffline/);
+        assert.match(ipm, /new BusDock\(this, process\.env\.FIREBUS_DOCK \|\| DOCK_STANDARD\)/);
+        const start = ohneKommentare(fs.readFileSync(path.join(__dirname, '../apps/dashboard/index.js'), 'utf8'));
+        assert.doesNotMatch(start, /IPM_SERVER_PORT/);
+    });
 
     console.log('\nNormalbetrieb');
     await pruefe('die Anmeldung läuft durch und ist für den Code dahinter eine normale Leitung', async () => {
@@ -125,11 +140,38 @@ function dashboard() {
 
         console.log('\nBahnhof weg');
         await pruefe('das Dashboard erfährt die Trennung, und der Daemon auch', async () => {
+            assert.strictEqual(zweites.dock.angedockt, true);
             bahnhof.kill('SIGTERM');
             await bis('Daemon getrennt', () => getrennt);
             await bis('Dashboard getrennt', () => zweites.leitungen[0].istZu === true);
         });
-        zweites.dock.beende();
+        // Seit 9340 abgeschaltet ist (2026-11-03): Ohne Bahnhof laufen die Daemons
+        // weiter, nur der Weg fehlt. Wer die Leitung schließt, darf daraus keinen
+        // Ausfall der Maschine machen, die Wache fragt dafür `angedockt`.
+        await pruefe('die Leitung trägt „Bahnhof weg", und das Dock weiß, dass es nicht hängt', async () => {
+            assert.strictEqual(zweites.leitungen[0].bahnhofWeg, true);
+            assert.strictEqual(zweites.dock.angedockt, false);
+        });
+        await pruefe('kommt der Bahnhof wieder, dockt das Dashboard von selbst an und sagt es', async () => {
+            const vorher = zweites.angedockt;
+            bahnhof = spawn(bin, ['-adresse', `127.0.0.1:${port}`, '-dock', SOCKET], { stdio: 'ignore' });
+            await bis('wieder angedockt', () => zweites.dock.angedockt && zweites.angedockt > vorher, 8000);
+        });
+        await pruefe('ein gewolltes Abdocken ist kein „Bahnhof weg", die Leitung bleibt beim Bahnhof', async () => {
+            const zweiter = new WebSocket(`ws://127.0.0.1:${port}/`);
+            let zweiterZu = false;
+            zweiter.on('close', () => { zweiterZu = true; });
+            await new Promise(r => zweiter.on('open', r));
+            zweiter.send(JSON.stringify({ type: 'register', payload: { daemon_id: 'd2', token: 't' } }));
+            await bis('zweite Leitung', () => zweites.leitungen.length === 2);
+            const leitung = zweites.leitungen[1];
+            zweites.dock.beende();
+            await warte(200);
+            assert.strictEqual(leitung.bahnhofWeg, false);
+            assert.strictEqual(leitung.istZu, undefined, 'beim Beenden wird keine Leitung geschlossen');
+            assert.strictEqual(zweiterZu, false, 'der Daemon hat das Abdocken bemerkt');
+            zweiter.close();
+        });
     });
 
     bahnhof.kill('SIGKILL');

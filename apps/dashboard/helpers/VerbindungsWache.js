@@ -13,6 +13,8 @@ const NACHPRUEFEN_MS = 60 * 1000;
 const PROBE_MS = 3000;
 
 const STELLEN = new Set(['running', 'starting', 'online']);
+/** Schon als Ausfall gemeldet: Das Nachprüfen meldet ihn nicht noch einmal. */
+const SCHON_WEG = new Set(['daemon_weg', 'maschine_weg']);
 
 /**
  * Führt je Maschine, wie die Leitung steht (2026-11-02, F15).
@@ -22,6 +24,7 @@ const STELLEN = new Set(['running', 'starting', 'online']);
  * die Maschine, denn ein stiller Daemon sagt nichts über die Spieler.
  *
  *   da → neu_verbinden → daemon_weg oder maschine_weg → da
+ *   da → neu_verbinden → bahnhof_weg → (Bahnhof zurück, neue Frist) → da
  *   da → angekuendigt  → da
  *
  * Etappe 4 ruft dieselben Einstiege aus dem Bahnhof. `getrennt` heißt dann: Alle
@@ -31,12 +34,16 @@ class VerbindungsWache {
     /**
      * @param {object} abhaengig
      * @param {Function} abhaengig.istVerbunden `daemonId → boolean`
+     * @param {Function} [abhaengig.bahnhofDa] `() → boolean`, hängt das Dock am Bahnhof?
+     * @param {Function} [abhaengig.ausgefallen] `daemonId → Promise`, die Frist ist um
      * @param {Function} [abhaengig.db] für den Wächter
      * @param {Function} [abhaengig.pruefe] `({host, ports}) → Promise<boolean>`
      * @param {Function} [abhaengig.jetzt]
      */
-    constructor({ istVerbunden, db, pruefe, jetzt }) {
+    constructor({ istVerbunden, bahnhofDa, ausgefallen, db, pruefe, jetzt }) {
         this.istVerbunden = istVerbunden;
+        this.bahnhofDa = bahnhofDa || (() => true);
+        this.ausgefallen = ausgefallen || (async () => {});
         this.db = db || (() => ServiceManager.get('dbService'));
         this.pruefe = pruefe || VerbindungsWache.maschineAntwortet;
         this.jetzt = jetzt || Date.now;
@@ -58,6 +65,17 @@ class VerbindungsWache {
     beende() {
         for (const uhr of this.uhren.values()) clearTimeout(uhr);
         this.uhren.clear();
+    }
+
+    /**
+     * Das Dock hängt wieder am Bahnhof. Wer auf ihn gewartet hat, bekommt eine neue
+     * Frist: Der Bahnhof stellt die Anmeldungen seiner Leitungen gleich selbst, wer bis
+     * dahin fehlt, ist ein gewöhnlicher Ausfall.
+     */
+    async angedockt() {
+        const zeilen = await this.db().query(
+            "SELECT daemon_id FROM rootserver WHERE verbindung = 'bahnhof_weg' AND daemon_id IS NOT NULL");
+        for (const z of zeilen || []) this._plane(z.daemon_id, GNADENFRIST_MS);
     }
 
     /** Der nächste Abriss dieses Daemons ist gewollt, etwa ein Update. */
@@ -82,7 +100,8 @@ class VerbindungsWache {
         this.angekuendigt.delete(daemonId);
         const m = await this._maschine(daemonId);
         if (!m) return;
-        if (m.verbindung === 'daemon_weg' || m.verbindung === 'maschine_weg') {
+        // Auch ohne Bahnhof wusste niemand, was dort geschah: Der Abgleich sagt es.
+        if (SCHON_WEG.has(m.verbindung) || m.verbindung === 'bahnhof_weg') {
             this.nachAusfall.add(daemonId);
         }
         await this._setze(daemonId, 'da');
@@ -143,11 +162,21 @@ class VerbindungsWache {
         this.uhren.delete(daemonId);
         if (this.istVerbunden(daemonId)) return;
 
+        // Ohne Bahnhof sagt das Anklopfen nichts: Die Maschine antwortet, der Daemon
+        // läuft, nur der Weg zu ihm fehlt. Weiter geht es mit `angedockt`.
+        if (!this.bahnhofDa()) {
+            await this._setze(daemonId, 'bahnhof_weg');
+            return;
+        }
+
         const m = await this._maschine(daemonId);
         if (!m) return;
         const antwortet = await this.pruefe({ host: m.host, ports: [22, m.sftp_port, m.abruf_port].filter(Boolean) });
         if (this.istVerbunden(daemonId)) return;
 
+        // Erst jetzt ist er weg. Bis 2026-11-03 setzte das Dashboard beim Start alle
+        // Daemons auf offline (`markAllOffline`), das hielt ihn sonst ewig `online`.
+        if (!SCHON_WEG.has(m.verbindung)) await this.ausgefallen(daemonId);
         await this._setze(daemonId, antwortet ? 'daemon_weg' : 'maschine_weg');
         this._plane(daemonId, NACHPRUEFEN_MS);
     }
