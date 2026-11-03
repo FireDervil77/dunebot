@@ -8,8 +8,11 @@
  * dabei? Das zählt diese Klasse je Stunde, Daemon und Name. Die Maschinenlast
  * beantwortet außerdem, ob eine dritte Maschine schneller macht oder nur trennt.
  *
- * Sie sitzt im heißesten Weg des Dashboards. Deshalb wird im Speicher gezählt und
- * einmal je Minute geschrieben, und sie wirft nie in die Nachricht hinein.
+ * Den Verkehr zählt seit Paket 4 (2026-11-03) der Busbahnhof
+ * (`internal/bahnhof/zaehlung.go`), auch die Dauer einer Antwort. Er meldet seine
+ * Zeilen im Minutentakt über das Dock, `uebernimm` trägt sie hier ein. Hier entsteht
+ * nur noch, was nur das Dashboard weiß: abgelaufene Fristen, die Belegung und die
+ * Maschinenlast aus dem Herzschlag. Geschrieben wird alles einmal je Minute.
  *
  * Auswerten: `node scripts/firebus-zaehlung.js`
  */
@@ -55,9 +58,8 @@ class FireBusZaehler {
     }
 
     /** @private */
-    _zeile(daemonId, name, art) {
+    _zeile(daemonId, name, art, stunde = stundeVon(this.jetzt())) {
         const sauber = String(name || '?').slice(0, MAX_NAME);
-        const stunde = stundeVon(this.jetzt());
         const schluesselFuer = (n) => `${stunde.getTime()}|${daemonId}|${n}|${art}`;
         const voll = !this.zeilen.has(schluesselFuer(sauber)) && this.zeilen.size >= MAX_SCHLUESSEL;
         const gezaehlt = voll ? UEBERLAUF : sauber;
@@ -75,21 +77,22 @@ class FireBusZaehler {
     }
 
     /**
-     * Eine Nachricht, die die Leitung passiert hat.
-     * @param {string} daemonId
-     * @param {string} name
-     * @param {'ein'|'aus'} art `ein` kommt vom Daemon, `aus` geht an ihn
-     * @param {number} bytes
-     * @param {number|null} [dauerMs] bei einer Antwort die Zeit seit dem Befehl
+     * Was der Bahnhof seit seinem letzten Takt gezählt hat (`zaehlung` auf dem Dock).
+     * Die Stunde kommt mit: Eine Zeile aus 14:59 bleibt in ihrer Stunde.
+     * @param {Array<{stunde: number, daemon: string, name: string, art: 'ein'|'aus', anzahl: number,
+     *   bytes: number, groesste: number, dauer_summe_ms: number, dauer_max_ms: number}>} zeilen
      */
-    zaehle(daemonId, name, art, bytes, dauerMs = null) {
-        const zeile = this._zeile(daemonId, name, art);
-        zeile.anzahl++;
-        zeile.bytes += bytes;
-        if (bytes > zeile.groesste) zeile.groesste = bytes;
-        if (dauerMs !== null) {
-            zeile.dauerSumme += dauerMs;
-            if (dauerMs > zeile.dauerMax) zeile.dauerMax = dauerMs;
+    uebernimm(zeilen) {
+        if (!Array.isArray(zeilen)) return;
+        const zahl = (x) => (Number.isFinite(Number(x)) && Number(x) > 0 ? Number(x) : 0);
+        for (const z of zeilen) {
+            if ((z?.art !== 'ein' && z?.art !== 'aus') || !z.daemon || !(zahl(z.stunde) > 0)) continue;
+            const zeile = this._zeile(String(z.daemon).slice(0, 64), z.name, z.art, stundeVon(zahl(z.stunde) * 1000));
+            zeile.anzahl += zahl(z.anzahl);
+            zeile.bytes += zahl(z.bytes);
+            zeile.groesste = Math.max(zeile.groesste, zahl(z.groesste));
+            zeile.dauerSumme += zahl(z.dauer_summe_ms);
+            zeile.dauerMax = Math.max(zeile.dauerMax, zahl(z.dauer_max_ms));
         }
     }
 

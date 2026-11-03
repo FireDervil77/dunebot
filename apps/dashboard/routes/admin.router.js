@@ -324,6 +324,8 @@ router.get('/firebus', async (req, res) => {
             zeilen: zeilen.map(z => ({ ...z, maschine: namen.get(z.daemon_id) || z.daemon_id })),
             gruende: require('../helpers/FireBusKontrolle').GRUENDE,
             fassung: require('../../../packages/firebus').fassung,
+            // Die Tür prüft seit Paket 4 nach dem Fahrplan des Bahnhofs, nicht nach dem hier.
+            bahnhof: ServiceManager.has('ipmServer') ? (ServiceManager.get('ipmServer').dock?.bahnhof || null) : null,
         });
     } catch (error) {
         Logger.error('[Admin] FireBus-Kontrolle nicht lesbar:', error);

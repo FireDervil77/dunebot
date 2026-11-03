@@ -8,12 +8,13 @@
  *     go test -tags lastprobe -run Lastprobe -v -timeout 10m ./internal/bahnhof/
  *
  * Angedockt wird mit dem echten `BusDock.js`. Jede Nachricht geht durch dieselbe Arbeit
- * wie im Dashboard vor dem Verteiler: JSON lesen, Name bilden, zählen
- * (`FireBusZaehler`), an der Tür prüfen (`FireBusKontrolle`). Der Verteiler dahinter
- * (`_routeMessage`, SSE an die Browser) ist nicht dabei, die Probe misst also die
- * Untergrenze dessen, was das Dashboard je Nachricht tut.
+ * wie im Dashboard vor dem Verteiler: JSON lesen. Tür und Zählung laufen seit Paket 4
+ * (2026-11-03) im Bahnhof und zählen dort mit, was er die Probe kostet. Der Verteiler
+ * dahinter (`_routeMessage`, SSE an die Browser) ist nicht dabei, die Probe misst also
+ * die Untergrenze dessen, was das Dashboard je Nachricht tut.
  *
- * Datenbank gibt es keine: Zähler und Tür sammeln im Speicher, geschrieben wird nie.
+ * `gehalten` bleibt hier 0: Was die Tür hält, kommt gar nicht erst an. Der Bahnhof
+ * meldet es im Takt als `kontrolle`, die Probe gibt es auf stderr aus.
  *
  * Ausgabe: je Sekunde eine Zeile JSON auf stdout, je Stufe getrennt.
  */
@@ -21,25 +22,11 @@
 
 const { monitorEventLoopDelay, performance } = require('perf_hooks');
 const BusDock = require('../apps/dashboard/helpers/BusDock');
-const FireBusZaehler = require('../apps/dashboard/helpers/FireBusZaehler');
-const FireBusKontrolle = require('../apps/dashboard/helpers/FireBusKontrolle');
 
 const pfad = process.argv[2];
 if (!pfad) {
     console.error('Aufruf: firebus-lastprobe-dock.js <Socket des Bahnhofs>');
     process.exit(2);
-}
-
-const keineDb = () => ({ query: async () => [] });
-const zaehler = new FireBusZaehler({ db: keineDb });
-const kontrolle = new FireBusKontrolle({ db: keineDb });
-
-/** Wie `nachrichtenName` in IPMServer.js. */
-function nachrichtenName(message) {
-    const typ = message.type?.toLowerCase();
-    return message.namespace && message.action
-        ? `${message.namespace}.${message.action}`
-        : (typ === 'event' ? message.payload?.event : typ);
 }
 
 const stufen = new Map();
@@ -60,19 +47,17 @@ const ipm = {
         warn: (...a) => console.error('[warn]', ...a),
         error: (...a) => console.error('[error]', ...a),
     },
+    _vomBahnhof(art, inhalt) {
+        if (art === 'kontrolle') console.error('[kontrolle]', JSON.stringify(inhalt.meldungen));
+    },
     _handleConnection(leitung) {
-        let daemonId = null;
         leitung.on('message', (data) => {
             const message = JSON.parse(data);
             if (message.type === 'register') {
-                daemonId = message.payload?.daemon_id || leitung.kanal;
                 leitung.send(JSON.stringify({ type: 'registered', sessionToken: 'probe' }));
                 return;
             }
-            const name = nachrichtenName(message);
-            zaehler.zaehle(daemonId, name, 'ein', data.length);
             const s = stufe(message.payload?.stufe || '-');
-            if (!kontrolle.pruefe(daemonId, name, data.length)) s.gehalten++;
             s.anzahl++;
             s.bytes += data.length;
             const gesendet = message.payload?.gesendet_ns;

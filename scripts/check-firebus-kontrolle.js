@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 /**
- * Die Fahrkartenkontrolle (FireBus Etappe 3, Linie V, F9).
+ * Die Fahrkartenkontrolle (FireBus Etappe 3, Linie V, F9), seit Paket 4 im Busbahnhof.
  *
  * Was nicht im Fahrplan steht, in die falsche Richtung fährt, zu groß oder zu schnell
- * ist, fährt nicht mit und wird gemeldet. Was nie verloren gehen darf, fährt auch bei
- * zu hohem Tempo mit. Antworten fahren immer, und Nutzlasten landen nie in der Meldung.
+ * ist, fährt nicht mit und wird gemeldet. Die Regeln selbst prüfen die Go-Tests
+ * (`internal/bahnhof/tuer_test.go`, `paket4_test.go`), am echten Programm
+ * `check-bus-dock.js`. Hier: Das Dashboard prüft nicht mehr selbst, es schreibt, was der
+ * Bahnhof meldet, und die Gründe stimmen in Bahnhof, Dashboard und Tabelle überein.
  *
  *   node scripts/check-firebus-kontrolle.js
  */
@@ -13,14 +15,14 @@ const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
 const WURZEL = path.join(__dirname, '..');
+const DAEMON = path.join(WURZEL, '..', 'firebot_daemon');
 require('dotenv').config({ path: path.join(WURZEL, 'apps/dashboard/.env'), quiet: true });
 const mysql = require('mysql2/promise');
 const { ServiceManager } = require('dunebot-core');
-ServiceManager.register('Logger', { warn() {}, info() {}, error() {}, debug() {} });
+const warnungen = [];
+ServiceManager.register('Logger', { warn: (t) => warnungen.push(t), info() {}, error() {}, debug() {} });
 
-const firebus = require('../packages/firebus');
 const FireBusKontrolle = require('../apps/dashboard/helpers/FireBusKontrolle');
-const IPMServer = require('../apps/dashboard/helpers/IPMServer');
 const migration = require('../migrations/kern/20261102_170000_firebus_kontrolle');
 const { ohneKommentare } = require('./lib/quelltext');
 
@@ -29,62 +31,49 @@ async function pruefe(was, tun) {
     try { await tun(); console.log(`  ✓ ${was}`); }
     catch (e) { fehler++; console.log(`  ✗ ${was}\n      ${String(e.message).split('\n').slice(0, 3).join('\n      ')}`); }
 }
-const neu = (mehr = {}) => new FireBusKontrolle({ db: () => ({ query: async () => [] }), ...mehr });
-const gemeldet = (k) => [...k.meldungen].map(([s, n]) => [...s.split('\n').slice(1), n]);
+const neu = () => new FireBusKontrolle({ db: () => ({ query: async () => [] }) });
+const gemeldet = (k) => [...k.meldungen].map(([s, n]) => [...JSON.parse(s), n]);
 
 (async () => {
-    console.log('\nDie Tür');
-    await pruefe('alles, was der Daemon laut Fahrplan sendet, fährt', () => {
+    console.log('\nDie Tür steht im Bahnhof');
+    await pruefe('das Dashboard prüft nicht mehr selbst', () => {
+        const ipm = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'apps/dashboard/helpers/IPMServer.js'), 'utf8'));
+        assert.doesNotMatch(ipm, /_kontrolliere|kontrolle\.pruefe/);
+        assert.strictEqual(typeof FireBusKontrolle.prototype.pruefe, 'undefined');
+        const tuer = ohneKommentare(fs.readFileSync(path.join(DAEMON, 'internal/bahnhof/bahnhof.go'), 'utf8'));
+        assert.match(tuer, /b\.tuer\.pruefe\(absender, k\.name\(\), len\(daten\)\)/);
+    });
+    await pruefe('die Gründe sind in Bahnhof, Dashboard und Tabelle dieselben', () => {
+        const go = ohneKommentare(fs.readFileSync(path.join(DAEMON, 'internal/bahnhof/tuer.go'), 'utf8'));
+        const imBahnhof = [...go.matchAll(/grund\w+\s*=\s*"(\w+)"/g)].map(m => m[1]).sort();
+        const tabelle = /ENUM\(([^)]*)\)/.exec(ohneKommentare(fs.readFileSync(path.join(WURZEL, 'migrations/kern/20261102_170000_firebus_kontrolle.js'), 'utf8')))[1]
+            .match(/'(\w+)'/g).map(x => x.slice(1, -1)).sort();
+        assert.deepStrictEqual(imBahnhof, Object.keys(FireBusKontrolle.GRUENDE).sort());
+        assert.deepStrictEqual(tabelle, imBahnhof);
+    });
+
+    console.log('\nWas der Bahnhof meldet');
+    await pruefe('Meldungen werden je Fall addiert, einmal ins Log geschrieben', () => {
+        warnungen.length = 0;
         const k = neu();
-        const seine = firebus.zeilen.filter(z => z.von === 'daemon');
-        assert.ok(seine.length > 20, 'Fahrplan zu kurz');
-        for (const z of seine) assert.strictEqual(k.pruefe('d1', z.name, 100), true, z.name);
+        k.uebernimm([{ daemon: 'd1', name: 'gibt.es.nicht', grund: 'unbekannt', anzahl: 2 }]);
+        k.uebernimm([{ daemon: 'd1', name: 'gibt.es.nicht', grund: 'unbekannt', anzahl: 3 }, { daemon: 'd1', name: 'gameserver.stop', grund: 'richtung', anzahl: 1 }]);
+        assert.deepStrictEqual(gemeldet(k), [['d1', 'gibt.es.nicht', 'unbekannt', 5], ['d1', 'gameserver.stop', 'richtung', 1]]);
+        assert.strictEqual(warnungen.length, 2, warnungen.join(' | '));
+    });
+    await pruefe('Unbekannte Gründe und Kaputtes werden übergangen', () => {
+        const k = neu();
+        k.uebernimm(null);
+        k.uebernimm([null, { daemon: 'd1', name: 'x', grund: 'erfunden', anzahl: 1 }, { daemon: 'd1', name: 'x', grund: 'tempo', anzahl: 0 },
+            { daemon: 'd1', name: 'x', grund: 'tempo', anzahl: 'viel' }]);
         assert.strictEqual(k.meldungen.size, 0);
     });
-    await pruefe('Unbekanntes und Namenloses bleibt draußen und wird gemeldet', () => {
+    await pruefe('ein Name mit Zeilenumbruch zerlegt den Schlüssel nicht, lange Namen werden gekürzt', () => {
         const k = neu();
-        assert.strictEqual(k.pruefe('d1', 'gibt.es.nicht', 10), false);
-        assert.strictEqual(k.pruefe('d1', undefined, 10), false);
-        assert.deepStrictEqual(gemeldet(k), [['gibt.es.nicht', 'unbekannt', 1], ['(ohne Namen)', 'unbekannt', 1]]);
-    });
-    await pruefe('ein Befehl vom Daemon ist die falsche Richtung', () => {
-        const k = neu();
-        assert.strictEqual(k.pruefe('d1', 'gameserver.stop', 10), false);
-        assert.deepStrictEqual(gemeldet(k), [['gameserver.stop', 'richtung', 1]]);
-    });
-    await pruefe('Tempo: Verlierbares bleibt draußen, was nie verloren gehen darf, fährt und wird gemeldet', () => {
-        const k = neu({ tempoGrenze: 2, jetzt: () => 1000 });
-        const nie = firebus.zeilen.find(z => z.von === 'daemon' && z.verlust === 'nie').name;
-        const verlierbar = firebus.zeilen.find(z => z.von === 'daemon' && z.verlust !== 'nie').name;
-        assert.ok(k.pruefe('d1', verlierbar, 1) && k.pruefe('d1', verlierbar, 1));
-        assert.strictEqual(k.pruefe('d1', verlierbar, 1), false);
-        assert.strictEqual(k.pruefe('d1', nie, 1), true);
-        assert.deepStrictEqual(gemeldet(k).map(m => m[1]), ['tempo', 'tempo']);
-        assert.strictEqual(k.pruefe('d2', verlierbar, 1), true, 'der Zähler gilt je Daemon');
-    });
-    await pruefe('eine neue Sekunde fängt bei null an', () => {
-        let jetzt = 1000;
-        const k = neu({ tempoGrenze: 1, jetzt: () => jetzt });
-        const name = firebus.zeilen.find(z => z.von === 'daemon' && z.verlust !== 'nie').name;
-        k.pruefe('d1', name, 1);
-        assert.strictEqual(k.pruefe('d1', name, 1), false);
-        jetzt = 2000;
-        assert.strictEqual(k.pruefe('d1', name, 1), true);
-    });
-    await pruefe('Antworten fahren immer, und die Nutzlast erreicht die Kontrolle nie', () => {
-        const fragen = [];
-        const ipm = Object.create(IPMServer.prototype);
-        ipm.kontrolle = { pruefe: (...a) => { fragen.push(a); return false; } };
-        assert.strictEqual(ipm._kontrolliere('d1', { type: 'command_response', payload: { success: true } }, 5), true);
-        assert.strictEqual(ipm._kontrolliere('d1', { type: 'RESPONSE' }, 5), true);
-        assert.strictEqual(fragen.length, 0);
-        assert.strictEqual(ipm._kontrolliere('d1', { type: 'event', namespace: 'x', action: 'y', payload: { rcon: 'geheim' } }, 5), false);
-        assert.deepStrictEqual(fragen[0], ['d1', 'x.y', 5]);
-    });
-    await pruefe('die Tür steht vor dem Verteiler', () => {
-        const t = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'apps/dashboard/helpers/IPMServer.js'), 'utf8'));
-        const tuer = t.indexOf('this._kontrolliere(daemonId, message, data.length)');
-        assert.ok(tuer > 0 && tuer < t.indexOf('await this._routeMessage(daemonId, message)'));
+        k.uebernimm([{ daemon: 'd1', name: 'a\nb', grund: 'unbekannt', anzahl: 1 }, { daemon: 'd1', name: 'x'.repeat(200), grund: 'unbekannt', anzahl: 1 }]);
+        const [[, eins], [, zwei]] = gemeldet(k);
+        assert.strictEqual(eins, 'a\nb');
+        assert.strictEqual(zwei.length, 80);
     });
 
     console.log('\nProtokoll, an einer Kopie');
@@ -100,13 +89,12 @@ const gemeldet = (k) => [...k.meldungen].map(([s, n]) => [...s.split('\n').slice
     };
     try {
         await migration.up(db);
-        await pruefe('zwei Takte derselben Stunde ergeben eine Zeile, und die Tür merkt sich nichts doppelt', async () => {
+        await pruefe('zwei Takte derselben Stunde ergeben eine Zeile', async () => {
             const k = new FireBusKontrolle({ db: () => db });
-            k.pruefe('d1', 'gibt.es.nicht', 10);
-            k.pruefe('d1', 'gibt.es.nicht', 10);
+            k.uebernimm([{ daemon: 'd1', name: 'gibt.es.nicht', grund: 'unbekannt', anzahl: 2 }]);
             await k.schreibe();
             assert.strictEqual(k.meldungen.size, 0);
-            k.pruefe('d1', 'gibt.es.nicht', 10);
+            k.uebernimm([{ daemon: 'd1', name: 'gibt.es.nicht', grund: 'unbekannt', anzahl: 1 }]);
             await k.schreibe();
             const z = await db.query('SELECT name, grund, anzahl FROM firebus_kontrolle');
             assert.strictEqual(z.length, 1);
@@ -128,10 +116,22 @@ const gemeldet = (k) => [...k.meldungen].map(([s, n]) => [...s.split('\n').slice
         assert.match(html, /Absender zu schnell/);
         assert.ok(!html.includes('<b>x</b>'), 'nicht escapet');
     });
+    await pruefe('die Seite nennt den Bahnhof, seinen Fahrplan und eine Abweichung', () => {
+        const ejs = require('ejs');
+        const vorlage = fs.readFileSync(path.join(WURZEL, 'apps/dashboard/themes/default/views/admin/firebus.ejs'), 'utf8');
+        const gruende = FireBusKontrolle.GRUENDE;
+        const gleich = ejs.render(vorlage, { zeilen: [], gruende, fassung: 7, bahnhof: { fassung: 7, stand: '<i>abc</i>' } });
+        assert.match(gleich, /Bahnhof &lt;i&gt;abc&lt;\/i&gt;, Fahrplan 7/);
+        assert.doesNotMatch(gleich, /Dashboard 7|nicht angedockt/);
+        assert.match(ejs.render(vorlage, { zeilen: [], gruende, fassung: 8, bahnhof: { fassung: 7, stand: 'abc' } }), /Dashboard 8/);
+        assert.match(ejs.render(vorlage, { zeilen: [], gruende, fassung: 8, bahnhof: null }), /Bahnhof nicht angedockt/);
+        const route = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'apps/dashboard/routes/admin.router.js'), 'utf8'));
+        assert.match(route, /bahnhof: ServiceManager\.has\('ipmServer'\) \? \(ServiceManager\.get\('ipmServer'\)\.dock\?\.bahnhof/);
+    });
     await pruefe('die Seite steht in der Navigation', () => {
         assert.match(fs.readFileSync(path.join(WURZEL, 'apps/dashboard/themes/default/partials/guild/sidebar.ejs'), 'utf8'), /url: '\/admin\/firebus'/);
     });
 
-    console.log(fehler ? `\n✗ ${fehler} Prüfung(en) rot` : '\n✅ Die Kontrolle prüft, meldet und liest nichts mit');
+    console.log(fehler ? `\n✗ ${fehler} Prüfung(en) rot` : '\n✅ Der Bahnhof kontrolliert, das Dashboard schreibt, und die Gründe passen');
     process.exit(fehler ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });

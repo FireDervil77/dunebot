@@ -212,27 +212,40 @@ function zaehler(start = Date.parse('2026-11-01T17:20:00Z')) {
     const z = new FireBusZaehler({ db: () => ({ query: async (sql, p) => { fragen.push({ sql, p }); return []; } }), jetzt: () => uhr.ms });
     return { z, fragen, uhr };
 }
-pruefe('zählt Anzahl, Bytes, größte, Dauer; dieselbe Stunde bleibt eine Zeile', () => {
-    const { z, uhr } = zaehler();
-    z.zaehle('d', 'gameserver.start', 'aus', 100);
-    uhr.ms += 60000;
-    z.zaehle('d', 'gameserver.start', 'aus', 300, 40);
-    z.zaehle('d', 'gameserver.start', 'ein', 10, 25);
+// Den Verkehr zählt seit Paket 4 der Bahnhof (internal/bahnhof/zaehlung.go), hier
+// kommen seine Zeilen an. Die Stunde reist mit.
+const STUNDE = Date.parse('2026-11-01T17:00:00Z') / 1000;
+const bahnhofZeile = (mehr) => ({ stunde: STUNDE, daemon: 'd', name: 'gameserver.start', art: 'aus', anzahl: 1, bytes: 100,
+    groesste: 100, dauer_summe_ms: 0, dauer_max_ms: 0, ...mehr });
+pruefe('übernimmt Anzahl, Bytes, größte, Dauer des Bahnhofs; dieselbe Stunde bleibt eine Zeile', () => {
+    const { z } = zaehler();
+    z.uebernimm([bahnhofZeile()]);
+    z.uebernimm([bahnhofZeile({ bytes: 300, groesste: 300, dauer_summe_ms: 40, dauer_max_ms: 40 }),
+        bahnhofZeile({ art: 'ein', bytes: 10, groesste: 10, dauer_summe_ms: 25, dauer_max_ms: 25 })]);
     const [aus, ein] = [...z.zeilen.values()];
     assert.strictEqual(z.zeilen.size, 2);
     assert.deepStrictEqual([aus.anzahl, aus.bytes, aus.groesste, aus.dauerSumme, aus.dauerMax], [2, 400, 300, 40, 40]);
     assert.strictEqual(ein.dauerMax, 25);
+    assert.strictEqual(aus.stunde.toISOString(), '2026-11-01T17:00:00.000Z');
 });
-pruefe('eine neue Stunde beginnt eine neue Zeile', () => {
+pruefe('die Stunde kommt vom Bahnhof, nicht von der Uhr beim Übernehmen', () => {
     const { z, uhr } = zaehler();
-    z.zaehle('d', 'heartbeat', 'ein', 1);
     uhr.ms += 3600000;
-    z.zaehle('d', 'heartbeat', 'ein', 1);
-    assert.strictEqual(z.zeilen.size, 2);
+    z.uebernimm([bahnhofZeile({ name: 'heartbeat', art: 'ein' })]);
+    z.uebernimm([bahnhofZeile({ name: 'heartbeat', art: 'ein', stunde: STUNDE + 3600 })]);
+    assert.deepStrictEqual([...z.zeilen.values()].map(x => x.stunde.getUTCHours()), [17, 18]);
+});
+pruefe('Kaputtes vom Dock wird übergangen, nicht gezählt', () => {
+    const { z } = zaehler();
+    z.uebernimm(null);
+    z.uebernimm([null, bahnhofZeile({ art: 'lesefaden' }), bahnhofZeile({ daemon: '' }), bahnhofZeile({ stunde: 'x' })]);
+    z.uebernimm([bahnhofZeile({ anzahl: -5, bytes: 'viel' })]);
+    assert.strictEqual(z.zeilen.size, 1);
+    assert.deepStrictEqual([...z.zeilen.values()].map(x => [x.anzahl, x.bytes]), [[0, 0]]);
 });
 pruefe('fremde Namen füllen den Speicher nicht, und der Überlauf wird gezählt', () => {
     const { z } = zaehler();
-    for (let i = 0; i < FireBusZaehler.MAX_SCHLUESSEL + 500; i++) z.zaehle('d', `erfunden.${i}`, 'ein', 1);
+    z.uebernimm(Array.from({ length: FireBusZaehler.MAX_SCHLUESSEL + 500 }, (_, i) => bahnhofZeile({ name: `erfunden.${i}`, art: 'ein' })));
     assert.ok(z.zeilen.size <= FireBusZaehler.MAX_SCHLUESSEL + 1, `${z.zeilen.size} Zeilen`);
     const ueber = [...z.zeilen.values()].find(x => x.name === FireBusZaehler.UEBERLAUF);
     assert.strictEqual(ueber.anzahl, 500);
@@ -240,9 +253,7 @@ pruefe('fremde Namen füllen den Speicher nicht, und der Überlauf wird gezählt
 pruefe('ein unbekannter Name wird einmal gemeldet, ein bekannter nie', () => {
     warnungen.length = 0;
     const { z } = zaehler();
-    z.zaehle('d', 'gibt.es.nicht', 'ein', 1);
-    z.zaehle('d', 'gibt.es.nicht', 'ein', 1);
-    z.zaehle('d', 'gameserver.start', 'aus', 1);
+    z.uebernimm([bahnhofZeile({ name: 'gibt.es.nicht', art: 'ein' }), bahnhofZeile({ name: 'gibt.es.nicht', art: 'ein' }), bahnhofZeile()]);
     assert.strictEqual(warnungen.length, 1, warnungen.join(' | '));
 });
 pruefe('Druck ist die Spanne: Der erste Wert ergibt keine Zahl, ein Neustart der Maschine auch nicht', () => {
@@ -284,7 +295,7 @@ pruefe('die Frist reist mit dem Befehl', () => {
 
 (async () => {
     const { z, fragen } = zaehler();
-    z.zaehle('d', 'heartbeat', 'ein', 10);
+    z.uebernimm([bahnhofZeile({ name: 'heartbeat', art: 'ein' })]);
     z.last('d', { hardware: null });
     await z.schreibe();
     pruefe('schreibt je Zeile einmal und leert den Speicher', () => {
@@ -299,23 +310,24 @@ pruefe('die Frist reist mit dem Befehl', () => {
 
     console.log('\nVerdrahtung');
     const IPMServer = require('../apps/dashboard/helpers/IPMServer');
-    pruefe('eine Antwort bekommt den Namen ihres Befehls und ihre Dauer', () => {
-        const gezaehlt = [];
-        const fake = { pendingCommands: new Map([['a1', { command: 'gameserver.logs', gesendetAm: Date.now() - 500 }]]),
-            zaehler: { zaehle: (...x) => gezaehlt.push(x) } };
-        IPMServer.prototype._zaehleEingang.call(fake, 'd', { type: 'command_response', id: 'a1' }, 40);
-        IPMServer.prototype._zaehleEingang.call(fake, 'd', { type: 'command_response', id: 'weg' }, 7);
-        IPMServer.prototype._zaehleEingang.call(fake, 'd', { type: 'HEARTBEAT' }, 3);
-        IPMServer.prototype._zaehleEingang.call(fake, 'd', { type: 'event', namespace: 'console', action: 'output' }, 3);
-        assert.strictEqual(gezaehlt[0][1], 'gameserver.logs');
-        assert.ok(gezaehlt[0][4] >= 500);
-        assert.deepStrictEqual(gezaehlt[1].slice(1, 3), ['antwort.unbekannt', 'ein']);
-        assert.strictEqual(gezaehlt[2][1], 'heartbeat');
-        assert.strictEqual(gezaehlt[3][1], 'console.output');
-    });
-    pruefe('gezählt wird vor dem Routing, danach wäre der offene Befehl weg', () => {
+    // Seit Paket 4 zählt der Bahnhof den Verkehr. Zählte das Dashboard wieder mit,
+    // stünde jede Nachricht doppelt in `firebus_zaehlung`.
+    pruefe('das Dashboard zählt keinen Verkehr mehr, es übernimmt die Zeilen des Bahnhofs', () => {
         const q = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'apps/dashboard/helpers/IPMServer.js'), 'utf8'));
-        assert.ok(q.indexOf('this._zaehleEingang(daemonId, message') < q.indexOf('await this._routeMessage(daemonId, message)'));
+        assert.doesNotMatch(q, /zaehler\.zaehle\(|_zaehleEingang|_kontrolliere|kontrolle\.pruefe/);
+        assert.strictEqual(typeof FireBusZaehler.prototype.zaehle, 'undefined');
+        const angenommen = [];
+        const fake = { zaehler: { uebernimm: (x) => angenommen.push(['z', x]) }, kontrolle: { uebernimm: (x) => angenommen.push(['k', x]) } };
+        IPMServer.prototype._vomBahnhof.call(fake, 'zaehlung', { zeilen: [1] });
+        IPMServer.prototype._vomBahnhof.call(fake, 'kontrolle', { meldungen: [2] });
+        IPMServer.prototype._vomBahnhof.call(fake, 'unbekannt', {});
+        assert.deepStrictEqual(angenommen, [['z', [1]], ['k', [2]]]);
+    });
+    pruefe('die Zählung des Bahnhofs kennt die Spalten von firebus_zaehlung', () => {
+        const go = fs.readFileSync(path.join(DAEMON, 'internal/bahnhof/zaehlung.go'), 'utf8');
+        for (const feld of ['stunde', 'daemon', 'name', 'art', 'anzahl', 'bytes', 'groesste', 'dauer_summe_ms', 'dauer_max_ms']) {
+            assert.match(go, new RegExp(`json:"${feld}"`), feld);
+        }
     });
 
     console.log(fehler ? `\n❌ ${fehler} Prüfung(en) fehlgeschlagen` : '\n✅ Fahrplan und Code stimmen überein, die Zählung rechnet richtig');

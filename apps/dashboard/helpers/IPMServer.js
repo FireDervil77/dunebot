@@ -48,13 +48,6 @@ const VERSION_JSON_PATH = path.join(__dirname, '..', 'downloads', 'daemon', 'ver
 const DOCK_STANDARD = '/run/firebot-bahnhof/dock.sock';
 
 /** Der Name einer Nachricht vom Daemon, so wie der Fahrplan ihn führt. */
-function nachrichtenName(message) {
-    const typ = message.type?.toLowerCase();
-    return message.namespace && message.action
-        ? `${message.namespace}.${message.action}`
-        : (typ === 'event' ? message.payload?.event : typ);
-}
-
 class IPMServer {
     constructor() {
         this.dock = null;
@@ -65,7 +58,7 @@ class IPMServer {
             bahnhofDa: () => Boolean(this.dock?.angedockt),
             ausgefallen: (id) => RootServer.markOffline(id),
         });
-        this.pendingCommands = new Map(); // commandId -> {resolve, reject, timeout, command, gesendetAm}
+        this.pendingCommands = new Map(); // commandId -> {resolve, reject, timeout, command}
         this.zaehler = new FireBusZaehler();
         this.kontrolle = new FireBusKontrolle();
         this.Logger = null;
@@ -250,7 +243,6 @@ class IPMServer {
                     if (result.success) {
                         this.registerFailures.delete(rateKey);
                         daemonId = result.daemonId;
-                        this.zaehler.zaehle(daemonId, 'register', 'ein', data.length);
                         authenticated = true;
                         
                         // ✅ SECURITY: Connection-Limit prüfen
@@ -371,11 +363,8 @@ class IPMServer {
                     return;
                 }
 
-                this._zaehleEingang(daemonId, message, data.length);
-
-                // Die Fahrkartenkontrolle (Linie V): Was durchfällt, fährt nicht mit.
-                if (!this._kontrolliere(daemonId, message, data.length)) return;
-
+                // Tür und Zählung stehen seit Paket 4 im Busbahnhof: Was hier
+                // ankommt, hat die Kontrolle schon passiert (`_vomBahnhof`).
                 // Message-Routing
                 await this._routeMessage(daemonId, message);
 
@@ -736,30 +725,15 @@ class IPMServer {
     }
 
     /**
-     * Zählt eine Nachricht vom Daemon. Muss vor dem Routing laufen: Danach ist
-     * der offene Befehl schon gelöscht, und eine Antwort hätte keinen Namen mehr.
-     * @private
+     * Was der Bahnhof im Minutentakt über das Dock meldet (FireBus Paket 4): Tür und
+     * Zählung laufen dort, geschrieben wird hier, denn der Bahnhof fasst die
+     * Datenbank nie an.
+     * @param {'zaehlung'|'kontrolle'} art
+     * @param {{zeilen?: Array, meldungen?: Array}} inhalt
      */
-    _zaehleEingang(daemonId, message, bytes) {
-        const typ = message.type?.toLowerCase();
-        if (typ === 'command_response' || typ === 'response') {
-            const offen = this.pendingCommands.get(message.id ?? message.payload?.commandId);
-            this.zaehler.zaehle(daemonId, offen ? offen.command : 'antwort.unbekannt', 'ein', bytes,
-                offen ? Date.now() - offen.gesendetAm : null);
-            return;
-        }
-        this.zaehler.zaehle(daemonId, nachrichtenName(message), 'ein', bytes);
-    }
-
-    /**
-     * Antworten tragen keinen Namen und fahren immer: Ohne sie bliebe ein Befehl bis
-     * zu seiner Frist offen.
-     * @private
-     */
-    _kontrolliere(daemonId, message, bytes) {
-        const typ = message.type?.toLowerCase();
-        if (typ === 'command_response' || typ === 'response') return true;
-        return this.kontrolle.pruefe(daemonId, nachrichtenName(message), bytes);
+    _vomBahnhof(art, inhalt) {
+        if (art === 'zaehlung') this.zaehler.uebernimm(inhalt?.zeilen);
+        else if (art === 'kontrolle') this.kontrolle.uebernimm(inhalt?.meldungen);
     }
 
     /**
@@ -942,7 +916,6 @@ class IPMServer {
             timestamp: Date.now()
         });
         conn.ws.send(bestaetigung);
-        this.zaehler.zaehle(daemonId, 'heartbeat_ack', 'aus', bestaetigung.length);
 
         // Optional: Server-Registry-Status aktualisieren + SSE-Broadcast pro Gameserver
         if (payload.servers) {
@@ -1667,8 +1640,7 @@ class IPMServer {
                     reject(error);
                 },
                 timeout: timeoutHandle,
-                command,
-                gesendetAm: Date.now()
+                command
             });
 
             // Command senden
@@ -1682,7 +1654,6 @@ class IPMServer {
                 frist_ms: timeout
             });
             conn.ws.send(nachricht);
-            this.zaehler.zaehle(daemonId, command, 'aus', Buffer.byteLength(nachricht));
 
             this.Logger.debug(`[IPMServer] Command sent to Daemon ${daemonId}: ${command} (ID: ${commandId})`);
         });
@@ -1909,7 +1880,6 @@ class IPMServer {
                     data
                 });
                 conn.ws.send(nachricht);
-                this.zaehler.zaehle(daemonId, 'broadcast', 'aus', Buffer.byteLength(nachricht));
                 sent++;
             }
         }

@@ -43,8 +43,10 @@ const freierPort = () => new Promise((fertig) => {
 
 /** Dashboard-Attrappe: nimmt Anmeldungen an wie `_handleConnection`, merkt sich alles. */
 function dashboard() {
-    const ipm = { Logger: stille, leitungen: [], nachrichten: [], ips: [], angedockt: 0 };
+    const fehlerLog = [];
+    const ipm = { Logger: { ...stille, error: (t) => fehlerLog.push(t) }, fehlerLog, leitungen: [], nachrichten: [], ips: [], angedockt: 0, gemeldet: [] };
     ipm._angedockt = () => { ipm.angedockt++; };
+    ipm._vomBahnhof = (art, inhalt) => ipm.gemeldet.push({ art, inhalt });
     ipm._handleConnection = (ws, req) => {
         ipm.leitungen.push(ws);
         ipm.ips.push(req.headers['x-forwarded-for']);
@@ -64,7 +66,9 @@ function dashboard() {
     const bin = path.join(ordner, 'firebot-bahnhof');
     execFileSync('go', ['build', '-o', bin, './cmd/bahnhof'], { cwd: DAEMON, stdio: 'ignore' });
     const port = await freierPort();
-    let bahnhof = spawn(bin, ['-adresse', `127.0.0.1:${port}`, '-dock', SOCKET], { stdio: 'ignore' });
+    // Kurzer Takt: Zählung und Kontrolle kommen sonst nur einmal je Minute.
+    const starteBahnhof = () => spawn(bin, ['-adresse', `127.0.0.1:${port}`, '-dock', SOCKET, '-takt', '300ms'], { stdio: 'ignore' });
+    let bahnhof = starteBahnhof();
     await bis('Socket', () => fs.existsSync(SOCKET));
 
     const erstes = dashboard();
@@ -129,6 +133,44 @@ function dashboard() {
         await bis('Ereignis', () => erstes.nachrichten.some(n => n.action === 'status_changed'));
     });
 
+    // Paket 4 (2026-11-03): Tür und Zählung im Bahnhof, das Dashboard schreibt nur.
+    console.log('\nTür und Zählung im Bahnhof');
+    await pruefe('der Bahnhof sagt beim Andocken seinen Fahrplan', async () => {
+        assert.strictEqual(erstes.dock.bahnhof?.fassung, require('../packages/firebus').fassung);
+        assert.strictEqual(erstes.angedockt, 1);
+    });
+    await pruefe('was die Tür hält, kommt nie beim Dashboard an, und der Bahnhof meldet es', async () => {
+        daemon.send(JSON.stringify({ type: 'event', namespace: 'gibt', action: 'es_nicht', payload: { rcon: 'geheim' } }));
+        daemon.send(JSON.stringify({ type: 'event', namespace: 'gameserver', action: 'status_changed', nr: 'nach-der-tuer' }));
+        await bis('Erlaubtes', () => erstes.nachrichten.some(n => n.nr === 'nach-der-tuer'));
+        assert.ok(!erstes.nachrichten.some(n => n.namespace === 'gibt'), 'durch die Tür gekommen');
+        await bis('Kontrolle', () => erstes.gemeldet.some(g => g.art === 'kontrolle'), 3000);
+        const k = erstes.gemeldet.find(g => g.art === 'kontrolle').inhalt.meldungen;
+        assert.deepStrictEqual(k.map(m => [m.daemon, m.name, m.grund, m.anzahl]), [['d1', 'gibt.es_nicht', 'unbekannt', 1]]);
+        assert.ok(!JSON.stringify(k).includes('geheim'), 'die Nutzlast steht in der Meldung');
+    });
+    await pruefe('der Bahnhof zählt je Daemon, Name und Richtung, mit Stunde', async () => {
+        await bis('Zählung', () => erstes.gemeldet.some(g => g.art === 'zaehlung'), 3000);
+        const zeilen = erstes.gemeldet.filter(g => g.art === 'zaehlung').flatMap(g => g.inhalt.zeilen);
+        const anzahl = (name, art) => zeilen.filter(z => z.daemon === 'd1' && z.name === name && z.art === art).reduce((n, z) => n + z.anzahl, 0);
+        assert.strictEqual(anzahl('register', 'ein'), 1);
+        assert.strictEqual(anzahl('gameserver.status_changed', 'ein'), 2);
+        assert.strictEqual(anzahl('command', 'aus'), 1);
+        assert.ok(zeilen.every(z => z.stunde % 3600 === 0));
+    });
+    await pruefe('Nachrichten vom Dashboard gehen gebündelt und ohne Umweg über Text', async () => {
+        const vorher = eingang.length;
+        const socket = erstes.dock.socket;
+        const senden = socket.send;
+        let vorgaenge = 0;
+        socket.send = function (...a) { vorgaenge++; assert.ok(Buffer.isBuffer(a[0]) && a[1]?.binary, 'nicht binär'); return senden.apply(this, a); };
+        for (let i = 0; i < 300; i++) erstes.leitungen[0].send(JSON.stringify({ type: 'broadcast', nr: i }));
+        await bis('alle 300', () => eingang.length >= vorher + 300);
+        socket.send = senden;
+        assert.strictEqual(vorgaenge, 1, `${vorgaenge} Sendevorgänge für 300 Nachrichten`);
+        assert.deepStrictEqual(eingang.slice(vorher).map(n => n.nr), Array.from({ length: 300 }, (_, i) => i), 'Reihenfolge');
+    });
+
     console.log('\nDashboard-Neustart');
     await pruefe('der Daemon bleibt verbunden, sein Herzschlag wird weiter bestätigt', async () => {
         erstes.dock.beende();
@@ -182,7 +224,7 @@ function dashboard() {
         });
         await pruefe('kommt der Bahnhof wieder, dockt das Dashboard von selbst an und sagt es', async () => {
             const vorher = zweites.angedockt;
-            bahnhof = spawn(bin, ['-adresse', `127.0.0.1:${port}`, '-dock', SOCKET], { stdio: 'ignore' });
+            bahnhof = starteBahnhof();
             await bis('wieder angedockt', () => zweites.dock.angedockt && zweites.angedockt > vorher, 8000);
         });
         await pruefe('ein gewolltes Abdocken ist kein „Bahnhof weg", die Leitung bleibt beim Bahnhof', async () => {
@@ -200,6 +242,38 @@ function dashboard() {
             assert.strictEqual(zweiterZu, false, 'der Daemon hat das Abdocken bemerkt');
             zweiter.close();
         });
+    });
+
+    // Dashboard und Bahnhof werden getrennt eingespielt. Passen die Fassungen nicht,
+    // dockt keiner falsch an: Die Leitungen bleiben beim Bahnhof, wie bei jedem Neustart.
+    console.log('\nFassungen');
+    await pruefe('ein Dashboard mit dem alten Dock wird abgewiesen', async () => {
+        const altes = new WebSocket(`ws+unix://${SOCKET}:/dock`);
+        const antwort = await new Promise((fertig) => {
+            altes.on('unexpected-response', (_, res) => fertig(res.statusCode));
+            altes.on('open', () => fertig('offen'));
+            altes.on('error', (e) => fertig(e.message));
+        });
+        assert.strictEqual(antwort, 426);
+    });
+    await pruefe('am alten Bahnhof dockt das neue Dashboard nicht an und sagt es', async () => {
+        const altSocket = path.join(ordner, 'alt.sock');
+        const http = require('http');
+        const server = http.createServer();
+        const wss = new WebSocket.Server({ server });
+        // So sprach der Bahnhof bis Paket 4: Text-Rahmen, kein hallo.
+        wss.on('connection', (ws) => ws.send(JSON.stringify({ k: '1', a: 'auf', ip: '127.0.0.1' })));
+        await new Promise(r => server.listen(altSocket, r));
+        const ipm = dashboard();
+        const dock = new BusDock(ipm, altSocket);
+        dock.starte();
+        await bis('Meldung', () => ipm.fehlerLog.some(t => /Dock-Fassung 2/.test(t)));
+        assert.strictEqual(dock.angedockt, false);
+        assert.strictEqual(ipm.angedockt, 0);
+        assert.strictEqual(ipm.leitungen.length, 0, 'eine Leitung aus dem alten Dock angenommen');
+        dock.beende();
+        wss.close();
+        server.close();
     });
 
     bahnhof.kill('SIGKILL');

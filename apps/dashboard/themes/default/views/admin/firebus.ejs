@@ -1,13 +1,21 @@
-<%# FireBus: Was die Fahrkartenkontrolle nicht mitfahren ließ (Linie V, F9). Die Seite
-    zeigt Name, Absender und Grund, Nutzlasten werden nie gespeichert. %>
+<%# FireBus: Was die Fahrkartenkontrolle nicht mitfahren ließ (Linie V, F9). Die Tür steht
+    seit Paket 4 im Busbahnhof, er meldet im Minutentakt. Die Seite zeigt Name, Absender und
+    Grund, Nutzlasten werden nie gespeichert. %>
 <div class="container-fluid">
   <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
       <h3 class="card-title mb-0"><i class="fa-solid fa-ticket me-2"></i>FireBus: Kontrolle</h3>
-      <span class="text-secondary small">Fahrplan Fassung <%= fassung %>, letzte 30 Tage</span>
+      <span class="text-secondary small">
+        <% if (typeof bahnhof !== 'undefined' && bahnhof) { %>
+          Bahnhof <%= bahnhof.stand %>, Fahrplan <%= bahnhof.fassung %><% if (bahnhof.fassung !== fassung) { %> <span class="badge bg-warning text-dark">Dashboard <%= fassung %></span><% } %>,
+        <% } else { %>
+          <span class="badge bg-danger">Bahnhof nicht angedockt</span> Fahrplan <%= fassung %>,
+        <% } %>
+        letzte 30 Tage
+      </span>
     </div>
     <div class="card-body">
-      <p class="text-secondary mb-3">Jede Nachricht vom Daemon wird an der Tür geprüft. Was durchfällt, fährt nicht mit und steht hier. Eine leere Liste ist der Normalfall.</p>
+      <p class="text-secondary mb-3">Jede Nachricht vom Daemon wird im Busbahnhof an der Tür geprüft. Was durchfällt, fährt nicht mit und steht hier, höchstens eine Minute später. Eine leere Liste ist der Normalfall.</p>
       <% if (!zeilen.length) { %>
         <div class="alert alert-success mb-0"><i class="fa-solid fa-check me-2"></i>Keine Meldungen.</div>
       <% } else { %>

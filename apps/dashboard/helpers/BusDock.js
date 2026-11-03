@@ -2,6 +2,7 @@
 
 const { EventEmitter } = require('events');
 const WebSocket = require('ws');
+const firebus = require('../../../packages/firebus');
 
 /**
  * Das Dock am Busbahnhof (FireBus Etappe 4, `internal/bahnhof` im Daemon).
@@ -16,10 +17,51 @@ const WebSocket = require('ws');
  *
  * Reißt das Dock, tragen die Leitungen `bahnhofWeg`: Ihre Daemons laufen weiter, nur der
  * Weg zu ihnen fehlt. Wer sie schließt, setzt deshalb keine Maschine auf offline.
+ *
+ * Dock-Fassung 2 (Paket 4): Jede Nachricht ist binär und trägt einen oder mehrere
+ * Datensätze, je Satz Länge und Kopf (JSON), Länge und Inhalt (die Nachricht des
+ * Daemons, roh). Beschrieben in `internal/bahnhof/dock.go`. Vorher steckte jede
+ * Nachricht als Text in einem JSON-Rahmen und wurde zweimal gelesen. Der Bahnhof sagt
+ * zuerst `hallo` mit seinem Fahrplan, erst dann gilt das Dock als angedockt. Tür und
+ * Zählung laufen im Bahnhof, er meldet sie im Minutentakt (`zaehlung`, `kontrolle`).
  */
 
 const NEUER_VERSUCH_MS = 2000;
+/** Ein Bahnhof mit dem alten Dock ändert sich nicht in zwei Sekunden. */
+const ALTER_BAHNHOF_MS = 30000;
+const HALLO_FRIST_MS = 5000;
 const MAX_RAHMEN_BYTES = 8 * 1024 * 1024;
+const BUENDEL_BYTES = 1024 * 1024;
+const DOCK_PFAD = '/dock/2';
+
+/** Ein Datensatz: Länge, Kopf, Länge, Inhalt. */
+function satz(kopf, inhalt) {
+    const k = Buffer.from(JSON.stringify(kopf));
+    const i = inhalt === undefined ? Buffer.alloc(0) : (Buffer.isBuffer(inhalt) ? inhalt : Buffer.from(String(inhalt)));
+    const laengen = Buffer.allocUnsafe(8);
+    laengen.writeUInt32BE(k.length, 0);
+    laengen.writeUInt32BE(i.length, 4);
+    return [laengen.subarray(0, 4), k, laengen.subarray(4, 8), i];
+}
+
+/** Zerlegt eine Dock-Nachricht in ihre Datensätze. Wirft bei kaputten Längen. */
+function zerlege(daten) {
+    const saetze = [];
+    let pos = 0;
+    const stueck = () => {
+        if (pos + 4 > daten.length) throw new Error('Datensatz kaputt');
+        const n = daten.readUInt32BE(pos);
+        if (pos + 4 + n > daten.length) throw new Error('Datensatz kaputt');
+        const s = daten.subarray(pos + 4, pos + 4 + n);
+        pos += 4 + n;
+        return s;
+    };
+    while (pos < daten.length) {
+        const kopf = JSON.parse(stueck().toString());
+        saetze.push({ kopf, inhalt: stueck() });
+    }
+    return saetze;
+}
 
 /** Sieht für `_handleConnection` aus wie ein WebSocket. */
 class DockLeitung extends EventEmitter {
@@ -32,7 +74,7 @@ class DockLeitung extends EventEmitter {
     }
 
     send(text) {
-        if (!this.zu) this.dock.sende({ k: this.kanal, a: 'daten', d: String(text) });
+        if (!this.zu) this.dock.sende({ k: this.kanal, a: 'daten' }, text);
     }
 
     /** Schließt die Leitung beim Bahnhof: Der Daemon verbindet sich dann neu. */
@@ -51,7 +93,7 @@ class DockLeitung extends EventEmitter {
 
 class BusDock {
     /**
-     * @param {{_handleConnection: Function, Logger: object, _angedockt?: Function}} ipm
+     * @param {{_handleConnection: Function, Logger: object, _angedockt?: Function, _vomBahnhof?: Function}} ipm
      * @param {string} pfad Socket des Bahnhofs
      */
     constructor(ipm, pfad) {
@@ -62,6 +104,11 @@ class BusDock {
         this.beendet = false;
         this.gemeldet = false;
         this.angedockt = false;
+        /** Was der Bahnhof beim Andocken sagt: `{fassung, stand}`. */
+        this.bahnhof = null;
+        this.ausgang = [];
+        this.ausgangBytes = 0;
+        this.geplant = false;
     }
 
     starte() {
@@ -72,30 +119,58 @@ class BusDock {
     beende() {
         this.beendet = true;
         clearTimeout(this.wartet);
+        clearTimeout(this.halloFrist);
+        this._leere();
         this.socket?.close();
     }
 
-    sende(rahmen) {
-        if (this.socket?.readyState === WebSocket.OPEN) this.socket.send(JSON.stringify(rahmen));
+    /**
+     * Reiht einen Datensatz ein. Was im selben Durchlauf der Ereignisschleife
+     * zusammenkommt, geht als eine Nachricht raus.
+     */
+    sende(kopf, inhalt) {
+        if (this.socket?.readyState !== WebSocket.OPEN) return;
+        const teile = satz(kopf, inhalt);
+        this.ausgang.push(...teile);
+        for (const t of teile) this.ausgangBytes += t.length;
+        if (this.ausgangBytes >= BUENDEL_BYTES) this._leere();
+        else if (!this.geplant) {
+            this.geplant = true;
+            setImmediate(() => this._leere());
+        }
+    }
+
+    _leere() {
+        this.geplant = false;
+        if (!this.ausgang.length) return;
+        const nachricht = Buffer.concat(this.ausgang, this.ausgangBytes);
+        this.ausgang = [];
+        this.ausgangBytes = 0;
+        if (this.socket?.readyState === WebSocket.OPEN) this.socket.send(nachricht, { binary: true });
     }
 
     _verbinde() {
         if (this.beendet) return;
-        const socket = new WebSocket(`ws+unix://${this.pfad}:/dock`, { maxPayload: MAX_RAHMEN_BYTES, perMessageDeflate: false });
+        const socket = new WebSocket(`ws+unix://${this.pfad}:${DOCK_PFAD}`, { maxPayload: MAX_RAHMEN_BYTES, perMessageDeflate: false });
         this.socket = socket;
+        this.zuAlt = false;
 
         socket.on('open', () => {
             this.gemeldet = false;
-            this.angedockt = true;
-            this.ipm.Logger.info('[BusDock] Am Bahnhof angedockt');
-            this.ipm._angedockt?.();
+            // Ein Bahnhof vor Paket 4 nimmt jeden Pfad an und sagt nie hallo.
+            this.halloFrist = setTimeout(() => this._zuAlt('sagt kein hallo'), HALLO_FRIST_MS);
         });
-        socket.on('message', (daten) => {
+        socket.on('message', (daten, binaer) => {
+            if (socket !== this.socket) return;
+            if (!binaer) return this._zuAlt('spricht das alte Dock');
+            let saetze;
             try {
-                this._nimm(JSON.parse(daten.toString()));
+                saetze = zerlege(daten);
             } catch (fehler) {
-                this.ipm.Logger.error('[BusDock] Rahmen nicht lesbar:', fehler);
+                this.ipm.Logger.error('[BusDock] Nachricht vom Bahnhof nicht lesbar:', fehler);
+                return;
             }
+            for (const { kopf, inhalt } of saetze) this._nimm(kopf, inhalt);
         });
         socket.on('error', (fehler) => {
             // Einmal melden, nicht alle zwei Sekunden: `close` folgt ohnehin.
@@ -103,8 +178,11 @@ class BusDock {
             this.gemeldet = true;
         });
         socket.on('close', () => {
+            clearTimeout(this.halloFrist);
             if (this.angedockt && !this.beendet) this.ipm.Logger.warn('[BusDock] Vom Bahnhof abgedockt, die Daemons sind nicht erreichbar');
             this.angedockt = false;
+            this.ausgang = [];
+            this.ausgangBytes = 0;
             // Ohne Dock gibt es keinen Weg zu diesen Daemons, das sagt die Trennung.
             if (!this.beendet) {
                 for (const leitung of [...this.leitungen.values()]) {
@@ -112,21 +190,49 @@ class BusDock {
                     leitung.geschlossen();
                 }
             }
-            if (!this.beendet) this.wartet = setTimeout(() => this._verbinde(), NEUER_VERSUCH_MS);
+            if (!this.beendet) this.wartet = setTimeout(() => this._verbinde(), this.zuAlt ? ALTER_BAHNHOF_MS : NEUER_VERSUCH_MS);
         });
     }
 
-    _nimm({ k, a, d, ip }) {
-        if (a === 'auf') {
+    /** Der Bahnhof läuft noch ohne Paket 4: abdocken, bis `bh-prod.sh` gelaufen ist. */
+    _zuAlt(grund) {
+        if (this.zuAlt) return;
+        this.zuAlt = true;
+        this.ipm.Logger.error(`[BusDock] Der Bahnhof ${grund}: Er braucht den Stand mit Dock-Fassung 2 (./bh-prod.sh). Neuer Versuch in ${ALTER_BAHNHOF_MS / 1000} s`);
+        this.socket?.terminate();
+    }
+
+    _nimm({ k, a, ip, fassung, stand }, inhalt) {
+        if (a === 'daten') {
+            this.leitungen.get(k)?.emit('message', inhalt);
+        } else if (a === 'auf') {
             const leitung = new DockLeitung(this, k);
             this.leitungen.set(k, leitung);
             this.ipm._handleConnection(leitung, { headers: { 'x-forwarded-for': ip }, socket: { remoteAddress: ip } });
-        } else if (a === 'daten') {
-            this.leitungen.get(k)?.emit('message', Buffer.from(d));
         } else if (a === 'zu') {
             this.leitungen.get(k)?.geschlossen();
+        } else if (a === 'hallo') {
+            clearTimeout(this.halloFrist);
+            this.angedockt = true;
+            this.bahnhof = { fassung, stand };
+            this.ipm.Logger.info(`[BusDock] Am Bahnhof angedockt (Stand ${stand}, Fahrplan ${fassung})`);
+            // Die Tür prüft nach dem Fahrplan des Bahnhofs: Ein neuer Name fährt erst,
+            // wenn der Bahnhof ihn kennt.
+            if (fassung !== firebus.fassung) {
+                this.ipm.Logger.warn(`[BusDock] Der Bahnhof fährt Fahrplan ${fassung}, das Dashboard ${firebus.fassung}: Bahnhof neu bauen (./bh-prod.sh)`);
+            }
+            this.ipm._angedockt?.();
+        } else if (a === 'zaehlung' || a === 'kontrolle') {
+            try {
+                this.ipm._vomBahnhof?.(a, JSON.parse(inhalt.toString()));
+            } catch (fehler) {
+                this.ipm.Logger.error(`[BusDock] ${a} vom Bahnhof nicht übernommen:`, fehler);
+            }
         }
     }
 }
 
 module.exports = BusDock;
+module.exports.satz = satz;
+module.exports.zerlege = zerlege;
+module.exports.DOCK_PFAD = DOCK_PFAD;
