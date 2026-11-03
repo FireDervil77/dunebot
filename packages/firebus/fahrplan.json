@@ -1,5 +1,5 @@
 {
-  "fassung": 7,
+  "fassung": 8,
   "linien": {"S": "Steuerung", "L": "Live", "O": "Output", "V": "Verify", "E": "Events", "D": "Datei"},
   "zeilen": [
     {"name": "register", "art": "steuerung", "von": "daemon", "linie": "V", "verlust": "nie"},
@@ -57,6 +57,7 @@
     {"name": "image.auspraegungen", "art": "befehl", "von": "dashboard", "linie": "S", "verlust": "nie", "reihe": "keine", "arbeit": "bindet"},
     {"name": "datenbank.anwenden", "art": "befehl", "von": "dashboard", "linie": "S", "verlust": "nie", "reihe": "maschine", "arbeit": "frei"},
     {"name": "daemon.update", "art": "befehl", "von": "dashboard", "linie": "S", "verlust": "nie", "reihe": "keine", "arbeit": "frei"},
+    {"name": "daemon.token_erneuern", "art": "befehl", "von": "dashboard", "linie": "S", "verlust": "nie", "reihe": "keine", "arbeit": "bindet"},
     {"name": "gameserver.content.modpack", "art": "befehl", "von": "dashboard", "linie": "S", "verlust": "nie", "reihe": "server", "schwer": true, "arbeit": "bindet"},
     {"name": "gameserver.content.fetch", "art": "befehl", "von": "dashboard", "linie": "S", "verlust": "nie", "reihe": "server", "schwer": true, "arbeit": "bindet"},
     {"name": "gameserver.uninstall", "art": "befehl", "von": "dashboard", "linie": "S", "verlust": "nie", "reihe": "server", "schwer": true, "arbeit": "bindet"},

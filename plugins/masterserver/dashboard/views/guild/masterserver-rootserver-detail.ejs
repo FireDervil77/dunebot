@@ -769,6 +769,14 @@ sudo journalctl -u firebot-daemon -f</code></pre>
 
                     <!-- Tab: Gefahrenzone -->
                     <div class="tab-pane fade" id="tab-danger">
+                        <div class="alert alert-warning">
+                            <h5><i class="fa-solid fa-key me-2"></i>Token erneuern</h5>
+                            <p class="mb-2">Aus dem Token entsteht der Schlüssel, mit dem Daemon und Dashboard ihre Nachrichten versiegeln. Bei der Einrichtung stand er einmal im Klartext auf dem Bildschirm und in der daemon.yaml. Erneuerst du ihn, gilt das nicht mehr: Der neue fährt versiegelt zum Daemon und wird nirgends angezeigt.</p>
+                            <p class="text-secondary mb-3" style="font-size:.85rem;">Der Daemon muss verbunden sein. Er verbindet sich danach einmal neu, seine Gameserver laufen weiter. Bis er sich unter dem neuen Token meldet, gilt der alte daneben.</p>
+                            <button class="btn btn-warning" id="tokenErneuernOeffnen">
+                                <i class="fa-solid fa-key me-1"></i>Token erneuern
+                            </button>
+                        </div>
                         <div class="alert alert-danger">
                             <h5><i class="fa-solid fa-triangle-exclamation me-2"></i>RootServer löschen</h5>
                             <p class="mb-3">Diese Aktion löscht den RootServer permanent und kann <strong>nicht rückgängig gemacht werden</strong>.</p>
@@ -783,6 +791,34 @@ sudo journalctl -u firebot-daemon -f</code></pre>
             </div>
         </div>
 
+
+<%# Rückfrage nach Vorlage #logsLoeschenModal: Name eintippen. %>
+<div class="modal modal-blur fade" id="tokenErneuernModal" tabindex="-1" aria-labelledby="tokenErneuernTitel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content border border-warning border-2">
+      <div class="modal-status bg-warning"></div>
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold" id="tokenErneuernTitel">
+          <i class="fa-solid fa-key me-2"></i>Token von „<%= rootserver.name %>" erneuern
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-3">Der Daemon bekommt einen neuen Token und verbindet sich einmal neu. Der alte Token taugt danach zu nichts mehr, auch nicht für eine neue Einrichtung mit der alten daemon.yaml.</p>
+        <label class="form-label fw-bold" for="tokenErneuernEingabe">
+          Zum Bestätigen eintippen: <span class="font-monospace" id="tokenErneuernSoll"><%= rootserver.name %></span>
+        </label>
+        <input type="text" class="form-control font-monospace" id="tokenErneuernEingabe" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal">Abbrechen</button>
+        <button type="button" class="btn btn-warning fw-bold" id="tokenErneuernKnopf" disabled>
+          <i class="fa-solid fa-key me-1"></i>Erneuern
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Live-Widget Script -->
 <script>
@@ -978,6 +1014,43 @@ sudo journalctl -u firebot-daemon -f</code></pre>
     // Initiales Laden + SSE starten
     poll();
     connectSSE();
+})();
+
+// ── Token erneuern (FireBus Paket 5) ─────────────────────────
+// Knopf bleibt gesperrt, bis der Name genau dasteht; der Server prüft ihn noch einmal.
+(function () {
+    const oeffnen = document.getElementById('tokenErneuernOeffnen');
+    const modalEl = document.getElementById('tokenErneuernModal');
+    if (!oeffnen || !modalEl) return;
+    const eingabe = document.getElementById('tokenErneuernEingabe');
+    const knopf = document.getElementById('tokenErneuernKnopf');
+    const soll = document.getElementById('tokenErneuernSoll').textContent;
+
+    oeffnen.addEventListener('click', function () {
+        eingabe.value = '';
+        knopf.disabled = true;
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    });
+    eingabe.addEventListener('input', function () {
+        knopf.disabled = eingabe.value.trim() !== soll;
+    });
+    knopf.addEventListener('click', async function () {
+        knopf.disabled = true;
+        try {
+            const r = await fetch('/guild/<%= guildId %>/plugins/masterserver/rootservers/<%= rootserver.id %>/token-erneuern', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bestaetigung: eingabe.value.trim() })
+            });
+            const d = await r.json();
+            if (!r.ok || !d.success) throw new Error(d.message || 'Nicht erneuert.');
+            bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+            GuildAjaxHandler.showToast('success', d.message);
+        } catch (e) {
+            knopf.disabled = eingabe.value.trim() !== soll;
+            GuildAjaxHandler.showToast('error', e.message);
+        }
+    });
 })();
 
 // ── RootServer löschen ───────────────────────────────────────

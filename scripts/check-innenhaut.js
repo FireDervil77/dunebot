@@ -11,7 +11,8 @@
  *   1. dieselbe Rechnung wie der Daemon, an den Testwerten aus `vektor_test.go`
  *   2. die Regeln von `helpers/Innenhaut.js`
  *   3. die Leitung im echten IPMServer: Anmeldung, Halle vor der Anmeldung, Klartext
- *   4. die Migrationen an temporären Kopien, Marke und Sitzungsnummer in der Datenbank
+ *   4. Token erneuern: der neue gilt neben dem alten, bis der Daemon unter ihm spricht
+ *   5. die Migrationen an temporären Kopien, Marke und Sitzungsnummer in der Datenbank
  *
  *   node scripts/check-innenhaut.js
  */
@@ -35,6 +36,7 @@ const RootServer = require('../plugins/masterserver/dashboard/models/RootServer'
 const IPMServer = require('../apps/dashboard/helpers/IPMServer');
 const migrationRootserver = require('../plugins/masterserver/migrations/20261103_170000_rootserver_innenhaut');
 const migrationSitzung = require('../migrations/kern/20261103_170000_firebus_sitzung');
+const migrationTokenNeu = require('../plugins/masterserver/migrations/20261103_180000_rootserver_api_key_neu');
 const { ohneKommentare } = require('./lib/quelltext');
 
 let fehler = 0;
@@ -74,6 +76,12 @@ function speicherDb(zeilen) {
         db: () => ({
             query: async (sql, p = []) => {
                 if (sql.startsWith('SELECT api_key')) return zeilen.filter(z => z.daemon_id === p[0]);
+                if (sql.startsWith('UPDATE rootserver SET api_key = api_key_neu')) {
+                    geschrieben.push(['token', ...p]);
+                    const z = zeilen.find(x => x.daemon_id === p[0] && x.api_key_neu === p[1]);
+                    if (z) Object.assign(z, { api_key: z.api_key_neu, api_key_neu: null });
+                    return { affectedRows: z ? 1 : 0 };
+                }
                 if (sql.startsWith('UPDATE rootserver')) {
                     geschrieben.push(p);
                     const z = zeilen.find(x => x.daemon_id === p[2]);
@@ -88,9 +96,9 @@ function speicherDb(zeilen) {
     };
 }
 
-async function neueHaut(zeilen, jetzt = () => 1_000_000) {
+async function neueHaut(zeilen, jetzt = () => 1_000_000, tokenGilt) {
     const speicher = speicherDb(zeilen);
-    const h = new Innenhaut({ db: speicher.db, Logger, jetzt });
+    const h = new Innenhaut({ db: speicher.db, Logger, jetzt, tokenGilt });
     await h.starte();
     return { h, speicher };
 }
@@ -314,12 +322,116 @@ async function neueHaut(zeilen, jetzt = () => 1_000_000) {
         ws.emit('close');
     });
 
+    console.log('\nToken erneuern');
+    await pruefe('der neue gilt neben dem alten, bis eine neue Sitzung unter ihm spricht', async () => {
+        const z = { ...zeile(), api_key_neu: null };
+        const gilt = [];
+        const { h, speicher } = await neueHaut([z], () => 1_000_000, (id) => gilt.push(id));
+        const alt = daemonSeite('token', 'd1', 100);
+        await h.oeffne(alt.siegle({ type: 'heartbeat' }));
+        h.neuerToken('d1', 'neu');
+        z.api_key_neu = 'neu';
+        // Unter dem alten geht es weiter, bis der Daemon umsteigt.
+        await h.oeffne(alt.siegle({ type: 'heartbeat' }));
+        assert.strictEqual(z.api_key, 'token');
+        // Eine ältere Sitzung unter dem neuen rückt ihn nicht nach.
+        await assert.rejects(h.oeffne(daemonSeite('neu', 'd1', 99).siegle({ type: 'heartbeat' })), (e) => e.innenhaut === 'alt');
+        assert.strictEqual(z.api_key, 'token');
+        const neu = daemonSeite('neu', 'd1', 101);
+        await h.oeffne(neu.siegle({ type: 'register', payload: { daemon_id: 'd1' } }));
+        await new Promise(r => setImmediate(r));
+        assert.deepStrictEqual([z.api_key, z.api_key_neu, gilt], ['neu', null, ['d1']]);
+        assert.ok(speicher.geschrieben.some(g => g[0] === 'token'));
+        // Der alte gilt nicht mehr, auch nicht mit einer neueren Sitzung.
+        await assert.rejects(h.oeffne(daemonSeite('token', 'd1', 102).siegle({ type: 'heartbeat' })), (e) => e.innenhaut === 'siegel');
+        // Antworten gehen unter dem neuen.
+        assert.strictEqual(neu.oeffne(h.siegle('d1', neu.sitzung, { type: 'heartbeat_ack' })).type, 'heartbeat_ack');
+    });
+    await pruefe('ein gespeicherter neuer Token gilt auch nach einem Neustart des Dashboards', async () => {
+        const z = { ...zeile(), api_key_neu: 'neu' };
+        const { h } = await neueHaut([z]);
+        await h.oeffne(daemonSeite('neu', 'd1', 101).siegle({ type: 'heartbeat' }));
+        await new Promise(r => setImmediate(r));
+        assert.deepStrictEqual([z.api_key, z.api_key_neu], ['neu', null]);
+    });
+    {
+        const tokenIpm = new IPMServer();
+        tokenIpm.Logger = Logger;
+        const sql = [];
+        tokenIpm.dbService = { query: async (s, p) => { sql.push([s.split(' ').slice(0, 6).join(' '), ...p]); return []; } };
+        tokenIpm._logDaemonEvent = async () => {};
+        const z = { daemon_id: 'd1', api_key: 'token', api_key_neu: null, innenhaut_sitzung: null, innenhaut_zaehler: 0 };
+        tokenIpm.innenhaut = new Innenhaut({ db: speicherDb([z]).db, Logger });
+        await tokenIpm.innenhaut.starte();
+        const d = daemonSeite('token', 'd1', 100);
+        await tokenIpm.innenhaut.oeffne(d.siegle({ type: 'heartbeat' }));
+        const ws = { gesendet: [], send(t) { this.gesendet.push(t); } };
+        await pruefe('nicht verbunden oder im Klartext: kein neuer Token', async () => {
+            assert.match((await tokenIpm.erneuereToken('d1')).error, /nicht verbunden/);
+            tokenIpm.connections.set('d1', { ws: { send() {} }, metadata: {} });
+            assert.match((await tokenIpm.erneuereToken('d1')).error, /Klartext/);
+            assert.deepStrictEqual(sql, [], 'trotzdem geschrieben');
+        });
+        tokenIpm.connections.set('d1', { ws: Object.assign(ws, { haut: { daemonId: 'd1', an: d.sitzung } }), metadata: {} });
+        const antworte = async (antwort) => {
+            const laeuft = tokenIpm.erneuereToken('d1');
+            for (let i = 0; i < 10 && !ws.gesendet.length; i++) await new Promise(r => setImmediate(r));
+            const befehl = d.oeffne(ws.gesendet.pop());
+            assert.strictEqual(befehl.command, 'daemon.token_erneuern');
+            assert.match(befehl.payload.token, /^[0-9a-f]{64}$/);
+            tokenIpm._resolveCommand(befehl.id, antwort);
+            return [await laeuft, befehl.payload.token];
+        };
+        await pruefe('versiegelt zum Daemon, steht in api_key_neu und gilt in der Innenhaut', async () => {
+            sql.length = 0;
+            const [ergebnis, token] = await antworte({ success: true });
+            assert.deepStrictEqual(ergebnis, { success: true });
+            assert.deepStrictEqual(sql[0], ['UPDATE rootserver SET api_key_neu = ?', token, 'd1']);
+            assert.strictEqual(tokenIpm.innenhaut.daemons.get('d1').tokenNeu, token);
+        });
+        await pruefe('lehnt der Daemon ab, wird der neue zurückgenommen', async () => {
+            sql.length = 0;
+            const [ergebnis, token] = await antworte({ success: false, error: 'yaml schreibgeschützt' });
+            assert.match(ergebnis.error, /abgelehnt: yaml schreibgeschützt/);
+            assert.deepStrictEqual(sql[1], ['UPDATE rootserver SET api_key_neu = NULL', 'd1', token]);
+            assert.strictEqual(tokenIpm.innenhaut.daemons.get('d1').tokenNeu, null);
+        });
+        await pruefe('ohne Antwort bleibt er stehen: Vielleicht hat der Daemon ihn', async () => {
+            sql.length = 0;
+            const senden = tokenIpm.sendCommand;
+            tokenIpm.sendCommand = async () => { const e = new Error('Command timeout after 30000ms'); e.code = 'frist'; throw e; };
+            const ergebnis = await tokenIpm.erneuereToken('d1');
+            tokenIpm.sendCommand = senden;
+            assert.match(ergebnis.error, /Keine Antwort/);
+            assert.strictEqual(sql.length, 1);
+            assert.ok(tokenIpm.innenhaut.daemons.get('d1').tokenNeu);
+        });
+    }
+    await pruefe('Route mit Recht und eingetipptem Namen, Knopf in der Gefahrenzone', () => {
+        const route = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'plugins/masterserver/dashboard/routes/rootserver.router.js'), 'utf8'));
+        assert.match(route, /router\.post\('\/:id\/token-erneuern', requirePermission\('MASTERSERVER\.ROOTSERVER\.EDIT'\)/);
+        assert.match(route, /String\(req\.body\?\.bestaetigung \|\| ''\)\.trim\(\) !== rootserver\.name/);
+        assert.match(route, /rootserver\.guild_id !== guildId/);
+        const seite = fs.readFileSync(path.join(WURZEL, 'plugins/masterserver/dashboard/views/guild/masterserver-rootserver-detail.ejs'), 'utf8');
+        assert.match(seite, /id="tokenErneuernOeffnen"/);
+        assert.match(seite, /rootservers\/<%= rootserver\.id %>\/token-erneuern/);
+        assert.match(seite, /knopf\.disabled = eingabe\.value\.trim\(\) !== soll/);
+        assert.doesNotMatch(seite, /api_key/, 'die Seite zeigt keinen Token');
+    });
+
     console.log('\nVerdrahtung');
     await pruefe('eine Sendestelle, Innenhaut vor dem Dock, Marken bei Heartbeat und Halt', () => {
         const q = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'apps/dashboard/helpers/IPMServer.js'), 'utf8'));
         assert.strictEqual((q.match(/ws\.send\(/g) || []).length, 2, 'ws.send nur in _sende und für die Ablehnung ohne Siegel');
         assert.ok(q.indexOf('await this.innenhaut.starte()') < q.indexOf('new BusDock('), 'die Innenhaut startet nach dem Dock');
         assert.match(q, /this\.innenhaut\?\.merke\(daemonId\)/);
+        // Angedockt wird erst nach Migrationen und Plugins: Der Bahnhof stellt die
+        // Anmeldungen sofort, und die lesen die neuen Spalten.
+        const start = q.slice(q.indexOf('async start()'), q.indexOf('async andocken()'));
+        assert.doesNotMatch(start, /new BusDock\(|innenhaut\.starte/, 'start() dockt schon an');
+        const index = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'apps/dashboard/index.js'), 'utf8'));
+        assert.ok(index.indexOf('await app.initialize()') > 0 && index.indexOf('await app.initialize()') < index.indexOf('await ipmServer.andocken()'),
+            'andocken() nicht nach app.initialize()');
         assert.match(q, /await this\.innenhaut\?\.merkeAlle\(\)/);
     });
     await pruefe('der Daemon schreibt nur versiegelt, und der Token fährt nicht mit', () => {
@@ -357,6 +469,12 @@ async function neueHaut(zeilen, jetzt = () => 1_000_000) {
             await migrationRootserver.up(db);
             const spalten = (await db.query("SHOW COLUMNS FROM rootserver LIKE 'innenhaut%'")).map(s => `${s.Field} ${s.Type} ${s.Null} ${s.Default}`);
             assert.deepStrictEqual(spalten, ['innenhaut_sitzung char(32) YES null', 'innenhaut_zaehler bigint(20) unsigned NO 0']);
+        });
+        await pruefe('api_key_neu kommt neben api_key, ein zweites Mal ändert nichts', async () => {
+            await migrationTokenNeu.up(db);
+            await migrationTokenNeu.up(db);
+            const [spalte] = await db.query("SHOW COLUMNS FROM rootserver LIKE 'api_key_neu'");
+            assert.deepStrictEqual([spalte.Type, spalte.Null], ['varchar(255)', 'YES']);
         });
         await pruefe('Marke schreiben und nach einem Neustart wieder lesen', async () => {
             await db.query(`INSERT INTO rootserver (guild_id, owner_user_id, daemon_id, name, host, api_key)

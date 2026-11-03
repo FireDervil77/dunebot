@@ -851,6 +851,38 @@ router.post('/:id/ips', requirePermission('MASTERSERVER.ROOTSERVER.EDIT'), async
 });
 
 // =====================================================
+// Route: Token erneuern (FireBus Paket 5)
+// POST /guild/:guildId/plugins/masterserver/rootservers/:id/token-erneuern
+//
+// Der neue Token fährt versiegelt zum Daemon, angezeigt wird er nie: Er wird
+// nirgends von Hand gebraucht. Bis der Daemon unter ihm spricht, gilt der alte
+// daneben weiter (IPMServer.erneuereToken).
+// =====================================================
+router.post('/:id/token-erneuern', requirePermission('MASTERSERVER.ROOTSERVER.EDIT'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const guildId = res.locals.guildId;
+    try {
+        const rootserver = await RootServer.getById(req.params.id);
+        if (!rootserver || rootserver.guild_id !== guildId) {
+            return res.status(404).json({ success: false, message: 'RootServer nicht gefunden' });
+        }
+        // Wie beim Löschen der Logs: Der Name steht auch hier noch einmal, nicht nur im Browser.
+        if (String(req.body?.bestaetigung || '').trim() !== rootserver.name) {
+            return res.status(400).json({ success: false, message: 'Zum Bestätigen den Namen des RootServers eintippen.' });
+        }
+        const ergebnis = await ServiceManager.get('ipmServer').erneuereToken(rootserver.daemon_id);
+        if (!ergebnis.success) {
+            return res.status(409).json({ success: false, message: ergebnis.error });
+        }
+        Logger.info(`[Masterserver] Token für RootServer ${rootserver.id} erneuert`);
+        res.json({ success: true, message: 'Der Daemon hat den neuen Token und verbindet sich neu. Ab dann gilt nur noch der neue.' });
+    } catch (error) {
+        Logger.error('[Masterserver] Token nicht erneuert:', error);
+        res.status(500).json({ success: false, message: 'Der Token ließ sich nicht erneuern.' });
+    }
+});
+
+// =====================================================
 // Route: IP-Adresse entfernen
 // DELETE /guild/:guildId/plugins/masterserver/rootservers/:id/ips/:ipId
 // =====================================================

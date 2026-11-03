@@ -136,6 +136,10 @@ process.on('uncaughtException', (error) => {
         await app.initialize();
         Logger.success("Dashboard-App erfolgreich initialisiert");
 
+        // Erst jetzt an den Bahnhof: Er stellt die Anmeldungen sofort, und dafür
+        // müssen Migrationen und Plugins stehen (IPMServer.andocken).
+        await ipmServer.andocken();
+
         // Kern-Widgets direkt beim Start registrieren (außerhalb des Plugin-Systems)
         const { registerAdminWidgets } = require('./helpers/AdminWidgets');
         registerAdminWidgets(

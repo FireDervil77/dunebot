@@ -162,8 +162,26 @@ class IPMServer {
         this.zaehler.starte();
         this.kontrolle.starte();
 
+        // ✅ Event-Handler für gameserver.status_changed registrieren
+        this._registerEventHandlers();
+    }
+
+    /**
+     * Dockt am Bahnhof an. Erst nach `app.initialize()` (index.js): Der Bahnhof stellt
+     * die Anmeldungen seiner Leitungen im Moment des Andockens, und dafür müssen
+     * Migrationen und Plugins stehen. Bis Paket 5 dockte schon `start()` an, die
+     * Anmeldungen liefen dann vor den Migrationen (neue Spalten fehlten) und vor den
+     * Plugins. Die Wache überbrückt die Sekunden: Fehlt das Dock länger als ihre Frist,
+     * führt sie die Maschinen als `bahnhof_weg`, nicht als offline.
+     */
+    async andocken() {
         // Vor dem Dock: Die Halle des Bahnhofs kommt gleich nach dem Andocken.
-        this.innenhaut = new Innenhaut({ db: () => this.dbService, Logger: this.Logger });
+        this.innenhaut = new Innenhaut({
+            db: () => this.dbService,
+            Logger: this.Logger,
+            tokenGilt: (daemonId) => this._logDaemonEvent(daemonId, 'token_gilt', {})
+                .catch(err => this.Logger.error('[IPMServer] Tokenwechsel nicht protokolliert:', err)),
+        });
         await this.innenhaut.starte();
 
         // Der einzige Weg zu den Daemons (FireBus Etappe 4). Der WebSocket-Server
@@ -171,9 +189,6 @@ class IPMServer {
         // niemand mehr.
         this.dock = new BusDock(this, process.env.FIREBUS_DOCK || DOCK_STANDARD);
         this.dock.starte();
-
-        // ✅ Event-Handler für gameserver.status_changed registrieren
-        this._registerEventHandlers();
 
         this.Logger.info(`[IPMServer] Dockt am Bahnhof an: ${this.dock.pfad}`);
     }
@@ -597,6 +612,40 @@ class IPMServer {
      */
     _sende(ws, nachricht) {
         ws.send(ws.haut ? this.innenhaut.siegle(ws.haut.daemonId, ws.haut.an, nachricht) : JSON.stringify(nachricht));
+    }
+
+    /**
+     * Knopf „Token erneuern" (FireBus Paket 5). Der neue Token fährt versiegelt unter dem
+     * alten zum Daemon, über eine Leitung im Klartext nie. Bis der Daemon unter dem neuen
+     * spricht, gelten beide (`Innenhaut._neuerTokenGilt`).
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    async erneuereToken(daemonId) {
+        const conn = this.connections.get(daemonId);
+        if (!conn) {
+            return { success: false, error: 'Der Daemon ist nicht verbunden. Der neue Token kommt nur über seine Leitung zu ihm.' };
+        }
+        if (!conn.ws.haut) {
+            return { success: false, error: 'Der Daemon spricht noch Klartext. Erst den Daemon aktualisieren, sonst führe der neue Token lesbar durch den Busbahnhof.' };
+        }
+        const neu = crypto.randomBytes(32).toString('hex');
+        await this.dbService.query('UPDATE rootserver SET api_key_neu = ? WHERE daemon_id = ?', [neu, daemonId]);
+        this.innenhaut.neuerToken(daemonId, neu);
+        try {
+            await this.sendCommand(daemonId, 'daemon.token_erneuern', { token: neu }, 30000);
+        } catch (error) {
+            // Ohne Antwort weiß niemand, ob der Daemon ihn hat: Dann bleibt er stehen und
+            // gilt, sobald der Daemon unter ihm spricht. Eine Ablehnung nimmt ihn zurück.
+            if (error.code !== 'frist') {
+                await this.dbService.query('UPDATE rootserver SET api_key_neu = NULL WHERE daemon_id = ? AND api_key_neu = ?', [daemonId, neu]);
+                this.innenhaut.neuerToken(daemonId, null);
+                return { success: false, error: `Der Daemon hat den neuen Token abgelehnt: ${error.message}` };
+            }
+            return { success: false, error: 'Keine Antwort vom Daemon. Hat er den Token doch bekommen, gilt er, sobald er sich unter ihm meldet, sonst bleibt der alte.' };
+        }
+        await this._logDaemonEvent(daemonId, 'token_erneuert', {})
+            .catch(err => this.Logger.error('[IPMServer] Tokenwechsel nicht protokolliert:', err));
+        return { success: true };
     }
 
     /**
@@ -1710,6 +1759,11 @@ class IPMServer {
                 // Die Spur nach dem Leeren (Masterserver, Daemon-Logs)
                 logs_geloescht:     { typ: 'status_change',  stufe: 'info',
                     satz: 'Daemon-Logs wurden gelöscht' },
+                // Knopf „Token erneuern" (FireBus Paket 5)
+                token_erneuert:     { typ: 'status_change',  stufe: 'info',
+                    satz: 'Neuer Token: Der Daemon hat ihn gespeichert und verbindet sich neu' },
+                token_gilt:         { typ: 'status_change',  stufe: 'info',
+                    satz: 'Der Daemon spricht unter dem neuen Token, der alte gilt nicht mehr' },
             };
             const eintrag = TAFEL[event]
                 || { typ: 'status_change', stufe: 'info', satz: `Daemon-Ereignis: ${event}` };
@@ -1776,7 +1830,11 @@ class IPMServer {
             const timeoutHandle = setTimeout(() => {
                 this.pendingCommands.delete(commandId);
                 this.zaehler.frist(daemonId, command);
-                reject(new Error(`Command timeout after ${timeout}ms`));
+                // Mit Kennung: Wer unterscheiden muss, ob die Antwort ausblieb, prüft
+                // nicht den Text (erneuereToken).
+                const frist = new Error(`Command timeout after ${timeout}ms`);
+                frist.code = 'frist';
+                reject(frist);
             }, timeout);
 
             // Speichern für Response-Routing

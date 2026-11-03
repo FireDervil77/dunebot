@@ -22,6 +22,10 @@ const crypto = require('crypto');
  * neueste Sitzung, und Zähler laufen nur aufwärts. Die neueste Sitzung jedes Daemons und
  * seinen höchsten Zähler schreibt das Dashboard in `rootserver` (nicht geheim), beim
  * Heartbeat, beim Wechsel der Sitzung und beim Beenden.
+ *
+ * Token erneuern: Der neue steht in `api_key_neu`, bis der Daemon eine neue Sitzung unter
+ * ihm beginnt. Erst dann rückt er nach `api_key`, und der alte gilt nicht mehr. Bis
+ * dahin gelten beide, fällt eine Seite mittendrin aus, sperrt sich niemand aus.
  */
 
 const LESBAR = ['type', 'namespace', 'action', 'id', 'command', 'frist_ms'];
@@ -146,12 +150,14 @@ function oeffneMit(schluessel, u) {
 
 class Innenhaut {
     /**
-     * @param {{db: () => {query: Function}, Logger: object, jetzt?: () => number}} teile
+     * @param {{db: () => {query: Function}, Logger: object, jetzt?: () => number,
+     *          tokenGilt?: (daemonId: string) => void}} teile
      */
-    constructor({ db, Logger, jetzt = Date.now }) {
+    constructor({ db, Logger, jetzt = Date.now, tokenGilt = () => {} }) {
         this.db = db;
         this.Logger = Logger;
         this.jetzt = jetzt;
+        this.tokenGilt = tokenGilt;
         this.sitzung = null;
         /** daemon_id → Zustand, siehe `_daemon`. */
         this.daemons = new Map();
@@ -184,12 +190,14 @@ class Innenhaut {
             this.laden.set(daemonId, (async () => {
                 try {
                     const [zeile] = await this.db().query(
-                        'SELECT api_key, innenhaut_sitzung, innenhaut_zaehler FROM rootserver WHERE daemon_id = ? LIMIT 1',
+                        'SELECT api_key, api_key_neu, innenhaut_sitzung, innenhaut_zaehler FROM rootserver WHERE daemon_id = ? LIMIT 1',
                         [daemonId]);
                     if (!zeile || !zeile.api_key) return null;
                     const sitzung = zeile.innenhaut_sitzung || null;
                     const d = {
                         k: grundschluessel(zeile.api_key, daemonId),
+                        tokenNeu: zeile.api_key_neu || null,
+                        kNeu: zeile.api_key_neu ? grundschluessel(zeile.api_key_neu, daemonId) : null,
                         geladen: this.jetzt(),
                         marke: { sitzung, nummer: sitzung ? nummerVon(sitzung) : 0, hoch: Number(zeile.innenhaut_zaehler) || 0 },
                         geschrieben: { sitzung, hoch: Number(zeile.innenhaut_zaehler) || 0 },
@@ -241,16 +249,30 @@ class Innenhaut {
         const salz = Buffer.from(u.s, 'hex');
         let schluessel = d.ein?.sitzung === u.s ? d.ein.schluessel : richtung(d.k, salz, 'd>a');
         let nachricht;
+        let mitNeuem = false;
         try {
             nachricht = oeffneMit(schluessel, u);
         } catch (error) {
-            // Vielleicht hat sich der Token geändert (Rootserver neu angelegt): einmal neu laden.
-            if (error.innenhaut !== 'siegel' || this.jetzt() - d.geladen < NEU_LADEN_MS) throw error;
-            this.daemons.delete(u.daemon);
-            d = await this._daemon(u.daemon);
-            if (!d) throw error;
-            schluessel = richtung(d.k, salz, 'd>a');
-            nachricht = oeffneMit(schluessel, u);
+            if (error.innenhaut !== 'siegel') throw error;
+            // Unter dem neuen Token spricht nur eine neue Sitzung (Token erneuern).
+            if (d.kNeu && d.marke.sitzung !== u.s) {
+                try {
+                    schluessel = richtung(d.kNeu, salz, 'd>a');
+                    nachricht = oeffneMit(schluessel, u);
+                    mitNeuem = true;
+                } catch {
+                    nachricht = null;
+                }
+            }
+            if (!mitNeuem) {
+                // Vielleicht hat sich der Token geändert (Rootserver neu angelegt): einmal neu laden.
+                if (this.jetzt() - d.geladen < NEU_LADEN_MS) throw error;
+                this.daemons.delete(u.daemon);
+                d = await this._daemon(u.daemon);
+                if (!d) throw error;
+                schluessel = richtung(d.k, salz, 'd>a');
+                nachricht = oeffneMit(schluessel, u);
+            }
         }
         // Der Vorlauf des Wizards hat eine eigene Sitzung, die nichts verbucht.
         if (nachricht.type === 'register' && nachricht.payload?.probe === true) {
@@ -258,7 +280,30 @@ class Innenhaut {
         }
         this._pruefeReihe(u.daemon, d, u);
         d.ein = { sitzung: u.s, schluessel };
+        if (mitNeuem) this._neuerTokenGilt(u.daemon, d);
         return { nachricht, daemonId: u.daemon, sitzung: u.s, probe: false };
+    }
+
+    /** Der Daemon spricht unter dem neuen Token: Ab jetzt gilt nur noch er. */
+    _neuerTokenGilt(daemonId, d) {
+        const token = d.tokenNeu;
+        d.k = d.kNeu;
+        d.kNeu = null;
+        d.tokenNeu = null;
+        d.aus.clear();
+        this.db().query('UPDATE rootserver SET api_key = api_key_neu, api_key_neu = NULL WHERE daemon_id = ? AND api_key_neu = ?',
+            [daemonId, token])
+            .then(() => this.tokenGilt(daemonId))
+            .catch(error => this.Logger.error(`[Innenhaut] Neuer Token von ${daemonId} gilt, aber nicht gespeichert`, error));
+        this.Logger.info(`[Innenhaut] ${daemonId} spricht unter dem neuen Token, der alte gilt nicht mehr`);
+    }
+
+    /** Knopf „Token erneuern": Bis der Daemon unter ihm spricht, gilt der neue neben dem alten. */
+    neuerToken(daemonId, token) {
+        const d = this.daemons.get(daemonId);
+        if (!d) return;
+        d.tokenNeu = token || null;
+        d.kNeu = token ? grundschluessel(token, daemonId) : null;
     }
 
     /** Nur die neueste Sitzung, nur aufwärts. Erst nach dem Siegel gerufen. */
