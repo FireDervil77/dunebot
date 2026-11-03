@@ -213,7 +213,7 @@ router.post('/', requirePermission('MASTERSERVER.ROOTSERVER.CREATE'), async (req
         // fallengelassen: Das INSERT kannte diese Spalten nie. Sie sind durch
         // `dbGewuenscht`/`dbJeServer` ersetzt, die wirklich ankommen.
         const {
-            name, host, daemonPort, description,
+            name, host, description,
             quotaProfileId,
             backupLimit,
             datacenter, countryCode,
@@ -249,7 +249,6 @@ router.post('/', requirePermission('MASTERSERVER.ROOTSERVER.CREATE'), async (req
             ownerUserId: res.locals.user?.id || null, // Discord User ID aus Session (optional)
             name,
             host,
-            daemonPort: parseInt(daemonPort) || 9340,
             systemUser,
             baseDirectory,
             description: description || null,
@@ -539,7 +538,7 @@ router.put('/:id', requirePermission('MASTERSERVER.ROOTSERVER.EDIT'), async (req
             });
         }
 
-        const { name, host, daemon_port, hostname, datacenter, country_code, description, ram_total_gb, disk_total_gb,
+        const { name, host, hostname, datacenter, country_code, description, ram_total_gb, disk_total_gb,
                 sftp_gewuenscht, sftp_port_wunsch, db_gewuenscht, db_je_server } = req.body;
 
         const portFehler = sftp_port_wunsch === undefined ? null
@@ -556,7 +555,6 @@ router.put('/:id', requirePermission('MASTERSERVER.ROOTSERVER.EDIT'), async (req
         await RootServer.update(rootserverId, {
             name,
             host,
-            daemon_port,
             hostname,
             datacenter,
             country_code,

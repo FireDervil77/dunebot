@@ -54,14 +54,14 @@ class RootServer {
         const result = await dbService.query(
             `INSERT INTO rootserver
              (daemon_id, guild_id, owner_user_id, name, description, hostname, host,
-              daemon_port, base_directory, api_key,
+              base_directory, api_key,
               daemon_status, install_status,
               cpu_cores, ram_total_gb, disk_total_gb,
               datacenter, country_code,
               fqdn, fastdl_enabled,
               db_gewuenscht, db_je_server, sftp_gewuenscht, sftp_port_wunsch,
               created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'offline', 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'offline', 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
             [
                 daemonId,
                 data.guildId,
@@ -70,7 +70,6 @@ class RootServer {
                 data.description   || null,
                 data.hostname      || null,
                 data.host,
-                data.daemonPort    || 9340,
                 data.baseDirectory || '/opt/firebot',
                 apiKey,
                 data.cpuCores      || null,
@@ -146,7 +145,7 @@ class RootServer {
         const dbService = ServiceManager.get('dbService');
         const allowed = [
             'name', 'description', 'host', 'hostname',
-            'daemon_port', 'base_directory',
+            'base_directory',
             'ram_total_gb', 'disk_total_gb', 'cpu_cores', 'cpu_threads', 'cpu_model',
             'ram_limit_gb', 'disk_limit_gb', 'cpu_limit_percent',
             'datacenter', 'country_code',

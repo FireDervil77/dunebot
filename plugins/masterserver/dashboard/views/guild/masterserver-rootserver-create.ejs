@@ -174,7 +174,7 @@
                     <% } %>
 
                     <div class="row">
-                        <div class="col-md-8">
+                        <div class="col-md-12">
                             <div class="mb-3">
                                 <label for="host">IP-Adresse / Host <span class="text-danger">*</span></label>
                                 
@@ -215,20 +215,8 @@
                                            name="host"
                                            placeholder="z.B. 192.168.1.100"
                                            required>
-                                    <small class="form-text text-secondary">IP-Adresse, auf der der Daemon lauscht</small>
+                                    <small class="form-text text-secondary">Öffentliche Adresse der Maschine</small>
                                 <% } %>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label for="daemonPort">Daemon-Port</label>
-                                <input type="number"
-                                       class="form-control"
-                                       id="daemonPort"
-                                       name="daemonPort"
-                                       value="9340"
-                                       min="1024" max="65535">
-                                <small class="form-text text-secondary">Standard: 9340 (WebSocket)</small>
                             </div>
                         </div>
                     </div>

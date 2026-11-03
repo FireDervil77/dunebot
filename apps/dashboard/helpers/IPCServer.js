@@ -390,7 +390,6 @@ class IPCServer {
                         ownerUserId:    owner_user_id || null,
                         name,
                         host:            host || null,
-                        daemonPort:      9340,
                         systemUser:      `guild_${shortGuildId}`,
                         baseDirectory:   '/opt/firebot',
                         ramTotalGb:      parseFloat(ram_gb),

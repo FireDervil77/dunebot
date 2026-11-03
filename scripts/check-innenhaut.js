@@ -486,6 +486,9 @@ async function neueHaut(zeilen, jetzt = () => 1_000_000, tokenGilt) {
         });
         await pruefe('die JWT-Spalten fallen weg, ein zweites Mal ändert nichts, down legt sie leer an', async () => {
             const spalten = async () => (await db.query("SHOW COLUMNS FROM rootserver LIKE 'session_token%'")).map(s => s.Field);
+            // Die Kopie folgt der echten Tabelle, und dort sind die Spalten seit dem
+            // Rollout schon weg: erst zurück, dann prüfen.
+            await migrationOhneJwt.down(db);
             assert.deepStrictEqual(await spalten(), ['session_token', 'session_token_expires_at']);
             await migrationOhneJwt.up(db);
             await migrationOhneJwt.up(db);

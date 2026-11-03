@@ -352,10 +352,6 @@
                                             <td class="text-secondary">Hostname</td>
                                             <td><%= rootserver.hostname || '–' %></td>
                                         </tr>
-                                        <tr>
-                                            <td class="text-secondary">Daemon-Port</td>
-                                            <td><code><%= rootserver.daemon_port || 9340 %></code></td>
-                                        </tr>
 
                                         <tr>
                                             <td class="text-secondary">Standort</td>
@@ -503,16 +499,10 @@ sudo journalctl -u firebot-daemon -n 50</code></pre>
                                 </div>
                             </div>
                             <div class="row">
-                                <div class="col-md-6">
+                                <div class="col-md-9">
                                     <div class="mb-3">
                                         <label>Host / IP</label>
                                         <input type="text" class="form-control" name="host" value="<%= rootserver.host || '' %>" placeholder="91.200.102.182">
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="mb-3">
-                                        <label>Daemon-Port</label>
-                                        <input type="number" class="form-control" name="daemon_port" value="<%= rootserver.daemon_port || 9340 %>">
                                     </div>
                                 </div>
                                 <div class="col-md-3">
