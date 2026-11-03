@@ -164,6 +164,8 @@ class DefaultTheme {
         am.registerScript('form-toast', 'form-toast.js', { deps: ['global-toast', 'csrf-helper'], version: this.version });
         am.registerScript('toast-notification-center', 'toast-notification-center.js', { deps: ['global-toast'], version: this.version });
         am.registerScript('button-loading', 'button-loading.js', { version: this.version });
+        // Ein Auge an jedem Kennwortfeld, auch an später eingefügten (2026-11-03).
+        am.registerScript('kennwort-auge', 'kennwort-auge.js', { version: this.version });
         // DuneDataTable. Beim Umstieg von AdminLTE auf Tabler ist es haengen
         // geblieben: das alte Theme reihte es fuer Guild-Seiten ein, dieses
         // nicht. `new DuneDataTable(...)` warf seitdem, und weil das im selben
@@ -273,6 +275,7 @@ class DefaultTheme {
         am.enqueueScript('form-toast');
         am.enqueueScript('toast-notification-center');
         am.enqueueScript('button-loading');
+        am.enqueueScript('kennwort-auge');
         am.enqueueScript('data-table');
         am.enqueueScript('guild');
         am.enqueueScript('rollstand');

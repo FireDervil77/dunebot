@@ -44,7 +44,11 @@
     var fehler = fehlerNachRegel(regelVon(feld), feld.value);
     feld.setCustomValidity(fehler || '');
     feld.style.borderColor = fehler ? 'var(--fb-danger, #dc3545)' : '';
-    var meldung = feld.parentNode && feld.parentNode.querySelector('[data-fb-regel-meldung]');
+    // Ein Kennwortfeld steckt in der Hülle seines Auges (kennwort-auge.js), die
+    // Meldung steht neben der Hülle.
+    var ort = feld.parentNode;
+    if (ort && ort.hasAttribute && ort.hasAttribute('data-kennwort-huelle')) ort = ort.parentNode;
+    var meldung = ort && ort.querySelector('[data-fb-regel-meldung]');
     if (meldung) {
       meldung.textContent = fehler || '';
       meldung.hidden = !fehler;
