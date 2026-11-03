@@ -257,8 +257,8 @@ async function pruefe(was, tun) {
         });
         await pruefe('die Serverzeile sagt, dass der Bahnhof fehlt, rot, Knöpfe gesperrt', async () => {
             const z = await zeile(g.id);
-            assert.deepStrictEqual([baueZustand(z).text, baueZustand(z).ton], ['Busbahnhof nicht erreichbar', 'red']);
-            assert.match(baueMesswerte(z).grund, /Busbahnhof nicht erreichbar seit .* letzter Stand: Läuft/);
+            assert.deepStrictEqual([baueZustand(z).text, baueZustand(z).ton], ['FireBus-Verbindung unterbrochen', 'red']);
+            assert.match(baueMesswerte(z).grund, /FireBus-Verbindung unterbrochen seit .* letzter Stand: Läuft/);
             assert.strictEqual(knopfZustand({ status: 'online', verbindung: 'bahnhof_weg' }).stop.aktiv, false);
             assert.strictEqual(pillenZustand({ status: 'online', verbindung: 'bahnhof_weg' }).sichtbar, false);
         });

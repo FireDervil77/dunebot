@@ -24,7 +24,7 @@ const PILLE = {
     maschine_weg: { text: 'Maschine nicht erreichbar', ton: 'red' },
     daemon_weg:   { text: 'Daemon nicht erreichbar',   ton: 'red' },
     // Der Daemon läuft, nur der Weg zu ihm fehlt (FireBus Etappe 4).
-    bahnhof_weg:  { text: 'Busbahnhof nicht erreichbar', ton: 'red' },
+    bahnhof_weg:  { text: 'FireBus-Verbindung unterbrochen', ton: 'red' },
     angekuendigt: { text: 'Daemon wird aktualisiert',  ton: 'blue' },
 };
 
