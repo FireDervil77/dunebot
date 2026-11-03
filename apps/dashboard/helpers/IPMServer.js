@@ -1562,6 +1562,9 @@ class IPMServer {
                     satz: 'Neuer Busbahnhof antwortete nicht, Daemon blieb beim alten' },
                 adresse_abgelehnt:  { typ: 'error',          stufe: 'warn',
                     satz: 'Daemon hat die genannte Busadresse abgelehnt' },
+                // Die Spur nach dem Leeren (Masterserver, Daemon-Logs)
+                logs_geloescht:     { typ: 'status_change',  stufe: 'info',
+                    satz: 'Daemon-Logs wurden gelöscht' },
             };
             const eintrag = TAFEL[event]
                 || { typ: 'status_change', stufe: 'info', satz: `Daemon-Ereignis: ${event}` };

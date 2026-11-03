@@ -259,7 +259,54 @@ router.post('/daemon/trigger-update', requirePermission('MASTERSERVER.DAEMON.MAN
 // =====================================================
 // Route 5: Daemon-Logs
 // URL: /guild/:guildId/plugins/masterserver/logs
+//      …/logs/export   (JSON zum Herunterladen)
+//      DELETE …/logs   (Löschen, Name eintippen)
+//
+// Bis 2026-11-03 zeigte die Seite nur die Logs des ERSTEN Rootservers der Guild
+// (`getDaemonForGuild`), bei zwei Maschinen fehlte die zweite ganz. Export und
+// Löschen riefen Routen, die es nie gab: Der Browser meldete beim Export, die
+// Datei sei auf der Website nicht verfügbar, und gelöscht wurde nie etwas.
+// Jetzt wählt man die Maschine, und alle drei Wege nehmen dieselbe Auswahl.
 // =====================================================
+
+const LOG_STUFEN = ['debug', 'info', 'warn', 'error'];
+/** Mehr kommt nicht in eine Exportdatei; ein Daemon schreibt nur Ereignisse, kein Rauschen. */
+const LOG_EXPORT_GRENZE = 50000;
+
+/**
+ * Welche Zeilen gemeint sind: Maschinen der Guild (alle oder eine) und Stufe.
+ * Eine fremde daemon_id fällt hier heraus, nie in die Abfrage.
+ */
+async function logAuswahl(guildId, quelle) {
+    const maschinen = await RootServer.getByGuild(guildId);
+    const mitDaemon = maschinen.filter(m => m.daemon_id);
+    const wunsch = String(quelle.daemon || '');
+    const gewaehlt = mitDaemon.find(m => m.daemon_id === wunsch) || null;
+    const ids = gewaehlt ? [gewaehlt.daemon_id] : mitDaemon.map(m => m.daemon_id);
+    const level = LOG_STUFEN.includes(quelle.level) ? quelle.level : null;
+
+    let wo = 'guild_id = ? AND daemon_id IN (?)';
+    const werte = [guildId, ids];
+    if (level) {
+        wo += ' AND level = ?';
+        werte.push(level);
+    }
+    return {
+        maschinen: mitDaemon, gewaehlt, ids, level, wo, werte,
+        namen: new Map(mitDaemon.map(m => [m.daemon_id, m.name])),
+    };
+}
+
+/** Metadaten als Objekt: Sie stehen als JSON-Text in der Tabelle. */
+function logMetadaten(roh) {
+    try {
+        const w = typeof roh === 'string' ? JSON.parse(roh) : roh;
+        return w && typeof w === 'object' && Object.keys(w).length ? w : null;
+    } catch {
+        return null;
+    }
+}
+
 router.get('/logs', requirePermission('MASTERSERVER.LOGS.VIEW'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
@@ -269,109 +316,136 @@ router.get('/logs', requirePermission('MASTERSERVER.LOGS.VIEW'), async (req, res
         res.locals.pluginName = 'masterserver';
         req.params.pluginName = 'masterserver';
 
-        // Daemon prüfen
-        const daemon = await getDaemonForGuild(guildId);
-        if (!daemon) {
+        const a = await logAuswahl(guildId, req.query);
+        if (!a.maschinen.length) {
             return res.redirect(`/guild/${guildId}/plugins/masterserver/rootservers`);
         }
+        const limit = [50, 100, 200, 500].includes(parseInt(req.query.limit)) ? parseInt(req.query.limit) : 100;
 
-        // Filter aus Query-Params
-        const level = req.query.level || null;
-        const limit = parseInt(req.query.limit) || 100;
+        // `mysql2` setzt das Array hinter IN (?) selbst ein: query, nicht execute.
+        // ── Namen gegen das echte Schema (Befund 2026-09-07) ──────────────
+        // Die Ansicht liest timestamp, log_id, source und metadata als Objekt;
+        // umgeformt wird hier, eine kaputte Zeile kostet ihr Feld, nicht die Seite.
+        const roh = await dbService.rawQuery(
+            `SELECT * FROM daemon_logs WHERE ${a.wo} ORDER BY created_at DESC, id DESC LIMIT ?`,
+            [...a.werte, limit]);
+        const logs = (roh || []).map((z) => ({
+            ...z,
+            log_id: z.id,
+            timestamp: z.created_at,
+            source: z.event_type || 'daemon',
+            aktion: z.action || null,
+            maschine: a.namen.get(z.daemon_id) || z.daemon_id,
+            metadata: logMetadaten(z.metadata),
+        }));
 
-        // Logs laden
-        let query = `
-            SELECT * FROM daemon_logs 
-            WHERE daemon_id = ?
-        `;
-        const params = [daemon.daemon_id];
+        const [stats] = await dbService.rawQuery(
+            `SELECT COUNT(*) AS total,
+                    SUM(level = 'error') AS errors, SUM(level = 'warn') AS warnings, SUM(level = 'info') AS info
+               FROM daemon_logs WHERE guild_id = ? AND daemon_id IN (?)`, [guildId, a.ids]);
 
-        if (level) {
-            query += ' AND level = ?';
-            params.push(level);
-        }
-
-        query += ' ORDER BY created_at DESC LIMIT ?';
-        params.push(limit);
-
-        // ── Die Zeilen in die Form bringen, die die Ansicht erwartet ──────
-        //
-        // Befund des Betreibers (2026-09-07): "Invalid Date | daemon | Daemon
-        // Event: reconnected" und Details, die nur `0: {  1: "` zeigen.
-        //
-        // Gemessen, beides Namensfehler gegen das echte Schema:
-        //
-        //   die Ansicht las   es gibt aber
-        //   log.timestamp     created_at        -> new Date(undefined)
-        //   log.log_id        id
-        //   log.source        (nichts) - dafuer event_type und action
-        //   log.metadata      eine JSON-ZEICHENKETTE, kein Objekt
-        //
-        // Das letzte erklaert die Zeichensuppe: `Object.entries("{...}")` geht
-        // ueber die Buchstaben, nicht ueber die Felder - Feld "0" ist "{",
-        // Feld "1" ist ein Anfuehrungszeichen.
-        //
-        // Umgeformt wird HIER und nicht in der Ansicht: Die Ansicht bekommt
-        // dieselben Namen wie ihre Schwester im Fenster (das Detailfenster
-        // baut aus derselben Liste), und eine kaputte Zeile kostet ihr Feld,
-        // nicht die Seite.
-        const rohLogs = await dbService.query(query, params);
-        const logs = (rohLogs || []).map((z) => {
-            let metadaten = null;
-            try {
-                const w = typeof z.metadata === 'string' ? JSON.parse(z.metadata) : z.metadata;
-                // Ein leeres Objekt ist keine Auskunft - dann soll die Ansicht
-                // gar keinen Details-Knopf anbieten.
-                if (w && typeof w === 'object' && Object.keys(w).length) metadaten = w;
-            } catch { /* unlesbare Metadaten kosten das Feld, nicht die Zeile */ }
-
-            return {
-                ...z,
-                log_id: z.id,
-                timestamp: z.created_at,
-                // Woher die Zeile stammt: `event_type` ist die Gattung
-                // (reconnect, disconnect, heartbeat_lost ...), `action` das
-                // rohe Wort. Beide zeigen, statt "daemon" hinzuschreiben.
-                source: z.event_type || 'daemon',
-                aktion: z.action || null,
-                metadata: metadaten
-            };
-        });
-
-        // Stats berechnen
-        const statsQuery = `
-            SELECT 
-                COUNT(*) as total,
-                SUM(CASE WHEN level = 'error' THEN 1 ELSE 0 END) as errors,
-                SUM(CASE WHEN level = 'warn' THEN 1 ELSE 0 END) as warnings,
-                SUM(CASE WHEN level = 'info' THEN 1 ELSE 0 END) as info
-            FROM daemon_logs 
-            WHERE daemon_id = ?
-        `;
-        const statsResult = await dbService.query(statsQuery, [daemon.daemon_id]);
-        const stats = statsResult[0] || { total: 0, errors: 0, warnings: 0, info: 0 };
-
-        // Retention-Days aus Config
         const retentionDays = parseInt(await dbService.getConfig('masterserver', 'LOG_RETENTION_DAYS', 'shared', guildId) || '30');
 
         await renderView(res, 'guild/masterserver-logs', {
             title: 'Daemon-Logs',
             activeMenu: `/guild/${guildId}/plugins/masterserver/logs`,
-            daemon,
+            maschinen: a.maschinen.map(m => ({ daemon_id: m.daemon_id, name: m.name, id: m.id })),
+            gewaehlt: a.gewaehlt ? a.gewaehlt.daemon_id : '',
             logs,
-            level,
+            level: a.level,
             limit,
-            stats,
+            stats: {
+                total: Number(stats?.total) || 0, errors: Number(stats?.errors) || 0,
+                warnings: Number(stats?.warnings) || 0, info: Number(stats?.info) || 0,
+            },
             retentionDays,
             guildId
         });
 
     } catch (error) {
         Logger.error('[Masterserver] Logs Error:', error);
-        res.status(500).render('error', { 
+        res.status(500).render('error', {
             message: 'Fehler beim Laden der Logs',
-            error: error.message 
+            error: error.message
         });
+    }
+});
+
+router.get('/logs/export', requirePermission('MASTERSERVER.LOGS.VIEW'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    const guildId = res.locals.guildId;
+
+    try {
+        const a = await logAuswahl(guildId, req.query);
+        if (!a.maschinen.length) return res.status(404).json({ success: false, message: 'Kein Rootserver mit Daemon.' });
+
+        const roh = await dbService.rawQuery(
+            `SELECT * FROM daemon_logs WHERE ${a.wo} ORDER BY created_at, id LIMIT ?`,
+            [...a.werte, LOG_EXPORT_GRENZE]);
+        const zeilen = (roh || []).map(z => ({
+            zeit: z.created_at,
+            maschine: a.namen.get(z.daemon_id) || null,
+            daemon_id: z.daemon_id,
+            level: z.level,
+            typ: z.event_type,
+            aktion: z.action,
+            meldung: z.message,
+            metadaten: logMetadaten(z.metadata),
+        }));
+
+        const teil = a.gewaehlt ? a.gewaehlt.name : 'alle';
+        const datei = `daemon-logs-${teil}-${new Date().toISOString().slice(0, 10)}.json`
+            .replace(/[^A-Za-z0-9._-]+/g, '-');
+        res.setHeader('Content-Disposition', `attachment; filename="${datei}"`);
+        res.type('application/json').send(JSON.stringify({
+            erstellt: new Date().toISOString(),
+            maschinen: a.gewaehlt ? [a.gewaehlt.name] : a.maschinen.map(m => m.name),
+            level: a.level,
+            anzahl: zeilen.length,
+            gekappt: zeilen.length >= LOG_EXPORT_GRENZE,
+            zeilen,
+        }, null, 2));
+    } catch (error) {
+        Logger.error('[Masterserver] Log-Export fehlgeschlagen:', error);
+        res.status(500).json({ success: false, message: 'Der Export ist fehlgeschlagen.' });
+    }
+});
+
+/**
+ * Löscht die Logs der gewählten Maschine, oder aller Maschinen der Guild.
+ * Verlangt den eingetippten Namen auch hier, nicht nur im Fenster: Ein Aufruf
+ * ohne Fenster soll nicht aus Versehen alles leeren.
+ */
+router.delete('/logs', requirePermission('MASTERSERVER.DAEMON.MANAGE'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    const guildId = res.locals.guildId;
+
+    try {
+        const a = await logAuswahl(guildId, { daemon: req.body?.daemon });
+        if (!a.maschinen.length) return res.status(404).json({ success: false, message: 'Kein Rootserver mit Daemon.' });
+        const soll = a.gewaehlt ? a.gewaehlt.name : 'ALLE';
+        if (String(req.body?.bestaetigung || '').trim() !== soll) {
+            return res.status(400).json({ success: false, message: `Zum Löschen „${soll}" eintippen.` });
+        }
+
+        const ergebnis = await dbService.rawQuery(`DELETE FROM daemon_logs WHERE ${a.wo}`, a.werte);
+        const anzahl = ergebnis?.affectedRows || 0;
+        const info = req.session?.user?.info || {};
+        const wer = info.username ? `${info.username} (${info.id})` : String(info.id || 'unbekannt');
+        Logger.info(`[Masterserver] ${anzahl} Daemon-Log(s) gelöscht von ${wer}: ${soll}`);
+
+        // Eine Spur bleibt: Wer leert, steht danach als erste Zeile im Log.
+        const ipm = ServiceManager.has('ipmServer') ? ServiceManager.get('ipmServer') : null;
+        for (const id of a.ids) {
+            await ipm?._logDaemonEvent(id, 'logs_geloescht', { von: wer, anzahl });
+        }
+
+        res.json({ success: true, anzahl, message: `${anzahl} Log-Einträge gelöscht.` });
+    } catch (error) {
+        Logger.error('[Masterserver] Logs löschen fehlgeschlagen:', error);
+        res.status(500).json({ success: false, message: 'Die Logs ließen sich nicht löschen.' });
     }
 });
 

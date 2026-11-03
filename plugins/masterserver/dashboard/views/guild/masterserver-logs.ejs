@@ -1,4 +1,12 @@
 <!-- Masterserver Daemon Logs -->
+<%# Seit 2026-11-03 je Maschine wählbar; Export und Löschen gehen an echte Routen
+    (guild.router.js, Route 5) und nehmen dieselbe Auswahl wie die Liste. %>
+<%
+  const rechte = (locals.userPermissions && userPermissions.permissions) || {};
+  const darfLoeschen = Boolean((locals.userPermissions && userPermissions.is_owner) || rechte['MASTERSERVER.DAEMON.MANAGE']);
+  const gewaehlteMaschine = maschinen.find(m => m.daemon_id === gewaehlt) || null;
+  const mehrere = maschinen.length > 1;
+%>
 <div class="container-fluid">
   <div class="row">
     <!-- Page Header -->
@@ -17,6 +25,15 @@
       <div class="card">
         <div class="card-body p-2">
           <form method="GET" action="/guild/<%= guildId %>/plugins/masterserver/logs" class="form-inline">
+            <div class="mb-3 me-3">
+              <label class="me-2">Maschine:</label>
+              <select name="daemon" class="form-control form-control-sm" onchange="this.form.submit()">
+                <option value="">Alle (<%= maschinen.length %>)</option>
+                <% maschinen.forEach(function (m) { %>
+                  <option value="<%= m.daemon_id %>" <%= gewaehlt === m.daemon_id ? 'selected' : '' %>><%= m.name %></option>
+                <% }) %>
+              </select>
+            </div>
             <div class="mb-3 me-3">
               <label class="me-2">Level:</label>
               <select name="level" class="form-control form-control-sm" onchange="this.form.submit()">
@@ -50,11 +67,12 @@
       <button type="button" class="btn btn-success" onclick="window.location.reload()">
         <i class="fa-solid fa-refresh me-1"></i> Aktualisieren
       </button>
-      <button type="button" class="btn btn-warning" onclick="exportLogs()">
+      <a class="btn btn-warning" download
+         href="/guild/<%= guildId %>/plugins/masterserver/logs/export?daemon=<%= encodeURIComponent(gewaehlt) %>&level=<%= encodeURIComponent(level || '') %>">
         <i class="fa-solid fa-download me-1"></i> Exportieren
-      </button>
-      <% if (daemon && daemon.daemon_id) { %>
-        <button type="button" class="btn btn-danger" onclick="clearLogs()">
+      </a>
+      <% if (darfLoeschen) { %>
+        <button type="button" class="btn btn-danger" id="logsLoeschenOeffnen">
           <i class="fa-solid fa-trash me-1"></i> Löschen
         </button>
       <% } %>
@@ -147,8 +165,9 @@
                   <tr>
                     <th width="5%">Level</th>
                     <th width="15%">Timestamp</th>
+                    <% if (mehrere && !gewaehlt) { %><th width="12%">Maschine</th><% } %>
                     <th width="15%">Source</th>
-                    <th width="50%">Message</th>
+                    <th width="<%= mehrere && !gewaehlt ? 38 : 50 %>%">Message</th>
                     <th width="15%">Details</th>
                   </tr>
                 </thead>
@@ -186,6 +205,7 @@
                           second: '2-digit'
                         }) %></small>
                       </td>
+                      <% if (mehrere && !gewaehlt) { %><td><%= log.maschine %></td><% } %>
                       <%# Gattung und rohes Wort - vorher stand hier fest
                           "daemon", weil `log.source` nie existierte. %>
                       <td>
@@ -226,7 +246,7 @@
                 <p>Es gibt keine Logs mit Level: <strong><%= level %></strong></p>
                 <a href="/guild/<%= guildId %>/plugins/masterserver/logs" class="btn btn-primary">Filter zurücksetzen</a>
               <% } else { %>
-                <p>Der Daemon hat noch keine Logs geschrieben.</p>
+                <p><%= gewaehlteMaschine ? gewaehlteMaschine.name + ' hat' : 'Die Daemons haben' %> noch keine Logs geschrieben.</p>
               <% } %>
             </div>
           <% } %>
@@ -246,6 +266,40 @@
     </div>
   </div>
 </div>
+
+<% if (darfLoeschen) { %>
+<%# Zerstörende Rückfrage nach Vorlage #paketEntfernenModal: rot, fett, Name eintippen. %>
+<div class="modal modal-blur fade" id="logsLoeschenModal" tabindex="-1" aria-labelledby="logsLoeschenTitel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content border border-danger border-2">
+      <div class="modal-status bg-danger"></div>
+      <div class="modal-header bg-danger-lt">
+        <h5 class="modal-title text-danger fw-bold" id="logsLoeschenTitel">
+          <i class="fa-solid fa-triangle-exclamation me-2"></i>Daemon-Logs ENDGÜLTIG löschen
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-danger fw-bold fs-3 mb-2">
+          <% if (gewaehlteMaschine) { %>Alle Logs von „<%= gewaehlteMaschine.name %>" werden gelöscht.<% } else { %>Die Logs ALLER <%= maschinen.length %> Maschinen werden gelöscht.<% } %>
+        </p>
+        <p class="text-danger fw-bold mb-3">Das lässt sich nicht zurücknehmen.</p>
+        <p class="mb-3">Es gehen <%= stats.total %> Einträge, unabhängig vom Level-Filter. Wer gelöscht hat, steht danach als erste Zeile im Log. Vorher exportieren, wenn du sie aufheben willst.</p>
+        <label class="form-label fw-bold" for="logsLoeschenEingabe">
+          Zum Bestätigen eintippen: <span class="font-monospace text-danger" id="logsLoeschenSoll"><%= gewaehlteMaschine ? gewaehlteMaschine.name : 'ALLE' %></span>
+        </label>
+        <input type="text" class="form-control font-monospace" id="logsLoeschenEingabe" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal">Abbrechen</button>
+        <button type="button" class="btn btn-danger fw-bold" id="logsLoeschenKnopf" disabled>
+          <i class="fa-solid fa-trash me-1"></i>Endgültig löschen
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<% } %>
 
 <!-- Log Details Modal -->
 <div class="modal fade" id="logDetailsModal" tabindex="-1" role="dialog">
@@ -280,13 +334,21 @@
 // fenster() kommt aus guild.js — dort ist es die einzige Definition im Projekt.
 // Eine Kopie an dieser Stelle ueberschrieb sie je nach Ladereihenfolge.
 
-const logsData = <%- JSON.stringify(logs) %>;
+// `<` als \u003c: Eine Meldung mit `</script>` beendete sonst diesen Block.
+const logsData = <%- JSON.stringify(logs).replace(/</g, '\\u003c') %>;
+
+/** Text für innerHTML: Meldungen und Metadaten kommen vom Daemon und von außen. */
+function esc(wert) {
+  return String(wert === undefined || wert === null ? '' : wert)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
 
 function showLogDetails(index) {
   const log = logsData[index];
   
   if (!log) {
-    GuildAjax.showToast('error', 'Log nicht gefunden');
+    GuildAjaxHandler.showToast('error', 'Log nicht gefunden');
     return;
   }
   
@@ -303,11 +365,11 @@ function showLogDetails(index) {
       <tbody>
         <tr>
           <th width="30%">Log-ID:</th>
-          <td><code>${log.log_id}</code></td>
+          <td><code>${esc(log.log_id)}</code></td>
         </tr>
         <tr>
           <th>Level:</th>
-          <td><span class="badge bg-${levelColor}-lt">${log.level.toUpperCase()}</span></td>
+          <td><span class="badge bg-${levelColor}-lt">${esc(String(log.level).toUpperCase())}</span></td>
         </tr>
         <tr>
           <th>Timestamp:</th>
@@ -315,18 +377,22 @@ function showLogDetails(index) {
         </tr>
         <tr>
           <th>Source:</th>
-          <td><code>${log.source || 'daemon'}</code></td>
+          <td><code>${esc(log.source || 'daemon')}</code></td>
         </tr>
         <tr>
           <th>Message:</th>
-          <td>${log.message}</td>
+          <td>${esc(log.message)}</td>
+        </tr>
+        <tr>
+          <th>Maschine:</th>
+          <td>${esc(log.maschine)}</td>
         </tr>
       </tbody>
     </table>
     
     ${log.metadata && Object.keys(log.metadata).length > 0 ? `
       <h6 class="mt-3">Metadata:</h6>
-      <pre class="bg-dark text-white p-3 rounded" style="max-height: 300px; overflow-y: auto;"><code>${JSON.stringify(log.metadata, null, 2)}</code></pre>
+      <pre class="bg-dark text-white p-3 rounded" style="max-height: 300px; overflow-y: auto;"><code>${esc(JSON.stringify(log.metadata, null, 2))}</code></pre>
     ` : ''}
   `;
   
@@ -334,56 +400,42 @@ function showLogDetails(index) {
   fenster('logDetailsModal')?.show();
 }
 
-function exportLogs() {
-  const guildId = '<%= guildId %>';
-  const level = '<%= level || "" %>';
-  const limit = '<%= limit %>';
-  
-  const params = new URLSearchParams();
-  if (level) params.append('level', level);
-  params.append('limit', limit);
-  params.append('format', 'json');
-  
-  const url = `/guild/${guildId}/plugins/masterserver/logs/export?${params.toString()}`;
-  
-  // Erstelle unsichtbaren Download-Link
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `daemon-logs-${Date.now()}.json`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  
-  GuildAjax.showToast('info', 'Export gestartet...');
-}
+// Löschen: Knopf bleibt gesperrt, bis der Name genau dasteht; der Server prüft ihn noch einmal.
+(function () {
+  const oeffnen = document.getElementById('logsLoeschenOeffnen');
+  const modalEl = document.getElementById('logsLoeschenModal');
+  if (!oeffnen || !modalEl) return;
+  const eingabe = document.getElementById('logsLoeschenEingabe');
+  const knopf = document.getElementById('logsLoeschenKnopf');
+  const soll = document.getElementById('logsLoeschenSoll').textContent;
 
-function clearLogs() {
-  if (!confirm('Wirklich ALLE Logs löschen? Diese Aktion kann nicht rückgängig gemacht werden!')) {
-    return;
-  }
-  
-  const guildId = '<%= guildId %>';
-  
-  fetch(`/guild/${guildId}/plugins/masterserver/logs`, {
-    method: 'DELETE',
-    headers: {
-      'Content-Type': 'application/json'
-    }
-  })
-  .then(response => response.json())
-  .then(result => {
-    if (result.success) {
-      GuildAjax.showToast('success', result.message || 'Logs gelöscht');
-      setTimeout(() => window.location.reload(), 1500);
-    } else {
-      GuildAjax.showToast('error', result.message || 'Fehler beim Löschen');
-    }
-  })
-  .catch(error => {
-    console.error('Clear logs error:', error);
-    GuildAjax.showToast('error', 'Netzwerkfehler');
+  oeffnen.addEventListener('click', function () {
+    eingabe.value = '';
+    knopf.disabled = true;
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
   });
-}
+  eingabe.addEventListener('input', function () {
+    knopf.disabled = eingabe.value.trim() !== soll;
+  });
+  knopf.addEventListener('click', async function () {
+    knopf.disabled = true;
+    try {
+      const r = await fetch('/guild/<%= guildId %>/plugins/masterserver/logs', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ daemon: <%- JSON.stringify(gewaehlt) %>, bestaetigung: eingabe.value.trim() })
+      });
+      const d = await r.json();
+      if (!r.ok || !d.success) throw new Error(d.message || 'Nicht gelöscht.');
+      bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+      GuildAjaxHandler.showToast('success', d.message);
+      setTimeout(function () { window.location.reload(); }, 1200);
+    } catch (e) {
+      knopf.disabled = eingabe.value.trim() !== soll;
+      GuildAjaxHandler.showToast('error', e.message);
+    }
+  });
+})();
 
 // Highlight log rows on hover
 document.addEventListener('DOMContentLoaded', function() {
