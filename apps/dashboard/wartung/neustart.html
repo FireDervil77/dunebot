@@ -1,0 +1,59 @@
+<!doctype html>
+<!--
+  „Gleich zurück": Der Apache zeigt diese Seite statt „Service Unavailable", wenn das
+  Dashboard nicht antwortet, meist für die Sekunden eines Neustarts (ErrorDocument 502
+  und 503, siehe apache.conf). Sie fragt selbst nach und lädt neu, sobald das Panel
+  wieder da ist. Alles, was sie braucht, liefert der Apache unter /_wartung/.
+-->
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Gleich zurück · FireBot</title>
+  <link rel="icon" href="/_wartung/kit/logo/web/avatar-64.png">
+  <link rel="stylesheet" href="/_wartung/seite.css">
+</head>
+<body>
+  <main class="buehne">
+    <img class="buehne__bild" src="/_wartung/kit/hero/BG_News_Blog_Header_1920x1080.png" alt="">
+    <div class="buehne__inhalt">
+      <img class="marke" src="/_wartung/kit/logo/FireBot_Logo_horizontal.png" alt="FireBot – firenetworks.de" width="1221" height="512">
+      <div class="titel"><h1>Wir sind gleich zurück</h1></div>
+      <div class="zeile">We'll be right back</div>
+      <p class="text">Das Panel startet gerade neu, meist dauert das nur ein paar Sekunden. Deine Gameserver und der Bot laufen in der Zeit weiter. Die Seite lädt von selbst neu, sobald alles wieder da ist.</p>
+      <p class="text text--zweit">The panel is restarting, which usually takes a few seconds. Your game servers and the bot keep running. This page reloads by itself once everything is back.</p>
+      <div class="knoepfe">
+        <button type="button" class="knopf" id="nochmal">Neu laden</button>
+        <span class="puls" aria-live="polite">
+          <span class="puls__punkte" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span id="stand">Prüfe, ob das Panel wieder da ist …</span>
+        </span>
+      </div>
+    </div>
+  </main>
+  <script>
+    (function () {
+      // Solange der Apache 502/503/504 antwortet, läuft das Dashboard noch nicht.
+      var WARTEN = [502, 503, 504];
+      var TAKT_MS = 3000;
+      var beginn = Date.now();
+      var stand = document.getElementById('stand');
+
+      function pruefe() {
+        fetch(location.href, { cache: 'no-store', credentials: 'same-origin' })
+          .then(function (r) {
+            if (WARTEN.indexOf(r.status) === -1) return location.reload();
+            var s = Math.round((Date.now() - beginn) / 1000);
+            stand.textContent = 'Noch nicht da, seit ' + s + ' s · prüfe weiter …';
+            setTimeout(pruefe, TAKT_MS);
+          })
+          .catch(function () { setTimeout(pruefe, TAKT_MS); });
+      }
+
+      document.getElementById('nochmal').addEventListener('click', function () { location.reload(); });
+      setTimeout(pruefe, TAKT_MS);
+    })();
+  </script>
+</body>
+</html>

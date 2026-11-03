@@ -1,0 +1,48 @@
+<!doctype html>
+<!--
+  Vorlage der Wartungsseite. Das Dashboard füllt sie unter /admin/wartung und legt das
+  Ergebnis als aktiv/wartung.html ab (helpers/Wartung.js). Liegt die Datei dort, zeigt
+  der Apache allen außer /admin diese Seite, auch wenn das Dashboard danach aus ist.
+  Die Platzhalter in doppelten geschweiften Klammern füllt Wartung.baue, escaped.
+-->
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Wartungsarbeiten · FireBot</title>
+  <link rel="icon" href="/_wartung/kit/logo/web/avatar-64.png">
+  <link rel="stylesheet" href="/_wartung/seite.css">
+</head>
+<body>
+  <main class="buehne">
+    <img class="buehne__bild" src="/_wartung/kit/hero/BG_News_Blog_Header_1920x1080.png" alt="">
+    <div class="buehne__inhalt">
+      <img class="marke" src="/_wartung/kit/logo/FireBot_Logo_horizontal.png" alt="FireBot – firenetworks.de" width="1221" height="512">
+      <div class="titel"><h1>Wartungsarbeiten</h1></div>
+      <div class="zeile">{{ZEILE}}</div>
+      <p class="text">{{TEXT_DE}}</p>
+      <p class="text text--zweit">{{TEXT_EN}}</p>
+      <div class="knoepfe">
+        <span class="puls" aria-live="polite">
+          <span class="puls__punkte" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span>Die Seite lädt von selbst neu, sobald wir fertig sind.</span>
+        </span>
+      </div>
+    </div>
+  </main>
+  <script>
+    (function () {
+      // Ist die Wartung aus, antwortet dieselbe Adresse nicht mehr mit 503.
+      var TAKT_MS = 30000;
+      function pruefe() {
+        fetch(location.href, { cache: 'no-store', credentials: 'same-origin' })
+          .then(function (r) { if (r.status !== 503) location.reload(); else setTimeout(pruefe, TAKT_MS); })
+          .catch(function () { setTimeout(pruefe, TAKT_MS); });
+      }
+      // In der Vorschau unter /admin steht die Seite in einem iframe und soll still bleiben.
+      if (window.top === window.self) setTimeout(pruefe, TAKT_MS);
+    })();
+  </script>
+</body>
+</html>

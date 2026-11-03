@@ -93,3 +93,6 @@ streamerbot_must_haves/
 allgemeine_todos_gesamtes_project.md
 # Fremde Egg-Sammlungen (Pelican/Pterodactyl) — nur zum Sichten, nie ins Repo
 fremd-vorlagen/
+
+# Wartungsseite: vom Dashboard geschaltet, vom Apache gelesen (helpers/Wartung.js)
+apps/dashboard/wartung/aktiv/

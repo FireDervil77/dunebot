@@ -332,6 +332,44 @@ router.get('/firebus', async (req, res) => {
 });
 
 // ================================================================
+// WARTUNGSSEITE
+// Geschaltet wird hier, ausgeliefert vom Apache (helpers/Wartung.js).
+// ================================================================
+
+router.get('/wartung', async (req, res) => {
+    const themeManager = ServiceManager.get('themeManager');
+    const Wartung = require('../helpers/Wartung');
+    await themeManager.renderView(res, 'admin/wartung', {
+        title: 'Wartungsseite',
+        activeMenu: '/admin/wartung',
+        wartung: Wartung.stand(),
+        maxText: Wartung.MAX_TEXT,
+    });
+});
+
+/** Die Seite, wie der Apache sie zeigen würde, mit dem Text aus dem Formular. */
+router.post('/wartung/vorschau', (req, res) => {
+    try {
+        res.type('html').send(require('../helpers/Wartung').baue(req.body));
+    } catch (error) {
+        res.status(error.status || 500).type('text').send(error.message);
+    }
+});
+
+router.post('/wartung', (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const info = req.session?.user?.info || {};
+    const wer = info.username ? `${info.username} (${info.id})` : String(info.id || 'unbekannt');
+    try {
+        const stand = require('../helpers/Wartung').setze(req.body, req.body?.an === true, wer);
+        res.json({ success: true, wartung: stand });
+    } catch (error) {
+        if (!error.status) Logger.error('[Wartung] Nicht geschaltet:', error);
+        res.status(error.status || 500).json({ success: false, message: error.message });
+    }
+});
+
+// ================================================================
 // TOAST-HISTORY
 // ================================================================
 

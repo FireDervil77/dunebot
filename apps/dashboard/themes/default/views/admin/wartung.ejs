@@ -1,0 +1,157 @@
+<%# Wartungsseite schalten (2026-11-03). Ausgeliefert wird sie vom Apache, nicht von
+    hier: Das Dashboard legt nur die fertige Seite ab (helpers/Wartung.js), damit sie
+    auch steht, wenn das Dashboard für längere Arbeiten aus ist. %>
+<%
+  const w = wartung;
+  const seit = w.geaendert_am ? new Date(w.geaendert_am).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' }) : null;
+%>
+<div class="container-fluid">
+  <div class="alert alert-warning d-none" id="wartungApache">
+    <i class="fa-solid fa-triangle-exclamation me-2"></i>Die Apache-Regeln fehlen noch: <code>/_wartung/</code> kommt nicht vom Apache. Bis sie eingebunden sind, wirkt der Schalter nicht, und die Vorschau steht ohne Gestaltung da. Einbinden: <code>Include /home/firedervil/dunebot_prod/apps/dashboard/wartung/apache.conf</code>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-5">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h3 class="card-title mb-0"><i class="fa-solid fa-person-digging me-2"></i>Wartungsseite</h3>
+          <span class="badge <%= w.an ? 'bg-red text-red-fg' : 'bg-secondary-lt' %>" id="wartungAbzeichen"><%= w.an ? 'Eingeschaltet' : 'Aus' %></span>
+        </div>
+        <div class="card-body">
+          <p class="text-secondary">Eingeschaltet sehen alle Besucher diese Seite statt der Website, angemeldete Nutzer eingeschlossen. Durch kommen nur <code>/admin</code>, die Anmeldung und die Rückrufe von außen. Der Apache zeigt sie auch dann, wenn das Dashboard aus ist.</p>
+
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" role="switch" id="wartungAn" <%= w.an ? 'checked' : '' %>>
+            <label class="form-check-label fw-bold" for="wartungAn">Wartungsseite anzeigen</label>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" for="wartungDe">Text auf Deutsch</label>
+            <textarea class="form-control" id="wartungDe" rows="3" maxlength="<%= maxText %>" placeholder="<%= w.vorgabe.text_de %>"><%= w.text_de %></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="wartungEn">Text auf Englisch</label>
+            <textarea class="form-control" id="wartungEn" rows="3" maxlength="<%= maxText %>" placeholder="<%= w.vorgabe.text_en %>"><%= w.text_en %></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="wartungBis">Voraussichtlich bis <span class="text-secondary">(freiwillig)</span></label>
+            <input class="form-control" type="datetime-local" id="wartungBis" value="<%= w.bis || '' %>">
+          </div>
+
+          <div class="d-flex flex-wrap align-items-center gap-2">
+            <button type="button" class="btn btn-primary" id="wartungSpeichern"><i class="fa-solid fa-floppy-disk me-1"></i>Texte speichern</button>
+            <a class="btn btn-outline-secondary" href="/_wartung/neustart.html" target="_blank" rel="noopener">„Gleich zurück"-Seite ansehen</a>
+          </div>
+          <div class="text-secondary small mt-3" id="wartungZuletzt"><% if (seit) { %>Zuletzt geändert <%= seit %><%= w.geaendert_von ? ' von ' + w.geaendert_von : '' %>.<% } %></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-7">
+      <div class="card">
+        <div class="card-header"><h3 class="card-title mb-0">Vorschau</h3></div>
+        <div class="card-body p-0">
+          <iframe id="wartungVorschau" title="Vorschau der Wartungsseite" style="display:block;width:100%;height:520px;border:0;background:#0f0d14"></iframe>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="wartungModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fa-solid fa-person-digging me-2"></i>Wartungsseite einschalten?</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+      </div>
+      <div class="modal-body">
+        <p class="fw-bold mb-2">Die Website ist dann für alle außer Admins nicht erreichbar.</p>
+        <p class="text-secondary mb-0">Besucher und angemeldete Nutzer sehen die Wartungsseite, bis du sie hier wieder ausschaltest. Gameserver, Bot und Daemons laufen weiter.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abbrechen</button>
+        <button type="button" class="btn btn-warning" id="wartungBestaetigen">Einschalten</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var schalter = document.getElementById('wartungAn');
+  var felder = { text_de: document.getElementById('wartungDe'), text_en: document.getElementById('wartungEn'), bis: document.getElementById('wartungBis') };
+  var vorschau = document.getElementById('wartungVorschau');
+  var abzeichen = document.getElementById('wartungAbzeichen');
+  var modalEl = document.getElementById('wartungModal');
+
+  function daten(an) {
+    return { an: an, text_de: felder.text_de.value, text_en: felder.text_en.value, bis: felder.bis.value };
+  }
+
+  function melde(art, text) {
+    if (window.GuildAjaxHandler && GuildAjaxHandler.showToast) GuildAjaxHandler.showToast(art, text);
+  }
+
+  function zeige(stand) {
+    schalter.checked = stand.an;
+    abzeichen.textContent = stand.an ? 'Eingeschaltet' : 'Aus';
+    abzeichen.className = 'badge ' + (stand.an ? 'bg-red text-red-fg' : 'bg-secondary-lt');
+    if (stand.geaendert_am) {
+      document.getElementById('wartungZuletzt').textContent = 'Zuletzt geändert ' +
+        new Date(stand.geaendert_am).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' }) +
+        (stand.geaendert_von ? ' von ' + stand.geaendert_von : '') + '.';
+    }
+  }
+
+  /** `bisher`: So steht der Schalter, wenn es nicht klappt. */
+  async function sende(an, meldung, bisher) {
+    try {
+      var r = await fetch('/admin/wartung', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(daten(an))
+      });
+      var d = await r.json();
+      if (!r.ok || !d.success) throw new Error(d.message || 'Nicht gespeichert.');
+      zeige(d.wartung);
+      melde('success', meldung);
+    } catch (e) {
+      schalter.checked = bisher;
+      melde('error', e.message);
+    }
+  }
+
+  var zeitgeber = null;
+  async function zeichne() {
+    try {
+      var r = await fetch('/admin/wartung/vorschau', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(daten(schalter.checked))
+      });
+      var html = await r.text();
+      if (r.ok) vorschau.srcdoc = html;
+    } catch (e) { /* Die Vorschau holt es beim nächsten Tippen nach. */ }
+  }
+  function bald() { clearTimeout(zeitgeber); zeitgeber = setTimeout(zeichne, 500); }
+
+  schalter.addEventListener('change', function () {
+    if (!schalter.checked) return sende(false, 'Wartungsseite ausgeschaltet.', true);
+    // Einschalten fragt nach: Danach sieht niemand außer Admins die Website.
+    schalter.checked = false;
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+  });
+  document.getElementById('wartungBestaetigen').addEventListener('click', function () {
+    bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+    sende(true, 'Wartungsseite eingeschaltet.', false);
+  });
+  document.getElementById('wartungSpeichern').addEventListener('click', function () {
+    sende(schalter.checked, schalter.checked ? 'Text der Wartungsseite geändert.' : 'Texte gespeichert.', schalter.checked);
+  });
+  Object.keys(felder).forEach(function (k) { felder[k].addEventListener('input', bald); });
+
+  // Kommt /_wartung/ vom Apache? Sonst wirkt der Schalter nicht, und das soll man sehen.
+  fetch('/_wartung/seite.css', { method: 'HEAD', cache: 'no-store' })
+    .then(function (r) { if (!r.ok) document.getElementById('wartungApache').classList.remove('d-none'); })
+    .catch(function () { document.getElementById('wartungApache').classList.remove('d-none'); });
+
+  zeichne();
+})();
+</script>
