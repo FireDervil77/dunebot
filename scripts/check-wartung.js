@@ -107,7 +107,8 @@ pruefe('während der Wartung kommen Admin, Anmeldung, Rückrufe und die Seite se
     const ausnahmen = [...conf.matchAll(/RewriteCond %\{REQUEST_URI\} !(\S+)/g)].map(m => new RegExp(m[1]));
     const durch = (url) => ausnahmen.some(r => r.test(url));
     for (const url of ['/admin', '/admin/wartung', '/auth/callback', '/api/twitch/webhook', '/api/core/toasts/log',
-        '/_wartung/seite.css', '/themes/default/assets/js/guild.js', '/downloads/daemon/version.json']) {
+        '/_wartung/seite.css', '/themes/default/assets/js/guild.js', '/downloads/daemon/version.json',
+        '/api/migration/23/stream']) {
         assert.ok(durch(url), `${url} wäre gesperrt`);
     }
     for (const url of ['/', '/guild', '/guild/1/plugins/gameserver', '/kb', '/api/guild/1', '/administrator']) {
