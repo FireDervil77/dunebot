@@ -948,6 +948,8 @@ function baueInstallation(server) {
 const INSTALL_PHASE = {
     pulling_image:   'Laufzeit-Abbild wird geholt',
     installing_game: 'Spiel wird installiert',
+    // Das Update vor einem Start („Mit Update starten", Daemon ab 1.1.16).
+    updating_game:   'Spiel wird aktualisiert',
     cleanup:         'wird aufgeräumt',
 };
 

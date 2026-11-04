@@ -67,6 +67,13 @@ const roh = (datei) => fs.existsSync(datei) ? fs.readFileSync(datei, 'utf8') : n
     pruefe(/melderNach\([^)]*protocol\.NSInstall[^)]*"installing_game"\)/.test(paket)
             && /"phase":\s*phase/.test(paket) && /"steps":/.test(paket),
         'Phasen und Schrittzahl gehen mit');
+    // Seit 2026-11-04 meldet auch das Update vor einem Start über denselben
+    // Melder, mit eigener Phase — vorher kamen nur die Zeilen an.
+    pruefe(/melderNach\([^)]*protocol\.NSInstall[^)]*"updating_game"\)/.test(paket)
+            && /melde:\s*melde,/.test(paket),
+        'das Update meldet mit Phase updating_game und reicht den ganzen Fortschritt durch');
+    pruefe(/updating_game:\s*'/.test(ohneKommentare(roh(path.join(WURZEL, 'plugins/gameserver/dashboard/helpers/Serverseite.js')) || '')),
+        'die Serverseite hat einen Text für updating_game');
 
     // ── Dashboard: annehmen und wegschreiben ─────────────────────────────────
     console.log('\nDashboard — annehmen, wegschreiben, weitergeben');
