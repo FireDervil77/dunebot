@@ -123,13 +123,11 @@
         
         <h6 class="fw-bold"><%= tr('dunemap:DASHBOARD.COMMANDS.STORM_TIMER') %></h6>
         <ul class="list-unstyled mb-3">
+          <%# `/storm set` und `/storm reset` gibt es nicht mehr (2026-11-04): Der
+              Timer rechnet aus der Server-Region in den Einstellungen. %>
           <li class="mb-2">
-            <code>/storm set 05:12:30</code>
-            <small class="text-secondary d-block"><%= tr('dunemap:DASHBOARD.COMMANDS.STORM_SET') %></small>
-          </li>
-          <li class="mb-2">
-            <code>/storm reset</code>
-            <small class="text-secondary d-block"><%= tr('dunemap:DASHBOARD.COMMANDS.STORM_RESET') %></small>
+            <code>/storm</code>
+            <small class="text-secondary d-block"><%= tr('dunemap:DASHBOARD.COMMANDS.STORM_SHOW') %></small>
           </li>
         </ul>
         

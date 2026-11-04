@@ -19,7 +19,7 @@
       "AUTO_RECALC": "Automatic Timer Recalculation",
       "CHANNEL": "Discord Map Channel ID",
       "BUTTON": "Go to Settings",
-      "INFO": "Settings can be found in the bot configuration under \"DuneMap\""
+      "INFO": "Settings can be found under Settings → DuneMap"
     },
     
     "COMMANDS": {
@@ -30,8 +30,7 @@
       "MAP_SET": "Place marker in sector A5 of type \"titan\"",
       "MAP_REMOVE": "Remove marker from sector A5 (Admin)",
       "STORM_TIMER": "Storm Timer:",
-      "STORM_SET": "Set storm timer to 05:12:30",
-      "STORM_RESET": "Reset storm timer",
+      "STORM_SHOW": "Countdown to the next storm, calculated from the server region",
       "TUTORIAL": "Tutorial",
       "TUTORIAL_DESC": "Display interactive tutorial"
     },

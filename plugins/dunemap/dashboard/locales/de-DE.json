@@ -19,7 +19,7 @@
       "AUTO_RECALC": "Automatische Timer-Neuberechnung",
       "CHANNEL": "Discord Map-Channel ID",
       "BUTTON": "Zu den Einstellungen",
-      "INFO": "Einstellungen findest du in der Bot-Konfiguration unter \"DuneMap\""
+      "INFO": "Einstellungen findest du unter Einstellungen → DuneMap"
     },
     
     "COMMANDS": {
@@ -30,8 +30,7 @@
       "MAP_SET": "Marker in Sektor A5 vom Typ \"titan\" setzen",
       "MAP_REMOVE": "Marker aus Sektor A5 entfernen (Admin)",
       "STORM_TIMER": "Storm-Timer:",
-      "STORM_SET": "Timer setzen (Format: DD:HH:MM, Admin)",
-      "STORM_RESET": "Timer zurücksetzen (Admin)",
+      "STORM_SHOW": "Countdown bis zum nächsten Sturm, berechnet aus der Server-Region",
       "TUTORIAL": "Tutorial:",
       "TUTORIAL_DESC": "Anleitung für DuneMap anzeigen"
     },
@@ -133,7 +132,7 @@
       "CHANNEL_TITLE": "Map-Channel",
       "CHANNEL_TEXT": "Der Channel, in dem die Marker-Commands funktionieren. Stelle sicher, dass der Bot Schreibrechte hat!",
       "SECTORS_TITLE": "Dune-Sektoren",
-      "SECTORS_TEXT": "Die Karte verwendet das Sektor-System (A1-I9). Marker werden mit <code>/marker add A5 titan</code> gesetzt."
+      "SECTORS_TEXT": "Die Karte verwendet das Sektor-System (A1-I9). Marker werden mit <code>/map set A5 titan</code> gesetzt."
     },
     
     "CURRENT_CONFIG": {
