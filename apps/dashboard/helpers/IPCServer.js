@@ -774,8 +774,10 @@ class IPCServer {
                     if (!srv.daemon_id) return message.reply({ success: false, error: 'Kein Daemon zugewiesen' });
                     if (!ipmServer?.isDaemonOnline(srv.daemon_id)) return message.reply({ success: false, error: 'Daemon ist offline' });
 
+                    // `update` nur vom Slash-Befehl (`/server start update:`), die
+                    // Panel-Knöpfe schicken es nicht und starten ohne (2026-11-04).
                     const { payload: startPayload, error: payloadError, dockerImage } =
-                        await buildStartPayload(srv, guildId, Logger);
+                        await buildStartPayload(srv, guildId, Logger, { update: payload.update === true });
 
                     if (payloadError) {
                         Logger.error(`[IPC/Gameserver] ${payloadError} (Server ${serverId})`);
@@ -801,7 +803,7 @@ class IPCServer {
                         require('../../../plugins/gameserver/dashboard/helpers/PanelService').pushZustandswechsel(serverId);
                         return message.reply({ success: false, error: grund });
                     }
-                    return message.reply({ success: true, data: { name: srv.name } });
+                    return message.reply({ success: true, data: { name: srv.name, mit_update: Boolean(startPayload.auto_update) } });
                 }
 
                 // ── Gameserver stoppen ──────────────────────────────────────────────────
@@ -848,7 +850,8 @@ class IPCServer {
                     if (!srv.daemon_id) return message.reply({ success: false, error: 'Kein Daemon zugewiesen' });
                     if (!ipmServer?.isDaemonOnline(srv.daemon_id)) return message.reply({ success: false, error: 'Daemon ist offline' });
 
-                    const { payload: restartPayload, error: payloadError } = await buildStartPayload(srv, guildId, Logger);
+                    const { payload: restartPayload, error: payloadError } =
+                        await buildStartPayload(srv, guildId, Logger, { update: payload.update === true });
                     if (payloadError) {
                         Logger.error(`[IPC/Gameserver] ${payloadError} (Server ${serverId})`);
                         return message.reply({ success: false, error: payloadError });
@@ -867,7 +870,7 @@ class IPCServer {
                         return message.reply({ success: false, error: grund });
                     }
                     await dbService.query('UPDATE gameservers SET last_started_at = NOW() WHERE id = ?', [serverId]);
-                    return message.reply({ success: true, data: { name: srv.name } });
+                    return message.reply({ success: true, data: { name: srv.name, mit_update: Boolean(restartPayload.auto_update) } });
                 }
 
                 // ── Status-Panel: sofortige Abfrage (Button "Neu laden") ─────────────────

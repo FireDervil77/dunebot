@@ -175,7 +175,11 @@ function ohneEgg(payload) {
         assert.strictEqual(updateBeimStart(p, true), false);
     });
 
-    await check('Nur Starten und Neu starten fragen: geplante Aufgaben, Absturz und Bot starten ohne', async () => {
+    // Seit 2026-11-04 (Betreiber) fragt auch der Slash-Befehl: `/server start`
+    // und `/server restart` haben `update:`. Die Knöpfe an den Discord-Panels
+    // gehen über dieselben IPC-Fälle, schicken das Feld aber nicht — sie bleiben
+    // ohne, ein versehentlicher Klick soll kein SteamCMD-Lauf werden.
+    await check('Nur Starten und Neu starten fragen (Panel und Slash-Befehl): geplante Aufgaben, Absturz und Panel-Knöpfe starten ohne', async () => {
         const fs = require('fs');
         const { ohneKommentare } = require('./lib/quelltext');
         const lies = (p) => ohneKommentare(fs.readFileSync(path.join(__dirname, '..', p), 'utf8'));
@@ -185,10 +189,17 @@ function ohneEgg(payload) {
             ...lies('apps/dashboard/helpers/IPCServer.js').matchAll(/buildStartPayload\(([^)]*)\)/g),
         ].map(m => m[1].replace(/\s+/g, ' ').trim());
         const mit = aufrufe.filter(a => /update/.test(a));
-        assert.deepStrictEqual(mit, ['server, guildId, Logger, { update: mitUpdate }', 'server, guildId, Logger, { update: mitUpdate }'],
-            `Aufrufe mit Update-Wahl: ${JSON.stringify(mit)} — erwartet genau zwei (Start- und Neustart-Route)`);
+        assert.deepStrictEqual(mit, [
+            'server, guildId, Logger, { update: mitUpdate }', 'server, guildId, Logger, { update: mitUpdate }',
+            'srv, guildId, Logger, { update: payload.update === true }', 'srv, guildId, Logger, { update: payload.update === true }',
+        ], `Aufrufe mit Update-Wahl: ${JSON.stringify(mit)} — erwartet vier (Start- und Neustart-Route, SERVER_START und SERVER_RESTART)`);
         assert.ok(aufrufe.length >= 5, `nur ${aufrufe.length} Aufrufe gefunden — der Wächter sucht an der falschen Stelle`);
         assert.match(lies('plugins/gameserver/dashboard/routes/servers.js'), /const mitUpdate = istWahr\(req\.body\?\.update\)/);
+        const befehl = lies('plugins/gameserver/bot/commands/server.js');
+        assert.strictEqual((befehl.match(/getBoolean\('update'\) === true/g) || []).length, 2,
+            '/server start und /server restart lesen die Option update nicht beide');
+        assert.doesNotMatch(lies('plugins/gameserver/bot/events/interactionCreate.js'), /update/,
+            'die Panel-Knöpfe schicken ein update — sie sollen ohne starten');
     });
 
     await check('Die Spalte auto_update schreibt niemand mehr (Anlegen, Bot, Bearbeiten)', async () => {

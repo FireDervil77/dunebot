@@ -9,6 +9,7 @@
         "SUB_RESTART": "Restart a gameserver",
         "SUB_MOVE": "Move server to another root server",
         "OPT_ID": "Gameserver ID",
+        "OPT_UPDATE": "Fetch the newest version via Steam first (default: no)",
         "OPT_SERVER": "Gameserver (to be moved)",
         "OPT_TARGET_ROOTSERVER": "Target root server (where the server will be moved)",
         "OPT_ROOTSERVER": "Rootserver (where the gameserver will be created)",

@@ -13,9 +13,9 @@ const { ServiceManager } = require('dunebot-core');
  *   list  [status] [rootserver] [search]   — Gameserver auflisten (Filter + Suche)
  *   status <id>                            — Detailstatus eines Gameservers (Autocomplete)
  *   create <rootserver> <addon> <name> ... — Neuen Gameserver erstellen
- *   start <id>                             — Gameserver starten (Autocomplete)
+ *   start <id> [update]                    — Gameserver starten (Autocomplete)
  *   stop <id>                              — Gameserver stoppen (Autocomplete)
- *   restart <id>                           — Gameserver neustarten (Autocomplete)
+ *   restart <id> [update]                  — Gameserver neustarten (Autocomplete)
  *   move <server> <target_rootserver>      — Server zwischen RootServern verschieben
  *
  * @type {import('dunebot-sdk').CommandType}
@@ -126,6 +126,12 @@ module.exports = {
                         required: true,
                         autocomplete: true,
                     },
+                    {
+                        name: 'update',
+                        type: ApplicationCommandOptionType.Boolean,
+                        description: 'gameserver:SERVER.OPT_UPDATE',
+                        required: false,
+                    },
                 ],
             },
             // ── stop ──────────────────────────────────────────────────────────────────
@@ -155,6 +161,12 @@ module.exports = {
                         description: 'gameserver:SERVER.OPT_ID',
                         required: true,
                         autocomplete: true,
+                    },
+                    {
+                        name: 'update',
+                        type: ApplicationCommandOptionType.Boolean,
+                        description: 'gameserver:SERVER.OPT_UPDATE',
+                        required: false,
                     },
                 ],
             },            // ── move ──────────────────────────────────────────────────────────
@@ -479,15 +491,23 @@ module.exports = {
                 // 2026-08-01 kam das Feld nur von den Panel-Buttons, der Slash-Befehl
                 // begnügte sich mit `ManageGuild`. Betreiber-Entscheidung: scharf
                 // schalten (Konzept 23.5) – wer startet, braucht GAMESERVER.START.
+                //
+                // `update` wie „Mit Update starten" im Panel (2026-11-04, Betreiber).
+                // Bis dahin startete der Bot immer ohne (abgesprochen 2026-10-16).
+                // Die Knöpfe an den Discord-Panels schicken das Feld nicht und
+                // bleiben ohne Update: Ein versehentlicher Klick soll kein
+                // SteamCMD-Lauf werden.
                 case 'start': {
-                    const id  = interaction.options.getInteger('id');
+                    const id     = interaction.options.getInteger('id');
+                    const update = interaction.options.getBoolean('update') === true;
                     const res = await ipcClient.sendToDashboard('gameserver:SERVER_START', {
-                        guild_id: guildId, server_id: id,
+                        guild_id: guildId, server_id: id, update,
                         actor_user_id: interaction.user.id,
                     });
                     if (!res?.success) return interaction.followUp({ embeds: [_errEmbed(res?.error)] });
                     return interaction.followUp({
-                        embeds: [_infoEmbed('▶️ Server startet', `**${res.data?.name}** wird gestartet...`)],
+                        embeds: [_infoEmbed('▶️ Server startet',
+                            `**${res.data?.name}** ${_updateSatz(update, res.data?.mit_update, 'gestartet')}`)],
                     });
                 }
 
@@ -506,14 +526,16 @@ module.exports = {
 
                 // ── /server restart <id> ──────────────────────────────────────────────
                 case 'restart': {
-                    const id  = interaction.options.getInteger('id');
+                    const id     = interaction.options.getInteger('id');
+                    const update = interaction.options.getBoolean('update') === true;
                     const res = await ipcClient.sendToDashboard('gameserver:SERVER_RESTART', {
-                        guild_id: guildId, server_id: id,
+                        guild_id: guildId, server_id: id, update,
                         actor_user_id: interaction.user.id,
                     });
                     if (!res?.success) return interaction.followUp({ embeds: [_errEmbed(res?.error)] });
                     return interaction.followUp({
-                        embeds: [_infoEmbed('🔄 Server neustart', `**${res.data?.name}** wurde neu gestartet.`)],
+                        embeds: [_infoEmbed('🔄 Server neustart',
+                            `**${res.data?.name}** ${_updateSatz(update, res.data?.mit_update, 'neu gestartet')}`)],
                     });
                 }
                 // ── /server move <server> <target_rootserver> ───────────────────────
@@ -946,6 +968,17 @@ function _infoEmbed(title, desc) {
         .setTitle(title)
         .setDescription(desc || '')
         .setTimestamp();
+}
+
+/**
+ * Der Satz nach dem Namen. `mitUpdate` sagt das Dashboard (`auto_update` im
+ * Auftrag): Ein Spiel ohne SteamCMD-Schritt startet trotz `update:` ohne —
+ * das soll dastehen, statt ein Update zu versprechen, das nicht kommt.
+ */
+function _updateSatz(gewuenscht, mitUpdate, tat) {
+    if (mitUpdate) return `wird aktualisiert und ${tat}. Je nach Spiel dauert das einige Minuten.`;
+    if (gewuenscht) return `wird ${tat}, ohne Update: Dieses Spiel kommt nicht über Steam.`;
+    return `wird ${tat}.`;
 }
 
 /**
