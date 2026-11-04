@@ -73,17 +73,32 @@ log_error() {
     echo -e "${RED}[✗]${NC} $1"
 }
 
+# Bei `curl ... | sudo bash` ist stdin das Skript selbst. Ein `read` von dort
+# bekam die Zeile hinter `main "$@"` oder das Ende der Pipe, nie die Antwort
+# des Menschen — gemessen am 2026-11-04: Die Deinstallation entfernte so
+# ungefragt Container und Images (Vorgabe „ja"). Gefragt wird deshalb am
+# Terminal. `-r /dev/tty` reicht als Prüfung nicht: Die Datei ist auch ohne
+# steuerndes Terminal lesbar, erst das Öffnen scheitert.
+hat_terminal() {
+    { : < /dev/tty; } 2>/dev/null
+}
+
 prompt_yes_no() {
     local prompt="$1"
     local default="${2:-n}"
-    
+
     if [[ "$default" == "y" ]]; then
         prompt="$prompt [Y/n]: "
     else
         prompt="$prompt [y/N]: "
     fi
-    
-    read -p "$prompt" response
+
+    if hat_terminal; then
+        read -r -p "$prompt" response < /dev/tty
+    else
+        response=""
+        log_warn "Kein Terminal — Vorgabe für „$1\": $default"
+    fi
     response=${response:-$default}
     
     if [[ "$response" =~ ^[Yy]$ ]]; then
@@ -540,7 +555,7 @@ run_setup_wizard() {
     # Bei `curl ... | sudo bash` ist stdin das Skript selbst — ein interaktiver
     # Dialog kann dort nichts lesen. Dann bleibt es beim zweiten Befehl, und das
     # wird gesagt statt stillschweigend uebersprungen.
-    if [[ ! -r /dev/tty ]]; then
+    if ! hat_terminal; then
         log_warn "Kein Terminal verfuegbar (Installation ueber eine Pipe)."
         log_info  "Der Einrichtungsdialog muss darum von Hand gestartet werden:"
         log_info  "   sudo ${INSTALL_DIR}/${BINARY_NAME}"
@@ -770,6 +785,16 @@ uninstall() {
     echo -e "${RED}║${NC}     ${YELLOW}⚠️  FireBot Daemon Deinstallation${NC}         ${RED}║${NC}"
     echo -e "${RED}╚═══════════════════════════════════════════════════╝${NC}"
     echo ""
+    # Die Fragen unten entscheiden über Container, Images und Spieldaten. Ohne
+    # jemanden, der antwortet, gälten still die Vorgaben — „ja" für Container
+    # und Images. Dann lieber gar nicht deinstallieren.
+    if ! hat_terminal; then
+        log_error "Die Deinstallation fragt einzeln nach und braucht dafür ein Terminal."
+        log_info  "Per SSH angemeldet ausführen:"
+        log_info  "   curl -fsSL https://firenetworks.de/downloads/daemon/install.sh | sudo bash -s -- --uninstall"
+        exit 1
+    fi
+
     log_warn "Deinstalliere FireBot Daemon..."
     echo ""
     
