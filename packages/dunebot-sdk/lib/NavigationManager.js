@@ -178,7 +178,7 @@ class NavigationManager {
             
             // Alle bestehenden Navigations-Items für dieses Plugin in dieser Guild laden
             const existing = await dbService.query(
-                "SELECT id, url, parent, type, sort_order, title, icon, abschnitt, capability FROM guild_nav_items WHERE plugin = ? AND guildId = ?",
+                "SELECT id, url, parent, type, sort_order, title, icon, abschnitt, capability, visible FROM guild_nav_items WHERE plugin = ? AND guildId = ?",
                 [pluginName, guildId]
             );
             
@@ -220,6 +220,12 @@ class NavigationManager {
                 if (item.icon       != null && item.icon       !== alt.icon)       felder.icon = item.icon;
                 if (item.abschnitt  !== undefined && (item.abschnitt || null) !== alt.abschnitt) felder.abschnitt = item.abschnitt || null;
                 if (item.capability != null && item.capability !== alt.capability) felder.capability = item.capability;
+                // `visible` nur, wenn das Plugin es ausdruecklich sagt (2026-11-04).
+                // Vorher galt es nur beim Anlegen: Eine Seite, die ein Plugin
+                // ausblendet (DuneMap „Interaktive Karte", Ansicht fehlte), blieb
+                // in jeder Guild sichtbar, die den Punkt schon hatte. Eine
+                // Oberflaeche, die `visible` von Hand setzt, gibt es nicht.
+                if (typeof item.visible === 'boolean' && (item.visible ? 1 : 0) !== Number(alt.visible)) felder.visible = item.visible ? 1 : 0;
 
                 const erklaert = Number(item.order);
                 if (Number.isFinite(erklaert) && erklaert >= 1000 && erklaert !== Number(alt.sort_order)) {

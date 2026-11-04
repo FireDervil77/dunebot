@@ -1000,6 +1000,10 @@ class DuneMapPlugin extends DashboardPlugin {
                 visible: true,
                 capability: 'DUNEMAP.ADMIN.MANAGE' // Punkte, nicht Unterstriche: siehe check-rechte-schluessel.js
             },
+            // Interaktive Karte - DISABLED (2026-11-04): Die Route rendert
+            // `guild/dunemap-map`, die Ansicht gab es nie — der Punkt führte für
+            // jeden mit DUNEMAP.VIEW auf „Fehler beim Laden der Karte". Wie die
+            // drei darunter erst sichtbar, wenn es die Ansicht gibt.
             {
                 title: 'dunemap:NAV.INTERACTIVE_MAP',
                 path: `/guild/${guildId}/plugins/dunemap/map`,
@@ -1007,7 +1011,7 @@ class DuneMapPlugin extends DashboardPlugin {
                 order: 15,
                 parent: `/guild/${guildId}/plugins/dunemap`,
                 type: 'main',
-                visible: true,
+                visible: false,
                 capability: 'DUNEMAP.VIEW'
             },
             // Quest-Finder Navigation - DISABLED (noch nicht implementiert)
