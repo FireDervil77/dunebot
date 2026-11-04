@@ -359,7 +359,7 @@ class DuneMapPlugin extends DashboardPlugin {
             });
             
             // POST: Settings speichern
-            this.guildRouter.post('/settings', requirePermission('DUNEMAP.SETTINGS_EDIT'), async (req, res) => {
+            this.guildRouter.post('/settings', requirePermission('DUNEMAP.SETTINGS.EDIT'), async (req, res) => {
                 const guildId = res.locals.guildId;
                 const dbService = ServiceManager.get('dbService');
                 const i18n = ServiceManager.get('i18n');
@@ -463,7 +463,7 @@ class DuneMapPlugin extends DashboardPlugin {
             });
 
             // === API: Marker CRUD für Leaflet Map ===
-            this.guildRouter.post('/map/marker', requirePermission('DUNEMAP.MARKERS_CREATE'), async (req, res) => {
+            this.guildRouter.post('/map/marker', requirePermission('DUNEMAP.MARKERS.CREATE'), async (req, res) => {
                 const guildId = res.locals.guildId;
                 const dbService = ServiceManager.get('dbService');
                 const { action, markerId, sectorX, sectorY, posX, posY, markerType, label, notes } = req.body;
@@ -523,7 +523,7 @@ class DuneMapPlugin extends DashboardPlugin {
             });
 
             // === ADMIN-INTERFACE (Sektor-Karte mit Marker-Editor) ===
-            this.guildRouter.get('/admin', requirePermission('DUNEMAP.ADMIN_MANAGE'), async (req, res) => {
+            this.guildRouter.get('/admin', requirePermission('DUNEMAP.ADMIN.MANAGE'), async (req, res) => {
                 const Logger = ServiceManager.get('Logger');
                 const guildId = res.locals.guildId;
                 const dbService = ServiceManager.get('dbService');
@@ -629,7 +629,7 @@ class DuneMapPlugin extends DashboardPlugin {
             });
             
             // POST: Marker erstellen/löschen
-            this.guildRouter.post('/admin/marker', requirePermission('DUNEMAP.MARKERS_CREATE'), async (req, res) => {
+            this.guildRouter.post('/admin/marker', requirePermission('DUNEMAP.MARKERS.CREATE'), async (req, res) => {
                 const guildId = res.locals.guildId;
                 const dbService = ServiceManager.get('dbService');
                 const Logger = ServiceManager.get('Logger');
@@ -998,7 +998,7 @@ class DuneMapPlugin extends DashboardPlugin {
                 parent: `/guild/${guildId}/plugins/dunemap`,
                 type: 'main',
                 visible: true,
-                capability: 'DUNEMAP.ADMIN_MANAGE' // ✅ UPPERCASE! Admin-Bereich
+                capability: 'DUNEMAP.ADMIN.MANAGE' // Punkte, nicht Unterstriche: siehe check-rechte-schluessel.js
             },
             {
                 title: 'dunemap:NAV.INTERACTIVE_MAP',
@@ -1053,7 +1053,7 @@ class DuneMapPlugin extends DashboardPlugin {
                 parent: `/guild/${guildId}/settings`,  // ← Parent ist Core-Settings!
                 type: 'main',
                 visible: true,
-                capability: 'DUNEMAP.SETTINGS_EDIT' // ✅ UPPERCASE! Settings-Bereich
+                capability: 'DUNEMAP.SETTINGS.EDIT'
             }
         ];
 
