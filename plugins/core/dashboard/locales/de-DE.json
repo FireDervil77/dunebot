@@ -204,18 +204,11 @@
       "LOCALE_LABEL": "Standard-Sprache",
       "LOCALE_HELP": "Die Standard-Sprache für Bot-Antworten und Dashboard-Inhalte",
       "THEME_LABEL": "Dashboard-Theme",
-      "THEME_HELP": "Weitere Themes werden in zukünftigen Updates hinzugefügt",
-      "THEME_DEFAULT": "Standard (Hell)",
-      "THEME_DARK": "Dark Mode (bald verfügbar)",
-      "THEME_NORD": "Nord Theme (bald verfügbar)",
+      "THEME_HELP": "Das Aussehen deines Dashboards wählst du unter Themes.",
+      "THEME_LINK": "Zu den Themes",
       "FEATURES_TITLE": "Features",
       "SLASH_LABEL": "Slash-Commands aktivieren",
       "SLASH_HELP": "Ermöglicht die Nutzung von Discord Slash-Commands (<code>/help</code> statt <code>!help</code>)",
-      "VERBOSE_LABEL": "Erweiterte Logs",
-      "VERBOSE_HELP": "Protokolliert alle Bot-Aktionen detailliert (für Administratoren empfohlen)",
-      "DEBUG_LABEL": "Debug-Modus",
-      "DEBUG_BADGE": "Für Entwickler",
-      "DEBUG_HELP": "Zeigt erweiterte Fehlerinfos und technische Details (kann die Performance beeinträchtigen)",
       "RESET_BTN": "Zurücksetzen",
       "SAVE_BTN": "Einstellungen speichern"
     },
@@ -224,10 +217,7 @@
       "PREFIX_TITLE": "Bot-Präfix",
       "PREFIX_TEXT": "Wähle ein eindeutiges Präfix, das nicht mit anderen Bots kollidiert. Beliebte Präfixe: <code>!</code>, <code>?</code>, <code>.</code>",
       "SLASH_TITLE": "Slash-Commands",
-      "SLASH_TEXT": "Slash-Commands sind die moderne Alternative zu Text-Befehlen. Sie bieten Auto-Vervollständigung und sind benutzerfreundlicher.",
-      "DEBUG_TITLE": "Debug-Modus",
-      "DEBUG_WARNING": "Achtung!",
-      "DEBUG_TEXT": "Der Debug-Modus sollte nur aktiviert werden, wenn du technische Probleme analysierst."
+      "SLASH_TEXT": "Slash-Commands sind die moderne Alternative zu Text-Befehlen. Sie bieten Auto-Vervollständigung und sind benutzerfreundlicher."
     },
     "STATUS": {
       "TITLE": "Aktuelle Konfiguration",

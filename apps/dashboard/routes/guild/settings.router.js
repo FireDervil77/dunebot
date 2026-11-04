@@ -45,7 +45,9 @@ router.get('/general', requirePermission('CORE.SETTINGS.VIEW'), async (req, res)
     res.locals.pluginName = 'core';
     req.params.pluginName = 'core';
 
-    const settings = { prefix: '!', locale: 'de-DE', theme: 'default', slashCommands: true };
+    // Kein `THEME` mehr (2026-11-04): Das aktive Theme steht in `guild_themes`
+    // und wird unter /themes gesetzt. `configs.THEME` las niemand.
+    const settings = { prefix: '!', locale: 'de-DE', slashCommands: true };
 
     try {
         const configs = await dbService.query(`
@@ -54,13 +56,12 @@ router.get('/general', requirePermission('CORE.SETTINGS.VIEW'), async (req, res)
             WHERE plugin_name = 'core'
               AND guild_id = ?
               AND context = 'shared'
-              AND config_key IN ('PREFIX_COMMANDS_PREFIX', 'LOCALE', 'THEME', 'INTERACTIONS_SLASH')
+              AND config_key IN ('PREFIX_COMMANDS_PREFIX', 'LOCALE', 'INTERACTIONS_SLASH')
         `, [guildId]);
 
         const keyMap = {
             'PREFIX_COMMANDS_PREFIX': 'prefix',
             'LOCALE': 'locale',
-            'THEME': 'theme',
             'INTERACTIONS_SLASH': 'slashCommands'
         };
 
@@ -80,12 +81,24 @@ router.get('/general', requirePermission('CORE.SETTINGS.VIEW'), async (req, res)
 
     const languagesMeta = i18n.languagesMeta || [];
 
+    // Die Statuskarte nennt das Theme, das wirklich gilt — dieselbe Quelle wie
+    // die Themes-Seite, nicht mehr `configs.THEME`.
+    let aktivesTheme = null;
+    try {
+        const name = await themeManager.getThemeForGuild(guildId);
+        const theme = (await themeManager.getInstalledThemes()).find(t => t.name === name);
+        aktivesTheme = theme?.displayName || name;
+    } catch (err) {
+        Logger.warn(`[KernSettings] Aktives Theme nicht lesbar: ${err.message}`);
+    }
+
     await themeManager.renderView(res, 'guild/settings/general', {
         title: 'Allgemeine Einstellungen',
         activeMenu: `/guild/${guildId}/settings/general`,
         guildId,
         settings,
-        languagesMeta
+        languagesMeta,
+        aktivesTheme
     });
 });
 
@@ -94,13 +107,12 @@ router.put('/general', requirePermission('CORE.SETTINGS.EDIT'), async (req, res)
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     const guildId = res.locals.guildId;
-    const { prefix, locale, theme, slashCommands } = req.body;
+    const { prefix, locale, slashCommands } = req.body;
 
     try {
         const settingsMap = {
             'PREFIX_COMMANDS_PREFIX': prefix,
             'LOCALE': locale,
-            'THEME': theme,
             'INTERACTIONS_SLASH': slashCommands === 'on' ? 1 : 0
         };
 
