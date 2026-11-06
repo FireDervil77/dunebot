@@ -225,27 +225,5 @@
         "RESTART_REQUIRED": "Änderungen werden nach dem nächsten Server-Neustart wirksam",
         "SAVE_CHANGES": "Änderungen speichern",
         "CANCEL": "Abbrechen"
-    },
-    "SETTINGS": {
-        "TITLE": "Gameserver Einstellungen",
-        "PLUGIN_SETTINGS": "Plugin-Einstellungen",
-        "MAX_SERVERS": "Maximale Anzahl Server",
-        "MAX_SERVERS_DESC": "Maximale Anzahl gleichzeitig aktiver Gameserver für diese Guild",
-        "AUTO_START_SERVERS": "Auto-Start Server",
-        "AUTO_START_SERVERS_DESC": "Server automatisch nach Bot-Neustart starten",
-        "AUTO_UPDATE_ADDONS": "Auto-Update Addons",
-        "AUTO_UPDATE_ADDONS_DESC": "Addons automatisch auf neue Versionen aktualisieren",
-        "DEFAULT_BACKUP": "Standard-Sicherung",
-        "DEFAULT_BACKUP_DESC": "Automatische Sicherung für neue Server aktivieren",
-        "BACKUP_INTERVAL": "Sicherungsabstand",
-        "BACKUP_INTERVAL_DESC": "Zeitabstand zwischen automatischen Sicherungen (in Stunden)",
-        "HOURS": "Stunden",
-        "HELP": "Hilfe",
-        "MAX_SERVERS_HELP": "Legt fest, wie viele Gameserver diese Guild gleichzeitig betreiben darf. Premium-Guilds können höhere Limits haben.",
-        "AUTO_START_HELP": "Wenn aktiviert, werden alle Server, die zum Zeitpunkt eines Bot-Neustarts online waren, automatisch wieder gestartet.",
-        "AUTO_UPDATE_HELP": "Wenn aktiviert, werden installierte Addons automatisch aktualisiert, wenn eine neue Version verfügbar ist.",
-        "DEFAULT_BACKUP_HELP": "Wenn aktiviert, wird für jeden neu erstellten Server automatisch ein Sicherung-Zeitplan konfiguriert.",
-        "SAVE": "Einstellungen speichern",
-        "CANCEL": "Abbrechen"
     }
 }

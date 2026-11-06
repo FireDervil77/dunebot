@@ -225,27 +225,5 @@
         "RESTART_REQUIRED": "Changes take effect after the next server restart",
         "SAVE_CHANGES": "Save Changes",
         "CANCEL": "Cancel"
-    },
-    "SETTINGS": {
-        "TITLE": "Gameserver Settings",
-        "PLUGIN_SETTINGS": "Plugin Settings",
-        "MAX_SERVERS": "Maximum Servers",
-        "MAX_SERVERS_DESC": "Maximum number of concurrent gameservers for this guild",
-        "AUTO_START_SERVERS": "Auto-Start Servers",
-        "AUTO_START_SERVERS_DESC": "Automatically start servers after bot restart",
-        "AUTO_UPDATE_ADDONS": "Auto-Update Addons",
-        "AUTO_UPDATE_ADDONS_DESC": "Automatically update addons to new versions",
-        "DEFAULT_BACKUP": "Default Backup",
-        "DEFAULT_BACKUP_DESC": "Enable automatic backup for new servers",
-        "BACKUP_INTERVAL": "Backup Interval",
-        "BACKUP_INTERVAL_DESC": "Time between automatic backups (in hours)",
-        "HOURS": "Hours",
-        "HELP": "Help",
-        "MAX_SERVERS_HELP": "Sets how many gameservers this guild can run simultaneously. Premium guilds may have higher limits.",
-        "AUTO_START_HELP": "When enabled, all servers that were online at the time of a bot restart will be automatically restarted.",
-        "AUTO_UPDATE_HELP": "When enabled, installed addons will be automatically updated when a new version is available.",
-        "DEFAULT_BACKUP_HELP": "When enabled, a backup schedule will be automatically configured for every newly created server.",
-        "SAVE": "Save Settings",
-        "CANCEL": "Cancel"
     }
 }

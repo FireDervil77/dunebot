@@ -532,7 +532,6 @@ class GameserverPlugin extends DashboardPlugin {
             // === GUILD-LEVEL ROUTES ===
             const addonsRouter = require('./routes/addons');
             const serversRouter = require('./routes/servers');
-            const settingsRouter = require('./routes/settings');
             const filesRouter = require('./routes/files');
             const consoleRouter = require('./routes/console');
             
@@ -576,9 +575,9 @@ class GameserverPlugin extends DashboardPlugin {
             
             // Console-API (Live Console)
             this.guildRouter.use('/console', consoleRouter);
-            
-            // Settings
-            this.guildRouter.use('/settings', settingsRouter);
+
+            // Die Einstellungsseite (`/settings`) ist am 2026-11-06 entfallen:
+            // Ihre fünf Felder wurden gespeichert, aber nie gelesen.
             
             Logger.debug('[Gameserver] Routen registriert (Guild-Level + WebFTP + Console)');
         } catch (error) {
@@ -1536,7 +1535,10 @@ class GameserverPlugin extends DashboardPlugin {
                 icon: 'fa-solid fa-dice-d20',
                 order: 20,
                 type: navigationManager.menuTypes.MAIN,
-                capability: 'GAMESERVER.EDIT', // Addons verwalten erfordert Edit-Rechte
+                // Dasselbe Recht, das die Route prüft (`routes/addons.js`). Bis
+                // zum 2026-11-06 stand hier GAMESERVER.EDIT: Wer nur ADDONS.VIEW
+                // hatte, sah den Punkt nicht, wer nur EDIT hatte, bekam 403.
+                capability: 'GAMESERVER.ADDONS.VIEW',
                 visible: true,
                 guildId,
                 // Muss dem `url` des Elternpunktes ZEICHENGLEICH entsprechen -
@@ -1551,17 +1553,12 @@ class GameserverPlugin extends DashboardPlugin {
             // und "Server", beide zur Serveruebersicht. Genau das Doppel, das
             // am 2026-09-03 schon bei `core` auffiel ("Themes / Uebersicht").
             //
-            // Der Elternpunkt TRAEGT die Uebersicht jetzt selbst.    
-            {
-                title: 'gameserver:NAV.GAMESERVER',
-                path: `/guild/${guildId}/plugins/gameserver/settings`,
-                icon: 'fa-solid fa-map',
-                order: null,  // Nach Core-Settings (21, 22, 23)
-                parent: `/guild/${guildId}/settings`,  // ← Parent ist Core-Settings!
-                type: 'main',
-                capability: 'GAMESERVER.EDIT', // Gameserver-Einstellungen ändern
-                visible: true
-            }
+            // Der Elternpunkt TRAEGT die Uebersicht jetzt selbst.
+            //
+            // ── Einstellungen → Gameserver ist entfallen (2026-11-06) ───────
+            //
+            // Die Seite speicherte fünf Werte, die nichts las. Der Aufräumer
+            // unten nimmt den Punkt beim nächsten Start aus jeder Guild.
         ];
 
         try {
@@ -1578,7 +1575,7 @@ class GameserverPlugin extends DashboardPlugin {
             // Aenderung an `navItems` sich selbst — ohne eine weitere Migration.
             await navigationManager.removeNavigation(this.name, guildId);
             await navigationManager.registerNavigation(this.name, guildId, navItems);
-            Logger.debug('[Gameserver] Navigation registriert (inkl. Settings unter Core)');
+            Logger.debug('[Gameserver] Navigation registriert');
         } catch (error) {
             Logger.error('[Gameserver] Fehler beim Registrieren der Navigation:', error);
         }
