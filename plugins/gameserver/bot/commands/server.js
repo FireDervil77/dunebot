@@ -178,7 +178,7 @@ module.exports = {
                     {
                         name: 'server',
                         type: ApplicationCommandOptionType.Integer,
-                        description: 'gameserver:SERVER.OPT_SERVER',
+                        description: 'gameserver:SERVER.OPT_MOVE_SERVER',
                         required: true,
                         autocomplete: true,
                     },
