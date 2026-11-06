@@ -87,6 +87,8 @@ apps/dashboard/downloads/launcher/
 #docs and docs folder
 docs/
 docs/*
+# Abgelegte Arbeitsnotizen (2026-11-06), lokal wie docs/
+docs_bak/
 !apps/dashboard/themes/default/views/admin/docs/
 
 streamerbot_must_haves/

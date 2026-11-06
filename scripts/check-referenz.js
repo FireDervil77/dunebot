@@ -41,7 +41,10 @@ const WURZEL        = path.join(__dirname, '..');
 const SCHEMA_PFAD   = path.join(WURZEL, 'packages/fbpkg/schema/referenz-v1.schema.json');
 const REFERENZ_PFAD = path.join(WURZEL, 'packages/fbpkg/referenz');
 const BEISPIEL_PFAD = path.join(WURZEL, 'packages/fbpkg/beispiele');
-const BESTAND_PFAD  = path.join(WURZEL, 'docs/spielpakete/bestand');
+// Die gemessenen Proben liegen seit dem Aufräumen von `docs/` am 2026-11-06 in
+// `docs_bak/` (lokal, nicht im Repository). Fehlt der Ordner, vergleicht der
+// Wächter still ohne Bestand — deshalb muss der Pfad mitziehen, wenn er wandert.
+const BESTAND_PFAD  = path.join(WURZEL, 'docs_bak/spielpakete/bestand');
 
 const MONATE_BIS_ALT = 6;
 
