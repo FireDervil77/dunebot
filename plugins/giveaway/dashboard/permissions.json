@@ -4,32 +4,32 @@
     "permissions": [
         {
             "key": "GIVEAWAY.VIEW",
-            "name": "Giveaway-System anzeigen",
-            "description": "Berechtigung um Giveaway-Übersicht und Einstellungen zu sehen",
+            "name": "giveaway:PERMS.VIEW",
+            "description": "giveaway:PERMS.VIEW_DESC",
             "category": "giveaway",
             "is_dangerous": 0,
             "requires": null
         },
         {
             "key": "GIVEAWAY.CREATE",
-            "name": "Giveaways erstellen",
-            "description": "Berechtigung um neue Giveaways über das Dashboard zu starten",
+            "name": "giveaway:PERMS.CREATE",
+            "description": "giveaway:PERMS.CREATE_DESC",
             "category": "giveaway",
             "is_dangerous": 0,
             "requires": "GIVEAWAY.VIEW"
         },
         {
             "key": "GIVEAWAY.MANAGE",
-            "name": "Giveaways verwalten",
-            "description": "Berechtigung um Giveaways zu bearbeiten, pausieren, beenden und rerolls durchzuführen",
+            "name": "giveaway:PERMS.MANAGE",
+            "description": "giveaway:PERMS.MANAGE_DESC",
             "category": "giveaway",
             "is_dangerous": 0,
             "requires": "GIVEAWAY.VIEW"
         },
         {
             "key": "GIVEAWAY.DELETE",
-            "name": "Giveaways löschen",
-            "description": "Berechtigung um Giveaways dauerhaft zu löschen",
+            "name": "giveaway:PERMS.DELETE",
+            "description": "giveaway:PERMS.DELETE_DESC",
             "category": "giveaway",
             "is_dangerous": 1,
             "requires": "GIVEAWAY.MANAGE"

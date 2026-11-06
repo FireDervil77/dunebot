@@ -585,6 +585,20 @@ class CommandManager {
                 kopie.description = this.client.translate(opt.description);
                 kopie.descriptionLocalizations = this.client.i18n.getAllTr(opt.description);
             }
+            // Auswahlnamen genauso, aber nur, wenn sie ein Sprachschlüssel sind
+            // (2026-11-06, zuerst für /music filter und /music loop). Feste
+            // Namen wie "ON" oder "TIMEOUT" bleiben unberührt.
+            if (Array.isArray(opt.choices)) {
+                kopie.choices = opt.choices.map((wahl) => (
+                    /^[a-z][a-z0-9_-]*:[A-Z0-9_.]+$/.test(wahl.name)
+                        ? {
+                            ...wahl,
+                            name: this.client.translate(wahl.name),
+                            nameLocalizations: this.client.i18n.getAllTr(wahl.name),
+                        }
+                        : wahl
+                ));
+            }
             if (Array.isArray(opt.options)) {
                 kopie.options = this.#uebersetzeOptionen(opt.options);
             }

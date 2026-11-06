@@ -4,24 +4,24 @@
   "permissions": [
     {
       "key": "WERKBANK.VIEW",
-      "name": "Werkbank anzeigen",
-      "description": "Berechtigung, die Werkbank und ihre Sitzungen zu sehen",
+      "name": "werkbank:PERMS.VIEW",
+      "description": "werkbank:PERMS.VIEW_DESC",
       "category": "werkbank",
       "is_dangerous": 0,
       "requires": null
     },
     {
       "key": "WERKBANK.BAUEN",
-      "name": "In der Werkbank bauen",
-      "description": "Sitzungen anlegen und verwerfen, Schritte ausführen — die Schritte laufen als Container auf einem Rootserver, ein script-Schritt führt beliebige Befehle aus",
+      "name": "werkbank:PERMS.BAUEN",
+      "description": "werkbank:PERMS.BAUEN_DESC",
       "category": "werkbank",
       "is_dangerous": 1,
       "requires": "WERKBANK.VIEW"
     },
     {
       "key": "WERKBANK.VEROEFFENTLICHEN",
-      "name": "Aus der Werkbank veröffentlichen",
-      "description": "Ein grün geprüftes Paket in den Kanal test einliefern — es wird damit für neue Server wählbar, und Symbol/Banner gehen an den Marktplatz-Eintrag",
+      "name": "werkbank:PERMS.VEROEFFENTLICHEN",
+      "description": "werkbank:PERMS.VEROEFFENTLICHEN_DESC",
       "category": "werkbank",
       "is_dangerous": 1,
       "requires": "WERKBANK.BAUEN"

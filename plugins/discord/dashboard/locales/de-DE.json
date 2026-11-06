@@ -140,5 +140,21 @@
     "UNLINK_HINT": "Die Nachricht bleibt im Kanal stehen, samt der gesetzten Reaktionen. Sie wirkt nur nicht mehr.",
     "UNLINK_CONFIRM": "Verknüpfung wirklich lösen? Die Nachricht bleibt im Kanal, wirkt aber nicht mehr."
   },
-  "SAVE": "Speichern"
+  "SAVE": "Speichern",
+  "PERMS": {
+    "VIEW": "Discord-Bereich anzeigen",
+    "VIEW_DESC": "Berechtigung, den Discord-Bereich im Dashboard zu öffnen",
+    "ROLES_VIEW": "Discord-Rollen anzeigen",
+    "ROLES_VIEW_DESC": "Berechtigung, die Rollen des Servers samt Berechtigungen zu sehen",
+    "ROLES_EDIT": "Discord-Rollen anlegen und bearbeiten",
+    "ROLES_EDIT_DESC": "Berechtigung, Rollen anzulegen und zu ändern — wirkt sofort auf dem Discord-Server",
+    "ROLES_DELETE": "Discord-Rollen löschen",
+    "ROLES_DELETE_DESC": "Berechtigung, Rollen endgültig zu löschen — nicht rückgängig zu machen",
+    "CHANNELS_VIEW": "Discord-Kanäle anzeigen",
+    "CHANNELS_VIEW_DESC": "Berechtigung, die Kanäle und Kategorien des Servers einzusehen",
+    "ROLEMENUS_VIEW": "Rollenmenüs anzeigen",
+    "ROLEMENUS_VIEW_DESC": "Berechtigung, die Rollenmenüs des Servers einzusehen",
+    "ROLEMENUS_MANAGE": "Rollenmenüs verwalten",
+    "ROLEMENUS_MANAGE_DESC": "Berechtigung, Rollenmenüs anzulegen, zu ändern und in einen Kanal zu senden. Wer das darf, bestimmt mittelbar, welche Rollen sich Mitglieder selbst geben können"
+  }
 }

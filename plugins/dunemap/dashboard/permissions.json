@@ -4,80 +4,80 @@
   "permissions": [
     {
       "key": "DUNEMAP.VIEW",
-      "name": "DuneMap anzeigen",
-      "description": "Berechtigung um DuneMap-Features zu sehen",
+      "name": "dunemap:PERMS.VIEW",
+      "description": "dunemap:PERMS.VIEW_DESC",
       "category": "dunemap",
       "is_dangerous": 0,
       "requires": null
     },
     {
       "key": "DUNEMAP.SETTINGS.EDIT",
-      "name": "DuneMap-Einstellungen bearbeiten",
-      "description": "Berechtigung um DuneMap-Konfiguration zu ändern",
+      "name": "dunemap:PERMS.SETTINGS_EDIT",
+      "description": "dunemap:PERMS.SETTINGS_EDIT_DESC",
       "category": "dunemap",
       "is_dangerous": 0,
       "requires": "DUNEMAP.VIEW"
     },
     {
       "key": "DUNEMAP.SECTORS.VIEW",
-      "name": "Sektoren anzeigen",
-      "description": "Berechtigung um Sektoren-Karten zu sehen",
+      "name": "dunemap:PERMS.SECTORS_VIEW",
+      "description": "dunemap:PERMS.SECTORS_VIEW_DESC",
       "category": "dunemap",
       "is_dangerous": 0,
       "requires": "DUNEMAP.VIEW"
     },
     {
       "key": "DUNEMAP.SECTORS.CREATE",
-      "name": "Sektoren erstellen",
-      "description": "Berechtigung um neue Sektoren anzulegen",
+      "name": "dunemap:PERMS.SECTORS_CREATE",
+      "description": "dunemap:PERMS.SECTORS_CREATE_DESC",
       "category": "dunemap",
       "is_dangerous": 0,
       "requires": "DUNEMAP.VIEW"
     },
     {
       "key": "DUNEMAP.SECTORS.EDIT",
-      "name": "Sektoren bearbeiten",
-      "description": "Berechtigung um bestehende Sektoren zu ändern",
+      "name": "dunemap:PERMS.SECTORS_EDIT",
+      "description": "dunemap:PERMS.SECTORS_EDIT_DESC",
       "category": "dunemap",
       "is_dangerous": 0,
       "requires": "DUNEMAP.VIEW"
     },
     {
       "key": "DUNEMAP.SECTORS.DELETE",
-      "name": "Sektoren löschen",
-      "description": "Berechtigung um Sektoren zu entfernen (kritisch)",
+      "name": "dunemap:PERMS.SECTORS_DELETE",
+      "description": "dunemap:PERMS.SECTORS_DELETE_DESC",
       "category": "dunemap",
       "is_dangerous": 1,
       "requires": "DUNEMAP.VIEW"
     },
     {
       "key": "DUNEMAP.MARKERS.CREATE",
-      "name": "Marker erstellen",
-      "description": "Berechtigung um Map-Marker zu setzen",
+      "name": "dunemap:PERMS.MARKERS_CREATE",
+      "description": "dunemap:PERMS.MARKERS_CREATE_DESC",
       "category": "dunemap",
       "is_dangerous": 0,
       "requires": "DUNEMAP.VIEW"
     },
     {
       "key": "DUNEMAP.MARKERS.EDIT",
-      "name": "Marker bearbeiten",
-      "description": "Berechtigung um bestehende Marker zu ändern",
+      "name": "dunemap:PERMS.MARKERS_EDIT",
+      "description": "dunemap:PERMS.MARKERS_EDIT_DESC",
       "category": "dunemap",
       "is_dangerous": 0,
       "requires": "DUNEMAP.VIEW"
     },
     {
       "key": "DUNEMAP.MARKERS.DELETE",
-      "name": "Marker löschen",
-      "description": "Berechtigung um Marker zu entfernen",
+      "name": "dunemap:PERMS.MARKERS_DELETE",
+      "description": "dunemap:PERMS.MARKERS_DELETE_DESC",
       "category": "dunemap",
       "is_dangerous": 0,
       "requires": "DUNEMAP.VIEW"
     },
     {
       "key": "DUNEMAP.ADMIN.MANAGE",
-      "name": "Admin-Panel verwalten",
-      "description": "Berechtigung für erweiterte Admin-Funktionen (Sektor-Karten, Export, etc.)",
+      "name": "dunemap:PERMS.ADMIN_MANAGE",
+      "description": "dunemap:PERMS.ADMIN_MANAGE_DESC",
       "category": "dunemap",
       "is_dangerous": 0,
       "requires": "DUNEMAP.VIEW"

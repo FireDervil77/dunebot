@@ -4,72 +4,72 @@
   "permissions": [
     {
       "key": "MASTERSERVER.VIEW",
-      "name": "MasterServer anzeigen",
-      "description": "Berechtigung um MasterServer-Panel zu sehen",
+      "name": "masterserver:PERMS.VIEW",
+      "description": "masterserver:PERMS.VIEW_DESC",
       "category": "masterserver",
       "is_dangerous": 0,
       "requires": null
     },
     {
       "key": "MASTERSERVER.DAEMON.MANAGE",
-      "name": "Daemon verwalten",
-      "description": "Berechtigung um Daemon-Instanzen zu konfigurieren und zu verbinden",
+      "name": "masterserver:PERMS.DAEMON_MANAGE",
+      "description": "masterserver:PERMS.DAEMON_MANAGE_DESC",
       "category": "masterserver",
       "is_dangerous": 1,
       "requires": "MASTERSERVER.VIEW"
     },
     {
       "key": "MASTERSERVER.ROOTSERVER.VIEW",
-      "name": "RootServer anzeigen",
-      "description": "Berechtigung um RootServer-Liste und Details zu sehen",
+      "name": "masterserver:PERMS.ROOTSERVER_VIEW",
+      "description": "masterserver:PERMS.ROOTSERVER_VIEW_DESC",
       "category": "masterserver",
       "is_dangerous": 0,
       "requires": "MASTERSERVER.VIEW"
     },
     {
       "key": "MASTERSERVER.ROOTSERVER.CREATE",
-      "name": "RootServer erstellen",
-      "description": "Berechtigung um neue RootServer anzulegen (kritisch - kostet Ressourcen)",
+      "name": "masterserver:PERMS.ROOTSERVER_CREATE",
+      "description": "masterserver:PERMS.ROOTSERVER_CREATE_DESC",
       "category": "masterserver",
       "is_dangerous": 1,
       "requires": "MASTERSERVER.ROOTSERVER.VIEW"
     },
     {
       "key": "MASTERSERVER.ROOTSERVER.EDIT",
-      "name": "RootServer bearbeiten",
-      "description": "Berechtigung um RootServer-Einstellungen zu ändern",
+      "name": "masterserver:PERMS.ROOTSERVER_EDIT",
+      "description": "masterserver:PERMS.ROOTSERVER_EDIT_DESC",
       "category": "masterserver",
       "is_dangerous": 0,
       "requires": "MASTERSERVER.ROOTSERVER.VIEW"
     },
     {
       "key": "MASTERSERVER.ROOTSERVER.DELETE",
-      "name": "RootServer löschen",
-      "description": "Berechtigung um RootServer zu entfernen (KRITISCH - löscht alle Gameserver!)",
+      "name": "masterserver:PERMS.ROOTSERVER_DELETE",
+      "description": "masterserver:PERMS.ROOTSERVER_DELETE_DESC",
       "category": "masterserver",
       "is_dangerous": 1,
       "requires": "MASTERSERVER.ROOTSERVER.VIEW"
     },
     {
       "key": "MASTERSERVER.RESOURCES.VIEW",
-      "name": "Ressourcen anzeigen",
-      "description": "Berechtigung um Ressourcen-Übersicht und Quota-Profile zu sehen",
+      "name": "masterserver:PERMS.RESOURCES_VIEW",
+      "description": "masterserver:PERMS.RESOURCES_VIEW_DESC",
       "category": "masterserver",
       "is_dangerous": 0,
       "requires": "MASTERSERVER.VIEW"
     },
     {
       "key": "MASTERSERVER.RESOURCES.MANAGE",
-      "name": "Ressourcen verwalten",
-      "description": "Berechtigung um Quota-Profile zu erstellen und zu bearbeiten",
+      "name": "masterserver:PERMS.RESOURCES_MANAGE",
+      "description": "masterserver:PERMS.RESOURCES_MANAGE_DESC",
       "category": "masterserver",
       "is_dangerous": 0,
       "requires": "MASTERSERVER.RESOURCES.VIEW"
     },
     {
       "key": "MASTERSERVER.LOGS.VIEW",
-      "name": "Daemon-Logs anzeigen",
-      "description": "Berechtigung um Daemon-System-Logs zu sehen",
+      "name": "masterserver:PERMS.LOGS_VIEW",
+      "description": "masterserver:PERMS.LOGS_VIEW_DESC",
       "category": "masterserver",
       "is_dangerous": 0,
       "requires": "MASTERSERVER.VIEW"

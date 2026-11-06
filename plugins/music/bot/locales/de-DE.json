@@ -34,7 +34,12 @@
     },
     "LOOP": {
         "DESCRIPTION": "Setzt die Wiederholung",
-        "MODE_DESC": "aus, titel oder liste"
+        "MODE_DESC": "aus, titel oder liste",
+        "CHOICES": {
+            "AUS": "Aus",
+            "TITEL": "Titel wiederholen",
+            "LISTE": "Warteschlange wiederholen"
+        }
     },
     "SHUFFLE": {
         "DESCRIPTION": "Mischt die Warteschlange"
@@ -47,7 +52,22 @@
     },
     "FILTER": {
         "DESCRIPTION": "Setzt einen Klangfilter",
-        "NAME_DESC": "Name des Filters"
+        "NAME_DESC": "Name des Filters",
+        "NAMES": {
+            "AUS": "Aus",
+            "BASSBOOST": "Bassboost",
+            "NIGHTCORE": "Nightcore",
+            "VAPORWAVE": "Vaporwave",
+            "ACHTD": "8D",
+            "KARAOKE": "Karaoke",
+            "TREBLE": "Höhen",
+            "AUSGLEICH": "Lautstärke ausgleichen",
+            "TIEFPASS": "Tiefpass",
+            "SCHNELL": "Schneller",
+            "LANGSAM": "Langsamer",
+            "HOEHER": "Höhere Tonlage",
+            "TIEFER": "Tiefere Tonlage"
+        }
     },
     "MODE247": {
         "DESCRIPTION": "Lässt den Bot dauerhaft im Sprachkanal",

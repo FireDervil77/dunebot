@@ -2,5 +2,13 @@
   "NAV": {
     "WERKBANK": "Werkbank"
   },
-  "TITLE": "Werkbank"
+  "TITLE": "Werkbank",
+  "PERMS": {
+    "VIEW": "Werkbank anzeigen",
+    "VIEW_DESC": "Berechtigung, die Werkbank und ihre Sitzungen zu sehen",
+    "BAUEN": "In der Werkbank bauen",
+    "BAUEN_DESC": "Sitzungen anlegen und verwerfen, Schritte ausführen — die Schritte laufen als Container auf einem Rootserver, ein script-Schritt führt beliebige Befehle aus",
+    "VEROEFFENTLICHEN": "Aus der Werkbank veröffentlichen",
+    "VEROEFFENTLICHEN_DESC": "Ein grün geprüftes Paket in den Kanal test einliefern — es wird damit für neue Server wählbar, und Symbol/Banner gehen an den Marktplatz-Eintrag"
+  }
 }

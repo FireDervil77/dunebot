@@ -163,5 +163,15 @@
     "ANF_WEG_DISCORD": "Discord",
     "ANF_WEG_STREAM": "Twitch-Chat",
     "ANF_OHNE_WERT": "kein Wert nötig"
+  },
+  "PERMS": {
+    "VIEW": "Giveaway-System anzeigen",
+    "VIEW_DESC": "Berechtigung um Giveaway-Übersicht und Einstellungen zu sehen",
+    "CREATE": "Giveaways erstellen",
+    "CREATE_DESC": "Berechtigung um neue Giveaways über das Dashboard zu starten",
+    "MANAGE": "Giveaways verwalten",
+    "MANAGE_DESC": "Berechtigung um Giveaways zu bearbeiten, pausieren, beenden und rerolls durchzuführen",
+    "DELETE": "Giveaways löschen",
+    "DELETE_DESC": "Berechtigung um Giveaways dauerhaft zu löschen"
   }
 }

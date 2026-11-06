@@ -555,5 +555,21 @@
     "kategorie": "Game or category",
     "url": "Stream address",
     "plattform": "Twitch, Kick or YouTube"
+  },
+  "PERMS": {
+    "VIEW": "View streaming",
+    "VIEW_DESC": "Allows opening the streaming area and seeing its status",
+    "STREAMERS_MANAGE": "Manage streamers",
+    "STREAMERS_MANAGE_DESC": "Allows adding channels to watch and removing them",
+    "TARGETS_MANAGE": "Manage targets",
+    "TARGETS_MANAGE_DESC": "Allows setting the announcement channel, mentioned role, filters and clean-up",
+    "TEMPLATES_EDIT": "Edit message templates",
+    "TEMPLATES_EDIT_DESC": "Allows changing the announcement text",
+    "SETTINGS_EDIT": "Edit streaming settings",
+    "SETTINGS_EDIT_DESC": "Allows setting the guild's defaults: default channel, cooldown, clean-up",
+    "TEST": "Send test announcement",
+    "TEST_DESC": "Allows sending a test announcement. It appears visibly in the channel.",
+    "CHAT_MANAGE": "Configure this channel's chatbot",
+    "CHAT_MANAGE_DESC": "Configure this channel's chatbot. Only takes effect in the home guild, nowhere else."
   }
 }

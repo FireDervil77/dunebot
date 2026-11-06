@@ -211,5 +211,27 @@
       "MARKER_REMOVED": "Marker removed!",
       "ERROR_REMOVE": "Error removing marker"
     }
+  },
+  "PERMS": {
+    "VIEW": "View DuneMap",
+    "VIEW_DESC": "Allows viewing DuneMap features",
+    "SETTINGS_EDIT": "Edit DuneMap settings",
+    "SETTINGS_EDIT_DESC": "Allows changing the DuneMap configuration",
+    "SECTORS_VIEW": "View sectors",
+    "SECTORS_VIEW_DESC": "Allows viewing sector maps",
+    "SECTORS_CREATE": "Create sectors",
+    "SECTORS_CREATE_DESC": "Allows creating new sectors",
+    "SECTORS_EDIT": "Edit sectors",
+    "SECTORS_EDIT_DESC": "Allows changing existing sectors",
+    "SECTORS_DELETE": "Delete sectors",
+    "SECTORS_DELETE_DESC": "Allows removing sectors (critical)",
+    "MARKERS_CREATE": "Create markers",
+    "MARKERS_CREATE_DESC": "Allows placing map markers",
+    "MARKERS_EDIT": "Edit markers",
+    "MARKERS_EDIT_DESC": "Allows changing existing markers",
+    "MARKERS_DELETE": "Delete markers",
+    "MARKERS_DELETE_DESC": "Allows removing markers",
+    "ADMIN_MANAGE": "Manage admin panel",
+    "ADMIN_MANAGE_DESC": "Allows advanced admin functions (sector maps, export, etc.)"
   }
 }

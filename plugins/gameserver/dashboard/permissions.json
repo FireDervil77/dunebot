@@ -4,184 +4,184 @@
   "permissions": [
     {
       "key": "GAMESERVER.VIEW",
-      "name": "Gameserver anzeigen",
-      "description": "Berechtigung um Gameserver-Liste und Details zu sehen",
+      "name": "gameserver:PERMS.VIEW",
+      "description": "gameserver:PERMS.VIEW_DESC",
       "category": "gameserver",
       "is_dangerous": 0,
       "requires": null
     },
     {
       "key": "GAMESERVER.CREATE",
-      "name": "Gameserver erstellen",
-      "description": "Berechtigung um neue Gameserver zu installieren",
+      "name": "gameserver:PERMS.CREATE",
+      "description": "gameserver:PERMS.CREATE_DESC",
       "category": "gameserver",
       "is_dangerous": 0,
       "requires": "GAMESERVER.VIEW"
     },
     {
       "key": "GAMESERVER.EDIT",
-      "name": "Gameserver bearbeiten",
-      "description": "Berechtigung um Gameserver-Einstellungen und Addons zu ändern",
+      "name": "gameserver:PERMS.EDIT",
+      "description": "gameserver:PERMS.EDIT_DESC",
       "category": "gameserver",
       "is_dangerous": 0,
       "requires": "GAMESERVER.VIEW"
     },
     {
       "key": "GAMESERVER.DELETE",
-      "name": "Gameserver löschen",
-      "description": "Berechtigung um Gameserver zu deinstallieren (kritisch)",
+      "name": "gameserver:PERMS.DELETE",
+      "description": "gameserver:PERMS.DELETE_DESC",
       "category": "gameserver",
       "is_dangerous": 1,
       "requires": "GAMESERVER.VIEW"
     },
     {
       "key": "GAMESERVER.START",
-      "name": "Gameserver starten",
-      "description": "Berechtigung um Gameserver zu starten",
+      "name": "gameserver:PERMS.START",
+      "description": "gameserver:PERMS.START_DESC",
       "category": "gameserver",
       "is_dangerous": 0,
       "requires": "GAMESERVER.VIEW"
     },
     {
       "key": "GAMESERVER.STOP",
-      "name": "Gameserver stoppen",
-      "description": "Berechtigung um Gameserver zu stoppen",
+      "name": "gameserver:PERMS.STOP",
+      "description": "gameserver:PERMS.STOP_DESC",
       "category": "gameserver",
       "is_dangerous": 0,
       "requires": "GAMESERVER.VIEW"
     },
     {
       "key": "GAMESERVER.RESTART",
-      "name": "Gameserver neu starten",
-      "description": "Berechtigung um Gameserver neu zu starten",
+      "name": "gameserver:PERMS.RESTART",
+      "description": "gameserver:PERMS.RESTART_DESC",
       "category": "gameserver",
       "is_dangerous": 0,
       "requires": "GAMESERVER.VIEW"
     },
     {
       "key": "GAMESERVER.CONSOLE.VIEW",
-      "name": "Console anzeigen",
-      "description": "Berechtigung um Server-Console zu sehen",
+      "name": "gameserver:PERMS.CONSOLE_VIEW",
+      "description": "gameserver:PERMS.CONSOLE_VIEW_DESC",
       "category": "gameserver",
       "is_dangerous": 0,
       "requires": "GAMESERVER.VIEW"
     },
     {
       "key": "GAMESERVER.CONSOLE.EXECUTE",
-      "name": "Console-Commands ausführen",
-      "description": "Berechtigung um Commands in der Console einzugeben (kritisch - voller Server-Zugriff)",
+      "name": "gameserver:PERMS.CONSOLE_EXECUTE",
+      "description": "gameserver:PERMS.CONSOLE_EXECUTE_DESC",
       "category": "gameserver",
       "is_dangerous": 1,
       "requires": "GAMESERVER.CONSOLE.VIEW"
     },
     {
       "key": "GAMESERVER.FILES.VIEW",
-      "name": "Dateien anzeigen",
-      "description": "Berechtigung um Server-Dateien anzusehen und herunterzuladen (Read-Only)",
+      "name": "gameserver:PERMS.FILES_VIEW",
+      "description": "gameserver:PERMS.FILES_VIEW_DESC",
       "category": "gameserver",
       "is_dangerous": 0,
       "requires": "GAMESERVER.VIEW"
     },
     {
       "key": "GAMESERVER.FILES.MANAGE",
-      "name": "Dateien verwalten",
-      "description": "Berechtigung um Dateien zu bearbeiten, hochzuladen und zu löschen (kritisch - voller Dateizugriff)",
+      "name": "gameserver:PERMS.FILES_MANAGE",
+      "description": "gameserver:PERMS.FILES_MANAGE_DESC",
       "category": "gameserver",
       "is_dangerous": 1,
       "requires": "GAMESERVER.FILES.VIEW"
     },
     {
       "key": "GAMESERVER.LOGS.VIEW",
-      "name": "Logs anzeigen",
-      "description": "Berechtigung um Server-Logs zu sehen",
+      "name": "gameserver:PERMS.LOGS_VIEW",
+      "description": "gameserver:PERMS.LOGS_VIEW_DESC",
       "category": "gameserver",
       "is_dangerous": 0,
       "requires": "GAMESERVER.VIEW"
     },
     {
       "key": "GAMESERVER.BACKUPS.VIEW",
-      "name": "Backups anzeigen",
-      "description": "Berechtigung um Backup-Liste zu sehen",
+      "name": "gameserver:PERMS.BACKUPS_VIEW",
+      "description": "gameserver:PERMS.BACKUPS_VIEW_DESC",
       "category": "gameserver",
       "is_dangerous": 0,
       "requires": "GAMESERVER.VIEW"
     },
     {
       "key": "GAMESERVER.BACKUPS.CREATE",
-      "name": "Backups erstellen",
-      "description": "Berechtigung um Server-Backups anzulegen",
+      "name": "gameserver:PERMS.BACKUPS_CREATE",
+      "description": "gameserver:PERMS.BACKUPS_CREATE_DESC",
       "category": "gameserver",
       "is_dangerous": 0,
       "requires": "GAMESERVER.VIEW"
     },
     {
       "key": "GAMESERVER.BACKUPS.DOWNLOAD",
-      "name": "Backups herunterladen",
-      "description": "Berechtigung um Backups herunterzuladen",
+      "name": "gameserver:PERMS.BACKUPS_DOWNLOAD",
+      "description": "gameserver:PERMS.BACKUPS_DOWNLOAD_DESC",
       "category": "gameserver",
       "is_dangerous": 0,
       "requires": "GAMESERVER.VIEW"
     },
     {
       "key": "GAMESERVER.BACKUPS.RESTORE",
-      "name": "Backups wiederherstellen",
-      "description": "Berechtigung um Backups einzuspielen (kritisch - überschreibt aktuelle Daten)",
+      "name": "gameserver:PERMS.BACKUPS_RESTORE",
+      "description": "gameserver:PERMS.BACKUPS_RESTORE_DESC",
       "category": "gameserver",
       "is_dangerous": 1,
       "requires": "GAMESERVER.VIEW"
     },
     {
       "key": "GAMESERVER.BACKUPS.DELETE",
-      "name": "Backups löschen",
-      "description": "Berechtigung um Backups zu entfernen",
+      "name": "gameserver:PERMS.BACKUPS_DELETE",
+      "description": "gameserver:PERMS.BACKUPS_DELETE_DESC",
       "category": "gameserver",
       "is_dangerous": 1,
       "requires": "GAMESERVER.VIEW"
     },
     {
       "key": "GAMESERVER.ADDONS.VIEW",
-      "name": "Addons anzeigen",
-      "description": "Berechtigung um installierte Addons zu sehen",
+      "name": "gameserver:PERMS.ADDONS_VIEW",
+      "description": "gameserver:PERMS.ADDONS_VIEW_DESC",
       "category": "gameserver",
       "is_dangerous": 0,
       "requires": "GAMESERVER.VIEW"
     },
     {
       "key": "GAMESERVER.ADDONS.INSTALL",
-      "name": "Addons installieren",
-      "description": "Berechtigung um Addons aus dem Marketplace zu installieren",
+      "name": "gameserver:PERMS.ADDONS_INSTALL",
+      "description": "gameserver:PERMS.ADDONS_INSTALL_DESC",
       "category": "gameserver",
       "is_dangerous": 0,
       "requires": "GAMESERVER.EDIT"
     },
     {
       "key": "GAMESERVER.ADDONS.UNINSTALL",
-      "name": "Addons deinstallieren",
-      "description": "Berechtigung um Addons zu entfernen",
+      "name": "gameserver:PERMS.ADDONS_UNINSTALL",
+      "description": "gameserver:PERMS.ADDONS_UNINSTALL_DESC",
       "category": "gameserver",
       "is_dangerous": 1,
       "requires": "GAMESERVER.EDIT"
     },
     {
       "key": "GAMESERVER.RCON",
-      "name": "RCON-Konsole nutzen",
-      "description": "Berechtigung um RCON-Befehle an den Gameserver zu senden (kritisch - voller Admin-Zugriff über RCON)",
+      "name": "gameserver:PERMS.RCON",
+      "description": "gameserver:PERMS.RCON_DESC",
       "category": "gameserver",
       "is_dangerous": 1,
       "requires": "GAMESERVER.VIEW"
     },
     {
       "key": "GAMESERVER.CRONJOBS.VIEW",
-      "name": "Cronjobs anzeigen",
-      "description": "Berechtigung um geplante Aufgaben (Cronjobs) anzusehen",
+      "name": "gameserver:PERMS.CRONJOBS_VIEW",
+      "description": "gameserver:PERMS.CRONJOBS_VIEW_DESC",
       "category": "gameserver",
       "is_dangerous": 0,
       "requires": "GAMESERVER.VIEW"
     },
     {
       "key": "GAMESERVER.CRONJOBS.MANAGE",
-      "name": "Cronjobs verwalten",
-      "description": "Cronjobs erstellen, bearbeiten und löschen (kritisch – löst Server-Aktionen aus)",
+      "name": "gameserver:PERMS.CRONJOBS_MANAGE",
+      "description": "gameserver:PERMS.CRONJOBS_MANAGE_DESC",
       "category": "gameserver",
       "is_dangerous": 1,
       "requires": "GAMESERVER.CRONJOBS.VIEW"

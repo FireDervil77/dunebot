@@ -2,5 +2,13 @@
   "NAV": {
     "WERKBANK": "Workbench"
   },
-  "TITLE": "Workbench"
+  "TITLE": "Workbench",
+  "PERMS": {
+    "VIEW": "View workbench",
+    "VIEW_DESC": "Allows seeing the workbench and its sessions",
+    "BAUEN": "Build in the workbench",
+    "BAUEN_DESC": "Create and discard sessions, run steps — the steps run as containers on a root server, a script step runs arbitrary commands",
+    "VEROEFFENTLICHEN": "Publish from the workbench",
+    "VEROEFFENTLICHEN_DESC": "Deliver a package that passed its checks into the test channel — it becomes selectable for new servers, and icon/banner go to the marketplace entry"
+  }
 }

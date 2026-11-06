@@ -4,32 +4,32 @@
   "permissions": [
     {
       "key": "TICKET.VIEW",
-      "name": "Ticket-System anzeigen",
-      "description": "Berechtigung um Ticket-Einstellungen und Übersicht zu sehen",
+      "name": "ticket:PERMS.VIEW",
+      "description": "ticket:PERMS.VIEW_DESC",
       "category": "ticket",
       "is_dangerous": 0,
       "requires": null
     },
     {
       "key": "TICKET.SETTINGS.EDIT",
-      "name": "Ticket-Einstellungen bearbeiten",
-      "description": "Berechtigung um Ticket-Einstellungen zu konfigurieren (Log-Kanal, Limit, Farben)",
+      "name": "ticket:PERMS.SETTINGS_EDIT",
+      "description": "ticket:PERMS.SETTINGS_EDIT_DESC",
       "category": "ticket",
       "is_dangerous": 0,
       "requires": "TICKET.VIEW"
     },
     {
       "key": "TICKET.CATEGORIES.MANAGE",
-      "name": "Ticket-Kategorien verwalten",
-      "description": "Berechtigung um Ticket-Kategorien zu erstellen, bearbeiten und löschen",
+      "name": "ticket:PERMS.CATEGORIES_MANAGE",
+      "description": "ticket:PERMS.CATEGORIES_MANAGE_DESC",
       "category": "ticket",
       "is_dangerous": 0,
       "requires": "TICKET.VIEW"
     },
     {
       "key": "TICKET.TICKETS.VIEW",
-      "name": "Tickets anzeigen",
-      "description": "Berechtigung um alle Tickets und Transkripte einzusehen",
+      "name": "ticket:PERMS.TICKETS_VIEW",
+      "description": "ticket:PERMS.TICKETS_VIEW_DESC",
       "category": "ticket",
       "is_dangerous": 0,
       "requires": "TICKET.VIEW"

@@ -122,7 +122,15 @@ const rechte = JSON.parse(lies('plugins/streaming/dashboard/permissions.json'));
 const chat = rechte.permissions.find(r => r.key === 'STREAMING.CHAT.MANAGE');
 pruefe(!!chat, 'STREAMING.CHAT.MANAGE ist eingetragen');
 pruefe(chat && chat.requires === 'STREAMING.VIEW', 'es setzt STREAMING.VIEW voraus');
-pruefe(/Heim-Guild/i.test(chat?.description || ''),
+// Seit 2026-11-06 steht in permissions.json der Sprachschlüssel, der Text in
+// den Sprachdateien. Geprüft wird beides, Deutsch und Englisch.
+const beschreibung = (lng) => {
+    const m = /^streaming:(.+)$/.exec(chat?.description || '');
+    if (!m) return '';
+    const datei = JSON.parse(lies(`plugins/streaming/dashboard/locales/${lng}.json`));
+    return m[1].split('.').reduce((o, s) => o?.[s], datei) || '';
+};
+pruefe(/Heim-Guild/i.test(beschreibung('de-DE')) && /home guild/i.test(beschreibung('en-GB')),
     'die Beschreibung nennt die Heim-Guild',
     'sonst wirkt es wie ein Recht, das ueberall zieht — tut es aber nicht');
 

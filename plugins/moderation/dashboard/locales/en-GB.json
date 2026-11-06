@@ -165,5 +165,31 @@
     "NOTIZ_UNVOLLSTAENDIG": "Member ID and text are required.",
     "NOTIZ_LOESCHEN": "Really delete this note?",
     "NOTIZ_GELOESCHT": "Note deleted."
+  },
+  "PERMS": {
+    "VIEW": "View moderation",
+    "VIEW_DESC": "Allows seeing the moderation settings",
+    "SETTINGS_EDIT": "Edit moderation settings",
+    "SETTINGS_EDIT_DESC": "Allows changing moderation settings (automod rules, filters, etc.)",
+    "BAN_EXECUTE": "Ban members",
+    "BAN_EXECUTE_DESC": "Allows banning users (critical action)",
+    "KICK_EXECUTE": "Kick members",
+    "KICK_EXECUTE_DESC": "Allows kicking users",
+    "MUTE_EXECUTE": "Mute members",
+    "MUTE_EXECUTE_DESC": "Allows muting/unmuting users",
+    "WARN_EXECUTE": "Warn members",
+    "WARN_EXECUTE_DESC": "Allows warning users",
+    "LOGS_VIEW": "View moderation logs",
+    "LOGS_VIEW_DESC": "Allows seeing moderation logs (bans, kicks, warnings)",
+    "CASES_MANAGE": "Manage cases",
+    "CASES_MANAGE_DESC": "Allows editing/deleting moderation cases",
+    "NOTES_VIEW": "View mod notes",
+    "NOTES_VIEW_DESC": "Allows viewing internal moderator notes",
+    "NOTES_MANAGE": "Manage mod notes",
+    "NOTES_MANAGE_DESC": "Allows creating and deleting moderator notes",
+    "PROTECTED_ROLES_MANAGE": "Manage protected roles",
+    "PROTECTED_ROLES_MANAGE_DESC": "Allows configuring protected roles (critical action)",
+    "CHANNEL_RULES_MANAGE": "Manage channel rules",
+    "CHANNEL_RULES_MANAGE_DESC": "Allows configuring channel-specific moderation rules"
   }
 }

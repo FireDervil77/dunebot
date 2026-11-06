@@ -194,5 +194,11 @@
   },
   "INVITES": {
     "SUBTITLE": "Wer über welche Einladung gekommen ist"
+  },
+  "PERMS": {
+    "VIEW": "Begrüßung anzeigen",
+    "VIEW_DESC": "Berechtigung um Begrüßungs-Einstellungen zu sehen",
+    "SETTINGS_EDIT": "Begrüßungs-Einstellungen bearbeiten",
+    "SETTINGS_EDIT_DESC": "Berechtigung um Begrüßungsnachrichten zu konfigurieren"
   }
 }

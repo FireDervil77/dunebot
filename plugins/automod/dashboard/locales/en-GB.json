@@ -353,5 +353,23 @@
     "STRIKES_ZURUECKGESETZT": "Strikes reset.",
     "AUFRAEUMEN_FRAGE": "Permanently delete entries older than {tage} days?",
     "AUFGERAEUMT": "{logs} violations and {events} raid events deleted."
+  },
+  "PERMS": {
+    "VIEW": "View AutoMod",
+    "VIEW_DESC": "Allows viewing the AutoMod settings",
+    "SETTINGS_EDIT": "Edit AutoMod settings",
+    "SETTINGS_EDIT_DESC": "Allows configuring AutoMod rules (spam filter, link filter, etc.)",
+    "RULES_CREATE": "Create AutoMod rules",
+    "RULES_CREATE_DESC": "Allows creating new AutoMod rules",
+    "RULES_EDIT": "Edit AutoMod rules",
+    "RULES_EDIT_DESC": "Allows changing existing AutoMod rules",
+    "RULES_DELETE": "Delete AutoMod rules",
+    "RULES_DELETE_DESC": "Allows removing AutoMod rules (critical)",
+    "WHITELIST_MANAGE": "Manage AutoMod whitelist",
+    "WHITELIST_MANAGE_DESC": "Allows exempting users/channels from AutoMod",
+    "LOGS_VIEW": "View AutoMod logs",
+    "LOGS_VIEW_DESC": "Allows viewing AutoMod actions (deleted messages, warnings, etc.)",
+    "KEYWORDS_MANAGE": "Manage keyword lists",
+    "KEYWORDS_MANAGE_DESC": "Allows editing keyword lists and their words. Whoever may do this also sees the wording of the lists."
   }
 }

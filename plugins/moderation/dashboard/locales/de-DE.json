@@ -165,5 +165,31 @@
     "NOTIZ_UNVOLLSTAENDIG": "Mitglieds-ID und Text sind erforderlich.",
     "NOTIZ_LOESCHEN": "Diese Notiz wirklich löschen?",
     "NOTIZ_GELOESCHT": "Notiz gelöscht."
+  },
+  "PERMS": {
+    "VIEW": "Moderation anzeigen",
+    "VIEW_DESC": "Berechtigung um Moderation-Einstellungen zu sehen",
+    "SETTINGS_EDIT": "Moderation-Einstellungen bearbeiten",
+    "SETTINGS_EDIT_DESC": "Berechtigung um Moderation-Einstellungen zu ändern (Automod-Regeln, Filter, etc.)",
+    "BAN_EXECUTE": "Bans ausführen",
+    "BAN_EXECUTE_DESC": "Berechtigung um User zu bannen (kritische Aktion)",
+    "KICK_EXECUTE": "Kicks ausführen",
+    "KICK_EXECUTE_DESC": "Berechtigung um User zu kicken",
+    "MUTE_EXECUTE": "Mutes ausführen",
+    "MUTE_EXECUTE_DESC": "Berechtigung um User zu muten/unmuten",
+    "WARN_EXECUTE": "Warnungen ausführen",
+    "WARN_EXECUTE_DESC": "Berechtigung um User zu warnen",
+    "LOGS_VIEW": "Moderation-Logs anzeigen",
+    "LOGS_VIEW_DESC": "Berechtigung um Moderation-Logs zu sehen (Bans, Kicks, Warns)",
+    "CASES_MANAGE": "Cases verwalten",
+    "CASES_MANAGE_DESC": "Berechtigung um Moderation-Cases zu bearbeiten/löschen",
+    "NOTES_VIEW": "Mod-Notizen anzeigen",
+    "NOTES_VIEW_DESC": "Berechtigung um interne Moderator-Notizen einzusehen",
+    "NOTES_MANAGE": "Mod-Notizen verwalten",
+    "NOTES_MANAGE_DESC": "Berechtigung um Moderator-Notizen zu erstellen und zu löschen",
+    "PROTECTED_ROLES_MANAGE": "Geschützte Rollen verwalten",
+    "PROTECTED_ROLES_MANAGE_DESC": "Berechtigung um geschützte Rollen zu konfigurieren (kritische Aktion)",
+    "CHANNEL_RULES_MANAGE": "Channel-Regeln verwalten",
+    "CHANNEL_RULES_MANAGE_DESC": "Berechtigung um channel-spezifische Moderationsregeln zu konfigurieren"
   }
 }

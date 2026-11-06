@@ -4,56 +4,56 @@
   "permissions": [
     {
       "key": "STREAMING.VIEW",
-      "name": "Streaming ansehen",
-      "description": "Berechtigung um den Streaming-Bereich zu oeffnen und den Betriebszustand zu sehen",
+      "name": "streaming:PERMS.VIEW",
+      "description": "streaming:PERMS.VIEW_DESC",
       "category": "streaming",
       "is_dangerous": 0,
       "requires": null
     },
     {
       "key": "STREAMING.STREAMERS.MANAGE",
-      "name": "Streamer verwalten",
-      "description": "Berechtigung um Kanaele zur Beobachtung einzutragen und wieder zu entfernen",
+      "name": "streaming:PERMS.STREAMERS_MANAGE",
+      "description": "streaming:PERMS.STREAMERS_MANAGE_DESC",
       "category": "streaming",
       "is_dangerous": 0,
       "requires": "STREAMING.VIEW"
     },
     {
       "key": "STREAMING.TARGETS.MANAGE",
-      "name": "Ziele verwalten",
-      "description": "Berechtigung um Ankuendigungskanal, Erwaehnungsrolle, Filter und Aufraeumart zu setzen",
+      "name": "streaming:PERMS.TARGETS_MANAGE",
+      "description": "streaming:PERMS.TARGETS_MANAGE_DESC",
       "category": "streaming",
       "is_dangerous": 0,
       "requires": "STREAMING.VIEW"
     },
     {
       "key": "STREAMING.TEMPLATES.EDIT",
-      "name": "Nachrichtenvorlagen bearbeiten",
-      "description": "Berechtigung um den Text der Ankuendigungen zu aendern",
+      "name": "streaming:PERMS.TEMPLATES_EDIT",
+      "description": "streaming:PERMS.TEMPLATES_EDIT_DESC",
       "category": "streaming",
       "is_dangerous": 0,
       "requires": "STREAMING.VIEW"
     },
     {
       "key": "STREAMING.SETTINGS.EDIT",
-      "name": "Streaming-Einstellungen bearbeiten",
-      "description": "Berechtigung um Vorgaben der Guild zu setzen: Standardkanal, Abklingzeit, Aufraeumart",
+      "name": "streaming:PERMS.SETTINGS_EDIT",
+      "description": "streaming:PERMS.SETTINGS_EDIT_DESC",
       "category": "streaming",
       "is_dangerous": 0,
       "requires": "STREAMING.VIEW"
     },
     {
       "key": "STREAMING.TEST",
-      "name": "Testankuendigung ausloesen",
-      "description": "Berechtigung um eine Probe-Ankuendigung zu senden. Sie erscheint sichtbar im Kanal.",
+      "name": "streaming:PERMS.TEST",
+      "description": "streaming:PERMS.TEST_DESC",
       "category": "streaming",
       "is_dangerous": 1,
       "requires": "STREAMING.VIEW"
     },
     {
       "key": "STREAMING.CHAT.MANAGE",
-      "name": "Chatbot dieses Kanals einstellen",
-      "description": "Chatbot dieses Kanals einstellen. Wirkt nur in der Heim-Guild, sonst nirgends.",
+      "name": "streaming:PERMS.CHAT_MANAGE",
+      "description": "streaming:PERMS.CHAT_MANAGE_DESC",
       "category": "streaming",
       "is_dangerous": 0,
       "requires": "STREAMING.VIEW"

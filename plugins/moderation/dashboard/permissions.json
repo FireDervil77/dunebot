@@ -4,96 +4,96 @@
   "permissions": [
     {
       "key": "MODERATION.VIEW",
-      "name": "Moderation anzeigen",
-      "description": "Berechtigung um Moderation-Einstellungen zu sehen",
+      "name": "moderation:PERMS.VIEW",
+      "description": "moderation:PERMS.VIEW_DESC",
       "category": "moderation",
       "is_dangerous": 0,
       "requires": null
     },
     {
       "key": "MODERATION.SETTINGS.EDIT",
-      "name": "Moderation-Einstellungen bearbeiten",
-      "description": "Berechtigung um Moderation-Einstellungen zu ändern (Automod-Regeln, Filter, etc.)",
+      "name": "moderation:PERMS.SETTINGS_EDIT",
+      "description": "moderation:PERMS.SETTINGS_EDIT_DESC",
       "category": "moderation",
       "is_dangerous": 0,
       "requires": "MODERATION.VIEW"
     },
     {
       "key": "MODERATION.BAN.EXECUTE",
-      "name": "Bans ausführen",
-      "description": "Berechtigung um User zu bannen (kritische Aktion)",
+      "name": "moderation:PERMS.BAN_EXECUTE",
+      "description": "moderation:PERMS.BAN_EXECUTE_DESC",
       "category": "moderation",
       "is_dangerous": 1,
       "requires": "MODERATION.VIEW"
     },
     {
       "key": "MODERATION.KICK.EXECUTE",
-      "name": "Kicks ausführen",
-      "description": "Berechtigung um User zu kicken",
+      "name": "moderation:PERMS.KICK_EXECUTE",
+      "description": "moderation:PERMS.KICK_EXECUTE_DESC",
       "category": "moderation",
       "is_dangerous": 0,
       "requires": "MODERATION.VIEW"
     },
     {
       "key": "MODERATION.MUTE.EXECUTE",
-      "name": "Mutes ausführen",
-      "description": "Berechtigung um User zu muten/unmuten",
+      "name": "moderation:PERMS.MUTE_EXECUTE",
+      "description": "moderation:PERMS.MUTE_EXECUTE_DESC",
       "category": "moderation",
       "is_dangerous": 0,
       "requires": "MODERATION.VIEW"
     },
     {
       "key": "MODERATION.WARN.EXECUTE",
-      "name": "Warnungen ausführen",
-      "description": "Berechtigung um User zu warnen",
+      "name": "moderation:PERMS.WARN_EXECUTE",
+      "description": "moderation:PERMS.WARN_EXECUTE_DESC",
       "category": "moderation",
       "is_dangerous": 0,
       "requires": "MODERATION.VIEW"
     },
     {
       "key": "MODERATION.LOGS.VIEW",
-      "name": "Moderation-Logs anzeigen",
-      "description": "Berechtigung um Moderation-Logs zu sehen (Bans, Kicks, Warns)",
+      "name": "moderation:PERMS.LOGS_VIEW",
+      "description": "moderation:PERMS.LOGS_VIEW_DESC",
       "category": "moderation",
       "is_dangerous": 0,
       "requires": "MODERATION.VIEW"
     },
     {
       "key": "MODERATION.CASES.MANAGE",
-      "name": "Cases verwalten",
-      "description": "Berechtigung um Moderation-Cases zu bearbeiten/löschen",
+      "name": "moderation:PERMS.CASES_MANAGE",
+      "description": "moderation:PERMS.CASES_MANAGE_DESC",
       "category": "moderation",
       "is_dangerous": 0,
       "requires": "MODERATION.VIEW"
     },
     {
       "key": "MODERATION.NOTES.VIEW",
-      "name": "Mod-Notizen anzeigen",
-      "description": "Berechtigung um interne Moderator-Notizen einzusehen",
+      "name": "moderation:PERMS.NOTES_VIEW",
+      "description": "moderation:PERMS.NOTES_VIEW_DESC",
       "category": "moderation",
       "is_dangerous": 0,
       "requires": "MODERATION.VIEW"
     },
     {
       "key": "MODERATION.NOTES.MANAGE",
-      "name": "Mod-Notizen verwalten",
-      "description": "Berechtigung um Moderator-Notizen zu erstellen und zu löschen",
+      "name": "moderation:PERMS.NOTES_MANAGE",
+      "description": "moderation:PERMS.NOTES_MANAGE_DESC",
       "category": "moderation",
       "is_dangerous": 0,
       "requires": "MODERATION.NOTES.VIEW"
     },
     {
       "key": "MODERATION.PROTECTED.ROLES.MANAGE",
-      "name": "Geschützte Rollen verwalten",
-      "description": "Berechtigung um geschützte Rollen zu konfigurieren (kritische Aktion)",
+      "name": "moderation:PERMS.PROTECTED_ROLES_MANAGE",
+      "description": "moderation:PERMS.PROTECTED_ROLES_MANAGE_DESC",
       "category": "moderation",
       "is_dangerous": 1,
       "requires": "MODERATION.SETTINGS.EDIT"
     },
     {
       "key": "MODERATION.CHANNEL.RULES.MANAGE",
-      "name": "Channel-Regeln verwalten",
-      "description": "Berechtigung um channel-spezifische Moderationsregeln zu konfigurieren",
+      "name": "moderation:PERMS.CHANNEL_RULES_MANAGE",
+      "description": "moderation:PERMS.CHANNEL_RULES_MANAGE_DESC",
       "category": "moderation",
       "is_dangerous": 0,
       "requires": "MODERATION.SETTINGS.EDIT"

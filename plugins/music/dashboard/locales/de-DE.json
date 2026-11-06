@@ -186,5 +186,38 @@
     "ORIGIN_PLACEHOLDER": "z. B. NCS, StreamBeats …",
     "ORIGIN_HINT": "Nur für dich — damit du in einem Jahr noch weißt, wo du nachlegen kannst. Wird nicht geprüft.",
     "FOR_STREAM": "Für den Stream"
+  },
+  "PERMS": {
+    "VIEW": "Musik ansehen",
+    "VIEW_DESC": "Berechtigung um den Musik-Bereich zu öffnen",
+    "PLAY": "Titel hinzufügen",
+    "PLAY_DESC": "Berechtigung um vom Dashboard aus Titel in die Warteschlange zu legen",
+    "CONTROL": "Wiedergabe steuern",
+    "CONTROL_DESC": "Berechtigung um anzuhalten, zu überspringen, zu stoppen und die Lautstärke zu setzen",
+    "PLAYLISTS_MANAGE": "Wiedergabelisten verwalten",
+    "PLAYLISTS_MANAGE_DESC": "Berechtigung um Wiedergabelisten anzulegen, zu ändern und zu löschen",
+    "HISTORY_VIEW": "Verlauf ansehen",
+    "HISTORY_VIEW_DESC": "Berechtigung um zu sehen, was gespielt wurde",
+    "SETTINGS_EDIT": "Musik-Einstellungen bearbeiten",
+    "SETTINGS_EDIT_DESC": "Berechtigung um DJ-Rolle, Quellen, Filter und Grenzwerte zu setzen",
+    "FILES_UPLOAD": "Eigene Tondateien hochladen",
+    "FILES_UPLOAD_DESC": "Berechtigung um eigene Tondateien abzulegen und abzuspielen. Belegt Plattenplatz - bewusst ein eigenes Recht, damit nicht jeder, der Musik abspielen darf, auch etwas ablegt.",
+    "FILES_DELETE": "Eigene Tondateien löschen",
+    "FILES_DELETE_DESC": "Berechtigung um hochgeladene Tondateien wieder zu entfernen"
+  },
+  "FILTER_NAMES": {
+    "AUS": "Aus",
+    "BASSBOOST": "Bassboost",
+    "NIGHTCORE": "Nightcore",
+    "VAPORWAVE": "Vaporwave",
+    "ACHTD": "8D",
+    "KARAOKE": "Karaoke",
+    "TREBLE": "Höhen",
+    "AUSGLEICH": "Lautstärke ausgleichen",
+    "TIEFPASS": "Tiefpass",
+    "SCHNELL": "Schneller",
+    "LANGSAM": "Langsamer",
+    "HOEHER": "Höhere Tonlage",
+    "TIEFER": "Tiefere Tonlage"
   }
 }

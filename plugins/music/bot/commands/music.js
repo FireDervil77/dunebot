@@ -132,9 +132,9 @@ module.exports = {
                         name: 'modus', description: 'music:LOOP.MODE_DESC',
                         type: ApplicationCommandOptionType.String, required: true,
                         choices: [
-                            { name: 'Aus', value: 'aus' },
-                            { name: 'Titel wiederholen', value: 'titel' },
-                            { name: 'Warteschlange wiederholen', value: 'liste' }
+                            { name: 'music:LOOP.CHOICES.AUS', value: 'aus' },
+                            { name: 'music:LOOP.CHOICES.TITEL', value: 'titel' },
+                            { name: 'music:LOOP.CHOICES.LISTE', value: 'liste' }
                         ]
                     }
                 ]
@@ -158,7 +158,9 @@ module.exports = {
                     {
                         name: 'name', description: 'music:FILTER.NAME_DESC',
                         type: ApplicationCommandOptionType.String, required: false,
-                        choices: klangfilter.auswahl().map(f => ({ name: f.name, value: f.wert }))
+                        // Schlüssel statt Namen: Die Anmeldung übersetzt sie je Sprache
+                        // (CommandManager, seit 2026-11-06).
+                        choices: klangfilter.auswahl().map(f => ({ name: `music:FILTER.NAMES.${f.wert.toUpperCase()}`, value: f.wert }))
                     }
                 ]
             },

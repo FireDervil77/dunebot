@@ -4,64 +4,64 @@
   "permissions": [
     {
       "key": "AUTOMOD.VIEW",
-      "name": "AutoMod anzeigen",
-      "description": "Berechtigung um AutoMod-Einstellungen zu sehen",
+      "name": "automod:PERMS.VIEW",
+      "description": "automod:PERMS.VIEW_DESC",
       "category": "automod",
       "is_dangerous": 0,
       "requires": null
     },
     {
       "key": "AUTOMOD.SETTINGS.EDIT",
-      "name": "AutoMod-Einstellungen bearbeiten",
-      "description": "Berechtigung um AutoMod-Regeln zu konfigurieren (Spam-Filter, Link-Filter, etc.)",
+      "name": "automod:PERMS.SETTINGS_EDIT",
+      "description": "automod:PERMS.SETTINGS_EDIT_DESC",
       "category": "automod",
       "is_dangerous": 0,
       "requires": "AUTOMOD.VIEW"
     },
     {
       "key": "AUTOMOD.RULES.CREATE",
-      "name": "AutoMod-Regeln erstellen",
-      "description": "Berechtigung um neue AutoMod-Regeln zu erstellen",
+      "name": "automod:PERMS.RULES_CREATE",
+      "description": "automod:PERMS.RULES_CREATE_DESC",
       "category": "automod",
       "is_dangerous": 0,
       "requires": "AUTOMOD.VIEW"
     },
     {
       "key": "AUTOMOD.RULES.EDIT",
-      "name": "AutoMod-Regeln bearbeiten",
-      "description": "Berechtigung um bestehende AutoMod-Regeln zu ändern",
+      "name": "automod:PERMS.RULES_EDIT",
+      "description": "automod:PERMS.RULES_EDIT_DESC",
       "category": "automod",
       "is_dangerous": 0,
       "requires": "AUTOMOD.VIEW"
     },
     {
       "key": "AUTOMOD.RULES.DELETE",
-      "name": "AutoMod-Regeln löschen",
-      "description": "Berechtigung um AutoMod-Regeln zu entfernen (kritisch)",
+      "name": "automod:PERMS.RULES_DELETE",
+      "description": "automod:PERMS.RULES_DELETE_DESC",
       "category": "automod",
       "is_dangerous": 1,
       "requires": "AUTOMOD.VIEW"
     },
     {
       "key": "AUTOMOD.WHITELIST.MANAGE",
-      "name": "AutoMod-Whitelist verwalten",
-      "description": "Berechtigung um User/Channels von AutoMod auszunehmen",
+      "name": "automod:PERMS.WHITELIST_MANAGE",
+      "description": "automod:PERMS.WHITELIST_MANAGE_DESC",
       "category": "automod",
       "is_dangerous": 0,
       "requires": "AUTOMOD.VIEW"
     },
     {
       "key": "AUTOMOD.LOGS.VIEW",
-      "name": "AutoMod-Logs anzeigen",
-      "description": "Berechtigung um AutoMod-Aktionen zu sehen (Gelöschte Nachrichten, Warns, etc.)",
+      "name": "automod:PERMS.LOGS_VIEW",
+      "description": "automod:PERMS.LOGS_VIEW_DESC",
       "category": "automod",
       "is_dangerous": 0,
       "requires": "AUTOMOD.VIEW"
     },
     {
       "key": "AUTOMOD.KEYWORDS.MANAGE",
-      "name": "Stichwortlisten verwalten",
-      "description": "Berechtigung um Stichwortlisten und ihre Wörter zu bearbeiten. Wer das darf, sieht auch den Wortlaut der Listen.",
+      "name": "automod:PERMS.KEYWORDS_MANAGE",
+      "description": "automod:PERMS.KEYWORDS_MANAGE_DESC",
       "category": "automod",
       "is_dangerous": 0,
       "requires": "AUTOMOD.VIEW"

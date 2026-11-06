@@ -162,7 +162,7 @@
             <label for="music-filter" class="form-label"><%= tr('music:FILTER') %></label>
             <select class="form-select" id="music-filter">
               <% filter.forEach(f => { %>
-                <option value="<%= f.wert %>" <%= zustand.filter === f.wert ? 'selected' : '' %>><%= f.name %></option>
+                <option value="<%= f.wert %>" <%= zustand.filter === f.wert ? 'selected' : '' %>><%= tr('music:FILTER_NAMES.' + f.wert.toUpperCase()) %></option>
               <% }); %>
             </select>
             <div class="form-hint"><%= tr('music:FILTER_HINT') %></div>

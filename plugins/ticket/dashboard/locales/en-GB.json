@@ -154,5 +154,15 @@
     "BAUSTEIN_UNVOLLSTAENDIG": "Shorthand and content are required.",
     "GESPEICHERT": "Saved.",
     "KEIN_TRANSKRIPT": "There is no transcript for this ticket."
+  },
+  "PERMS": {
+    "VIEW": "View ticket system",
+    "VIEW_DESC": "Allows seeing the ticket settings and overview",
+    "SETTINGS_EDIT": "Edit ticket settings",
+    "SETTINGS_EDIT_DESC": "Allows configuring ticket settings (log channel, limit, colours)",
+    "CATEGORIES_MANAGE": "Manage ticket categories",
+    "CATEGORIES_MANAGE_DESC": "Allows creating, editing and deleting ticket categories",
+    "TICKETS_VIEW": "View tickets",
+    "TICKETS_VIEW_DESC": "Allows viewing all tickets and transcripts"
   }
 }

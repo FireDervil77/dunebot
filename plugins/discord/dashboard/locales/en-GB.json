@@ -140,5 +140,21 @@
     "UNLINK_HINT": "The message stays in the channel along with its reactions. It simply stops working.",
     "UNLINK_CONFIRM": "Really unlink? The message stays in the channel but stops working."
   },
-  "SAVE": "Save"
+  "SAVE": "Save",
+  "PERMS": {
+    "VIEW": "View Discord area",
+    "VIEW_DESC": "Allows opening the Discord area in the dashboard",
+    "ROLES_VIEW": "View Discord roles",
+    "ROLES_VIEW_DESC": "Allows seeing the server's roles and their permissions",
+    "ROLES_EDIT": "Create and edit Discord roles",
+    "ROLES_EDIT_DESC": "Allows creating and changing roles — takes effect immediately on the Discord server",
+    "ROLES_DELETE": "Delete Discord roles",
+    "ROLES_DELETE_DESC": "Allows deleting roles for good — cannot be undone",
+    "CHANNELS_VIEW": "View Discord channels",
+    "CHANNELS_VIEW_DESC": "Allows viewing the server's channels and categories",
+    "ROLEMENUS_VIEW": "View role menus",
+    "ROLEMENUS_VIEW_DESC": "Allows viewing the server's role menus",
+    "ROLEMENUS_MANAGE": "Manage role menus",
+    "ROLEMENUS_MANAGE_DESC": "Allows creating, changing and sending role menus to a channel. Whoever may do this indirectly decides which roles members can give themselves"
+  }
 }

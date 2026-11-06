@@ -154,5 +154,15 @@
     "BAUSTEIN_UNVOLLSTAENDIG": "Kürzel und Inhalt sind erforderlich.",
     "GESPEICHERT": "Gespeichert.",
     "KEIN_TRANSKRIPT": "Für dieses Ticket gibt es kein Transkript."
+  },
+  "PERMS": {
+    "VIEW": "Ticket-System anzeigen",
+    "VIEW_DESC": "Berechtigung um Ticket-Einstellungen und Übersicht zu sehen",
+    "SETTINGS_EDIT": "Ticket-Einstellungen bearbeiten",
+    "SETTINGS_EDIT_DESC": "Berechtigung um Ticket-Einstellungen zu konfigurieren (Log-Kanal, Limit, Farben)",
+    "CATEGORIES_MANAGE": "Ticket-Kategorien verwalten",
+    "CATEGORIES_MANAGE_DESC": "Berechtigung um Ticket-Kategorien zu erstellen, bearbeiten und löschen",
+    "TICKETS_VIEW": "Tickets anzeigen",
+    "TICKETS_VIEW_DESC": "Berechtigung um alle Tickets und Transkripte einzusehen"
   }
 }

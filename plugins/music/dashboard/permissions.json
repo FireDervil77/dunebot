@@ -4,64 +4,64 @@
   "permissions": [
     {
       "key": "MUSIC.VIEW",
-      "name": "Musik ansehen",
-      "description": "Berechtigung um den Musik-Bereich zu öffnen",
+      "name": "music:PERMS.VIEW",
+      "description": "music:PERMS.VIEW_DESC",
       "category": "music",
       "is_dangerous": 0,
       "requires": null
     },
     {
       "key": "MUSIC.PLAY",
-      "name": "Titel hinzufügen",
-      "description": "Berechtigung um vom Dashboard aus Titel in die Warteschlange zu legen",
+      "name": "music:PERMS.PLAY",
+      "description": "music:PERMS.PLAY_DESC",
       "category": "music",
       "is_dangerous": 0,
       "requires": "MUSIC.VIEW"
     },
     {
       "key": "MUSIC.CONTROL",
-      "name": "Wiedergabe steuern",
-      "description": "Berechtigung um anzuhalten, zu überspringen, zu stoppen und die Lautstärke zu setzen",
+      "name": "music:PERMS.CONTROL",
+      "description": "music:PERMS.CONTROL_DESC",
       "category": "music",
       "is_dangerous": 0,
       "requires": "MUSIC.VIEW"
     },
     {
       "key": "MUSIC.PLAYLISTS.MANAGE",
-      "name": "Wiedergabelisten verwalten",
-      "description": "Berechtigung um Wiedergabelisten anzulegen, zu ändern und zu löschen",
+      "name": "music:PERMS.PLAYLISTS_MANAGE",
+      "description": "music:PERMS.PLAYLISTS_MANAGE_DESC",
       "category": "music",
       "is_dangerous": 0,
       "requires": "MUSIC.VIEW"
     },
     {
       "key": "MUSIC.HISTORY.VIEW",
-      "name": "Verlauf ansehen",
-      "description": "Berechtigung um zu sehen, was gespielt wurde",
+      "name": "music:PERMS.HISTORY_VIEW",
+      "description": "music:PERMS.HISTORY_VIEW_DESC",
       "category": "music",
       "is_dangerous": 0,
       "requires": "MUSIC.VIEW"
     },
     {
       "key": "MUSIC.SETTINGS.EDIT",
-      "name": "Musik-Einstellungen bearbeiten",
-      "description": "Berechtigung um DJ-Rolle, Quellen, Filter und Grenzwerte zu setzen",
+      "name": "music:PERMS.SETTINGS_EDIT",
+      "description": "music:PERMS.SETTINGS_EDIT_DESC",
       "category": "music",
       "is_dangerous": 0,
       "requires": "MUSIC.VIEW"
     },
     {
       "key": "MUSIC.FILES.UPLOAD",
-      "name": "Eigene Tondateien hochladen",
-      "description": "Berechtigung um eigene Tondateien abzulegen und abzuspielen. Belegt Plattenplatz - bewusst ein eigenes Recht, damit nicht jeder, der Musik abspielen darf, auch etwas ablegt.",
+      "name": "music:PERMS.FILES_UPLOAD",
+      "description": "music:PERMS.FILES_UPLOAD_DESC",
       "category": "music",
       "is_dangerous": 1,
       "requires": "MUSIC.VIEW"
     },
     {
       "key": "MUSIC.FILES.DELETE",
-      "name": "Eigene Tondateien löschen",
-      "description": "Berechtigung um hochgeladene Tondateien wieder zu entfernen",
+      "name": "music:PERMS.FILES_DELETE",
+      "description": "music:PERMS.FILES_DELETE_DESC",
       "category": "music",
       "is_dangerous": 0,
       "requires": "MUSIC.VIEW"

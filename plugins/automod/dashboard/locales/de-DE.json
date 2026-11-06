@@ -353,5 +353,23 @@
     "STRIKES_ZURUECKGESETZT": "Strikes zurückgesetzt.",
     "AUFRAEUMEN_FRAGE": "Einträge älter als {tage} Tage endgültig löschen?",
     "AUFGERAEUMT": "{logs} Verstöße und {events} Raid-Ereignisse gelöscht."
+  },
+  "PERMS": {
+    "VIEW": "AutoMod anzeigen",
+    "VIEW_DESC": "Berechtigung um AutoMod-Einstellungen zu sehen",
+    "SETTINGS_EDIT": "AutoMod-Einstellungen bearbeiten",
+    "SETTINGS_EDIT_DESC": "Berechtigung um AutoMod-Regeln zu konfigurieren (Spam-Filter, Link-Filter, etc.)",
+    "RULES_CREATE": "AutoMod-Regeln erstellen",
+    "RULES_CREATE_DESC": "Berechtigung um neue AutoMod-Regeln zu erstellen",
+    "RULES_EDIT": "AutoMod-Regeln bearbeiten",
+    "RULES_EDIT_DESC": "Berechtigung um bestehende AutoMod-Regeln zu ändern",
+    "RULES_DELETE": "AutoMod-Regeln löschen",
+    "RULES_DELETE_DESC": "Berechtigung um AutoMod-Regeln zu entfernen (kritisch)",
+    "WHITELIST_MANAGE": "AutoMod-Whitelist verwalten",
+    "WHITELIST_MANAGE_DESC": "Berechtigung um User/Channels von AutoMod auszunehmen",
+    "LOGS_VIEW": "AutoMod-Logs anzeigen",
+    "LOGS_VIEW_DESC": "Berechtigung um AutoMod-Aktionen zu sehen (Gelöschte Nachrichten, Warns, etc.)",
+    "KEYWORDS_MANAGE": "Stichwortlisten verwalten",
+    "KEYWORDS_MANAGE_DESC": "Berechtigung um Stichwortlisten und ihre Wörter zu bearbeiten. Wer das darf, sieht auch den Wortlaut der Listen."
   }
 }

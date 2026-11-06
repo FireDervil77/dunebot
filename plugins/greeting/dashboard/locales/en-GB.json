@@ -194,5 +194,11 @@
   },
   "INVITES": {
     "SUBTITLE": "Who arrived through which invite"
+  },
+  "PERMS": {
+    "VIEW": "View greeting",
+    "VIEW_DESC": "Allows seeing the greeting settings",
+    "SETTINGS_EDIT": "Edit greeting settings",
+    "SETTINGS_EDIT_DESC": "Allows configuring greeting messages"
   }
 }

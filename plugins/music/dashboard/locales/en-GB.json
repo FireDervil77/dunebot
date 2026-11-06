@@ -186,5 +186,38 @@
     "ORIGIN_PLACEHOLDER": "e.g. NCS, StreamBeats …",
     "ORIGIN_HINT": "For you only — so you still know where to get more in a year. Not verified.",
     "FOR_STREAM": "For the stream"
+  },
+  "PERMS": {
+    "VIEW": "View music",
+    "VIEW_DESC": "Allows opening the music area",
+    "PLAY": "Add tracks",
+    "PLAY_DESC": "Allows adding tracks to the queue from the dashboard",
+    "CONTROL": "Control playback",
+    "CONTROL_DESC": "Allows pausing, skipping, stopping and setting the volume",
+    "PLAYLISTS_MANAGE": "Manage playlists",
+    "PLAYLISTS_MANAGE_DESC": "Allows creating, changing and deleting playlists",
+    "HISTORY_VIEW": "View history",
+    "HISTORY_VIEW_DESC": "Allows seeing what has been played",
+    "SETTINGS_EDIT": "Edit music settings",
+    "SETTINGS_EDIT_DESC": "Allows setting the DJ role, sources, filters and limits",
+    "FILES_UPLOAD": "Upload own audio files",
+    "FILES_UPLOAD_DESC": "Allows uploading and playing your own audio files. Takes up disk space - deliberately a separate permission so that not everyone who may play music can also upload.",
+    "FILES_DELETE": "Delete own audio files",
+    "FILES_DELETE_DESC": "Allows removing uploaded audio files"
+  },
+  "FILTER_NAMES": {
+    "AUS": "Off",
+    "BASSBOOST": "Bass boost",
+    "NIGHTCORE": "Nightcore",
+    "VAPORWAVE": "Vaporwave",
+    "ACHTD": "8D",
+    "KARAOKE": "Karaoke",
+    "TREBLE": "Treble",
+    "AUSGLEICH": "Normalise loudness",
+    "TIEFPASS": "Low pass",
+    "SCHNELL": "Faster",
+    "LANGSAM": "Slower",
+    "HOEHER": "Higher pitch",
+    "TIEFER": "Lower pitch"
   }
 }

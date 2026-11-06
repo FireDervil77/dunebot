@@ -14,11 +14,14 @@
  *   1. Je `plugins/<plugin>/{bot,dashboard}/locales`: dieselben Schlüssel in
  *      de-DE und en-GB.
  *   2. Jeder feste Schlüssel `'<namensraum>:<SCHLÜSSEL>'` in `getT(`,
- *      `replyT(`, `tr(`, `t(`, `translate(` oder `description:` steht in
+ *      `replyT(`, `tr(`, `t(`, `translate(`, `description:` oder `name:`
+ *      (Auswahlnamen, seit 2026-11-06) steht in
  *      beiden Sprachen der Sprachdatei, die die App lädt (Bot liest `bot/`,
  *      Dashboard liest `dashboard/`, siehe I18nManager.loadPluginTranslations).
  *      Zusammengesetzte Schlüssel (`'x:EVENT_' + s`) sind nicht prüfbar und
  *      werden ausgelassen. Kommentare zählen nicht (`ohneKommentare`).
+ *   3. Name und Beschreibung jedes Rechts in `dashboard/permissions.json` sind
+ *      Schlüssel im Namensraum des Plugins und stehen in beiden Sprachen.
  *
  *   node scripts/check-sprachdateien.js
  */
@@ -30,7 +33,7 @@ const { ohneKommentare, ohneKommentareEjs } = require('./lib/quelltext');
 
 const WURZEL = path.join(__dirname, '..');
 const SPRACHEN = ['de-DE', 'en-GB'];
-const AUFRUF = /(?:\b(?:getT|replyT|tr|t|translate)\(\s*|\bdescription:\s*)(['"`])([a-z][a-z0-9_-]*):([A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*)\1(?!\s*\+)/g;
+const AUFRUF = /(?:\b(?:getT|replyT|tr|t|translate)\(\s*|\b(?:description|name):\s*)(['"`])([a-z][a-z0-9_-]*):([A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*)\1(?!\s*\+)/g;
 
 function flach(obj, praefix = '', aus = new Set()) {
     for (const [k, v] of Object.entries(obj)) {
@@ -133,8 +136,48 @@ for (const datei of [...dateien(path.join(WURZEL, 'plugins')), ...dateien(path.j
     }
 }
 
+// 3. Rechtenamen (seit 2026-11-06)
+//
+// Die Rechteseiten zeigen `tr(perm.name_translation_key)`. Bis dahin stand
+// dort in elf Plugins deutscher Klartext, Englisch sah also Deutsch. Jeder
+// Name und jede Beschreibung ist jetzt ein Schlüssel mit dem Namensraum des
+// Plugins und steht in beiden Sprachen von `dashboard/locales`.
+let rechte = 0;
+for (const p of plugins) {
+    const datei = path.join(WURZEL, 'plugins', p, 'dashboard', 'permissions.json');
+    if (!fs.existsSync(datei)) continue;
+    const ns = require(path.join(WURZEL, 'plugins', p, 'package.json')).name;
+    const je = schluessel[`${p}/dashboard`];
+    for (const recht of JSON.parse(fs.readFileSync(datei, 'utf8')).permissions || []) {
+        for (const feld of ['name', 'description']) {
+            const wert = recht[feld];
+            if (!wert) continue;
+            rechte++;
+            const m = /^([a-z][a-z0-9_-]*):([A-Za-z0-9_.]+)$/.exec(wert);
+            if (!m) {
+                // `core` schreibt seine Schlüssel ohne Namensraum (PERMISSIONS.*,
+                // CORE.PERM_*); die stehen im allgemeinen Namensraum des Kerns.
+                if (p === 'core' && /^[A-Z][A-Z0-9_.]+$/.test(wert)) continue;
+                fehler++;
+                console.log(`  ✗ ${rel(datei)}: ${recht.key}.${feld} ist Klartext („${String(wert).slice(0, 40)}"), kein Sprachschlüssel`);
+                continue;
+            }
+            if (m[1] !== ns) {
+                fehler++;
+                console.log(`  ✗ ${rel(datei)}: ${recht.key}.${feld} zeigt in den Namensraum ${m[1]}, nicht ${ns}`);
+                continue;
+            }
+            for (const lng of SPRACHEN) {
+                if (je && je[lng].has(m[2])) continue;
+                fehler++;
+                console.log(`  ✗ ${rel(datei)}: ${recht.key}.${feld} '${wert}' fehlt in plugins/${p}/dashboard/locales/${lng}.json`);
+            }
+        }
+    }
+}
+
 if (fehler) {
     console.log(`\n❌ ${fehler} Lücke(n) in den Sprachdateien der Plugins.`);
     process.exit(1);
 }
-console.log(`✅ ${dateienGeprueft} Sprachdateien mit gleichen Schlüsseln, ${abfragen} feste Abfragen, alle vorhanden.`);
+console.log(`✅ ${dateienGeprueft} Sprachdateien mit gleichen Schlüsseln, ${abfragen} feste Abfragen und ${rechte} Rechtetexte, alle vorhanden.`);

@@ -555,5 +555,21 @@
     "kategorie": "Spiel oder Kategorie",
     "url": "Adresse des Streams",
     "plattform": "Twitch, Kick oder YouTube"
+  },
+  "PERMS": {
+    "VIEW": "Streaming ansehen",
+    "VIEW_DESC": "Berechtigung um den Streaming-Bereich zu öffnen und den Betriebszustand zu sehen",
+    "STREAMERS_MANAGE": "Streamer verwalten",
+    "STREAMERS_MANAGE_DESC": "Berechtigung um Kanäle zur Beobachtung einzutragen und wieder zu entfernen",
+    "TARGETS_MANAGE": "Ziele verwalten",
+    "TARGETS_MANAGE_DESC": "Berechtigung um Ankündigungskanal, Erwähnungsrolle, Filter und Aufräumart zu setzen",
+    "TEMPLATES_EDIT": "Nachrichtenvorlagen bearbeiten",
+    "TEMPLATES_EDIT_DESC": "Berechtigung um den Text der Ankündigungen zu ändern",
+    "SETTINGS_EDIT": "Streaming-Einstellungen bearbeiten",
+    "SETTINGS_EDIT_DESC": "Berechtigung um Vorgaben der Guild zu setzen: Standardkanal, Abklingzeit, Aufräumart",
+    "TEST": "Testankündigung auslösen",
+    "TEST_DESC": "Berechtigung um eine Probe-Ankündigung zu senden. Sie erscheint sichtbar im Kanal.",
+    "CHAT_MANAGE": "Chatbot dieses Kanals einstellen",
+    "CHAT_MANAGE_DESC": "Chatbot dieses Kanals einstellen. Wirkt nur in der Heim-Guild, sonst nirgends."
   }
 }

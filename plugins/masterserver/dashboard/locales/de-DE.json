@@ -18,5 +18,25 @@
     },
     "LOGS": {
         "TITLE": "Daemon-Logs"
+    },
+    "PERMS": {
+        "VIEW": "MasterServer anzeigen",
+        "VIEW_DESC": "Berechtigung um MasterServer-Panel zu sehen",
+        "DAEMON_MANAGE": "Daemon verwalten",
+        "DAEMON_MANAGE_DESC": "Berechtigung um Daemon-Instanzen zu konfigurieren und zu verbinden",
+        "ROOTSERVER_VIEW": "RootServer anzeigen",
+        "ROOTSERVER_VIEW_DESC": "Berechtigung um RootServer-Liste und Details zu sehen",
+        "ROOTSERVER_CREATE": "RootServer erstellen",
+        "ROOTSERVER_CREATE_DESC": "Berechtigung um neue RootServer anzulegen (kritisch - kostet Ressourcen)",
+        "ROOTSERVER_EDIT": "RootServer bearbeiten",
+        "ROOTSERVER_EDIT_DESC": "Berechtigung um RootServer-Einstellungen zu ändern",
+        "ROOTSERVER_DELETE": "RootServer löschen",
+        "ROOTSERVER_DELETE_DESC": "Berechtigung um RootServer zu entfernen (KRITISCH - löscht alle Gameserver!)",
+        "RESOURCES_VIEW": "Ressourcen anzeigen",
+        "RESOURCES_VIEW_DESC": "Berechtigung um Ressourcen-Übersicht und Quota-Profile zu sehen",
+        "RESOURCES_MANAGE": "Ressourcen verwalten",
+        "RESOURCES_MANAGE_DESC": "Berechtigung um Quota-Profile zu erstellen und zu bearbeiten",
+        "LOGS_VIEW": "Daemon-Logs anzeigen",
+        "LOGS_VIEW_DESC": "Berechtigung um Daemon-System-Logs zu sehen"
     }
 }

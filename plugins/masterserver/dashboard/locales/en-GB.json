@@ -18,5 +18,25 @@
     },
     "LOGS": {
         "TITLE": "Daemon logs"
+    },
+    "PERMS": {
+        "VIEW": "View masterserver",
+        "VIEW_DESC": "Allows seeing the masterserver panel",
+        "DAEMON_MANAGE": "Manage daemon",
+        "DAEMON_MANAGE_DESC": "Allows configuring and connecting daemon instances",
+        "ROOTSERVER_VIEW": "View root servers",
+        "ROOTSERVER_VIEW_DESC": "Allows seeing the root server list and details",
+        "ROOTSERVER_CREATE": "Create root servers",
+        "ROOTSERVER_CREATE_DESC": "Allows creating new root servers (critical - costs resources)",
+        "ROOTSERVER_EDIT": "Edit root servers",
+        "ROOTSERVER_EDIT_DESC": "Allows changing root server settings",
+        "ROOTSERVER_DELETE": "Delete root servers",
+        "ROOTSERVER_DELETE_DESC": "Allows removing root servers (CRITICAL - deletes all game servers!)",
+        "RESOURCES_VIEW": "View resources",
+        "RESOURCES_VIEW_DESC": "Allows seeing the resource overview and quota profiles",
+        "RESOURCES_MANAGE": "Manage resources",
+        "RESOURCES_MANAGE_DESC": "Allows creating and editing quota profiles",
+        "LOGS_VIEW": "View daemon logs",
+        "LOGS_VIEW_DESC": "Allows seeing daemon system logs"
     }
 }

@@ -220,5 +220,27 @@
       "MARKER_REMOVED": "Marker entfernt!",
       "ERROR_REMOVE": "Fehler beim Entfernen"
     }
+  },
+  "PERMS": {
+    "VIEW": "DuneMap anzeigen",
+    "VIEW_DESC": "Berechtigung um DuneMap-Features zu sehen",
+    "SETTINGS_EDIT": "DuneMap-Einstellungen bearbeiten",
+    "SETTINGS_EDIT_DESC": "Berechtigung um DuneMap-Konfiguration zu ändern",
+    "SECTORS_VIEW": "Sektoren anzeigen",
+    "SECTORS_VIEW_DESC": "Berechtigung um Sektoren-Karten zu sehen",
+    "SECTORS_CREATE": "Sektoren erstellen",
+    "SECTORS_CREATE_DESC": "Berechtigung um neue Sektoren anzulegen",
+    "SECTORS_EDIT": "Sektoren bearbeiten",
+    "SECTORS_EDIT_DESC": "Berechtigung um bestehende Sektoren zu ändern",
+    "SECTORS_DELETE": "Sektoren löschen",
+    "SECTORS_DELETE_DESC": "Berechtigung um Sektoren zu entfernen (kritisch)",
+    "MARKERS_CREATE": "Marker erstellen",
+    "MARKERS_CREATE_DESC": "Berechtigung um Map-Marker zu setzen",
+    "MARKERS_EDIT": "Marker bearbeiten",
+    "MARKERS_EDIT_DESC": "Berechtigung um bestehende Marker zu ändern",
+    "MARKERS_DELETE": "Marker löschen",
+    "MARKERS_DELETE_DESC": "Berechtigung um Marker zu entfernen",
+    "ADMIN_MANAGE": "Admin-Panel verwalten",
+    "ADMIN_MANAGE_DESC": "Berechtigung für erweiterte Admin-Funktionen (Sektor-Karten, Export, etc.)"
   }
 }

@@ -4,56 +4,56 @@
   "permissions": [
     {
       "key": "DISCORD.VIEW",
-      "name": "Discord-Bereich anzeigen",
-      "description": "Berechtigung, den Discord-Bereich im Dashboard zu öffnen",
+      "name": "discord:PERMS.VIEW",
+      "description": "discord:PERMS.VIEW_DESC",
       "category": "discord",
       "is_dangerous": 0,
       "requires": null
     },
     {
       "key": "DISCORD.ROLES.VIEW",
-      "name": "Discord-Rollen anzeigen",
-      "description": "Berechtigung, die Rollen des Servers samt Berechtigungen zu sehen",
+      "name": "discord:PERMS.ROLES_VIEW",
+      "description": "discord:PERMS.ROLES_VIEW_DESC",
       "category": "discord",
       "is_dangerous": 0,
       "requires": "DISCORD.VIEW"
     },
     {
       "key": "DISCORD.ROLES.EDIT",
-      "name": "Discord-Rollen anlegen und bearbeiten",
-      "description": "Berechtigung, Rollen anzulegen und zu ändern — wirkt sofort auf dem Discord-Server",
+      "name": "discord:PERMS.ROLES_EDIT",
+      "description": "discord:PERMS.ROLES_EDIT_DESC",
       "category": "discord",
       "is_dangerous": 1,
       "requires": "DISCORD.ROLES.VIEW"
     },
     {
       "key": "DISCORD.ROLES.DELETE",
-      "name": "Discord-Rollen löschen",
-      "description": "Berechtigung, Rollen endgültig zu löschen — nicht rückgängig zu machen",
+      "name": "discord:PERMS.ROLES_DELETE",
+      "description": "discord:PERMS.ROLES_DELETE_DESC",
       "category": "discord",
       "is_dangerous": 1,
       "requires": "DISCORD.ROLES.VIEW"
     },
     {
       "key": "DISCORD.CHANNELS.VIEW",
-      "name": "Discord-Kanäle anzeigen",
-      "description": "Berechtigung, die Kanäle und Kategorien des Servers einzusehen",
+      "name": "discord:PERMS.CHANNELS_VIEW",
+      "description": "discord:PERMS.CHANNELS_VIEW_DESC",
       "category": "discord",
       "is_dangerous": 0,
       "requires": "DISCORD.VIEW"
     },
     {
       "key": "DISCORD.ROLEMENUS.VIEW",
-      "name": "Rollenmenüs anzeigen",
-      "description": "Berechtigung, die Rollenmenüs des Servers einzusehen",
+      "name": "discord:PERMS.ROLEMENUS_VIEW",
+      "description": "discord:PERMS.ROLEMENUS_VIEW_DESC",
       "category": "discord",
       "is_dangerous": 0,
       "requires": "DISCORD.VIEW"
     },
     {
       "key": "DISCORD.ROLEMENUS.MANAGE",
-      "name": "Rollenmenüs verwalten",
-      "description": "Berechtigung, Rollenmenüs anzulegen, zu ändern und in einen Kanal zu senden. Wer das darf, bestimmt mittelbar, welche Rollen sich Mitglieder selbst geben können",
+      "name": "discord:PERMS.ROLEMENUS_MANAGE",
+      "description": "discord:PERMS.ROLEMENUS_MANAGE_DESC",
       "category": "discord",
       "is_dangerous": 1,
       "requires": "DISCORD.ROLEMENUS.VIEW"

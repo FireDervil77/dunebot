@@ -54,7 +54,7 @@ const FILTER = {
         tempo: 1
     },
     treble: {
-        name: 'Hoehen',
+        name: 'Höhen',
         ffmpeg: 'treble=g=8',
         tempo: 1
     },

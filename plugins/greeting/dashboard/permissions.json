@@ -4,16 +4,16 @@
   "permissions": [
     {
       "key": "GREETING.VIEW",
-      "name": "Begrüßung anzeigen",
-      "description": "Berechtigung um Begrüßungs-Einstellungen zu sehen",
+      "name": "greeting:PERMS.VIEW",
+      "description": "greeting:PERMS.VIEW_DESC",
       "category": "greeting",
       "is_dangerous": 0,
       "requires": null
     },
     {
       "key": "GREETING.SETTINGS.EDIT",
-      "name": "Begrüßungs-Einstellungen bearbeiten",
-      "description": "Berechtigung um Begrüßungsnachrichten zu konfigurieren",
+      "name": "greeting:PERMS.SETTINGS_EDIT",
+      "description": "greeting:PERMS.SETTINGS_EDIT_DESC",
       "category": "greeting",
       "is_dangerous": 0,
       "requires": "GREETING.VIEW"
