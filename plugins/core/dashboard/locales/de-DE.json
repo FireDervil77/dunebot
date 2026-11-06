@@ -78,13 +78,7 @@
     "PERM_MEDIA_UPLOAD": "Medien hochladen",
     "PERM_MEDIA_UPLOAD_DESC": "Erlaubt das Hochladen von Bildern und Dateien",
     "PERM_MEDIA_DELETE": "Medien löschen",
-    "PERM_MEDIA_DELETE_DESC": "Erlaubt das Löschen von Medien aus der Bibliothek (KRITISCH)",
-    "PERM_ROLES_VIEW": "Rollen ansehen",
-    "PERM_ROLES_VIEW_DESC": "Erlaubt das Ansehen der Guild-Rollen",
-    "PERM_ROLES_EDIT": "Rollen bearbeiten",
-    "PERM_ROLES_EDIT_DESC": "Erlaubt das Bearbeiten der Guild-Rollen",
-    "PERM_CHANNELS_VIEW": "Channels ansehen",
-    "PERM_CHANNELS_VIEW_DESC": "Erlaubt das Ansehen der Guild-Channels"
+    "PERM_MEDIA_DELETE_DESC": "Erlaubt das Löschen von Medien aus der Bibliothek (KRITISCH)"
   },
   "PERMISSIONS": {
     "VIEW": "Berechtigungen ansehen",

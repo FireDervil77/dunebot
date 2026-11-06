@@ -278,18 +278,15 @@
                                             <strong><%= slots %></strong>
                                             <% if (locals.slotVariable) { %>
                                                 <span class="text-secondary">
-                                                    &mdash; aus <code><%= slotVariable %></code>
+                                                    &mdash; <%= tr('gameserver:SERVER.MAX_PLAYERS_FROM') %> <code><%= slotVariable %></code>
                                                 </span>
                                             <% } %>
                                         <% } else { %>
-                                            <span class="text-secondary">&ndash; das Spielpaket nennt keine Slot-Anzahl</span>
+                                            <span class="text-secondary">&ndash; <%= tr('gameserver:SERVER.MAX_PLAYERS_NONE') %></span>
                                         <% } %>
                                     </div>
                                     <small class="form-text text-secondary">
-                                        Die Slot-Anzahl ist eine Einstellung des Spiels
-                                        (<code>max_players</code>) und wird auf der Serverseite unter
-                                        &bdquo;Einstellungen&ldquo; geändert &ndash; nur die landet im
-                                        Startbefehl.
+                                        <%= tr('gameserver:SERVER.MAX_PLAYERS_DESC') %>
                                     </small>
                                 </div>
 

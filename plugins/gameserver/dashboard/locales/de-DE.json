@@ -1,6 +1,5 @@
 {
     "NAV": {
-        "DASHBOARD": "Dashboard",
         "GAMESERVER": "Gameserver",
         "ADDONS": "Spiele-Datenbank",
         "MY_ADDONS": "Meine Addons",
@@ -99,7 +98,6 @@
         "STOP": "Stoppen",
         "RESTART": "Neustarten",
         "DELETE": "Löschen",
-        "EDIT": "Bearbeiten",
         "STATUS_ONLINE": "Online",
         "STATUS_OFFLINE": "Offline",
         "STATUS_STARTING": "Startet...",
@@ -219,9 +217,10 @@
         "NAME_DESC": "Anzeigename des Gameservers (wird in der Liste angezeigt)",
         "GAME_READONLY": "Spiel und Template können nachträglich nicht geändert werden",
         "AUTO_RESTART_DESC": "Server automatisch neu starten, wenn er unerwartet abstürzt",
-        "AUTO_UPDATE_DESC": "Holt vor jedem Start die neueste Fassung der Spieldateien über Steam.",
         "MAX_PLAYERS": "Maximale Spieler",
-        "MAX_PLAYERS_DESC": "Maximale Anzahl gleichzeitiger Spieler (1-200)",
+        "MAX_PLAYERS_FROM": "aus",
+        "MAX_PLAYERS_NONE": "das Spielpaket nennt keine Slot-Anzahl",
+        "MAX_PLAYERS_DESC": "Die Slot-Anzahl ist eine Einstellung des Spiels (max_players) und wird auf der Serverseite unter „Einstellungen“ geändert, nur die landet im Startbefehl.",
         "CURRENT_STATUS": "Aktueller Status",
         "RESTART_REQUIRED": "Änderungen werden nach dem nächsten Server-Neustart wirksam",
         "SAVE_CHANGES": "Änderungen speichern",

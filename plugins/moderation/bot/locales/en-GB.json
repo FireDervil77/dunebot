@@ -3,6 +3,7 @@
     "DESCRIPTION": "Manage your server's moderation settings.",
 
     "NO_MATCH_USER": "No user found matching `{{query}}`",
+    "NO_MATCH_CHANNEL": "No voice channel found matching `{{query}}`",
     "INVALID_SUBCOMMAND": "Invalid subcommand: `{{sub}}`",
     "ERROR_OCCURRED": "An error occurred while processing your request",
     "COLLECT_TIMEOUT": "You took too long to respond. Command cancelled.",
@@ -115,7 +116,7 @@
         "SUCCESS": "{{target}} is timed out!",
         "BOT_PERM": "I do not have permission to ban {{target}}",
         "MEMBER_PERM": "You do not have permission to ban {{target}}",
-        "ALREADY_TIMED_OUT": "{{target}} is already timed out",
+        "ALREADY_TIMEOUT": "{{target}} is already timed out",
         "FAILED": "Failed to timed {{target}}"
     },
 
@@ -178,7 +179,7 @@
         "VUNMUTE_BOT_PERM": "I do not have permission to voice unmute {{target}}",
         "VUNMUTE_NO_VOICE": "{{target}} is not in any voice channel",
         "VUNMUTE_NOT_MUTED": "{{target}} is not voice muted",
-        "VUNMUTE_ERROR": "Failed to voice mute {{target}}",
+        "VUNMUTE_ERROR": "Failed to voice unmute {{target}}",
 
         "DEAFEN_SUCCESS": "{{target}} is deafened in this server",
         "DEAFEN_MEMBER_PERM": "You do not have permission to deafen {{target}}",
@@ -187,16 +188,16 @@
         "DEAFEN_ALREADY_DEAFENED": "{{target}} is already deafened",
         "DEAFEN_ERROR": "Failed to deafen {{target}}",
 
-        "UNDEAFEN_SUCCESS": "{{target}} is deafened in this server",
-        "UNDEAFEN_MEMBER_PERM": "You do not have permission to deafen {{target}}",
-        "UNDEAFEN_BOT_PERM": "I do not have permission to deafen {{target}}",
+        "UNDEAFEN_SUCCESS": "{{target}} is no longer deafened in this server",
+        "UNDEAFEN_MEMBER_PERM": "You do not have permission to undeafen {{target}}",
+        "UNDEAFEN_BOT_PERM": "I do not have permission to undeafen {{target}}",
         "UNDEAFEN_NO_VOICE": "{{target}} is not in any voice channel",
         "UNDEAFEN_NOT_DEAFENED": "{{target}} is not deafened",
-        "UNDEAFEN_ERROR": "Failed to deafen {{target}}",
+        "UNDEAFEN_ERROR": "Failed to undeafen {{target}}",
 
         "KICK_SUCCESS": "{{target}} is disconnected from the voice channel",
-        "KICK_MEMBER_PERM": "You do not have permission to deafen {{target}}",
-        "KICK_BOT_PERM": "I do not have permission to deafen {{target}}",
+        "KICK_MEMBER_PERM": "You do not have permission to disconnect {{target}} from voice",
+        "KICK_BOT_PERM": "I do not have permission to disconnect {{target}} from voice",
         "KICK_NO_VOICE": "{{target}} is not in any voice channel",
         "KICK_ERROR": "Failed to disconnect {{target}} from the voice channel",
 
@@ -227,6 +228,7 @@
         "SUB_CLEAR_USER": "user to clear warnings for",
 
         "NO_USER": "No user provided",
+        "NO_BOTS": "Bots cannot be warned",
         "NO_WARNINGS": "{{target}} has no warnings",
         "WARNINGS_TITLE": "Warnings for {{target}}",
         "WARN_CLEAR": "All warnings for {{target}} have been cleared"

@@ -42,6 +42,7 @@
         "CLAIM_SUCCESS": "Du hast dieses Ticket übernommen!",
         "CLAIM_FAIL": "Ticket konnte nicht übernommen werden.",
         "ALREADY_CLAIMED": "Dieses Ticket wurde bereits von {{user}} übernommen!",
+        "CLAIM_NO_PERMISSION": "Nur Team-Mitglieder können Tickets übernehmen.",
         "CLAIMED_MSG": "📥 {{user}} hat dieses Ticket übernommen und wird sich um dein Anliegen kümmern.",
         "UNCLAIMED_MSG": "📤 {{user}} hat die Übernahme dieses Tickets aufgegeben.",
         "UNCLAIM_SUCCESS": "Du hast die Übernahme aufgegeben.",
@@ -162,5 +163,29 @@
         "ADD_ERROR": "Benutzer konnte nicht zum Ticket hinzugefügt werden",
         "INVALID_ID": "Du musst eine gültige Benutzer-ID/Rollen-ID eingeben",
         "REMOVE_ERROR": "Benutzer konnte nicht aus dem Ticket entfernt werden"
+    },
+
+    "TAG": {
+        "DESCRIPTION": "Gespeicherte Antworten (Tags) für Tickets verwalten und senden",
+        "SUB_USE_DESC": "Sendet einen Tag in diesen Kanal",
+        "SUB_CREATE_DESC": "Legt einen neuen Tag an",
+        "SUB_EDIT_DESC": "Ändert den Inhalt eines Tags",
+        "SUB_DELETE_DESC": "Löscht einen Tag",
+        "SUB_LIST_DESC": "Zeigt alle Tags dieses Servers",
+        "OPT_NAME": "Name des Tags",
+        "OPT_CONTENT": "Inhalt des Tags",
+        "NAME_REQUIRED": "Bitte gib den Namen des Tags an",
+        "CREATE_USAGE": "Verwendung: `tag create <name> | <inhalt>`",
+        "EDIT_USAGE": "Verwendung: `tag edit <name> | <inhalt>`",
+        "INVALID_SUB": "Unbekannter Unterbefehl. Möglich sind `use`, `create`, `edit`, `delete` und `list`",
+        "NOT_FOUND": "Es gibt keinen Tag `{{name}}`",
+        "USED": "Tag `{{name}}` gesendet",
+        "INVALID_NAME": "Ungültiger Name: erlaubt sind a–z, 0–9, `-` und `_`, höchstens 50 Zeichen",
+        "ALREADY_EXISTS": "Den Tag `{{name}}` gibt es schon",
+        "CREATED": "Tag `{{name}}` angelegt",
+        "UPDATED": "Tag `{{name}}` geändert",
+        "DELETED": "Tag `{{name}}` gelöscht",
+        "EMPTY": "Auf diesem Server gibt es noch keine Tags",
+        "LIST": "**Tags ({{count}}):** {{tags}}"
     }
 }

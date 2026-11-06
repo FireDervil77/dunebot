@@ -101,7 +101,7 @@ module.exports = {
             return message.reply(successMessage);
         } catch (err) {
             Logger.error('[DuneMap] Fehler beim Speichern des Channels:', err);
-            return message.replyT('dunemap:CHANNEL.CHANNEL_SET_ERROR');
+            return message.replyT('dunemap:CHANNELS.CHANNEL_SET_ERROR');
         }
     },
 

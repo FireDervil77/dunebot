@@ -42,6 +42,7 @@
         "CLAIM_SUCCESS": "You have claimed this ticket!",
         "CLAIM_FAIL": "Could not claim this ticket.",
         "ALREADY_CLAIMED": "This ticket has already been claimed by {{user}}!",
+        "CLAIM_NO_PERMISSION": "Only team members can claim tickets.",
         "CLAIMED_MSG": "📥 {{user}} has claimed this ticket and will assist you.",
         "UNCLAIMED_MSG": "📤 {{user}} has unclaimed this ticket.",
         "UNCLAIM_SUCCESS": "You have unclaimed this ticket.",
@@ -162,5 +163,29 @@
         "ADD_ERROR": "Failed to add user to the ticket",
         "INVALID_ID": "Oops! You need to input a valid userId/roleId",
         "REMOVE_ERROR": "Failed to remove user from the ticket"
+    },
+
+    "TAG": {
+        "DESCRIPTION": "Manage and send saved replies (tags) for tickets",
+        "SUB_USE_DESC": "Sends a tag to this channel",
+        "SUB_CREATE_DESC": "Creates a new tag",
+        "SUB_EDIT_DESC": "Changes the content of a tag",
+        "SUB_DELETE_DESC": "Deletes a tag",
+        "SUB_LIST_DESC": "Lists all tags on this server",
+        "OPT_NAME": "Name of the tag",
+        "OPT_CONTENT": "Content of the tag",
+        "NAME_REQUIRED": "Please provide the name of the tag",
+        "CREATE_USAGE": "Usage: `tag create <name> | <content>`",
+        "EDIT_USAGE": "Usage: `tag edit <name> | <content>`",
+        "INVALID_SUB": "Unknown subcommand. Available: `use`, `create`, `edit`, `delete` and `list`",
+        "NOT_FOUND": "There is no tag `{{name}}`",
+        "USED": "Tag `{{name}}` sent",
+        "INVALID_NAME": "Invalid name: allowed are a–z, 0–9, `-` and `_`, at most 50 characters",
+        "ALREADY_EXISTS": "The tag `{{name}}` already exists",
+        "CREATED": "Tag `{{name}}` created",
+        "UPDATED": "Tag `{{name}}` updated",
+        "DELETED": "Tag `{{name}}` deleted",
+        "EMPTY": "There are no tags on this server yet",
+        "LIST": "**Tags ({{count}}):** {{tags}}"
     }
 }

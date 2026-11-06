@@ -140,8 +140,13 @@
     }
   },
   
-  "API": {
-    "MARKER_ADDED": "Marker added!",
+  "MESSAGES": {
+    "ERROR_LOADING_DASHBOARD": "Error loading the DuneMap overview",
+    "SETTINGS_SAVED": "DuneMap settings saved!",
+    "ERROR_LOADING_MAP": "Error loading the sector map",
+    "MISSING_PARAMS": "Missing parameters: sectorX, sectorY, markerType required",
+    "MAX_MARKERS": "Maximum 6 markers per sector!",
+    "MARKER_SET": "Marker {{type}} set in {{sector}}!",
     "MARKER_REMOVED": "Marker removed!",
     "MARKER_TYPE_REMOVED": "Marker {{type}} removed!",
     "MISSING_REMOVE_PARAMS": "Missing parameters: markerId OR (sectorX, sectorY, markerType) required",
