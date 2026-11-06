@@ -124,8 +124,20 @@ async function pruefe(was, tun) {
             assert.match(antwort.message, /SFTP: gilt, sobald der Daemon sich wieder anmeldet/, 'ohne verbundenen Daemon sagt die Antwort, wann es gilt');
         } finally { Object.assign(RootServer, echt); }
         assert.deepStrictEqual(gesehen, [1, 0, undefined, 1]);
-        const quelle = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'plugins/masterserver/dashboard/routes/rootserver.router.js'), 'utf8'));
-        assert.ok(/sftpGewuenscht: sftpGewuenscht === 'true' \|\| sftpGewuenscht === true/.test(quelle), 'Anlegen reicht den Wunsch nicht weiter');
+        // Anlegen läuft seit 2026-11-06 über RootServerAnlegen (Formular und
+        // `/daemon register`). Gemessen wird, was beim Modell ankommt.
+        const anlegenEcht = { create: RootServer.create, getByGuild: RootServer.getByGuild };
+        const angelegt = [];
+        RootServer.create = async (daten) => { angelegt.push(daten.sftpGewuenscht); return { id: 1, daemonId: 'd', apiKey: 'k' }; };
+        RootServer.getByGuild = async () => [];
+        ServiceManager.register('ipmServer', { isDaemonOnline: () => false });
+        try {
+            const RootServerAnlegen = require(path.join(WURZEL, 'plugins/masterserver/dashboard/helpers/RootServerAnlegen.js'));
+            for (const wert of ['true', true, 'false', undefined]) {
+                await RootServerAnlegen.anlegen({ guildId: 'g1', felder: { name: 'x', host: '1.2.3.4', sftpGewuenscht: wert } });
+            }
+        } finally { Object.assign(RootServer, anlegenEcht); }
+        assert.deepStrictEqual(angelegt, [true, true, false, false], 'Anlegen reicht den Wunsch nicht weiter');
         const modell = fs.readFileSync(path.join(WURZEL, 'plugins/masterserver/dashboard/models/RootServer.js'), 'utf8');
         assert.ok(/db_gewuenscht, db_je_server, sftp_gewuenscht,/.test(modell) && /data\.sftpGewuenscht \? 1 : 0/.test(modell), 'das INSERT kennt sftp_gewuenscht nicht');
         const detail = fs.readFileSync(path.join(WURZEL, 'plugins/masterserver/dashboard/views/guild/masterserver-rootserver-detail.ejs'), 'utf8');

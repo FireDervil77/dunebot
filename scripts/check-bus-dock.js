@@ -112,11 +112,23 @@ function dashboard() {
         // Nach jeder Anmeldung auch als eigene Nachricht (seit 1.1.13). Seit F20 gibt es
         // eine Anmeldung, die versiegelte.
         assert.strictEqual((ipm.match(/this\._sendeBusAdresse\(ws\)/g) || []).length, 1, 'die Anmeldung schickt die Busadresse nicht');
+        // Seit 2026-11-06 baut der Server die daemon.yaml (RootServerAnlegen.js),
+        // für das Formular und für `/daemon register`. Der Browser zeigt sie nur.
+        const anlegenPfad = path.join(__dirname, '../plugins/masterserver/dashboard/helpers/RootServerAnlegen.js');
+        const anlegen = ohneKommentare(fs.readFileSync(anlegenPfad, 'utf8'));
+        assert.match(anlegen, /busAdresse: busAdresse\(\)/);
+        assert.match(anlegen, /require\([^)]*helpers\/BusAdresse'\)/);
+        assert.doesNotMatch(anlegen, /9341/, 'die Vorlage rechnet die Adresse wieder selbst aus');
+        const { daemonYaml } = require(anlegenPfad);
+        assert.match(daemonYaml({ daemonId: 'd', apiKey: 'k', host: null, busAdresse: 'wss://bahnhof:9341' }),
+            /^dashboard:\n {2}url: "wss:\/\/bahnhof:9341"$/m, 'die Busadresse kommt nicht in der daemon.yaml an');
         const vorlage = ohneKommentare(fs.readFileSync(path.join(__dirname, '../apps/dashboard/themes/default/assets/js/guild.js'), 'utf8'));
-        assert.match(vorlage, /const busAdresse = d\.busAdresse/);
+        assert.match(vorlage, /elYaml\.value = d\.daemonYaml/);
         assert.doesNotMatch(vorlage, /9341/, 'die Vorlage rechnet die Adresse wieder selbst aus');
         const route = ohneKommentare(fs.readFileSync(path.join(__dirname, '../plugins/masterserver/dashboard/routes/rootserver.router.js'), 'utf8'));
-        assert.match(route, /busAdresse: require\([^)]*BusAdresse'\)\.busAdresse\(\)/);
+        assert.match(route, /RootServerAnlegen\.anlegen\(/);
+        const ipc = ohneKommentare(fs.readFileSync(path.join(__dirname, '../apps/dashboard/helpers/IPCServer.js'), 'utf8'));
+        assert.match(ipc, /RootServerAnlegen\.anlegen\(/, '/daemon register geht wieder einen eigenen Weg');
         // Und der Wizard des Daemons nennt neuen Maschinen denselben Bahnhof.
         const wizard = ohneKommentare(fs.readFileSync(path.join(DAEMON, 'internal/config/wizard.go'), 'utf8'));
         assert.strictEqual(/const BusAdresse = "([^"]+)"/.exec(wizard)?.[1], busAdresse({ DASHBOARD_BASE_URL: 'https://firenetworks.de' }));

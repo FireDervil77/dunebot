@@ -1,6 +1,6 @@
 'use strict';
 
-const { ApplicationCommandOptionType, EmbedBuilder } = require('discord.js');
+const { ApplicationCommandOptionType, EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const { ServiceManager } = require('dunebot-core');
 
 /**
@@ -9,8 +9,9 @@ const { ServiceManager } = require('dunebot-core');
  * Subcommands:
  *   list                       — alle RootServer der Guild auflisten
  *   status <id>                — Status + Hardware eines RootServers (Autocomplete)
- *   register <name> <ram> <disk> [host]
- *                              — neuen RootServer registrieren + daemon.yaml-Daten ausgeben
+ *   register <name> <host> [domain] [beschreibung] [sftp] [datenbanken]
+ *                              — neuen RootServer anlegen wie der Assistent im Dashboard
+ *                                (helpers/RootServerAnlegen.js), daemon.yaml als Datei
  *   delete <id>                — RootServer entfernen (Autocomplete)
  *
  * @type {import('dunebot-sdk').CommandType}
@@ -59,24 +60,42 @@ module.exports = {
                         max_length: 64,
                     },
                     {
-                        name: 'ram_gb',
-                        type: ApplicationCommandOptionType.Number,
-                        description: 'masterserver:DAEMON.OPT_RAM',
-                        required: true,
-                        min_value: 1,
-                    },
-                    {
-                        name: 'disk_gb',
-                        type: ApplicationCommandOptionType.Number,
-                        description: 'masterserver:DAEMON.OPT_DISK',
-                        required: true,
-                        min_value: 10,
-                    },
-                    {
                         name: 'host',
                         type: ApplicationCommandOptionType.String,
                         description: 'masterserver:DAEMON.OPT_HOST',
+                        required: true,
+                        max_length: 255,
+                    },
+                    // Hier standen bis zum 2026-11-06 `ram_gb` und `disk_gb` als
+                    // Pflichtfelder. Der Assistent fragt sie seit M-6 nicht mehr:
+                    // Der Daemon misst die Hardware beim ersten Verbinden.
+                    {
+                        name: 'domain',
+                        type: ApplicationCommandOptionType.String,
+                        description: 'masterserver:DAEMON.OPT_FQDN',
                         required: false,
+                        max_length: 255,
+                    },
+                    {
+                        name: 'beschreibung',
+                        type: ApplicationCommandOptionType.String,
+                        description: 'masterserver:DAEMON.OPT_DESCRIPTION',
+                        required: false,
+                        max_length: 255,
+                    },
+                    {
+                        name: 'sftp',
+                        type: ApplicationCommandOptionType.Boolean,
+                        description: 'masterserver:DAEMON.OPT_SFTP',
+                        required: false,
+                    },
+                    {
+                        name: 'datenbanken',
+                        type: ApplicationCommandOptionType.Integer,
+                        description: 'masterserver:DAEMON.OPT_DB',
+                        required: false,
+                        min_value: 0,
+                        max_value: 20,
                     },
                 ],
             },
@@ -102,7 +121,7 @@ module.exports = {
         const ipcClient = ServiceManager.get('ipcClient');
         const sub       = interaction.options.getSubcommand();
         const guildId   = interaction.guildId;
-        const t         = (key) => interaction.guild.getT(key);
+        const t         = (key, werte) => interaction.guild.getT(key, werte);
 
         if (!ipcClient) {
             return interaction.followUp({ embeds: [_errEmbed('IPC nicht verfügbar.')] });
@@ -113,7 +132,7 @@ module.exports = {
 
                 // ── /daemon list ──────────────────────────────────────────
                 case 'list': {
-                    const res = await ipcClient.sendToDashboard('masterserver:DAEMON_LIST', { guild_id: guildId });
+                    const res = await ipcClient.sendToDashboard('masterserver:DAEMON_LIST', { actor_user_id: interaction.user.id, guild_id: guildId });
                     if (!res?.success) return interaction.followUp({ embeds: [_errEmbed(res?.error)] });
 
                     const servers = res.data || [];
@@ -151,7 +170,7 @@ module.exports = {
                 case 'status': {
                     const id = interaction.options.getInteger('id');
                     const res = await ipcClient.sendToDashboard('masterserver:DAEMON_STATUS', {
-                        guild_id: guildId, rootserver_id: id
+                        guild_id: guildId, rootserver_id: id, actor_user_id: interaction.user.id
                     });
                     if (!res?.success) return interaction.followUp({ embeds: [_errEmbed(res?.error)] });
 
@@ -183,47 +202,47 @@ module.exports = {
 
                 // ── /daemon register ──────────────────────────────────────
                 case 'register': {
-                    const name       = interaction.options.getString('name');
-                    const ram_gb     = interaction.options.getNumber('ram_gb');
-                    const disk_gb    = interaction.options.getNumber('disk_gb');
-                    const host       = interaction.options.getString('host')       ?? null;
-
+                    const name = interaction.options.getString('name');
                     const res = await ipcClient.sendToDashboard('masterserver:DAEMON_REGISTER', {
-                        guild_id:     guildId,
+                        guild_id:      guildId,
                         owner_user_id: interaction.user.id,
+                        actor_user_id: interaction.user.id,
                         name,
-                        host,
-                        ram_gb,
-                        disk_gb,
+                        host:          interaction.options.getString('host'),
+                        fqdn:          interaction.options.getString('domain') ?? null,
+                        description:   interaction.options.getString('beschreibung') ?? null,
+                        sftp:          interaction.options.getBoolean('sftp') ?? false,
+                        db_je_server:  interaction.options.getInteger('datenbanken') ?? 0,
                     });
 
                     if (!res?.success) return interaction.followUp({ embeds: [_errEmbed(res?.error)] });
 
-                    const { id, daemon_id, api_key } = res.data;
-
-                    // API-Key nur ephemeral senden (einmalig!)
+                    const d = res.data;
+                    // Der Befehl antwortet nur dem Aufrufer (`ephemeral` oben), der
+                    // API-Key steht also nie im Kanal.
                     const embed = new EmbedBuilder()
-                        .setTitle('✅ RootServer registriert')
+                        .setTitle(t('masterserver:DAEMON.REGISTER_TITLE', { name }))
                         .setColor(0x57F287)
-                        .setDescription(
-                            '⚠️ **Kopiere die Verbindungsdaten jetzt** — der API-Key wird nur einmal angezeigt!'
-                        )
+                        .setDescription(t('masterserver:DAEMON.REGISTER_DESC'))
                         .addFields(
-                            { name: 'RootServer-ID', value: String(id),     inline: true },
-                            { name: 'Daemon-ID',     value: `\`${daemon_id}\``, inline: false },
-                            { name: 'API-Key',       value: `\`${api_key}\``,   inline: false },
+                            { name: t('masterserver:DAEMON.REGISTER_ID'),        value: String(d.id),             inline: true },
+                            { name: t('masterserver:DAEMON.REGISTER_DAEMON_ID'), value: `\`${d.daemonId}\``,       inline: false },
+                            { name: t('masterserver:DAEMON.REGISTER_API_KEY'),   value: `\`${d.apiKey}\``,         inline: false },
+                            { name: t('masterserver:DAEMON.REGISTER_BUS'),       value: `\`${d.busAdresse}\``,     inline: false },
+                            { name: t('masterserver:DAEMON.REGISTER_INSTALL'),   value: `\`\`\`\n${d.installBefehl}\n\`\`\``, inline: false },
                         )
-                        .setFooter({ text: 'Trage diese Werte in daemon.yaml ein' })
+                        .setFooter({ text: t('masterserver:DAEMON.REGISTER_FOOTER') })
                         .setTimestamp();
 
-                    return interaction.followUp({ embeds: [embed], ephemeral: true });
+                    const yaml = new AttachmentBuilder(Buffer.from(d.daemonYaml, 'utf8'), { name: 'daemon.yaml' });
+                    return interaction.followUp({ embeds: [embed], files: [yaml], ephemeral: true });
                 }
 
                 // ── /daemon delete <id> ───────────────────────────────────
                 case 'delete': {
                     const id = interaction.options.getInteger('id');
                     const res = await ipcClient.sendToDashboard('masterserver:DAEMON_DELETE', {
-                        guild_id: guildId, rootserver_id: id
+                        guild_id: guildId, rootserver_id: id, actor_user_id: interaction.user.id
                     });
                     if (!res?.success) return interaction.followUp({ embeds: [_errEmbed(res?.error)] });
 

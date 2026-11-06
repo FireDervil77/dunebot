@@ -807,52 +807,10 @@ class GuildAjaxHandler {
                 if (elId)  elId.value  = d.daemonId  || '';
                 if (elKey) elKey.value = d.apiKey     || '';
 
-                // daemon.yaml Template generieren
-                // Die Busadresse kommt vom Panel (helpers/BusAdresse.js), dieselbe,
-                // die es jedem Daemon bei der Anmeldung nennt.
-                const busAdresse = d.busAdresse || '';
-                if (elYaml) {
-                    const bindIpLine = d.host ? `  bind_ip: "${d.host}"` : '  bind_ip: ""  # Leer = alle Interfaces (0.0.0.0)';
-                    elYaml.value = [
-                        '# FireBot Daemon Konfiguration',
-                        '# Generiert vom Dashboard – bitte auf deinen Server kopieren',
-                        '# Pfad: /opt/firebot-daemon/daemon.yaml',
-                        '',
-                        'daemon:',
-                        `  name: "rootserver-${d.daemonId ? d.daemonId.substring(0, 8) : 'neu'}"`,
-                        '',
-                        '  # Daemon-ID – Eindeutige ID aus dem Dashboard (NICHT ändern!)',
-                        `  daemon_id: "${d.daemonId || ''}"`,
-                        '',
-                        '  # Setup-Token vom Dashboard – NUR EINMAL SICHTBAR!',
-                        '  # Er fährt nie über die Leitung: Aus ihm entsteht der Schlüssel, mit dem Daemon und Dashboard ihre Nachrichten versiegeln.',
-                        `  token: "${d.apiKey || ''}"`,
-                        '',
-                        'dashboard:',
-                        `  url: "${busAdresse}"`,
-                        '',
-                        'logging:',
-                        '  level: "info"',
-                        '  file: "logs/daemon.log"',
-                        '',
-                        'gameserver:',
-                        '  # Port-Allocations werden über das Dashboard verwaltet',
-                        '',
-                        'filesystem:',
-                        '  base_directory: "/var/lib/firebot-daemon/volumes"',
-                        '  auto_create_base: true',
-                        '',
-                        'docker:',
-                        '  socket: "/var/run/docker.sock"',
-                        '  network: "firebot"',
-                        '  # Bind-IP: Gameserver-Ports werden NUR auf dieser IP geöffnet.',
-                        '  # Wichtig bei Servern mit mehreren öffentlichen IPs!',
-                        bindIpLine,
-                        '  dns:',
-                        '    - "1.1.1.1"',
-                        '    - "8.8.8.8"',
-                    ].join('\n');
-                }
+                // Die daemon.yaml baut der Server (masterserver/dashboard/helpers/
+                // RootServerAnlegen.js), dieselbe, die `/daemon register` im Bot
+                // als Datei schickt. Bis zum 2026-11-06 stand die Vorlage hier.
+                if (elYaml) elYaml.value = d.daemonYaml || '';
 
                 // Weiter-Button mit redirectUrl vorbelegen
                 const btnContinue = document.getElementById('setup-continue-btn');

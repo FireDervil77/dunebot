@@ -299,6 +299,15 @@ class IPCServer {
 
         const { guild_id: guildId, rootserver_id: rootserverId } = payload;
 
+        // Dieselben Rechte wie die Seiten unter Masterserver → RootServer.
+        const RECHT = {
+            DAEMON_LIST:     'MASTERSERVER.ROOTSERVER.VIEW',
+            DAEMON_STATUS:   'MASTERSERVER.ROOTSERVER.VIEW',
+            DAEMON_REGISTER: 'MASTERSERVER.ROOTSERVER.CREATE',
+            DAEMON_DELETE:   'MASTERSERVER.ROOTSERVER.DELETE',
+        };
+        if (RECHT[action] && await this._akteurDarfNicht('Masterserver', action, payload, message, RECHT[action])) return;
+
         try {
             switch (action) {
 
@@ -380,30 +389,26 @@ class IPCServer {
 
                 // ── Neuen RootServer registrieren ──────────────────────────
                 case 'DAEMON_REGISTER': {
-                    const { name, host, ram_gb, disk_gb, owner_user_id } = payload;
-                    if (!guildId || !name || !ram_gb || !disk_gb) {
-                        return message.reply({ success: false, error: 'guild_id, name, ram_gb und disk_gb sind erforderlich' });
-                    }
-                    const shortGuildId = guildId.substring(0, 10);
-                    const result = await RootServer.create({
+                    // Derselbe Ablauf wie das Formular im Dashboard (2026-11-06,
+                    // helpers/RootServerAnlegen.js). Bis dahin ein eigener Weg mit
+                    // RAM und Platte von Hand, ohne IP, ohne Busadresse.
+                    if (!guildId) return message.reply({ success: false, error: 'guild_id fehlt' });
+                    const RootServerAnlegen = require('../../../plugins/masterserver/dashboard/helpers/RootServerAnlegen');
+                    const { name, host, fqdn, description, sftp, db_je_server, owner_user_id } = payload;
+                    const dbJe = Number(db_je_server ?? 0);
+                    const ergebnis = await RootServerAnlegen.anlegen({
                         guildId,
-                        ownerUserId:    owner_user_id || null,
-                        name,
-                        host:            host || null,
-                        systemUser:      `guild_${shortGuildId}`,
-                        baseDirectory:   '/opt/firebot',
-                        ramTotalGb:      parseFloat(ram_gb),
-                        diskTotalGb:     parseFloat(disk_gb),
-                    });
-                    Logger.info(`[IPC/Masterserver] RootServer erstellt via Bot: ${result.id} (Guild: ${guildId})`);
-                    return message.reply({
-                        success: true,
-                        data: {
-                            id:        result.id,
-                            daemon_id: result.daemonId,
-                            api_key:   result.apiKey,
+                        ownerUserId: owner_user_id,
+                        felder: {
+                            name, host, fqdn, description,
+                            sftpGewuenscht: sftp === true,
+                            dbGewuenscht: dbJe > 0,
+                            dbJeServer: dbJe,
                         }
                     });
+                    if (!ergebnis.ok) return message.reply({ success: false, error: ergebnis.fehler });
+                    Logger.info(`[IPC/Masterserver] RootServer erstellt via Bot: ${ergebnis.data.id} (Guild: ${guildId})`);
+                    return message.reply({ success: true, data: ergebnis.data });
                 }
 
                 // ── RootServer löschen ────────────────────────────────────
@@ -428,16 +433,6 @@ class IPCServer {
                 }
 
                 // ── API-Key des RootServers anzeigen ──────────────────────
-                case 'DAEMON_APIKEY': {
-                    if (!guildId || !rootserverId) return message.reply({ success: false, error: 'guild_id und rootserver_id erforderlich' });
-                    const rs = await RootServer.getById(rootserverId);
-                    if (!rs || rs.guild_id !== guildId) return message.reply({ success: false, error: 'RootServer nicht gefunden' });
-                    return message.reply({
-                        success: true,
-                        data: { daemon_id: rs.daemon_id, api_key: rs.api_key }
-                    });
-                }
-
                 default:
                     return message.reply({ success: false, error: `Unbekannte Aktion: ${action}` });
             }
@@ -445,6 +440,64 @@ class IPCServer {
             Logger.error(`[IPC/Masterserver] ${action} Fehler:`, err);
             return message.reply({ success: false, error: err.message });
         }
+    }
+
+    /**
+     * Prüft die Berechtigung des Auslösers, wenn einer mitgeschickt wurde.
+     *
+     * Hintergrund: Die Slash-Befehle `/server` und `/daemon` sind über
+     * `userPermissions: ['ManageGuild']` gesperrt, ein Panel-Button dagegen
+     * steht in einem Kanal, den jeder sehen kann. Kommt eine
+     * `actor_user_id` mit, entscheidet derselbe PermissionManager, der das
+     * Web-UI absichert – damit kann eine Guild "Starten" an eine
+     * Moderatorenrolle geben, ohne ManageGuild zu verschenken.
+     *
+     * Ohne `actor_user_id` wird nicht geprüft. Seit 2026-11-06 schicken alle
+     * Unterbefehle von `/server` und `/daemon`, die etwas ändern, den Auslöser
+     * mit (Betreiber: „Rechte müssen so hergestellt werden, dass sie
+     * funktionieren"). Bis dahin liefen `/server create`, `/server move` und
+     * `/daemon register|delete` allein mit ManageGuild durch.
+     *
+     * Gameserver und Masterserver teilen sich diese eine Prüfung; vorher lag
+     * sie als Closure nur im Gameserver-Zweig.
+     *
+     * @param {string} bereich Für das Protokoll, etwa 'Gameserver'
+     * @param {string} action
+     * @param {Object} payload
+     * @param {Object} message
+     * @param {string} permissionKey
+     * @returns {Promise<boolean>} true = verweigert, die Antwort ist schon gesendet
+     * @private
+     */
+    async _akteurDarfNicht(bereich, action, payload, message, permissionKey) {
+        const Logger = ServiceManager.get('Logger');
+        const actorId = payload.actor_user_id;
+        const guildId = payload.guild_id;
+        if (!actorId) return false;
+
+        const permissionManager = ServiceManager.get('permissionManager');
+        if (!permissionManager) {
+            // Kein Rechtesystem erreichbar → nicht durchlassen. Bei einer
+            // Aktion, die einen Gameserver stoppt, ist Verweigern die
+            // richtige Antwort auf Unwissenheit.
+            await message.reply({ success: false, error: 'Rechteprüfung nicht verfügbar' });
+            return true;
+        }
+
+        const allowed = await permissionManager.hasPermission(actorId, guildId, permissionKey);
+        if (!allowed) {
+            Logger.warn(`[IPC/${bereich}] ${action} abgelehnt: User ${actorId} ohne ${permissionKey} in Guild ${guildId}`);
+            await message.reply({ success: false, error: `Dir fehlt die Berechtigung ${permissionKey}.` });
+            return true;
+        }
+
+        // Auch die erlaubten Fälle protokollieren: Ein Panel-Button steht in
+        // einem Kanal, und wer dort Rechte hat, kann einen Server auch aus
+        // Langeweile durchschalten. Ohne diese Zeile ließe sich hinterher
+        // nicht sagen, wer den Server um 3 Uhr gestoppt hat.
+        const ziel = payload.server_id ?? payload.rootserver_id ?? '-';
+        Logger.info(`[IPC/${bereich}] ${action} durch User ${actorId} (Ziel ${ziel}, Guild ${guildId})`);
+        return false;
     }
 
     /**
@@ -458,52 +511,8 @@ class IPCServer {
 
         const { guild_id: guildId, server_id: serverId, rootserver_id: rootserverId } = payload;
 
-        /**
-         * Prüft die Berechtigung des Auslösers, wenn einer mitgeschickt wurde.
-         *
-         * Hintergrund: Der Slash-Befehl `/server` ist über
-         * `userPermissions: ['ManageGuild']` gesperrt, ein Panel-Button dagegen
-         * steht in einem Kanal, den jeder sehen kann. Kommt eine
-         * `actor_user_id` mit, entscheidet derselbe PermissionManager, der das
-         * Web-UI absichert – damit kann eine Guild "Starten" an eine
-         * Moderatorenrolle geben, ohne ManageGuild zu verschenken.
-         *
-         * Ohne `actor_user_id` bleibt es beim bisherigen Verhalten (der
-         * Slash-Pfad prüft auf Befehlsebene). Das ist bewusst kein
-         * Pflichtfeld: Es scharf zu schalten würde Nutzer aussperren, die heute
-         * `/server start` benutzen, ohne im Rechtesystem GAMESERVER.START zu
-         * haben – das ist eine Entscheidung des Betreibers, kein Nebeneffekt.
-         *
-         * @param {string} permissionKey
-         * @returns {Promise<boolean>} false = Antwort wurde schon gesendet
-         */
-        const actorMayNot = async (permissionKey) => {
-            const actorId = payload.actor_user_id;
-            if (!actorId) return false;
-
-            const permissionManager = ServiceManager.get('permissionManager');
-            if (!permissionManager) {
-                // Kein Rechtesystem erreichbar → nicht durchlassen. Bei einer
-                // Aktion, die einen Gameserver stoppt, ist Verweigern die
-                // richtige Antwort auf Unwissenheit.
-                await message.reply({ success: false, error: 'Rechteprüfung nicht verfügbar' });
-                return true;
-            }
-
-            const allowed = await permissionManager.hasPermission(actorId, guildId, permissionKey);
-            if (!allowed) {
-                Logger.warn(`[IPC/Gameserver] ${action} abgelehnt: User ${actorId} ohne ${permissionKey} in Guild ${guildId}`);
-                await message.reply({ success: false, error: `Dir fehlt die Berechtigung ${permissionKey}.` });
-                return true;
-            }
-
-            // Auch die erlaubten Fälle protokollieren: Ein Panel-Button steht in
-            // einem Kanal, und wer dort Rechte hat, kann einen Server auch aus
-            // Langeweile durchschalten. Ohne diese Zeile ließe sich hinterher
-            // nicht sagen, wer den Server um 3 Uhr gestoppt hat.
-            Logger.info(`[IPC/Gameserver] ${action} durch User ${actorId} (Server ${serverId}, Guild ${guildId})`);
-            return false;
-        };
+        const actorMayNot = (permissionKey) =>
+            this._akteurDarfNicht('Gameserver', action, payload, message, permissionKey);
 
         try {
             switch (action) {
@@ -511,6 +520,7 @@ class IPCServer {
                 // ── Liste aller Gameserver der Guild (mit Filtern) ──────────────────────
                 case 'SERVER_LIST': {
                     if (!guildId) return message.reply({ success: false, error: 'guild_id fehlt' });
+                    if (await actorMayNot('GAMESERVER.VIEW')) return;
                     const { status_filter, rootserver_filter, search } = payload;
                     let query = `
                         SELECT gs.id, gs.name, gs.status,
@@ -541,6 +551,7 @@ class IPCServer {
                 // ── Einzelner Gameserver-Status ─────────────────────────────────────────
                 case 'SERVER_STATUS': {
                     if (!guildId || !serverId) return message.reply({ success: false, error: 'guild_id und server_id erforderlich' });
+                    if (await actorMayNot('GAMESERVER.VIEW')) return;
                     // Die Snapshot-Spalten stehen bewusst NACH gs.* – bei gleichem
                     // Alias gewinnt die letzte Spalte, der Live-Wert überschreibt
                     // also den Registry-Wert aus gameservers.
@@ -575,6 +586,7 @@ class IPCServer {
                     const { addon_slug, server_name, owner_user_id } = payload;
                     if (!guildId || !addon_slug || !rootserverId || !server_name)
                         return message.reply({ success: false, error: 'guild_id, addon_slug, rootserver_id und server_name erforderlich' });
+                    if (await actorMayNot('GAMESERVER.CREATE')) return;
 
                     const [rootserver] = await dbService.query(
                         `SELECT id, name, daemon_id, host, system_user
@@ -1063,6 +1075,8 @@ class IPCServer {
                     if (!guildId || !serverId) {
                         return message.reply({ success: false, error: 'guild_id und server_id erforderlich' });
                     }
+                    // Wie die Route `POST /servers/:id/migrate` im Dashboard.
+                    if (await actorMayNot('GAMESERVER.EDIT')) return;
 
                     const { target_rootserver_id, user_id } = payload;
                     if (!target_rootserver_id) {

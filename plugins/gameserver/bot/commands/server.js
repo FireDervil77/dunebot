@@ -365,6 +365,7 @@ module.exports = {
                         status_filter:     statusFilter,
                         rootserver_filter: rootserverFilter,
                         search,
+                        actor_user_id:     interaction.user.id,
                     });
                     if (!res?.success) return interaction.followUp({ embeds: [_errEmbed(res?.error)] });
 
@@ -405,6 +406,7 @@ module.exports = {
                     const id  = interaction.options.getInteger('id');
                     const res = await ipcClient.sendToDashboard('gameserver:SERVER_STATUS', {
                         guild_id: guildId, server_id: id,
+                        actor_user_id: interaction.user.id,
                     });
                     if (!res?.success) return interaction.followUp({ embeds: [_errEmbed(res?.error)] });
 
@@ -462,6 +464,7 @@ module.exports = {
                         addon_slug:    addonSlug,
                         server_name:   name,
                         owner_user_id: interaction.user.id,
+                        actor_user_id: interaction.user.id,
                     });
                     if (!res?.success) return interaction.followUp({ embeds: [_errEmbed(res?.error)] });
 
@@ -549,6 +552,7 @@ module.exports = {
                         server_id: serverId,
                         target_rootserver_id: targetRootServerId,
                         user_id: userId,
+                        actor_user_id: userId,
                     });
 
                     if (!res?.success) return interaction.followUp({ embeds: [_errEmbed(res?.error)] });
@@ -800,6 +804,7 @@ module.exports = {
             server_name:   name,
             env_overrides: envOverrides,
             owner_user_id: interaction.user.id,
+            actor_user_id: interaction.user.id,
         });
 
         if (!res?.success) return interaction.editReply({ embeds: [_errEmbed(res?.error)] });

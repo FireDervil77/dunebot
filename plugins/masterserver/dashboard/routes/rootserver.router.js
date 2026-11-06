@@ -17,6 +17,8 @@ const { ServiceManager } = require('dunebot-core');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 const RootServer = require('../models/RootServer');
 const Maschinenbefund = require('../helpers/Maschinenbefund');
+const RootServerAnlegen = require('../helpers/RootServerAnlegen');
+const { dbGrenzeFehler } = RootServerAnlegen;
 
 /** Der Bereich, aus dem diese Maschine Spielports vergibt — oder null, solange keiner angelegt ist. */
 async function spielportBereich(rootserverId) {
@@ -25,7 +27,6 @@ async function spielportBereich(rootserverId) {
         'SELECT MIN(port) AS von, MAX(port) AS bis FROM port_allocations WHERE rootserver_id = ?', [rootserverId]);
     return b && b.von ? { von: Number(b.von), bis: Number(b.bis) } : null;
 }
-const RootServer_getDaemon = async (guildId) => { const rows = await require('../models/RootServer').getByGuild(guildId); const rs = rows[0] || null; if (rs) { rs.status = rs.daemon_status; rs.version = rs.daemon_version; } return rs; };
 
 // Helper: themeManager.renderView() wrapper
 const renderView = async (res, viewPath, data) => {
@@ -191,176 +192,27 @@ router.get('/create', requirePermission('MASTERSERVER.ROOTSERVER.CREATE'), async
 // =====================================================
 router.post('/', requirePermission('MASTERSERVER.ROOTSERVER.CREATE'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
-    const dbService = ServiceManager.get('dbService');
     const guildId = res.locals.guildId;
 
     try {
-        // ── Was das Formular seit M-6 noch fragt ─────────────────────────────
-        //
-        // Nur noch ABSICHT. `cpuCores`, `ramTotal` und `diskTotal` sind
-        // entfallen: Die Maschine misst sie beim ersten Verbinden genauer, als
-        // sie jemand tippen kann — und die gemessenen Werte sind seit der
-        // Migration „Quota folgt erkannter Hardware" ohnehin die, mit denen
-        // gerechnet wird.
-        //
-        // `hostname` ist ebenfalls entfallen. Es gab zwei Felder für einen
-        // Namen, und ausgerechnet das mit der Beschriftung „nur zur Anzeige"
-        // entschied die Adresse, die ein Spieler bekam. Geblieben ist `fqdn` —
-        // als Wunsch, den eine Messung bestätigt oder eben nicht.
-        //
-        // `mysqlEnabled`, `mysqlDbLimit`, `webDomain` und `fastdlUrl` standen
-        // hier schon, wurden an das Modell durchgereicht und dort still
-        // fallengelassen: Das INSERT kannte diese Spalten nie. Sie sind durch
-        // `dbGewuenscht`/`dbJeServer` ersetzt, die wirklich ankommen.
-        const {
-            name, host, description,
-            quotaProfileId,
-            backupLimit,
-            datacenter, countryCode,
-            fqdn, fastdlEnabled,
-            dbGewuenscht, dbJeServer,
-            sftpGewuenscht, sftpPort
-        } = req.body;
-
-        // Validierung
-        if (!name || !host) {
-            return res.status(400).json({
-                success: false,
-                message: 'Pflichtfelder fehlen: Name und IP-Adresse'
-            });
-        }
-        // Spielports gibt es beim Anlegen noch nicht — der Bereich wird danach vergeben.
-        const sftpPortFehler = Maschinenbefund.sftpPortFehler(sftpPort, null);
-        if (sftpPortFehler) return res.status(400).json({ success: false, message: sftpPortFehler });
-        const dbAnlegen = dbGewuenscht === 'true' || dbGewuenscht === true;
-        const dbFehlerAnlegen = dbGrenzeFehler(dbAnlegen, dbJeServer ?? 0);
-        if (dbFehlerAnlegen) return res.status(400).json({ success: false, message: dbFehlerAnlegen });
-
-        // ✅ Auto-Generated Values (NEW Format - gs-guild_ Prefix!)
-        // WICHTIG: Guild-ID auf 10 Zeichen kürzen (Linux Username Limit bei System-Usern)
-        const shortGuildId = guildId.substring(0, 10);
-        const systemUser = `guild_${shortGuildId}`;  // Daemon fügt "gs-" Präfix hinzu!
-        const baseDirectory = '/opt/firebot';
-        const guildDirectory = `/opt/firebot/guilds/${guildId}`;
-
-        // RootServer erstellen
-        const result = await RootServer.create({
+        // Derselbe Ablauf wie `/daemon register` im Bot (2026-11-06):
+        // helpers/RootServerAnlegen.js. Dort steht, was das Formular fragt und
+        // warum die Hardware leer bleibt.
+        const ergebnis = await RootServerAnlegen.anlegen({
             guildId,
             ownerUserId: res.locals.user?.id || null, // Discord User ID aus Session (optional)
-            name,
-            host,
-            systemUser,
-            baseDirectory,
-            description: description || null,
-            fqdn: fqdn || null,
-            fastdlEnabled: fastdlEnabled === 'true' || fastdlEnabled === true,
-            // Datenbanken: Wunsch und Grenze. Ob es geht, entscheidet der Befund
-            // der Maschine — nicht dieses Häkchen.
-            dbGewuenscht: dbAnlegen,
-            dbJeServer: Number(dbJeServer ?? 0),
-            // SFTP für externe Programme (2026-10-27): Wunsch, geht an den Wizard.
-            sftpGewuenscht: sftpGewuenscht === 'true' || sftpGewuenscht === true,
-            sftpPortWunsch: String(sftpPort ?? '').trim() ? Number(sftpPort) : null,
-            // Hardware bleibt leer: Der Daemon meldet sie beim ersten Verbinden.
-            cpuCores: null,
-            cpuThreads: null,
-            cpuModel: null,
-            ramTotalGb: null,
-            diskTotalGb: null,
-            backupLimit: parseInt(backupLimit) || 3
+            felder: req.body
         });
-
-        Logger.info(`[Masterserver] RootServer created: ${result.id} (${result.daemonId}) by ${systemUser}`);
-
-        // ✅ Virtual Server im Daemon erstellen (wenn Daemon online)
-        const ipmServer = ServiceManager.get('ipmServer');
-        const daemon = await RootServer_getDaemon(guildId);
-        
-        if (daemon && ipmServer.isDaemonOnline(daemon.daemon_id)) {
-            try {
-                Logger.info(`[Masterserver] Erstelle Virtual Server für RootServer ${result.id} im Daemon...`);
-                Logger.debug(`[Masterserver] systemUser: "${systemUser}" (Länge: ${systemUser.length})`);
-                Logger.debug(`[Masterserver] guildId: "${guildId}" (Länge: ${guildId.length})`);
-                
-                // Neue Filesystem-Struktur: {base_dir}/{username}/rootserver_{id}/
-                const vServerResponse = await ipmServer.sendCommand(daemon.daemon_id, 'virtual.create', {
-                    daemon_id: daemon.daemon_id,     // ✅ NEUER Parameter: daemon_id (nicht server_id!)
-                    rootserver_id: result.id,        // RootServer DB-ID für Unterverzeichnis
-                    guild_id: guildId,               // Guild-ID für SQLite-Cache
-                    server_name: name,               // Display-Name
-                    username: systemUser,            // gs-guild_XXXXX
-                    custom_path: null
-                    //
-                    // Hier standen bis zum 2026-08-20 vier weitere Felder:
-                    // ram_limit_gb, disk_limit_gb, mysql_enabled, web_domain.
-                    //
-                    // Gemessen: `handleVirtualCreate` im Daemon liest genau
-                    // fünf Schlüssel — daemon_id/server_id, server_name,
-                    // username, rootserver_id, guild_id. Die vier anderen sind
-                    // nie irgendwo angekommen.
-                    //
-                    // Zwei davon waren nach dem Umbau des Formulars (M-6) sogar
-                    // nicht mehr definiert: `ramTotal` und `diskTotal` gibt es
-                    // nicht mehr, `parseFloat(ramTotal)` hätte hier einen
-                    // ReferenceError geworfen. Er wäre im umgebenden catch
-                    // gelandet, das mit „Nicht kritisch" protokolliert — der
-                    // RootServer wäre also angelegt worden und die
-                    // Verzeichnisstruktur stillschweigend nicht.
-                }, 180000);  // 3 Minuten Timeout (SteamCMD Installation!)
-
-                if (vServerResponse.success) {
-                    Logger.success(`[Masterserver] Virtual Server erstellt: ${vServerResponse.data?.server_path || 'unknown'}`);
-                    
-                    // Install-Status auf 'completed' setzen
-                    await RootServer.updateInstallStatus(result.daemonId, 'completed');
-                } else {
-                    Logger.error(`[Masterserver] Virtual Server Setup fehlgeschlagen: ${vServerResponse.error}`);
-                    // Nicht kritisch - User kann Setup später manuell triggern
-                }
-            } catch (vServerError) {
-                Logger.error('[Masterserver] Virtual Server Creation Error:', vServerError);
-                // Nicht kritisch - RootServer wurde erstellt, Virtual Server kann später erstellt werden
-            }
-        } else {
-            Logger.warn('[Masterserver] Daemon offline - Virtual Server muss später erstellt werden');
-        }
-
-        // Quota-Profil zuweisen (wenn vorhanden UND nicht "none")
-        if (quotaProfileId && quotaProfileId !== '' && quotaProfileId !== 'none') {
-            try {
-                // Quota-Profil-Daten laden
-                const [profile] = await dbService.query(
-                    'SELECT * FROM quota_profiles WHERE id = ?',
-                    [quotaProfileId]
-                );
-
-                if (profile) {
-                    // Quota-Eintrag in rootserver_quotas erstellen (ohne custom overrides)
-                    await dbService.query(
-                        `INSERT INTO rootserver_quotas 
-                         (rootserver_id, profile_id, custom_ram_mb, custom_cpu_cores, custom_disk_gb, created_at, updated_at)
-                         VALUES (?, ?, NULL, NULL, NULL, NOW(), NOW())`,
-                        [result.id, quotaProfileId]
-                    );
-
-                    Logger.info(`[Masterserver] Quota Profile ${quotaProfileId} assigned to RootServer ${result.id}`);
-                }
-            } catch (quotaError) {
-                Logger.error('[Masterserver] Quota assignment failed:', quotaError);
-                // Nicht kritisch - RootServer wurde erstellt
-            }
+        if (!ergebnis.ok) {
+            return res.status(ergebnis.status).json({ success: false, message: ergebnis.fehler });
         }
 
         res.json({
             success: true,
             message: 'RootServer erfolgreich erstellt! Sie werden zur Details-Seite weitergeleitet...',
             data: {
-                id: result.id,
-                daemonId: result.daemonId,
-                apiKey: result.apiKey,
-                host: host || null,
-                busAdresse: require('../../../../apps/dashboard/helpers/BusAdresse').busAdresse(),
-                redirectUrl: `/guild/${guildId}/plugins/masterserver/rootservers/${result.id}`
+                ...ergebnis.data,
+                redirectUrl: `/guild/${guildId}/plugins/masterserver/rootservers/${ergebnis.data.id}`
             }
         });
 
@@ -511,16 +363,6 @@ async function datenbankAnwenden(rootserverId) {
     }
 }
 
-/**
- * Datenbanken je Gameserver: eine ganze Zahl von 0 bis 20; mit Häkchen
- * mindestens 1. Gibt den Fehler in einem Satz zurück oder null.
- */
-function dbGrenzeFehler(gewuenscht, jeServer) {
-    const n = Number(String(jeServer ?? '').trim());
-    if (!Number.isInteger(n) || n < 0 || n > 20) return 'Datenbanken je Gameserver: eine ganze Zahl von 0 bis 20.';
-    if (gewuenscht && n < 1) return 'Mit Datenbanken braucht jeder Gameserver mindestens eine.';
-    return null;
-}
 
 router.put('/:id', requirePermission('MASTERSERVER.ROOTSERVER.EDIT'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
