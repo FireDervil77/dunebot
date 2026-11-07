@@ -494,7 +494,11 @@ exports.updatePlugins = async (req, res) => {
         if (action === 'enable') {
             for (const plugin of plugins) {
                 try {
-                    await pluginManager.enableInGuild(plugin, guildId, req);
+                    // enableInGuild meldet einen Fehlschlag mit `false`, nicht mit
+                    // einem Wurf — ohne diese Prüfung stand er als Erfolg da.
+                    if (await pluginManager.enableInGuild(plugin, guildId, req) !== true) {
+                        throw new Error(`Plugin "${plugin}" konnte nicht aktiviert werden, Einzelheiten im Log des Dashboards`);
+                    }
                     results.push({
                         plugin,
                         success: true,
@@ -523,7 +527,10 @@ exports.updatePlugins = async (req, res) => {
             }
             for (const plugin of plugins) {
                 try {
-                    await pluginManager.disableInGuild(plugin, guildId, req);
+                    // `undefined` heißt: Plugin nicht gefunden, nichts geschah.
+                    if (await pluginManager.disableInGuild(plugin, guildId, req) !== true) {
+                        throw new Error(`Plugin "${plugin}" nicht gefunden, es wurde nichts abgeschaltet`);
+                    }
                     results.push({
                         plugin,
                         success: true,
@@ -544,15 +551,20 @@ exports.updatePlugins = async (req, res) => {
             });
         }
         
-        // Änderungen per IPC an den Bot senden
-        try {
-            await ipcServer.broadcastOne("dashboard:UPDATE_PLUGIN", {
-                guildId,
-                action,
-                plugins
-            });
-        } catch (err) {
-            Logger.error(`Fehler beim Senden der aktualisierten Plugin-Konfiguration für Guild ${guildId}:`, err);
+        // Änderungen per IPC an den Bot senden — nur, was hier gelungen ist.
+        // Bis 2026-11-07 gingen alle angefragten Plugins hinaus: Brach das
+        // Abschalten hier ab (K067), schaltete der Bot trotzdem ab. Der Bot
+        // nimmt je Nachricht ein Plugin, deshalb eine Nachricht je Plugin.
+        for (const plugin of results.filter(r => r.success).map(r => r.plugin)) {
+            try {
+                await ipcServer.broadcastOne("dashboard:UPDATE_PLUGIN", {
+                    guildId,
+                    action,
+                    plugins: [plugin]
+                });
+            } catch (err) {
+                Logger.error(`Fehler beim Senden der aktualisierten Plugin-Konfiguration für Guild ${guildId}:`, err);
+            }
         }
         
         res.json({

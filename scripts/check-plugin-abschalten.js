@@ -28,6 +28,7 @@ const vm = require('vm');
 const ejs = require('ejs');
 const WURZEL = path.join(__dirname, '..');
 const { ServiceManager } = require('dunebot-core');
+const { ohneKommentare } = require('./lib/quelltext');
 
 let fehler = 0;
 async function pruefe(was, tun) {
@@ -244,6 +245,129 @@ function formular(name, d) {
             assert.deepStrictEqual(gerufen, [['beginne', 1], ['loesche', 1, true]]);
             assert.strictEqual(privat, 1);
         } finally { Object.assign(Loeschung, echt); }
+    });
+
+    // ── Discord /plugin status (F4, Betreiber 2026-11-07) ────────────────
+    // Das Dashboard schaltet, der Bot folgt den Erfolgen, Discord zeigt den
+    // Ausgang. Abschalten nur mit den eingetippten Namen.
+    const pluginBefehl = require('../apps/bot/commands/plugin.js');
+    async function discord({ an = ['gameserver', 'music'], gewaehlt, getippt = null, dashboard }) {
+        const spur = { fenster: 0, ipc: [], bot: [], texte: [] };
+        const text = (k, w) => `${k}${w ? ' ' + JSON.stringify(w) : ''}`;
+        const anzeige = { edit: async ({ content }) => { spur.texte.push(content); } };
+        const fensterAntwort = getippt === null ? null : {
+            customId: null, user: { id: 'u1' },
+            fields: { getTextInputValue: () => getippt },
+            update: async ({ content }) => { spur.texte.push(content); return anzeige; },
+        };
+        const waiter = {
+            id: 'w1', values: gewaehlt, user: { id: 'u1' },
+            update: async ({ content }) => { spur.texte.push(content); return anzeige; },
+            showModal: async (m) => { spur.fenster++; if (fensterAntwort) fensterAntwort.customId = m.data.custom_id; },
+            awaitModalSubmit: async ({ filter }) => {
+                if (!fensterAntwort || !filter(fensterAntwort)) throw new Error('Zeitablauf');
+                return fensterAntwort;
+            },
+        };
+        const sentMsg = {
+            channel: { awaitMessageComponent: async ({ filter }) => {
+                assert.ok(filter({ customId: 'plugin-status-menu', user: { id: 'u1' } }));
+                return waiter;
+            } },
+            edit: async ({ content }) => { spur.texte.push(content); },
+        };
+        const alle = ['core', 'gameserver', 'music', 'ticket'].map(name => ({ name }));
+        const nachricht = {
+            guild: { id: '222', getT: (k, w) => text(k.replace('core:PLUGIN.', ''), w) },
+            member: { id: 'u1' },
+            reply: async () => sentMsg,
+            client: { pluginManager: {
+                plugins: alle,
+                istVerfuegbar: () => true,
+                enableInGuild: async (n) => { spur.bot.push(['ein', n]); return true; },
+                disableInGuild: async (n) => { spur.bot.push(['aus', n]); return true; },
+            } },
+        };
+        ServiceManager.register('dbService', { getEnabledPlugins: async () => ['core', ...an] });
+        ServiceManager.register('ipcClient', { sendToDashboard: async (ereignis, nutzlast, frist) => {
+            spur.ipc.push({ ereignis, nutzlast, frist });
+            return dashboard(nutzlast);
+        } });
+        await pluginBefehl.messageRun({ message: nachricht, args: ['status'] });
+        return spur;
+    }
+    const ok = (n) => ({ success: true, data: { ergebnisse: [
+        ...n.enabled.map(p => ({ plugin: p, aktion: 'ein', ok: true })),
+        ...n.disabled.map(p => ({ plugin: p, aktion: 'aus', ok: true })),
+    ] } });
+
+    await pruefe('Discord: Abwählen fragt nach den Namen, falsche Namen ändern nichts', async () => {
+        const r = await discord({ gewaehlt: ['core', 'music'], getippt: 'gameservr', dashboard: ok });
+        assert.strictEqual(r.fenster, 1, 'kein Fenster zum Bestätigen');
+        assert.deepStrictEqual(r.ipc, [], 'trotz falscher Namen ans Dashboard');
+        assert.deepStrictEqual(r.bot, []);
+        assert.match(r.texte.at(-1), /^STATUS_CONFIRM_MISMATCH.*gameserver/);
+    });
+
+    await pruefe('Discord: ohne Bestätigung nichts geändert', async () => {
+        const r = await discord({ gewaehlt: ['core', 'music'], getippt: null, dashboard: ok });
+        assert.deepStrictEqual(r.ipc, []);
+        assert.match(r.texte.at(-1), /^STATUS_CONFIRM_TIMEOUT/);
+    });
+
+    await pruefe('Discord: richtige Namen — erst das Dashboard, dann der Bot, Ausgang in Discord', async () => {
+        const r = await discord({ gewaehlt: ['core', 'music', 'ticket'], getippt: ' GameServer ', dashboard: ok });
+        assert.strictEqual(r.ipc.length, 1);
+        assert.strictEqual(r.ipc[0].ereignis, 'core:UPDATE_PLUGIN_STATUS');
+        assert.deepStrictEqual(r.ipc[0].nutzlast, { guildId: '222', enabled: ['ticket'], disabled: ['gameserver'] });
+        assert.ok(r.ipc[0].frist >= 10 * 60 * 1000, 'zu kurze Frist für das Abschalten von Gameservern');
+        assert.deepStrictEqual(r.bot, [['ein', 'ticket'], ['aus', 'gameserver']]);
+        assert.match(r.texte.at(-1), /STATUS_RESULT_ON \{"liste":"ticket"\}\nSTATUS_RESULT_OFF \{"liste":"gameserver"\}/);
+    });
+
+    await pruefe('Discord: bricht das Dashboard ab, folgt der Bot nicht und Discord nennt den Grund', async () => {
+        const r = await discord({ gewaehlt: ['core', 'music'], getippt: 'gameserver', dashboard: () => ({ success: false, data: { ergebnisse: [
+            { plugin: 'gameserver', aktion: 'aus', ok: false, grund: 'Zelt kommt nicht herunter' }] } }) });
+        assert.deepStrictEqual(r.bot, [], 'der Bot schaltete trotz Abbruch ab');
+        assert.match(r.texte.at(-1), /STATUS_RESULT_FAILED.*Zelt kommt nicht herunter/);
+    });
+
+    await pruefe('Discord: antwortet das Dashboard nicht, ändert der Bot nichts', async () => {
+        const r = await discord({ gewaehlt: ['core', 'music'], getippt: 'gameserver', dashboard: () => ({ success: false, error: 'Zeitüberschreitung' }) });
+        assert.deepStrictEqual(r.bot, []);
+        assert.match(r.texte.at(-1), /^STATUS_NO_DASHBOARD.*Zeitüberschreitung/);
+    });
+
+    await pruefe('Discord: nur einschalten braucht kein Fenster, schon Abgeschaltetes wird nicht erneut abgeschaltet', async () => {
+        const r = await discord({ an: ['music'], gewaehlt: ['core', 'music', 'ticket'], dashboard: ok });
+        assert.strictEqual(r.fenster, 0);
+        assert.deepStrictEqual(r.ipc[0].nutzlast, { guildId: '222', enabled: ['ticket'], disabled: [] });
+        const nichts = await discord({ an: ['music'], gewaehlt: ['core', 'music'], dashboard: ok });
+        assert.deepStrictEqual(nichts.ipc, []);
+        assert.match(nichts.texte.at(-1), /^STATUS_NOTHING/);
+    });
+
+    await pruefe('Dashboard: UPDATE_PLUGIN_STATUS meldet je Plugin, ein Fehlschlag ist kein success', async () => {
+        const IPCServer = require('../apps/dashboard/helpers/IPCServer');
+        const Klasse = IPCServer.IPCServer || IPCServer;
+        ServiceManager.register('pluginManager', {
+            enableInGuild: async () => false,
+            disableInGuild: async (n) => { if (n === 'gameserver') throw new Error('gameserver: Aufräumen gescheitert'); return true; },
+        });
+        let antwort = null;
+        await Klasse.prototype._handleCoreEvent.call(Object.create(Klasse.prototype), 'UPDATE_PLUGIN_STATUS',
+            { guildId: '222', enabled: ['ticket'], disabled: ['gameserver', 'music'] }, { reply: (a) => { antwort = a; } });
+        assert.strictEqual(antwort.success, false);
+        assert.deepStrictEqual(antwort.data.ergebnisse.map(e => [e.plugin, e.aktion, e.ok]),
+            [['ticket', 'ein', false], ['gameserver', 'aus', false], ['music', 'aus', true]]);
+        assert.match(antwort.data.ergebnisse[1].grund, /Aufräumen gescheitert/);
+    });
+
+    await pruefe('Dashboard-Knopf: der Bot hört nur von den gelungenen Plugins, false gilt als Fehlschlag', async () => {
+        const c = ohneKommentare(lies('apps/dashboard/controllers/guild.controller.js'));
+        assert.match(c, /for \(const plugin of results\.filter\(r => r\.success\)\.map\(r => r\.plugin\)\)[\s\S]{0,120}broadcastOne\("dashboard:UPDATE_PLUGIN"[\s\S]{0,200}plugins: \[plugin\]/);
+        assert.match(c, /await pluginManager\.enableInGuild\(plugin, guildId, req\) !== true/);
+        assert.match(c, /await pluginManager\.disableInGuild\(plugin, guildId, req\) !== true/);
     });
 
     console.log(fehler ? `\n✗ ${fehler} Prüfung(en) rot` : '\n✅ Abschalten nur mit Namen, die Kontroll-Guild behält ihre Inhalte');

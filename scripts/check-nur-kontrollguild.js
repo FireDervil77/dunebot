@@ -86,8 +86,11 @@ pruefe('die öffentliche Startseite zeigt interne Plugins nicht', () => {
 });
 pruefe('der Bot-Befehl `plugin` bietet sie fremden Guilds nicht an', () => {
     const t = lies('apps/bot/commands/plugin.js');
-    assert.strictEqual((t.match(/pluginManager\.plugins[\s\S]{0,40}\.filter\(\(?p\)? => !p\.ownerOnly/g) || []).length, 4, 'vier Listen');
-    assert.strictEqual((t.match(/istVerfuegbar\(p\.name, guild\.id\)/g) || []).length, 4);
+    // Drei Listen: list, info, status. `status` nahm bis 2026-11-07 zwei (Menü
+    // und Verarbeitung), seitdem eine — `waehlbar` — für beides (F4).
+    assert.strictEqual((t.match(/pluginManager\.plugins[\s\S]{0,40}\.filter\(\(?p\)? => !p\.ownerOnly/g) || []).length, 3, 'drei Listen');
+    assert.strictEqual((t.match(/istVerfuegbar\(p\.name, guild\.id\)/g) || []).length, 3);
+    assert.match(t, /const kandidaten = waehlbar\.filter/, 'status verarbeitet nicht die gefilterte Liste');
 });
 
 console.log(fehler ? `\n❌ ${fehler} Prüfung(en) rot` : '\n✅ Interne Plugins bleiben in der Kontroll-Guild');

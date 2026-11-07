@@ -251,7 +251,7 @@ class IPCServer {
 
     /**
      * Core-Events vom Bot verarbeiten (Bot→Dashboard)
-     * Aktuell: UPDATE_PLUGIN_STATUS – synchronisiert Plugin-Enable/Disable ans Dashboard
+     * Aktuell: UPDATE_PLUGIN_STATUS – Discord `/plugin status` schaltet über das Dashboard ein und ab
      * @private
      */
     async _handleCoreEvent(action, payload, message) {
@@ -260,27 +260,35 @@ class IPCServer {
 
         switch (action) {
             case 'UPDATE_PLUGIN_STATUS': {
+                // Discord `/plugin status` (F4, Betreiber 2026-11-07): Das
+                // Dashboard schaltet ein und ab — beim Abschalten mit dem
+                // Löschen der Inhalte —, der Bot folgt nur den Erfolgen und
+                // sagt in Discord, wie es ausging. Deshalb geht das Ergebnis je
+                // Plugin zurück. Bis dahin standen Fehler nur im Log, und die
+                // Antwort war immer `success`.
                 const { guildId, enabled = [], disabled = [] } = payload;
                 if (!guildId) return message.reply({ success: false, error: 'guildId fehlt' });
 
                 Logger.info(`[IPC/core] Plugin-Status-Update für Guild ${guildId}: +[${enabled.join(',')}] -[${disabled.join(',')}]`);
 
-                for (const pluginName of enabled) {
+                const ergebnisse = [];
+                const fuehreAus = async (pluginName, aktion, tun) => {
                     try {
-                        await pluginManager.enableInGuild(pluginName, guildId);
+                        const ok = (await tun()) === true;
+                        ergebnisse.push({ plugin: pluginName, aktion, ok, grund: ok ? null : 'fehlgeschlagen, Einzelheiten im Log des Dashboards' });
                     } catch (err) {
-                        Logger.error(`[IPC/core] enableInGuild(${pluginName}) gescheitert:`, err);
+                        Logger.error(`[IPC/core] ${aktion === 'ein' ? 'enableInGuild' : 'disableInGuild'}(${pluginName}) gescheitert:`, err);
+                        ergebnisse.push({ plugin: pluginName, aktion, ok: false, grund: err.message });
                     }
+                };
+                for (const pluginName of enabled) {
+                    await fuehreAus(pluginName, 'ein', () => pluginManager.enableInGuild(pluginName, guildId));
                 }
                 for (const pluginName of disabled) {
-                    try {
-                        await pluginManager.disableInGuild(pluginName, guildId);
-                    } catch (err) {
-                        Logger.error(`[IPC/core] disableInGuild(${pluginName}) gescheitert:`, err);
-                    }
+                    await fuehreAus(pluginName, 'aus', () => pluginManager.disableInGuild(pluginName, guildId));
                 }
 
-                return message.reply({ success: true });
+                return message.reply({ success: ergebnisse.every(e => e.ok), data: { ergebnisse } });
             }
             default:
                 return message.reply({ success: false, error: `Unbekannte core-Aktion: ${action}` });
