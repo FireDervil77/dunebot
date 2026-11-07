@@ -1,0 +1,20 @@
+/*
+ * Schriften des öffentlichen Frontends — vom eigenen Server.
+ *
+ * Bis 2026-11-07 (Kassensturz K279) von fonts.googleapis.com, siehe
+ * schriften-guild.css. Dieselben Schnitte wie vorher:
+ *
+ *   Roboto   300, 400, 500, 700
+ *   Raleway  400, 600, 700
+ *   Poppins  400, 500, 600
+ */
+@import url('/vendor/schriften/roboto/300.css');
+@import url('/vendor/schriften/roboto/400.css');
+@import url('/vendor/schriften/roboto/500.css');
+@import url('/vendor/schriften/roboto/700.css');
+@import url('/vendor/schriften/raleway/400.css');
+@import url('/vendor/schriften/raleway/600.css');
+@import url('/vendor/schriften/raleway/700.css');
+@import url('/vendor/schriften/poppins/400.css');
+@import url('/vendor/schriften/poppins/500.css');
+@import url('/vendor/schriften/poppins/600.css');

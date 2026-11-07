@@ -183,14 +183,15 @@ for (const t of themeJs.matchAll(/\[([^\]]*)\]\s*\.\s*forEach\(\s*h\s*=>\s*am\.e
 }
 
 // **Die Schriftquelle geht denselben Weg und kann denselben Tod sterben.**
-// Sie ist ein Vendor-Handle, faellt also durch die Dateischleife unten
-// hindurch — geprueft wird sie deshalb hier von Hand. Eine nicht geladene
-// Schrift stuerzt nicht ab, sie sieht nur nach Systemschrift aus; genau so
-// hat der Guild-Bereich bis zum 2026-09-04 ausgesehen, waehrend Tabler um
-// "Inter Var" bat, die nie jemand geholt hat.
+// Eine nicht geladene Schrift stuerzt nicht ab, sie sieht nur nach
+// Systemschrift aus; genau so hat der Guild-Bereich bis zum 2026-09-04
+// ausgesehen, waehrend Tabler um "Inter Var" bat, die nie jemand geholt hat.
+// Seit 2026-11-07 (K279) ist sie die eigene Datei `schriften-guild.css`
+// statt einer Google-Adresse — hier namentlich, damit das Handle stimmt; dass
+// die Dateien dahinter da sind, prueft check-fremde-quellen.
 pruefe('Die Schriftquelle ist angemeldet',
-    /registerVendorStyle\(\s*'fonts-guild'/.test(themeJs),
-    'Ohne `registerVendorStyle` gibt es das Handle nicht.');
+    /registerStyle\(\s*'fonts-guild',\s*'schriften-guild\.css'/.test(themeJs),
+    'Ohne `registerStyle(\'fonts-guild\', \'schriften-guild.css\')` gibt es das Handle nicht.');
 pruefe('Die Schriftquelle wird im Guild-Bereich eingereiht',
     eingereiht.has('fonts-guild'),
     'Angemeldet, aber nie eingereiht — der Browser holt sie nie.');

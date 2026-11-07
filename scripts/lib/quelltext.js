@@ -88,4 +88,18 @@ function ohneKommentareShell(inhalt) {
     return String(inhalt).split('\n').map(z => (/^\s*#/.test(z) ? '' : z)).join('\n');
 }
 
-module.exports = { ohneKommentare, ohneKommentareEjs, ohneKommentareShell };
+/**
+ * Dasselbe fuer CSS (2026-11-07, check-fremde-quellen).
+ *
+ * CSS kennt nur `/* … *\/`. `ohneKommentare` taugt hier nicht: Seine
+ * Zeilenregel schneidet ab `//` ab und machte aus `url(//fremd.de/x)` ein
+ * `url(` — genau die Adresse, nach der man sucht, waere weg.
+ *
+ * @param {string} inhalt Roher Inhalt einer .css-Datei
+ * @returns {string}
+ */
+function ohneKommentareCss(inhalt) {
+    return String(inhalt).replace(/\/\*[\s\S]*?\*\//g, ' ');
+}
+
+module.exports = { ohneKommentare, ohneKommentareEjs, ohneKommentareShell, ohneKommentareCss };

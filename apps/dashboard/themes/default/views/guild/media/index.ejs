@@ -2,12 +2,12 @@
 <%# Galerie, Detail-Panel und Bild-Editor (Cropper.js) %>
 
 <%#
-  Cropper laedt weiterhin vom CDN. Das gehoert perspektivisch in den
-  AssetManager (siehe "CDN lokalisieren" im Umbaukonzept) — solange es hier
-  steht, funktioniert es unter beiden Themes gleich.
+  Cropper kommt seit 2026-11-07 vom eigenen Server (npm-Paket, /vendor/cropperjs,
+  Kassensturz K279), nicht mehr vom CDN. Es steht weiter hier statt im
+  AssetManager, damit es unter beiden Themes gleich funktioniert.
 %>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.css">
-<script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js"></script>
+<link rel="stylesheet" href="/vendor/cropperjs/cropper.min.css">
+<script src="/vendor/cropperjs/cropper.min.js"></script>
 
 <style>
     /*

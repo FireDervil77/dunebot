@@ -16,37 +16,28 @@
  * @author FireDervil
  */
 
-/** Was noch von außen kommt. Ziel ist, auch das lokal zu haben. */
-const CDN = {
-    jquery:    'https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js',
-    toastrJs:  'https://cdn.jsdelivr.net/npm/toastr@2.1.4/build/toastr.min.js',
-    toastrCss: 'https://cdn.jsdelivr.net/npm/toastr@2.1.4/build/toastr.min.css',
-    sortable:  'https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js',
-    fontawesome: 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css',
-    fontsFrontend: 'https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Raleway:wght@400;600;700&family=Poppins:wght@400;500;600&display=swap',
-
-    // **Der Guild-Bereich hatte bis zum 2026-09-04 gar keine Schrift.**
-    //
-    // Der Kommentar hier sagte "nutzt Tablers eigene Schrift". Nachgemessen in
-    // `node_modules/@tabler/core/dist/css/tabler.min.css`:
-    //
-    //     --tblr-font-sans-serif: "Inter Var", Inter, -apple-system, …
-    //
-    // Tabler *bittet* um Inter, liefert sie aber nicht mit, und geladen hat sie
-    // hier nie jemand. Was man sah, war der Systemfallback — auf Windows Segoe
-    // UI. Das ist der groesste Einzelunterschied zwischen Entwurf und Panel
-    // gewesen, und er stand nirgends als Fehler, weil eine fehlende Schrift
-    // immer irgendetwas anzeigt.
-    //
-    // Die drei aus dem Entwurf: Bricolage Grotesque fuer Ueberschriften,
-    // Public Sans fuer Fliesstext, JetBrains Mono fuer Zahlen und Kennungen.
-    // Jede Rolle hat in `tokens.css` einen vollstaendigen Fallback-Stapel —
-    // faellt Google aus, sieht die Seite wie vorher aus statt kaputt.
-    fontsGuild: 'https://fonts.googleapis.com/css2'
-              + '?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700'
-              + '&family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400'
-              + '&family=JetBrains+Mono:wght@400;500;700'
-              + '&display=swap'
+/**
+ * Bibliotheken vom eigenen Server, aus node_modules (Vendor-Route in app.js).
+ *
+ * Bis 2026-11-07 (Kassensturz K279) kamen sie von cdn.jsdelivr.net,
+ * cdnjs.cloudflare.com und fonts.googleapis.com — jeder Seitenaufruf meldete
+ * dort die Adresse des Besuchers, ohne Einwilligung, und ein Ausfall dort
+ * nahm Icons, Toasts und Schriften mit. Fassungen exakt wie vorher, gepflegt
+ * in apps/dashboard/package.json.
+ *
+ * **Der Guild-Bereich hatte bis zum 2026-09-04 gar keine Schrift.** Tabler
+ * bittet in `tabler.min.css` um "Inter Var"/Inter, liefert sie aber nicht mit.
+ * Seitdem die drei aus dem Entwurf: Bricolage Grotesque für Überschriften,
+ * Public Sans für Fließtext, JetBrains Mono für Zahlen und Kennungen. Die
+ * Schnitte stehen in `schriften-guild.css` und `schriften-frontend.css`;
+ * jede Rolle hat in `tokens.css` einen vollständigen Fallback-Stapel.
+ */
+const LOKAL = {
+    jquery:      '/vendor/jquery/jquery.min.js',
+    toastrJs:    '/vendor/toastr/toastr.min.js',
+    toastrCss:   '/vendor/toastr/toastr.min.css',
+    sortable:    '/vendor/sortablejs/Sortable.min.js',
+    fontawesome: '/vendor/fontawesome/css/all.min.css'
 };
 
 /** Aus node_modules ausgeliefert — siehe die Vendor-Route in app.js. */
@@ -63,7 +54,7 @@ class DefaultTheme {
         // **Das ist der Cache-Schluessel aller eigenen Dateien** (`?v=`), nicht
         // die Nummer in `theme.json`. Wer nur dort hochzaehlt, aendert die CSS
         // und der Browser zeigt weiter die alte — ohne Fehler, ohne Hinweis.
-        this.version = '2.2.0';
+        this.version = '2.2.1';
         this.description = 'Standard-Theme auf Tabler (Bootstrap 5). Loest AdminLTE ab.';
         this.author = 'firedervil';
         this.info = { darkMode: true, supportRTL: false, responsive: true };
@@ -85,13 +76,13 @@ class DefaultTheme {
         // ── Was Tabler (noch) nicht abdeckt ─────────────────────────────────
         // Font Awesome bleibt vorerst: die Icon-Namen stecken über alle Views
         // verteilt. Der Wechsel auf @tabler/icons ist ein eigener Schritt.
-        am.registerVendorStyle('fa-css', CDN.fontawesome, { version: '6.5.1' });
+        am.registerVendorStyle('fa-css', LOKAL.fontawesome, { version: '6.5.1' });
         // Vor `tokens`, damit die Familien stehen, bevor die Rollen sie nennen.
-        am.registerVendorStyle('fonts-guild', CDN.fontsGuild, { version: '' });
-        am.registerVendorStyle('toastr-css', CDN.toastrCss, { version: '2.1.4' });
-        am.registerVendorScript('jquery', CDN.jquery, { version: '3.7.1' });
-        am.registerVendorScript('toastr-js', CDN.toastrJs, { deps: ['jquery'], version: '2.1.4' });
-        am.registerVendorScript('sortable', CDN.sortable, { version: '1.15.6' });
+        am.registerStyle('fonts-guild', 'schriften-guild.css', { version: this.version });
+        am.registerVendorStyle('toastr-css', LOKAL.toastrCss, { version: '2.1.4' });
+        am.registerVendorScript('jquery', LOKAL.jquery, { version: '3.7.1' });
+        am.registerVendorScript('toastr-js', LOKAL.toastrJs, { deps: ['jquery'], version: '2.1.4' });
+        am.registerVendorScript('sortable', LOKAL.sortable, { version: '1.15.6' });
 
         // ── Eigene Dateien (über die Theme-Kette auflösbar) ──────────────────
         am.registerStyle('data-table-css', 'data-table.css', { version: this.version });
@@ -132,8 +123,8 @@ class DefaultTheme {
         // stuenden Startseite und Blog ohne ihre Bibliotheken da.
         am.registerVendorStyle('bootstrap-css', '/public/vendor/bootstrap/css/bootstrap.min.css', { version: '4.4.1' });
         am.registerVendorStyle('bootstrap-icons', '/public/vendor/bootstrap-icons/bootstrap-icons.min.css', { version: '1.13.1' });
-        am.registerVendorStyle('fontawesome', CDN.fontawesome, { version: '6.5.1' });
-        am.registerVendorStyle('fonts-frontend', CDN.fontsFrontend, { version: '' });
+        am.registerVendorStyle('fontawesome', LOKAL.fontawesome, { version: '6.5.1' });
+        am.registerStyle('fonts-frontend', 'schriften-frontend.css', { version: this.version });
         am.registerVendorStyle('aos-css', '/public/vendor/aos/aos.css', { version: '2.3.4' });
         am.registerVendorStyle('glightbox-css', '/public/vendor/glightbox/css/glightbox.min.css', { version: '3.2.0' });
         am.registerVendorStyle('swiper-css', '/public/vendor/swiper/swiper-bundle.min.css', { version: '11.0.5' });

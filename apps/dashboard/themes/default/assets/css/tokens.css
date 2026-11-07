@@ -68,7 +68,7 @@
        Drei Rollen, nicht drei Namen: Wer die Schrift wechselt, fasst hier an
        und nicht 40 Regeln. Jeder Stapel endet in Systemschriften — faellt die
        Schriftquelle aus, sieht die Seite wie vorher aus statt kaputt. */
-    --fb-font-display: "Bricolage Grotesque", "Trebuchet MS", "Segoe UI", sans-serif;
+    --fb-font-display: "Bricolage Grotesque Variable", "Bricolage Grotesque", "Trebuchet MS", "Segoe UI", sans-serif;
     --fb-font-ui:      "Public Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
     --fb-font-mono:    "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, "Liberation Mono", monospace;
 

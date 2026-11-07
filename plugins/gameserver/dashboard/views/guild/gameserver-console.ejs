@@ -142,9 +142,10 @@ const serverConfig = locals.serverConfig || {}; // Addon-Config (rconSupported, 
     </div>
 
 <!-- xterm.js CSS + JS -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
-<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+<%# Die Kopie des Plugins, dieselbe wie über den AssetManager — nicht mehr das CDN (K279, 2026-11-07) %>
+<link rel="stylesheet" href="/assets/plugins/gameserver/vendor/xterm/xterm.min.css">
+<script src="/assets/plugins/gameserver/vendor/xterm/xterm.min.js"></script>
+<script src="/assets/plugins/gameserver/vendor/xterm/xterm-addon-fit.min.js"></script>
 
 <script>
 (function() {

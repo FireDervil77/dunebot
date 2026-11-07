@@ -563,28 +563,24 @@ module.exports = class App {
             contentSecurityPolicy: {
                 directives: {
                     defaultSrc: ["'self'"],
+                    // Keine CDNs und kein Google Fonts mehr: Bibliotheken und
+                    // Schriften kommen seit 2026-11-07 vom eigenen Server
+                    // (/vendor, Kassensturz K279). Die Freigaben hier hätten
+                    // jedem eingeschleusten Verweis dorthin die Tür offen gelassen.
                     styleSrc: [
                         "'self'", 
-                        "'unsafe-inline'", 
-                        "https://fonts.googleapis.com", 
-                        "https://cdn.jsdelivr.net",
-                        "https://cdnjs.cloudflare.com" // Font Awesome
+                        "'unsafe-inline'"
                     ],
                     scriptSrc: [
                         "'self'",
                         "'unsafe-inline'",
                         "'unsafe-eval'",
-                        "https://cdn.jsdelivr.net",
-                        "https://cdnjs.cloudflare.com", // Font Awesome
                         "https://js.stripe.com", // Stripe SDK
                         "https://www.googletagmanager.com" // GTM-Loader (siehe frontend/consent.ejs)
                     ],
                     scriptSrcAttr: ["'unsafe-inline'"], // Inline Event Handler (onclick, onload, etc.)
                     fontSrc: [
                         "'self'", 
-                        "https://fonts.gstatic.com", 
-                        "https://cdn.jsdelivr.net",
-                        "https://cdnjs.cloudflare.com", // Font Awesome
                         "data:" // Font-Data-URLs
                     ],
                     imgSrc: ["'self'", "data:", "https:", "http:"],
@@ -592,8 +588,6 @@ module.exports = class App {
                         "'self'", 
                         "ws:", 
                         "wss:",
-                        "https://cdn.jsdelivr.net", // Source Maps für Chart.js, Toastr, etc.
-                        "https://cdnjs.cloudflare.com", // Source Maps für Font Awesome, etc.
                         "https://api.stripe.com", // Stripe API
                         "https://checkout.stripe.com", // Stripe Checkout
                         "https://www.googletagmanager.com", // GTM-Container nachladen
@@ -715,14 +709,35 @@ module.exports = class App {
         // im Repo zu liegen. Aktualisieren heißt dann `npm update`, nicht
         // "Dateien austauschen und hoffen".
         // Beispiel: /vendor/tabler/css/tabler.min.css
-        for (const [urlPfad, paketPfad] of Object.entries({
-            '/vendor/tabler': '@tabler/core/dist'
+        //
+        // Seit 2026-11-07 (Kassensturz K279) auch alles, was vorher von
+        // cdn.jsdelivr.net, cdnjs.cloudflare.com und fonts.googleapis.com kam:
+        // Jeder Seitenaufruf meldete dort die Adresse des Besuchers, ohne dass
+        // er eingewilligt hatte, und fiel ein CDN aus, fehlten Icons, Toasts
+        // oder die Konsole. Ausgeliefert wird je Paket nur der Ordner, den die
+        // Seiten brauchen. Fassungen: apps/dashboard/package.json, exakt.
+        for (const [urlPfad, [paket, ordner]] of Object.entries({
+            '/vendor/tabler':                ['@tabler/core', 'dist'],
+            '/vendor/jquery':                ['jquery', 'dist'],
+            '/vendor/toastr':                ['toastr', 'build'],
+            '/vendor/sortablejs':            ['sortablejs', ''],
+            '/vendor/fontawesome/css':       ['@fortawesome/fontawesome-free', 'css'],
+            '/vendor/fontawesome/webfonts':  ['@fortawesome/fontawesome-free', 'webfonts'],
+            '/vendor/cropperjs':             ['cropperjs', 'dist'],
+            '/vendor/schriften/roboto':      ['@fontsource/roboto', ''],
+            '/vendor/schriften/raleway':     ['@fontsource/raleway', ''],
+            '/vendor/schriften/poppins':     ['@fontsource/poppins', ''],
+            '/vendor/schriften/public-sans': ['@fontsource/public-sans', ''],
+            '/vendor/schriften/jetbrains-mono': ['@fontsource/jetbrains-mono', ''],
+            '/vendor/schriften/bricolage-grotesque': ['@fontsource-variable/bricolage-grotesque', '']
         })) {
             try {
-                const wurzel = path.dirname(require.resolve(`${paketPfad.split('/dist')[0]}/package.json`));
-                this.app.use(urlPfad, express.static(path.join(wurzel, 'dist')));
-            } catch {
-                // Paket nicht installiert — das Theme, das es braucht, meldet sich schon
+                const wurzel = path.dirname(require.resolve(`${paket}/package.json`));
+                this.app.use(urlPfad, express.static(path.join(wurzel, ordner)));
+            } catch (err) {
+                // Fehlt ein Paket, fehlen auf den Seiten Icons, Schriften oder
+                // Skripte — das soll im Log stehen, nicht erst im Browser auffallen.
+                ServiceManager.get("Logger").warn(`[Vendor] ${paket} nicht installiert, ${urlPfad} bleibt leer (npm install im Dashboard): ${err.code || err.message}`);
             }
         }
 

@@ -1,0 +1,25 @@
+/*
+ * Schriften des Guild-Bereichs und der Anmeldung — vom eigenen Server.
+ *
+ * Bis 2026-11-07 (Kassensturz K279) kamen sie von fonts.googleapis.com; jeder
+ * Seitenaufruf meldete Google dabei die Adresse des Besuchers. Jetzt aus
+ * npm-Paketen (@fontsource), ausgeliefert unter /vendor/schriften/ (app.js).
+ * Dieselben Schnitte wie vorher in der Google-Adresse:
+ *
+ *   Bricolage Grotesque  500, 700 mit optischer Größe  → variabel (opsz + wght)
+ *   Public Sans          400, 500, 600, 700, 400 kursiv
+ *   JetBrains Mono       400, 500, 700
+ *
+ * Die variable Bricolage heißt bei Fontsource „Bricolage Grotesque Variable";
+ * tokens.css nennt beide Namen. Jede Datei bringt alle Zeichensätze mit
+ * `unicode-range` — der Browser lädt nur, was die Seite braucht.
+ */
+@import url('/vendor/schriften/bricolage-grotesque/opsz.css');
+@import url('/vendor/schriften/public-sans/400.css');
+@import url('/vendor/schriften/public-sans/400-italic.css');
+@import url('/vendor/schriften/public-sans/500.css');
+@import url('/vendor/schriften/public-sans/600.css');
+@import url('/vendor/schriften/public-sans/700.css');
+@import url('/vendor/schriften/jetbrains-mono/400.css');
+@import url('/vendor/schriften/jetbrains-mono/500.css');
+@import url('/vendor/schriften/jetbrains-mono/700.css');
