@@ -774,6 +774,24 @@ class GameserverPlugin extends DashboardPlugin {
                     plan ? JSON.stringify(plan) : null, server_id]
             );
 
+            // Der Einstellungs-Nachweis reist mit `started` (Daemon,
+            // Baustelle 171): je Einstellung und Ziel, ob ihr Wert ankam. Nur
+            // die bekannten Felder, gekürzt — es ist Inhalt von der Maschine.
+            // Ohne `nachweis` (älterer Daemon, oder Daemon neu gestartet, als
+            // der Server schon lief) bleibt der vorige stehen.
+            if (art === 'started' && Array.isArray(payload?.nachweis)) {
+                const nachweis = payload.nachweis.slice(0, 500).map(n => ({
+                    key:     String(n?.key || '').slice(0, 100),
+                    ziel:    String(n?.ziel || '').slice(0, 20),
+                    wo:      n?.wo ? String(n.wo).slice(0, 200) : undefined,
+                    zustand: String(n?.zustand || '').slice(0, 30),
+                    hinweis: n?.hinweis ? String(n.hinweis).slice(0, 300) : undefined,
+                })).filter(n => n.key && n.zustand);
+                await dbService.query(
+                    'UPDATE gameservers SET einstellungs_nachweis = ?, einstellungs_nachweis_am = NOW() WHERE id = ?',
+                    [JSON.stringify(nachweis), server_id]);
+            }
+
             const [server] = await dbService.query(
                 'SELECT guild_id, name FROM gameservers WHERE id = ?', [server_id]);
             if (!server) return;

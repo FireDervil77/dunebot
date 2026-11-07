@@ -1935,6 +1935,9 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
                 gs.spielfassung_build,
                 gs.spielfassung_label,
                 gs.spielfassung_am,
+                -- Kam jede Einstellung beim letzten Start an (B171, Serverseite.baueEinstellungen).
+                gs.einstellungs_nachweis,
+                gs.einstellungs_nachweis_am,
                 am.name as game_name,
                 am.slug as game_slug,
                 am.icon_url as game_icon,

@@ -257,6 +257,13 @@
       </span>
     </div>
     <div style="padding:4px 20px 20px">
+      <%# B171 (2026-11-07): Der Nachweis gilt für die Werte, mit denen der
+          Server zuletzt gestartet wurde — nicht für eine Änderung seitdem. %>
+      <% if (u.einstellungen.nachweisAm) { %>
+        <div class="fb-muted" style="font-size:12px;padding:8px 0 0">
+          Ob jede Einstellung ankam, zeigt der letzte Start (<%= new Date(u.einstellungen.nachweisAm).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' }) %>). Eine Änderung danach gilt erst ab dem nächsten.
+        </div>
+      <% } %>
       <% if (u.einstellungen.ohnePaket) { %>
         <div class="fb-muted" style="padding:16px 0;font-size:13px">
           Dieser Server läuft noch über den alten Weg und hat kein Spielpaket.
@@ -296,7 +303,21 @@
                   <% if (u.hoehe === 'fachlich') { %>
                     <span class="fb-pille" style="background:#fff;border:1px solid var(--fb-border)"><%= e.schluessel %></span>
                   <% } %>
+                  <% if (e.nachweis) { %>
+                    <%# B171: kam der Wert beim letzten Start an? Je Ziel ein Satz im Tooltip. %>
+                    <span class="fb-pille" title="<%= e.nachweis.ziele.join('\n') %>"
+                          style="<%= e.nachweis.art === 'gut' ? 'background:#e7f6ec;color:#1e7a3c'
+                                   : e.nachweis.art === 'warn' ? 'background:#fdecec;color:#b42318'
+                                   : 'background:#f1f3f5;color:#5f6b7a' %>">
+                      <%= e.nachweis.art === 'gut' ? '✓' : e.nachweis.art === 'warn' ? '⚠' : '·' %> <%= e.nachweis.text %>
+                    </span>
+                  <% } %>
                 </div>
+                <% if (e.nachweis && e.nachweis.art === 'warn') { %>
+                  <div style="font-size:12px;margin-top:4px;color:var(--fb-danger, #b42318);text-wrap:pretty">
+                    <%= e.nachweis.ziele.join(' · ') %>
+                  </div>
+                <% } %>
               </div>
               <div>
                 <% if (!e.aenderbar) { %>

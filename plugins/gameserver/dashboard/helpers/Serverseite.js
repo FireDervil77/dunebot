@@ -542,12 +542,63 @@ function bedingungSatz(bed, paket) {
     return `„${name}" ${zustand}`;
 }
 
+/**
+ * Kam eine Einstellung beim letzten Start an? (Baustelle 171, F7, 2026-11-07)
+ *
+ * Der Daemon schickt bei `started` je Einstellung und Ziel ein Urteil —
+ * dieselbe Rechnung wie der Nachweis der Werkbank (werkbank_nachweis.go) —
+ * und der Handler legt es in `gameservers.einstellungs_nachweis`. Hier wird je
+ * Einstellung das schlechteste Urteil über ihre Ziele genommen: Kommt der Wert
+ * in der Datei an, aber nicht in der Startzeile, hat er nicht gewirkt.
+ *
+ * `rang` ordnet: angekommen < nur im laufenden Spiel prüfbar < keine Meldung
+ * < kam nicht an.
+ */
+const NACHWEIS = {
+    angekommen:       { rang: 0, art: 'gut',     text: 'kam beim letzten Start an' },
+    nicht_pruefbar:   { rang: 1, art: 'neutral', text: 'erst im laufenden Spiel prüfbar' },
+    keine_meldung:    { rang: 2, art: 'neutral', text: 'beim letzten Start keine Meldung' },
+    nicht_verdrahtet: { rang: 3, art: 'warn',    text: 'kam beim letzten Start nicht an' },
+    nicht_gefunden:   { rang: 3, art: 'warn',    text: 'die Datei kennt den Schlüssel nicht' },
+    fehlgeschlagen:   { rang: 4, art: 'warn',    text: 'Schreiben scheiterte beim letzten Start' },
+};
+
+/** Die gespeicherten Nachweise, je Schlüssel gebündelt — oder null. */
+function nachweiseJeSchluessel(server) {
+    let liste = server?.einstellungs_nachweis;
+    try { if (typeof liste === 'string') liste = JSON.parse(liste); } catch { liste = null; }
+    if (!Array.isArray(liste)) return null;
+    const je = new Map();
+    for (const n of liste) {
+        if (!n || !n.key || !NACHWEIS[n.zustand]) continue;
+        if (!je.has(n.key)) je.set(n.key, []);
+        je.get(n.key).push(n);
+    }
+    return je;
+}
+
+/** Das Urteil über alle Ziele einer Einstellung: das schlechteste, mit allen Hinweisen. */
+function nachweisFuer(ziele) {
+    if (!ziele || !ziele.length) return null;
+    const schlimmst = ziele.reduce((a, b) => (NACHWEIS[b.zustand].rang > NACHWEIS[a.zustand].rang ? b : a));
+    const n = NACHWEIS[schlimmst.zustand];
+    return {
+        zustand: schlimmst.zustand,
+        art:     n.art,
+        text:    n.text,
+        // Je Ziel ein Satz — für den Tooltip und die fachliche Höhe.
+        ziele:   ziele.map(z => `${z.ziel}${z.wo ? ' (' + z.wo + ')' : ''}: ${NACHWEIS[z.zustand].text}${z.hinweis ? ' — ' + z.hinweis : ''}`),
+    };
+}
+
 function baueEinstellungen(server, paket, hoehe) {
     const alle = Array.isArray(paket?.settings) ? paket.settings : [];
     // Dieselbe Form wie unten, auch ohne Einstellungen: Die Übersicht liest
     // `gruppen` — fehlte es, riss ein Paket ohne Einstellungen die ganze
     // Serverseite mit 500 (Hytale aus der Werkbank, Server 206, 2026-10-01).
-    if (alle.length === 0) return { sichtbar: [], gruppen: [], verborgen: 0, ohnePaket: !paket };
+    if (alle.length === 0) return { sichtbar: [], gruppen: [], verborgen: 0, ohnePaket: !paket, nachweisAm: null };
+
+    const nachweise = nachweiseJeSchluessel(server);
 
     const erlaubt = HOEHE[hoehe];
     let paketWerte = {};
@@ -634,6 +685,8 @@ function baueEinstellungen(server, paket, hoehe) {
             // geschrieben wird sie weiter.
             wirktNur:    e.applies_when && !Bedingung.trifftZu(e.applies_when, geltend)
                 ? wirktNurText(e.applies_when, paket) : null,
+            // B171: kam der Wert beim letzten Start an? null = kein Nachweis.
+            nachweis:    nachweise ? nachweisFuer(nachweise.get(e.key)) : null,
         });
     }
     // Nach Gruppen bündeln — in der Reihenfolge, in der sie im Paket stehen.
@@ -648,7 +701,9 @@ function baueEinstellungen(server, paket, hoehe) {
         g.eintraege.push(e);
     }
 
-    return { sichtbar, gruppen, verborgen, ohnePaket: false };
+    return { sichtbar, gruppen, verborgen, ohnePaket: false,
+        // Von welchem Start der Nachweis stammt — die Karte sagt es dazu.
+        nachweisAm: nachweise && server?.einstellungs_nachweis_am ? server.einstellungs_nachweis_am : null };
 }
 
 /** Die Befehlsliste des Pakets — samt dem, was nicht geht. */
@@ -1448,7 +1503,7 @@ function baueWelt(sicherungen) {
     return { letzte: liste[0].wann, text: liste[0].text, liste };
 }
 
-module.exports = { baueUebersicht, HOEHE, WIRKUNG, RISIKO, GRUPPE, BEFEHL_NAME, BEFEHL_QUELLE };
+module.exports = { baueUebersicht, HOEHE, WIRKUNG, RISIKO, GRUPPE, BEFEHL_NAME, BEFEHL_QUELLE, NACHWEIS };
 // Für den Wächter (check-spielfassung): die Zeile „Spiel" im Paket-Block.
 module.exports.bauePaketkarte = bauePaketkarte;
 
