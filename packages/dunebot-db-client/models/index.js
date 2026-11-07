@@ -8,7 +8,6 @@ const User = require("./User");
 const Configs = require("./Config");
 const News = require("./News");
 const Locale = require("./Locale");
-const State = require("./State");
 const NavItem = require("./NavItem");
 const Changelog = require("./Changelog");
 const Notifications = require("./Notifications");
@@ -24,7 +23,6 @@ module.exports = {
         Config: Configs(),
         News: News(),
         Locale: Locale(),
-        State: State(),
         NavItem: NavItem(),
         Changelog: Changelog(),
         Notifications: Notifications()

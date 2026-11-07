@@ -1,7 +1,7 @@
 'use strict';
 
-const crypto = require('crypto');
 const { ServiceManager } = require('dunebot-core');
+const Ruecksprung = require('./Ruecksprung');
 
 /**
  * Der Einladungslink — und der Weg zurueck.
@@ -18,7 +18,8 @@ const { ServiceManager } = require('dunebot-core');
  *                        Entwicklerportal bereits eingetragen, dort ist nichts
  *                        zu tun
  *   state                „einladung:<Zufallswert>", der Wert liegt in der
- *                        Sitzung
+ *                        Sitzung (`helpers/Ruecksprung.js`, seit 2026-11-07
+ *                        derselbe Weg wie Anmeldung und Verknüpfungen)
  *
  * **Der `state` ist die Sicherung.** Ohne ihn koennte jemand einen Rücksprung
  * mit fremder `guild_id` unterschieben und damit unsere Willkommensseite fuer
@@ -114,15 +115,9 @@ function baueEinladungsUrl(req, guildId) {
         // Aus welcher Guild der Vorgang losging, merken wir uns bewusst NICHT:
         // Bei einem gemeinsamen Kennzeichen waere der Wert bloss der der
         // letzten Schleifenrunde. Welche Guild es wurde, sagt allein Discord.
-        const vorhanden = req.session.einladung;
-        const frisch = vorhanden?.kennzeichen && (Date.now() - (vorhanden.zeit || 0) < FRIST_MS);
-        const kennzeichen = frisch ? vorhanden.kennzeichen : crypto.randomBytes(16).toString('hex');
-
-        req.session.einladung = { kennzeichen, zeit: Date.now() };
-
         parameter.set('response_type', 'code');
         parameter.set('redirect_uri', ruecksprung);
-        parameter.set('state', `${MARKIERUNG}:${kennzeichen}`);
+        parameter.set('state', Ruecksprung.beginne(req, MARKIERUNG, { fristMs: FRIST_MS, teilen: true }));
     }
 
     return `https://discord.com/api/oauth2/authorize?${parameter.toString()}`;
@@ -136,20 +131,13 @@ function baueEinladungsUrl(req, guildId) {
  *          `null`, wenn es sich um einen gewoehnlichen Anmelde-Callback handelt
  */
 function ruecksprungPruefen(req) {
-    const state = String(req?.query?.state || '');
-    if (!state.startsWith(`${MARKIERUNG}:`)) return null;
+    if (Ruecksprung.zweckVon(req?.query?.state) !== MARKIERUNG) return null;
 
-    const antwort = (gueltig, grund, guildId = null) => {
-        if (req?.session?.einladung) delete req.session.einladung;
-        return { istEinladung: true, gueltig, guildId, grund };
-    };
+    const antwort = (gueltig, grund, guildId = null) => ({ istEinladung: true, gueltig, guildId, grund });
 
-    const kennzeichen = state.slice(MARKIERUNG.length + 1);
-    const vorgang = req?.session?.einladung;
-
-    if (!vorgang?.kennzeichen) return antwort(false, 'kein_vorgang');
-    if (!gleich(vorgang.kennzeichen, kennzeichen)) return antwort(false, 'kennzeichen_falsch');
-    if (Date.now() - (vorgang.zeit || 0) > FRIST_MS) return antwort(false, 'abgelaufen');
+    // Verbraucht den Vorgang, gültig oder nicht — wie bisher.
+    const vorgang = Ruecksprung.pruefe(req, MARKIERUNG, req.query.state);
+    if (!vorgang.gueltig) return antwort(false, vorgang.grund);
 
     // Welche Guild es wurde, sagt **allein Discord**. Der Einladende darf im
     // Dialog einen anderen Server gewaehlt haben als den, aus dem er losgegangen
@@ -161,19 +149,6 @@ function ruecksprungPruefen(req) {
     if (req?.query?.error) return antwort(false, `abgebrochen:${req.query.error}`, guildId);
 
     return antwort(true, 'ok', guildId);
-}
-
-/**
- * Vergleicht zwei Zeichenketten in fester Zeit.
- * @param {string} a
- * @param {string} b
- * @returns {boolean}
- */
-function gleich(a, b) {
-    const linkes = Buffer.from(String(a));
-    const rechtes = Buffer.from(String(b));
-    if (linkes.length !== rechtes.length) return false;
-    return crypto.timingSafeEqual(linkes, rechtes);
 }
 
 /**

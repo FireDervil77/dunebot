@@ -22,12 +22,12 @@
  */
 
 const express = require('express');
-const crypto = require('crypto');
 const router = express.Router();
 const { ServiceManager } = require('dunebot-core');
 const { VerbindungsRegistry } = require('dunebot-sdk');
 const { CheckAuth } = require('../middlewares/auth.middleware');
 const Verbindungsspeicher = require('../helpers/Verbindungsspeicher');
+const Ruecksprung = require('../helpers/Ruecksprung');
 
 /**
  * Wie lange ein begonnener Vorgang gilt. Grosszuegig, weil das Anmelden bei
@@ -61,43 +61,10 @@ function rueckrufUrl(plattform) {
  * @param {string} wert Vorschlag aus der Anfrage
  * @returns {string|null} sicherer Pfad oder null
  */
-function sicheresZiel(wert) {
-    const z = String(wert || '');
-    if (!z.startsWith('/') || z.startsWith('//')) return null;
-    return z;
-}
+// Seit 2026-11-07 dieselbe Regel wie für die Anmeldung (Ruecksprung.eigenesZiel),
+// nicht eine zweite Fassung: Pfad mit genau einem `/`, kein `\`, nichts unter `/auth/`.
+const sicheresZiel = Ruecksprung.eigenesZiel;
 
-/**
- * Der `state` traegt die angefragte Zusage mit.
- *
- * **Warum nicht in der Datenbank:** `saveState` kennt genau zwei Felder,
- * Zufallswert und Rueckkehrziel. Das Ziel dafuer zu missbrauchen wuerde
- * `sicheresZiel` aushebeln - und ein drittes Feld waere eine Schema-Aenderung
- * fuer eine Zeichenkette.
- *
- * Der Zufallswert ist hexadezimal, ein Zusage-Name passt auf
- * `NAME_MUSTER` (klein, Ziffern, Bindestrich). Ein Punkt dazwischen ist
- * deshalb eindeutig, und der State bleibt als Ganzes das, was er war: ein
- * Wert, der einmal gilt.
- *
- * @param {string} state Roher State aus der Anfrage
- * @returns {{roh: string, zusage: string|null}} Zerlegung
- */
-function stateZerlegen(state) {
-    const wert = String(state || '');
-    const teile = wert.split('.');
-    const zusage = teile[1] || null;
-    const ziel = teile[2] || 'benutzer';
-
-    return {
-        roh: wert,
-        zusage: zusage && VerbindungsRegistry.NAME_MUSTER.test(zusage) ? zusage : null,
-        // **Wem die Zustimmung gehoert.** `benutzer` ist der Normalfall und die
-        // Vorgabe: Ein alter oder verstuemmelter `state` fuehrt nie versehentlich
-        // in den Betreiber-Zweig, der ganz andere Rechte hat.
-        ziel: ziel === 'anlage' ? 'anlage' : 'benutzer'
-    };
-}
 
 /**
  * Darf dieser Aufrufer im Namen der **Anlage** handeln?
@@ -128,7 +95,6 @@ async function istAdmin(req) {
 // =====================================================
 router.get('/:plattform/start', CheckAuth, async (req, res) => {
     const Logger = ServiceManager.get('Logger');
-    const dbService = ServiceManager.get('dbService');
 
     const name = String(req.params.plattform || '');
     const anbieter = VerbindungsRegistry.NAME_MUSTER.test(name)
@@ -148,9 +114,10 @@ router.get('/:plattform/start', CheckAuth, async (req, res) => {
     }
 
     try {
-        // Derselbe Mechanismus wie bei der Discord-Anmeldung: ein einmaliger
-        // Zufallswert, der Hin- und Rueckweg verbindet. Ohne ihn koennte ein
-        // Fremder einen Rueckruf unterschieben.
+        // Derselbe Mechanismus wie bei der Discord-Anmeldung (seit 2026-11-07
+        // wirklich, helpers/Ruecksprung.js): ein einmaliger Zufallswert in der
+        // Sitzung, der Hin- und Rückweg verbindet. Ohne ihn könnte ein Fremder
+        // einen Rückruf unterschieben.
         // **Eine Zusage wird beim Namen genannt, nie als Scope-Liste.** Kaeme
         // die Liste aus der Adresszeile, koennte jeder Link jede Berechtigung
         // erfragen — der Benutzer saehe einen Twitch-Dialog voller
@@ -220,14 +187,17 @@ router.get('/:plattform/start', CheckAuth, async (req, res) => {
             }
         }
 
-        // Der `state` traegt drei Dinge: Zufall, Zweck und Ziel. Ohne das Ziel
-        // muesste der Rueckruf raten, wem die Zustimmung gehoert — oder es
-        // braeuchte eine zweite Rueckrufadresse, die der Betreiber bei Twitch
-        // von Hand nachtragen muesste.
-        const state = crypto.randomBytes(16).toString('hex')
-            + (zusage ? `.${zusage}` : '')
-            + (fuerAnlage ? '.anlage' : '');
-        await dbService.saveState(state, zurueck);
+        // Der Vorgang liegt in der Sitzung (helpers/Ruecksprung.js, K034,
+        // 2026-11-07): Rückkehrziel, Zusage und ob die Anlage zustimmt. Ohne
+        // sie müsste der Rückruf raten, wem die Zustimmung gehört — oder es
+        // bräuchte eine zweite Rückrufadresse, die der Betreiber bei Twitch
+        // von Hand nachtragen müsste. Bis dahin standen Zusage und `.anlage`
+        // im `state` selbst und der Vorgang in der Tabelle `states`, an
+        // niemanden gebunden: Ein fremder Rückruf mit gültigem Wert hätte das
+        // Konto eines Fremden an den Angemeldeten gehängt.
+        const state = Ruecksprung.beginne(req, `verbindung.${name}`, {
+            daten: { ziel: zurueck, zusage, anlage: fuerAnlage }, fristMs: HOECHSTALTER_MS
+        });
 
         const ziel = await anbieter.autorisierUrl({
             state, rueckrufUrl: rueckrufUrl(name), scopes
@@ -257,29 +227,15 @@ router.get('/:plattform/rueckruf', CheckAuth, async (req, res) => {
     let zurueck = '/guild';
 
     try {
-        // 1. State pruefen und **verbrauchen**. Ein State, der zweimal gilt,
-        //    ist keiner.
-        const gespeichert = req.query.state ? await dbService.getState(String(req.query.state)) : null;
-        if (!gespeichert) {
-            Logger.warn(`[Verbindungen] ${name}: Rueckruf ohne gueltigen State`);
+        // 1. Vorgang prüfen und **verbrauchen** (Ruecksprung.pruefe): aus
+        //    DIESER Sitzung, für diese Plattform, höchstens HOECHSTALTER_MS
+        //    alt, einmal. Ein State, der zweimal gilt, ist keiner.
+        const vorgang = Ruecksprung.pruefe(req, `verbindung.${name}`, req.query.state);
+        if (!vorgang.gueltig) {
+            Logger.warn(`[Verbindungen] ${name}: Rueckruf verworfen (${vorgang.grund})`);
             return res.redirect('/guild?fehler=state');
         }
-
-        // **Ein State ohne Verfallsdatum gilt ewig.** `getState` prueft das
-        // Alter nicht — es gibt den Zeitpunkt nur zurueck. Ein Rueckruf, der
-        // Tage spaeter eintrifft, gehoert nicht mehr zu diesem Vorgang.
-        const alterMs = gespeichert.created_at
-            ? Date.now() - new Date(gespeichert.created_at).getTime() : 0;
-        if (alterMs > HOECHSTALTER_MS) {
-            await dbService.deleteState(String(req.query.state));
-            Logger.warn(`[Verbindungen] ${name}: State war ${Math.round(alterMs / 60000)} Minuten alt`);
-            return res.redirect('/guild?fehler=state');
-        }
-
-        zurueck = sicheresZiel(gespeichert.redirect_url) || '/guild';
-        // Verbrauchen, bevor irgendetwas anderes passiert: Ein State, der
-        // zweimal gilt, ist keiner.
-        await dbService.deleteState(String(req.query.state));
+        zurueck = sicheresZiel(vorgang.daten.ziel) || '/guild';
 
         // 2. Abbruch beim Anbieter ist kein Fehler, sondern eine Entscheidung.
         if (req.query.error) {
@@ -294,7 +250,12 @@ router.get('/:plattform/rueckruf', CheckAuth, async (req, res) => {
         //    dieselbe Identitaet PLUS die Schluessel. Zwei Aufrufe waeren hier
         //    nicht nur verschwenderisch, sondern unmoeglich — ein
         //    Autorisierungscode laesst sich genau einmal einloesen.
-        const { zusage, ziel } = stateZerlegen(req.query.state);
+        // Wem die Zustimmung gehört, sagt der Vorgang in der Sitzung — nie die
+        // Adresse. `benutzer` ist die Vorgabe: Nur ein Vorgang, der am Start
+        // ausdrücklich für die Anlage begann, führt in den Betreiber-Zweig.
+        const zusage = VerbindungsRegistry.NAME_MUSTER.test(String(vorgang.daten.zusage || ''))
+            ? vorgang.daten.zusage : null;
+        const ziel = vorgang.daten.anlage === true ? 'anlage' : 'benutzer';
         const mitZusage = Boolean(zusage) && typeof anbieter.tauschen === 'function';
 
         const wer = mitZusage
@@ -494,7 +455,4 @@ module.exports.rueckrufUrl = rueckrufUrl;
 // Sicherheitszusage, die nur als Regex geprueft wird, ist keine.
 module.exports.sicheresZiel = sicheresZiel;
 
-// Ebenfalls nach aussen: Die Zerlegung des States entscheidet, ob eine Zusage
-// gespeichert wird. Sie gehoert gepruefft, nicht angenommen.
-module.exports.stateZerlegen = stateZerlegen;
 module.exports.erbeteneScopes = erbeteneScopes;

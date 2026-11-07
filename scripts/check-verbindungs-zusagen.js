@@ -130,12 +130,20 @@ let speicherVorbereiten = async () => {};
     pruefe(VerbindungsRegistry.scopesVon('pruef', 'erfunden') === null,
         'ein erfundener Name liefert nichts');
 
-    pruefe(router.stateZerlegen('abc123.abo-rollen').zusage === 'abo-rollen',
-        'der State traegt die Zusage ueber den Rueckweg');
-    pruefe(router.stateZerlegen('abc123').zusage === null,
-        'ohne Zusage bleibt der State ein reiner Nachweis-Vorgang');
-    pruefe(router.stateZerlegen('abc123.Boese/Sache').zusage === null,
-        'ein Name, der ein Muster verletzt, wird verworfen');
+    // Seit 2026-11-07 (K034) trägt der Vorgang in der Sitzung die Zusage über
+    // den Rückweg, nicht mehr der `state` (bis dahin `abc123.abo-rollen`).
+    {
+        const Ruecksprung = require('../apps/dashboard/helpers/Ruecksprung');
+        const req = { session: {} };
+        const state = Ruecksprung.beginne(req, 'verbindung.pruef', { daten: { zusage: 'abo-rollen' }, fristMs: 60000 });
+        pruefe(!state.includes('abo-rollen'), 'die Zusage steht nicht in der Adresse');
+        const v = Ruecksprung.pruefe(req, 'verbindung.pruef', state);
+        pruefe(v.gueltig && v.daten.zusage === 'abo-rollen', 'der Vorgang trägt die Zusage über den Rückweg');
+        const quelle = require('./lib/quelltext').ohneKommentare(require('fs').readFileSync(
+            path.join(__dirname, '../apps/dashboard/routes/verbindungen.router.js'), 'utf8'));
+        pruefe(/const zusage = VerbindungsRegistry\.NAME_MUSTER\.test\(String\(vorgang\.daten\.zusage \|\| ''\)\)\s*\? vorgang\.daten\.zusage : null;/.test(quelle),
+            'ein Name, der das Muster verletzt, wird auch aus dem Vorgang verworfen');
+    }
 
     // ---------------------------------------------------------------
     console.log('\nEine angemeldete Zusage muss erreichbar sein');

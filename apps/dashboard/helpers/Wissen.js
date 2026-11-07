@@ -167,19 +167,6 @@ function istAngemeldet(req) {
     return Boolean(req?.session?.user?.info?.id);
 }
 
-/**
- * Wohin es nach dem Login geht, wenn jemand von einem Artikel mit Schloss kam.
- *
- * Nur Adressen unter `/kb` — der Login führt sonst fest zur Serverauswahl, und
- * eine frei wählbare Rückkehradresse wäre eine offene Weiterleitung.
- *
- * @returns {string|null}
- */
-function rueckkehrZiel(adresse) {
-    const a = String(adresse || '');
-    return /^\/kb(\/[a-z0-9-]+){0,2}\/?$/.test(a) ? a : null;
-}
-
 // ────────────────────────────────────────────────────────────────────────────
 // Die alten Adressen unter /docs
 // ────────────────────────────────────────────────────────────────────────────
@@ -559,7 +546,7 @@ async function artikelEntfernen(id) {
 module.exports = {
     SPRACHEN, STAENDE, START, Eingabefehler,
     sprache, text, kuerzelAus, rendere,
-    sichtbarkeit, istAngemeldet, rueckkehrZiel, neueAdresse,
+    sichtbarkeit, istAngemeldet, neueAdresse,
     bereiche, bereich, artikelImBereich, artikel, suche,
     allesFuerVerwaltung, bereichRoh, artikelRoh,
     bereichSpeichern, bereichEntfernen, artikelSpeichern, artikelEntfernen,

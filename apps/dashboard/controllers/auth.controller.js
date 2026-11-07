@@ -4,6 +4,10 @@ require("dotenv").config();
 
 const { ServiceManager } = require("dunebot-core");
 const { baueEinladungsUrl, ruecksprungPruefen, warteAufGuild } = require("../helpers/Einladung");
+const Ruecksprung = require("../helpers/Ruecksprung");
+
+/** Wie lange zwischen Anmeldeseite und Rücksprung von Discord vergehen darf. */
+const ANMELDUNG_FRIST_MS = 15 * 60 * 1000;
 
 // Discord OAuth2 Konfiguration
 const CLIENT_ID = process.env.CLIENT_ID;
@@ -21,13 +25,19 @@ exports.login = async (req, res) => {
     try {
         // Wenn der Benutzer nicht angemeldet ist, zeige die Login-Seite
         if (!req.session.user?.info?.id || !req.session.user?.guilds) {
-            // Redirect-URL für nach der Anmeldung
-            const redirectURL = req.query.redirect || "/auth/server-selector";
-            req.session.redirectURL = redirectURL;
-            
+            // Wohin es nach der Anmeldung geht, und der `state` dafür — beides
+            // in der Sitzung (helpers/Ruecksprung.js, K034, 2026-11-07). Bis
+            // dahin schickte die Anmeldung keinen `state`, und der Rücksprung
+            // nahm jeden Code an (Login-CSRF). Das Ziel galt nur unter `/kb`;
+            // seitdem jede eigene Seite außer `/auth/`.
+            const redirectURL = Ruecksprung.eigenesZiel(req.query.redirect) || "/auth/server-selector";
+            const state = Ruecksprung.beginne(req, 'anmeldung', {
+                daten: { ziel: redirectURL }, fristMs: ANMELDUNG_FRIST_MS, teilen: true
+            });
+
             // Discord OAuth URL
             const scope = "identify email guilds";
-            const discordAuthURL = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=${encodeURIComponent(scope)}`;
+            const discordAuthURL = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=${encodeURIComponent(scope)}&state=${encodeURIComponent(state)}`;
             
             // Direkt zur Discord-Auth weiterleiten oder Login-Seite anzeigen
             if (req.query.direct === "true") {
@@ -45,9 +55,7 @@ exports.login = async (req, res) => {
             // auf die eigene Seite. Bis zum 2026-10-11 ging `redirect` ungeprüft
             // in die Weiterleitung: `/auth/login?redirect=https://fremd…` führte
             // einen Angemeldeten von unserer Adresse aus auf eine fremde.
-            const ziel = typeof req.query.redirect === 'string' && /^\/(?![\/\\])/.test(req.query.redirect)
-                ? req.query.redirect : null;
-            res.redirect(ziel || "/auth/server-selector");
+            res.redirect(Ruecksprung.eigenesZiel(req.query.redirect) || "/auth/server-selector");
         }
     } catch (error) {
         Logger.error("Fehler beim Anzeigen der Login-Seite:", error);
@@ -96,6 +104,15 @@ exports.callback = async (req, res) => {
             }
 
             return res.redirect(`/guild/${einladung.guildId}/willkommen`);
+        }
+
+        // Der Rücksprung muss zu einer Anmeldung gehören, die in DIESER
+        // Sitzung begann (K034). Sonst könnte ein Fremder seinen eigenen Code
+        // unterschieben und den Besucher in sein Konto einloggen.
+        const anmeldung = Ruecksprung.pruefe(req, 'anmeldung', req.query.state);
+        if (!anmeldung.gueltig) {
+            Logger.warn(`[Anmeldung] Rücksprung verworfen (${anmeldung.grund})`);
+            return res.redirect("/auth/login?error=state");
         }
 
         if (!req.query.code) {
@@ -248,9 +265,7 @@ exports.callback = async (req, res) => {
         // Der Artikel braucht keine Guild. `rueckkehrZiel` lässt nur Adressen
         // unter /kb durch — alles andere wäre eine offene Weiterleitung. Die
         // gemerkte Adresse (`login` oben) wurde bis dahin nie benutzt.
-        const kbZiel = require('../helpers/Wissen').rueckkehrZiel(req.session.redirectURL);
-        delete req.session.redirectURL;
-        const redirectURL = kbZiel || "/auth/server-selector";
+        const redirectURL = Ruecksprung.eigenesZiel(anmeldung.daten.ziel) || "/auth/server-selector";
         Logger.debug("Redirect nach Login:", redirectURL);
         
         // Daten in Session speichern

@@ -144,13 +144,15 @@ function anfrage({ sitzung = {}, abfrage = {} } = {}) {
 }
 
 const GUILD = '123456789012345678';
-const vorgang = (ueber = {}) => ({ kennzeichen: 'abc123', zeit: Date.now(), ...ueber });
+const vorgang = (ueber = {}) => ({ kennzeichen: 'abc123', zeit: Date.now(), fristMs: einladung.FRIST_MS, daten: {}, ...ueber });
+// Seit 2026-11-07 liegt der Vorgang unter `ruecksprung` (helpers/Ruecksprung.js, K034).
+const mit = (v) => ({ ruecksprung: { einladung: v } });
 
 pruefe('gewoehnlicher Anmelde-Callback geht uns nichts an',
     einladung.ruecksprungPruefen(anfrage({ abfrage: { code: 'x' } })), null);
 
 const gut = einladung.ruecksprungPruefen(anfrage({
-    sitzung: { einladung: vorgang() },
+    sitzung: mit(vorgang()),
     abfrage: { state: 'einladung:abc123', guild_id: GUILD, code: 'x' },
 }));
 pruefe('gueltiger Ruecksprung', { gueltig: gut.gueltig, guildId: gut.guildId }, { gueltig: true, guildId: GUILD });
@@ -166,32 +168,32 @@ falsch('untergeschobener Ruecksprung ohne Vorgang in der Sitzung', anfrage({
     abfrage: { state: 'einladung:abc123', guild_id: GUILD },
 }));
 falsch('falsches Kennzeichen', anfrage({
-    sitzung: { einladung: vorgang() },
+    sitzung: mit(vorgang()),
     abfrage: { state: 'einladung:FALSCH', guild_id: GUILD },
 }));
 falsch('abgelaufen', anfrage({
-    sitzung: { einladung: vorgang({ zeit: Date.now() - einladung.FRIST_MS - 1 }) },
+    sitzung: mit(vorgang({ zeit: Date.now() - einladung.FRIST_MS - 1 })),
     abfrage: { state: 'einladung:abc123', guild_id: GUILD },
 }));
 falsch('keine brauchbare Guild-Kennung', anfrage({
-    sitzung: { einladung: vorgang() },
+    sitzung: mit(vorgang()),
     abfrage: { state: 'einladung:abc123', guild_id: 'keine-zahl' },
 }));
 falsch('Discord schickt gar keine Guild mit', anfrage({
-    sitzung: { einladung: vorgang() },
+    sitzung: mit(vorgang()),
     abfrage: { state: 'einladung:abc123' },
 }));
 falsch('Benutzer hat abgebrochen', anfrage({
-    sitzung: { einladung: vorgang() },
+    sitzung: mit(vorgang()),
     abfrage: { state: 'einladung:abc123', guild_id: GUILD, error: 'access_denied' },
 }));
 
-const sitzung = { einladung: vorgang() };
+const sitzung = mit(vorgang());
 einladung.ruecksprungPruefen(anfrage({ sitzung, abfrage: { state: 'einladung:abc123', guild_id: GUILD } }));
-pruefeWahr('der Vorgang gilt nur einmal — danach ist er aus der Sitzung raus', !sitzung.einladung);
+pruefeWahr('der Vorgang gilt nur einmal — danach ist er aus der Sitzung raus', !sitzung.ruecksprung.einladung);
 
 pruefe('die Guild kommt von Discord, nicht aus der Sitzung', einladung.ruecksprungPruefen(anfrage({
-    sitzung: { einladung: vorgang() },
+    sitzung: mit(vorgang()),
     abfrage: { state: 'einladung:abc123', guild_id: GUILD },
 })).guildId, GUILD);
 
@@ -214,7 +216,7 @@ console.log('\n   Ein Kennzeichen je Sitzung, nicht je Link');
         `${ersterLink} / ${zweiterLink} / ${dritterLink}`);
     pruefeWahr('und der erste Link wird danach noch angenommen',
         einladung.ruecksprungPruefen({
-            session: { einladung: { ...sitzung.einladung } },
+            session: mit({ ...sitzung.ruecksprung.einladung }),
             query: { state: ersterLink, guild_id: GUILD },
         }).gueltig === true);
 
@@ -234,7 +236,7 @@ console.log('\n   Ein Kennzeichen je Sitzung, nicht je Link');
     pruefe('… und den Ruecksprung', offen.searchParams.get('redirect_uri'), 'https://beispiel.de/auth/callback');
     pruefeWahr('der Ruecksprung von dort wird angenommen, mit der Guild, die Discord nennt',
         einladung.ruecksprungPruefen({
-            session: { einladung: { ...offenSitzung.einladung } },
+            session: mit({ ...offenSitzung.ruecksprung.einladung }),
             query: { state: offen.searchParams.get('state'), guild_id: GUILD },
         }).guildId === GUILD);
     {

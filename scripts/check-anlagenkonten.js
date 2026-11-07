@@ -141,20 +141,29 @@ console.log('\nDer Betreiber erreicht sie — der ganze Weg');
 
 console.log('\nDer Anlagen-Zweig ist nicht erschleichbar');
 {
-    const { stateZerlegen } = require('../apps/dashboard/routes/verbindungen.router');
-
-    pruefe(stateZerlegen('abc.chatbot.anlage').ziel === 'anlage',
-        'der gewollte Fall wird erkannt');
-    pruefe(stateZerlegen('abc.chatbot').ziel === 'benutzer',
-        'ohne Angabe gilt "benutzer"');
-    pruefe(stateZerlegen('abc').ziel === 'benutzer',
-        'ein alter `state` ohne Punkte ebenso');
-    pruefe(stateZerlegen('abc.chatbot.Anlage').ziel === 'benutzer',
-        'Grossschreibung zaehlt nicht als Treffer');
-    pruefe(stateZerlegen('abc.chatbot.betreiber').ziel === 'benutzer',
-        'und ein erfundenes Ziel faellt auf "benutzer" zurueck',
+    // Seit 2026-11-07 (K034) trägt der `state` nur Zweck und Zufall. Ob die
+    // Anlage zustimmt, steht im Vorgang der Sitzung, den der Start anlegt —
+    // die Adresse kann es nicht mehr behaupten. Bis dahin hing `.anlage` am
+    // `state`, und stateZerlegen las es heraus.
+    const Ruecksprung = require('../apps/dashboard/helpers/Ruecksprung');
+    const { ohneKommentare } = require('./lib/quelltext');
+    const quelle = ohneKommentare(fs.readFileSync(path.join(__dirname, '../apps/dashboard/routes/verbindungen.router.js'), 'utf8'));
+    pruefe(/const ziel = vorgang\.daten\.anlage === true \? 'anlage' : 'benutzer';/.test(quelle),
+        'der Rückruf nimmt das Ziel aus dem Vorgang, nur `true` heißt Anlage',
         'im Zweifel der Zweig mit den wenigeren Rechten');
-    pruefe(stateZerlegen(null).ziel === 'benutzer', 'auch ohne `state`');
+    pruefe(/Ruecksprung\.beginne\(req, `verbindung\.\$\{name\}`, \{\s*daten: \{ ziel: zurueck, zusage, anlage: fuerAnlage \}/.test(quelle),
+        'der Start legt es dort ab');
+    pruefe(!/stateZerlegen|req\.query\.state[^)]*\.split/.test(quelle), 'der `state` wird nicht mehr zerlegt');
+
+    const sitzung = { session: {} };
+    const state = Ruecksprung.beginne(sitzung, 'verbindung.twitch', { daten: { anlage: true }, fristMs: 60000 });
+    pruefe(!state.includes('anlage'), 'die Anlage steht nicht in der Adresse');
+    pruefe(Ruecksprung.pruefe({ session: {} }, 'verbindung.twitch', state).gueltig === false,
+        'ein `state` aus einer anderen Sitzung öffnet nichts, auch nicht die Anlage');
+    pruefe(Ruecksprung.pruefe(sitzung, 'verbindung.twitch', `${state}.anlage`).gueltig === false,
+        'ein angehängtes `.anlage` macht den `state` ungültig');
+    pruefe(Ruecksprung.pruefe(sitzung, 'verbindung.twitch', state).gueltig === false,
+        'und nach dem Fehlversuch ist der Vorgang verbraucht');
 
     // **Beide Routen einzeln, nicht gezaehlt.** Die erste Fassung dieser Regel
     // zaehlte `istAdmin(req)` im ganzen Quelltext und verlangte mindestens

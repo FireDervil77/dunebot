@@ -173,10 +173,13 @@ function uebersetzer(locale) {
         for (const p of ['', 'faq.md', 'gameserver/ressourcen.md', 'plugins/', 'index.md', 'bot/slash-commands']) {
             assert.strictEqual(migration.neueAdresse(p), Wissen.neueAdresse(p), p);
         }
-        const r = Wissen.rueckkehrZiel;
+        // Die Rückkehr nach dem Login: seit 2026-11-07 (K034) jede eigene Seite
+        // außer /auth/, nicht mehr nur /kb — das Ziel liegt in der Sitzung,
+        // nicht in der Adresse des Rücksprungs. Fremde Ziele bleiben draußen.
+        const r = require('../apps/dashboard/helpers/Ruecksprung').eigenesZiel;
         assert.deepStrictEqual(['/kb', '/kb/gameserver', '/kb/gameserver/ressourcen', '/kb/a/b/'].map(r), ['/kb', '/kb/gameserver', '/kb/gameserver/ressourcen', '/kb/a/b/']);
-        assert.deepStrictEqual(['https://fremd.de', '//fremd.de', '/kb/../admin', '/admin', '/kb/a/b/c', '/kb?x=//fremd.de', '/kbx', undefined, '/auth/server-selector'].map(r),
-            [null, null, null, null, null, null, null, null, null]);
+        assert.deepStrictEqual(['https://fremd.de', '//fremd.de', '/\\fremd.de', 'kb', undefined, '/auth/server-selector', '/auth/logout'].map(r),
+            [null, null, null, null, null, null, null]);
     });
 
     await pruefe('Sprache: gewünschte Fassung, sonst deutsch; Kürzel aus Titeln', () => {
@@ -658,7 +661,7 @@ function uebersetzer(locale) {
         const an = await hole('/kb/pruef-bereich/geheimer-trick', AN);
         assert.ok(an.text.includes('GEHEIMTEXT') && !an.text.includes('class="kb-schloss"'));
         // Die Adresse, die der Knopf mitgibt, lässt der Login auch wieder zu.
-        assert.strictEqual(Wissen.rueckkehrZiel('/kb/pruef-bereich/geheimer-trick'), '/kb/pruef-bereich/geheimer-trick');
+        assert.strictEqual(require('../apps/dashboard/helpers/Ruecksprung').eigenesZiel('/kb/pruef-bereich/geheimer-trick'), '/kb/pruef-bereich/geheimer-trick');
     });
 
     await pruefe('Entwurf: außen nicht da — auch nicht für Angemeldete, nicht in Liste und Suche', async () => {
@@ -778,7 +781,7 @@ function uebersetzer(locale) {
         assert.match(leiste, /url: '\/admin\/kb',\s+titel: 'Wissensdatenbank'/);
         assert.ok(!leiste.includes('/admin/docs'));
         const anmeldung = ohneKommentare(lies('apps/dashboard/controllers/auth.controller.js'));
-        assert.match(anmeldung, /rueckkehrZiel\(req\.session\.redirectURL\)/);
+        assert.match(anmeldung, /Ruecksprung\.eigenesZiel\(anmeldung\.daten\.ziel\)/);
         // Die Ansicht gibt genau EINE Sache unescapt aus: den gerenderten Inhalt.
         const ansicht = ohneKommentareEjs(lies('apps/dashboard/themes/default/views/frontend/kb.ejs'));
         assert.deepStrictEqual([...new Set((ansicht.match(/<%-\s*[^%]+%>/g) || []).map(x => x.replace(/\s+/g, ' ')))], ['<%- inhaltHtml %>']);

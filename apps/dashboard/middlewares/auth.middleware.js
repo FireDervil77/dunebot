@@ -1,4 +1,3 @@
-const crypto = require("crypto");
 const { ServiceManager } = require("dunebot-core");
 const { baueEinladungsUrl } = require("../helpers/Einladung");
 
@@ -9,18 +8,12 @@ const { baueEinladungsUrl } = require("../helpers/Einladung");
  * @param {import('express').NextFunction} next
  */
 module.exports.CheckAuth = async (req, res, next) => {
-    // aus dem ServiceManager bereit stellen
-    const dbService = ServiceManager.get('dbService');
-
-      if (!req.session.user?.info?.id) {
-        const redirectURL = req.originalUrl;
-        const state = crypto.randomBytes(16).toString("hex");
-        try {
-            await dbService.saveState(state, redirectURL);
-            return res.redirect(`/auth/login?state=${state}`);
-        } catch (err) {
-            return res.status(500).send("Internal Server Error");
-        }
+    // Ohne Anmeldung zum Login, das Ziel geht mit. Den `state` legt erst der
+    // Login an, in der Sitzung (helpers/Ruecksprung.js). Bis 2026-11-07 stand
+    // hier eine Zeile in `states` je Aufruf ohne Anmeldung, die niemand las —
+    // der Login wertete `?state=` nie aus, und das Ziel ging verloren (K034).
+    if (!req.session.user?.info?.id) {
+        return res.redirect(`/auth/login?redirect=${encodeURIComponent(req.originalUrl)}`);
     }
     // User für alle Routen verfügbar machen (admin + guild)
     res.locals.user = req.session.user?.info || null;
