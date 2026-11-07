@@ -90,6 +90,26 @@ async function aboRollenGewuenscht(streamerId) {
 }
 
 /**
+ * Braucht dieser Kanal die Abo-Ereignisse — und darf er sie haben?
+ *
+ * **Gewuenscht reicht nicht** (K129, Baustelle 99, 2026-11-07). Die
+ * Abo-Ereignisse leben von der Zusage des Kanalinhabers. Loest er seine
+ * Verknuepfung, bleibt die Erlaubnis bei Twitch bestehen, bis er sie dort
+ * selbst entzieht — ein Bestellen ginge also durch, und die Abonnentenliste
+ * fuellte sich wieder, unter einer Verknuepfung, die es nicht mehr gibt.
+ * Deshalb gilt: ohne Inhaber keine Abo-Ereignisse, egal wer die Rolle will.
+ *
+ * @param {number} streamerId Streamer
+ * @param {string} plattform Plattform
+ * @param {string} kanalId Kanal bei der Plattform
+ * @returns {Promise<boolean>} true, wenn bestellt bleiben bzw. werden soll
+ */
+async function aboEreignisseGebraucht(streamerId, plattform, kanalId) {
+    if (!(await aboRollenGewuenscht(streamerId))) return false;
+    return Boolean(await require('./abonnenten').kanalInhaber({ plattform, kanal_id: kanalId }));
+}
+
+/**
  * @returns {Object} Datenbankdienst
  */
 function db() {
@@ -183,7 +203,7 @@ async function abosSichern(streamerId, plattform, kanalId) {
 
     // Die Abo-Ereignisse kommen nur dazu, wenn eine Guild sie braucht.
     const gewuenscht = [...ereignisseVon(plattform)];
-    if (await aboRollenGewuenscht(streamerId)) gewuenscht.push(...aboEreignisseVon(plattform));
+    if (await aboEreignisseGebraucht(streamerId, plattform, kanalId)) gewuenscht.push(...aboEreignisseVon(plattform));
 
     // Und die Melder (12c) nur, wenn eine Guild sie will UND der Kanalinhaber
     // die noetige Zusage erteilt hat. Ein Ereignis ohne Zusage zu bestellen
@@ -306,9 +326,12 @@ async function melderEreignisseFuer(streamerId, plattform, kanalId) {
 async function aboEreignisseAufraeumen(streamerId) {
     const Logger = ServiceManager.get('Logger');
 
-    // Solange EINE Guild die Rolle vergibt, bleiben die Abos. Referenzzaehlung
-    // wie ueberall sonst.
-    if (await aboRollenGewuenscht(streamerId)) return { abbestellt: 0, behalten: true };
+    // Solange EINE Guild die Rolle vergibt UND der Kanalinhaber verknuepft
+    // ist, bleiben die Abos. Referenzzaehlung wie ueberall sonst.
+    const kanal = (await db().query('SELECT plattform, kanal_id FROM streaming_streamers WHERE id = ?', [streamerId]))[0];
+    if (kanal && await aboEreignisseGebraucht(streamerId, kanal.plattform, kanal.kanal_id)) {
+        return { abbestellt: 0, behalten: true };
+    }
 
     const zeilen = await db().query(
         'SELECT s.plattform, s.kanal_id, a.id, a.ereignis, a.anbieter_abo_id FROM streaming_subscriptions a ' +
@@ -392,7 +415,7 @@ async function melderEreignisseAufraeumen(streamerId) {
     // Was gebraucht wird: die Pflichtereignisse, die Abo-Ereignisse (falls
     // eine Rolle vergeben wird) und die noch gewuenschten Melder.
     const gebraucht = new Set(ereignisseVon(plattform).map(b => b.typ));
-    if (await aboRollenGewuenscht(streamerId)) {
+    if (await aboEreignisseGebraucht(streamerId, plattform, zeilen[0].kanal_id)) {
         for (const b of aboEreignisseVon(plattform)) gebraucht.add(b.typ);
     }
     for (const b of await melderEreignisseFuer(streamerId, plattform, zeilen[0].kanal_id)) {
@@ -465,7 +488,7 @@ async function abosAufraeumen(streamerId) {
 }
 
 module.exports = {
-    aboEreignisseVon, aboRollenGewuenscht, aboEreignisseAufraeumen,
+    aboEreignisseVon, aboRollenGewuenscht, aboEreignisseGebraucht, aboEreignisseAufraeumen,
     ADAPTER,
     ereignisseVon,
     rueckrufAdresse,

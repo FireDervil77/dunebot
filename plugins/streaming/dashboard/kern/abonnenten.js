@@ -231,6 +231,14 @@ async function auftragSchreiben(streamerId, mitgliedId, richtung) {
 async function aufnehmen(streamer, person) {
     if (!person?.kontoId) return 'Ereignis ohne Konto';
 
+    // **Ohne Inhaber keine Abonnentenliste** (K129, Baustelle 99). Die Liste
+    // entsteht unter der Zusage des Kanalinhabers; hat er seine Verknuepfung
+    // geloest, wird sie geloescht und die Abo-Ereignisse abbestellt. Ein
+    // Ereignis, das in dieser Luecke noch ankommt, legt sie nicht neu an.
+    if (!(await kanalInhaber(streamer))) {
+        return `${person.kontoName || person.kontoId} abonniert - Kanal nicht verknuepft, nichts vermerkt`;
+    }
+
     await db().query(`
         INSERT INTO streaming_subscribers (streamer_id, konto_id, konto_name, stufe, geschenkt, gesehen_am)
         VALUES (?, ?, ?, ?, ?, NOW())

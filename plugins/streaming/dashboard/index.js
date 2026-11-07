@@ -91,6 +91,7 @@ class StreamingDashboardPlugin extends DashboardPlugin {
             // entschieden am 2026-08-26). Der Kern kennt Twitch nicht — er
             // bekommt hier zwei Funktionen und sonst nichts.
             const twitch = require('./plattformen/twitch');
+            const loesen = require('./kern/loesen');
             VerbindungsRegistry.register('twitch', {
                 label: 'Twitch',
                 symbol: 'fa-brands fa-twitch',
@@ -265,6 +266,15 @@ class StreamingDashboardPlugin extends DashboardPlugin {
                     // Serverleitung selbst zum Heim eines fremden Kanals
                     // erklaeren - und im Chat dieses Kanals reden.
                     wahl: meinkanal.wahl
+                },
+
+                // **Was beim Loesen wegfaellt** (K129, Baustelle 99). Der Kern
+                // fragt vorher, was er am Knopf nennen soll, und ruft danach
+                // das Aufraeumen. Was er nicht erreicht, holt der Tageslauf
+                // nach (`kern/loesen.js`).
+                loesen: {
+                    wasWegfaellt: (ctx) => loesen.wasWegfaellt('twitch', ctx),
+                    aufraeumen: (ctx) => loesen.nachDemLoesen('twitch', ctx)
                 }
             });
             Logger.info('[Streaming] Kontoverknuepfung angemeldet: twitch');

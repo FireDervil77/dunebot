@@ -193,6 +193,16 @@ const drossel    = require('../plugins/streaming/dashboard/ausgabe/drossel');
     // aber fremd - dort vergibt die Zusage des Inhabers nichts (Baustelle 125).
     daten.heim = { 7: 'G1' };
 
+    // K129: Ohne verknuepften Kanalinhaber wird gar nichts vermerkt — die
+    // Liste entsteht unter seiner Zusage, und beim Loesen geht sie mit.
+    const INHABER = { plattform: 'twitch', konto_id: '42', user_id: 'DINHABER' };
+    daten.verknuepfungen = [];
+    daten.auftraege = [];
+    const ungeloest = await abonnenten.aufnehmen(streamer, { kontoId: '333', kontoName: 'Spaet' });
+    pruefe(!daten.abonnenten.some(a => a.konto_id === '333') && daten.auftraege.length === 0,
+        'ohne verknuepften Kanalinhaber wird kein Abonnent vermerkt', ungeloest);
+    daten.verknuepfungen = [INHABER];
+
     // Ohne Verknuepfung: vermerkt, aber keine Rolle.
     daten.auftraege = [];
     const ohne = await abonnenten.aufnehmen(streamer, { kontoId: '111', kontoName: 'Ohne' });
@@ -203,7 +213,7 @@ const drossel    = require('../plugins/streaming/dashboard/ausgabe/drossel');
         'er bekommt die Rolle, sobald er sich verknuepft');
 
     // Mit Verknuepfung: je Ziel mit Rolle ein Auftrag.
-    daten.verknuepfungen = [{ plattform: 'twitch', konto_id: '111', user_id: 'D111' }];
+    daten.verknuepfungen = [INHABER, { plattform: 'twitch', konto_id: '111', user_id: 'D111' }];
     daten.auftraege = [];
     await abonnenten.aufnehmen(streamer, { kontoId: '111', kontoName: 'Mit' });
 
@@ -273,6 +283,7 @@ const drossel    = require('../plugins/streaming/dashboard/ausgabe/drossel');
 
     daten.abonnenten = [{ streamer_id: 7, konto_id: '111' }, { streamer_id: 7, konto_id: '222' }];
     daten.verknuepfungen = [
+        INHABER,
         { plattform: 'twitch', konto_id: '111', user_id: 'D111' }
         // 222 ist NICHT verknuepft
     ];

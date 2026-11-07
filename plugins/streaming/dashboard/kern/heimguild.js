@@ -306,4 +306,4 @@ async function istHeim(guildId) {
     return zeilen.length > 0;
 }
 
-module.exports = { streamerZuKonto, moeglicheGuilds, setzen, kanaeleDerGuild, istHeim };
+module.exports = { streamerZuKonto, moeglicheGuilds, setzen, kanaeleDerGuild, istHeim, navigationAuffrischen, chatAbosAnstossen };

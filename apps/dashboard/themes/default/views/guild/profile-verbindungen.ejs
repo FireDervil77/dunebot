@@ -10,6 +10,8 @@
  * @context {Array}   rueckrufe  - nur fuer Betreiber: { label, url }
  * @context {Object?} anbieter[].einstellungen - { titel, hinweis, zeilen[], wahl }
  * @context {Object?} …wahl - { name, label, hinweis, leerText, optionen[], grund }
+ * @context {Object?} anbieter[].loesen - { weg[], bleibt[], grund } — was beim Loesen wegfaellt (K129)
+ * @context {string?} anbieter[].loesenName - was zum Loesen eingetippt werden muss
  * @context {string?} meldung
  * @context {string?} fehler
  * @context {string?} grund - Klartext einer abgelehnten Auswahl
@@ -17,7 +19,9 @@
 <%
 const TEXTE = {
   verbunden: ['success', 'Das Konto ist jetzt verknüpft.'],
-  geloest:   ['success', 'Die Verknüpfung wurde gelöst.'],
+  geloest:   ['success', 'Die Verknüpfung wurde gelöst. Was daran hing, ist entfernt.'],
+  geloest_rest: ['warning', 'Die Verknüpfung wurde gelöst. Das Aufräumen dessen, was daran hing, ist gescheitert. Der nächste Tageslauf holt es nach, der Grund steht im Protokoll.'],
+  bestaetigung: ['warning', 'Der eingetippte Name stimmte nicht. Es wurde nichts gelöst.'],
   abgebrochen:['info',   'Du hast den Vorgang bei der Plattform abgebrochen. Es wurde nichts gespeichert.'],
   vergeben:  ['danger',  'Dieses Konto ist bereits mit einem anderen Benutzer verknüpft. Wenn das deins ist, muss die andere Verknüpfung zuerst gelöst werden.'],
   state:     ['warning', 'Der Vorgang ist abgelaufen oder wurde doppelt geöffnet. Bitte noch einmal starten.'],
@@ -233,12 +237,8 @@ if (fehler === 'abgelehnt') {
               </form>
             <% } %>
             <% if (a.verbunden) { %>
-              <form method="POST" action="/verbindungen/<%= a.name %>/loesen"
-                    onsubmit="return confirm('Verknüpfung mit <%= a.label %> lösen? Funktionen, die sie voraussetzen, wirken danach nicht mehr.');">
-                <input type="hidden" name="_csrf" value="<%= locals.csrfToken %>">
-                <input type="hidden" name="zurueck" value="/guild/<%= guildId %>/profile/verbindungen">
-                <button type="submit" class="btn btn-outline-danger w-100">Verknüpfung lösen</button>
-              </form>
+              <button type="button" class="btn btn-outline-danger w-100"
+                      data-bs-toggle="modal" data-bs-target="#loesenModal-<%= a.name %>">Verknüpfung lösen</button>
             <% } else { %>
               <a class="btn btn-primary w-100"
                  href="/verbindungen/<%= a.name %>/start?zurueck=<%= encodeURIComponent(`/guild/${guildId}/profile/verbindungen`) %>">
@@ -251,6 +251,67 @@ if (fehler === 'abgelehnt') {
     <% }) %>
   </div>
 <% } %>
+
+<%# **Lösen ist endgültig** (K129, 2026-11-07): Es nimmt mit, was unter der
+    Verknüpfung entstand. Deshalb der rote Dialog mit eingetipptem Namen statt
+    confirm(); die Route prüft den Namen ein zweites Mal. %>
+<% anbieter.filter(a => a.verbunden).forEach(a => { const l = a.loesen || { weg: [], bleibt: [], grund: null }; %>
+  <div class="modal modal-blur fade" id="loesenModal-<%= a.name %>" tabindex="-1" aria-labelledby="loesenTitel-<%= a.name %>" aria-hidden="true" data-loesen-dialog>
+    <div class="modal-dialog modal-dialog-centered" role="document">
+      <form class="modal-content border border-danger border-2" method="POST" action="/verbindungen/<%= a.name %>/loesen">
+        <input type="hidden" name="_csrf" value="<%= locals.csrfToken %>">
+        <input type="hidden" name="zurueck" value="/guild/<%= guildId %>/profile/verbindungen">
+        <div class="modal-status bg-danger"></div>
+        <div class="modal-header bg-danger-lt">
+          <h5 class="modal-title text-danger fw-bold" id="loesenTitel-<%= a.name %>">
+            <i class="fa-solid fa-triangle-exclamation me-2"></i>Verknüpfung mit <%= a.label %> ENDGÜLTIG lösen
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-danger fw-bold fs-3 mb-2">„<%= a.loesenName %>" wird von deinem Konto gelöst.</p>
+          <p class="text-danger fw-bold mb-3">Das lässt sich nicht zurücknehmen.</p>
+          <div class="fw-bold mb-1">Es gehen mit:</div>
+          <ul class="mb-3">
+            <li>Der Nachweis, dass dir das Konto gehört</li>
+            <% if (a.scopes && a.scopes.length) { %><li>Die Berechtigungen, die du erteilt hast</li><% } %>
+            <% l.weg.forEach(satz => { %><li><%= satz %></li><% }) %>
+          </ul>
+          <% if (l.grund) { %>
+            <p class="text-warning small">Nicht alles ließ sich gerade aufzählen: <%= l.grund %> Gelöscht wird trotzdem alles, was daran hängt.</p>
+          <% } %>
+          <% if (l.bleibt.length) { %>
+            <div class="fw-bold mb-1">Es bleibt:</div>
+            <ul class="mb-3 text-secondary">
+              <% l.bleibt.forEach(satz => { %><li><%= satz %></li><% }) %>
+            </ul>
+          <% } %>
+          <label class="form-label fw-bold" for="loesenEingabe-<%= a.name %>">
+            Zum Bestätigen den Namen eintippen: <span class="font-monospace text-danger"><%= a.loesenName %></span>
+          </label>
+          <input type="text" class="form-control font-monospace" id="loesenEingabe-<%= a.name %>" name="bestaetigung"
+                 autocomplete="off" spellcheck="false" data-soll="<%= a.loesenName %>">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal">Abbrechen</button>
+          <button type="submit" class="btn btn-danger fw-bold" disabled>
+            <i class="fa-solid fa-link-slash me-1"></i>Endgültig lösen
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+<% }) %>
+<script>
+document.querySelectorAll('[data-loesen-dialog]').forEach(function (dialog) {
+  var eingabe = dialog.querySelector('input[name="bestaetigung"]');
+  var knopf = dialog.querySelector('button[type="submit"]');
+  var stimmt = function () { return eingabe.value.trim() === eingabe.dataset.soll; };
+  eingabe.addEventListener('input', function () { knopf.disabled = !stimmt(); });
+  dialog.querySelector('form').addEventListener('submit', function (e) { if (!stimmt()) e.preventDefault(); });
+  dialog.addEventListener('shown.bs.modal', function () { eingabe.value = ''; knopf.disabled = true; eingabe.focus(); });
+});
+</script>
 
 <% if (rueckrufe && rueckrufe.length) { %>
   <%# Nur fuer den Betreiber: Diese Adressen muessen beim Anbieter Zeichen

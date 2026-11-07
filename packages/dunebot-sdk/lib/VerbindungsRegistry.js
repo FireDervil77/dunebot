@@ -137,6 +137,31 @@
  * Nachweis auf genau diesen Kanal zeigt). Eine Pruefung im Kern waere eine
  * zweite, die irgendwann von der ersten abweicht.
  *
+ * ## Was ein Anbieter mitbringen kann, damit das Loesen aufraeumt
+ *
+ * ```js
+ * loesen: {
+ *     // Solange die Verknuepfung steht: was wegfaellt, was bleibt — fuer den Knopf.
+ *     async wasWegfaellt({ userId, kontoId }) { return { weg: ['…'], bleibt: ['…'] }; },
+ *     // Nachdem der Nachweis geloescht ist. Wirft, wenn es nicht ging.
+ *     async aufraeumen({ userId, kontoId }) { … }
+ * }
+ * ```
+ *
+ * **Seit 2026-11-07** (K129, Baustelle 99). Vorher loeschte das Loesen genau
+ * die Zeile in `user_connections` und sonst nichts; was ein Plugin unter der
+ * Verknuepfung angelegt hatte, blieb liegen. Der Kern kennt die Tabellen der
+ * Plugins nicht — deshalb raeumt jedes sein Eigenes, und der Kern ruft.
+ *
+ * **Beide oder keiner.** Ein Aufraeumen ohne Auskunft loeschte, ohne dass der
+ * Knopf es sagt; eine Auskunft ohne Aufraeumen versprach ein Loeschen, das
+ * nicht kommt.
+ *
+ * **Ist das Plugin beim Loesen abgeschaltet, ruft niemand.** Der Kern loest
+ * trotzdem (wer sich loesen will, haengt nicht davon ab, ob gerade jemand
+ * fragt). Ein Anbieter mit `loesen` muss den Rest deshalb selbst nachholen
+ * koennen — bei Twitch der Tageslauf, mit derselben Bedingung.
+ *
  * **Alle drei oder keine.** Ein Anbieter mit `zusagen`, aber ohne `pruefen`,
  * wuerde Schluessel sammeln, die niemand nachhaelt - und bei Twitch waere das
  * ein Verstoss gegen die Auflage, Token stuendlich zu pruefen. Deshalb weist
@@ -180,6 +205,7 @@ function register(name, beschreibung) {
     // der erste Token ablaeuft und niemand zustaendig ist.
     const zusagen = pruefeZusagen(name, beschreibung);
     const einstellungen = pruefeEinstellungen(name, beschreibung);
+    const loesen = pruefeLoesen(name, beschreibung.loesen);
 
     anbieter.set(name, {
         name,
@@ -193,9 +219,30 @@ function register(name, beschreibung) {
         tauschen: beschreibung.tauschen || null,
         erneuern: beschreibung.erneuern || null,
         pruefen: beschreibung.pruefen || null,
-        einstellungen
+        einstellungen,
+        loesen
     });
     return true;
+}
+
+/**
+ * Den Loesen-Haken eines Anbieters pruefen.
+ *
+ * @param {string} name Anbieter
+ * @param {Object} [roh] Rohe Angaben
+ * @returns {Object|null} geprueft oder null
+ */
+function pruefeLoesen(name, roh) {
+    if (roh === undefined || roh === null) return null;
+    if (typeof roh !== 'object' || Array.isArray(roh)) {
+        throw new Error(`VerbindungsRegistry: loesen von "${name}" ist kein Objekt`);
+    }
+    for (const feld of ['wasWegfaellt', 'aufraeumen']) {
+        if (typeof roh[feld] !== 'function') {
+            throw new Error(`VerbindungsRegistry: loesen von "${name}" hat kein ${feld}()`);
+        }
+    }
+    return { wasWegfaellt: roh.wasWegfaellt, aufraeumen: roh.aufraeumen };
 }
 
 /**
@@ -504,8 +551,52 @@ async function einstellungenWahlSetzen(name, ctx, wert) {
     return { ok: !!ergebnis.ok, grund: ergebnis.grund || null };
 }
 
+/**
+ * Was beim Loesen wegfaellt — fuer den Knopf.
+ *
+ * **Faellt nie durch**, wie `einstellungenLesen`: Die Seite erfuellt ihren
+ * Zweck auch ohne. Was klemmt, kommt als `grund` zurueck, und der Dialog sagt
+ * dann, dass er nicht alles aufzaehlen kann — nicht etwa "es faellt nichts weg".
+ *
+ * @param {string} name Anbieter
+ * @param {Object} ctx `{ userId, kontoId, kontoName }`
+ * @param {Object} [logger] Etwas mit `.warn`
+ * @returns {Promise<{weg: Array<string>, bleibt: Array<string>, grund: string|null}>} Auskunft
+ */
+async function loesenVorschau(name, ctx, logger = null) {
+    const a = anbieter.get(name);
+    if (!a || !a.loesen) return { weg: [], bleibt: [], grund: null };
+    try {
+        const roh = await a.loesen.wasWegfaellt(ctx);
+        const saetze = (liste) => (Array.isArray(liste) ? liste : []).filter(Boolean).map(String);
+        return { weg: saetze(roh?.weg), bleibt: saetze(roh?.bleibt), grund: null };
+    } catch (error) {
+        if (logger && typeof logger.warn === 'function') {
+            logger.warn(`[VerbindungsRegistry] loesen.wasWegfaellt von "${name}" gescheitert:`, error.message);
+        }
+        return { weg: [], bleibt: [], grund: error.message || 'Konnte gerade nicht ermittelt werden.' };
+    }
+}
+
+/**
+ * Das Aufraeumen nach dem Loesen.
+ *
+ * **Wirft durch** — anders als die Vorschau. Ein Aufraeumen, das im Stillen
+ * scheitert, saehe aus wie ein vollstaendiges Loesen.
+ *
+ * @param {string} name Anbieter
+ * @param {Object} ctx `{ userId, kontoId, kontoName }`
+ * @returns {Promise<Object|null>} Bericht des Anbieters, null wenn niemand angemeldet ist
+ */
+async function loesenAufraeumen(name, ctx) {
+    const a = anbieter.get(name);
+    if (!a || !a.loesen) return null;
+    return (await a.loesen.aufraeumen(ctx)) || {};
+}
+
 module.exports = {
     register, unregister, get, list, scopesVon,
     einstellungenLesen, einstellungenWahlLesen, einstellungenWahlSetzen,
+    loesenVorschau, loesenAufraeumen,
     NAME_MUSTER
 };

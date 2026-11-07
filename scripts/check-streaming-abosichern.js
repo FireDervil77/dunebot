@@ -92,6 +92,11 @@ ServiceManager.register('dbService', {
         if (s.startsWith('SELECT g.*, v.id AS verbindung')) {
             return daten.inhaber ? [{ scopes: daten.scopes, konto_name: 'Inhaber' }] : [];
         }
+        // `aboEreignisseAufraeumen` fragt seit K129 nach dem Kanal, um den
+        // Inhaber zu finden (ohne ihn keine Abo-Ereignisse).
+        if (s.startsWith('SELECT plattform, kanal_id FROM streaming_streamers WHERE id = ?')) {
+            return [{ plattform: 'twitch', kanal_id: '12345' }];
+        }
         if (s.startsWith('INSERT INTO streaming_subscriptions')) {
             mitschrift.insert.push({ streamer_id: w[0], ereignis: w[1] });
             daten.abos.push({ id: daten.abos.length + 1, streamer_id: w[0], ereignis: w[1], zustand: 'angefragt' });
@@ -299,13 +304,22 @@ console.log('\nDie Abo-Ereignisse kommen nur auf Wunsch');
     pruefe(ohne.length === NAMEN.length && !ABO_NAMEN.some(n => ohne.includes(n)),
         'ohne Abo-Rolle nur die Pflichtereignisse', ohne.join(' '));
 
-    neuAufsetzen([], true);
+    neuAufsetzen([], true, null, 'channel:read:subscriptions');
     await abos.abosSichern(1, 'twitch', '12345');
     const mit = mitschrift.abonniert.map(a => a.b.typ);
     pruefe(ABO_NAMEN.every(n => mit.includes(n)),
-        'mit Abo-Rolle kommen sie dazu', `${mit.length} Ereignisse`);
+        'mit Abo-Rolle und verknuepftem Inhaber kommen sie dazu', `${mit.length} Ereignisse`);
     pruefe(mitschrift.insert.every(i => typeof i.ereignis === 'string'),
         'auch sie gehen als Name in die Tabelle');
+
+    // K129: Die Abo-Ereignisse leben von der Zusage des Inhabers. Hat er
+    // seine Verknuepfung geloest, laesst Twitch das Bestellen trotzdem zu —
+    // die Erlaubnis dort bleibt, bis er sie selbst entzieht.
+    neuAufsetzen([], true);
+    await abos.abosSichern(1, 'twitch', '12345');
+    const ohneInhaber = mitschrift.abonniert.map(a => a.b.typ);
+    pruefe(!ABO_NAMEN.some(n => ohneInhaber.includes(n)),
+        'mit Abo-Rolle, aber ohne verknuepften Inhaber kommen sie nicht dazu', ohneInhaber.join(' '));
 }
 
 console.log('\nAufraeumen erkennt seine Ereignisse am Namen');
@@ -320,10 +334,15 @@ console.log('\nAufraeumen erkennt seine Ereignisse am Namen');
     pruefe(daten.abos.length === NAMEN.length && NAMEN.every(n => daten.abos.some(a => a.ereignis === n)),
         'die Pflichtereignisse bleiben stehen', daten.abos.map(a => a.ereignis).join(' '));
 
-    neuAufsetzen([...NAMEN, ...ABO_NAMEN].map(e => ({ ereignis: e, zustand: 'bestaetigt' })), true);
+    neuAufsetzen([...NAMEN, ...ABO_NAMEN].map(e => ({ ereignis: e, zustand: 'bestaetigt' })), true, null, 'channel:read:subscriptions');
     const behalten = await abos.aboEreignisseAufraeumen(1);
     pruefe(behalten.behalten === true && behalten.abbestellt === 0,
-        'solange eine Guild die Rolle vergibt, bleibt alles stehen');
+        'solange eine Guild die Rolle vergibt und der Inhaber verknuepft ist, bleibt alles stehen');
+
+    neuAufsetzen([...NAMEN, ...ABO_NAMEN].map(e => ({ ereignis: e, zustand: 'bestaetigt' })), true);
+    const geloest = await abos.aboEreignisseAufraeumen(1);
+    pruefe(geloest.abbestellt === ABO_NAMEN.length,
+        'ohne verknuepften Inhaber gehen sie, auch wenn eine Guild die Rolle will (K129)', String(geloest.abbestellt));
 }
 
 console.log('\nEin Melder haelt sein Ereignis fest');

@@ -224,7 +224,18 @@ async function konten(userId) {
                         { userId, kontoId: da.konto_id, kontoName: da.konto_name },
                         ServiceManager.get('Logger'))
                 }
-                : null
+                : null,
+
+            // **Was beim Loesen wegfaellt** (K129). Fuer den roten Dialog am
+            // Knopf; faellt nie durch, was klemmt, kommt als `grund`.
+            loesen: da
+                ? await VerbindungsRegistry.loesenVorschau(
+                    a.name,
+                    { userId, kontoId: da.konto_id, kontoName: da.konto_name },
+                    ServiceManager.get('Logger'))
+                : null,
+            // Was eingetippt werden muss — dieselbe Regel wie in der Route.
+            loesenName: da ? String(da.konto_name || da.konto_id) : null
         };
     }));
 }

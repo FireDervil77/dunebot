@@ -1009,6 +1009,16 @@ async function tagesLauf() {
     }
 
     try {
+        // **Kanaele ohne Verknuepfung** (K129): was das Loesen nicht
+        // erreichte, weil das Plugin aus war oder Twitch klemmte. Vor dem
+        // Chat-Abgleich, denn es leert die Heim-Guild.
+        const n = await require('./loesen').nachholen();
+        if (n) log().info(`[Streaming] ${n} Kanal/Kanaele ohne Verknuepfung nachtraeglich aufgeraeumt`);
+    } catch (err) {
+        log().error('[Streaming] Aufraeumen nach dem Loesen fehlgeschlagen:', err);
+    }
+
+    try {
         // **Die Chat-Abos nach dem Aufraeumen**, und das ist keine Willkuer:
         // Der Aufraeumer loescht Streamer ohne Ziel und ohne Abo - mitsamt
         // ihrer `heim_guild_id`. Liefe der Chat-Abgleich davor, bestellte er

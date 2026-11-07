@@ -378,14 +378,42 @@ router.post('/:plattform/loesen', CheckAuth, async (req, res) => {
     }
 
     try {
-        // **Auch dann loesbar, wenn das Plugin abgeschaltet ist.** Deshalb
-        // steht hier keine Registry-Abfrage: Wer seine Verknuepfung loswerden
-        // will, darf nicht davon abhaengen, ob gerade jemand danach fragt.
+        const zeile = (await dbService.query(
+            'SELECT konto_id, konto_name FROM user_connections WHERE user_id = ? AND plattform = ? LIMIT 1',
+            [userId, name]))[0];
+        if (!zeile) return res.redirect(`${zurueck}?fehler=nicht_verbunden`);
+
+        // **Der Name, eingetippt** (K129, 2026-11-07). Seit das Loesen
+        // mitnimmt, was unter der Verknuepfung entstand, laesst es sich nicht
+        // zuruecknehmen. Der Dialog sperrt den Knopf bis zum richtigen Namen;
+        // geprueft wird hier, damit ein abgeschickter Rest-Klick nichts tut.
+        const soll = String(zeile.konto_name || zeile.konto_id);
+        if (String(req.body?.bestaetigung || '').trim() !== soll) {
+            return res.redirect(`${zurueck}?fehler=bestaetigung`);
+        }
+
+        // **Auch dann loesbar, wenn das Plugin abgeschaltet ist.** Der
+        // Nachweis geht in jedem Fall: Wer seine Verknuepfung loswerden will,
+        // darf nicht davon abhaengen, ob gerade jemand danach fragt.
         await dbService.query(
             'DELETE FROM user_connections WHERE user_id = ? AND plattform = ?',
             [userId, name]);
-
         Logger.info(`[Verbindungen] ${name} von ${userId} geloest`);
+
+        // **Danach raeumt das Plugin sein Eigenes** — nach dem Loeschen, weil
+        // es dieselbe Frage stellt wie ueberall: Wer hat diesen Kanal
+        // verknuepft? Niemand mehr. Ist es abgeschaltet, ruft hier niemand,
+        // und sein Tageslauf holt es nach.
+        try {
+            const bericht = await VerbindungsRegistry.loesenAufraeumen(name,
+                { userId, kontoId: String(zeile.konto_id), kontoName: zeile.konto_name });
+            if (bericht === null) {
+                Logger.info(`[Verbindungen] ${name}: kein Anbieter angemeldet - Aufraeumen holt das Plugin nach`);
+            }
+        } catch (error) {
+            Logger.error(`[Verbindungen] Aufraeumen nach dem Loesen von ${name} fehlgeschlagen:`, error);
+            return res.redirect(`${zurueck}?ok=geloest_rest`);
+        }
         return res.redirect(`${zurueck}?ok=geloest`);
     } catch (error) {
         Logger.error(`[Verbindungen] Loesen ${name} fehlgeschlagen:`, error);
