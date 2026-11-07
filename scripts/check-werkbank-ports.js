@@ -75,6 +75,11 @@ function alsFormular(p) {
     };
     if (m) f.abstand = m[2];              // ohne Kopplung ist das Feld gesperrt und fehlt
     if (p.required === false) f.optional = 'on';
+    // „Nur intern" (werkbank-sitzung.ejs: Feld nur_intern, vom Knopf vorbelegt).
+    // Fehlte hier bis 2026-11-07: Minecraft 1.5.15 trägt es am RCON-Port, die
+    // Attrappe ließ es weg, und der Wächter meldete einen Verlust, den die
+    // echte Karte nicht hat (Kassensturz K262).
+    if (p.internal_only === true) f.nur_intern = 'on';
     return f;
 }
 
@@ -103,7 +108,7 @@ const UDP = (purpose, mehr = {}) => ({ purpose, protocol: 'udp', assign: 'pool',
 
     // ── 1) Unverändert speichern ändert nichts ───────────────────────────────
     console.log('\nBestandspakete: unverändert durch die Karte');
-    const gesehen = { ports: 0, gekoppelt: 0, variable: 0, nurWenn: 0, optional: 0, abfragen: 0, bereit: 0 };
+    const gesehen = { ports: 0, gekoppelt: 0, variable: 0, nurWenn: 0, optional: 0, intern: 0, abfragen: 0, bereit: 0 };
     for (const [slug, paket] of neueste) {
         const vorher = kopie(paket);
         const { entwurf, image, schritte } = S.entwurfAusPaket(paket);
@@ -119,6 +124,7 @@ const UDP = (purpose, mehr = {}) => ({ purpose, protocol: 'udp', assign: 'pool',
                 if (p.variable) gesehen.variable++;
                 if (p.needed_by) gesehen.nurWenn++;
                 if (p.required === false) gesehen.optional++;
+                if (p.internal_only === true) gesehen.intern++;
             }
             const q = paket.management?.query;
             if (q) {
