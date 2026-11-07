@@ -220,7 +220,7 @@
     "ABGLEICH_TITEL": "Anschluss abgleichen",
     "ABGLEICH_TEXT": "Wer gerade /mod getippt hat, muss nicht bis zum nächsten Tageslauf warten.",
     "ABGLEICH_KNOPF": "Jetzt abgleichen",
-    "FUSSNOTE": "<strong>Befehle und Chat-Filter kommen mit Stufe 15.</strong> Heute liest der Bot mit, zählt — und sagt beim Streamstart Bescheid, wenn das eingeschaltet ist. Was im Chat ankommt, wird dabei <strong>nicht gespeichert</strong>: kein Text, kein Absender. Ob, wie lange und wofür das zulässig wäre, gehört zur ausstehenden Rechtsprüfung und wird nicht nebenbei in einem Zähler entschieden."
+    "FUSSNOTE": "<strong>Was der Bot im Chat tut:</strong> Er liest mit, beantwortet „Meine Befehle“, spricht „Meine Ansagen“, nimmt bei „Mitmachen“ Lose und Musikwünsche an und sagt beim Streamstart Bescheid, wenn das eingeschaltet ist. Der Chat-Schutz ist noch ein Entwurf. Den <strong>Text</strong> einer Nachricht speichert der Bot nicht: Er liest ihn, antwortet und vergisst ihn. Den <strong>Absender</strong> (Twitch-Name und -Kennung) behalten nur <code>!los</code> und der Musikwunsch, weil sie ohne ihn nicht funktionieren — Lose 30 Tage, Musikwünsche 7 Tage, danach löscht sie der tägliche Lauf."
   },
   "ANSAGEN": {
     "F_TEXT": "Ohne Text hätte die Ansage nichts zu sagen.",
