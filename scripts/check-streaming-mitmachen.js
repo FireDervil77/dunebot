@@ -67,7 +67,7 @@ function neuAufsetzen(welche = {}) {
         : 'clips:edit channel:manage:polls user:write:chat';
     welt.befehle = welche.befehle !== undefined ? welche.befehle
         : [{ wort: 'clip', aktiv: 1, wer: 'moderator', abkuehlung_s: 60 },
-           { wort: 'umfrage', aktiv: 1, wer: 'alle', abkuehlung_s: 30 }];
+           { wort: 'poll', aktiv: 1, wer: 'alle', abkuehlung_s: 30 }];
     welt.umfragen = welche.umfragen !== undefined ? welche.umfragen
         : { ok: true, abgelehnt: false, grund: null, umfragen: [UMFRAGE_LAEUFT, UMFRAGE_ALT] };
     welt.start = welche.start !== undefined ? welche.start
@@ -385,7 +385,7 @@ console.log('\nDie zwei Befehle haengen an denselben Zusagen');
     // Ein `zusage: 'clipp'` am Befehl waere ein Tippfehler ohne Fehlermeldung:
     // Die Befehlsseite zeigte den Schluessel-Hinweis, die Mitmachen-Seite
     // wuesste nichts davon.
-    for (const wort of ['clip', 'umfrage']) {
+    for (const wort of ['clip', 'poll']) {
         const eintrag = befehle.FERTIG[wort];
         pruefe(typeof eintrag?.tun === 'function',
             `\`!${wort}\` bewirkt etwas (\`tun\`), statt nur zu antworten`);
@@ -401,7 +401,7 @@ console.log('\nDer Befehlsstand kommt aus der Tabelle, nicht aus dem Code');
     pruefe(b.befehle.clip?.aktiv === false && b.befehle.clip?.wer === 'alle',
         'ein abgeschalteter, aufgemachter Befehl wird auch so gezeigt',
         JSON.stringify(b.befehle.clip));
-    pruefe(b.befehle.umfrage === null,
+    pruefe(b.befehle.poll === null,
         'und ein Befehl ohne Zeile heisst „noch nicht eingerichtet", nicht „an"');
 
     // **`!los` muss im Stand auftauchen, obwohl er keine Zusage hat.**
@@ -410,11 +410,11 @@ console.log('\nDer Befehlsstand kommt aus der Tabelle, nicht aus dem Code');
     // es haengt an einem anderen Plugin. Ohne `braucht` im Filter zeigte die
     // Verlosungskarte dauerhaft „Noch nicht eingerichtet", egal was in der
     // Tabelle steht - eine Karte, die ihren eigenen Befehl nicht kennt.
-    neuAufsetzen({ befehle: [{ wort: 'los', aktiv: 1, wer: 'alle', abkuehlung_s: 0 }] });
+    neuAufsetzen({ befehle: [{ wort: 'ticket', aktiv: 1, wer: 'alle', abkuehlung_s: 0 }] });
     const c = await mitmachen.zustand('g1');
-    pruefe(c.befehle.los?.aktiv === true,
+    pruefe(c.befehle.ticket?.aktiv === true,
         '`!los` steht im Befehlsstand, obwohl er keine Zusage braucht',
-        JSON.stringify(c.befehle.los));
+        JSON.stringify(c.befehle.ticket));
 }
 
 console.log('\nDie Kanalart wird gelesen, nicht vermutet');

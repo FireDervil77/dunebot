@@ -173,7 +173,7 @@ const befehlsseite = `/guild/${guildId}/plugins/streaming/befehle`;
           </div>
           <div class="zeile">
             <div class="zeile__bez"><%= tr('streaming:MITMACHEN.BEFEHL') %></div>
-            <div><%= befehlSatz(bericht.befehle.umfrage) %></div>
+            <div><%= befehlSatz(bericht.befehle.poll) %></div>
           </div>
         </div>
 
@@ -434,7 +434,7 @@ const befehlsseite = `/guild/${guildId}/plugins/streaming/befehle`;
             <div class="zeile">
               <div class="zeile__bez"><%= tr('streaming:MITMACHEN.BEFEHL') %></div>
               <div>
-                <%= befehlSatz(bericht.befehle.los) %>
+                <%= befehlSatz(bericht.befehle.ticket) %>
                 <div class="zeile__hilfe">
                   <%= tr('streaming:MITMACHEN.EINGERICHTET_AUF') %> <a href="<%= befehlsseite %>"><%= tr('streaming:NAV.COMMANDS') %></a>.
                 </div>

@@ -42,7 +42,12 @@ const PRAEFIX = '!';
 /**
  * Die fertigen Befehle.
  *
- * Der Schluessel ist das Wort. Wer einen neuen will, schreibt ihn hier hin —
+ * Der Schluessel ist das Wort. **Seit 2026-11-07 englisch** (Kassensturz K321,
+ * Betreiber: „Englisch, Deutsch bleibt"): `!game`, `!commands`, `!poll`,
+ * `!ticket` hiessen vorher `!spiel`, `!befehle`, `!umfrage`, `!los`. Die alten
+ * Woerter stehen unter `auch` und loesen weiter aus (ZWEITNAME), damit im Chat
+ * niemand einen Bruch merkt; gespeichert wird nur der Hauptname (Migration
+ * 20261107_130000_befehle_englisch). Wer einen neuen will, schreibt ihn hier hin —
  * und `scripts/check-streaming-befehle.js` haelt Liste und Ansicht zusammen.
  *
  * ## Zwei Sorten, seit P9
@@ -85,13 +90,17 @@ const FERTIG = {
             ? `${k.streamer} ist seit ${dauerText(k.seitMs)} live.`
             : `${k.streamer} ist gerade nicht live.`
     },
-    spiel: {
+    game: {
+        // Deutsches Wort als Zweitname: Zuschauer kennen es (2026-11-07, K321).
+        auch: ['spiel'],
         beschreibung: 'Titel und Kategorie des laufenden Streams.',
         antwort: (k) => !k.live ? `${k.streamer} ist gerade nicht live.`
             : (k.kategorie ? `${k.kategorie} — ${k.titel || 'ohne Titel'}`
                            : (k.titel || 'Titel und Kategorie sind nicht gesetzt.'))
     },
-    befehle: {
+    commands: {
+        // Deutsches Wort als Zweitname: Zuschauer kennen es (2026-11-07, K321).
+        auch: ['befehle'],
         beschreibung: 'Zählt auf, welche Befehle es hier gibt.',
 
         // **Getrennt mit ` · `, nicht mit einem Leerzeichen.** Bis zum
@@ -157,7 +166,9 @@ const FERTIG = {
         }
     },
 
-    umfrage: {
+    poll: {
+        // Deutsches Wort als Zweitname: Zuschauer kennen es (2026-11-07, K321).
+        auch: ['umfrage'],
         beschreibung: 'Sagt, welche Umfrage gerade läuft und wie sie steht.',
         zusage: 'umfragen',
         wer: 'alle',
@@ -187,7 +198,9 @@ const FERTIG = {
     // Kein `zusage`: `!los` loest bei Twitch nichts aus, es schreibt nur in
     // den Chat - und das kann der Kanal ohnehin, sonst gaebe es hier gar
     // keine Befehle.
-    los: {
+    ticket: {
+        // Deutsches Wort als Zweitname: Zuschauer kennen es (2026-11-07, K321).
+        auch: ['los'],
         beschreibung: 'Beim laufenden Gewinnspiel mitmachen.',
         wer: 'alle',
         abkuehlung_s: 0,
@@ -398,6 +411,13 @@ const FERTIG = {
         }
     }
 };
+
+/**
+ * Zweitname → Hauptname, gebaut aus `auch` in FERTIG. Ein Zweitname loest aus
+ * wie der Hauptname, gespeichert und angezeigt wird der Hauptname.
+ */
+const ZWEITNAME = Object.freeze(Object.fromEntries(
+    Object.entries(FERTIG).flatMap(([wort, b]) => (b.auch || []).map(z => [z, wort]))));
 
 /**
  * Braucht dieser Befehl ein anderes Plugin, und ist es da?
@@ -785,7 +805,11 @@ async function auswerten(kanal) {
     }
 
     const zeilen = await befehleFuer(String(streamer.heim_guild_id), streamer.id);
-    const zeile = zeilen.find(z => z.wort === zerlegt.wort);
+    // Erst das getippte Wort, dann der Hauptname eines Zweitnamens: Ein
+    // eigener Befehl, der vor 2026-11-07 schon so hiess wie ein Zweitname,
+    // behaelt damit sein Wort.
+    const zeile = zeilen.find(z => z.wort === zerlegt.wort)
+        || (ZWEITNAME[zerlegt.wort] ? zeilen.find(z => z.wort === ZWEITNAME[zerlegt.wort]) : null);
     if (!zeile) return null;
 
     if (!darf(zeile.wer, kanal)) {
@@ -964,9 +988,10 @@ async function anlegen(guildId, streamerId, f, userId) {
     if (!/^[a-z0-9_-]{1,32}$/.test(wort)) {
         return { ok: false, grund: 'wort' };
     }
-    if (FERTIG[wort]) {
+    if (FERTIG[wort] || ZWEITNAME[wort]) {
         // Ein eigener Befehl darf nicht heissen wie ein fertiger — sonst
-        // entschiede die Sortierung, welcher antwortet.
+        // entschiede die Sortierung, welcher antwortet. Das gilt auch fuer
+        // die Zweitnamen (`!spiel` und die anderen, seit 2026-11-07).
         return { ok: false, grund: 'belegt' };
     }
     if (!String(f.antwort || '').trim()) return { ok: false, grund: 'antwort' };
@@ -1107,7 +1132,7 @@ async function fertigSetzen(guildId, streamerId, gewaehlt, wer = {}) {
 }
 
 module.exports = {
-    PRAEFIX, FERTIG, RANG, PLATZHALTER,
+    PRAEFIX, FERTIG, ZWEITNAME, RANG, PLATZHALTER,
     alleFuerGuild, anlegen, aendern, entfernen, fertigSetzen,
     zerlegen, darf, fuellen, dauerText, fertigAntwort,
     befehleFuer, auswerten, verfuegbar, verfuegbarkeiten

@@ -87,7 +87,7 @@ const SEITEN = {
               text: 'Verweist auf deine Heim-Guild. Den Link kennt der Bot von selbst.' },
             { zustand: 'entwurf', icon: 'fa-solid fa-clock', titel: '!uptime',
               text: 'Wie lange der Stream schon läuft.' },
-            { zustand: 'entwurf', icon: 'fa-solid fa-gamepad', titel: '!spiel',
+            { zustand: 'entwurf', icon: 'fa-solid fa-gamepad', titel: '!game',
               text: 'Titel und Kategorie des laufenden Streams.' },
             { zustand: 'entwurf', icon: 'fa-solid fa-pen', titel: 'Eigene Befehle',
               text: 'Ein Wort, eine Antwort, und wer ihn benutzen darf.' }
@@ -96,7 +96,7 @@ const SEITEN = {
         vorhanden: [
             { was: 'Der Auswerter (seit Stufe 15)', wo: 'kern/befehle.auswerten()' },
             { was: 'Die Tabelle für eigene Befehle', wo: 'streaming_commands' },
-            { was: 'Fertige Befehle', wo: '!uptime, !spiel, !befehle' },
+            { was: 'Fertige Befehle', wo: '!uptime, !game, !commands' },
             { was: 'Der Bot kann senden (seit 13c)', wo: 'twitch.chatSenden()' }
         ],
 
@@ -329,13 +329,13 @@ const SEITEN = {
 
         merkmale: [
             { zustand: 'steht', icon: 'fa-solid fa-gift', titel: 'Verlosung',
-              text: 'Mitmachen per <code>!los</code>. Angelegt wird weiter im Verlosungs-Plugin — '
+              text: 'Mitmachen per <code>!ticket</code>. Angelegt wird weiter im Verlosungs-Plugin — '
                   + 'dort stellst du bei der Verlosung ein, ob im Discord, im Stream oder in beidem '
                   + 'mitgemacht wird.' },
             { zustand: 'entwurf', icon: 'fa-solid fa-music', titel: 'Musikwunsch',
               text: 'Wünschen per <code>!wunsch</code>. Warteschlange und Rechte aus dem Musik-Plugin.' },
             { zustand: 'steht', icon: 'fa-solid fa-square-poll-vertical', titel: 'Umfrage',
-              text: 'Twitch-eigene Umfragen: <code>!umfrage</code> sagt den Stand.' },
+              text: 'Twitch-eigene Umfragen: <code>!poll</code> sagt den Stand.' },
             { zustand: 'steht', icon: 'fa-solid fa-scissors', titel: 'Clip',
               text: '<code>!clip</code> schneidet die letzten Sekunden. Am 2026-09-06 im Stream gelaufen.' }
         ],

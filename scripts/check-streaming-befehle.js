@@ -397,14 +397,37 @@ console.log('\nFertige Befehle antworten aus dem Zustand');
     pruefe(/nicht live/.test(mitschrift.gesendet[0]?.text || ''),
         'offline sagt der Befehl das, statt eine Null zu nennen', mitschrift.gesendet[0]?.text);
 
-    neuAufsetzen([{ wort: 'spiel', art: 'fertig' }]);
+    neuAufsetzen([{ wort: 'game', art: 'fertig' }]);
     await befehle.auswerten(nachricht('!spiel'));
     pruefe(/Astro Colony/.test(mitschrift.gesendet[0]?.text || ''), 'die Kategorie kommt mit');
 
-    neuAufsetzen([{ wort: 'befehle', art: 'fertig' }, { wort: 'regeln', antwort: 'sei nett' }]);
+    neuAufsetzen([{ wort: 'commands', art: 'fertig' }, { wort: 'regeln', antwort: 'sei nett' }]);
     await befehle.auswerten(nachricht('!befehle'));
-    pruefe(/!befehle/.test(mitschrift.gesendet[0]?.text || '') && /!regeln/.test(mitschrift.gesendet[0]?.text || ''),
+    pruefe(/!commands/.test(mitschrift.gesendet[0]?.text || '') && /!regeln/.test(mitschrift.gesendet[0]?.text || ''),
         'die Liste nennt alle', mitschrift.gesendet[0]?.text);
+}
+
+// Seit 2026-11-07 (K321) englische Hauptnamen, die deutschen Woerter loesen als
+// Zweitname weiter aus. Oben laufen `!spiel` und `!befehle` schon gegen Zeilen
+// mit den Hauptnamen; hier der Rest des Vertrags.
+console.log('\nEnglische Hauptnamen, deutsche Zweitnamen');
+{
+    pruefe(JSON.stringify(befehle.ZWEITNAME) === JSON.stringify({ spiel: 'game', befehle: 'commands', umfrage: 'poll', los: 'ticket' }),
+        'vier Zweitnamen, je auf ihren Hauptnamen', JSON.stringify(befehle.ZWEITNAME));
+    pruefe(Object.keys(befehle.ZWEITNAME).every(z => !befehle.FERTIG[z]), 'kein Zweitname ist selbst ein Befehl');
+
+    neuAufsetzen([{ wort: 'game', art: 'fertig' }]);
+    await befehle.auswerten(nachricht('!game'));
+    pruefe(/Astro Colony/.test(mitschrift.gesendet[0]?.text || ''), 'der Hauptname loest aus', mitschrift.gesendet[0]?.text);
+
+    // Ein eigener Befehl, der schon vor dem Umbau `spiel` hiess, behaelt sein Wort.
+    neuAufsetzen([{ wort: 'game', art: 'fertig' }, { wort: 'spiel', antwort: 'mein eigenes Spiel' }]);
+    await befehle.auswerten(nachricht('!spiel'));
+    pruefe(mitschrift.gesendet[0]?.text === 'mein eigenes Spiel', 'ein alter eigener Befehl geht dem Zweitnamen vor', mitschrift.gesendet[0]?.text);
+
+    neuAufsetzen([]);
+    await befehle.auswerten(nachricht('!spiel'));
+    pruefe(mitschrift.gesendet.length === 0, 'ist der Hauptname nicht eingeschaltet, schweigt auch der Zweitname');
 }
 
 console.log('\nEigene Befehle fuellen ihre Platzhalter');
@@ -755,6 +778,10 @@ console.log('\nAnlegen prueft, bevor es schreibt');
         'ohne Antwort haette der Befehl nichts zu sagen');
     pruefe((await befehle.anlegen('g1', 1, { wort: 'uptime', antwort: 'x' })).grund === 'belegt',
         'ein eigener Befehl darf nicht heissen wie ein fertiger');
+    // Auch die Zweitnamen sind vergeben (K321) — sonst entschiede die Reihenfolge.
+    for (const z of ['spiel', 'befehle', 'umfrage', 'los']) {
+        pruefe((await befehle.anlegen('g1', 1, { wort: z, antwort: 'x' })).grund === 'belegt', `ein eigener Befehl darf nicht !${z} heissen`);
+    }
     pruefe((await befehle.anlegen('g1', 1, { wort: '!Regeln', antwort: 'ok' })).ok === true,
         'das Praefix und Grossbuchstaben werden abgeraeumt statt abgelehnt');
     pruefe((await befehle.anlegen('g1', 1, { wort: 'regeln', antwort: 'nochmal' })).grund === 'doppelt',
@@ -783,11 +810,11 @@ console.log('\nEine Guild fasst nur ihre eigenen Befehle an');
 console.log('\nAbwaehlen schaltet ab, es loescht nicht');
 {
     neuAufsetzen([]);
-    await befehle.fertigSetzen('g1', 1, ['uptime', 'spiel']);
+    await befehle.fertigSetzen('g1', 1, ['uptime', 'game']);
     const vorher = daten.befehle.length;
     daten.befehle.find(z => z.wort === 'uptime').benutzt_anzahl = 42;
 
-    await befehle.fertigSetzen('g1', 1, ['spiel']);
+    await befehle.fertigSetzen('g1', 1, ['game']);
     const uptime = daten.befehle.find(z => z.wort === 'uptime');
     pruefe(daten.befehle.length === vorher, 'die Zeile bleibt stehen', String(daten.befehle.length));
     pruefe(Number(uptime.aktiv) === 0, 'sie ist nur abgeschaltet');
@@ -801,7 +828,7 @@ console.log('\nEin fertiger Befehl darf jetzt etwas BEWIRKEN (P9)');
     // `await` faellt hier auf und nirgends sonst — im Chat stuende dann
     // `[object Promise]`, und Twitch nimmt das anstandslos entgegen.
     neuAufsetzen([{ wort: 'clip', art: 'fertig', abkuehlung_s: 0 },
-                  { wort: 'umfrage', art: 'fertig', abkuehlung_s: 0 }]);
+                  { wort: 'poll', art: 'fertig', abkuehlung_s: 0 }]);
 
     await befehle.auswerten(nachricht('!clip', { istModerator: true }));
     const gesagt = mitschrift.gesendet.at(-1)?.text || '';
@@ -881,8 +908,8 @@ console.log('\nGeteilter Chat: nur der eigene Kanal loest aus');
     // Mit Moderator-Abzeichen: Auch das oeffnet keinen fremden Kanal.
     neuAufsetzen([{ wort: 'uptime', art: 'fertig' },
                   { wort: 'clip', art: 'fertig', abkuehlung_s: 0 },
-                  { wort: 'umfrage', art: 'fertig', abkuehlung_s: 0 }]);
-    for (const wort of ['uptime', 'clip', 'umfrage']) {
+                  { wort: 'poll', art: 'fertig', abkuehlung_s: 0 }]);
+    for (const wort of ['uptime', 'clip', 'poll']) {
         await befehle.auswerten(nachricht('!' + wort, { ausFremdemKanal: true, istModerator: true }));
     }
     pruefe(mitschrift.gesendet.length === 0, 'aus einem fremden Kanal geht keine Antwort in den Chat',
@@ -902,12 +929,12 @@ console.log('\nGeteilter Chat: nur der eigene Kanal loest aus');
 
 console.log('\n!umfrage sagt den Stand, oder dass keine laeuft');
 {
-    neuAufsetzen([{ wort: 'umfrage', art: 'fertig', abkuehlung_s: 0 }]);
+    neuAufsetzen([{ wort: 'poll', art: 'fertig', abkuehlung_s: 0 }]);
     await befehle.auswerten(nachricht('!umfrage'));
     pruefe(/keine Umfrage/i.test(mitschrift.gesendet.at(-1)?.text || ''),
         'ohne laufende Umfrage steht das da', mitschrift.gesendet.at(-1)?.text);
 
-    neuAufsetzen([{ wort: 'umfrage', art: 'fertig', abkuehlung_s: 0 }]);
+    neuAufsetzen([{ wort: 'poll', art: 'fertig', abkuehlung_s: 0 }]);
     welt.umfragen = { ok: true, abgelehnt: false, grund: null, umfragen: [
         { id: 'u1', frage: 'Welches Spiel?', laeuft: true, gesamt: 7,
           antworten: [{ titel: 'Astro', stimmen: 5 }, { titel: 'Satisfactory', stimmen: 2 }] },
@@ -1029,7 +1056,7 @@ console.log('\n!los braucht ein anderes Plugin — und sagt das');
     });
 
     daten.befehle.length = 0;
-    daten.befehle.push({ id: 90, guild_id: 'g1', streamer_id: null, wort: 'los',
+    daten.befehle.push({ id: 90, guild_id: 'g1', streamer_id: null, wort: 'ticket',
                          art: 'fertig', antwort: null, wer: 'alle', abkuehlung_s: 0, aktiv: 1 });
 
     // --- Das Plugin ist fuer diese Guild aus ---------------------------
@@ -1042,7 +1069,7 @@ console.log('\n!los braucht ein anderes Plugin — und sagt das');
         mitschrift.gesendet.at(-1)?.text);
 
     const stand = await befehle.verfuegbarkeiten('g1');
-    pruefe(stand.los.ok === false, 'und der Schalter auf der Seite ist aus');
+    pruefe(stand.ticket.ok === false, 'und der Schalter auf der Seite ist aus');
     pruefe(stand.uptime.ok === true, 'Befehle ohne Abhaengigkeit bleiben davon unberuehrt');
 
     // Einschalten darf man ihn dann auch nicht — auch nicht am Formular vorbei.
@@ -1052,15 +1079,15 @@ console.log('\n!los braucht ein anderes Plugin — und sagt das');
     // Schreibzugriff mit 'los'" und lief rot, obwohl der Code stimmte. Was
     // zaehlt, ist der Wert: `aktiv` muss 0 sein.
     mitschrift.schreibzugriffe.length = 0;
-    await befehle.fertigSetzen('g1', 1, ['los']);
-    const losZeile = mitschrift.schreibzugriffe.find(z => z.werte?.[2] === 'los');
+    await befehle.fertigSetzen('g1', 1, ['ticket']);
+    const losZeile = mitschrift.schreibzugriffe.find(z => z.werte?.[2] === 'ticket');
     pruefe(losZeile && losZeile.werte[3] === 0,
         'und einschalten laesst er sich auch nicht',
         losZeile ? `aktiv = ${losZeile.werte[3]}` : 'gar nicht geschrieben');
 
     // Die Attrappe hat den Befehl damit wirklich abgeschaltet — fuer die
     // naechsten Faelle wieder anschalten, sonst pruefen sie nichts mehr.
-    daten.befehle.find(b => b.wort === 'los').aktiv = 1;
+    daten.befehle.find(b => b.wort === 'ticket').aktiv = 1;
 
     // --- Plugin an, aber keine Verlosung offen -------------------------
     welt.verlosung.plugin = true;
@@ -1108,13 +1135,13 @@ console.log('\n!los braucht ein anderes Plugin — und sagt das');
     // je Befehlszeile und nicht je Zuschauer; jede Sekunde darin sperrt echte
     // Zuschauer aus, und geaendert wird sie danach nie wieder (`fertigSetzen`
     // schreibt sie nur beim INSERT).
-    pruefe(befehle.FERTIG.los.abkuehlung_s === 0,
+    pruefe(befehle.FERTIG.ticket.abkuehlung_s === 0,
         '!los kommt ohne Abkuehlung in die Welt — sie wuerde Zuschauer aussperren',
-        `${befehle.FERTIG.los.abkuehlung_s} s`);
+        `${befehle.FERTIG.ticket.abkuehlung_s} s`);
 
     mitschrift.schreibzugriffe.length = 0;
     await befehle.fertigSetzen('g2', 1, []);
-    const neuZeile = mitschrift.schreibzugriffe.find(z => z.werte?.[2] === 'los');
+    const neuZeile = mitschrift.schreibzugriffe.find(z => z.werte?.[2] === 'ticket');
     pruefe(neuZeile && neuZeile.werte[5] === 0,
         'und genau diese 0 landet auch in der Datenbank',
         neuZeile ? `abkuehlung_s = ${neuZeile.werte[5]}` : 'nicht geschrieben');
@@ -1405,7 +1432,7 @@ console.log('\nKein abhaengiger Befehl bleibt ungeprueft');
     // **Die Liste haelt sich selbst aktuell.** Ohne diesen Fall waere der
     // naechste Befehl mit `braucht` still ungeprueft: Der Waechter bliebe
     // gruen, weil er ihn gar nicht kennt.
-    const geprueft = new Set(['los', ...musikGeprueft]);
+    const geprueft = new Set(['ticket', ...musikGeprueft]);
     const abhaengig = Object.keys(befehle.FERTIG).filter(w => befehle.FERTIG[w].braucht);
     const fehlend = abhaengig.filter(w => !geprueft.has(w));
     pruefe(fehlend.length === 0,
