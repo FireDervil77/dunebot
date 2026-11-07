@@ -1268,7 +1268,11 @@ class PluginManager extends BasePluginManager {
                 try {
                     if (tabellen.length) {
                         const geloescht = await dbService.loescheGuildZeilen(tabellen, guildId);
-                        Logger.info(`Plugin ${pluginName}: Inhalte der Guild ${guildId} gelöscht`, geloescht);
+                        // Die Zahlen in den Text: Das zweite Argument des Loggers
+                        // nimmt nur ein Error-Objekt, ein Objekt dort fällt weg.
+                        const zeilen = Object.entries(geloescht).filter(([, n]) => n > 0)
+                            .map(([t, n]) => `${t} ${n}`).join(', ');
+                        Logger.info(`Plugin ${pluginName}: Inhalte der Guild ${guildId} gelöscht (${zeilen || 'keine Zeilen'})`);
                     }
                     await dbService.query(
                         "DELETE FROM configs WHERE plugin_name = ? AND guild_id = ?",
