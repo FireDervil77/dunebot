@@ -28,6 +28,7 @@ const path = require('path');
 const vm = require('vm');
 const assert = require('assert');
 const ejs = require('ejs');
+const { ohneKommentare, ohneKommentareEjs } = require('./lib/quelltext');
 
 const WURZEL = path.join(__dirname, '..');
 const ANSICHT = path.join(WURZEL, 'plugins/gameserver/dashboard/views/guild/partials/server-detail-inhalte.ejs');
@@ -56,6 +57,7 @@ const LISTE = {
 };
 
 function seite(liste = LISTE) {
+    // Roh mit Absicht: gerendert wird die echte Vorlage, geprüft die Ausgabe samt Inline-Skript.
     const gezeichnet = ejs.render(fs.readFileSync(ANSICHT, 'utf8'), {
         server: { id: 222, name: 'Fires Satisfactory Bude' }, guildId: 'g1',
         userPermissions: { permissions: { 'GAMESERVER.FILES.MANAGE': true } },
@@ -138,7 +140,7 @@ const warte = () => new Promise(r => setImmediate(r));
         await warte(); await warte();
         v.w.inhaltFormular();
         assert.ok(!/id="inhalt-ordner"/.test(v.knoten['inhalte-formular'].innerHTML));
-        const quelle = fs.readFileSync(ANSICHT, 'utf8');
+        const quelle = ohneKommentareEjs(fs.readFileSync(ANSICHT, 'utf8'));
         assert.ok(/daten\.append\('ordner', ordner\.value\.trim\(\)\)/.test(quelle), 'der Ordner geht nicht mit');
     });
 
@@ -192,7 +194,7 @@ const warte = () => new Promise(r => setImmediate(r));
             assert.ok(a.MANAGER && a.MANAGER.name && /^https:\/\//.test(a.MANAGER.url), `${name} nennt keinen Manager`);
         }
         assert.ok(!/smm\.ficsit\.app/.test(Quellen.fuer('ficsit').MANAGER.url), 'smm.ficsit.app startet einen Download');
-        const route = fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/routes/inhalte.js'), 'utf8');
+        const route = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/routes/inhalte.js'), 'utf8'));
         assert.ok(/manager: Quellen\.katalog\(q\)\.MANAGER \|\| null/.test(route));
     });
 

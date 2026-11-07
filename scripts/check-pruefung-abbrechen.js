@@ -116,6 +116,8 @@ async function pruefe(was, tun) {
         const router = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'plugins/werkbank/dashboard/routes/guild.router.js'), 'utf8'));
         const teil = router.slice(router.indexOf("'/:kennung/pruefung/abbrechen'"), router.indexOf("'/:kennung/einstellungen'"));
         assert.match(teil, /if \(!r\.daemon\) require\('\.\.\/helpers\/Ereignisse'\)\.umzugWeiter/);
+        // Roh mit Absicht: Die Endmarke des Knopf-Abschnitts ist der Kommentar
+        // „// ── Live-Ausgabe" im Inline-Skript — ohne Kommentare gäbe es sie nicht.
         const seite = fs.readFileSync(path.join(WURZEL, 'plugins/werkbank/dashboard/views/guild/werkbank-sitzung.ejs'), 'utf8');
         const knopf = seite.slice(seite.indexOf("knopfPruefAbbrechen.addEventListener"), seite.indexOf('// ── Live-Ausgabe'));
         assert.ok(knopf.length > 50, 'der Knopf wurde nicht gefunden');

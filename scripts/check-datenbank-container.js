@@ -25,7 +25,7 @@ const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
 const { ServiceManager } = require('dunebot-core');
-const { ohneKommentare } = require('./lib/quelltext');
+const { ohneKommentare, ohneKommentareEjs } = require('./lib/quelltext');
 
 const WURZEL = path.join(__dirname, '..');
 const still = () => {};
@@ -180,11 +180,11 @@ async function pruefe(was, tun) {
     });
 
     await pruefe('Bearbeiten-Formular: verstecktes „false" vor dem Kästchen, Anzahl daneben; Anlegen sagt Container', () => {
-        const detail = fs.readFileSync(path.join(WURZEL, 'plugins/masterserver/dashboard/views/guild/masterserver-rootserver-detail.ejs'), 'utf8');
+        const detail = ohneKommentareEjs(fs.readFileSync(path.join(WURZEL, 'plugins/masterserver/dashboard/views/guild/masterserver-rootserver-detail.ejs'), 'utf8'));
         const v = detail.indexOf('name="db_gewuenscht" value="false"'), k = detail.indexOf('id="editDb" name="db_gewuenscht" value="true"');
         assert.ok(v > 0 && k > v, 'das versteckte „false" muss VOR dem Kästchen stehen');
         assert.ok(detail.includes('name="db_je_server"'), 'die Anzahl fehlt');
-        const anlegen = fs.readFileSync(path.join(WURZEL, 'plugins/masterserver/dashboard/views/guild/masterserver-rootserver-create.ejs'), 'utf8');
+        const anlegen = ohneKommentareEjs(fs.readFileSync(path.join(WURZEL, 'plugins/masterserver/dashboard/views/guild/masterserver-rootserver-create.ejs'), 'utf8'));
         assert.ok(/MariaDB-Container/.test(anlegen) && !/rührt der Daemon MySQL/.test(anlegen), 'der Hilfetext beim Anlegen spricht noch von der Host-MySQL');
     });
 

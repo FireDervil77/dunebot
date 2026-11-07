@@ -36,6 +36,7 @@ global.window = undefined;
 const { knopfZustand, pillenZustand } = require('../plugins/gameserver/dashboard/assets/js/gameserver-live.js');
 const migration = require('../plugins/masterserver/migrations/20261102_100000_rootserver_verbindung');
 const bahnhofMigration = require('../plugins/masterserver/migrations/20261103_100000_rootserver_bahnhof_weg');
+const { ohneKommentare } = require('./lib/quelltext');
 
 let fehler = 0;
 async function pruefe(was, tun) {
@@ -100,10 +101,10 @@ async function pruefe(was, tun) {
         assert.strictEqual(await VerbindungsWache.maschineAntwortet({ host: '-c 1; id', ports: [] }), false);
     });
     await pruefe('Live-Seite und Route tragen die Verbindung', () => {
-        const live = fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/assets/js/gameserver-live.js'), 'utf8');
+        const live = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/assets/js/gameserver-live.js'), 'utf8'));
         assert.match(live, /sse\.on\('verbindung'/);
         assert.match(live, /verbindung: s\.verbindung \|\| 'da'/);
-        const route = fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/routes/servers.js'), 'utf8');
+        const route = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/routes/servers.js'), 'utf8'));
         assert.strictEqual((route.match(/Verbindung'\)\.SPALTEN/g) || []).length, 2, 'Status und Serverseite');
         assert.match(fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/helpers/Serverliste.js'), 'utf8'), /Verbindung'\)\.SPALTEN/);
     });

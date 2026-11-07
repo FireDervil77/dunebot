@@ -54,7 +54,7 @@ async function pruefe(was, tun) {
     catch (e) { fehler++; console.log(`  ✗ ${was}\n      ${String(e.message).split('\n').slice(0, 3).join('\n      ')}`); }
 }
 
-const quelle = fs.readFileSync(WIDGET, 'utf8');
+const quelle = ohneKommentareEjs(fs.readFileSync(WIDGET, 'utf8'));
 const zeichne = (rootservers) => ejs.render(quelle,
     { guildId: 'g1', rootservers, auslastung: Auslastung.ausZeile }, { filename: WIDGET });
 const abzeichen = (html) => [...html.matchAll(/data-rs-badge>\s*(Online|Offline)\s*</g)].map(m => m[1]);
@@ -227,8 +227,8 @@ function attrappenBlock(daemonId) {
 
     await pruefe('Vertrag mit dem Daemon: Befehl, Ereignis und Frist auf beiden Seiten gleich', async () => {
         const DAEMON = process.env.DAEMON_WURZEL || path.join(WURZEL, '../firebot_daemon');
-        const go = fs.readFileSync(path.join(DAEMON, 'internal/websocket/hostmesswerte.go'), 'utf8');
-        const proto = fs.readFileSync(path.join(DAEMON, 'pkg/protocol/messages.go'), 'utf8');
+        const go = ohneKommentare(fs.readFileSync(path.join(DAEMON, 'internal/websocket/hostmesswerte.go'), 'utf8'));
+        const proto = ohneKommentare(fs.readFileSync(path.join(DAEMON, 'pkg/protocol/messages.go'), 'utf8'));
         assert.match(go, new RegExp(`hostMesswertBefehl\\s*=\\s*"${Bestellung.BEFEHL.replace('.', '\\.')}"`), 'Befehlsname weicht ab');
         assert.match(go, /protocol\.NewEvent\(protocol\.NSSystem, protocol\.SystemStats,/);
         assert.match(proto, /NSSystem Namespace = "system"/);

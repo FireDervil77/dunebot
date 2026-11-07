@@ -156,6 +156,8 @@ ServiceManager.register('Logger', { info: (t) => meldungen.push(t), warn: () => 
             const d = (await rufe('get', '/logs')).ansicht.d;
             const ejs = require('ejs');
             const datei = path.join(WURZEL, 'plugins/masterserver/dashboard/views/guild/masterserver-logs.ejs');
+            // Roh mit Absicht: Die Vorlage wird gerendert, geprüft wird die AUSGABE —
+            // EJS-Kommentare fallen beim Rendern weg, die Skripte kommen so, wie der Browser sie bekommt.
             const html = ejs.render(require('fs').readFileSync(datei, 'utf8'),
                 { ...d, tr: (k) => k, userPermissions: { is_owner: true, permissions: {} } }, { filename: datei });
             const skripte = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(m => m[1]).join('\n');

@@ -184,7 +184,7 @@ function ohneEgg(payload) {
         const { ohneKommentare } = require('./lib/quelltext');
         const lies = (p) => ohneKommentare(fs.readFileSync(path.join(__dirname, '..', p), 'utf8'));
         const aufrufe = [
-            ...lies('plugins/gameserver/dashboard/routes/servers.js').matchAll(/buildStartPayload\(([^)]*)\)/g),
+            ...ohneKommentare(lies('plugins/gameserver/dashboard/routes/servers.js')).matchAll(/buildStartPayload\(([^)]*)\)/g),
             ...lies('plugins/gameserver/dashboard/helpers/CronWorker.js').matchAll(/buildStartPayload\(([^)]*)\)/g),
             ...lies('apps/dashboard/helpers/IPCServer.js').matchAll(/buildStartPayload\(([^)]*)\)/g),
         ].map(m => m[1].replace(/\s+/g, ' ').trim());
@@ -194,8 +194,8 @@ function ohneEgg(payload) {
             'srv, guildId, Logger, { update: payload.update === true }', 'srv, guildId, Logger, { update: payload.update === true }',
         ], `Aufrufe mit Update-Wahl: ${JSON.stringify(mit)} — erwartet vier (Start- und Neustart-Route, SERVER_START und SERVER_RESTART)`);
         assert.ok(aufrufe.length >= 5, `nur ${aufrufe.length} Aufrufe gefunden — der Wächter sucht an der falschen Stelle`);
-        assert.match(lies('plugins/gameserver/dashboard/routes/servers.js'), /const mitUpdate = istWahr\(req\.body\?\.update\)/);
-        const befehl = lies('plugins/gameserver/bot/commands/server.js');
+        assert.match(ohneKommentare(lies('plugins/gameserver/dashboard/routes/servers.js')), /const mitUpdate = istWahr\(req\.body\?\.update\)/);
+        const befehl = ohneKommentare(lies('plugins/gameserver/bot/commands/server.js'));
         assert.strictEqual((befehl.match(/getBoolean\('update'\) === true/g) || []).length, 2,
             '/server start und /server restart lesen die Option update nicht beide');
         assert.doesNotMatch(lies('plugins/gameserver/bot/events/interactionCreate.js'), /update/,

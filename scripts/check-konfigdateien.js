@@ -29,7 +29,7 @@ const WURZEL = path.join(__dirname, '..');
 require('dotenv').config({ path: path.join(WURZEL, 'apps/dashboard/.env'), quiet: true });
 const Ajv = require('ajv');
 const { ServiceManager } = require('dunebot-core');
-const { ohneKommentare } = require('./lib/quelltext');
+const { ohneKommentare, ohneKommentareEjs } = require('./lib/quelltext');
 
 ServiceManager.register('dbService', {
     query: async (sql) => {
@@ -237,16 +237,16 @@ const SERVER = { id: 7, rootserver_id: 55, daemon_id: 'd', install_path: '/x' };
         assert.match(routen, /if \(hatKonfigdateien\) BEREICHE\.konfiguration = /);
         const files = ohneKommentare(lies('plugins/gameserver/dashboard/routes/files.js'));
         assert.match(files, /'\/servers\/:serverId\/konfiguration', requirePermission\('GAMESERVER\.FILES\.VIEW'\)/);
-        const seite = lies('plugins/gameserver/dashboard/views/guild/server-detail.ejs');
+        const seite = ohneKommentareEjs(lies('plugins/gameserver/dashboard/views/guild/server-detail.ejs'));
         assert.match(seite, /locals\.hatKonfigdateien \? \[\['konfiguration', 'Konfiguration'\]\]/);
         assert.match(seite, /include\('partials\/server-detail-konfiguration'/);
     });
     await pruefe('Dateimanager und Bereich teilen ein Editor-Fenster, der Bereich setzt nichts als Text-HTML', async () => {
         for (const d of ['server-detail-files.ejs', 'server-detail-konfiguration.ejs']) {
-            assert.match(lies('plugins/gameserver/dashboard/views/guild/partials', d), /include\('server-detail-editor', \{ canManage \}\)/, d);
-            assert.ok(!lies('plugins/gameserver/dashboard/views/guild/partials', d).includes('id="monaco-editor"'), `${d} trägt ein eigenes Fenster`);
+            assert.match(ohneKommentareEjs(lies('plugins/gameserver/dashboard/views/guild/partials', d)), /include\('server-detail-editor', \{ canManage \}\)/, d);
+            assert.ok(!ohneKommentareEjs(lies('plugins/gameserver/dashboard/views/guild/partials', d)).includes('id="monaco-editor"'), `${d} trägt ein eigenes Fenster`);
         }
-        const bereich = lies('plugins/gameserver/dashboard/views/guild/partials/server-detail-konfiguration.ejs');
+        const bereich = ohneKommentareEjs(lies('plugins/gameserver/dashboard/views/guild/partials/server-detail-konfiguration.ejs'));
         assert.doesNotMatch(bereich, /innerHTML/, 'Namen kommen aus Paketen und vom Daemon');
         assert.match(bereich, /nurEditor: true/);
         const fm = ohneKommentare(lies('plugins/gameserver/dashboard/assets/js/file-manager.js'));

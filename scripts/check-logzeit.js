@@ -16,9 +16,10 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { ohneKommentare } = require('./lib/quelltext');
 const SDK = path.join(__dirname, '../packages/dunebot-sdk');
 
-const quelle = fs.readFileSync(path.join(SDK, 'lib/utils/Logger.js'), 'utf8');
+const quelle = ohneKommentare(fs.readFileSync(path.join(SDK, 'lib/utils/Logger.js'), 'utf8'));
 const m = quelle.match(/translateTime:\s*"([^"]+)"/);
 const { prettyFactory } = require(require.resolve('pino-pretty', { paths: [SDK] }));
 

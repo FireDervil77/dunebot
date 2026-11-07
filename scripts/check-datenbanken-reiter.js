@@ -26,7 +26,7 @@ const path = require('path');
 const assert = require('assert');
 const ejs = require('ejs');
 const { ServiceManager } = require('dunebot-core');
-const { ohneKommentare } = require('./lib/quelltext');
+const { ohneKommentare, ohneKommentareEjs } = require('./lib/quelltext');
 
 const WURZEL = path.join(__dirname, '..');
 require('dotenv').config({ path: path.join(WURZEL, 'apps/dashboard/.env'), quiet: true });
@@ -270,7 +270,7 @@ const wirft = async (fn, muster, status) => {
         assert.ok(a > 0 && a < b, 'nicht oder hinter filesRouter eingehängt');
         const srv = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/routes/servers.js'), 'utf8'));
         assert.ok(/datenbanken: 'Datenbanken',/.test(srv), 'BEREICHE kennt datenbanken nicht');
-        const detail = fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/views/guild/server-detail.ejs'), 'utf8');
+        const detail = ohneKommentareEjs(fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/views/guild/server-detail.ejs'), 'utf8'));
         assert.ok(detail.includes("['datenbanken',  'Datenbanken']"), 'Navigation');
         assert.ok(detail.includes("include('partials/server-detail-datenbanken'"), 'Vorlage nicht eingebunden');
     });
@@ -329,7 +329,7 @@ const wirft = async (fn, muster, status) => {
         assert.ok(r.indexOf('Datenbanken.anlegen(') > r.indexOf('INSERT INTO gameservers'), 'Anlegen vor dem INSERT');
         assert.ok(/r\.db_gewuenscht, r\.db_moeglich, r\.db_grund, r\.db_je_server/.test(r), 'Rootserver ohne Datenbank-Angaben');
         assert.ok(/datenbank_fehler: datenbankFehler/.test(r), 'Fehler nicht in der Antwort');
-        const step3 = fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/views/guild/server-create-step3.ejs'), 'utf8');
+        const step3 = ohneKommentareEjs(fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/views/guild/server-create-step3.ejs'), 'utf8'));
         assert.ok(/if \(a\.d\.datenbank_fehler\)/.test(step3), 'Schritt 3 springt weiter und verschluckt den Fehler');
     });
 
@@ -361,6 +361,9 @@ const wirft = async (fn, muster, status) => {
 
     const SCHRITT3 = path.join(WURZEL, 'plugins/gameserver/dashboard/views/guild/server-create-step3.ejs');
     await pruefe('Schritt 3: Schalter nur mit Angebot; Pflicht fest an; Pflicht ohne Angebot nennt den Grund', () => {
+        // Roh mit Absicht: Der Abschnitt beginnt mit seinem EJS-Kommentar
+        // („Datenbank (Stufe 11 S4)"), der ist der Anker zum Ausschneiden und
+        // wird mitgerendert. Ohne Kommentare gäbe es den Anker nicht.
         const q = fs.readFileSync(SCHRITT3, 'utf8');
         const a = q.indexOf('Datenbank (Stufe 11 S4)'), b = q.indexOf('<% if (werte.aufVorgabe > 0) { %>', a);
         const stueck = q.slice(q.lastIndexOf('<%#', a), b);

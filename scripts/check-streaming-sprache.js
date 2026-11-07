@@ -19,7 +19,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const ejs = require('ejs');
-const { ohneKommentareEjs } = require('./lib/quelltext');
+const { ohneKommentare, ohneKommentareEjs } = require('./lib/quelltext');
 
 const WURZEL = path.join(__dirname, '..');
 const P = path.join(WURZEL, 'plugins/streaming/dashboard');
@@ -46,7 +46,7 @@ pruefe('jeder genannte Schlüssel steht in beiden Sprachen', () => {
     const fehlt = [];
     const dateien = SEITEN.map(s => `views/guild/streaming-${s}.ejs`).concat('routes/musik.router.js', 'routes/_shared.js');
     for (const d of dateien) {
-        const q = lies(d);
+        const q = d.endsWith('.ejs') ? ohneKommentareEjs(lies(d)) : ohneKommentare(lies(d));
         for (const m of q.matchAll(/streaming:([A-Z][A-Z_0-9]*(?:\.[A-Za-z_0-9]+)+)/g)) {
             // `'streaming:BEFEHLE.FERTIG.' + wort`: Das Ende bestimmt erst die Laufzeit.
             if (q[m.index + m[0].length] === '.') continue;
@@ -84,7 +84,7 @@ pruefe('kein deutscher Text mehr sichtbar', () => {
 
 pruefe('kein tr() in einem Kommentar, alle Vorlagen kompilieren', () => {
     for (const s of SEITEN) {
-        const q = lies(`views/guild/streaming-${s}.ejs`);
+        const q = ohneKommentareEjs(lies(`views/guild/streaming-${s}.ejs`));
         ejs.compile(q, { filename: path.join(P, `views/guild/streaming-${s}.ejs`) });
         for (const k of q.match(/<%#[\s\S]*?%>|\/\*[\s\S]*?\*\//g) || []) {
             assert.ok(!/tr\('streaming:/.test(k), `${s}: ${k.slice(0, 60)}`);
@@ -134,6 +134,7 @@ pruefe('jede Seite rendert auf Englisch, ohne rohen Schlüssel und ohne deutsche
     };
     for (const s of SEITEN) {
         const f = path.join(P, `views/guild/streaming-${s}.ejs`);
+        // Roh mit Absicht: gerendert wird die echte Vorlage, geprüft die Ausgabe (EJS-Kommentare fallen dabei weg).
         const html = ejs.render(fs.readFileSync(f, 'utf8'), { ...gemeinsam, ...daten[s] },
             { filename: f, includer: () => ({ template: ' ' }) });
         assert.ok(!/streaming:[A-Z]/.test(html), `${s}: roher Schlüssel in der Ausgabe`);
@@ -145,7 +146,7 @@ pruefe('jede Seite rendert auf Englisch, ohne rohen Schlüssel und ohne deutsche
 
 pruefe('Rückfragen im Attribut laufen über JSON.stringify', () => {
     for (const s of SEITEN) {
-        for (const m of lies(`views/guild/streaming-${s}.ejs`).matchAll(/onsubmit="[^"]*"/g)) {
+        for (const m of ohneKommentareEjs(lies(`views/guild/streaming-${s}.ejs`)).matchAll(/onsubmit="[^"]*"/g)) {
             assert.match(m[0], /JSON\.stringify\(tr\(/, `${s}: ${m[0].slice(0, 70)}`);
         }
     }

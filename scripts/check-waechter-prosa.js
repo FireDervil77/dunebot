@@ -67,6 +67,13 @@ const ALLE = process.argv.includes('--alle');
  * BEKANNT ist — nicht, dass sie in Ordnung ist.
  */
 const BEKANNT = new Set([
+    'check-ascii-umlaute.js',        // sucht zeilenweise in Zeichenketten, Zeilennummer im Befund; Grund an der Stelle (2026-11-07)
+    'check-daemon-logs.js',          // rendert die echte Vorlage und prüft die Ausgabe (2026-11-07)
+    'check-datenbanken-reiter.js',   // Schritt 3: der EJS-Kommentar ist der Anker zum Ausschneiden; Grund an der Stelle (2026-11-07)
+    'check-pruefung-abbrechen.js',   // Endmarke ist der Kommentar „// ── Live-Ausgabe“ im Inline-Skript; Grund an der Stelle (2026-11-07)
+    'check-spieler-liste.js',        // rendert die echte Vorlage und prüft die Ausgabe (2026-11-07)
+    'check-streaming-sprache.js',    // rendert die echten Vorlagen und prüft die Ausgabe; Quelltext-Suchen ohne Kommentare (2026-11-07)
+    'check-wartung.js',              // statisches HTML der Wartungsseite und die gebaute Seite, kein JavaScript (2026-11-07)
     'check-adminlte.js',
     'check-anlagenkonten.js',
     'check-chatabos.js',

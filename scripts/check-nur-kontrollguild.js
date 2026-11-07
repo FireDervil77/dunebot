@@ -65,19 +65,19 @@ pruefe('alle anderen Plugins bleiben für jede Guild da', () => mitKontrolle(KON
 console.log('\nJeder Weg');
 pruefe('beide Manager prüfen am Einschalten selbst', () => {
     for (const d of ['apps/dashboard/helpers/PluginManager.js', 'apps/bot/helpers/PluginManager.js']) {
-        const t = lies(d);
+        const t = ohneKommentare(lies(d));
         const kopf = t.indexOf('async enableInGuild(');
         assert.ok(kopf > 0, d);
         assert.match(t.slice(kopf, kopf + 260), /if \(!this\.istVerfuegbar\(pluginName, guildId\)\)\s*\{\s*throw/, d);
     }
 });
 pruefe('Liste und Schalter im Dashboard fragen die Regel, der tote Weg ist weg', () => {
-    const t = lies('apps/dashboard/controllers/guild.controller.js');
+    const t = ohneKommentare(lies('apps/dashboard/controllers/guild.controller.js'));
     assert.strictEqual((t.match(/pluginManager\.istVerfuegbar\(pluginName, guildId\)/g) || []).length, 2);
     assert.ok(!/BOT_OWNER_ID/.test(t), 'config.json-Weg: Den hatte kein Plugin');
 });
 pruefe('die Route einer fremden Guild gibt 404', () => {
-    const t = lies('apps/dashboard/routes/guild.router.js');
+    const t = ohneKommentare(lies('apps/dashboard/routes/guild.router.js'));
     assert.match(t, /istVerfuegbar\(plugin\.name, req\.params\.guildId\)\)\s*\{\s*return res\.status\(404\)/);
     assert.ok(t.indexOf('istVerfuegbar') < t.indexOf('!plugin.guildRouter'), 'die Prüfung muss vor dem Router stehen');
 });
@@ -85,7 +85,7 @@ pruefe('die öffentliche Startseite zeigt interne Plugins nicht', () => {
     assert.match(lies('apps/dashboard/controllers/frontend.controller.js'), /packageJson\.nurKontrollGuild === true\) return null/);
 });
 pruefe('der Bot-Befehl `plugin` bietet sie fremden Guilds nicht an', () => {
-    const t = lies('apps/bot/commands/plugin.js');
+    const t = ohneKommentare(lies('apps/bot/commands/plugin.js'));
     // Drei Listen: list, info, status. `status` nahm bis 2026-11-07 zwei (Menü
     // und Verarbeitung), seitdem eine — `waehlbar` — für beides (F4).
     assert.strictEqual((t.match(/pluginManager\.plugins[\s\S]{0,40}\.filter\(\(?p\)? => !p\.ownerOnly/g) || []).length, 3, 'drei Listen');

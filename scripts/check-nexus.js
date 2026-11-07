@@ -105,12 +105,12 @@ const ohneKommentare = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/
     });
 
     await pruefe('Die Vormerkliste beim Anlegen laesst Nexus nicht durch', async () => {
-        const lies = (datei) => ohneKommentare(fs.readFileSync(
+        const liesOhneKommentare = (datei) => ohneKommentare(fs.readFileSync(
             path.join(WURZEL, 'plugins/gameserver/dashboard', datei), 'utf8'));
-        assert.ok(/\.filter\(m => m\.kennung && Quellen\.gibtEs\(m\.quelle\)\)/.test(lies('routes/servers.js')),
+        assert.ok(/\.filter\(m => m\.kennung && Quellen\.gibtEs\(m\.quelle\)\)/.test(liesOhneKommentare('routes/servers.js')),
             'die Vormerkliste prueft nicht mehr gegen gibtEs');
         for (const datei of ['routes/servers.js', 'index.js']) {
-            assert.ok(!/katalogeAus|waehleKatalog/.test(lies(datei)), `${datei} fragt reine Kataloge`);
+            assert.ok(!/katalogeAus|waehleKatalog/.test(liesOhneKommentare(datei)), `${datei} fragt reine Kataloge`);
         }
     });
 

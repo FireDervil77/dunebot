@@ -45,6 +45,8 @@ function* dateien(ordner) {
 function funde(datei) {
     const json = datei.endsWith('.json');
     const treffer = [];
+    // Roh mit Absicht: Gesucht wird zeilenweise IN Zeichenketten (LITERAL), mit Zeilennummer im Befund.
+    // ohneKommentare schnitte `//` innerhalb von Zeichenketten ab und verschöbe nichts, verlöre aber Treffer.
     fs.readFileSync(datei, 'utf8').split('\n').forEach((zeile, i) => {
         const s = zeile.trim();
         if (/^(\/\/|\*|\/\*)/.test(s) || zeile.includes('Logger') || zeile.includes('console.')) return;

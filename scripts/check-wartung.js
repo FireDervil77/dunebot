@@ -19,6 +19,7 @@ const WURZEL = path.join(__dirname, '..');
 const meldungen = [];
 ServiceManager.register('Logger', { info: (t) => meldungen.push(t), warn: () => {}, error: () => {}, debug: () => {} });
 const Wartung = require('../apps/dashboard/helpers/Wartung');
+const { ohneKommentare } = require('./lib/quelltext');
 
 const lies = (p) => fs.readFileSync(path.join(WURZEL, p), 'utf8');
 let fehler = 0;
@@ -122,6 +123,8 @@ pruefe('Texte und Zwischendateien sind nicht abrufbar', () => {
 console.log('\nSeiten');
 for (const datei of ['neustart.html', 'wartung.vorlage.html']) {
     pruefe(`${datei} braucht nichts vom Dashboard, und alles, was sie lädt, gibt es`, () => {
+        // Roh mit Absicht: statisches HTML der Wartungsseite, kein JavaScript —
+        // ohneKommentare schnitte `//` in Adressen ab, und genau die werden hier geprüft.
         const html = lies(`apps/dashboard/wartung/${datei}`);
         const quellen = [...html.matchAll(/(?:src|href)="([^"]+)"/g)].map(m => m[1]);
         assert.ok(quellen.length >= 4, 'zu wenige Quellen gefunden');

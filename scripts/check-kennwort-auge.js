@@ -15,6 +15,7 @@ const assert = require('assert');
 
 const WURZEL = path.join(__dirname, '..');
 const { ausstatten, durchsuche } = require('../apps/dashboard/themes/default/assets/js/kennwort-auge.js');
+const { ohneKommentare } = require('./lib/quelltext');
 
 let fehler = 0;
 function pruefe(was, tun) {
@@ -196,13 +197,13 @@ pruefe('textregel.js findet seine Meldung auch über die Hülle hinweg', () => {
 
 console.log('\nEingebunden');
 pruefe('im Guild-Bereich eingereiht, also auch unter /admin', () => {
-    const theme = fs.readFileSync(path.join(WURZEL, 'apps/dashboard/themes/default/theme.js'), 'utf8');
+    const theme = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'apps/dashboard/themes/default/theme.js'), 'utf8'));
     assert.match(theme, /registerScript\('kennwort-auge', 'kennwort-auge\.js'/);
     const guild = theme.slice(theme.indexOf("am.enqueueStyle('fonts-guild')"));
     assert.match(guild, /am\.enqueueScript\('kennwort-auge'\)/);
 });
 pruefe('im Browser beobachtet es auch später eingefügte und umgestellte Felder', () => {
-    const js = fs.readFileSync(path.join(WURZEL, 'apps/dashboard/themes/default/assets/js/kennwort-auge.js'), 'utf8');
+    const js = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'apps/dashboard/themes/default/assets/js/kennwort-auge.js'), 'utf8'));
     assert.match(js, /MutationObserver/);
     assert.match(js, /attributeFilter: \['type'\]/);
 });

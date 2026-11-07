@@ -26,7 +26,7 @@ const path = require('path');
 const assert = require('assert');
 const ejs = require('ejs');
 const { ServiceManager } = require('dunebot-core');
-const { ohneKommentare } = require('./lib/quelltext');
+const { ohneKommentare, ohneKommentareEjs } = require('./lib/quelltext');
 
 const WURZEL = path.join(__dirname, '..');
 require('dotenv').config({ path: path.join(WURZEL, 'apps/dashboard/.env'), quiet: true });
@@ -138,9 +138,9 @@ async function pruefe(was, tun) {
             }
         } finally { Object.assign(RootServer, anlegenEcht); }
         assert.deepStrictEqual(angelegt, [true, true, false, false], 'Anlegen reicht den Wunsch nicht weiter');
-        const modell = fs.readFileSync(path.join(WURZEL, 'plugins/masterserver/dashboard/models/RootServer.js'), 'utf8');
+        const modell = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'plugins/masterserver/dashboard/models/RootServer.js'), 'utf8'));
         assert.ok(/db_gewuenscht, db_je_server, sftp_gewuenscht,/.test(modell) && /data\.sftpGewuenscht \? 1 : 0/.test(modell), 'das INSERT kennt sftp_gewuenscht nicht');
-        const detail = fs.readFileSync(path.join(WURZEL, 'plugins/masterserver/dashboard/views/guild/masterserver-rootserver-detail.ejs'), 'utf8');
+        const detail = ohneKommentareEjs(fs.readFileSync(path.join(WURZEL, 'plugins/masterserver/dashboard/views/guild/masterserver-rootserver-detail.ejs'), 'utf8'));
         const v = detail.indexOf('name="sftp_gewuenscht" value="false"'), k = detail.indexOf('id="editSftp" name="sftp_gewuenscht" value="true"');
         assert.ok(v > 0 && k > v, 'das versteckte „false" muss VOR dem Kästchen stehen');
     });

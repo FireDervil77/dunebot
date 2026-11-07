@@ -28,7 +28,7 @@ const vm = require('vm');
 const ejs = require('ejs');
 const WURZEL = path.join(__dirname, '..');
 const { ServiceManager } = require('dunebot-core');
-const { ohneKommentare } = require('./lib/quelltext');
+const { ohneKommentare, ohneKommentareEjs } = require('./lib/quelltext');
 
 let fehler = 0;
 async function pruefe(was, tun) {
@@ -40,7 +40,7 @@ const VORLAGE = 'apps/dashboard/themes/default/views/guild/plugins.ejs';
 
 /** Das Inline-Skript der Seite mit einem kleinen Dokument. */
 function dialog() {
-    const quelle = lies(VORLAGE);
+    const quelle = ohneKommentareEjs(lies(VORLAGE));
     const ab = quelle.indexOf('<script data-abschalten-skript>');
     const skript = quelle.slice(quelle.indexOf('>', ab) + 1, quelle.indexOf('</script>', ab));
     const el = (id) => ({ id, value: '', textContent: '', disabled: false, addEventListener() {} });
@@ -109,7 +109,7 @@ function formular(name, d) {
     });
 
     await pruefe('Vorlage: beide Knöpfe tragen Dialog und Feld, Texte in beiden Sprachen', async () => {
-        const q = lies(VORLAGE);
+        const q = ohneKommentareEjs(lies(VORLAGE));
         ejs.compile(q, { filename: path.join(WURZEL, VORLAGE) });
         assert.strictEqual((q.match(/name="action" value="disable"/g) || []).length, 2);
         assert.strictEqual((q.match(/data-abschalten="<%= p\.name %>"/g) || []).length, 2, 'ein Knopf ohne Dialog');
@@ -126,7 +126,7 @@ function formular(name, d) {
     });
 
     await pruefe('Controller: ohne den Namen kein Abschalten', async () => {
-        const hier = lies('apps/dashboard/controllers/guild.controller.js');
+        const hier = ohneKommentare(lies('apps/dashboard/controllers/guild.controller.js'));
         const ab = hier.indexOf("} else if (action === 'disable')");
         const zweig = hier.slice(ab, hier.indexOf('disableInGuild', ab));
         assert.match(zweig, /plugins\.some\(plugin => plugin !== bestaetigung\)/);

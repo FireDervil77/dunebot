@@ -98,7 +98,7 @@ const lies = (rel) => fs.readFileSync(path.join(WURZEL, rel), 'utf8');
     console.log('\nDateien über 10 MB (F4)');
 
     await pruefe('Prüfvektor: dieselbe Zahl wie DateiUnterschrift im Daemon', async () => {
-        const go = lies('../firebot_daemon/internal/sicherungsabruf/datei_test.go');
+        const go = ohneKommentare(lies('../firebot_daemon/internal/sicherungsabruf/datei_test.go'));
         const vektor = /const erwartet = "([0-9a-f]{64})"/.exec(go);
         assert.ok(vektor, 'kein Prüfvektor im Go-Test');
         const js = crypto.createHmac('sha256', 'schluessel').update('datei\n209\nlogs/server.log\n1790000000').digest('hex');

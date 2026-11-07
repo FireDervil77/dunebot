@@ -26,7 +26,7 @@ const fs = require('fs');
 const path = require('path');
 const WURZEL = path.join(__dirname, '..');
 const { ServiceManager } = require('dunebot-core');
-const { ohneKommentare } = require('./lib/quelltext');
+const { ohneKommentare, ohneKommentareEjs } = require('./lib/quelltext');
 
 let fehler = 0;
 async function pruefe(was, tun) {
@@ -59,7 +59,7 @@ const lies = (rel) => fs.readFileSync(path.join(WURZEL, rel), 'utf8');
     await pruefe('Fuß „x % der Buchung" vom Server, live gezeichnet', async () => {
         assert.strictEqual(S.baueCpu(24, 800).fuss, '3 % der Buchung');
         assert.strictEqual(S.baueCpu(24, null).fuss, 'keine Grenze gebucht');
-        const v = lies('plugins/gameserver/dashboard/views/guild/server-detail.ejs');
+        const v = ohneKommentareEjs(lies('plugins/gameserver/dashboard/views/guild/server-detail.ejs'));
         assert.ok(!/100 % ist ein Kern/.test(v), 'der alte Fuß steht noch da');
         assert.match(v, /data-fb-live="messfuss-cpu" data-fb-server="<%= server.id %>"><%= mw\.cpu \? mw\.cpu\.fuss/);
         assert.match(v, /data-fb-live="messfuss-ram" data-fb-server="<%= server.id %>"><%= mw\.ram \? mw\.ram\.fuss/);
@@ -89,7 +89,7 @@ const lies = (rel) => fs.readFileSync(path.join(WURZEL, rel), 'utf8');
         const q = ohneKommentare(lies('plugins/gameserver/dashboard/helpers/Serverseite.js'));
         const kennzahlen = q.slice(q.indexOf('function baueKennzahlen'), q.indexOf('function baueCpu'));
         assert.match(kennzahlen, /cpuText = .*baueCpu\(cpu, zahlOderNull\(server\.allocated_cpu_percent\)\)\.text/);
-        const vorlage = lies('plugins/gameserver/dashboard/views/guild/partials/server-detail-uebersicht.ejs');
+        const vorlage = ohneKommentareEjs(lies('plugins/gameserver/dashboard/views/guild/partials/server-detail-uebersicht.ejs'));
         assert.ok(/u\.kennzahlen\.cpuText/.test(vorlage), 'die Übersicht zeigt cpuText nicht');
         assert.ok(!/kennzahlen\.cpu\.toFixed/.test(vorlage), 'die Übersicht formatiert die CPU wieder selbst');
     });

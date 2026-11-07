@@ -69,8 +69,8 @@ pruefe('der Fahrplan kennt sie nicht, und beide Kopien sind gleich', () => {
 // Seit 2026-11-03 liest der Bahnhof die Leitungen, nicht mehr das Dashboard. Die
 // Grenze, die dort gilt, steht in `internal/bahnhof/bahnhof.go`.
 pruefe('dieselbe Nachrichtengrenze in Daemon und Bahnhof', () => {
-    const bahnhof = eval(/maxNachrichtBytes = ([0-9 <]+)/.exec(lies(DAEMON, 'internal/bahnhof/bahnhof.go'))[1]);
-    const daemon = eval(/const MaxNachrichtBytes = ([0-9 *]+)/.exec(lies(DAEMON, 'internal/websocket/client.go'))[1]);
+    const bahnhof = eval(/maxNachrichtBytes = ([0-9 <]+)/.exec(ohneKommentare(lies(DAEMON, 'internal/bahnhof/bahnhof.go')))[1]);
+    const daemon = eval(/const MaxNachrichtBytes = ([0-9 *]+)/.exec(ohneKommentare(lies(DAEMON, 'internal/websocket/client.go')))[1]);
     assert.strictEqual(bahnhof, GRENZE);
     assert.strictEqual(daemon, GRENZE);
 });
@@ -86,7 +86,7 @@ pruefe('Dashboard: unterschriebene Adressen sind https und prüfen genau ein Zer
 });
 
 pruefe('Daemon: Unterschriebenes nur auf dem TLS-Zweig, FastDL nur im Klartext', () => {
-    const abruf = lies(DAEMON, 'internal/sicherungsabruf/abruf.go');
+    const abruf = ohneKommentare(lies(DAEMON, 'internal/sicherungsabruf/abruf.go'));
     const sicher = abruf.split('\n').filter(z => z.includes('sicherMux.HandleFunc')).join('\n');
     const klar = abruf.split('\n').filter(z => z.includes('klarMux.HandleFunc')).join('\n');
     for (const pfad of ['PFAD', 'PfadDatei', 'PfadInhalt']) {
@@ -99,7 +99,7 @@ pruefe('Daemon: Unterschriebenes nur auf dem TLS-Zweig, FastDL nur im Klartext',
 
 pruefe('die Anmeldung trägt das Zertifikat bis in die Spalte', () => {
     assert.match(lies(DAEMON, 'internal/websocket/client.go'), /registerPayload\["abruf_zertifikat"\]/);
-    const ipm = lies(WURZEL, 'apps/dashboard/helpers/IPMServer.js');
+    const ipm = ohneKommentare(lies(WURZEL, 'apps/dashboard/helpers/IPMServer.js'));
     // Eine Anmeldung, die versiegelte (F20).
     assert.strictEqual((ipm.match(/abrufZertifikat: abruf_zertifikat \?\? null/g) || []).length, 1);
     assert.match(lies(WURZEL, 'plugins/masterserver/dashboard/models/RootServer.js'), /fields\.push\('abruf_zertifikat = \?'\)/);

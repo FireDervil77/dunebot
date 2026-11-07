@@ -103,7 +103,7 @@ function konsole(s) {
         assert.deepStrictEqual(falsch, []);
     });
     await pruefe('Konsole und Übersicht laden den Client vor sich', () => {
-        const index = fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/index.js'), 'utf8');
+        const index = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/index.js'), 'utf8'));
         for (const name of ['gameserver-console', 'gameserver-overview', 'gameserver-live']) {
             const stelle = index.indexOf(`registerScript('${name}'`);
             assert.ok(stelle >= 0, name);

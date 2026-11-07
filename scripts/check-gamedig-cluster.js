@@ -21,6 +21,7 @@ const cluster = require('cluster');
 const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
+const { ohneKommentare } = require('./lib/quelltext');
 
 const ABSTURZ = 7;
 
@@ -53,7 +54,7 @@ if (!cluster.isPrimary) {
             assert.strictEqual(await lauf('ja'), 0);
         });
         await pruefe('der QueryService legt ihn vor jeder Abfrage an', () => {
-            const t = fs.readFileSync(path.join(__dirname, '../plugins/gameserver/dashboard/helpers/QueryService.js'), 'utf8');
+            const t = ohneKommentare(fs.readFileSync(path.join(__dirname, '../plugins/gameserver/dashboard/helpers/QueryService.js'), 'utf8'));
             assert.match(t, /await udpSocketBereit\(\);\s*const state = await GameDig\.query\(/);
             assert.strictEqual((t.match(/GameDig\.query\(/g) || []).length, 1, 'jede Abfrage braucht den Vorab-Socket');
         });

@@ -16,7 +16,7 @@
 const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
-const { ohneKommentare } = require('./lib/quelltext');
+const { ohneKommentare, ohneKommentareEjs } = require('./lib/quelltext');
 
 const WURZEL = path.join(__dirname, '..');
 require('dotenv').config({ path: path.join(WURZEL, 'apps/dashboard/.env'), quiet: true });
@@ -68,7 +68,7 @@ async function pruefe(was, tun) {
 
     console.log('\nSperre');
     await pruefe('Start, Neustart und Neuinstallation fragen die Sperre, Stoppen nicht', () => {
-        const t = lies('plugins/gameserver/dashboard/routes/servers.js');
+        const t = ohneKommentare(lies('plugins/gameserver/dashboard/routes/servers.js'));
         for (const r of ['start', 'restart', 'reinstall']) {
             assert.match(t, new RegExp(`router\\.post\\('/:serverId/${r}', require\\('\\.\\./helpers/Modpackstand'\\)\\.sperre`), r);
         }
@@ -83,14 +83,14 @@ async function pruefe(was, tun) {
         assert.deepStrictEqual(antworten, [409, 'weiter']);
     });
     await pruefe('die Antwort wartet nicht aufs Ende, und ein Wurf beendet den Vorgang trotzdem', () => {
-        const t = lies('plugins/gameserver/dashboard/routes/inhalte.js');
+        const t = ohneKommentare(lies('plugins/gameserver/dashboard/routes/inhalte.js'));
         const stelle = t.indexOf('res.status(202)');
         assert.ok(stelle > 0 && stelle < t.indexOf('InhalteHolen.installiereModpack({'), 'Der Apache gibt nach 10 Minuten auf');
         assert.match(t, /installiereModpack\(\{[\s\S]{0,800}\(fehler\) => \{[\s\S]{0,200}success: false[\s\S]{0,200}\.then\(ergebnis => Modpackstand\.beende\(/);
     });
 
     console.log('\nMods-Seite');
-    const seite = fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/views/guild/partials/server-detail-inhalte.ejs'), 'utf8');
+    const seite = ohneKommentareEjs(fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/views/guild/partials/server-detail-inhalte.ejs'), 'utf8'));
     await pruefe('die Karte nennt, wann das Paket installiert wurde', () => {
         assert.match(seite, /Zuletzt installiert: \$\{escape\(modpackZeit\(m\.installiert_am\)\)\}/);
     });
@@ -139,7 +139,7 @@ async function pruefe(was, tun) {
         assert.deepStrictEqual(kurzstand({ modpack: { status: 'installiert', name: 'NanoMagic' },
             mods: [{ status: 'installiert', name: 'A' }, { status: 'geplant', name: 'B' }] }),
             { modpack: 'NanoMagic', anzahl: 1, namen: ['A'] });
-        const seite = lies('plugins/gameserver/dashboard/views/guild/server-detail.ejs');
+        const seite = ohneKommentareEjs(lies('plugins/gameserver/dashboard/views/guild/server-detail.ejs'));
         require('ejs').compile(seite, { filename: 'server-detail.ejs' });
         assert.match(lies('plugins/gameserver/dashboard/routes/servers.js'), /Inhalte\.fuerServer\(server\.id\)\.then\(Inhalte\.kurzstand/);
     });

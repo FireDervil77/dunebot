@@ -26,7 +26,7 @@ const path = require('path');
 const ejs = require('ejs');
 const WURZEL = path.join(__dirname, '..');
 const { ServiceManager } = require('dunebot-core');
-const { ohneKommentare } = require('./lib/quelltext');
+const { ohneKommentare, ohneKommentareEjs } = require('./lib/quelltext');
 
 let fehler = 0;
 async function pruefe(was, tun) {
@@ -86,7 +86,7 @@ const lies = (rel) => fs.readFileSync(path.join(WURZEL, rel), 'utf8');
 
     await pruefe('Seite: Wahl nur mit Fernsteuerung, Skript schreibt Befehl und Antwort als Hinweis', async () => {
         const datei = path.join(WURZEL, 'plugins/werkbank/dashboard/views/guild/werkbank-sitzung.ejs');
-        const quelle = fs.readFileSync(datei, 'utf8');
+        const quelle = ohneKommentareEjs(fs.readFileSync(datei, 'utf8'));
         ejs.compile(quelle, { filename: datei });
         const form = quelle.slice(quelle.indexOf('<form id="formEingabe"'), quelle.indexOf('</form>', quelle.indexOf('<form id="formEingabe"')));
         assert.match(form, /<% if \(_fern\.rcon\) \{ %>[\s\S]*name="weg"[\s\S]*value="rcon"[\s\S]*<% \} %>/, 'die Wahl hängt nicht an der Fernsteuerung');

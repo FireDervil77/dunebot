@@ -85,7 +85,7 @@ function zuweisungen(quelle) {
     });
 
     await pruefe('IPC-Wege: der Fehlerzweig schreibt error_message', async () => {
-        const ipc = lies('apps/dashboard/helpers/IPCServer.js');
+        const ipc = ohneKommentare(lies('apps/dashboard/helpers/IPCServer.js'));
         const fehlend = [];
         for (const t of alle.filter(x => x.datei.endsWith('IPCServer.js'))) {
             const ab = ipc.indexOf(`if (!${t.name}?.success)`);

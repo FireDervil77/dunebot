@@ -24,7 +24,7 @@ const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
 const { ServiceManager } = require('dunebot-core');
-const { ohneKommentare } = require('./lib/quelltext');
+const { ohneKommentare, ohneKommentareEjs } = require('./lib/quelltext');
 
 const WURZEL = path.join(__dirname, '..');
 require('dotenv').config({ path: path.join(WURZEL, 'apps/dashboard/.env'), quiet: true });
@@ -162,7 +162,7 @@ async function pruefe(was, tun) {
         assert.strictEqual(bauePaketkarte({ spielfassung_build: '513885', spielfassung_label: '1.2.4.1' }, p).spiel, '1.2.4.1 (Build 513885)');
         assert.strictEqual(bauePaketkarte({ spielfassung_build: '513885' }, p).spiel, '513885');
         assert.strictEqual(bauePaketkarte({}, p).spiel, null);
-        const ansicht = fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/views/guild/partials/server-detail-uebersicht.ejs'), 'utf8');
+        const ansicht = ohneKommentareEjs(fs.readFileSync(path.join(WURZEL, 'plugins/gameserver/dashboard/views/guild/partials/server-detail-uebersicht.ejs'), 'utf8'));
         assert.ok(ansicht.includes("['Spiel', u.paket.spiel]"), 'die Zeile steht nicht in der Seite');
     });
 
