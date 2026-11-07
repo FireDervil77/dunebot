@@ -725,10 +725,19 @@ router.post('/:serverId/inhalte/modpack', requirePermission('GAMESERVER.FILES.MA
         // Wie es ausgeht, erfahren alle Tabs über den Live-Kanal.
         res.status(202).json({ success: true, gestartet: true });
 
-        Modpackstand.nachStopp(geladen.server.id, guildId, () => InhalteHolen.installiereModpack({
-            server: geladen.server, guildId, paket, laderDesServers: lader,
-            beiFortschritt: (teil) => Modpackstand.fortschritt(geladen.server.id, teil),
-        })).then((ergebnis) => {
+        // **Erst pruefen, dann stoppen** (K190, Betreiber 2026-11-07). Passt
+        // das Paket nicht in den gebuchten Platz oder nicht zum Lader, bleibt
+        // der Server, wie er ist — vorher wurde erst gestoppt und dann
+        // festgestellt, dass es nicht geht.
+        const beiFortschritt = (teil) => Modpackstand.fortschritt(geladen.server.id, teil);
+        InhalteHolen.pruefeModpack({ server: geladen.server, paket, laderDesServers: lader, beiFortschritt })
+            .then(pruefung => (!pruefung.passt
+                ? { success: false, fehler: pruefung.fehler, platz: pruefung.zahlen || null, nichtGestoppt: true }
+                : Modpackstand.nachStopp(geladen.server.id, guildId, () => InhalteHolen.installiereModpack({
+                    server: geladen.server, guildId, paket, laderDesServers: lader,
+                    abgleich: pruefung.abgleich, beiFortschritt,
+                }))))
+        .then((ergebnis) => {
             if (ergebnis.success) {
                 Logger.info(`[Gameserver/Inhalte] Modpack ${paket.kennung} ${paket.fassung} `
                     + `auf Server ${geladen.server.id}`);
@@ -742,8 +751,9 @@ router.post('/:serverId/inhalte/modpack', requirePermission('GAMESERVER.FILES.MA
             // Die Liste kann Tausende Namen lang sein, die Browser brauchen die Zahl.
             aufgeraeumt: { blieb: (ergebnis.aufgeraeumt?.blieb || []).length },
             ...wirkung(geladen),
-            // `geladen` kennt den Status von vor dem Stopp.
-            laeuft: false,
+            // `geladen` kennt den Status von vor dem Stopp — nach einer
+            // Ablehnung in der Vorpruefung gab es keinen.
+            laeuft: ergebnis.nichtGestoppt ? wirkung(geladen).laeuft : false,
         })).catch(fehler => Logger.error('[Gameserver/Inhalte] Modpack-Stand nicht beendet:', fehler));
         return undefined;
     } catch (error) {

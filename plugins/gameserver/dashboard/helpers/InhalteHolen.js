@@ -685,24 +685,127 @@ async function aktualisiere({ server, inhalt, guildId, zeile, spielfassung = nul
  */
 const MODPACK_FRIST_MS = 1800000; // 30 Minuten
 
-async function installiereModpack({ server, guildId, paket, laderDesServers, beiFortschritt = () => {} }) {
-    const Logger = ServiceManager.get('Logger');
-    const dbService = ServiceManager.get('dbService');
-    const ipmServer = ServiceManager.get('ipmServer');
+/** So lange darf die Vorpruefung dauern: Sie laedt nur das Archiv. */
+const MODPACK_PRUEF_FRIST_MS = 600000; // 10 Minuten
 
+/**
+ * Die Bedingung, unter der ein Modpack ohne Neuinstallation geht.
+ *
+ * Sie steht hier und nicht nur in der Suche: Eine Kennung kommt nicht nur aus
+ * einer Trefferliste (Adresszeile, spaeterer Discord-Befehl, ein
+ * Wiederholversuch auf einer alten Zeile). Dieselbe Ueberlegung wie bei den
+ * zwei Toren gegen Modpacks in der Mod-Suche.
+ *
+ * @throws {Error} wenn das Paket einen anderen Lader verlangt
+ */
+function pruefeLader(paket, laderDesServers) {
     if (!paket?.url) throw new Error('Das Modpack nennt keine Datei');
-
-    // ── Die Bedingung, unter der das ohne Neuinstallation geht ─────────────
-    //
-    // Sie steht hier und nicht nur in der Suche: Eine Kennung kommt nicht nur
-    // aus einer Trefferliste (Adresszeile, spaeterer Discord-Befehl, ein
-    // Wiederholversuch auf einer alten Zeile). Dieselbe Ueberlegung wie bei den
-    // zwei Toren gegen Modpacks in der Mod-Suche.
     if (laderDesServers && paket.lader && paket.lader !== laderDesServers) {
         throw new Error(`„${paket.name}" verlangt ${paket.lader}, dieser Server laeuft mit `
             + `${laderDesServers}. Ein Modpack bestimmt den Lader — das waere eine `
             + 'Neuinstallation, keine Ergaenzung.');
     }
+}
+
+/**
+ * Reine Client-Mods, die das Paket nicht als solche ausweist.
+ *
+ * Modrinth wird gefragt, der Daemon bekommt die Pruefsummen (siehe
+ * `Modrinth.clientDateien`). Scheitert die Nachfrage, wird trotzdem
+ * installiert — wie vor dem Abgleich, nur mit dem, was das Paket selbst sagt.
+ * Das steht dann im Protokoll UND im Ergebnis: Ein Abgleich, der still
+ * ausfaellt, saehe aus wie einer, der nichts gefunden hat.
+ *
+ * @returns {Promise<{abgleich: Object, abgleichFehler: string|null}>}
+ */
+async function holeAbgleich(paket) {
+    try {
+        // Erst hier geladen: Modrinth.js und diese Datei kennen einander.
+        return { abgleich: await require('./Modrinth').clientDateien(paket.kennung, paket.fassung), abgleichFehler: null };
+    } catch (fehler) {
+        ServiceManager.get('Logger').warn(`[Gameserver/Modpack] ${paket.kennung} ${paket.fassung}: Abgleich mit Modrinth nicht möglich `
+            + `(${fehler.message}) — installiert wird nach den Angaben des Pakets allein`);
+        return { abgleich: { sha1: [], namen: [], geprueft: 0, ohneAuskunft: 0 }, abgleichFehler: fehler.message };
+    }
+}
+
+/**
+ * Passt das Modpack in den gebuchten Platz? — BEVOR der Server gestoppt wird
+ * (Kassensturz K190, Baustelle 151, 2026-11-07).
+ *
+ * Bis hierhin stoppte die Route zuerst, und der Daemon pruefte nur das
+ * Archiv. Die Mods, bei Pixelmon rund 600 MB, kamen ungeprueft dazu — das
+ * Paket landete ganz, und danach startete der Server nicht mehr, weil er ueber
+ * seiner Grenze lag. Betreiber: „Erst pruefen, dann stoppen".
+ *
+ * Der Daemon laedt das Archiv, rechnet den Bedarf und schreibt den Platz des
+ * alten Pakets gut (`weicht`: dessen Dateien entfernt die Installation zuerst).
+ * Passt es, haelt er das Archiv vor, und die Installation laedt es nicht noch
+ * einmal. Er prueft dort ein zweites Mal.
+ *
+ * @returns {Promise<{passt: boolean, fehler?: string, abgleich?: Object, zahlen?: Object}>}
+ */
+async function pruefeModpack({ server, paket, laderDesServers, beiFortschritt = () => {} }) {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    const ipmServer = ServiceManager.get('ipmServer');
+
+    try {
+        pruefeLader(paket, laderDesServers);
+    } catch (fehler) {
+        return { passt: false, fehler: fehler.message };
+    }
+    const daemonId = await daemonVon(dbService, server);
+    if (!daemonId) return { passt: false, fehler: 'Kein Daemon zugewiesen' };
+    if (!ipmServer?.isDaemonOnline(daemonId)) return { passt: false, fehler: 'Daemon ist offline' };
+
+    beiFortschritt({ phase: 'abgleich' });
+    const abgleich = await holeAbgleich(paket);
+
+    const { modpack: altes } = await Inhalte.fuerServer(server.id);
+    const weicht = altes && altes.status === 'installiert' ? Inhalte.dateienAus(altes) : [];
+
+    beiFortschritt({ phase: 'pruefen' });
+    const antwort = await ipmServer.sendCommand(daemonId, 'gameserver.content.modpack.pruefen', {
+        server_id:     String(server.id),
+        rootserver_id: String(server.rootserver_id),
+        install_path:  server.install_path,
+        adresse:       paket.url,
+        sha1:          paket.sha1 || '',
+        auslassen:     abgleich.abgleich.sha1,
+        weicht,
+    }, MODPACK_PRUEF_FRIST_MS).catch(fehler => ({ success: false, error: fehler.message }));
+
+    if (!antwort?.success) {
+        const grund = antwort?.error || 'Der Daemon hat nicht geantwortet';
+        // Ein Daemon vor dieser Fassung kennt den Befehl nicht. Dann wird
+        // nicht ohne Pruefung eingespielt — sonst gaebe es zwei Wege.
+        const alt = /unbekannt/i.test(grund) ? ' Der Daemon kennt die Vorprüfung noch nicht — erst den Daemon aktualisieren.' : '';
+        Logger.warn(`[Gameserver/Modpack] ${paket.kennung} ${paket.fassung}: Vorprüfung gescheitert: ${grund}`);
+        return { passt: false, fehler: `Vorprüfung gescheitert: ${grund}.${alt} Am Server wurde nichts geändert.` };
+    }
+
+    const d = antwort.data || {};
+    const zahlen = { bedarf: d.bedarf_bytes, grenze: d.grenze_bytes, belegt: d.belegt_bytes, wirdFrei: d.wird_frei_bytes };
+    if (!d.passt) {
+        const grund = String(d.grund || 'Der Platz reicht nicht.');
+        Logger.info(`[Gameserver/Modpack] ${paket.kennung} ${paket.fassung} passt nicht auf Server ${server.id}: ${grund}`);
+        return { passt: false, zahlen, fehler: `${grund.charAt(0).toUpperCase()}${grund.slice(1)}. Am Server wurde nichts geändert.` };
+    }
+    if (!d.gemessen) {
+        // Wie DarfSchreiben im Daemon: Ein Messfehler verhindert nichts, wird aber gesagt.
+        Logger.warn(`[Gameserver/Modpack] Server ${server.id}: ${d.grund || 'Platz nicht messbar'} — eingespielt wird trotzdem`);
+    }
+    return { passt: true, zahlen, abgleich };
+}
+
+async function installiereModpack({ server, guildId, paket, laderDesServers, abgleich: vorher = null,
+    beiFortschritt = () => {} }) {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    const ipmServer = ServiceManager.get('ipmServer');
+
+    pruefeLader(paket, laderDesServers);
 
     const daemonId = await daemonVon(dbService, server);
     if (!daemonId) throw new Error('Kein Daemon zugewiesen');
@@ -746,22 +849,10 @@ async function installiereModpack({ server, guildId, paket, laderDesServers, bei
 
     // ── Reine Client-Mods, die das Paket nicht als solche ausweist ──────────
     //
-    // Modrinth wird gefragt, der Daemon bekommt die Pruefsummen (siehe
-    // `Modrinth.clientDateien`). Scheitert die Nachfrage, wird trotzdem
-    // installiert — wie vor dem Abgleich, nur mit dem, was das Paket selbst
-    // sagt. Das steht dann im Protokoll UND im Ergebnis: Ein Abgleich, der
-    // still ausfaellt, saehe aus wie einer, der nichts gefunden hat.
-    beiFortschritt({ phase: 'abgleich' });
-    let abgleich = { sha1: [], namen: [], geprueft: 0, ohneAuskunft: 0 };
-    let abgleichFehler = null;
-    try {
-        // Erst hier geladen, wie weiter unten: Modrinth.js und diese Datei kennen einander.
-        abgleich = await require('./Modrinth').clientDateien(paket.kennung, paket.fassung);
-    } catch (fehler) {
-        abgleichFehler = fehler.message;
-        Logger.warn(`[Gameserver/Modpack] ${paket.kennung} ${paket.fassung}: Abgleich mit Modrinth nicht möglich `
-            + `(${fehler.message}) — installiert wird nach den Angaben des Pakets allein`);
-    }
+    // Die Vorpruefung hat Modrinth schon gefragt; dieselbe Antwort, damit
+    // Pruefung und Installation dieselben Dateien meinen.
+    if (!vorher) beiFortschritt({ phase: 'abgleich' });
+    const { abgleich, abgleichFehler } = vorher || await holeAbgleich(paket);
 
     const antwort = await ipmServer.sendCommand(daemonId, 'gameserver.content.modpack', {
         server_id:     String(server.id),
@@ -924,5 +1015,5 @@ async function holeGeplantesModpack({ server, guildId }) {
 module.exports = {
     daemonVon, istLader,
     vorschau, installiere, holeGeplante, aktualisiere, entferneDateien, entferneMitWaisen,
-    installiereModpack, holeGeplantesModpack, fremdeModDateien, MOD_ORDNER,
+    installiereModpack, pruefeModpack, holeGeplantesModpack, fremdeModDateien, MOD_ORDNER,
 };

@@ -271,7 +271,8 @@ const Modrinth = require(path.join(WURZEL, 'plugins/gameserver/dashboard/helpers
     const holenAbgleich = ohneKommentare(roh(path.join(WURZEL, 'plugins/gameserver/dashboard/helpers/InhalteHolen.js')) || '');
     pruefe(/auslassen:\s+abgleich\.sha1/.test(holenAbgleich) && holenAbgleich.includes("require('./Modrinth').clientDateien(paket.kennung, paket.fassung)"),
         'der Auftrag „Modpaket einspielen" schickt die Pruefsummen mit');
-    pruefe(/abgleichFehler = fehler\.message/.test(holenAbgleich) && /Abgleich mit Modrinth nicht möglich/.test(holenAbgleich) && /fehler: abgleichFehler/.test(holenAbgleich),
+    // Seit K190 (2026-11-07) in `holeAbgleich`, das Pruefung und Installation teilen.
+    pruefe(/abgleichFehler: fehler\.message/.test(holenAbgleich) && /Abgleich mit Modrinth nicht möglich/.test(holenAbgleich) && /fehler: abgleichFehler/.test(holenAbgleich),
         'faellt die Nachfrage aus, steht das im Protokoll und im Ergebnis',
         'Ein Abgleich, der still ausfaellt, sieht aus wie einer, der nichts gefunden hat.');
     pruefe(/daten\.ausgelassen_abgleich !== undefined/.test(holenAbgleich),
