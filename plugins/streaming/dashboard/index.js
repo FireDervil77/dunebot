@@ -434,46 +434,22 @@ class StreamingDashboardPlugin extends DashboardPlugin {
     }
 
     /**
-     * Plugin in einer Guild deaktivieren.
+     * Plugin in einer Guild deaktivieren - Navigation entfernen.
      *
-     * Entfernt werden die Ziele DIESER Guild - nicht die Streamer. Die sind
-     * global und gehoeren anderen Guilds mit; wer sie hier loeschte, naehme
-     * fremden Servern ihre Ankuendigungen weg.
-     *
+     * Die Zeilen der Guild löscht der Kern nach `guildInhalte` in package.json
+     * (K067, 2026-11-07); hier bleibt, was außerhalb der eigenen Tabellen liegt.
+     * Die Streamer stehen nicht in der Liste: Sie sind global
+     * (`heim_guild_id`, keine `guild_id`) und gehoeren anderen Guilds mit; wer
+     * sie hier loeschte, naehme fremden Servern ihre Ankuendigungen weg.
      * Die verwaisten Abos raeumt der taegliche Abgleich ab (Stufe 6).
      *
      * @param {string} guildId Discord-Guild-ID
      * @returns {Promise<boolean>} true bei Erfolg
      */
     async onGuildDisable(guildId) {
-        const Logger = ServiceManager.get('Logger');
-        const dbService = ServiceManager.get('dbService');
-
-        try {
-            await ServiceManager.get('navigationManager').removeNavigation(this.name, guildId);
-
-            // Reihenfolge zaehlt wegen der Fremdschluessel auf den Zielen
-            const abfragen = [
-                `DELETE FROM streaming_messages
-                  WHERE target_id IN (SELECT id FROM streaming_targets WHERE guild_id = ?)`,
-                'DELETE FROM streaming_outbox  WHERE guild_id = ?',
-                'DELETE FROM streaming_targets WHERE guild_id = ?'
-            ];
-
-            for (const sql of abfragen) {
-                try {
-                    await dbService.query(sql, [guildId]);
-                } catch (e) {
-                    if (e.code !== 'ER_NO_SUCH_TABLE') throw e;
-                }
-            }
-
-            Logger.success(`[Streaming] Ziele der Guild ${guildId} entfernt (Streamer bleiben - sie sind global)`);
-            return true;
-        } catch (error) {
-            Logger.error(`[Streaming] Fehler beim Deaktivieren fuer Guild ${guildId}:`, error);
-            throw error;
-        }
+        await ServiceManager.get('navigationManager').removeNavigation(this.name, guildId);
+        ServiceManager.get('Logger').info(`[Streaming] Plugin fuer Guild ${guildId} deaktiviert (Streamer bleiben - sie sind global)`);
+        return true;
     }
 
     /**

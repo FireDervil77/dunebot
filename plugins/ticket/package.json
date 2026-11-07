@@ -5,11 +5,22 @@
     "version": "1.5.3",
     "author": "FireBot Team",
     "license": "none",
-    "type":"commonjs",
+    "type": "commonjs",
     "peerDependencies": {
         "discord.js": "^14.19.0",
         "express": "^5.1.0",
         "dunebot-core": "*",
         "dunebot-sdk": "*"
+    },
+    "guildInhalte": {
+        "loeschen": [
+            "ticket_feedback",
+            "ticket_transcripts",
+            "tickets",
+            "ticket_auto_responses",
+            "ticket_categories",
+            "ticket_tags",
+            "ticket_settings"
+        ]
     }
 }

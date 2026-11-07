@@ -5,11 +5,20 @@
     "version": "1.8.2",
     "author": "FireBot Team",
     "license": "none",
-    "type":"commonjs",
+    "type": "commonjs",
     "peerDependencies": {
         "discord.js": "^14.19.0",
         "express": "^5.1.0",
         "dunebot-core": "*",
         "dunebot-sdk": "*"
+    },
+    "guildInhalte": {
+        "loeschen": [
+            "moderation_channel_rules",
+            "moderation_logs",
+            "moderation_notes",
+            "moderation_protected_roles",
+            "moderation_settings"
+        ]
     }
 }

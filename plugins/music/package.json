@@ -14,5 +14,15 @@
         "@discordjs/voice": "^0.19.2",
         "play-dl": "^1.9.7",
         "ffmpeg-static": "^5.3.0"
+    },
+    "guildInhalte": {
+        "loeschen": [
+            "music_queue",
+            "music_sessions",
+            "music_playlists",
+            "music_history",
+            "music_files",
+            "music_settings"
+        ]
     }
 }

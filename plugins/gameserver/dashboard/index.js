@@ -345,178 +345,73 @@ class GameserverPlugin extends DashboardPlugin {
 
 
     /**
-     * Guild-spezifische Deaktivierung
-     * 
-     * Cleanup-Prozess:
-     * 1. Alle Gameserver der Guild laden
-     * 2. Laufende Server stoppen (IPM)
-     * 3. Server-Dateien deinstallieren (IPM)
-     * 4. Gameserver aus DB löschen
-     * 5. Private Addons & Templates löschen
-     * 
-     * ⚠️ Öffentliche Addons bleiben erhalten (Community-Ressource)!
-     * 
+     * Guild-spezifische Deaktivierung: alle Gameserver der Guild löschen.
+     *
+     * Jeder Server geht den Weg des normalen Löschens (`Loeschung`, K067,
+     * 2026-11-07): stoppen und auf die Meldung warten, Datenbanken im
+     * Container, Dateien, Ports, SFTP-Zugänge, Zeile. Bis dahin hatte das
+     * Abschalten einen eigenen, kürzeren Weg — die Datenbanken blieben im
+     * Container, Ports und SFTP-Zugänge wurden nicht freigegeben.
+     *
+     * Erzwungen wie „Trotzdem löschen": Ist ein Daemon offline, gehen die
+     * Zeilen, die Dateien bleiben auf der Maschine (steht im Log). Kommt ein
+     * Server nicht sicher herunter, bleibt er — dann wirft diese Methode, der
+     * Kern bricht das Abschalten ab, und das Plugin bleibt an (Betreiber
+     * 2026-11-07).
+     *
+     * Die übrigen Zeilen der Guild löscht danach der Kern nach `guildInhalte`
+     * in package.json. Private Pakete löscht diese Methode selbst: In
+     * `addon_marketplace` ist `guild_id` die Guild, die ein Paket eingestellt
+     * hat, und öffentliche gehören allen (Community-Ressource).
+     *
      * @param {string} guildId - Discord Guild ID
-     * @throws {Error} Bei kritischen Fehlern während des Cleanup
+     * @throws {Error} Wenn ein Server im Umzug ist oder nicht gelöscht werden konnte
      */
     async onGuildDisable(guildId) {
         const Logger = ServiceManager.get('Logger');
         const dbService = ServiceManager.get('dbService');
-        const ipmServer = ServiceManager.get('ipmServer');
-        const navigationManager = ServiceManager.get('navigationManager');
-        
-        try {
-            Logger.warn(`[Gameserver] Deaktiviere Plugin für Guild ${guildId} - Cleanup starten...`);
-            
-            // ════════════════════════════════════════════════════════════
-            // 1. Alle Gameserver der Guild holen
-            // ════════════════════════════════════════════════════════════
-            const servers = await dbService.query(`
-                SELECT 
-                    gs.*,
-                    r.daemon_id,
-                    r.system_user,
-                    am.name as addon_name,
-                    am.slug as addon_slug
-                FROM gameservers gs
-                LEFT JOIN rootserver r ON gs.rootserver_id = r.id
-                LEFT JOIN addon_marketplace am ON gs.addon_marketplace_id = am.id
-                WHERE gs.guild_id = ?
-            `, [guildId]);
-            
-            Logger.info(`[Gameserver] ${servers.length} Gameserver gefunden für Guild ${guildId}`);
-            
-            if (servers.length === 0) {
-                Logger.info('[Gameserver] Keine Gameserver vorhanden - überspringe Server-Cleanup');
-            } else {
-                // ════════════════════════════════════════════════════════════
-                // 2. Jeden Gameserver stoppen & deinstallieren
-                // ════════════════════════════════════════════════════════════
-                let stoppedCount = 0;
-                let uninstalledCount = 0;
-                let offlineCount = 0;
-                
-                for (const server of servers) {
-                    Logger.info(`[Gameserver] Verarbeite Server: ${server.name} (${server.addon_name || 'Unknown'})`);
-                    
-                    const daemonOnline = ipmServer?.isDaemonOnline(server.daemon_id);
-                    
-                    if (!daemonOnline) {
-                        Logger.warn(`[Gameserver] Daemon ${server.daemon_id} offline - Server ${server.id} wird nur aus DB gelöscht`);
-                        Logger.warn(`[Gameserver] → Server-Dateien müssen manuell gelöscht werden: ${server.install_path}`);
-                        offlineCount++;
-                        continue;
-                    }
-                    
-                    // ────────────────────────────────────────────────────────
-                    // 2a. Server stoppen (falls läuft)
-                    // ────────────────────────────────────────────────────────
-                    // `online`, nicht `running`: Die Spalte kennt `running` nicht
-                    // (ENUM installing, installed, starting, online, stopping,
-                    // offline, error, updating) — das ist ein Daemon-Wert, den
-                    // diese Datei weiter unten selbst in `online` uebersetzt. Bis
-                    // zum 2026-09-14 stand hier `running`, und laufende Server
-                    // wurden beim Abbau des Plugins deshalb nie gestoppt, bevor
-                    // ihre Dateien weg waren (Baustelle 117).
-                    // Über ServerStopp wie das Löschen eines einzelnen Servers
-                    // (Baustelle 119, F5, 2026-10-29). Vorher: Stopp schicken,
-                    // 2 s warten, Dateien löschen — auch wenn das Spiel noch
-                    // herunterfuhr und Spielstände schrieb (der Daemon antwortet
-                    // auf gameserver.stop mit `queued`, nicht mit „ist unten").
-                    // Jetzt wird gewartet, bis der Daemon „gestoppt" meldet
-                    // (höchstens STOPP_FRIST_MS), und Browser/Discord-Panel
-                    // sehen „Stoppt…" sofort.
-                    const ServerStopp = require('./helpers/ServerStopp');
-                    const stopp = await ServerStopp.stoppeFallsLaeuft({ server, guildId });
-                    if (stopp.gestoppt) {
-                        stoppedCount++;
-                        Logger.success(`[Gameserver] Server ${server.id} gestoppt`);
-                    } else if (!stopp.ok) {
-                        // Wie bisher: Der Abbau geht weiter. Aber es steht da,
-                        // dass die Dateien unter einem womöglich noch laufenden
-                        // Spiel gelöscht werden.
-                        Logger.warn(`[Gameserver] Server ${server.id} nicht sicher gestoppt (${stopp.grund}) — `
-                            + 'die Deinstallation folgt trotzdem');
-                    }
-                    
-                    // ────────────────────────────────────────────────────────
-                    // 2b. Server-Dateien deinstallieren
-                    // ────────────────────────────────────────────────────────
-                    try {
-                        Logger.info(`[Gameserver] Deinstalliere Server ${server.id} (${server.install_path})...`);
-                        
-                        await ipmServer.sendCommand(server.daemon_id, 'gameserver.uninstall', {
-                            server_id: server.id.toString(),
-                            rootserver_id: server.rootserver_id,
-                            install_path: server.install_path
-                        }, 60000);  // 60s Timeout für Uninstall
-                        
-                        uninstalledCount++;
-                        Logger.success(`[Gameserver] Server ${server.id} deinstalliert (Dateien gelöscht)`);
-                    } catch (error) {
-                        Logger.error(`[Gameserver] Fehler beim Deinstallieren von Server ${server.id}:`, error);
-                        Logger.warn(`[Gameserver] → Server-Dateien müssen manuell gelöscht werden: ${server.install_path}`);
-                        // Trotzdem weitermachen - DB-Cleanup ist wichtiger
-                    }
-                }
-                
-                Logger.info(`[Gameserver] Server-Cleanup: ${stoppedCount} gestoppt, ${uninstalledCount} deinstalliert, ${offlineCount} offline`);
-            }
-            
-            // ════════════════════════════════════════════════════════════
-            // 3. Alle Gameserver aus DB löschen
-            // ════════════════════════════════════════════════════════════
-            const gameserverResult = await dbService.query(
-                'DELETE FROM gameservers WHERE guild_id = ?',
-                [guildId]
-            );
-            
-            Logger.info(`[Gameserver] ${gameserverResult.affectedRows} Gameserver aus DB gelöscht`);
-            
-            // ════════════════════════════════════════════════════════════
-            // 4. Private Addons löschen (korrekte Spalte: guild_id)
-            // ════════════════════════════════════════════════════════════
-            const privateAddons = await dbService.query(
-                'DELETE FROM addon_marketplace WHERE guild_id = ? AND visibility = "private"',
-                [guildId]
-            );
-            
-            Logger.info(`[Gameserver] ${privateAddons.affectedRows} private Addons gelöscht`);
-            
-            // Hinweis auf öffentliche Addons
-            const publicAddonsCount = await dbService.query(
-                'SELECT COUNT(*) as count FROM addon_marketplace WHERE guild_id = ? AND visibility = "public"',
-                [guildId]
-            );
-            
-            if (publicAddonsCount[0]?.count > 0) {
-                Logger.info(`[Gameserver] ℹ️  ${publicAddonsCount[0].count} öffentliche Addons bleiben erhalten (Community-Ressource)`);
-            }
-            
-            // ════════════════════════════════════════════════════════════
-            // 5. Navigation entfernen
-            // ════════════════════════════════════════════════════════════
-            await navigationManager.removeNavigation(this.name, guildId);
-            
-            // ════════════════════════════════════════════════════════════
-            // 6. Zusammenfassung
-            // ════════════════════════════════════════════════════════════
-            Logger.success(`[Gameserver] Cleanup erfolgreich abgeschlossen für Guild ${guildId}`);
-            Logger.info(`[Gameserver] Zusammenfassung:`);
-            Logger.info(`  → ${servers.length} Gameserver verarbeitet`);
-            Logger.info(`  → ${gameserverResult.affectedRows} DB-Einträge gelöscht`);
-            Logger.info(`  → ${privateAddons.affectedRows} private Addons gelöscht`);
-            
-            if (servers.some(s => !ipmServer?.isDaemonOnline(s.daemon_id))) {
-                Logger.warn(`[Gameserver] ⚠️  Einige Daemons waren offline!`);
-                Logger.warn(`[Gameserver] → Server-Dateien müssen manuell gelöscht werden!`);
-            }
-            
-            return true;
-        } catch (error) {
-            Logger.error(`[Gameserver] Fehler beim Deaktivieren für Guild ${guildId}:`, error);
-            throw error;
+        const Loeschung = require('./helpers/Loeschung');
+        const Umzugsstand = require('./helpers/Umzugsstand');
+
+        // Dieselben Spalten wie die Lösch-Route (routes/servers.js).
+        const servers = await dbService.query(`
+            SELECT gs.id, gs.name, gs.status, gs.last_status_update, gs.rootserver_id,
+                   r.daemon_id, am.slug AS addon_slug,
+                   ${Umzugsstand.SPALTE}
+              FROM gameservers gs
+              LEFT JOIN rootserver r ON gs.rootserver_id = r.id
+              LEFT JOIN addon_marketplace am ON gs.addon_marketplace_id = am.id
+             WHERE gs.guild_id = ?
+        `, [guildId]);
+
+        // Erst prüfen, dann löschen: Ein Umzug trägt die Dateien gerade weg.
+        const imUmzug = servers.filter(s => Umzugsstand.laeuft(s.umzug_status));
+        if (imUmzug.length) {
+            throw new Error(`Im Umzug: ${imUmzug.map(s => s.name).join(', ')}. Abschalten, wenn der Umzug fertig ist.`);
         }
+
+        Logger.warn(`[Gameserver] Abschalten in Guild ${guildId}: ${servers.length} Gameserver werden gelöscht`);
+        const gescheitert = [];
+        for (const server of servers) {
+            if (!await Loeschung.beginne(server.id, guildId)) {
+                gescheitert.push(`${server.name}: ${Loeschung.GESPERRT}`);
+                continue;
+            }
+            const ergebnis = await Loeschung.fuehreAus({ server, guildId, erzwingen: true });
+            if (!ergebnis.ok) gescheitert.push(`${server.name}: ${ergebnis.grund}`);
+        }
+        if (gescheitert.length) {
+            throw new Error(`Nicht alle Gameserver gelöscht — ${gescheitert.join(' · ')}`);
+        }
+
+        const privat = await dbService.query(
+            'DELETE FROM addon_marketplace WHERE guild_id = ? AND visibility = "private"', [guildId]);
+        const [oeffentlich] = await dbService.query(
+            'SELECT COUNT(*) AS anzahl FROM addon_marketplace WHERE guild_id = ? AND visibility = "public"', [guildId]);
+        Logger.info(`[Gameserver] ${privat.affectedRows} private Pakete gelöscht, ${oeffentlich?.anzahl || 0} öffentliche bleiben`);
+
+        await ServiceManager.get('navigationManager').removeNavigation(this.name, guildId);
+        return true;
     }
 
 

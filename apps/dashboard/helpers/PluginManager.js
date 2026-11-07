@@ -1225,10 +1225,21 @@ class PluginManager extends BasePluginManager {
             await this.hooks.doAction('before_plugin_guild_disable_method', plugin, guildId);
             
             // Die Kontroll-Guild behält ihre Inhalte (Betreiber 2026-10-29, F19/F30):
-            // `onGuildDisable` löscht in acht Plugins Inhalte, dort läuft es
-            // nicht; Menü und Rechte gehen wie überall (Schritte 5 und 6). Zentral
+            // weder `onGuildDisable` noch das Löschen der Zeilen läuft dort;
+            // Menü und Rechte gehen wie überall (Schritte 4 und 5). Zentral
             // hier statt in jedem Plugin, damit ein neues die Ausnahme nicht vergisst.
             const inhalteBleiben = String(guildId) === String(process.env.CONTROL_GUILD_ID);
+
+            // Scheitert das Aufräumen, wird abgebrochen: nichts weiter gelöscht,
+            // das Plugin bleibt an, die Meldung nennt den Grund (Betreiber
+            // 2026-11-07). Bis dahin ging es weiter, und die Guild stand mit
+            // einem abgeschalteten Plugin und seinen halben Inhalten da — etwa
+            // einem Gameserver, der nicht herunterkam.
+            const brichAb = async (schritt, fehler) => {
+                Logger.error(`Plugin ${pluginName}: ${schritt} für Guild ${guildId} gescheitert, Abschalten abgebrochen:`, fehler);
+                await this.hooks.doAction('plugin_guild_disable_method_failed', plugin, guildId, fehler);
+                throw new Error(`${pluginName}: ${schritt} gescheitert, das Plugin bleibt an. ${fehler.message}`);
+            };
 
             if (inhalteBleiben) {
                 Logger.warn(`Plugin ${pluginName}: Kontroll-Guild — Inhalte bleiben, nur Menü und Rechte gehen`);
@@ -1237,8 +1248,7 @@ class PluginManager extends BasePluginManager {
                     await plugin.onGuildDisable(guildId);
                     Logger.debug(`Plugin ${pluginName}: onGuildDisable() erfolgreich für Guild ${guildId}`);
                 } catch (disableError) {
-                    Logger.error(`Plugin ${pluginName}: Fehler in onGuildDisable() für Guild ${guildId}:`, disableError);
-                    await this.hooks.doAction('plugin_guild_disable_method_failed', plugin, guildId, disableError);
+                    await brichAb('Aufräumen', disableError);
                 }
             }
             
@@ -1246,47 +1256,39 @@ class PluginManager extends BasePluginManager {
 
             await this.hooks.doAction('after_guild_specific_disable', plugin, guildId);
 
-            // 2. Plugin-Konfiguration entfernen
-            try {
-                // Alle Konfigurationseinträge für dieses Plugin in dieser Guild löschen
-                if (!inhalteBleiben) await dbService.query(
-                    "DELETE FROM configs WHERE plugin_name = ? AND guild_id = ?",
-                    [pluginName, guildId]
-                );
-                Logger.debug(`Konfigurationen für Plugin ${pluginName} in Guild ${guildId} entfernt`);
-            } catch (configError) {
-                Logger.error(`Fehler beim Entfernen der Konfigurationen für ${pluginName}:`, configError);
-            }
-
-            // 3. Plugin-spezifische Daten bereinigen
-            try {
-                // Plugin-Tabellen ermitteln
-                const pluginTables = inhalteBleiben ? [] : (plugin.getDatabaseTables?.() || []);
-                
-                // Für jede Tabelle Guild-spezifische Einträge löschen
-                for (const table of pluginTables) {
-                    if (table.hasGuildData) {
-                        await dbService.query(
-                            `DELETE FROM ${table.name} WHERE guild_id = ?`,
-                            [guildId]
-                        );
-                        Logger.debug(`Daten aus Tabelle ${table.name} für Guild ${guildId} entfernt`);
+            // 2. Die Zeilen der Guild in den Tabellen des Plugins — die Tabellen
+            // selbst bleiben, alle Guilds teilen sie (Betreiber 2026-11-07).
+            // Welche, steht in `package.json` unter `guildInhalte.loeschen`;
+            // dass dort jede Tabelle mit `guild_id` steht, prüft
+            // `scripts/check-guild-inhalte.js`. Bis dahin fragte der Kern
+            // `getDatabaseTables()`, das kein Plugin hatte: Gelöscht wurde nur,
+            // was ein `onGuildDisable` von Hand löschte (K067).
+            if (!inhalteBleiben) {
+                const tabellen = this.loadPluginMeta(pluginName)?.guildInhalte?.loeschen || [];
+                try {
+                    if (tabellen.length) {
+                        const geloescht = await dbService.loescheGuildZeilen(tabellen, guildId);
+                        Logger.info(`Plugin ${pluginName}: Inhalte der Guild ${guildId} gelöscht`, geloescht);
                     }
+                    await dbService.query(
+                        "DELETE FROM configs WHERE plugin_name = ? AND guild_id = ?",
+                        [pluginName, guildId]
+                    );
+                } catch (tabellenFehler) {
+                    await brichAb('Löschen der Inhalte', tabellenFehler);
                 }
-            } catch (tableError) {
-                Logger.error(`Fehler beim Bereinigen der Plugin-Tabellen für ${pluginName}:`, tableError);
             }
 
             await this.hooks.doAction('before_update_guild_settings_disable', plugin, guildId);
 
-            // 4. Plugin in guild_plugins Tabelle deaktivieren (NEU!)
+            // 3. Plugin in guild_plugins Tabelle deaktivieren
             const userId = req?.session?.user?.info?.id || null;
             await dbService.disablePluginForGuild(guildId, pluginName, userId);
             Logger.debug(`Plugin ${pluginName} in guild_plugins für Guild ${guildId} deaktiviert (User: ${userId || 'System'})`);
 
             await this.hooks.doAction('after_update_guild_settings_disable', plugin, guildId);
 
-            // 5. Permissions entfernen
+            // 4. Permissions entfernen
             try {
                 const permissionManager = ServiceManager.get('permissionManager');
                 if (permissionManager) {
@@ -1299,7 +1301,7 @@ class PluginManager extends BasePluginManager {
                 Logger.error(`Fehler beim Entfernen der Permissions für ${pluginName}:`, permError);
             }
 
-            // 6. Navigation entfernen - NEU: Nutze NavigationManager statt ThemeManager
+            // 5. Navigation entfernen
             if (navigationManager) {
                 await navigationManager.removeNavigation(pluginName, guildId);
                 Logger.debug(`Navigation für Plugin ${pluginName} in Guild ${guildId} entfernt`);

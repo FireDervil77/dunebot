@@ -29,5 +29,11 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "type": "commonjs"
+  "type": "commonjs",
+  "guildInhalte": {
+    "loeschen": [
+      "greeting_invite_mappings",
+      "greeting_settings"
+    ]
+  }
 }

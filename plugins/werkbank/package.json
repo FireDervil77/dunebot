@@ -11,5 +11,10 @@
         "express": "^5.1.0",
         "dunebot-core": "*",
         "dunebot-sdk": "*"
+    },
+    "guildInhalte": {
+        "loeschen": [
+            "werkbank_sitzungen"
+        ]
     }
 }

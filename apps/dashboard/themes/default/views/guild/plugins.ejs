@@ -13,9 +13,11 @@
 <%
 /**
  * Was beim Abschalten gelöscht wird (F30, 2026-10-30). Die Liste nennt die
- * Plugins, deren `onGuildDisable` Inhalte löscht, gemessen am Quelltext.
+ * Plugins mit `guildInhalte.loeschen` in package.json (K067, 2026-11-07);
+ * `scripts/check-guild-inhalte.js` hält beide gleich. Plugins nur für die
+ * Kontroll-Guild fehlen: Dort bleiben die Inhalte ohnehin.
  */
-const MIT_INHALTEN = ['gameserver', 'masterserver', 'giveaway', 'music', 'streaming', 'ticket', 'dunemap', 'greeting'];
+const MIT_INHALTEN = ['gameserver', 'masterserver', 'giveaway', 'music', 'streaming', 'ticket', 'dunemap', 'greeting', 'automod', 'moderation', 'discord'];
 const abschaltenWeg = (name) => tr('ADMIN_PAGE.DISABLE_GOES_' + (MIT_INHALTEN.includes(name) ? name.toUpperCase() : 'DEFAULT'));
 %>
 

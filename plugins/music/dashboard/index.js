@@ -199,40 +199,22 @@ class MusicDashboardPlugin extends DashboardPlugin {
     }
 
     /**
-     * Plugin in einer Guild deaktivieren - Navigation und Daten entfernen
+     * Plugin in einer Guild deaktivieren - Navigation und hochgeladene Dateien.
+     *
+     * Die Zeilen der Guild löscht der Kern nach `guildInhalte` in package.json
+     * (K067, 2026-11-07); hier bleibt, was außerhalb der eigenen Tabellen liegt.
+     * Die Dateien liegen auf der Platte, nicht in einer Tabelle: Bis
+     * 2026-11-07 gingen nur die Eintraege in `music_files`, die Dateien unter
+     * `uploads/musik/<guildId>/` blieben liegen.
      *
      * @param {string} guildId Discord-Guild-ID
      */
     async onGuildDisable(guildId) {
-        const Logger = ServiceManager.get('Logger');
-        const dbService = ServiceManager.get('dbService');
-
-        try {
-            await ServiceManager.get('navigationManager').removeNavigation(this.name, guildId);
-
-            // Reihenfolge zaehlt wegen des Fremdschluessels auf den Listen
-            const abfragen = [
-                'DELETE FROM music_playlist_tracks WHERE playlist_id IN (SELECT id FROM music_playlists WHERE guild_id = ?)',
-                'DELETE FROM music_playlists WHERE guild_id = ?',
-                'DELETE FROM music_history WHERE guild_id = ?',
-                'DELETE FROM music_files WHERE guild_id = ?',
-                'DELETE FROM music_settings WHERE guild_id = ?'
-            ];
-
-            for (const sql of abfragen) {
-                try {
-                    await dbService.query(sql, [guildId]);
-                } catch (e) {
-                    if (e.code !== 'ER_NO_SUCH_TABLE') throw e;
-                }
-            }
-
-            Logger.success(`[Musik] Daten fuer Guild ${guildId} entfernt`);
-            return true;
-        } catch (error) {
-            Logger.error(`[Musik] Fehler beim Deaktivieren fuer Guild ${guildId}:`, error);
-            throw error;
-        }
+        await ServiceManager.get('navigationManager').removeNavigation(this.name, guildId);
+        const { entferneGuildVerzeichnis } = require('../shared/dateien');
+        await entferneGuildVerzeichnis(guildId);
+        ServiceManager.get('Logger').info(`[Musik] Plugin fuer Guild ${guildId} deaktiviert, hochgeladene Dateien entfernt`);
+        return true;
     }
 
     /**

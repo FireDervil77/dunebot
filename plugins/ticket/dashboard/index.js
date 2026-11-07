@@ -105,43 +105,17 @@ class TicketPlugin extends DashboardPlugin {
     }
 
     /**
-     * Plugin in einer Guild deaktivieren - Navigation und Daten entfernen
+     * Plugin in einer Guild deaktivieren - Navigation entfernen.
+     *
+     * Die Zeilen der Guild löscht der Kern nach `guildInhalte` in package.json
+     * (K067, 2026-11-07); hier bleibt, was außerhalb der eigenen Tabellen liegt.
      *
      * @param {string} guildId Discord-Guild-ID
      */
     async onGuildDisable(guildId) {
-        const Logger = ServiceManager.get('Logger');
-        const dbService = ServiceManager.get('dbService');
-
-        try {
-            await ServiceManager.get('navigationManager').removeNavigation(this.name, guildId);
-
-            // Reihenfolge zaehlt wegen der Fremdschluessel. `ticket_tags` kam
-            // beim Umbau am 2026-08-07 dazu - vorher blieben die Bausteine
-            // einer abgeschalteten Guild in der Tabelle stehen.
-            const abfragen = [
-                'DELETE FROM ticket_transcripts WHERE guild_id = ?',
-                'DELETE FROM tickets WHERE guild_id = ?',
-                'DELETE FROM ticket_categories WHERE guild_id = ?',
-                'DELETE FROM ticket_tags WHERE guild_id = ?',
-                'DELETE FROM ticket_settings WHERE guild_id = ?'
-            ];
-
-            for (const sql of abfragen) {
-                try {
-                    await dbService.query(sql, [guildId]);
-                } catch (e) {
-                    // Eine noch nie angelegte Tabelle ist kein Fehler
-                    if (e.code !== 'ER_NO_SUCH_TABLE') throw e;
-                }
-            }
-
-            Logger.success(`[Ticket] Daten fuer Guild ${guildId} entfernt`);
-            return true;
-        } catch (error) {
-            Logger.error(`[Ticket] Fehler beim Deaktivieren fuer Guild ${guildId}:`, error);
-            throw error;
-        }
+        await ServiceManager.get('navigationManager').removeNavigation(this.name, guildId);
+        ServiceManager.get('Logger').info(`[Ticket] Plugin fuer Guild ${guildId} deaktiviert`);
+        return true;
     }
 
     /**

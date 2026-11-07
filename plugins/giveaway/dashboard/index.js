@@ -116,44 +116,17 @@ class GiveawayDashboardPlugin extends DashboardPlugin {
     }
 
     /**
-     * Plugin in einer Guild deaktivieren - Navigation und Daten entfernen
+     * Plugin in einer Guild deaktivieren - Navigation entfernen.
+     *
+     * Die Zeilen der Guild löscht der Kern nach `guildInhalte` in package.json
+     * (K067, 2026-11-07); hier bleibt, was außerhalb der eigenen Tabellen liegt.
      *
      * @param {string} guildId Discord-Guild-ID
      */
     async onGuildDisable(guildId) {
-        const Logger = ServiceManager.get('Logger');
-        const navigationManager = ServiceManager.get('navigationManager');
-        const dbService = ServiceManager.get('dbService');
-
-        try {
-            await navigationManager.removeNavigation(this.name, guildId);
-
-            // Reihenfolge zaehlt: erst die abhaengigen Zeilen, dann die
-            // Verlosungen selbst.
-            const abfragen = [
-                'DELETE FROM giveaway_requirements WHERE giveaway_id IN (SELECT id FROM giveaways WHERE guild_id = ?)',
-                'DELETE FROM giveaway_winners WHERE giveaway_id IN (SELECT id FROM giveaways WHERE guild_id = ?)',
-                'DELETE FROM giveaway_entries WHERE giveaway_id IN (SELECT id FROM giveaways WHERE guild_id = ?)',
-                'DELETE FROM giveaways WHERE guild_id = ?',
-                'DELETE FROM giveaway_templates WHERE guild_id = ?',
-                'DELETE FROM giveaway_blacklist WHERE guild_id = ?'
-            ];
-
-            for (const sql of abfragen) {
-                try {
-                    await dbService.query(sql, [guildId]);
-                } catch (e) {
-                    // Eine noch nie angelegte Tabelle ist kein Fehler
-                    if (e.code !== 'ER_NO_SUCH_TABLE') throw e;
-                }
-            }
-
-            Logger.success(`[Giveaway] Daten fuer Guild ${guildId} entfernt`);
-            return true;
-        } catch (error) {
-            Logger.error(`[Giveaway] Fehler beim Deaktivieren fuer Guild ${guildId}:`, error);
-            throw error;
-        }
+        await ServiceManager.get('navigationManager').removeNavigation(this.name, guildId);
+        ServiceManager.get('Logger').info(`[Giveaway] Plugin fuer Guild ${guildId} deaktiviert`);
+        return true;
     }
 
     /**

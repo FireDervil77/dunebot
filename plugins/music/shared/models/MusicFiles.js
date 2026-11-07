@@ -233,17 +233,6 @@ class MusicFiles {
                    < DATE_SUB(NOW(), INTERVAL s.datei_aufbewahrung_tage DAY)
         `);
     }
-
-    /**
-     * Alle Eintraege einer Guild loeschen (beim Abschalten des Plugins).
-     *
-     * @param {string} guildId Discord-Guild-ID
-     * @returns {Promise<void>}
-     */
-    static async alleEntfernen(guildId) {
-        const dbService = ServiceManager.get('dbService');
-        await dbService.query(`DELETE FROM music_files WHERE guild_id = ?`, [guildId]);
-    }
 }
 
 module.exports = MusicFiles;

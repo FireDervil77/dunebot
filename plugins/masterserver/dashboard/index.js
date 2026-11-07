@@ -139,9 +139,10 @@ class MasterserverDashboardPlugin extends DashboardPlugin {
      * Cleanup-Prozess:
      * 1. Dependency Check (Gameserver-Plugin darf nicht aktiv sein)
      * 2. Safety Check (keine Gameserver mehr auf Rootservern)
-     * 3. System-User vom Daemon löschen (IPM)
-     * 4. Rootserver aus DB löschen
-     * 5. Daemon-Instances aus DB löschen
+     * 3. Virtuellen Server auf dem Daemon löschen (IPM)
+     *
+     * Die Zeilen (`rootserver`, `daemon_logs`) löscht danach der Kern nach
+     * `guildInhalte` in package.json, in einer Transaktion (K067, 2026-11-07).
      * 
      * @param {string} guildId - Discord Guild ID
      * @throws {Error} Wenn Gameserver-Plugin noch aktiv ist
@@ -229,30 +230,20 @@ class MasterserverDashboardPlugin extends DashboardPlugin {
             }
 
             // ════════════════════════════════════════════════════════════
-            // 5. Rootserver löschen (CASCADE löscht Quotas, Logs, Ports etc.)
+            // 5. Die Rootserver-Zeilen löscht der Kern (guildInhalte), CASCADE
+            //    nimmt Quotas, IPs und Ports mit.
             //
-            // `server_registry` stand hier mit in der Aufzählung — die Tabelle ist
-            // seit dem 2026-09-21 zurückgezogen (B146, sie hatte null Zeilen).
             // Die Gameserver-ZEILEN werden dabei nicht gelöscht, sondern
             // entwurzelt: `fk_gameservers_rootserver` hat `ON DELETE SET NULL`
             // (am 2026-09-21 in `information_schema.REFERENTIAL_CONSTRAINTS`
-            // nachgesehen, nicht angenommen). Ihr Löschen ist der eigene Schritt
-            // weiter oben — mit Volume. Bleibt einer übrig, hat er danach
-            // `rootserver_id = NULL` und gehört zu keiner Maschine mehr.
+            // nachgesehen, nicht angenommen). Ihr Löschen ist Sache des
+            // Gameserver-Plugins, das vorher abgeschaltet sein muss.
             //
             // ⚠ `gameserver_migrations` steht auf `RESTRICT`: Gibt es einen
-            // Umzugseintrag auf diese Maschine, scheitert das Löschen des
-            // Rootservers — und die Meldung nennt den Fremdschlüssel, nicht den
-            // Grund. Ungeprüft, ob dieser Fall im Betrieb schon vorkam.
-            //    daemon_instances existiert nicht mehr (seit Migration 2.0.0)
+            // Umzugseintrag auf diese Maschine, scheitert das Löschen im Kern —
+            // dann bricht das Abschalten ab, und die Meldung nennt den
+            // Fremdschlüssel. Ungeprüft, ob dieser Fall im Betrieb schon vorkam.
             // ════════════════════════════════════════════════════════════
-
-            const rootserverResult = await dbService.query(
-                'DELETE FROM rootserver WHERE guild_id = ?',
-                [guildId]
-            );
-
-            Logger.info(`[Masterserver] ${rootserverResult.affectedRows} RootServer aus DB gelöscht`);
             
             // ════════════════════════════════════════════════════════════
             // 6. Navigation entfernen (wird automatisch vom PluginManager gemacht)
@@ -262,8 +253,7 @@ class MasterserverDashboardPlugin extends DashboardPlugin {
             // ════════════════════════════════════════════════════════════
             // 7. Zusammenfassung & Warnungen
             // ════════════════════════════════════════════════════════════
-            Logger.success(`[Masterserver] Cleanup erfolgreich abgeschlossen für Guild ${guildId}`);
-            Logger.info(`[Masterserver] Gelöscht: ${rootservers.length} RootServer auf ${daemonsGesehen.size} Daemon(s)`);
+            Logger.success(`[Masterserver] Aufräumen auf ${daemonsGesehen.size} Daemon(s) für ${rootservers.length} RootServer der Guild ${guildId} abgeschlossen`);
 
             const offline = rootservers.filter(rs => !ipmServer?.isDaemonOnline(rs.daemon_id));
             if (offline.length) {

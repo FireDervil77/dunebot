@@ -361,15 +361,24 @@ async function pruefe(name, fn) {
         } finally { ServerStopp.stoppe = echt; }
     });
 
-    await pruefe('Der Plugin-Abbau stoppt über stoppeFallsLaeuft, erst dann wird deinstalliert', async () => {
+    // Seit 2026-11-07 (K067) löscht der Plugin-Abbau jeden Server über
+    // Loeschung, wie der Knopf „Löschen" — und Loeschung.ablauf stoppt über
+    // stoppeFallsLaeuft, bevor etwas gelöscht wird.
+    await pruefe('Der Plugin-Abbau löscht über Loeschung, und die stoppt über stoppeFallsLaeuft', async () => {
         const { ohneKommentare } = require('./lib/quelltext');
-        const idx = ohneKommentare(require('fs').readFileSync(
-            path.join(__dirname, '../plugins/gameserver/dashboard/index.js'), 'utf8'));
+        const quelle = (rel) => ohneKommentare(require('fs').readFileSync(path.join(__dirname, '..', rel), 'utf8'));
+        const idx = quelle('plugins/gameserver/dashboard/index.js');
         const ab = idx.indexOf('async onGuildDisable(');
-        const abbau = idx.slice(ab, idx.indexOf("'gameserver.uninstall'", ab));
-        assert.match(abbau, /ServerStopp\.stoppeFallsLaeuft\(\{ server, guildId \}\)/);
-        assert.doesNotMatch(abbau, /'gameserver\.stop'/, 'eigener Stoppbefehl — zweiter Weg');
-        assert.doesNotMatch(abbau, /setTimeout\(resolve, 2000\)/, 'die 2 s Raten sind zurück');
+        const abbau = idx.slice(ab, idx.indexOf('\n    }\n', ab));
+        assert.match(abbau, /Loeschung\.beginne\(server\.id, guildId\)/);
+        assert.match(abbau, /Loeschung\.fuehreAus\(\{ server, guildId, erzwingen: true \}\)/);
+        for (const eigen of ["'gameserver.stop'", "'gameserver.uninstall'", 'stoppeFallsLaeuft', 'setTimeout(resolve, 2000)']) {
+            assert.ok(!abbau.includes(eigen), `${eigen} im Abbau — zweiter Weg neben Loeschung`);
+        }
+        const loeschung = quelle('plugins/gameserver/dashboard/helpers/Loeschung.js');
+        const ablauf = loeschung.slice(loeschung.indexOf('async function ablauf('));
+        assert.ok(ablauf.indexOf('ServerStopp.stoppeFallsLaeuft({ server, guildId })') < ablauf.indexOf("'gameserver.uninstall'"),
+            'Loeschung deinstalliert vor dem Stopp');
     });
 
     await pruefe('Der Umzug ist als Ausnahme mit Grund benannt', async () => {

@@ -5,11 +5,25 @@
     "version": "2.6.1",
     "author": "FireBot Team",
     "license": "none",
-    "type":"commonjs",
+    "type": "commonjs",
     "peerDependencies": {
         "discord.js": "^14.19.0",
         "express": "^5.1.0",
         "dunebot-core": "*",
         "dunebot-sdk": "*"
+    },
+    "guildInhalte": {
+        "loeschen": [
+            "gameserver_backups",
+            "gameserver_content",
+            "gameserver_cronjobs",
+            "gameserver_datenbanken",
+            "gameserver_status",
+            "gameserver_status_panels",
+            "gameservers"
+        ],
+        "bleiben": {
+            "addon_marketplace": "guild_id ist die Guild, die das Paket eingestellt hat; öffentliche Pakete gehören allen, die privaten löscht onGuildDisable"
+        }
     }
 }

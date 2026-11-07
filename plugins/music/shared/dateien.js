@@ -62,6 +62,21 @@ function pfadFuer(guildId, dateiname) {
     return voll;
 }
 
+/**
+ * Das Verzeichnis einer Guild samt Inhalt entfernen - beim Abschalten des
+ * Plugins (K067, 2026-11-07). Fehlt es, ist das kein Fehler.
+ *
+ * Die Guild-ID wird geprueft, bevor ein Pfad entsteht: Ein leerer Wert hiesse
+ * sonst `uploads/musik/` selbst, und damit die Dateien aller Guilds.
+ *
+ * @param {string} guildId Discord-Guild-ID
+ * @returns {Promise<void>}
+ */
+async function entferneGuildVerzeichnis(guildId) {
+    if (!/^\d+$/.test(String(guildId ?? ''))) throw new Error(`Musik: ungueltige Guild-ID „${guildId}"`);
+    await fs.promises.rm(path.join(basisVerzeichnis(), String(guildId)), { recursive: true, force: true });
+}
+
 /** Erlaubte Tonformate. Was ffmpeg nicht kennt, hilft hier niemandem. */
 const ERLAUBTE_TYPEN = [
     'audio/mpeg', 'audio/mp3',
@@ -112,6 +127,7 @@ function typFuer(dateiname) {
 module.exports = {
     basisVerzeichnis,
     guildVerzeichnis,
+    entferneGuildVerzeichnis,
     pfadFuer,
     typFuer,
     ERLAUBTE_TYPEN,

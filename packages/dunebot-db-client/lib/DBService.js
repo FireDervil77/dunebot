@@ -133,7 +133,41 @@ class DBService extends DBClient {
             connection.release();
         }
     }
-    
+
+    /**
+     * Die Zeilen einer Guild aus Tabellen löschen — die Tabellen bleiben.
+     *
+     * Alle Guilds teilen sich eine Datenbank und damit jede Tabelle; eine Guild
+     * besitzt nur ihre Zeilen (Betreiber 2026-11-07, Kassensturz K067). Beim
+     * Abschalten eines Plugins nennt der Kern hier die Liste aus dessen
+     * `package.json` (`guildInhalte.loeschen`), geprüft von
+     * `scripts/check-guild-inhalte.js`.
+     *
+     * In einer Transaktion und in der Reihenfolge der Liste: Scheitert eine
+     * Tabelle, ist keine geleert. Wer Fremdschlüssel ohne CASCADE hat, steht
+     * vor seiner Elterntabelle.
+     *
+     * @param {string[]} tabellen Tabellennamen mit Spalte `guild_id`
+     * @param {string} guildId Discord-Guild-ID
+     * @returns {Promise<Object<string, number>>} gelöschte Zeilen je Tabelle
+     */
+    async loescheGuildZeilen(tabellen, guildId) {
+        // Ohne Guild hieße `WHERE guild_id = NULL` nichts, `= 'undefined'`
+        // auch nichts — beides sähe aus wie gelungen.
+        if (!/^\d+$/.test(String(guildId ?? ''))) throw new Error(`loescheGuildZeilen: ungültige Guild-ID „${guildId}"`);
+        for (const t of tabellen) {
+            if (!/^[a-z][a-z0-9_]*$/.test(t)) throw new Error(`loescheGuildZeilen: ungültiger Tabellenname „${t}"`);
+        }
+        return this.transaction(async (verbindung) => {
+            const geloescht = {};
+            for (const t of tabellen) {
+                const [ergebnis] = await verbindung.query(`DELETE FROM \`${t}\` WHERE guild_id = ?`, [String(guildId)]);
+                geloescht[t] = ergebnis.affectedRows;
+            }
+            return geloescht;
+        });
+    }
+
     /**
      * Holt alle Konfigurationen für eine Guild als Objekt
      * @param {string} guildId Guild-ID

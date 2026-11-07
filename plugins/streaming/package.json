@@ -11,5 +11,20 @@
         "express": "^5.1.0",
         "dunebot-core": "*",
         "dunebot-sdk": "*"
+    },
+    "guildInhalte": {
+        "loeschen": [
+            "streaming_announcements",
+            "streaming_commands",
+            "streaming_lose",
+            "streaming_music_queue",
+            "streaming_music_state",
+            "streaming_outbox",
+            "streaming_role_grants",
+            "streaming_serverstopp_streamer",
+            "streaming_serverstopp",
+            "streaming_targets",
+            "streaming_variables"
+        ]
     }
 }

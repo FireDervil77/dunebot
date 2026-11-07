@@ -932,37 +932,17 @@ class DuneMapPlugin extends DashboardPlugin {
     }
 
     /**
-     * Wird aufgerufen, wenn das Plugin in einer Guild deaktiviert wird
-     * Entfernt guild-spezifische Daten
-     * @param {string} guildId - Discord Guild ID
+     * Plugin in einer Guild deaktivieren - Navigation entfernen.
+     *
+     * Die Zeilen der Guild löscht der Kern nach `guildInhalte` in package.json
+     * (K067, 2026-11-07); hier bleibt, was außerhalb der eigenen Tabellen liegt.
+     *
+     * @param {string} guildId Discord-Guild-ID
      */
     async onGuildDisable(guildId) {
-        const Logger = ServiceManager.get('Logger');
-        const dbService = ServiceManager.get('dbService');
-        const navigationManager = ServiceManager.get('navigationManager');
-        
-        try {
-            Logger.info(`Deaktiviere [DuneMap] Plugin für Guild ${guildId}...`);
-            
-            // Navigation über NavigationManager entfernen
-            await navigationManager.removeNavigation(this.name, guildId);
-            
-            // Guild-spezifische Daten aus ALLEN DuneMap-Tabellen löschen
-            await dbService.query('DELETE FROM dunemap_storm_timer WHERE guild_id = ?', [guildId]);
-            await dbService.query('DELETE FROM dunemap_markers WHERE guild_id = ?', [guildId]);
-            
-            // Configs löschen
-            await dbService.query(
-                'DELETE FROM configs WHERE plugin_name = ? AND guild_id = ?',
-                [this.name, guildId]
-            );
-            
-            Logger.success(`[DuneMap] Daten für Guild ${guildId} erfolgreich entfernt (storm_timer, markers, gps_markers, configs)`);
-            return true;
-        } catch (error) {
-            Logger.error(`Fehler beim Entfernen der [DuneMap] Daten für Guild ${guildId}:`, error);
-            throw error;
-        }
+        await ServiceManager.get('navigationManager').removeNavigation(this.name, guildId);
+        ServiceManager.get('Logger').info(`[DuneMap] Plugin fuer Guild ${guildId} deaktiviert`);
+        return true;
     }
 
 

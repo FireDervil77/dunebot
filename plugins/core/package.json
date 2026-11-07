@@ -10,5 +10,12 @@
   "repository": "https://github.com/firedervil77/dunebot-plugins",
   "dependencies": {
     "dunebot-sdk": "*"
+  },
+  "guildInhalte": {
+    "loeschen": [],
+    "bleiben": {
+      "guild_groups_permissions_backup": "core lässt sich nicht abschalten",
+      "guild_permission_seeds": "core lässt sich nicht abschalten; die Rechte eines Plugins nimmt unregisterPluginPermissions"
+    }
   }
 }

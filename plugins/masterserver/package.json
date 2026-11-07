@@ -5,11 +5,17 @@
     "version": "2.1.1",
     "author": "FireBot Team",
     "license": "none",
-    "type":"commonjs",
+    "type": "commonjs",
     "peerDependencies": {
         "discord.js": "^14.19.0",
         "express": "^5.1.0",
         "dunebot-core": "*",
         "dunebot-sdk": "*"
+    },
+    "guildInhalte": {
+        "loeschen": [
+            "daemon_logs",
+            "rootserver"
+        ]
     }
 }

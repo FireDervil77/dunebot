@@ -125,31 +125,17 @@ class GreetingDashboardPlugin extends DashboardPlugin {
     }
 
     /**
-     * Guild-spezifische Deaktivierung
-     * Entfernt guild-spezifische Daten
-     * 
-     * @param {string} guildId - Discord Guild ID
+     * Plugin in einer Guild deaktivieren - Navigation entfernen.
+     *
+     * Die Zeilen der Guild löscht der Kern nach `guildInhalte` in package.json
+     * (K067, 2026-11-07); hier bleibt, was außerhalb der eigenen Tabellen liegt.
+     *
+     * @param {string} guildId Discord-Guild-ID
      */
     async onGuildDisable(guildId) {
-        const Logger = ServiceManager.get('Logger');
-        const dbService = ServiceManager.get('dbService');
-        const navigationManager = ServiceManager.get('navigationManager');
-        
-        try {
-            Logger.info(`[Greeting] Deaktiviere Plugin für Guild ${guildId}...`);
-            
-            // Navigation entfernen
-            await navigationManager.removeNavigation(this.name, guildId);
-            
-            // Guild-spezifische Daten löschen
-            await dbService.query('DELETE FROM greeting_settings WHERE guild_id = ?', [guildId]);
-            
-            Logger.success(`[Greeting] Daten für Guild ${guildId} entfernt`);
-            return true;
-        } catch (error) {
-            Logger.error(`[Greeting] Fehler beim Deaktivieren für Guild ${guildId}:`, error);
-            throw error;
-        }
+        await ServiceManager.get('navigationManager').removeNavigation(this.name, guildId);
+        ServiceManager.get('Logger').info(`[Greeting] Plugin fuer Guild ${guildId} deaktiviert`);
+        return true;
     }
 
     /**
