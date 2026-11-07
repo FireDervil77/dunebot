@@ -79,8 +79,9 @@ function vergleichen(sollen, vergeben) {
 /**
  * Wer hat fuer diesen Kanal belegt, dass er ihm gehoert?
  *
- * **Das ist der Eigentumsnachweis, ohne `besitzer_id`.** Die Spalte ist bis
- * heute leer (Baustelle 72); gebraucht wird sie hier auch nicht: Ein Konto
+ * **Das ist der einzige Eigentumsnachweis.** Eine gespeicherte Kopie gibt es
+ * nicht mehr: `streaming_streamers.besitzer_id` war nie gefuellt und ist seit
+ * 2026-11-07 entfernt (K101, Baustelle 72). Ein Konto
  * gehoert laut `user_connections` hoechstens einem Discord-Benutzer, und die
  * Kanalkennung IST die Kontokennung. Wer also `twitch/12345` verknuepft hat,
  * hat damit belegt, dass ihm der Kanal `12345` gehoert.
