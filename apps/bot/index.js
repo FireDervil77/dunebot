@@ -99,6 +99,20 @@ manager.on("shardCreate", (shard) => {
         Logger.success(`Erfolgreich ${shards.size} Shards gestartet`);
     } catch (err) {
         Logger.error("Fehler beim Spawnen der Shards:", err);
+        // Erst die Shards, dann wir. Ein Shard, der zu spät bereit wird, lebt
+        // sonst weiter, ohne Manager: Am 2026-11-07 um 10:01 brauchte Shard 0
+        // länger als spawnTimeout, der Manager ging, pm2 startete einen neuen
+        // — und der alte Shard (PID 393989) wurde doch noch fertig. Zwei
+        // „Bot #0" warfen sich danach alle zwei Sekunden gegenseitig vom IPC
+        // des Dashboards (551 Abbrüche in der ersten Stunde), und jeder Befehl,
+        // der einen solchen Moment traf, scheiterte.
+        for (const shard of manager.shards.values()) {
+            try {
+                shard.kill();
+            } catch (killErr) {
+                Logger.error(`Shard ${shard.id} ließ sich nicht beenden — er läuft womöglich ohne Manager weiter:`, killErr);
+            }
+        }
         process.exit(1);
     }
 })();

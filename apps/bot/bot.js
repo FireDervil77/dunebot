@@ -251,20 +251,37 @@ async function cleanup() {
     }
 }
 
-// Signal Handler registrieren
-process.on('SIGTERM', async () => {
-    const Logger = ServiceManager.get("Logger");
-    Logger.info('SIGTERM empfangen, beende Bot-Instanz...');
-    await cleanup();
-    process.exit(0);
-});
+// Beenden — einmal, egal wer zuerst ruft. Beim gewöhnlichen Herunterfahren
+// kommen SIGTERM vom Manager und gleich danach `disconnect` (der Manager
+// geht); das Aufräumen soll trotzdem nur einmal laufen. Hängt es, endet der
+// Prozess nach zehn Sekunden trotzdem.
+let beenden = null;
+function beendeEinmal(grund) {
+    if (!beenden) {
+        beenden = (async () => {
+            ServiceManager.get("Logger").info(`${grund}, beende Bot-Instanz...`);
+            setTimeout(() => process.exit(0), 10000).unref();
+            await cleanup();
+            process.exit(0);
+        })();
+    }
+    return beenden;
+}
 
-process.on('SIGINT', async () => {
-    const Logger = ServiceManager.get("Logger");
-    Logger.info('SIGINT empfangen, beende Bot-Instanz...');
-    await cleanup();
-    process.exit(0);
-});
+// Signal Handler registrieren
+process.on('SIGTERM', () => beendeEinmal('SIGTERM empfangen'));
+process.on('SIGINT', () => beendeEinmal('SIGINT empfangen'));
+
+// Ohne Manager kein Shard (2026-11-07). Stirbt der Shard-Manager, schließt
+// sich die IPC-Leitung zu ihm, und Node meldet `disconnect`. Bis dahin lief
+// ein Shard dann einfach weiter — angemeldet bei Discord und beim Dashboard,
+// neben dem neuen Shard, den pm2 startete (siehe index.js, Fehler beim
+// Spawnen). Hängt das Aufräumen, endet der Prozess nach zehn Sekunden
+// trotzdem. Im Worker-Modus gibt es keine solche Leitung (`process.send`
+// fehlt), dort endet der Thread ohnehin mit dem Manager.
+if (typeof process.send === 'function') {
+    process.on('disconnect', () => beendeEinmal('Shard-Manager ist weg'));
+}
 
 // Error Handling
 process.on("unhandledRejection", (err) => {
