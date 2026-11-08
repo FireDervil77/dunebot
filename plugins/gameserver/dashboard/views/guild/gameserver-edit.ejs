@@ -159,6 +159,25 @@
                                     </div>
 
                                     <%#
+                                      K055 (2026-11-08): Weniger RAM als gemessen gebraucht nur mit
+                                      ausdrücklichem Schalter. Den Satz und die Grenze rechnet
+                                      helpers/RamBedarf.js, die Route PUT prüft dasselbe noch einmal.
+                                    %>
+                                    <% if (ramBedarf) { %>
+                                        <div class="alert alert-warning py-2 mt-2 mb-0" id="ramBedarfHinweis"
+                                             data-grenze-mb="<%= ramBedarf.grenzeMb %>"
+                                             data-bisher-mb="<%= server.allocated_ram_mb || '' %>" style="display:none;">
+                                            <i class="fa-solid fa-triangle-exclamation me-1"></i>
+                                            <%= ramBedarf.text %>
+                                            <div class="form-check form-switch mt-2 mb-0">
+                                                <input class="form-check-input" type="checkbox" role="switch"
+                                                       id="ram_trotzdem" name="ram_trotzdem" value="ja">
+                                                <label class="form-check-label" for="ram_trotzdem">Trotzdem verkleinern</label>
+                                            </div>
+                                        </div>
+                                    <% } %>
+
+                                    <%#
                                       Die GiB-Angabe hat bis zum 2026-08-10 nur gebucht, nie begrenzt.
                                       Seit Daemon 1.0.26 setzt der Daemon eine Projekt-Quota auf das
                                       Serververzeichnis — das setzt aber voraus, dass das Dateisystem
@@ -352,6 +371,28 @@
     }
 
     felder.forEach(f => { f.addEventListener('change', pruefen); f.addEventListener('input', pruefen); });
+    pruefen();
+})();
+
+/**
+ * Weniger RAM als gemessen gebraucht (K055): Hinweis und Schalter nur zeigen,
+ * wenn verkleinert wird und die Wahl unter der Grenze vom Server liegt.
+ */
+(function () {
+    const kasten = document.getElementById('ramBedarfHinweis');
+    const wahl   = document.getElementById('allocated_ram_mb');
+    if (!kasten || !wahl) return;
+    const grenze = Number(kasten.dataset.grenzeMb);
+    const bisher = kasten.dataset.bisherMb === '' ? null : Number(kasten.dataset.bisherMb);
+    const schalter = document.getElementById('ram_trotzdem');
+
+    function pruefen() {
+        const neu = wahl.value === '' ? null : Number(wahl.value);
+        const zeigen = neu !== null && neu < grenze && (bisher === null || neu < bisher);
+        kasten.style.display = zeigen ? '' : 'none';
+        if (!zeigen && schalter) schalter.checked = false;
+    }
+    wahl.addEventListener('change', pruefen);
     pruefen();
 })();
 </script>

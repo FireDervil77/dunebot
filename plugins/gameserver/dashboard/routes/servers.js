@@ -2459,8 +2459,13 @@ router.get('/:serverId/edit', requirePermission('GAMESERVER.EDIT'), async (req, 
             Logger.warn(`[Gameserver] Kapazität für RootServer ${server.rootserver_id} nicht lesbar: ${err.message}`);
         }
 
+        // Der gemessene Bedarf (K055): Die Seite warnt, sobald weniger gewählt
+        // wird, die Route PUT prüft dasselbe noch einmal.
+        const ramBedarf = await require('../helpers/RamBedarf').lade(dbService, serverId);
+
         return await themeManager.renderView(res, 'guild/gameserver-edit', {
             kapazitaet,
+            ramBedarf,
             // "Einstellungen" ueberall gleich: der Knopf auf der Serverseite
             // heisst so, die Karte auf dieser Seite auch. Vorher stand hier
             // "Server bearbeiten" — drei Namen fuer dieselbe Sache, und der
@@ -2651,6 +2656,23 @@ router.put('/:serverId', requirePermission('GAMESERVER.EDIT'), async (req, res) 
                     success: false,
                     message: `Ungültige Ressourcenangabe: ${fehlend.join(', ')}`
                 });
+            }
+
+            // Unter den gemessenen Bedarf nur mit ausdrücklicher Zustimmung
+            // (K055, 2026-11-08). Ohne sie wird der Server beim nächsten
+            // Höchststand vom System beendet, und das sähe niemand beim Speichern.
+            const RamBedarf = require('../helpers/RamBedarf');
+            const ramWarnung = RamBedarf.warnung(
+                await RamBedarf.lade(dbService, serverId), ramMB, server.allocated_ram_mb);
+            if (ramWarnung && req.body.ram_trotzdem !== 'ja') {
+                return res.status(409).json({
+                    success: false,
+                    rueckfrage: 'ram_unter_bedarf',
+                    message: `${ramWarnung} Zum Speichern „Trotzdem verkleinern“ einschalten.`
+                });
+            }
+            if (ramWarnung) {
+                Logger.warn(`[Gameserver] Server ${serverId}: RAM trotz Warnung verkleinert auf ${ramMB} MiB — ${ramWarnung}`);
             }
 
             const mehrRamMB  = ramMB      - (server.allocated_ram_mb      || 0);

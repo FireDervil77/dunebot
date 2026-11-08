@@ -427,7 +427,21 @@ class GuildAjaxHandler {
             });
 
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                // Die Meldung des Servers mitnehmen (2026-11-08, K055). Bis dahin
+                // stand bei jeder Ablehnung „Netzwerkfehler oder Serverfehler“,
+                // auch wenn der Server genau sagte, was fehlt („Auf dem RootServer
+                // ist nicht genug frei …“).
+                const fehler = new Error(`HTTP error! status: ${response.status}`);
+                try {
+                    const antwort = await response.json();
+                    if (antwort && typeof antwort.message === 'string' && antwort.message) {
+                        fehler.meldung = antwort.message;
+                    }
+                } catch (_) {
+                    // Keine JSON-Antwort (etwa eine Fehlerseite des Proxys): dann
+                    // bleibt es beim allgemeinen Satz.
+                }
+                throw fehler;
             }
 
             const result = await response.json();
@@ -581,9 +595,10 @@ class GuildAjaxHandler {
             }
 
         } catch (error) {
-            this.showToast('error', window.i18n?.COMMON?.NETWORK_ERROR || 'Netzwerkfehler oder Serverfehler');
+            this.showToast('error', error.meldung
+                || window.i18n?.COMMON?.NETWORK_ERROR || 'Netzwerkfehler oder Serverfehler');
             console.error(error);
-            
+
             // Button wiederherstellen (bei Error)
             if (submitBtn && originalBtnState) {
                 ButtonLoader.setError(submitBtn, 'Fehler!', 2000);
