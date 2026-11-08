@@ -1452,6 +1452,8 @@ router.get('/status', requirePermission('GAMESERVER.VIEW'), async (req, res) => 
                         grund:   a.grund,
                         text:    a.text,
                         stufen:  a.stufen,
+                        kopf:    a.kopf,
+                        fuss:    a.fuss,
                     },
                     // Derselbe Aufruf, aus dem die Serverseite zeichnet. Der
                     // Browser bekommt Text und Farbe, nicht die Schwellen.

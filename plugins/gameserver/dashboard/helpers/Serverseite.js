@@ -1413,9 +1413,36 @@ function baueBereitschaft(paket, server = {}) {
         stufen[i].wartet = zaehlt && i === wartend;
     }
 
+    const bereit = zaehlt && wieWeit >= 0
+        && stufen.every((st, i) => !st.verlangt || i <= wieWeit || st.ungeprueft);
+    const frist = r.timeout_sec || null;
+
+    // ── Kopf und Fußsatz der Karte, fertig für die Ansicht (K304, 2026-11-08) ─
+    //
+    // Bis heute rechnete beides die Vorlage beim Laden. Die Punkte liefen live
+    // mit, die Pille nicht: Nach einem Stopp stand im Kopf weiter „bereit“,
+    // bis jemand neu lud. Jetzt kommen sie von hier, beim Laden und über
+    // `/servers/status`.
+    //
+    // Ein Server, der nicht läuft, heißt „aus“, auch ohne frühere Meldung.
+    // Läuft er mit einer Meldung vom vorigen Lauf, hat er noch nichts gemeldet.
+    // Bisher stand dann „Server ist aus“.
+    const kopf = bereit   ? { text: 'bereit', gut: true }
+               : zaehlt   ? { text: 'Stufe ' + gemeldet, gut: false }
+               : !laeuft  ? { text: 'Server ist aus', gut: false }
+               :            { text: 'noch nicht gemeldet', gut: false };
+    const fuss = !laeuft
+        ? (gemeldet ? 'Der Server ist aus — die letzte gemeldete Stufe sagt nichts über jetzt.'
+                    : 'Der Server ist aus.')
+        : !zaehlt
+        ? 'Der Server hat noch keine Stufe gemeldet' + (frist ? ' (Frist ' + frist + ' s)' : '') + '.'
+        : 'Gemeldet von fb-init auf der Maschine' + (frist ? ', Frist ' + frist + ' s' : '') + '.';
+
     return {
         stufen,
-        frist: r.timeout_sec || null,
+        kopf,
+        fuss,
+        frist,
         gemessen: zaehlt,
         stufe: zaehlt ? gemeldet : null,
         // Der Erklärsatz von fb-init — der Teil, für den die Messung gebaut wurde.
@@ -1423,8 +1450,7 @@ function baueBereitschaft(paket, server = {}) {
         // Ein Stand von gestern ist keine Auskunft über heute — und ein Stand
         // vom vorigen Lauf ebenso wenig.
         veraltet: Boolean(gemeldet) && (!laeuft || !ausDiesemLauf),
-        bereit: zaehlt && wieWeit >= 0
-            && stufen.every((st, i) => !st.verlangt || i <= wieWeit || st.ungeprueft),
+        bereit,
         // Die Namen der Stufen, die fb-init nicht pruefen konnte — fuer den Text.
         ungeprueft: stufen.filter(st => st.ungeprueft).map(st => st.name),
     };
@@ -1629,6 +1655,9 @@ function baueBereitschaftAuskunft(paket, s) {
         bereit:  Boolean(leiter?.bereit),
         stufe:   leiter?.stufe || null,
         grund:   leiter?.grund || null,
+        // Kopf und Fußsatz der Bereitschaftskarte (K304), fertig gerechnet.
+        kopf:    leiter?.kopf || null,
+        fuss:    leiter?.fuss || null,
         text:
             !leiter                 ? 'nicht messbar'
           : leiter.bereit && leiter.ungeprueft.length

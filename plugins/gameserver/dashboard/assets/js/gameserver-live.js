@@ -540,6 +540,9 @@
                         bereit:  b ? b.bereit  : undefined,
                         messbar: b ? b.messbar : undefined,
                         text:    b ? b.text    : undefined,
+                        // Kopf und Fußsatz der Bereitschaftskarte (K304).
+                        kopf:    b ? b.kopf    : undefined,
+                        fuss:    b ? b.fuss    : undefined,
                         // Fertig gerechnet vom Server (bauePlatz): Text und Ton.
                         // null heisst "keine Grenze gebucht und nichts gemessen".
                         platz:   s.platz || null,
@@ -759,6 +762,20 @@
                         } else {
                             el.textContent = `${z.spieler} / ${(z.max === null || z.max === undefined) ? '?' : z.max}`;
                         }
+                        break;
+                    }
+
+                    // Kopf und Fußsatz der Bereitschaftskarte: fertig vom
+                    // Server (K304). Ohne Angabe bleibt stehen, was dasteht.
+                    case 'bereitschaft-kopf': {
+                        if (!z.kopf) break;
+                        el.textContent = z.kopf.text;
+                        el.classList.toggle('fb-pille-gut', Boolean(z.kopf.gut));
+                        break;
+                    }
+
+                    case 'bereitschaft-fuss': {
+                        if (z.fuss) el.textContent = z.fuss;
                         break;
                     }
 

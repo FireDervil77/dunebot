@@ -451,15 +451,10 @@
     <div class="fb-karte">
       <div class="fb-kopf">
         <span>Bereitschaft</span>
-        <% if (u.bereitschaft.bereit) { %>
-          <span class="fb-pille fb-pille-gut" style="margin-left:auto">bereit</span>
-        <% } else if (u.bereitschaft.gemessen) { %>
-          <span class="fb-pille" style="margin-left:auto">Stufe <%= u.bereitschaft.stufe %></span>
-        <% } else if (u.bereitschaft.veraltet) { %>
-          <span class="fb-pille" style="margin-left:auto">Server ist aus</span>
-        <% } else { %>
-          <span class="fb-pille" style="margin-left:auto">noch nicht gemeldet</span>
-        <% } %>
+        <%# Text und Ton rechnet baueBereitschaft (K304) — die Live-Anzeige
+            zeichnet dieselbe Angabe nach einem Stopp oder Start neu. %>
+        <span class="fb-pille<%= u.bereitschaft.kopf.gut ? ' fb-pille-gut' : '' %>" style="margin-left:auto"
+              data-fb-live="bereitschaft-kopf" data-fb-server="<%= server.id %>"><%= u.bereitschaft.kopf.text %></span>
       </div>
       <div class="fb-koerper">
         <% u.bereitschaft.stufen.forEach(function (st) { %>
@@ -496,15 +491,8 @@
             aber. Bei einer neuen Welt ist das normal." %>
         <div style="font-size:13px;margin-top:8px;text-wrap:pretty<%= u.bereitschaft.grund ? '' : ';display:none' %>"
              data-fb-live="bereitschaft-grund" data-fb-server="<%= server.id %>"><%= u.bereitschaft.grund || '' %></div>
-        <div class="fb-muted" style="font-size:13px;margin-top:8px">
-          <% if (u.bereitschaft.veraltet) { %>
-            Der Server ist aus — die letzte gemeldete Stufe sagt nichts über jetzt.
-          <% } else if (!u.bereitschaft.gemessen) { %>
-            Der Server hat noch keine Stufe gemeldet<%= u.bereitschaft.frist ? ' (Frist ' + u.bereitschaft.frist + ' s)' : '' %>.
-          <% } else { %>
-            Gemeldet von fb-init auf der Maschine<%= u.bereitschaft.frist ? ', Frist ' + u.bereitschaft.frist + ' s' : '' %>.
-          <% } %>
-        </div>
+        <div class="fb-muted" style="font-size:13px;margin-top:8px"
+             data-fb-live="bereitschaft-fuss" data-fb-server="<%= server.id %>"><%= u.bereitschaft.fuss %></div>
       </div>
     </div>
   <% } %>

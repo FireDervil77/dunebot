@@ -186,6 +186,50 @@ const pruefe = (ok, was, zusatz = '') => {
     pruefe(ohneZeiten.gemessen && ohneZeiten.bereit,
         'ohne beide Zeitangaben wird kein Fehlalarm erzeugt');
 
+    // ── Kopf und Fußsatz folgen dem Stopp (K304, 2026-11-08) ─────────────────
+    //
+    // Die Pille im Kartenkopf rechnete die Vorlage beim Laden. Nach einem Stopp
+    // stand dort weiter „bereit“, bis jemand neu lud. Jetzt rechnet sie
+    // baueBereitschaft, und die Live-Anzeige zeichnet sie nach.
+    console.log('\n▸ Kopf und Fußsatz der Karte (K304)');
+    const lauf = Serverseite.baueBereitschaft(paket,
+        { status: 'online', bereitschaft_stufe: 'query', bereitschaft_am: nachher, last_started_at: vorher });
+    const gestoppt = Serverseite.baueBereitschaft(paket,
+        { status: 'offline', bereitschaft_stufe: 'query', bereitschaft_am: nachher, last_started_at: vorher });
+    pruefe(lauf.kopf && lauf.kopf.text === 'bereit' && lauf.kopf.gut === true && /fb-init/.test(lauf.fuss),
+        'laufend und bereit: „bereit“, grün', JSON.stringify(lauf.kopf));
+    pruefe(gestoppt.kopf && gestoppt.kopf.text === 'Server ist aus' && !gestoppt.kopf.gut
+        && /letzte gemeldete Stufe/.test(gestoppt.fuss),
+        'nach dem Stopp: „Server ist aus“, nicht grün', JSON.stringify(gestoppt.kopf));
+    pruefe(alt.kopf.text === 'noch nicht gemeldet' && /noch keine Stufe/.test(alt.fuss),
+        'läuft mit Meldung vom vorigen Lauf: „noch nicht gemeldet“, nicht „Server ist aus“',
+        JSON.stringify(alt.kopf));
+    const zwischen = Serverseite.baueBereitschaft(paket, { status: 'starting', bereitschaft_stufe: 'process' });
+    pruefe(zwischen.kopf.text === 'Stufe process' && !zwischen.kopf.gut, 'auf dem Weg: die gemeldete Stufe');
+    const ausk = Serverseite.baueBereitschaftAuskunft(paket, { status: 'offline', bereitschaft_stufe: 'query' });
+    pruefe(ausk.kopf && ausk.kopf.text === 'Server ist aus' && typeof ausk.fuss === 'string',
+        'die Auskunft für /servers/status trägt Kopf und Fußsatz');
+
+    {
+        const fs = require('fs');
+        const p = require('path');
+        const roh = (d) => fs.readFileSync(p.join(__dirname, '..', d), 'utf8');
+        const ohne = (t) => require('./lib/quelltext').ohneKommentare(t);
+        const ejs = roh('plugins/gameserver/dashboard/views/guild/partials/server-detail-uebersicht.ejs')
+            .replace(/<%#[\s\S]*?%>/g, '');
+        const live = ohne(roh('plugins/gameserver/dashboard/assets/js/gameserver-live.js'));
+        const route = ohne(roh('plugins/gameserver/dashboard/routes/servers.js'));
+        pruefe(/data-fb-live="bereitschaft-kopf"/.test(ejs) && /data-fb-live="bereitschaft-fuss"/.test(ejs)
+            && !/Server ist aus/.test(ejs),
+            'die Vorlage zeichnet Kopf und Fußsatz aus der Angabe, rechnet nicht selbst');
+        pruefe(/case 'bereitschaft-kopf'/.test(live) && /case 'bereitschaft-fuss'/.test(live)
+            && /kopf:\s*b \? b\.kopf/.test(live) && /fuss:\s*b \? b\.fuss/.test(live),
+            'die Live-Anzeige übernimmt und zeichnet beides');
+        const s = route.indexOf('bereitschaft: {');
+        pruefe(s >= 0 && /kopf:\s*a\.kopf/.test(route.slice(s, s + 400)) && /fuss:\s*a\.fuss/.test(route.slice(s, s + 400)),
+            '/servers/status liefert Kopf und Fußsatz mit');
+    }
+
     // ── Und die Abfragen holen die Spalten überhaupt ─────────────────────────
     //
     // Der eigentliche Fund vom 2026-09-08: Die Serverseite rief die richtige
