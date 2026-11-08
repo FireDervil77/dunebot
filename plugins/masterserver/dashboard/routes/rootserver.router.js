@@ -276,6 +276,17 @@ router.get('/:id', requirePermission('MASTERSERVER.ROOTSERVER.VIEW'), async (req
             stopped: gameservers.filter(g => g.status === 'offline').length
         };
 
+        // Wen ein Wechsel des Datenbank-Images trifft (K318): laufende Server
+        // dieser Maschine mit mindestens einer Datenbank.
+        const dbBetroffen = rootserver.db_image_neu
+            ? await dbService.query(
+                `SELECT DISTINCT gs.id, gs.name
+                   FROM gameserver_datenbanken d
+                   JOIN gameservers gs ON gs.id = d.server_id
+                  WHERE gs.rootserver_id = ? AND gs.status = 'online'
+                  ORDER BY gs.name`, [rootserverId])
+            : [];
+
         await renderView(res, 'guild/masterserver-rootserver-detail', {
             title: `RootServer: ${rootserver.name}`,
             activeMenu: `/guild/${guildId}/plugins/masterserver/rootservers`,
@@ -283,6 +294,7 @@ router.get('/:id', requirePermission('MASTERSERVER.ROOTSERVER.VIEW'), async (req
             isOnline,
             gameserverStats,
             gameservers,
+            dbBetroffen,
             guildId
         });
 
@@ -687,6 +699,44 @@ router.post('/:id/ips', requirePermission('MASTERSERVER.ROOTSERVER.EDIT'), async
             return res.status(409).json({ success: false, message: 'Diese IP ist bereits eingetragen' });
         }
         res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// =====================================================
+// Route: Datenbank-Image wechseln (K318, 2026-11-08)
+// POST /guild/:guildId/plugins/masterserver/rootservers/:id/datenbank/wechseln
+//
+// Der Daemon meldet ein neueres fb/mariadb:latest (db_image_neu); gewechselt
+// wird nur hier, auf Knopfdruck — die Spiele mit Datenbank sind dabei einige
+// Sekunden ohne sie. Kein eigener Befehl: `datenbank.anwenden` mit
+// `image_wechseln`, der Fahrplan des Bahnhofs bleibt unverändert. Das Ergebnis
+// kommt als Ereignis `datenbank.befund` (RootServer.uebernimmDatenbank).
+// =====================================================
+router.post('/:id/datenbank/wechseln', requirePermission('MASTERSERVER.ROOTSERVER.EDIT'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+    const guildId = res.locals.guildId;
+    try {
+        const rootserver = await RootServer.getById(req.params.id);
+        if (!rootserver || rootserver.guild_id !== guildId) {
+            return res.status(404).json({ success: false, message: 'RootServer nicht gefunden' });
+        }
+        if (!rootserver.db_gewuenscht || !rootserver.db_image_neu) {
+            return res.status(409).json({ success: false, message: 'Es liegt kein neueres Datenbank-Image bereit.' });
+        }
+        const ipm = ServiceManager.has('ipmServer') ? ServiceManager.get('ipmServer') : null;
+        if (!rootserver.daemon_id || !ipm?.isDaemonOnline(rootserver.daemon_id)) {
+            return res.status(409).json({ success: false, message: 'Der Daemon ist nicht verbunden.' });
+        }
+        await ipm.sendCommand(rootserver.daemon_id, 'datenbank.anwenden', { an: true, image_wechseln: true }, 15000);
+        await dbService.query('UPDATE rootserver SET db_moeglich = 0, db_grund = ? WHERE id = ?',
+            [`Wechsel auf das Image ${rootserver.db_image_neu} läuft — der Stand erscheint hier, sobald der Daemon ihn meldet.`,
+                rootserver.id]);
+        Logger.info(`[Masterserver] Datenbank-Image auf RootServer ${rootserver.id}: Wechsel ${rootserver.db_image} → ${rootserver.db_image_neu} angestoßen`);
+        res.json({ success: true, message: 'Der Daemon wechselt das Image. Die Seite zeigt das Ergebnis nach dem Neuladen.' });
+    } catch (error) {
+        Logger.error('[Masterserver] Datenbank-Image nicht gewechselt:', error);
+        res.status(500).json({ success: false, message: `Nicht gewechselt: ${error.message}` });
     }
 });
 

@@ -372,8 +372,14 @@ class RootServer {
         const [zeile] = await dbService.query('SELECT db_gewuenscht FROM rootserver WHERE daemon_id = ?', [daemonId]);
         if (!zeile) return null;
         const d = M.leiteDatenbankAb(!!zeile.db_gewuenscht, zustand || null);
-        await dbService.query('UPDATE rootserver SET db_moeglich = ?, db_grund = ? WHERE daemon_id = ?',
-            [d.moeglich, d.grund, daemonId]);
+        // Image-Stand (K318, Daemon ab 1.1.20): fehlt das Feld, ist es NULL —
+        // dann gibt es auch keinen Knopf zum Wechseln.
+        const i = M.leiteImageAb(zustand || null);
+        await dbService.query(
+            `UPDATE rootserver SET db_moeglich = ?, db_grund = ?,
+                    db_image = ?, db_image_neu = ?, db_wechsel = ?
+              WHERE daemon_id = ?`,
+            [d.moeglich, d.grund, i.image, i.imageNeu, i.wechsel, daemonId]);
         return d;
     }
 

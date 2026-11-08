@@ -235,6 +235,39 @@
                         <% if (rootserver.db_grund) { %>
                             <div class="text-secondary mt-1" style="font-size:.78rem;"><%= rootserver.db_grund %></div>
                         <% } %>
+                        <%# Image-Stand (K318, Daemon ab 1.1.20). `dbBetroffen` mit typeof:
+                            Die Ansicht gilt sofort, die Route erst nach dem Neustart. -%>
+                        <% if (rootserver.db_image) { %>
+                            <div class="text-secondary mt-1" style="font-size:.78rem;">Image <code><%= rootserver.db_image %></code></div>
+                        <% } %>
+                        <% if (rootserver.db_wechsel) { %>
+                            <div class="text-danger mt-1" style="font-size:.78rem;"><i class="fa-solid fa-triangle-exclamation me-1"></i>Letzter Wechsel <%= rootserver.db_wechsel %></div>
+                        <% } %>
+                        <% if (rootserver.db_gewuenscht && rootserver.db_image_neu) { %>
+                            <% const betroffen = (typeof dbBetroffen !== 'undefined' && Array.isArray(dbBetroffen)) ? dbBetroffen : []; %>
+                            <div class="alert alert-info mt-2 mb-0 py-2" style="font-size:.8rem;" id="dbImageWechsel">
+                                <div><i class="fa-solid fa-circle-arrow-up me-1"></i>Ein neueres Datenbank-Image liegt bereit:
+                                    <code><%= rootserver.db_image || '?' %></code> → <code><%= rootserver.db_image_neu %></code></div>
+                                <div class="mt-1">Beim Wechsel wird der Container ersetzt. Die Daten und das Kennwort bleiben,
+                                    die Spiele mit Datenbank sind einige Sekunden ohne sie. Startet der neue nicht, kommt der alte zurück.</div>
+                                <div class="mt-1">
+                                    <% if (betroffen.length) { %>
+                                        Laufen gerade und haben eine Datenbank:
+                                        <% betroffen.forEach(function (g, i) { %><%= i ? ', ' : '' %><strong><%= g.name %></strong> (#<%= g.id %>)<% }) %>
+                                    <% } else { %>
+                                        Gerade läuft kein Server dieser Maschine mit Datenbank.
+                                    <% } %>
+                                </div>
+                                <div class="mt-2 d-flex gap-2">
+                                    <button type="button" class="btn btn-sm btn-primary" id="dbImageWechselKnopf">
+                                        <i class="fa-solid fa-rotate me-1"></i>Jetzt wechseln
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-danger d-none" id="dbImageWechselJa">
+                                        <i class="fa-solid fa-check me-1"></i>Ja, jetzt wechseln
+                                    </button>
+                                </div>
+                            </div>
+                        <% } %>
                     </div>
 
                     <%# ── SFTP für externe Programme (2026-10-27) ────────── %>
@@ -1038,6 +1071,35 @@ sudo journalctl -u firebot-daemon -f</code></pre>
             GuildAjaxHandler.showToast('success', d.message);
         } catch (e) {
             knopf.disabled = eingabe.value.trim() !== soll;
+            GuildAjaxHandler.showToast('error', e.message);
+        }
+    });
+})();
+
+// ── Datenbank-Image wechseln (K318) ──────────────────────────
+// Zwei Schritte statt confirm(): Der erste Knopf zeigt den zweiten.
+(function () {
+    const erst = document.getElementById('dbImageWechselKnopf');
+    const ja = document.getElementById('dbImageWechselJa');
+    if (!erst || !ja) return;
+    erst.addEventListener('click', function () {
+        erst.classList.add('d-none');
+        ja.classList.remove('d-none');
+    });
+    ja.addEventListener('click', async function () {
+        ja.disabled = true;
+        try {
+            const r = await fetch('/guild/<%= guildId %>/plugins/masterserver/rootservers/<%= rootserver.id %>/datenbank/wechseln', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: '{}'
+            });
+            const d = await r.json();
+            if (!r.ok || !d.success) throw new Error(d.message || 'Nicht gewechselt.');
+            GuildAjaxHandler.showToast('success', d.message);
+            ja.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Wechsel läuft …';
+        } catch (e) {
+            ja.disabled = false;
             GuildAjaxHandler.showToast('error', e.message);
         }
     });

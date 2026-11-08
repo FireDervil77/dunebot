@@ -17,6 +17,9 @@
  *              aus dem Ereignis datenbank.befund
  *   Formular   Bearbeiten nimmt Häkchen und Anzahl an, prüft die Grenze,
  *              schickt datenbank.anwenden nur bei geändertem Häkchen
+ *   Image      (K318, 2026-11-08) Der Daemon meldet image/image_neu/wechsel,
+ *              gespeichert in db_image*, der Knopf am Rootserver schickt
+ *              datenbank.anwenden mit image_wechseln — nur auf Knopfdruck
  *
  *   node scripts/check-datenbank-container.js
  */
@@ -37,7 +40,8 @@ ServiceManager.register('dbService', {
         const t = sql.trim();
         spur.abfragen.push([t, w]);
         if (/^SELECT db_gewuenscht FROM rootserver WHERE daemon_id = \?$/.test(t)) return spur.zeile ? [spur.zeile] : [];
-        if (/^UPDATE rootserver SET db_moeglich = \?, db_grund = \? WHERE daemon_id = \?$/.test(t)) return {};
+        if (/^UPDATE rootserver SET db_moeglich = \?, db_grund = \?, db_image = \?, db_image_neu = \?, db_wechsel = \? WHERE daemon_id = \?$/
+            .test(t.replace(/\s+/g, ' '))) return {};
         if (/^UPDATE rootserver SET db_moeglich = 0, db_grund = \? WHERE id = \?$/.test(t)) return {};
         if (/^UPDATE rootserver SET sftp_port = \?, sftp_moeglich = \?, sftp_grund = \? WHERE daemon_id = \?$/.test(t)) return {};
         if (/^SELECT sftp_gewuenscht FROM rootserver WHERE daemon_id = \?$/.test(t)) return [{ sftp_gewuenscht: 0 }];
@@ -84,7 +88,7 @@ async function pruefe(was, tun) {
     await pruefe('uebernimmDatenbank schreibt möglich und Grund — auch ohne Zustand (alter Daemon)', async () => {
         await RootServer.uebernimmDatenbank('d1', { laeuft: true, fassung: '11.4.13', adresse: 'fb-datenbank:3306' });
         assert.deepStrictEqual(spur.abfragen[1][1].slice(0, 1), [1]);
-        assert.strictEqual(spur.abfragen[1][1][2], 'd1');
+        assert.strictEqual(spur.abfragen[1][1].at(-1), 'd1');
         spur.abfragen = [];
         await RootServer.uebernimmDatenbank('d1', null);
         assert.strictEqual(spur.abfragen[1][1][0], 0);
@@ -186,6 +190,75 @@ async function pruefe(was, tun) {
         assert.ok(detail.includes('name="db_je_server"'), 'die Anzahl fehlt');
         const anlegen = ohneKommentareEjs(fs.readFileSync(path.join(WURZEL, 'plugins/masterserver/dashboard/views/guild/masterserver-rootserver-create.ejs'), 'utf8'));
         assert.ok(/MariaDB-Container/.test(anlegen) && !/rührt der Daemon MySQL/.test(anlegen), 'der Hilfetext beim Anlegen spricht noch von der Host-MySQL');
+    });
+
+    console.log('\nImage-Wechsel (K318)');
+
+    await pruefe('leiteImageAb: nur Kurz-IDs aus Hex, alles andere NULL; der Wechsel-Satz gekürzt', () => {
+        assert.deepStrictEqual(M.leiteImageAb({ image: '28a71c6cdb01', image_neu: '3c31a17ad2fe', wechsel: ' gescheitert (x) ' }),
+            { image: '28a71c6cdb01', imageNeu: '3c31a17ad2fe', wechsel: 'gescheitert (x)' });
+        assert.deepStrictEqual(M.leiteImageAb({ image: '<b>x</b>', image_neu: 'latest', wechsel: '' }), { image: null, imageNeu: null, wechsel: null });
+        assert.deepStrictEqual(M.leiteImageAb(null), { image: null, imageNeu: null, wechsel: null });
+        assert.strictEqual(M.leiteImageAb({ wechsel: 'x'.repeat(900) }).wechsel.length, 500);
+    });
+
+    await pruefe('uebernimmDatenbank schreibt den Image-Stand; ein alter Daemon ohne Felder setzt ihn auf NULL', async () => {
+        await RootServer.uebernimmDatenbank('d1', { laeuft: true, image: '28a71c6cdb01', image_neu: '3c31a17ad2fe' });
+        assert.deepStrictEqual(spur.abfragen[1][1].slice(2), ['28a71c6cdb01', '3c31a17ad2fe', null, 'd1']);
+        spur.abfragen = [];
+        await RootServer.uebernimmDatenbank('d1', { laeuft: true });
+        assert.deepStrictEqual(spur.abfragen[1][1].slice(2), [null, null, null, 'd1']);
+    });
+
+    async function wechsle(zeile) {
+        const echt = RootServer.getById;
+        RootServer.getById = async () => (zeile ? { id: 54, guild_id: 'g1', daemon_id: 'd54', name: 'n1', ...zeile } : null);
+        const antwort = {};
+        const res = { locals: { guildId: 'g1' }, status(c) { antwort.c = c; return this; }, json(o) { Object.assign(antwort, o); return this; } };
+        try { await handle('post', '/:id/datenbank/wechseln')({ params: { id: '54' }, body: {} }, res); }
+        finally { RootServer.getById = echt; }
+        return antwort;
+    }
+
+    await pruefe('Knopf: schickt datenbank.anwenden mit image_wechseln und sagt am Rootserver, dass gewechselt wird', async () => {
+        spur.online = true;
+        const r = await wechsle({ db_gewuenscht: 1, db_image: '28a71c6cdb01', db_image_neu: '3c31a17ad2fe' });
+        assert.strictEqual(r.success, true, JSON.stringify(r));
+        assert.deepStrictEqual(spur.befehle, [['d54', 'datenbank.anwenden', { an: true, image_wechseln: true }]]);
+        assert.match(spur.abfragen.find(a => /db_moeglich = 0, db_grund/.test(a[0]))[1][0], /Wechsel auf das Image 3c31a17ad2fe läuft/);
+    });
+
+    await pruefe('Knopf: ohne neueres Image, ohne Verbindung, fremde Guild — nichts geschickt', async () => {
+        spur.online = true;
+        assert.strictEqual((await wechsle({ db_gewuenscht: 1, db_image_neu: null })).c, 409);
+        assert.strictEqual((await wechsle({ db_gewuenscht: 0, db_image_neu: '3c31a17ad2fe' })).c, 409);
+        assert.strictEqual((await wechsle({ guild_id: 'fremd', db_gewuenscht: 1, db_image_neu: '3c31a17ad2fe' })).c, 404);
+        spur.online = false;
+        assert.strictEqual((await wechsle({ db_gewuenscht: 1, db_image_neu: '3c31a17ad2fe' })).c, 409);
+        assert.deepStrictEqual(spur.befehle, []);
+    });
+
+    await pruefe('Anzeige: Kasten nur mit neuerem Image, Knopf zweistufig an die Route, dbBetroffen über typeof', () => {
+        const detail = ohneKommentareEjs(fs.readFileSync(path.join(WURZEL, 'plugins/masterserver/dashboard/views/guild/masterserver-rootserver-detail.ejs'), 'utf8'));
+        assert.ok(/if \(rootserver\.db_gewuenscht && rootserver\.db_image_neu\)[\s\S]{0,200}typeof dbBetroffen !== 'undefined'/.test(detail), 'Kasten oder typeof fehlt');
+        assert.ok(detail.includes("/datenbank/wechseln'"), 'der Knopf schickt nicht an die Route');
+        const a = detail.indexOf("getElementById('dbImageWechselKnopf')");
+        const block = detail.slice(a, detail.indexOf('})();', a));
+        assert.ok(a > 0 && block.includes("getElementById('dbImageWechselJa')"), 'Knopf-Block nicht gefunden');
+        assert.ok(!/confirm\(/.test(block), 'confirm() statt zwei Schritten');
+        const route = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'plugins/masterserver/dashboard/routes/rootserver.router.js'), 'utf8'));
+        assert.ok(/dbBetroffen,\s*guildId/.test(route), 'die Detailseite gibt dbBetroffen nicht mit');
+    });
+
+    await pruefe('Daemon: liest image_wechseln aus datenbank.anwenden und wechselt nie bei der Anmeldung', () => {
+        const DAEMON = '/home/firedervil/firebot_daemon';
+        const client = ohneKommentare(fs.readFileSync(path.join(DAEMON, 'internal/websocket/client.go'), 'utf8'));
+        assert.ok(/payload\["image_wechseln"\]\.\(bool\)[\s\S]{0,120}c\.wechsleDatenbank\(/.test(client), 'image_wechseln kommt im Daemon nicht an');
+        const st = ohneKommentare(fs.readFileSync(path.join(DAEMON, 'internal/datenbank/steuerung.go'), 'utf8'));
+        const wende = st.slice(st.indexOf('func (s *Steuerung) Wende('), st.indexOf('func (s *Steuerung) wende('));
+        assert.ok(wende.includes('vergleicheImage') && !wende.includes('WechsleImage') && !wende.includes('wechsle('),
+            'Wende darf nur vergleichen, nie wechseln');
+        assert.ok(/json:"image_neu,omitempty"/.test(st) && /json:"wechsel,omitempty"/.test(st), 'Feldnamen im Zustand passen nicht');
     });
 
     console.log(fehler ? `\n✗ ${fehler} gescheitert, ${bestanden} bestanden` : `\n✓ ${bestanden} bestanden`);

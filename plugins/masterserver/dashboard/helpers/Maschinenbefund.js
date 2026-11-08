@@ -139,6 +139,21 @@ function leiteFastdlAb(gewuenscht, webserver) {
  * @param {{laeuft:boolean, fassung?:string, adresse?:string, grund?:string}|null} zustand
  *        null = der Daemon kennt den Container nicht (Fassung vor 1.0.140)
  */
+/**
+ * Image-Stand des Containers `fb-datenbank` (K318, 2026-11-08): worauf er
+ * läuft, ob ein neueres `fb/mariadb:latest` bereitliegt, wie der letzte
+ * Wechsel ausging. Nur Kurz-IDs aus Hex-Zeichen — sie landen in der Ansicht.
+ *
+ * @param {{image?:string, image_neu?:string, wechsel?:string}|null} zustand
+ * @returns {{image:string|null, imageNeu:string|null, wechsel:string|null}}
+ */
+function leiteImageAb(zustand) {
+    const id = (v) => (typeof v === 'string' && /^[0-9a-f]{6,16}$/.test(v) ? v : null);
+    const z = zustand && typeof zustand === 'object' ? zustand : {};
+    const wechsel = typeof z.wechsel === 'string' && z.wechsel.trim() ? z.wechsel.trim().slice(0, 500) : null;
+    return { image: id(z.image), imageNeu: id(z.image_neu), wechsel };
+}
+
 function leiteDatenbankAb(gewuenscht, zustand) {
     if (!gewuenscht) {
         return { moeglich: 0, grund: 'Nicht angefordert.' };
@@ -226,6 +241,7 @@ module.exports = {
     pruefeNamen,
     leiteFastdlAb,
     leiteDatenbankAb,
+    leiteImageAb,
     hardwareIstBelastbar,
     istRueckschleife,
     nackteIp, leiteSftpAb, sftpPortFehler
