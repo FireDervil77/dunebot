@@ -4000,7 +4000,7 @@ router.get('/:serverId/backups', requirePermission('GAMESERVER.BACKUPS.VIEW'), a
 
         const backups = await dbService.query(
             `SELECT id, name, size_bytes, datenbanken, status, note, created_by, created_at, completed_at,
-                    error_message, wiederhergestellt
+                    error_message, wiederhergestellt, pruned_at
              FROM gameserver_backups
              WHERE server_id = ?
              ORDER BY created_at DESC`,

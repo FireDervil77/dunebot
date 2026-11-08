@@ -23,6 +23,17 @@
                     <li>seine Datenbanken</li>
                     <li>SFTP-Zugang, Ports und geplante Aufgaben</li>
                 </ul>
+                <%# Wie viele Sicherungen mitgehen, holt deleteServer aus der Liste —
+                    damit man sie vorher noch herunterladen kann (K313, 2026-11-08). %>
+                <div class="alert alert-warning mb-3 d-none" id="serverLoeschenSicherungen" role="alert">
+                    <div class="fw-bold mb-1">
+                        <i class="fa-solid fa-box-archive me-1"></i><span id="serverLoeschenSicherungenSatz"></span>
+                    </div>
+                    <div class="mb-2">Willst du sie behalten, lade sie vorher herunter. Danach sind sie weg.</div>
+                    <a class="btn btn-sm btn-warning" id="serverLoeschenZuSicherungen" href="#">
+                        <i class="fa-solid fa-download me-1"></i>Zu den Sicherungen
+                    </a>
+                </div>
                 <label class="form-label fw-bold" for="serverLoeschenEingabe">
                     Zum Bestätigen eintippen: <span class="font-monospace text-danger" id="serverLoeschenSoll"></span>
                 </label>

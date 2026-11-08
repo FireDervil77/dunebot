@@ -213,12 +213,14 @@ function deleteServer(serverId, serverName) {
         if (!knopf.disabled) knopf.click();
     };
 
+    const guildId = window.location.pathname.match(/\/guild\/(\d+)/)[1];
+    const uebersicht = `/guild/${guildId}/plugins/gameserver/servers`;
+    zeigeMitgehendeSicherungen(uebersicht, serverId);
+
     const fenster = bootstrap.Modal.getOrCreateInstance(dialog);
     knopf.onclick = async () => {
         if (!passt()) return;
         knopf.disabled = true;
-        const guildId = window.location.pathname.match(/\/guild\/(\d+)/)[1];
-        const uebersicht = `/guild/${guildId}/plugins/gameserver/servers`;
         const meldung = 'Server wird gelöscht. Läuft er noch, wird er vorher beendet.';
 
         // Vor der Anfrage: Die Live-Anzeige springt bei „wird gelöscht" schon
@@ -245,6 +247,35 @@ function deleteServer(serverId, serverName) {
 
     fenster.show();
     dialog.addEventListener('shown.bs.modal', () => eingabe.focus(), { once: true });
+}
+
+/**
+ * Im Löschdialog: Wie viele Sicherungen gehen mit? (K313, 2026-11-08)
+ *
+ * Gezählt wird, was als Archiv noch auf der Maschine liegt — fertig und nicht
+ * von der Aufbewahrung entfernt. Kommt die Liste nicht (kein Recht, Fehler),
+ * bleibt es bei der Aufzählung im Dialog, die sagt es auch.
+ */
+async function zeigeMitgehendeSicherungen(uebersicht, serverId) {
+    const kasten = document.getElementById('serverLoeschenSicherungen');
+    if (!kasten) return;
+    kasten.classList.add('d-none');
+    try {
+        const antwort = await fetch(`${uebersicht}/${serverId}/backups`, { headers: { Accept: 'application/json' } });
+        if (!antwort.ok) return;
+        const { backups } = await antwort.json();
+        const da = (backups || []).filter(b => b.status === 'completed' && !b.pruned_at);
+        if (!da.length) return;
+        const bytes = da.reduce((n, b) => n + (Number(b.size_bytes) || 0), 0);
+        const groesse = bytes >= 1e9 ? `${(bytes / 1e9).toFixed(1).replace('.', ',')} GB` : `${Math.max(1, Math.round(bytes / 1e6))} MB`;
+        document.getElementById('serverLoeschenSicherungenSatz').textContent = da.length === 1
+            ? `Dieser Server hat eine Sicherung (${groesse}). Sie wird mit gelöscht.`
+            : `Dieser Server hat ${da.length} Sicherungen (zusammen ${groesse}). Sie werden mit gelöscht.`;
+        document.getElementById('serverLoeschenZuSicherungen').href = `${uebersicht}/${serverId}?bereich=sicherungen`;
+        kasten.classList.remove('d-none');
+    } catch (_) {
+        // Ohne Liste kein Kasten — die Aufzählung im Dialog nennt die Sicherungen trotzdem.
+    }
 }
 
 /**
