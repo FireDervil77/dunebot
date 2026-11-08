@@ -258,7 +258,8 @@ const UDP = (purpose, mehr = {}) => ({ purpose, protocol: 'udp', assign: 'pool',
         await S.portSpeichern(s, { alt: 'rcon', zweck: 'rcon', protocol: 'tcp', basis: '' });
         assert.ok(!('internal_only' in s.entwurf.ports[1]), 'der Schalter ist aus, das Feld steht aber noch im Port');
         const start = ohneKommentare(fs.readFileSync(path.join(DAEMON, 'internal/gameserver/server_lifecycle_docker.go'), 'utf8'));
-        assert.match(start, /BuildPortMap\(paket\.OeffentlichePorts\(s\.ports\), bindIP\)/, 'der Daemon veröffentlicht interne Ports');
+        assert.match(start, /BuildPortMap\(paket\.OeffentlichePorts\(s\.ports\), bindIP, paket\.Protokolle\(\)\)/,
+            'der Daemon veröffentlicht interne Ports, oder das Protokoll kommt nicht aus dem Paket (K305)');
         const bindung = start.match(/BuildPortMap\(/g) || [];
         assert.strictEqual(bindung.length, 1, 'ein zweiter Weg bindet Ports');
     });
