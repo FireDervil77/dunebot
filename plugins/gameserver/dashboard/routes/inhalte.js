@@ -1057,7 +1057,7 @@ router.get('/:serverId/inhalte/ladestand', requirePermission('GAMESERVER.VIEW'),
         // Der andere Aufrufer derselben Antwort (`routes/files.js`, Editor)
         // dekodierte seit jeher. Nur dieser nicht.
         const text = roh.toString('utf8');
-        const ergebnis = BepInExLog.werteAus(text);
+        const ergebnis = BepInExLog.werteAus(text, { nurAnfang });
         const zuordnung = BepInExLog.ordneZu(ergebnis, await Inhalte.fuerServer(req.params.serverId), eintrag.mod_time);
 
         return res.json({
@@ -1071,6 +1071,8 @@ router.get('/:serverId/inhalte/ladestand', requirePermission('GAMESERVER.VIEW'),
             // Er steht in derselben Zeile wie die BepInEx-Fassung, wird also
             // ohne einen zweiten Griff zum Daemon mitgelesen.
             spiel: ergebnis.spiel,
+            // Ausnahmen nach dem Laden, ohne Zuordnung zu einem Mod (K174).
+            nachDemLaden: ergebnis.nachDemLaden,
             laeuft: wirkung(geladen).laeuft,
             ...zuordnung,
         });

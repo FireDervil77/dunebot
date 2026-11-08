@@ -131,6 +131,45 @@ const MELDUNGEN = [
       grund: m => kuerze(`Prozessfilter (${m[2]})`) },
 ];
 
+// ── Ausnahmen NACH dem Laden (K174/B136, 2026-11-08) ───────────────────────
+//
+// Server 190, 2026-09-17: SleepSkip 1.3.0 lud sauber und warf danach bei jedem
+// Durchlauf `MissingFieldException: Field not found: .ZRoutedRpc.Everybody`
+// aus `Game.UpdateSleeping`. Die Konsole lief voll, die Seite zeigte jeden Mod
+// als „geladen“.
+//
+// Gezählt wird nur, was eine AUSNAHME ist (`…Exception: …`), nicht jede
+// Fehlerzeile: Auch ein Valheim ganz ohne Mods schreibt nach dem Chainloader
+// `[Error : Unity Log]`-Zeilen (Shader, Video, AsyncResourceUpload). Die
+// gehören dem Spiel und sagten über Mods nichts.
+//
+// Keine Zuordnung zu einem Mod: Die Ausnahme trägt seinen Namen nicht. Eine
+// geratene Zuordnung wäre eine falsche Auskunft, die wie eine richtige aussieht.
+// Gezeigt wird der Ort (erste Stapelzeile außer den Hüllen von Harmony), und
+// daraus erkennt der Betreiber den Mod, wie damals an `Game.UpdateSleeping`.
+const AUSNAHME = /^([A-Za-z_][\w.`+]*Exception)\b:?\s*(.*)$/;
+const ARTEN_HOECHSTENS = 3;
+
+/** Eine Stapelzeile ohne „at“, Adressen und Dateiangaben. Null für Hüllen. */
+function ortAus(zeile) {
+    let s = String(zeile || '').trim().replace(/^at\s+/, '');
+    if (!s || s === 'Stack trace:' || /^\(wrapper /.test(s) || /^Rethrow as /.test(s)) return null;
+    s = s.replace(/\s*\(at [^)]*\)\s*$/, '').replace(/\s*\[0x[0-9a-f]+\]\s*(in .*)?$/i, '').trim();
+    return s ? kuerze(s).slice(0, 160) : null;
+}
+
+function nachDemLadenText(n, arten, nurAnfang) {
+    if (!n) return null;
+    const zahl = n.toLocaleString('de-DE');
+    const h = arten[0];
+    const haeufigste = h
+        ? ` Häufigste: ${h.art}${h.text ? ': ' + h.text : ''}${h.ort ? ' in ' + h.ort : ''} (${h.anzahl.toLocaleString('de-DE')}×).`
+        : '';
+    return `Nach dem Laden ${n === 1 ? '1 Ausnahme' : zahl + ' Ausnahmen'}${nurAnfang ? ' (mindestens, nur der Anfang des Logs gelesen)' : ''}.`
+        + haeufigste
+        + ' Welcher Mod sie wirft, sagt das Log nicht; der Ort zeigt meist, was er verändert.';
+}
+
 /**
  * Die Logdatei auswerten.
  *
@@ -138,11 +177,29 @@ const MELDUNGEN = [
  * @returns {{vollstaendig: boolean, bepinex: string|null, pack: string|null, anzahl: number|null,
  *            spiel: {prozess: string|null, stand: string|null, roh: string|null}|null,
  *            plugins: Array<{name: string, fassung: string|null, status: string|null,
- *                            grund: string|null, warnungen: string[]}>}}
+ *                            grund: string|null, warnungen: string[]}>,
+ *            nachDemLaden: {ausnahmen: number, text: string|null,
+ *                           arten: Array<{art: string, text: string, ort: string|null, anzahl: number}>}}}
+ * @param {{nurAnfang?: boolean}} [optionen] nurAnfang: nur der Anfang des Logs wurde gelesen
  */
-function werteAus(text) {
+function werteAus(text, { nurAnfang = false } = {}) {
     const ergebnis = { vollstaendig: false, bepinex: null, pack: null, anzahl: null,
-                       spiel: null, plugins: [] };
+                       spiel: null, plugins: [],
+                       nachDemLaden: { ausnahmen: 0, arten: [], text: null } };
+    const arten = new Map();
+    let wartetAufOrt = null;   // die zuletzt gezählte Ausnahme, bis ihre erste Stapelzeile kommt
+    const zaehle = (art, nachricht) => {
+        const e = { art, text: kuerze(nachricht).slice(0, 160), ort: null, anzahl: 0 };
+        ergebnis.nachDemLaden.ausnahmen++;
+        wartetAufOrt = e;
+        return e;
+    };
+    const verbuche = (e) => {
+        const schluessel = `${e.art}|${e.text}|${e.ort || ''}`;
+        const da = arten.get(schluessel);
+        if (da) da.anzahl++;
+        else { e.anzahl = 1; arten.set(schluessel, e); }
+    };
     const bekannt = new Map();
     const plugin = (roh) => {
         const { name, fassung } = teilePlugin(roh);
@@ -159,8 +216,16 @@ function werteAus(text) {
     for (const zeile of String(text || '').replace(/^﻿/, '').split(/\r?\n/)) {
         const k = zeile.match(KOPF);
         // Ohne Kopf ist es eine Fortsetzung (Stacktrace). Den Grund traegt die
-        // erste Zeile — der Rest wuerde die Anzeige nur fuellen.
-        if (!k) continue;
+        // erste Zeile — der Rest wuerde die Anzeige nur fuellen. Nur einer
+        // Ausnahme nach dem Laden gibt die erste echte Stapelzeile ihren Ort.
+        if (!k) {
+            if (wartetAufOrt) {
+                const ort = ortAus(zeile);
+                if (ort) { wartetAufOrt.ort = ort; verbuche(wartetAufOrt); wartetAufOrt = null; }
+            }
+            continue;
+        }
+        if (wartetAufOrt) { verbuche(wartetAufOrt); wartetAufOrt = null; }
         const [, stufe, quelle, nachricht] = k;
 
         if (quelle === 'BepInEx') {
@@ -193,7 +258,13 @@ function werteAus(text) {
 
         // Alles andere gehoert dem Mod, der gerade geladen wird — und nur ihm.
         // Nach `Chainloader startup complete` ist niemand mehr zustaendig: Die
-        // Unity-Fehler danach (Shader, Video) betreffen das Spiel.
+        // Unity-Fehler danach (Shader, Video) betreffen das Spiel. Ausnahmen
+        // danach werden gezählt, aber keinem Mod angehängt (siehe AUSNAHME).
+        if (ergebnis.vollstaendig && (stufe === 'Error' || stufe === 'Fatal')) {
+            const a = nachricht.match(AUSNAHME);
+            if (a) zaehle(a[1], a[2]);
+            continue;
+        }
         if (!offen || ergebnis.vollstaendig) continue;
         if (stufe === 'Error' || stufe === 'Fatal') {
             if (offen.status === 'geladen') { offen.status = 'fehler'; offen.grund = kuerze(nachricht); }
@@ -206,6 +277,11 @@ function werteAus(text) {
         offen.status = 'abgebrochen';
         offen.grund = 'Der Start endete, während dieser Mod geladen wurde.';
     }
+
+    if (wartetAufOrt) verbuche(wartetAufOrt);
+    const n = ergebnis.nachDemLaden;
+    n.arten = [...arten.values()].sort((a, b) => b.anzahl - a.anzahl).slice(0, ARTEN_HOECHSTENS);
+    n.text = nachDemLadenText(n.ausnahmen, n.arten, nurAnfang);
     return ergebnis;
 }
 

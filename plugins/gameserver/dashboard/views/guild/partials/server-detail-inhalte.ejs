@@ -214,6 +214,9 @@
         ${LADESTAND.vollstaendig ? '' : ' · <span style="color:var(--fb-danger)">das Laden wurde nicht abgeschlossen</span>'}
         ${LADESTAND.nurAnfang ? ' · Log über 10 MB: nur der Anfang gelesen' : ''}
         ${fremd.length ? `<br>Geladen, aber keinem Eintrag zugeordnet: ${escape(fremd.join(', '))}` : ''}
+        ${LADESTAND.nachDemLaden && LADESTAND.nachDemLaden.text
+          ? `<br><span style="color:var(--fb-warning)" data-ladestand="nach-dem-laden"><i class="fa-solid fa-triangle-exclamation"></i> ${escape(LADESTAND.nachDemLaden.text)}</span>`
+          : ''}
       </div>`;
   }
 

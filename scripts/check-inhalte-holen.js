@@ -1099,6 +1099,55 @@ async function pruefe(name, fn) {
         assert.strictEqual(nachName(e, 'Jotunn').grund, null);
     });
 
+    // ── K174/B136 (2026-11-08): Ausnahmen nach dem Laden ────────────────────
+    //
+    // Die Zeilen von Server 190 (2026-09-17, SleepSkip 1.3.0), so wie die
+    // Konsole sie zeigte: mit „at“, Hülle von Harmony und Adresse.
+    const SLEEPSKIP = (n) => Array.from({ length: n }, () => [
+        '[Error  : Unity Log] MissingFieldException: Field not found: .ZRoutedRpc.Everybody',
+        'Stack trace:',
+        '  at (wrapper dynamic-method) Game.DMD<Game::UpdateSleeping>(Game)',
+        '  at Game.UpdateSleeping () [0x00077] in <abc>:0',
+        '',
+    ].join('\n')).join('\n');
+    await pruefe('Unity-Fehler ohne Ausnahme nach dem Laden zählen nicht (Valheim ohne Mods)', async () => {
+        const e = BepInExLog.werteAus(LANG_LOG);
+        assert.strictEqual(e.nachDemLaden.ausnahmen, 0);
+        assert.strictEqual(e.nachDemLaden.text, null);
+    });
+    await pruefe('eine Ausnahme beim Laden gehört dem Mod, nicht den Ausnahmen danach', async () => {
+        const e = BepInExLog.werteAus(FEHLER_LOG);
+        assert.strictEqual(e.nachDemLaden.ausnahmen, 0);
+    });
+    await pruefe('SleepSkip: dauerhaft geworfen wird gezählt, mit Ort, ohne Mod; Jotunn bleibt „geladen“', async () => {
+        const e = BepInExLog.werteAus(SAUBER_LOG + SLEEPSKIP(4));
+        assert.strictEqual(nachName(e, 'Jotunn').status, 'geladen');
+        assert.strictEqual(e.nachDemLaden.ausnahmen, 4);
+        const [h] = e.nachDemLaden.arten;
+        assert.strictEqual(h.art, 'MissingFieldException');
+        assert.strictEqual(h.ort, 'Game.UpdateSleeping ()');
+        assert.strictEqual(h.anzahl, 4);
+        assert.match(e.nachDemLaden.text, /^Nach dem Laden 4 Ausnahmen\. Häufigste: MissingFieldException: Field not found: \.ZRoutedRpc\.Everybody in Game\.UpdateSleeping \(\) \(4×\)/);
+        assert.ok(!/SleepSkip|Jotunn/.test(e.nachDemLaden.text), 'der Text nennt einen Mod');
+    });
+    await pruefe('zwei Arten, die häufigere zuerst; nur der Anfang gelesen heißt „mindestens“', async () => {
+        const andere = '[Error  : Unity Log] NullReferenceException: Object reference not set to an instance of an object\n'
+            + 'Stack trace:\nPlayer.Update () (at <x>:0)\n';
+        const e = BepInExLog.werteAus(SAUBER_LOG + andere + SLEEPSKIP(2), { nurAnfang: true });
+        assert.strictEqual(e.nachDemLaden.ausnahmen, 3);
+        assert.deepStrictEqual(e.nachDemLaden.arten.map(a => [a.art, a.anzahl]),
+            [['MissingFieldException', 2], ['NullReferenceException', 1]]);
+        assert.strictEqual(e.nachDemLaden.arten[1].ort, 'Player.Update ()');
+        assert.match(e.nachDemLaden.text, /mindestens, nur der Anfang/);
+    });
+    await pruefe('Route und Seite reichen den Satz durch, die Seite escaped ihn', async () => {
+        const route = ohneKommentare(fs.readFileSync(path.join(__dirname, '../plugins/gameserver/dashboard/routes/inhalte.js'), 'utf8'));
+        assert.match(route, /BepInExLog\.werteAus\(text, \{ nurAnfang \}\)/);
+        assert.match(route, /nachDemLaden: ergebnis\.nachDemLaden/);
+        const ejs = fs.readFileSync(path.join(__dirname, '../plugins/gameserver/dashboard/views/guild/partials/server-detail-inhalte.ejs'), 'utf8');
+        assert.match(ejs, /data-ladestand="nach-dem-laden"[\s\S]{0,120}escape\(LADESTAND\.nachDemLaden\.text\)/);
+    });
+
     await pruefe('Endet der Start mitten im Laden, heisst das abgebrochen — nicht geladen', async () => {
         const bis = FEHLER_LOG.split('\n');
         const i = bis.findIndex(z => z.includes('Loading [TeleportEverything 2.9.1]'));
