@@ -502,6 +502,15 @@ router.get('/:id/status', requirePermission('MASTERSERVER.ROOTSERVER.VIEW'), asy
                 version:         rootserver.daemon_version,
                 osInfo:          rootserver.os_info,
                 systemResources,
+                // Stand von fb-datenbank (K318): Der Knopf „Jetzt wechseln"
+                // fragt hier nach, bis der Daemon das Ergebnis gemeldet hat.
+                datenbank: {
+                    moeglich:  !!rootserver.db_moeglich,
+                    grund:     rootserver.db_grund || null,
+                    image:     rootserver.db_image || null,
+                    image_neu: rootserver.db_image_neu || null,
+                    wechsel:   rootserver.db_wechsel || null,
+                },
             }
         });
 
@@ -712,6 +721,9 @@ router.post('/:id/ips', requirePermission('MASTERSERVER.ROOTSERVER.EDIT'), async
 // `image_wechseln`, der Fahrplan des Bahnhofs bleibt unverändert. Das Ergebnis
 // kommt als Ereignis `datenbank.befund` (RootServer.uebernimmDatenbank).
 // =====================================================
+/** Anfang von db_grund, solange ein Wechsel läuft — die Seite fragt danach (Detailansicht). */
+const WECHSEL_LAEUFT = 'Wechsel auf das Image';
+
 router.post('/:id/datenbank/wechseln', requirePermission('MASTERSERVER.ROOTSERVER.EDIT'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
@@ -730,10 +742,10 @@ router.post('/:id/datenbank/wechseln', requirePermission('MASTERSERVER.ROOTSERVE
         }
         await ipm.sendCommand(rootserver.daemon_id, 'datenbank.anwenden', { an: true, image_wechseln: true }, 15000);
         await dbService.query('UPDATE rootserver SET db_moeglich = 0, db_grund = ? WHERE id = ?',
-            [`Wechsel auf das Image ${rootserver.db_image_neu} läuft — der Stand erscheint hier, sobald der Daemon ihn meldet.`,
+            [`${WECHSEL_LAEUFT} ${rootserver.db_image_neu} läuft — der Stand erscheint hier, sobald der Daemon ihn meldet.`,
                 rootserver.id]);
         Logger.info(`[Masterserver] Datenbank-Image auf RootServer ${rootserver.id}: Wechsel ${rootserver.db_image} → ${rootserver.db_image_neu} angestoßen`);
-        res.json({ success: true, message: 'Der Daemon wechselt das Image. Die Seite zeigt das Ergebnis nach dem Neuladen.' });
+        res.json({ success: true, message: 'Der Daemon wechselt das Image. Die Seite lädt neu, sobald er das Ergebnis meldet.', laeuft: WECHSEL_LAEUFT });
     } catch (error) {
         Logger.error('[Masterserver] Datenbank-Image nicht gewechselt:', error);
         res.status(500).json({ success: false, message: `Nicht gewechselt: ${error.message}` });

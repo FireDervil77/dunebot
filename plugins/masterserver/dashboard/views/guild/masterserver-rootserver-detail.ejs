@@ -1098,11 +1098,30 @@ sudo journalctl -u firebot-daemon -f</code></pre>
             if (!r.ok || !d.success) throw new Error(d.message || 'Nicht gewechselt.');
             GuildAjaxHandler.showToast('success', d.message);
             ja.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Wechsel läuft …';
+            warteAufErgebnis(d.laeuft || 'Wechsel auf das Image');
         } catch (e) {
             ja.disabled = false;
             GuildAjaxHandler.showToast('error', e.message);
         }
     });
+
+    // Bis 2026-11-08 blieb hier „Wechsel läuft …" stehen, bis jemand neu lud —
+    // der Wechsel selbst dauerte Sekunden. Jetzt: nachfragen, bis der Daemon
+    // gemeldet hat (sein Befund ersetzt den Satz „Wechsel … läuft"), dann neu laden.
+    function warteAufErgebnis(laeuft) {
+        const ende = Date.now() + 6 * 60 * 1000; // 2 min Bereitschaft je Container, zweimal, dazu Holen
+        const frage = async function () {
+            try {
+                const r = await fetch('/guild/<%= guildId %>/plugins/masterserver/rootservers/<%= rootserver.id %>/status');
+                const d = await r.json();
+                const db = d && d.data && d.data.datenbank;
+                if (db && !String(db.grund || '').startsWith(laeuft)) { location.reload(); return; }
+            } catch (_) { /* nächster Versuch */ }
+            if (Date.now() < ende) setTimeout(frage, 2000);
+            else ja.innerHTML = '<i class="fa-solid fa-clock me-1"></i>Noch keine Meldung — Seite später neu laden';
+        };
+        setTimeout(frage, 2000);
+    }
 })();
 
 // ── RootServer löschen ───────────────────────────────────────

@@ -50,6 +50,7 @@ ServiceManager.register('dbService', {
 });
 ServiceManager.register('ipmServer', {
     isDaemonOnline: () => spur.online,
+    getDaemonHardware: () => null,
     async sendCommand(daemonId, befehl, nutzlast) {
         spur.befehle.push([daemonId, befehl, nutzlast]);
         if (spur.befehlFehler) throw new Error(spur.befehlFehler);
@@ -226,6 +227,26 @@ async function pruefe(was, tun) {
         assert.strictEqual(r.success, true, JSON.stringify(r));
         assert.deepStrictEqual(spur.befehle, [['d54', 'datenbank.anwenden', { an: true, image_wechseln: true }]]);
         assert.match(spur.abfragen.find(a => /db_moeglich = 0, db_grund/.test(a[0]))[1][0], /Wechsel auf das Image 3c31a17ad2fe läuft/);
+    });
+
+    await pruefe('nach dem Klick: /status trägt den Datenbank-Stand, die Seite fragt nach und lädt neu, wenn der Satz „läuft“ ersetzt ist', async () => {
+        spur.online = true;
+        const r = await wechsle({ db_gewuenscht: 1, db_image: '28a71c6cdb01', db_image_neu: '3c31a17ad2fe' });
+        const satz = spur.abfragen.find(a => /db_moeglich = 0, db_grund/.test(a[0]))[1][0];
+        assert.ok(r.laeuft && satz.startsWith(r.laeuft), `die Seite erkennt den laufenden Wechsel nicht: ${r.laeuft} / ${satz}`);
+        const echt = RootServer.getById;
+        RootServer.getById = async () => ({ id: 54, guild_id: 'g1', daemon_id: 'd54', db_moeglich: 1, db_grund: 'Container läuft',
+            db_image: '3c31a17ad2fe', db_image_neu: null, db_wechsel: null });
+        const antwort = {};
+        const res = { locals: { guildId: 'g1' }, status(c) { antwort.c = c; return this; }, json(o) { Object.assign(antwort, o); return this; } };
+        try { await handle('get', '/:id/status')({ params: { id: '54' } }, res); } finally { RootServer.getById = echt; }
+        assert.ok(antwort.data, 'Antwort: ' + JSON.stringify(antwort));
+        assert.deepStrictEqual(antwort.data?.datenbank, { moeglich: true, grund: 'Container läuft', image: '3c31a17ad2fe', image_neu: null, wechsel: null });
+        const detail = ohneKommentareEjs(fs.readFileSync(path.join(WURZEL, 'plugins/masterserver/dashboard/views/guild/masterserver-rootserver-detail.ejs'), 'utf8'));
+        const a = detail.indexOf('function warteAufErgebnis(');
+        const block = detail.slice(a, detail.indexOf('})();', a));
+        assert.ok(a > 0 && /warteAufErgebnis\(d\.laeuft/.test(detail), 'nach dem Klick fragt niemand nach');
+        assert.ok(/\/status'/.test(block) && /startsWith\(laeuft\)/.test(block) && /location\.reload\(\)/.test(block), 'Nachfragen ohne Neuladen');
     });
 
     await pruefe('Knopf: ohne neueres Image, ohne Verbindung, fremde Guild — nichts geschickt', async () => {
