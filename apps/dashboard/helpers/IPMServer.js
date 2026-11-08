@@ -1541,6 +1541,11 @@ class IPMServer {
                     satz: 'Neuer Token: Der Daemon hat ihn gespeichert und verbindet sich neu' },
                 token_gilt:         { typ: 'status_change',  stufe: 'info',
                     satz: 'Der Daemon spricht unter dem neuen Token, der alte gilt nicht mehr' },
+                // Aufräumen beim Verbinden (reste.befund, K313)
+                reste_entfernt:     { typ: 'status_change',  stufe: 'info',
+                    satz: 'Daemon hat Reste gelöschter Server entfernt' },
+                reste_geblieben:    { typ: 'status_change',  stufe: 'warn',
+                    satz: 'Auf der Maschine liegen Reste, die der Daemon nicht entfernt hat' },
             };
             const eintrag = TAFEL[event]
                 || { typ: 'status_change', stufe: 'info', satz: `Daemon-Ereignis: ${event}` };
@@ -2086,6 +2091,25 @@ class IPMServer {
         eventRouter.register('datenbank', 'befund', async (payload, message, context) => {
             if (!context?.daemonId) return;
             await RootServer.uebernimmDatenbank(context.daemonId, payload?.datenbank || null);
+        });
+
+        // Bestand nach dem Aufräumen beim Verbinden (K313, Daemon ab 1.1.21):
+        // Was weg kam, steht im Protokoll der Maschine — es war ein Löschen.
+        eventRouter.register('reste', 'befund', async (payload, message, context) => {
+            if (!context?.daemonId) return;
+            const befund = await RootServer.uebernimmReste(context.daemonId, payload);
+            if (!befund) return;
+            const summe = (l) => l.reduce((n, r) => n + r.bytes, 0);
+            if (befund.entfernt.length) {
+                this.Logger.info(`[Reste] ${context.daemonId}: ${befund.entfernt.length} Rest(e) gelöschter Server entfernt, `
+                    + `${Math.round(summe(befund.entfernt) / 1e6)} MB — ${befund.entfernt.map(r => `${r.art} ${r.name}`).join(', ')}`);
+                await this._logDaemonEvent(context.daemonId, 'reste_entfernt', { entfernt: befund.entfernt });
+            }
+            if (befund.geblieben.length) {
+                this.Logger.warn(`[Reste] ${context.daemonId}: ${befund.geblieben.length} Rest(e) geblieben — `
+                    + befund.geblieben.map(r => `${r.art} ${r.name}: ${r.grund}`).join('; '));
+                await this._logDaemonEvent(context.daemonId, 'reste_geblieben', { geblieben: befund.geblieben });
+            }
         });
 
         // Busadresse aus dem Panel: Was der Daemon daraus gemacht hat

@@ -383,6 +383,23 @@ class RootServer {
         return d;
     }
 
+    /**
+     * Bestand nach dem Aufräumen beim Verbinden übernehmen (K313, 2026-11-08) —
+     * aus dem Ereignis `reste.befund`. Verglichen wird er in scripts/check-reste.js.
+     *
+     * @param {string} daemonId
+     * @param {object} payload  wie gemeldet
+     * @returns {Promise<object|null>} der bereinigte Befund, null = Maschine unbekannt
+     */
+    static async uebernimmReste(daemonId, payload) {
+        const dbService = ServiceManager.get('dbService');
+        const befund = require('../helpers/Reste').bereinige(payload);
+        const r = await dbService.query(
+            'UPDATE rootserver SET reste_befund = ?, reste_am = NOW() WHERE daemon_id = ?',
+            [JSON.stringify(befund), daemonId]);
+        return r && r.affectedRows ? befund : null;
+    }
+
     static async uebernimmMaschinenbefund(daemonId, befund, gesehenIp) {
         const dbService = ServiceManager.get('dbService');
         const M = require('../helpers/Maschinenbefund');

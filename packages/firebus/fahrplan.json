@@ -1,5 +1,5 @@
 {
-  "fassung": 9,
+  "fassung": 10,
   "linien": {"S": "Steuerung", "L": "Live", "O": "Output", "V": "Verify", "E": "Events", "D": "Datei"},
   "zeilen": [
     {"name": "register", "art": "steuerung", "von": "daemon", "linie": "V", "verlust": "nie"},
@@ -30,6 +30,7 @@
     {"name": "sftp.befund", "art": "ereignis", "von": "daemon", "linie": "E", "verlust": "nie"},
     {"name": "adresse.befund", "art": "ereignis", "von": "daemon", "linie": "E", "verlust": "nie"},
     {"name": "datenbank.befund", "art": "ereignis", "von": "daemon", "linie": "E", "verlust": "nie"},
+    {"name": "reste.befund", "art": "ereignis", "von": "daemon", "linie": "E", "verlust": "nie"},
     {"name": "werkbank.status", "art": "ereignis", "von": "daemon", "linie": "E", "verlust": "nie"},
     {"name": "werkbank.fertig", "art": "ereignis", "von": "daemon", "linie": "E", "verlust": "nie"},
     {"name": "werkbank.fehlgeschlagen", "art": "ereignis", "von": "daemon", "linie": "E", "verlust": "nie"},
@@ -99,7 +100,6 @@
     {"name": "sftp.anwenden", "art": "befehl", "von": "dashboard", "linie": "V", "verlust": "nie", "reihe": "maschine", "arbeit": "bindet"},
     {"name": "sftp.user.sync", "art": "befehl", "von": "dashboard", "linie": "V", "verlust": "nie", "reihe": "maschine", "arbeit": "bindet"},
     {"name": "sftp.users.replace", "art": "befehl", "von": "dashboard", "linie": "V", "verlust": "nie", "reihe": "maschine", "arbeit": "bindet"},
-    {"name": "gameserver.cleanup_orphaned", "art": "befehl", "von": "dashboard", "linie": "S", "verlust": "nie", "reihe": "maschine", "arbeit": "bindet", "ohne_aufrufer": true},
     {"name": "gameserver.migrate.download", "art": "befehl", "von": "dashboard", "linie": "S", "verlust": "nie", "reihe": "keine", "arbeit": "frei", "ohne_aufrufer": true},
     {"name": "gameserver.migrate.upload", "art": "befehl", "von": "dashboard", "linie": "S", "verlust": "nie", "reihe": "keine", "arbeit": "frei", "ohne_aufrufer": true},
     {"name": "gameserver.apply_config", "art": "befehl", "von": "dashboard", "linie": "S", "verlust": "nie", "reihe": "server", "arbeit": "bindet", "ohne_aufrufer": true},
