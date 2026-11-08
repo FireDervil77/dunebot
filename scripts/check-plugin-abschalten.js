@@ -319,7 +319,7 @@ function formular(name, d) {
         const r = await discord({ gewaehlt: ['core', 'music', 'ticket'], getippt: ' GameServer ', dashboard: ok });
         assert.strictEqual(r.ipc.length, 1);
         assert.strictEqual(r.ipc[0].ereignis, 'core:UPDATE_PLUGIN_STATUS');
-        assert.deepStrictEqual(r.ipc[0].nutzlast, { guildId: '222', enabled: ['ticket'], disabled: ['gameserver'] });
+        assert.deepStrictEqual(r.ipc[0].nutzlast, { guildId: '222', enabled: ['ticket'], disabled: ['gameserver'], userId: 'u1' });
         assert.ok(r.ipc[0].frist >= 10 * 60 * 1000, 'zu kurze Frist für das Abschalten von Gameservern');
         assert.deepStrictEqual(r.bot, [['ein', 'ticket'], ['aus', 'gameserver']]);
         assert.match(r.texte.at(-1), /STATUS_RESULT_ON \{"liste":"ticket"\}\nSTATUS_RESULT_OFF \{"liste":"gameserver"\}/);
@@ -341,7 +341,7 @@ function formular(name, d) {
     await pruefe('Discord: nur einschalten braucht kein Fenster, schon Abgeschaltetes wird nicht erneut abgeschaltet', async () => {
         const r = await discord({ an: ['music'], gewaehlt: ['core', 'music', 'ticket'], dashboard: ok });
         assert.strictEqual(r.fenster, 0);
-        assert.deepStrictEqual(r.ipc[0].nutzlast, { guildId: '222', enabled: ['ticket'], disabled: [] });
+        assert.deepStrictEqual(r.ipc[0].nutzlast, { guildId: '222', enabled: ['ticket'], disabled: [], userId: 'u1' });
         const nichts = await discord({ an: ['music'], gewaehlt: ['core', 'music'], dashboard: ok });
         assert.deepStrictEqual(nichts.ipc, []);
         assert.match(nichts.texte.at(-1), /^STATUS_NOTHING/);

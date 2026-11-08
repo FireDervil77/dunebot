@@ -756,6 +756,16 @@ async getAllConfigs() {
 
     /**
      * Aktiviert ein Plugin für eine Guild
+     *
+     * Zeit und Benutzer werden nur beim wirklichen Einschalten gestempelt
+     * (K158, 2026-11-08). Dashboard und Bot schalten bei jedem Start alle
+     * eingeschalteten Plugins noch einmal ein; bis dahin stand danach in allen
+     * 59 Zeilen der Start als `enabled_at` und niemand als `enabled_by`. Ist die
+     * Zeile schon an, ändert sich nur die Fassung.
+     *
+     * Die IF()-Zuweisungen stehen VOR `is_enabled = 1`: MariaDB weist von
+     * links nach rechts zu, sie lesen also noch den alten Zustand.
+     *
      * @param {string} guildId Guild-ID
      * @param {string} pluginName Plugin-Name
      * @param {string} version Plugin-Version (optional)
@@ -769,18 +779,23 @@ async getAllConfigs() {
                 (guild_id, plugin_name, is_enabled, plugin_version, enabled_at, enabled_by)
             VALUES (?, ?, 1, ?, NOW(), ?)
             ON DUPLICATE KEY UPDATE
+                enabled_at = IF(is_enabled = 1, enabled_at, NOW()),
+                enabled_by = IF(is_enabled = 1, enabled_by, VALUES(enabled_by)),
+                disabled_at = IF(is_enabled = 1, disabled_at, NULL),
+                disabled_by = IF(is_enabled = 1, disabled_by, NULL),
                 is_enabled = 1,
                 plugin_version = VALUES(plugin_version),
-                enabled_at = NOW(),
-                enabled_by = VALUES(enabled_by),
-                disabled_at = NULL,
-                disabled_by = NULL,
                 updated_at = NOW()
         `, [guildId, pluginName, version, userId]);
     }
 
     /**
      * Deaktiviert ein Plugin für eine Guild
+     *
+     * Wie beim Einschalten nur beim wirklichen Abschalten gestempelt: Der Bot
+     * folgt dem Dashboard und schaltet noch einmal ab, ohne Benutzer — bis
+     * 2026-11-08 überschrieb er damit, wer es war.
+     *
      * @param {string} guildId Guild-ID
      * @param {string} pluginName Plugin-Name
      * @param {string} userId User-ID des Deaktivierenden (optional)
@@ -790,9 +805,9 @@ async getAllConfigs() {
     async disablePluginForGuild(guildId, pluginName, userId = null) {
         return await this.query(`
             UPDATE guild_plugins
-            SET is_enabled = 0,
-                disabled_at = NOW(),
-                disabled_by = ?,
+            SET disabled_at = IF(is_enabled = 1, NOW(), disabled_at),
+                disabled_by = IF(is_enabled = 1, ?, disabled_by),
+                is_enabled = 0,
                 updated_at = NOW()
             WHERE guild_id = ? AND plugin_name = ?
         `, [userId, guildId, pluginName]);

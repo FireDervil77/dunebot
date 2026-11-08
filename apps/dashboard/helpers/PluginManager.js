@@ -1132,7 +1132,8 @@ class PluginManager extends BasePluginManager {
             }
 
             // NEU: Plugin in guild_plugins Tabelle aktivieren
-            const userId = req?.session?.user?.info?.id || null;
+            // Ohne Anfrage (Discord `/plugin status`) kommt der Benutzer als `{ userId }`.
+            const userId = req?.session?.user?.info?.id || req?.userId || null;
             const pluginVersion = plugin.version || null;
             
             await dbService.enablePluginForGuild(guildId, pluginName, pluginVersion, userId);
@@ -1286,7 +1287,8 @@ class PluginManager extends BasePluginManager {
             await this.hooks.doAction('before_update_guild_settings_disable', plugin, guildId);
 
             // 3. Plugin in guild_plugins Tabelle deaktivieren
-            const userId = req?.session?.user?.info?.id || null;
+            // Ohne Anfrage (Discord `/plugin status`) kommt der Benutzer als `{ userId }`.
+            const userId = req?.session?.user?.info?.id || req?.userId || null;
             await dbService.disablePluginForGuild(guildId, pluginName, userId);
             Logger.debug(`Plugin ${pluginName} in guild_plugins für Guild ${guildId} deaktiviert (User: ${userId || 'System'})`);
 

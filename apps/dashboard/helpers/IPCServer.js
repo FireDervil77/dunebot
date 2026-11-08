@@ -290,11 +290,13 @@ class IPCServer {
                         ergebnisse.push({ plugin: pluginName, aktion, ok: false, grund: err.message });
                     }
                 };
+                // Wer in Discord schaltete, steht in guild_plugins (K158).
+                const wer = /^\d{17,20}$/.test(String(payload.userId || '')) ? { userId: String(payload.userId) } : null;
                 for (const pluginName of enabled) {
-                    await fuehreAus(pluginName, 'ein', () => pluginManager.enableInGuild(pluginName, guildId));
+                    await fuehreAus(pluginName, 'ein', () => pluginManager.enableInGuild(pluginName, guildId, wer));
                 }
                 for (const pluginName of disabled) {
-                    await fuehreAus(pluginName, 'aus', () => pluginManager.disableInGuild(pluginName, guildId));
+                    await fuehreAus(pluginName, 'aus', () => pluginManager.disableInGuild(pluginName, guildId, wer));
                 }
 
                 return message.reply({ success: ergebnisse.every(e => e.ok), data: { ergebnisse } });
