@@ -125,6 +125,7 @@ function _stern(p) {
                             <div class="card-body">
                                 <p><%= p.description || tr('ADMIN_PAGE.NO_DESCRIPTION') %></p>
                                 <p class="text-secondary small mb-0"><%= tr('ADMIN_PAGE.AUTHOR') %>: <%= p.author %></p>
+                                <% if (p.stempel) { %><p class="text-secondary small mb-0"><i class="fa-solid fa-clock-rotate-left me-1"></i><%= p.stempel %></p><% } %>
 
                                 <% if (p.updateInfo) { %>
                                     <div class="alert alert-warning p-2 mt-3 mb-0">
@@ -224,7 +225,7 @@ function _stern(p) {
                                             <span class="badge bg-warning-lt">v<%= p.updateInfo.available_version %></span>
                                         <% } %>
                                     </td>
-                                    <td class="text-secondary"><%= p.author %></td>
+                                    <td class="text-secondary"><%= p.author %><% if (p.stempel) { %><div class="small"><%= p.stempel %></div><% } %></td>
                                     <td><%= p.description || tr('ADMIN_PAGE.NO_DESCRIPTION') %></td>
                                     <td>
                                         <div class="d-flex flex-wrap gap-1">
@@ -301,6 +302,7 @@ function _stern(p) {
                             <div class="card-body">
                                 <p class="text-secondary"><%= p.description || tr('ADMIN_PAGE.NO_DESCRIPTION') %></p>
                                 <p class="text-secondary small mb-0"><%= tr('ADMIN_PAGE.AUTHOR') %>: <%= p.author %></p>
+                                <% if (p.stempel) { %><p class="text-secondary small mb-0"><i class="fa-solid fa-clock-rotate-left me-1"></i><%= p.stempel %></p><% } %>
                             </div>
                             <div class="card-footer">
                                 <form action="/guild/<%= guildId %>/plugins"
@@ -340,7 +342,7 @@ function _stern(p) {
                                     <td><span class="avatar opacity-75" style="background-image: url('<%= p.icon %>')"></span></td>
                                     <td><strong><%= p.displayName %></strong><%- _abzeichen(p) %><%- _stern(p) %></td>
                                     <td><span class="badge bg-secondary-lt">v<%= p.version %></span></td>
-                                    <td class="text-secondary"><%= p.author %></td>
+                                    <td class="text-secondary"><%= p.author %><% if (p.stempel) { %><div class="small"><%= p.stempel %></div><% } %></td>
                                     <td class="text-secondary"><%= p.description || tr('ADMIN_PAGE.NO_DESCRIPTION') %></td>
                                     <td>
                                         <form action="/guild/<%= guildId %>/plugins"

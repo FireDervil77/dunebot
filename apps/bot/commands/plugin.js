@@ -301,7 +301,7 @@ async function pluginStatus(arg0) {
     const ipcClient = ServiceManager.get("ipcClient");
     const antwort = ipcClient
         ? await ipcClient.sendToDashboard("core:UPDATE_PLUGIN_STATUS",
-            { guildId: guild.id, enabled: einschalten, disabled: abschalten, userId: waiter.user.id }, DASHBOARD_FRIST_MS)
+            { guildId: guild.id, enabled: einschalten, disabled: abschalten, userId: waiter.user.id, userName: waiter.user.globalName || waiter.user.username }, DASHBOARD_FRIST_MS)
         : { success: false, error: "keine Verbindung zum Dashboard" };
     const ergebnisse = antwort?.data?.ergebnisse;
     if (!Array.isArray(ergebnisse)) {

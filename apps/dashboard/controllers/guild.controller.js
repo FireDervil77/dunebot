@@ -10,6 +10,22 @@ const path = require("path");
 const { ServiceManager } = require("dunebot-core");
 
 /**
+ * Der Satz auf der Plugin-Karte: wer es wann ein- oder abschaltete (K158).
+ * Gestempelt wird nur beim Wechsel (DBService.enablePluginForGuild); ohne
+ * Namen steht nur die Zeit da — so bei allem, was vor 2026-11-08 geschah.
+ */
+function stempelSatz(zeile, tr, sprache) {
+    const an = Number(zeile.is_enabled) === 1;
+    const wann = an ? zeile.enabled_at : zeile.disabled_at;
+    if (!wann || typeof tr !== 'function') return null;
+    const datum = new Date(wann).toLocaleDateString(String(sprache || '').startsWith('en') ? 'en-GB' : 'de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const wer = an ? zeile.enabled_by_name : zeile.disabled_by_name;
+    const schluessel = `ADMIN_PAGE.${an ? 'ENABLED' : 'DISABLED'}_STAMP${wer ? '_BY' : ''}`;
+    return tr(schluessel, { datum, wer: wer || '' });
+}
+exports.stempelSatz = stempelSatz;
+
+/**
  * Guild-Dashboard anzeigen
  * @author firedervil
  * @param {import('express').Request} req - Express Request Objekt
@@ -251,12 +267,17 @@ exports.getPlugins = async (req, res) => {
         // Aktivierte Plugins aus guild_plugins Tabelle laden (mit Versionen)
         let enabledServerPlugins = [];
         let pluginVersionsFromDB = {};
+        let stempelJePlugin = {};
         try {
-            const pluginsData = await dbService.query(`
-                SELECT plugin_name, plugin_version 
+            // Auch die abgeschalteten: Ihre Karte sagt, wer es wann tat (K158).
+            const zeilen = await dbService.query(`
+                SELECT plugin_name, plugin_version, is_enabled,
+                       enabled_at, enabled_by_name, disabled_at, disabled_by_name
                 FROM guild_plugins 
-                WHERE guild_id = ? AND is_enabled = 1
+                WHERE guild_id = ?
             `, [guildId]);
+            const pluginsData = zeilen.filter(z => Number(z.is_enabled) === 1);
+            stempelJePlugin = Object.fromEntries(zeilen.map(z => [z.plugin_name, stempelSatz(z, res.locals.tr, res.locals.locale)]));
             
             enabledServerPlugins = pluginsData.map(p => p.plugin_name);
             pluginVersionsFromDB = pluginsData.reduce((acc, p) => {
@@ -365,7 +386,8 @@ exports.getPlugins = async (req, res) => {
                         isCore,
                         canDisable: !isCore,
                         // NEU: Badge-Informationen hinzufügen
-                        badge: pluginBadges[pluginName] || null
+                        badge: pluginBadges[pluginName] || null,
+                        stempel: stempelJePlugin[pluginName] || null
                     };
 
                     if (plugin.enabled) {

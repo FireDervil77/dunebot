@@ -291,7 +291,9 @@ class IPCServer {
                     }
                 };
                 // Wer in Discord schaltete, steht in guild_plugins (K158).
-                const wer = /^\d{17,20}$/.test(String(payload.userId || '')) ? { userId: String(payload.userId) } : null;
+                const wer = /^\d{17,20}$/.test(String(payload.userId || ''))
+                    ? { userId: String(payload.userId), userName: String(payload.userName || '').slice(0, 100) || null }
+                    : null;
                 for (const pluginName of enabled) {
                     await fuehreAus(pluginName, 'ein', () => pluginManager.enableInGuild(pluginName, guildId, wer));
                 }

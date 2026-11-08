@@ -1132,11 +1132,12 @@ class PluginManager extends BasePluginManager {
             }
 
             // NEU: Plugin in guild_plugins Tabelle aktivieren
-            // Ohne Anfrage (Discord `/plugin status`) kommt der Benutzer als `{ userId }`.
+            // Ohne Anfrage (Discord `/plugin status`) kommt der Benutzer als `{ userId, userName }`.
             const userId = req?.session?.user?.info?.id || req?.userId || null;
+            const userName = req?.session?.user?.info?.global_name || req?.session?.user?.info?.username || req?.userName || null;
             const pluginVersion = plugin.version || null;
             
-            await dbService.enablePluginForGuild(guildId, pluginName, pluginVersion, userId);
+            await dbService.enablePluginForGuild(guildId, pluginName, pluginVersion, userId, userName);
             Logger.debug(`Plugin ${pluginName} (v${pluginVersion}) in guild_plugins für Guild ${guildId} aktiviert (User: ${userId || 'System'})`);
 
             // ✅ NEU: Permissions für Guild registrieren
@@ -1287,9 +1288,10 @@ class PluginManager extends BasePluginManager {
             await this.hooks.doAction('before_update_guild_settings_disable', plugin, guildId);
 
             // 3. Plugin in guild_plugins Tabelle deaktivieren
-            // Ohne Anfrage (Discord `/plugin status`) kommt der Benutzer als `{ userId }`.
+            // Ohne Anfrage (Discord `/plugin status`) kommt der Benutzer als `{ userId, userName }`.
             const userId = req?.session?.user?.info?.id || req?.userId || null;
-            await dbService.disablePluginForGuild(guildId, pluginName, userId);
+            const userName = req?.session?.user?.info?.global_name || req?.session?.user?.info?.username || req?.userName || null;
+            await dbService.disablePluginForGuild(guildId, pluginName, userId, userName);
             Logger.debug(`Plugin ${pluginName} in guild_plugins für Guild ${guildId} deaktiviert (User: ${userId || 'System'})`);
 
             await this.hooks.doAction('after_update_guild_settings_disable', plugin, guildId);

@@ -770,23 +770,26 @@ async getAllConfigs() {
      * @param {string} pluginName Plugin-Name
      * @param {string} version Plugin-Version (optional)
      * @param {string} userId User-ID des Aktivierenden (optional)
+     * @param {string} userName Name dazu, wie Discord ihn gerade nennt (optional)
      * @returns {Promise<Object>}
      * @author FireDervil
      */
-    async enablePluginForGuild(guildId, pluginName, version = null, userId = null) {
+    async enablePluginForGuild(guildId, pluginName, version = null, userId = null, userName = null) {
         return await this.query(`
             INSERT INTO guild_plugins 
-                (guild_id, plugin_name, is_enabled, plugin_version, enabled_at, enabled_by)
-            VALUES (?, ?, 1, ?, NOW(), ?)
+                (guild_id, plugin_name, is_enabled, plugin_version, enabled_at, enabled_by, enabled_by_name)
+            VALUES (?, ?, 1, ?, NOW(), ?, ?)
             ON DUPLICATE KEY UPDATE
                 enabled_at = IF(is_enabled = 1, enabled_at, NOW()),
                 enabled_by = IF(is_enabled = 1, enabled_by, VALUES(enabled_by)),
+                enabled_by_name = IF(is_enabled = 1, enabled_by_name, VALUES(enabled_by_name)),
                 disabled_at = IF(is_enabled = 1, disabled_at, NULL),
                 disabled_by = IF(is_enabled = 1, disabled_by, NULL),
+                disabled_by_name = IF(is_enabled = 1, disabled_by_name, NULL),
                 is_enabled = 1,
                 plugin_version = VALUES(plugin_version),
                 updated_at = NOW()
-        `, [guildId, pluginName, version, userId]);
+        `, [guildId, pluginName, version, userId, userName]);
     }
 
     /**
@@ -799,18 +802,20 @@ async getAllConfigs() {
      * @param {string} guildId Guild-ID
      * @param {string} pluginName Plugin-Name
      * @param {string} userId User-ID des Deaktivierenden (optional)
+     * @param {string} userName Name dazu (optional)
      * @returns {Promise<Object>}
      * @author FireDervil
      */
-    async disablePluginForGuild(guildId, pluginName, userId = null) {
+    async disablePluginForGuild(guildId, pluginName, userId = null, userName = null) {
         return await this.query(`
             UPDATE guild_plugins
             SET disabled_at = IF(is_enabled = 1, NOW(), disabled_at),
                 disabled_by = IF(is_enabled = 1, ?, disabled_by),
+                disabled_by_name = IF(is_enabled = 1, ?, disabled_by_name),
                 is_enabled = 0,
                 updated_at = NOW()
             WHERE guild_id = ? AND plugin_name = ?
-        `, [userId, guildId, pluginName]);
+        `, [userId, userName, guildId, pluginName]);
     }
 
     /**
