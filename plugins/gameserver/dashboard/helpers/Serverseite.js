@@ -297,7 +297,8 @@ const ABZEICHEN = { green: 'success', yellow: 'warning', blue: 'info', red: 'dan
  *   1. `bind_ip`        — bindet der Server an eine bestimmte Adresse, ist er
  *                         NUR dort erreichbar. Ein noch so schöner Name, der
  *                         auf eine andere Adresse derselben Maschine zeigt,
- *                         hilft dann niemandem.
+ *                         hilft dann niemandem. Ist sie gleich der IP der
+ *                         Maschine, sagt sie nichts (siehe K304 unten).
  *   2. geprüfter Name   — nur wenn `fqdn_gilt` gesetzt ist, und das setzt
  *                         ausschliesslich eine Messung (M-3), nie eine Eingabe.
  *   3. die IP           — die Antwort, die immer stimmt.
@@ -404,8 +405,23 @@ function beitrittsPasswort(paket, server = {}) {
 
 function baueAdresse(server) {
     const nameGilt = Boolean(server.fqdn_gilt) && Boolean(server.fqdn);
-    const host = server.bind_ip
+
+    // ── `bind_ip` gewinnt nur, wenn sie etwas sagt (K304, 2026-11-08) ────────
+    //
+    // Beim Anlegen wird `bind_ip` immer auf die IP der Maschine gesetzt
+    // (servers.js, IPCServer.js). Am 2026-11-08 galt das für alle 8 Server.
+    // Damit gewann sie an jeder Stelle, die sie abfragte, und der geprüfte
+    // Name erschien nur dort, wo die Abfrage sie vergaß: Die Übersicht zeigte
+    // `45.131.66.91:…`, die Serverseite `node2.firenetworks.de:…`.
+    //
+    // Regel (Betreiber): Der geprüfte Name steht, wenn `bind_ip` fehlt oder
+    // gleich der IP der Maschine ist. Er zeigt dann auf dieselbe Adresse.
+    // Bindet ein Server an eine andere IP, steht nur diese.
+    const eigeneIp = server.bind_ip && server.bind_ip !== server.rootserver_ip
+        ? server.bind_ip : null;
+    const host = eigeneIp
         || (nameGilt ? server.fqdn : null)
+        || server.bind_ip
         || server.rootserver_ip
         || null;
 

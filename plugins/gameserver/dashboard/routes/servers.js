@@ -1891,6 +1891,9 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
                 -- geschrieben wurde.
                 gs.laeuft_seit,
                 gs.last_status_update,
+                -- Für baueAdresse: Ohne sie zeigte die Serverseite eine andere
+                -- Adresse als die Übersicht (K304, 2026-11-08).
+                gs.bind_ip,
                 -- Ohne diese drei baute baueBereitschaft() die Leiter aus
                 -- undefined und schrieb "nicht gemessen" hin, obwohl die Stufe
                 -- in derselben Zeile stand. Der Helfer war richtig, die

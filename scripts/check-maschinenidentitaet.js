@@ -128,7 +128,11 @@ function pruefe(bedingung, was, zusatz = '') {
             // (StarRupture nahm am 2026-10-06 im Beitreten-Feld keinen an).
             ['ungeprüfter Name', { fqdn: 'node1.firenetworks.de', fqdn_gilt: 0, server_ip: '203.0.113.7' }, '203.0.113.7:25002', null],
             ['geprüfter Name',   { fqdn: 'node1.firenetworks.de', fqdn_gilt: 1, server_ip: '203.0.113.7' }, 'node1.firenetworks.de:25002', '203.0.113.7:25002'],
-            ['bind_ip schlägt alles', { bind_ip: '203.0.113.9', fqdn: 'node1.firenetworks.de', fqdn_gilt: 1, server_ip: '203.0.113.7' }, '203.0.113.9:25002', null],
+            ['bind_ip auf eine andere IP schlägt alles', { bind_ip: '203.0.113.9', fqdn: 'node1.firenetworks.de', fqdn_gilt: 1, server_ip: '203.0.113.7' }, '203.0.113.9:25002', null],
+            // K304 (Betreiber 2026-11-08): bind_ip gleich der IP der Maschine
+            // sagt nichts, so legt das Anlegen jeden Server an.
+            ['bind_ip = IP der Maschine, Name geprüft', { bind_ip: '203.0.113.7', fqdn: 'node1.firenetworks.de', fqdn_gilt: 1, server_ip: '203.0.113.7' }, 'node1.firenetworks.de:25002', '203.0.113.7:25002'],
+            ['bind_ip = IP der Maschine, Name ungeprüft', { bind_ip: '203.0.113.7', fqdn: 'node1.firenetworks.de', fqdn_gilt: 0, server_ip: '203.0.113.7' }, '203.0.113.7:25002', null],
             ['gar kein Name',    { fqdn: null, fqdn_gilt: 0, server_ip: '203.0.113.7' }, '203.0.113.7:25002', null],
         ];
         for (const [was, felder, erwartet, alsIp] of faelle) {
@@ -140,6 +144,20 @@ function pruefe(bedingung, was, zusatz = '') {
             pruefe(ip === alsIp, `${was}: als IP → ${ip === null ? 'keine zweite Zeile' : ip}`,
                 ip === alsIp ? '' : `erwartet war ${alsIp}`);
         }
+
+        // Dieselbe Regel nützt nichts, wenn eine Seite ihre Eingabe nicht holt:
+        // Der Serverseite fehlte bind_ip bis 2026-11-08 (K304).
+        const fs = require('fs');
+        const { ohneKommentare } = require('./lib/quelltext');
+        const route = ohneKommentare(fs.readFileSync(require('path').join(__dirname,
+            '../plugins/gameserver/dashboard/routes/servers.js'), 'utf8'))
+            .split('\n').map(z => z.replace(/(^|\s)--\s.*$/, '')).join('\n');
+        const von = route.indexOf("router.get('/:serverId',");
+        const bis = von >= 0 ? route.indexOf("router.get('/:serverId/", von) : -1;
+        const block = von >= 0 ? route.slice(von, bis > von ? bis : undefined) : '';
+        pruefe(/gs\.bind_ip/.test(block) && /AS rootserver_ip/i.test(block) && /r\.fqdn_gilt/.test(block),
+            'die Serverseite fragt bind_ip, die IP der Maschine und den geprüften Namen ab',
+            von < 0 ? 'Block nicht gefunden — Anker anpassen' : '');
     } finally {
         if (angelegt) {
             await conn.query('DELETE FROM rootserver_quotas WHERE rootserver_id = ?', [angelegt.id]).catch(() => {});
