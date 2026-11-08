@@ -72,6 +72,12 @@ function dashboard() {
     // Kurzer Takt: Zählung und Kontrolle kommen sonst nur einmal je Minute.
     const starteBahnhof = () => spawn(bin, ['-adresse', `127.0.0.1:${port}`, '-dock', SOCKET, '-takt', '300ms'], { stdio: 'ignore' });
     let bahnhof = starteBahnhof();
+    // Jeder Ausgang nimmt den Bahnhof mit, auch ein Abbruch über catch: Seit dem
+    // 2026-11-03 08:17 lief ein Bahnhof aus /tmp weiter (gefunden 2026-11-08, K313).
+    process.on('exit', () => {
+        try { bahnhof.kill('SIGKILL'); } catch (_) { /* schon beendet */ }
+        fs.rmSync(ordner, { recursive: true, force: true });
+    });
     await bis('Socket', () => fs.existsSync(SOCKET));
 
     const erstes = dashboard();
@@ -295,8 +301,6 @@ function dashboard() {
         server.close();
     });
 
-    bahnhof.kill('SIGKILL');
-    fs.rmSync(ordner, { recursive: true, force: true });
     console.log(fehler ? `\n✗ ${fehler} Prüfung(en) rot` : '\n✅ Das Dashboard startet neu, die Leitung bleibt, und der Daemon meldet sich selbst neu an');
     process.exit(fehler ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });
