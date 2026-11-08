@@ -1,5 +1,5 @@
 const mysql = require('mysql2/promise');
-const { ServiceManager } = require("dunebot-core");
+const { ServiceManager, Anfragezeit } = require("dunebot-core");
 require("dotenv").config();
 
 /**
@@ -65,7 +65,8 @@ class DBClient {
      * @returns {Promise<any>} Ergebnis der Abfrage
      */
     async query(sql, params = []) {
-        const [rows] = await this.pool.execute(sql, params);
+        // Zeit je Anfrage: zählt in den Kopf Server-Timing (Anfragezeit).
+        const [rows] = await Anfragezeit.messe('db', null, () => this.pool.execute(sql, params));
         return rows;
     }
 
@@ -75,6 +76,12 @@ class DBClient {
      * @returns {Promise<any>} Ergebnis der Transaktion
      */
     async transaction(callback) {
+        // Die ganze Transaktion zählt als EINE Abfrage — ihre Einzelschritte
+        // laufen über die Verbindung, nicht über query().
+        return Anfragezeit.messe('db', null, () => this.#transaktion(callback));
+    }
+
+    async #transaktion(callback) {
         const connection = await this.pool.getConnection();
         await connection.beginTransaction();
         

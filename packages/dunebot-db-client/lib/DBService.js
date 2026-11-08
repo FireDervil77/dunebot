@@ -1,5 +1,5 @@
 const DBClient = require("./DBClient");
-const { ServiceManager } = require("dunebot-core");
+const { ServiceManager, Anfragezeit } = require("dunebot-core");
 const models = require('../models');
 
 const path = require('path');
@@ -89,7 +89,7 @@ class DBService extends DBClient {
      * @returns {Promise<any>}
      */
     async rawQuery(sql, params = []) {
-        const [rows] = await this.pool.query(sql, params);
+        const [rows] = await Anfragezeit.messe('db', null, () => this.pool.query(sql, params));
         return rows;
     }
     
@@ -120,6 +120,11 @@ class DBService extends DBClient {
      * @returns {Promise<any>} Ergebnis der Transaktion
      */
     async transaction(callback) {
+        // Die ganze Transaktion zählt als EINE Abfrage (Anfragezeit).
+        return Anfragezeit.messe('db', null, () => this.#transaktion(callback));
+    }
+
+    async #transaktion(callback) {
         const connection = await this.getConnection();
         try {
             await connection.beginTransaction();

@@ -16,7 +16,8 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const { ServiceManager } = require('dunebot-core');
+const { ServiceManager, Anfragezeit } = require('dunebot-core');
+const { performance } = require('perf_hooks');
 // Hier stand `const { MessageValidator, MessageBuilder } = require('dunebot-sdk')`
 // — beide Namen kamen in dieser Datei kein zweites Mal vor (2026-09-22 gesucht).
 // Validiert wird im `IPMEventRouter`, gebaut wird mit `JSON.stringify`.
@@ -1573,7 +1574,31 @@ class IPMServer {
      * @param {number} timeout - Timeout in ms (wird automatisch basierend auf Command gesetzt)
      * @returns {Promise<object>} Command-Response
      */
+    /**
+     * Ein Befehl an einen Daemon — gemessen (2026-11-08).
+     *
+     * Die Zeit geht in den Kopf Server-Timing der laufenden Anfrage
+     * (Anfragezeit, Art `daemon`), und ab einer Sekunde ins Protokoll — auch
+     * außerhalb einer Anfrage (Takt). Bis dahin maß niemand, wie lange ein
+     * Daemon für einen Befehl brauchte.
+     */
     async sendCommand(daemonId, command, payload = {}, timeout = null) {
+        const beginn = performance.now();
+        try {
+            return await this._sendeBefehl(daemonId, command, payload, timeout);
+        } finally {
+            const ms = performance.now() - beginn;
+            Anfragezeit.buche('daemon', ms, command);
+            if (ms >= IPMServer.LANGSAMER_BEFEHL_MS) {
+                this.Logger.warn(`[IPMServer] Daemon ${daemonId}: Befehl ${command} brauchte ${Math.round(ms)} ms`);
+            }
+        }
+    }
+
+    /** Ab hier steht ein Daemon-Befehl im Protokoll. */
+    static LANGSAMER_BEFEHL_MS = 1000;
+
+    async _sendeBefehl(daemonId, command, payload = {}, timeout = null) {
         // NOTE: Keine Payload-Validierung für Daemon-Commands!
         // IPMServer kommuniziert direkt mit Go-Daemon (firebot_daemon), NICHT mit Bot
         // WebSocket-Validator ist nur für Bot-Commands gedacht

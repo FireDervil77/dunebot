@@ -10,6 +10,7 @@ const { parsePlaceholders, buildEmbed } = require("./lib/PlaceholderParser");
 const KanalTypen = require("./lib/KanalTypen");
 const Sprachwahl = require("./lib/Sprachwahl");
 const Spielemeldungen = require("./lib/Spielemeldungen");
+const Anfragezeit = require("./lib/Anfragezeit");
 const languagesMeta = require("./languages-meta.json");
 
 module.exports = {
@@ -27,4 +28,5 @@ module.exports = {
     KanalTypen,
     Sprachwahl,
     Spielemeldungen,
+    Anfragezeit,
 };

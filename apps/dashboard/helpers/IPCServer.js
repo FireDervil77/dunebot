@@ -1,5 +1,5 @@
 const { Server, ServerStatus } = require("veza");
-const { ServiceManager } = require("dunebot-core");
+const { ServiceManager, Anfragezeit } = require("dunebot-core");
 const bcrypt = require("bcrypt");
 // Welche Aktion in welchem Zustand erlaubt ist, steht an genau einer Stelle.
 // Ein Discord-Knopf ist ein Abbild der Vergangenheit und kann jederzeit im
@@ -40,6 +40,11 @@ class IPCServer {
      * @returns {Promise<Array>} Antworten
      */
     async broadcast(event, data, receptive = true, { timeout = -1 } = {}) {
+        // Zeit je Anfrage: Art `bot` im Kopf Server-Timing (Anfragezeit).
+        return Anfragezeit.messe('bot', event, () => this.#broadcast(event, data, receptive, { timeout }));
+    }
+
+    async #broadcast(event, data, receptive = true, { timeout = -1 } = {}) {
         const Logger = ServiceManager.get('Logger');
 
         const startTime = Date.now();
@@ -110,6 +115,10 @@ class IPCServer {
      * @returns {Promise<Object>} Antwort des Bots
      */
     async broadcastOne(event, data, receptive = true, { timeout = -1 } = {}) {
+        return Anfragezeit.messe('bot', event, () => this.#broadcastOne(event, data, receptive, { timeout }));
+    }
+
+    async #broadcastOne(event, data, receptive = true, { timeout = -1 } = {}) {
         const Logger = ServiceManager.get('Logger');
         
         const startTime = Date.now();

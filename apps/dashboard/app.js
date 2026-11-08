@@ -537,6 +537,9 @@ module.exports = class App {
      * @private
      */
     #initializeMiddlewares() {
+        // Zuerst: Zeit je Anfrage (Server-Timing), damit „gesamt" alles umfasst.
+        this.app.use(require('./middlewares/anfragezeit.middleware'));
+
         // === WICHTIG: Stripe Webhook Route VOR express.json() ===
         // Webhook benötigt raw body für Signature Verification!
         this.app.use(
