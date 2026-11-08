@@ -22,7 +22,6 @@ class GameserverOverview {
 
         this.guildId = guildId;
         this.kanal = null;
-        this.isTabVisible = true;
 
         // ✅ SINGLETON: Speichere Instanz
         if (!GameserverOverview.instances) {
@@ -44,35 +43,10 @@ class GameserverOverview {
         }
 
         console.log('[GameserverOverview] Initialisierung gestartet...');
-        
-        // Page Visibility API: Pausiere SSE bei inaktivem Tab
-        document.addEventListener('visibilitychange', () => {
-            this.isTabVisible = !document.hidden;
-            if (!this.kanal) return;
-            
-            if (this.isTabVisible) {
-                console.log('[GameserverOverview] 👁️ Tab aktiv → SSE fortsetzen');
-                // Bei Tab-Aktivierung: Reconnect wenn disconnected
-                if (!this.kanal.isConnected()) {
-                    // Kleine Verzögerung um doppelte Reconnects zu vermeiden
-                    setTimeout(() => {
-                        if (this.isTabVisible && !this.kanal.isConnected()) {
-                            this.kanal.connect();
-                            
-                            // ✅ NEU: Nach Reconnect → Status-Refresh für alle Server
-                            // (Fall: Installation lief während Tab inaktiv)
-                            this.refreshAllServerStates();
-                        }
-                    }, 100);
-                }
-            } else {
-                console.log('[GameserverOverview] 😴 Tab inaktiv → SSE pausieren');
-                // Bei Tab-Deaktivierung: Gracefully disconnect. Das gilt für den
-                // Kanal der Seite, ein verdeckter Tab hält also keinen offen.
-                this.kanal.disconnect();
-            }
-        });
-        
+
+        // Den verdeckten Tab pausiert der Kanal selbst, für jede Seite
+        // (`gameserver-sse.js`, FRIST_VERDECKT_MS). Bis 2026-11-08 tat das hier
+        // nur die Übersicht, Serverseite und Konsole hielten ihren Kanal offen.
         this.connectSSE();
     }
 
@@ -118,6 +92,12 @@ class GameserverOverview {
                 }
             });
 
+            // Nach jedem Wiederverbinden (Ende der Pause, Dashboard-Neustart)
+            // die Stati nachholen, etwa eine Installation, die derweil lief.
+            this.kanal.on('connected', (d) => {
+                if (d.wieder) this.refreshAllServerStates();
+            });
+
             this.kanal.connect();
 
         } catch (error) {
@@ -130,7 +110,7 @@ class GameserverOverview {
      * Wichtig für: Installation-Status, der sich während Tab inaktiv geändert hat
      */
     async refreshAllServerStates() {
-        console.log('[GameserverOverview] 🔄 Refreshe alle Server-Stati nach Tab-Reaktivierung...');
+        console.log('[GameserverOverview] 🔄 Hole alle Server-Stati nach dem Wiederverbinden...');
         
         try {
             const response = await fetch(`/guild/${this.guildId}/plugins/gameserver/servers/status`);

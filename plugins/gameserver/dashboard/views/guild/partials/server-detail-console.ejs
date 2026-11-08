@@ -125,9 +125,9 @@ if (typeof gameserverConsole === 'undefined' && typeof GameserverConsoleClient !
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// ✨ PERSISTENT AUTO-CONNECT – Console bleibt dauerhaft verbunden
-// Kein Tab-basiertes Disconnect: SSE-Stream läuft immer, auch wenn Tab
-// nicht aktiv ist (Install-Output geht so nie verloren).
+// AUTO-CONNECT – die Konsole bleibt angemeldet. Den Kanal gibt ein verdeckter
+// Browser-Tab nach 30 s frei (gameserver-sse.js, K256), danach lädt die
+// Konsole ihren Verlauf neu (holeVerlaufNeu), auch die Installationsausgabe.
 // ════════════════════════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', function() {
     // AssetManager-Fallback: Script im Footer geladen → jetzt instanziieren

@@ -14,7 +14,10 @@
  *   - Zuhörer überleben eine Neuverbindung, und die Konsole lässt den Kanal offen.
  *   - `fuerServer` lässt nur den eigenen Server durch, wie vorher `?server_id=`.
  *   - Nach einem Dashboard-Neustart verbindet sich der Kanal neu, ohne Grenze.
- *   - Die Übersicht gibt den Kanal in einem verdeckten Tab frei.
+ *   - Ein verdeckter Tab gibt den Kanal nach der Frist frei, für jede Seite
+ *     (K256, 2026-11-08); beim Sichtbarwerden holen Live-Anzeige, Übersicht und
+ *     Konsole nach, was in der Lücke kam.
+ *   - `connected` erreicht auch die `on()`-Handler, mit `wieder` ab dem zweiten Mal.
  *
  * Nichts wird geschrieben.
  *
@@ -42,13 +45,24 @@ function seite() {
     const zeitgeber = [];
     const still = () => {};
     const horcherAmDokument = {};
+    const abrufe = [];
+    let nummer = 0;
     const k = {
         console: { log: still, warn: still, debug: still, error: still },
         JSON, Math, String, Number, Promise, Map, Set, Array, Object,
-        setTimeout: (fn) => { zeitgeber.push(fn); return zeitgeber.length; },
-        clearTimeout: (n) => { zeitgeber[n - 1] = still; },
-        document: { hidden: false, addEventListener: (art, fn) => { horcherAmDokument[art] = fn; } },
-        fetch: () => Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true }) }),
+        setTimeout: (fn, ms) => { nummer++; zeitgeber.push({ fn, ms: ms || 0, nummer }); return nummer; },
+        clearTimeout: (n) => { const i = zeitgeber.findIndex(z => z.nummer === n); if (i >= 0) zeitgeber.splice(i, 1); },
+        document: {
+            hidden: false,
+            addEventListener: (art, fn) => { (horcherAmDokument[art] = horcherAmDokument[art] || []).push(fn); },
+        },
+        fetch: (url, opt) => {
+            abrufe.push({ url, body: opt && opt.body });
+            const antwort = /\/attach$/.test(url)
+                ? { success: true, verbunden: true, client_id: 'neu', history: ['eins', 'zwei'] }
+                : { success: true };
+            return Promise.resolve({ ok: true, json: () => Promise.resolve(antwort) });
+        },
         EventSource: class {
             constructor(url) { this.url = url; this.horcher = {}; this.zu = false; quellen.push(this); }
             addEventListener(art, fn) { (this.horcher[art] = this.horcher[art] || []).push(fn); }
@@ -59,8 +73,17 @@ function seite() {
     vm.createContext(k);
     vm.runInContext(`${lies('gameserver-sse.js')}\nthis.GameserverSSEClient = GameserverSSEClient;`, k);
     const sende = (q, art, nutzlast) => (q.horcher[art] || []).forEach(fn => fn({ data: JSON.stringify(nutzlast) }));
-    const laufe = () => { const z = zeitgeber.splice(0); z.forEach(fn => fn()); };
-    return { k, quellen, sende, laufe, horcherAmDokument };
+    // Laeuft alle Zeitgeber bis `bisMs` (Vorgabe: alle).
+    const laufe = (bisMs = Infinity) => {
+        const z = zeitgeber.filter(t => t.ms <= bisMs);
+        for (const t of z) zeitgeber.splice(zeitgeber.indexOf(t), 1);
+        z.forEach(t => t.fn());
+    };
+    const sicht = (verdeckt) => {
+        k.document.hidden = verdeckt;
+        (horcherAmDokument.visibilitychange || []).forEach(fn => fn());
+    };
+    return { k, quellen, sende, laufe, sicht, zeitgeber, abrufe, horcherAmDokument };
 }
 
 function konsole(s) {
@@ -69,7 +92,11 @@ function konsole(s) {
     const c = Object.create(s.k.GameserverConsoleClient.prototype);
     c.config = { apiBase: '/x', guildId: 'g', serverId: '216' };
     c.zeilen = [];
-    c.terminal = { writeln: still, write: still, refresh: still, scrollToBottom: still, rows: 24 };
+    c.terminal = { writeln: (z) => c.geschrieben.push(z), write: still, refresh: still, scrollToBottom: still,
+        reset: () => { c.geschrieben = []; c.zurueckgesetzt++; }, rows: 24 };
+    c.geschrieben = [];
+    c.zurueckgesetzt = 0;
+    c.colorizeLogLine = (z) => z;
     c.fitAddon = { fit: still };
     c.connected = true;
     c.updateStatus = (text) => { c.status = text; };
@@ -99,6 +126,15 @@ function konsole(s) {
             if (/new\s+EventSource\(/.test(text) && !client && !d.endsWith('gameserver-console.ejs')) {
                 falsch.push(`${path.basename(d)} öffnet selbst einen Kanal`);
             }
+        }
+        assert.deepStrictEqual(falsch, []);
+    });
+    await pruefe('nur der Client pausiert im verdeckten Tab, keine Seite daneben', () => {
+        const falsch = ['servers-overview.js', 'console-client.js', 'gameserver-live.js']
+            .filter(d => /visibilitychange/.test(ohneKommentare(lies(d))));
+        const ejs = path.join(WURZEL, 'plugins/gameserver/dashboard/views/guild');
+        for (const d of ['server-detail.ejs', 'servers-overview.ejs', 'partials/server-detail-console.ejs']) {
+            if (/visibilitychange/.test(ohneKommentare(fs.readFileSync(path.join(ejs, d), 'utf8')))) falsch.push(d);
         }
         assert.deepStrictEqual(falsch, []);
     });
@@ -218,8 +254,93 @@ function konsole(s) {
         assert.strictEqual(s.quellen.length, 2);
     });
 
+    console.log('\nVerdeckter Tab');
+    await pruefe('`connected` erreicht `on()` und `fuerServer`, `wieder` erst ab dem zweiten Mal', () => {
+        const s = seite();
+        const kanal = s.k.GameserverSSEClient.fuerSeite('g');
+        const da = [];
+        kanal.on('connected', (d) => da.push(['seite', d.wieder]));
+        kanal.fuerServer('216').on('connected', (d) => da.push(['server', d.wieder]));
+        kanal.connect();
+        s.sende(s.quellen[0], 'connected', {});
+        s.quellen[0].onerror(new Error('Neustart'));
+        s.laufe();
+        s.sende(s.quellen[1], 'connected', {});
+        assert.deepStrictEqual(da, [['seite', false], ['server', false], ['seite', true], ['server', true]]);
+    });
+    await pruefe('verdeckt hält er den Kanal bis zur Frist, danach gibt er ihn frei', () => {
+        const s = seite();
+        const kanal = s.k.GameserverSSEClient.fuerSeite('g');
+        kanal.connect();
+        s.sende(s.quellen[0], 'connected', {});
+        s.sicht(true);
+        s.laufe(29999);
+        assert.strictEqual(s.quellen[0].zu, false, 'vor der Frist schon zu');
+        assert.ok(s.zeitgeber.some(t => t.ms === 30000), 'keine Frist von 30 s geplant');
+        s.laufe();
+        assert.strictEqual(s.quellen[0].zu, true, 'nach der Frist noch offen');
+        assert.strictEqual(kanal.isConnected(), false);
+    });
+    await pruefe('wer vor der Frist zurückkommt, behält den Kanal', () => {
+        const s = seite();
+        const kanal = s.k.GameserverSSEClient.fuerSeite('g');
+        kanal.connect();
+        s.sicht(true);
+        s.sicht(false);
+        s.laufe();
+        assert.strictEqual(s.quellen.length, 1);
+        assert.strictEqual(s.quellen[0].zu, false);
+    });
+    await pruefe('pausiert öffnet weder ein Neuversuch noch ein `connect()` den Kanal, Sichtbarwerden schon', () => {
+        const s = seite();
+        const kanal = s.k.GameserverSSEClient.fuerSeite('g');
+        kanal.connect();
+        s.quellen[0].onerror(new Error('weg'));
+        s.sicht(true);
+        s.zeitgeber.filter(t => t.ms === 30000).forEach(t => { s.zeitgeber.splice(s.zeitgeber.indexOf(t), 1); t.fn(); });
+        s.laufe();
+        kanal.connect();
+        assert.strictEqual(s.quellen.length, 1, 'im verdeckten Tab neu verbunden');
+        s.sicht(false);
+        assert.strictEqual(s.quellen.length, 2);
+    });
+    await pruefe('ein von Hand getrennter Kanal kommt beim Sichtbarwerden nicht zurück', () => {
+        const s = seite();
+        const kanal = s.k.GameserverSSEClient.fuerSeite('g');
+        kanal.connect();
+        s.sicht(true);
+        kanal.disconnect();
+        s.laufe();
+        s.sicht(false);
+        assert.strictEqual(s.quellen.length, 1);
+    });
+    await pruefe('nach der Pause holt die Live-Anzeige alles nach', () => {
+        // Die Klasse steckt in einer Hülle ohne Ausgang, geprüft wird die Stelle.
+        assert.ok(/sse\.on\('connected',\s*\(d\)\s*=>\s*\{\s*if \(d\.wieder\) this\.holeAlles\(\)/
+            .test(ohneKommentare(lies('gameserver-live.js'))), 'gameserver-live.js holt bei `wieder` nicht nach');
+    });
+    await pruefe('nach der Pause lädt die Konsole ihren Verlauf neu und meldet den alten Attach ab', async () => {
+        const s = seite();
+        const c = konsole(s);
+        c.clientId = 'alt';
+        c.setupSSE();
+        s.sende(s.quellen[0], 'connected', {});
+        assert.strictEqual(c.zurueckgesetzt, 0, 'schon beim ersten Verbinden neu geladen');
+        s.sicht(true);
+        s.laufe();
+        s.sicht(false);
+        s.sende(s.quellen[1], 'connected', {});
+        await new Promise(r => setImmediate(r));
+        assert.strictEqual(c.zurueckgesetzt, 1);
+        assert.deepStrictEqual(c.geschrieben.slice(1), ['eins', 'zwei']);
+        assert.strictEqual(c.clientId, 'neu');
+        const ab = s.abrufe.find(a => /\/detach$/.test(a.url));
+        assert.ok(ab, 'alter Attach nicht abgemeldet');
+        assert.strictEqual(JSON.parse(ab.body).client_id, 'alt');
+    });
+
     console.log('\nÜbersicht');
-    await pruefe('ein verdeckter Tab gibt den Kanal frei, ein sichtbarer holt ihn zurück und lädt nach', () => {
+    await pruefe('nach der Pause holt die Übersicht die Stati nach', () => {
         const s = seite();
         vm.runInContext(`${lies('servers-overview.js')}\nthis.GameserverOverview = GameserverOverview;`, s.k);
         const o = new s.k.GameserverOverview('g');
@@ -227,15 +348,16 @@ function konsole(s) {
         o.refreshAllServerStates = () => { nachgeladen++; };
         o.init();
         assert.strictEqual(s.quellen.length, 1);
+        s.sende(s.quellen[0], 'connected', {});
+        assert.strictEqual(nachgeladen, 0, 'schon beim ersten Verbinden nachgeladen');
 
-        s.k.document.hidden = true;
-        s.horcherAmDokument.visibilitychange();
+        s.sicht(true);
+        s.laufe();
         assert.strictEqual(s.quellen[0].zu, true, 'der verdeckte Tab hält den Kanal offen');
 
-        s.k.document.hidden = false;
-        s.horcherAmDokument.visibilitychange();
-        s.laufe();
+        s.sicht(false);
         assert.strictEqual(s.quellen.length, 2);
+        s.sende(s.quellen[1], 'connected', {});
         assert.strictEqual(nachgeladen, 1);
     });
     await pruefe('Übersicht und Live-Anzeige teilen ihn', () => {

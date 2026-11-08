@@ -358,8 +358,9 @@
                 this.holeBald();
             });
 
-            // Nach JEDEM Verbinden nachholen — auch nach einem Wiederverbinden.
-            sse.on('connected', () => this.holeAlles());
+            // Einmal jetzt, dann nach jedem Wiederverbinden (Dashboard-Neustart,
+            // Ende der Pause im verdeckten Tab): Was in der Luecke kam, fehlt.
+            sse.on('connected', (d) => { if (d.wieder) this.holeAlles(); });
             this.holeAlles();
         }
 

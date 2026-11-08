@@ -284,7 +284,12 @@ class GameserverConsoleClient {
                     console.debug('[Console] fit/refresh nach SSE-connect fehlgeschlagen (ignoriere):', err?.message || err);
                 }
             };
-            hoere('connected', refit);
+            // Nach einem Wiederverbinden (Ende der Pause im verdeckten Tab,
+            // Dashboard-Neustart) fehlen die Zeilen der Lücke: den Verlauf neu holen.
+            abmelden.push(kanal.on('connected', (d) => {
+                refit();
+                if (d.wieder) this.holeVerlaufNeu();
+            }));
 
             // Gameserver-Events (für Status-Echos)
             hoere('gameserver', (e) => {
@@ -613,6 +618,60 @@ class GameserverConsoleClient {
                 this.terminal.writeln('\x1b[31mERROR Fehler beim Trennen: ' + error.message + '\x1b[0m');
                 this.terminal.writeln('');
             }
+        }
+    }
+
+    /**
+     * Baut das Terminal aus dem Verlauf neu auf, nachdem der Kanal eine Lücke
+     * hatte (verdeckter Tab, Dashboard-Neustart). Live-Zeilen kommen nur über
+     * den Kanal; was in der Lücke kam, steht allein im Verlauf des Daemons und,
+     * solange der Server installiert oder gescheitert ist, in den
+     * Installationszeilen (`routes/console.js`).
+     *
+     * Der neue Attach ersetzt den alten, der danach abgemeldet wird, sonst
+     * bliebe er im ConsoleManager liegen.
+     */
+    async holeVerlaufNeu() {
+        if (!this.connected || this._holtVerlauf) return;
+        this._holtVerlauf = true;
+        const alt = this.clientId;
+        try {
+            const response = await fetch(`${this.config.apiBase}/attach`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            if (!data.success) throw new Error(data.message || 'Attach abgelehnt');
+
+            this.clientId = data.client_id || null;
+            this._ptyAttached = data.verbunden === true;
+
+            this.terminal.reset();
+            const verlauf = Array.isArray(data.history) ? data.history : [];
+            this.terminal.writeln('\x1b[36m[Verbindung war unterbrochen — Verlauf neu geladen: '
+                + verlauf.length + ' Zeilen]\x1b[0m');
+            verlauf.forEach(entry => {
+                const text = (typeof entry === 'string') ? entry : (entry && entry.line ? entry.line : '');
+                if (text) this.terminal.writeln(this.colorizeLogLine(text));
+            });
+            this.terminal.scrollToBottom();
+            this.updateStatus(this._ptyAttached ? 'Verbunden' : 'Bereit', this._ptyAttached ? 'success' : 'secondary');
+
+            if (alt && alt !== this.clientId) {
+                fetch(`${this.config.apiBase}/detach`, {
+                    method: 'POST',
+                    keepalive: true,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ client_id: alt })
+                }).catch(err => console.warn('[Console] Alten Attach nicht abgemeldet:', err));
+            }
+        } catch (error) {
+            console.error('[Console] Verlauf nach Unterbrechung nicht geladen:', error);
+            this.terminal.writeln('\x1b[33m[Console] Verbindung war unterbrochen, der Verlauf ließ sich nicht neu laden ('
+                + error.message + ') — Zeilen aus der Lücke fehlen.\x1b[0m');
+        } finally {
+            this._holtVerlauf = false;
         }
     }
 

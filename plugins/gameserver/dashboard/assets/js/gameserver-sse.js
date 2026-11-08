@@ -25,6 +25,21 @@
  */
 const STROM_AKTIONEN = new Set(['console', 'install_output', 'modpack_stand']);
 
+/**
+ * Ereignisse des Kanals selbst, nicht eines Servers. Sie tragen keine
+ * `server_id` und gehen deshalb auch durch `fuerServer()`.
+ */
+const KANAL_AKTIONEN = new Set(['connected', 'verbindung_verloren']);
+
+/**
+ * So lange darf ein verdeckter Tab seinen Kanal halten (Baustelle 217, K256).
+ *
+ * Jeder offene Kanal belegt einen Platz in der HTTP/2-Verbindung des Browsers
+ * und einen Worker im Apache (`MaxRequestWorkers 150`, für alle Benutzer
+ * zusammen). Die Frist erspart einem schnellen Tabwechsel das Neuverbinden.
+ */
+const FRIST_VERDECKT_MS = 30000;
+
 class GameserverSSEClient {
     /**
      * Der Kanal dieser Seite. Mehr als einen gibt es nicht (Baustelle 217).
@@ -81,7 +96,21 @@ class GameserverSSEClient {
          */
         this.connected = false;
         this.manuallyDisconnected = false;
-        
+
+        /**
+         * Pause im verdeckten Tab: `gewollt` heisst, jemand hat verbunden und
+         * nicht getrennt. `pausiert` heisst, der Kanal ist nur wegen des
+         * verdeckten Tabs zu. `schonVerbunden` unterscheidet das erste
+         * `connected` von jedem weiteren, nach dem die Seiten nachholen.
+         */
+        this.gewollt = false;
+        this.pausiert = false;
+        this.pauseTimer = null;
+        this.schonVerbunden = false;
+        if (typeof document !== 'undefined' && document.addEventListener) {
+            document.addEventListener('visibilitychange', () => this._sichtbarkeit());
+        }
+
         /**
          * Statistiken
          */
@@ -98,10 +127,12 @@ class GameserverSSEClient {
      * Verbindung herstellen
      */
     connect() {
-        // Jeder Nutzer der Seite ruft das, der erste oeffnet den Kanal.
-        if (this.eventSource) return;
-
+        this.gewollt = true;
         this.manuallyDisconnected = false;
+
+        // Jeder Nutzer der Seite ruft das, der erste oeffnet den Kanal. Im
+        // pausierten Tab oeffnet erst das Sichtbarwerden.
+        if (this.eventSource || this.pausiert) return;
 
         // SSE-Endpoint URL
         const url = `/guild/${this.guildId}/plugins/gameserver/servers/events`;
@@ -121,6 +152,15 @@ class GameserverSSEClient {
                 this.reconnectDelay = 1000; // Reset delay
                 this.reconnectAttempts = 0;
                 this.aufgegebenGemeldet = false;
+
+                // Auch an die `on()`-Handler. `wieder` ist wahr ab dem zweiten
+                // Verbinden (Dashboard-Neustart, Ende einer Pause): Was in der
+                // Luecke kam, ist an der Seite vorbeigegangen, sie holt nach.
+                // Bis 2026-11-08 kam `connected` nur bei `hoere()` an, und
+                // `gameserver-live.js` holte nach einem Wiederverbinden nie nach.
+                const wieder = this.schonVerbunden;
+                this.schonVerbunden = true;
+                this._handleEvent({ ...data, action: 'connected', wieder });
             });
 
             // Gameserver-Events
@@ -220,18 +260,60 @@ class GameserverSSEClient {
     disconnect() {
         console.log('[GameserverSSE] Disconnecting...');
         this.manuallyDisconnected = true;
+        this.gewollt = false;
+        this.pausiert = false;
+        if (this.pauseTimer) {
+            clearTimeout(this.pauseTimer);
+            this.pauseTimer = null;
+        }
+        this._schliesse();
+    }
+
+    /**
+     * Schliesst die Leitung und haelt einen geplanten Neuversuch an.
+     * @private
+     */
+    _schliesse() {
         this.connected = false;
 
-        // Reconnect-Timer stoppen
         if (this.reconnectTimer) {
             clearTimeout(this.reconnectTimer);
             this.reconnectTimer = null;
         }
 
-        // EventSource schließen
         if (this.eventSource) {
             this.eventSource.close();
             this.eventSource = null;
+        }
+    }
+
+    /**
+     * Verdeckter Tab: nach der Frist den Kanal freigeben. Sichtbarer Tab: einen
+     * pausierten Kanal wieder oeffnen, die Seiten holen auf `connected` nach.
+     * @private
+     */
+    _sichtbarkeit() {
+        if (document.hidden) {
+            if (!this.gewollt || this.pausiert || this.pauseTimer) return;
+            this.pauseTimer = setTimeout(() => {
+                this.pauseTimer = null;
+                if (!document.hidden || !this.gewollt) return;
+                console.log('[GameserverSSE] Tab verdeckt, Kanal pausiert');
+                this.pausiert = true;
+                this._schliesse();
+            }, FRIST_VERDECKT_MS);
+            return;
+        }
+
+        if (this.pauseTimer) {
+            clearTimeout(this.pauseTimer);
+            this.pauseTimer = null;
+        }
+        if (this.pausiert) {
+            console.log('[GameserverSSE] Tab sichtbar, Kanal wieder offen');
+            this.pausiert = false;
+            this.reconnectDelay = 1000;
+            this.connect();
         }
     }
 
@@ -272,7 +354,7 @@ class GameserverSSEClient {
      * Der Kanal, gesehen von einer Seite, die nur einen Server zeigt.
      *
      * Dieselbe Regel, die bisher `?server_id=` im Dashboard anwandte: Durch geht
-     * nur, was diese Kennung traegt.
+     * nur, was diese Kennung traegt, dazu die Ereignisse des Kanals selbst.
      *
      * @param {string|number} serverId
      * @returns {{on: Function, connect: Function, disconnect: Function}}
@@ -281,7 +363,7 @@ class GameserverSSEClient {
         const id = String(serverId);
         return {
             on: (action, handler) => this.on(action, (message) => {
-                if (String(message.server_id) === id) handler(message);
+                if (KANAL_AKTIONEN.has(action) || String(message.server_id) === id) handler(message);
             }),
             connect: () => this.connect(),
             disconnect: () => this.disconnect()
@@ -346,7 +428,7 @@ class GameserverSSEClient {
                     console.error(`[GameserverSSE] Handler-Fehler (${action}):`, error);
                 }
             });
-        } else if (!STROM_AKTIONEN.has(action)) {
+        } else if (!STROM_AKTIONEN.has(action) && !KANAL_AKTIONEN.has(action)) {
             // Die Warnung soll falsch verdrahtete Ereignisse aufdecken. Reine
             // Ausgabestroeme gehoeren nicht dazu: Sie laufen zeilenweise und
             // werden nur auf den Seiten ausgewertet, die sie auch anzeigen —
