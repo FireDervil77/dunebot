@@ -455,6 +455,11 @@ class GameserverPlugin extends DashboardPlugin {
             // Addon Marketplace
             this.guildRouter.use('/addons', addonsRouter);
             
+            // „Hilfe“ auf den Seiten eines Servers: die Anleitung seines Spiels
+            // statt des Steckbriefs (2026-11-09). VOR allen Routern unter
+            // /servers und vor filesRouter, der /servers/:serverId/… selbst führt.
+            this.guildRouter.use('/servers/:serverId', require('./helpers/Spielhilfe').fuerServer);
+
             // Server-Management
             this.guildRouter.use('/servers', serversRouter);
 

@@ -10,6 +10,7 @@
   @context {Array}       bereiche        [{ id, kuerzel, titel }]
   @context {number}      vorgabeBereich
   @context {string[]}    plugins         Namen der Plugins, für „Hilfe im Dashboard“
+  @context {Array}       spiele          [{ id, name, slug }] der Spielpakete, für „Anleitung für Spiel“
 %>
 <%
   const t = (artikel && artikel.title_translations) || {};
@@ -95,6 +96,25 @@
                             </select>
                             <div class="form-hint">Auf den Seiten dieses Plugins führt „Hilfe“ oben hierher, sobald der Artikel veröffentlicht ist. Hat ein anderer Artikel das Plugin, geht es von dort hierher.</div>
                         </div>
+                        <%
+                          const _spiele = typeof spiele !== 'undefined' ? spiele : [];
+                          const _spiel = artikel && artikel.spiel ? Number(artikel.spiel) : null;
+                          // Ein gelöschtes Paket bleibt sichtbar gewählt, statt beim nächsten Speichern still zu fallen.
+                          const _verwaist = _spiel && !_spiele.some(function (s) { return Number(s.id) === _spiel; });
+                        %>
+                        <% if (_spiele.length || _verwaist) { %>
+                        <div class="col-md-3">
+                            <label class="form-label" for="aSpiel">Anleitung für Spiel</label>
+                            <select class="form-select" id="aSpiel" name="spiel">
+                                <option value="">— kein Spiel —</option>
+                                <% _spiele.forEach(function (s) { %>
+                                    <option value="<%= s.id %>" <%= _spiel === Number(s.id) ? 'selected' : '' %>><%= s.name %> (<%= s.slug %>)</option>
+                                <% }); %>
+                                <% if (_verwaist) { %><option value="<%= _spiel %>" selected>#<%= _spiel %> — Paket gibt es nicht mehr</option><% } %>
+                            </select>
+                            <div class="form-hint">Auf den Seiten jedes Servers dieses Spiels führt „Hilfe“ oben hierher, sobald der Artikel veröffentlicht ist.</div>
+                        </div>
+                        <% } %>
                         <% } %>
                         <div class="col-12">
                             <div class="form-hint">

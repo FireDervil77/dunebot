@@ -53,6 +53,7 @@ const Wissen = require(path.join(WURZEL, 'apps/dashboard/helpers/Wissen'));
 const migration = require(path.join(WURZEL, 'migrations/kern/20261011_150000_wissensdatenbank.js'));
 // Zieht die Hilfe-Zuordnung vom Bereich an den Artikel (K290) — läuft hier hinter der ersten.
 const hilfeMigration = require(path.join(WURZEL, 'migrations/kern/20261109_100000_kb_hilfe_am_artikel.js'));
+const spielMigration = require(path.join(WURZEL, 'migrations/kern/20261109_120000_kb_anleitung_spiel.js'));
 const ANSICHTEN = path.join(WURZEL, 'apps/dashboard/themes/default/views');
 const lies = (p) => fs.readFileSync(path.join(WURZEL, p), 'utf8');
 const gibtEs = (p) => fs.existsSync(path.join(WURZEL, p));
@@ -343,10 +344,11 @@ function uebersetzer(locale) {
     });
 
     await pruefe('die Hilfe-Migration zieht das Plugin vom Bereich an den Artikel, zweimal ohne Schaden', async () => {
-        for (let lauf = 0; lauf < 2; lauf++) await hilfeMigration.up(db);
+        for (let lauf = 0; lauf < 2; lauf++) { await hilfeMigration.up(db); await spielMigration.up(db); }
         const spalten = async (tab) => (await db.query(`SHOW COLUMNS FROM \`${tab}\``)).map(z => z.Field);
         assert.ok(!(await spalten('kb_categories')).includes('plugin'), 'kb_categories.plugin ist noch da — zwei Wege');
         assert.ok((await spalten('kb_articles')).includes('plugin'));
+        assert.ok((await spalten('kb_articles')).includes('spiel'));
     });
 
     await pruefe('Lesen: Bereiche in ihrer Reihenfolge, die Startseite steht in keiner Liste', async () => {
@@ -584,7 +586,7 @@ function uebersetzer(locale) {
 
         // Der Satz für den Menschen.
         const router = ohneKommentare(lies('apps/dashboard/routes/admin/kb.router.js'));
-        assert.match(router, /artikelSpeichern\(req\.body \|\| \{\}, autor, bericht, pluginNamen\(\)\)[\s\S]{0,260}zuVerweisen\(bericht\)/);
+        assert.match(router, /artikelSpeichern\(req\.body \|\| \{\}, autor, bericht, pluginNamen\(\), spiele\.map\(s => Number\(s\.id\)\)\)[\s\S]{0,260}zuVerweisen\(bericht\)/);
         assert.match(router, /bereichSpeichern\(req\.body \|\| \{\}, bericht\)[\s\S]{0,120}zuVerweisen\(bericht\)/);
 
         for (const id of [quelle, ziel, aehnlich]) await Wissen.artikelEntfernen(id);

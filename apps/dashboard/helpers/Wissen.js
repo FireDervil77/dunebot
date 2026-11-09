@@ -224,6 +224,7 @@ function artikelFuerAnzeige(zeile, locale) {
         oeffentlich: Number(zeile.is_public) === 1,
         reihenfolge: zeile.sort_order,
         plugin: zeile.plugin || null,
+        spiel: zeile.spiel ? Number(zeile.spiel) : null,
         autor: zeile.author || null,
         geaendert: zeile.updated_at,
         istStartseite: zeile.bereich_slug === START.bereich && zeile.slug === START.artikel,
@@ -231,7 +232,7 @@ function artikelFuerAnzeige(zeile, locale) {
 }
 
 const ARTIKEL_SPALTEN = `a.id, a.category_id, a.slug, a.title_translations, a.excerpt_translations,
-       a.content_translations, a.status, a.is_public, a.sort_order, a.plugin, a.author, a.created_at, a.updated_at,
+       a.content_translations, a.status, a.is_public, a.sort_order, a.plugin, a.spiel, a.author, a.created_at, a.updated_at,
        c.slug AS bereich_slug`;
 
 /**
@@ -492,7 +493,27 @@ function pruefePlugin(wert, bekannte) {
 }
 
 /**
+ * Das Spielpaket, dessen Anleitung ein Artikel sein soll — leer heißt keines.
+ * Gespeichert wird die Kennung des Pakets (`addon_marketplace.id`), nicht das
+ * Kürzel: Die Kürzel weichen von den Artikeln ab und haben Tippfehler
+ * (`windorse`), eine Korrektur dort darf die Anleitung nicht abhängen.
+ *
+ * `bekannte` sind die Kennungen der Spiele, die es gibt.
+ */
+function pruefeSpiel(wert, bekannte) {
+    if (wert === undefined || wert === null || String(wert).trim() === '') return null;
+    const id = Number(wert);
+    if (!Number.isInteger(id) || id <= 0 || (Array.isArray(bekannte) && !bekannte.includes(id))) {
+        throw new Eingabefehler(`Artikel: Ein Spiel mit der Kennung „${String(wert).slice(0, 20)}" gibt es nicht.`);
+    }
+    return id;
+}
+
+/**
  * Artikel anlegen oder ändern.
+ *
+ * **Anleitung je Spiel (2026-11-09).** Dasselbe für `spiel`: höchstens ein
+ * Artikel je Spielpaket, Übernahme wie beim Plugin.
  *
  * **Hilfe im Dashboard (K290, 2026-11-09).** Je Plugin zeigt höchstens EIN
  * Artikel. Wählt ein Artikel ein Plugin, das ein anderer schon hat, geht es
@@ -504,11 +525,13 @@ function pruefePlugin(wert, bekannte) {
  *                    status, is_public, sort_order, plugin
  * @param {string|null} autor
  * @param {object} [bericht]  bekommt `verweise` ({ artikel, stellen, von, nach }), wenn die Adresse sich geändert hat,
- *                            und `hilfe` ({ plugin, von, entwurf }), wenn ein anderer Artikel das Plugin abgab
+ *                            `hilfe` ({ plugin, von, entwurf }), wenn ein anderer Artikel das Plugin abgab,
+ *                            und `anleitung` ({ spiel, von, entwurf }) ebenso für das Spiel
  * @param {string[]|null} [plugins]  die Plugins, die es gibt; ohne Liste nur die Form des Namens
+ * @param {number[]|null} [spiele]   die Kennungen der Spielpakete; ohne Liste nur die Form
  * @returns {Promise<number>} id des Artikels
  */
-async function artikelSpeichern(f, autor = null, bericht = {}, plugins = null) {
+async function artikelSpeichern(f, autor = null, bericht = {}, plugins = null, spiele = null) {
     const titel = String(f.title_de || '').trim();
     if (!titel) throw new Eingabefehler('Artikel: Der deutsche Titel fehlt.');
     if (!String(f.content_de || '').trim()) throw new Eingabefehler('Artikel: Der deutsche Inhalt fehlt.');
@@ -519,6 +542,7 @@ async function artikelSpeichern(f, autor = null, bericht = {}, plugins = null) {
     const stand = STAENDE.includes(f.status) ? f.status : 'draft';
     const oeffentlich = f.is_public === true || f.is_public === '1' || f.is_public === 'on' || f.is_public === 1 ? 1 : 0;
     const plugin = pruefePlugin(f.plugin, plugins);
+    const spiel = pruefeSpiel(f.spiel, spiele);
     const id = f.id ? Number(f.id) : null;
 
     const doppelt = await db().query(
@@ -536,26 +560,33 @@ async function artikelSpeichern(f, autor = null, bericht = {}, plugins = null) {
         }
     }
     const istStart = b.slug === START.bereich && slug === START.artikel;
-    if (plugin && istStart) {
-        throw new Eingabefehler('Artikel: Die Startseite von /kb ist keine Hilfe eines Plugins — wähle dafür einen eigenen Artikel.');
+    if ((plugin || spiel) && istStart) {
+        throw new Eingabefehler('Artikel: Die Startseite von /kb ist keine Hilfe eines Plugins oder Spiels — wähle dafür einen eigenen Artikel.');
     }
-    const [halter] = plugin ? await db().query(
-        `SELECT a.id, a.slug, c.slug AS bereich_slug
-           FROM kb_articles a JOIN kb_categories c ON c.id = a.category_id
-          WHERE a.plugin = ? AND a.id <> ?`, [plugin, id || 0]) : [];
+    // Wer hat das Plugin oder das Spiel bisher? Beide Spalten sind eindeutig.
+    const halter = [];
+    for (const [spalte, wert, meldung] of [['plugin', plugin, 'hilfe'], ['spiel', spiel, 'anleitung']]) {
+        if (wert === null) continue;
+        const [h] = await db().query(
+            `SELECT a.id, a.slug, c.slug AS bereich_slug
+               FROM kb_articles a JOIN kb_categories c ON c.id = a.category_id
+              WHERE a.${spalte} = ? AND a.id <> ?`, [wert, id || 0]);
+        if (h) halter.push({ spalte, wert, meldung, ...h });
+    }
     const gibAb = async (q) => {
-        if (!halter) return;
-        await q('UPDATE kb_articles SET plugin = NULL WHERE id = ?', [halter.id]);
-        bericht.hilfe = { plugin, von: `/kb/${halter.bereich_slug}/${halter.slug}`, entwurf: stand !== 'published' };
+        for (const h of halter) {
+            await q(`UPDATE kb_articles SET ${h.spalte} = NULL WHERE id = ?`, [h.id]);
+            bericht[h.meldung] = { [h.spalte]: h.wert, von: `/kb/${h.bereich_slug}/${h.slug}`, entwurf: stand !== 'published' };
+        }
     };
 
     const werte = [bereichId, slug, uebersetzungen(titel, f.title_en), uebersetzungen(f.excerpt_de, f.excerpt_en),
-        uebersetzungen(f.content_de, f.content_en), stand, oeffentlich, Number.parseInt(f.sort_order, 10) || 0, plugin];
+        uebersetzungen(f.content_de, f.content_en), stand, oeffentlich, Number.parseInt(f.sort_order, 10) || 0, plugin, spiel];
     if (id) {
         const sql = `UPDATE kb_articles SET category_id = ?, slug = ?, title_translations = ?, excerpt_translations = ?,
-                    content_translations = ?, status = ?, is_public = ?, sort_order = ?, plugin = ? WHERE id = ?`;
+                    content_translations = ?, status = ?, is_public = ?, sort_order = ?, plugin = ?, spiel = ? WHERE id = ?`;
         const neueAdresseDesArtikels = `/kb/${b.slug}/${slug}`;
-        if (alteAdresse === neueAdresseDesArtikels && !halter) {
+        if (alteAdresse === neueAdresseDesArtikels && !halter.length) {
             await db().query(sql, [...werte, id]);
             return id;
         }
@@ -572,10 +603,10 @@ async function artikelSpeichern(f, autor = null, bericht = {}, plugins = null) {
         return id;
     }
     const einfuegen = `INSERT INTO kb_articles (category_id, slug, title_translations, excerpt_translations,
-                content_translations, status, is_public, sort_order, plugin, author)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+                content_translations, status, is_public, sort_order, plugin, spiel, author)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     const neu = [...werte, autor ? String(autor).slice(0, 100) : null];
-    if (!halter) return (await db().query(einfuegen, neu)).insertId;
+    if (!halter.length) return (await db().query(einfuegen, neu)).insertId;
     return inTransaktion(async (q) => {
         await gibAb(q);
         return (await q(einfuegen, neu)).insertId;
@@ -601,6 +632,23 @@ async function hilfeFuerPlugin(pluginName, locale) {
     return { adresse: `/kb/${zeile.bereich_slug}/${zeile.slug}`, titel: text(zeile.title_translations, locale) || zeile.slug };
 }
 
+/**
+ * Die Anleitung eines Spiels — der veröffentlichte Artikel, der auf die
+ * Kennung des Spielpakets zeigt. Die Seiten eines Servers fragen danach.
+ *
+ * @returns {Promise<{adresse: string, titel: string}|null>}
+ */
+async function hilfeFuerSpiel(spielId, locale) {
+    const id = Number(spielId);
+    if (!Number.isInteger(id) || id <= 0) return null;
+    const [zeile] = await db().query(
+        `SELECT a.slug, a.title_translations, c.slug AS bereich_slug
+           FROM kb_articles a JOIN kb_categories c ON c.id = a.category_id
+          WHERE a.spiel = ? AND a.status = 'published'`, [id]);
+    if (!zeile) return null;
+    return { adresse: `/kb/${zeile.bereich_slug}/${zeile.slug}`, titel: text(zeile.title_translations, locale) || zeile.slug };
+}
+
 async function artikelEntfernen(id) {
     const a = await artikelRoh(id);
     if (!a) throw new Eingabefehler('Diesen Artikel gibt es nicht mehr.');
@@ -616,6 +664,6 @@ module.exports = {
     bereiche, bereich, artikelImBereich, artikel, suche,
     allesFuerVerwaltung, bereichRoh, artikelRoh,
     bereichSpeichern, bereichEntfernen, artikelSpeichern, artikelEntfernen,
-    hilfeFuerPlugin,
+    hilfeFuerPlugin, hilfeFuerSpiel,
     ersetzeAdresse, verweiseUmschreiben, inTransaktion,
 };

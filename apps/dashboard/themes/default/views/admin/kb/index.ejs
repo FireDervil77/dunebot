@@ -76,6 +76,7 @@
                                     <td>
                                         <a href="/admin/kb/artikel/<%= a.id %>"><strong><%= a.titel %></strong></a>
                                         <% if (a.istStartseite) { %><span class="badge bg-primary-lt ms-1" title="Dieser Artikel ist der Text der Startseite von /kb und steht in keiner Liste.">Startseite von /kb</span><% } %>
+                                        <% if (a.spiel) { const _s = (typeof spiele !== 'undefined' ? spiele : []).find(function (x) { return Number(x.id) === a.spiel; }); %><span class="badge bg-green-lt ms-1" title="Auf den Seiten jedes Servers dieses Spiels zeigt „Hilfe“ hierher<%= a.stand === 'published' ? '' : ' — sobald der Artikel veröffentlicht ist' %>."><i class="fa-solid fa-gamepad me-1"></i>Anleitung: <%= _s ? _s.name : '#' + a.spiel + ' (Paket fehlt)' %></span><% } %>
                                         <% if (a.plugin) { %><span class="badge bg-azure-lt ms-1" title="Auf den Seiten dieses Plugins im Dashboard zeigt „Hilfe“ hierher<%= a.stand === 'published' ? '' : ' — sobald der Artikel veröffentlicht ist' %>."><i class="fa-solid fa-circle-question me-1"></i>Hilfe: <%= a.plugin %></span><% } %>
                                         <br><small class="text-secondary font-monospace"><%= a.istStartseite ? '/kb' : '/kb/' + b.kuerzel + '/' + a.kuerzel %></small>
                                     </td>

@@ -33,6 +33,8 @@ const mysql = require(path.join(WURZEL, 'node_modules/mysql2/promise'));
 const { ServiceManager } = require('dunebot-core');
 const Wissen = require(path.join(WURZEL, 'apps/dashboard/helpers/Wissen'));
 const migration = require(path.join(WURZEL, 'migrations/kern/20261109_100000_kb_hilfe_am_artikel.js'));
+const spielMigration = require(path.join(WURZEL, 'migrations/kern/20261109_120000_kb_anleitung_spiel.js'));
+const Spielhilfe = require(path.join(WURZEL, 'plugins/gameserver/dashboard/helpers/Spielhilfe'));
 
 const lies = (p) => fs.readFileSync(path.join(WURZEL, p), 'utf8');
 let fehler = 0;
@@ -63,6 +65,9 @@ async function pruefe(name, fn) {
     const spalten = async (tab) => (await roh(`SHOW COLUMNS FROM \`${tab}\``)).map(z => z.Field);
     // Vor dem Rollout gibt es die Spalte am Artikel noch nicht, danach schon —
     // die Kopie wird in beiden Fällen in die alte Form gebracht.
+    if ((await spalten('kb_articles')).includes('spiel')) {
+        await roh('ALTER TABLE kb_articles DROP INDEX IF EXISTS uq_kb_articles_spiel, DROP COLUMN spiel');
+    }
     if ((await spalten('kb_articles')).includes('plugin')) {
         await roh('ALTER TABLE kb_articles DROP INDEX IF EXISTS uq_kb_articles_plugin, DROP COLUMN plugin');
     }
@@ -104,6 +109,8 @@ async function pruefe(name, fn) {
         },
     };
     ServiceManager.register('dbService', db);
+    const geloggt = [];
+    ServiceManager.register('Logger', { error: (...a) => geloggt.push(a), warn() {}, info() {}, debug() {} });
     const pluginVon = async (bereich, kuerzel) => (await roh(
         `SELECT a.plugin FROM kb_articles a JOIN kb_categories c ON c.id = a.category_id WHERE c.slug = ? AND a.slug = ?`,
         [bereich, kuerzel]))[0]?.plugin ?? null;
@@ -136,6 +143,23 @@ async function pruefe(name, fn) {
         const [g] = await roh(`SELECT id FROM kb_articles WHERE plugin = 'greeting'`);
         assert.strictEqual(g.id, fremd.id, 'die Migration hat eine vorhandene Wahl überschrieben');
     });
+    await pruefe('die Spiel-Migration ordnet jedem Spieleartikel sein Paket zu — über die Kennung, zweimal ohne Schaden', async () => {
+        for (let lauf = 0; lauf < 2; lauf++) await spielMigration.up(db);
+        const index = await roh(`SHOW INDEX FROM kb_articles WHERE Key_name = 'uq_kb_articles_spiel'`);
+        assert.strictEqual(Number(index[0]?.Non_unique), 0, 'je Spiel höchstens ein Artikel — der Schlüssel fehlt');
+        const fehlt = [];
+        for (const [artikel, kuerzel] of spielMigration.ANLEITUNGEN) {
+            const [paket] = await roh(`SELECT id FROM addon_marketplace WHERE slug IN (?) ORDER BY id LIMIT 1`, [kuerzel]);
+            if (!paket) { fehlt.push('Paket ' + kuerzel.join('/')); continue; }
+            const [a] = await roh(`SELECT a.spiel FROM kb_articles a JOIN kb_categories c ON c.id = a.category_id WHERE c.slug = 'spiele' AND a.slug = ?`, [artikel]);
+            if (!a) { fehlt.push('Artikel ' + artikel); continue; }
+            assert.strictEqual(Number(a.spiel), paket.id, artikel);
+        }
+        assert.deepStrictEqual(fehlt, [], 'die Liste der Migration trifft nicht mehr');
+        const ohne = await roh(`SELECT am.slug FROM addon_marketplace am WHERE NOT EXISTS (SELECT 1 FROM kb_articles a WHERE a.spiel = am.id)`);
+        if (ohne.length) console.log(`      (ohne Anleitung: ${ohne.map(z => z.slug).join(', ')})`);
+    });
+
     await roh('UPDATE kb_articles SET plugin = NULL WHERE id = ?', [fremd.id]);
     await roh(`UPDATE kb_articles a JOIN kb_categories c ON c.id = a.category_id SET a.plugin = 'greeting' WHERE c.slug = 'plugins' AND a.slug = 'greeting'`);
 
@@ -202,6 +226,69 @@ async function pruefe(name, fn) {
             status: 'published', is_public: '1', plugin: 'core' }, null, {}, PLUGINS), /Startseite von \/kb ist keine Hilfe/);
     });
 
+    const spielVon = async (slug) => Number((await roh(
+        `SELECT a.spiel FROM kb_articles a JOIN kb_categories c ON c.id = a.category_id WHERE c.slug = 'spiele' AND a.slug = ?`, [slug]))[0]?.spiel) || null;
+    const SPIELE = (await roh('SELECT id FROM addon_marketplace')).map(z => z.id);
+    const satisfactory = await spielVon('satisfactory');
+
+    await pruefe('Anleitung: der veröffentlichte Artikel zur Kennung des Spiels; sonst nichts', async () => {
+        assert.ok(satisfactory, 'Satisfactory hat keine Kennung');
+        assert.strictEqual((await Wissen.hilfeFuerSpiel(satisfactory, 'de-DE')).adresse, '/kb/spiele/satisfactory');
+        assert.strictEqual((await Wissen.hilfeFuerSpiel(String(await spielVon('windrose')), 'en-GB')).adresse, '/kb/spiele/windrose');
+        for (const boese of [null, '', 0, -1, 'abc', '1 OR 1=1', 1.5, 999999999]) {
+            assert.strictEqual(await Wissen.hilfeFuerSpiel(boese, 'de-DE'), null, String(boese));
+        }
+    });
+
+    await pruefe('ein Entwurf übernimmt die Anleitung eines Spiels und sagt es; ein unbekanntes Spiel wird abgewiesen', async () => {
+        const [spiele] = await roh(`SELECT id FROM kb_categories WHERE slug = 'spiele'`);
+        const bericht = {};
+        const id = await Wissen.artikelSpeichern({ category_id: spiele.id, slug: 'satisfactory-neu', title_de: 'S neu', content_de: 'T',
+            status: 'draft', is_public: '0', spiel: String(satisfactory) }, null, bericht, PLUGINS, SPIELE);
+        assert.deepStrictEqual(bericht.anleitung, { spiel: satisfactory, von: '/kb/spiele/satisfactory', entwurf: true });
+        assert.strictEqual(bericht.hilfe, undefined);
+        assert.strictEqual(await spielVon('satisfactory'), null);
+        assert.strictEqual(await Wissen.hilfeFuerSpiel(satisfactory, 'de-DE'), null, 'solange Entwurf, keine Anleitung');
+        assert.strictEqual((await Wissen.artikelEntfernen(id)).spiel, satisfactory);
+        await roh(`UPDATE kb_articles a JOIN kb_categories c ON c.id = a.category_id SET a.spiel = ? WHERE c.slug = 'spiele' AND a.slug = 'satisfactory'`, [satisfactory]);
+        await assert.rejects(Wissen.artikelSpeichern({ category_id: spiele.id, slug: 'x-neu', title_de: 'X', content_de: 'T', spiel: '999999' }, null, {}, PLUGINS, SPIELE),
+            /Ein Spiel mit der Kennung „999999" gibt es nicht/);
+        await assert.rejects(Wissen.artikelSpeichern({ category_id: spiele.id, slug: 'x-neu', title_de: 'X', content_de: 'T', spiel: 'abc' }, null, {}, PLUGINS, null),
+            /gibt es nicht/);
+    });
+
+    await pruefe('Serverseite: „Hilfe“ wird die Anleitung des Spiels — nur für eine Seite dieses Servers in dieser Guild', async () => {
+        const [server] = await roh(
+            `SELECT gs.id, gs.guild_id FROM gameservers gs WHERE gs.addon_marketplace_id = ? ORDER BY gs.id LIMIT 1`, [satisfactory]);
+        const [anderer] = await roh(`SELECT gs.id, gs.guild_id, gs.addon_marketplace_id FROM gameservers gs
+            WHERE NOT EXISTS (SELECT 1 FROM kb_articles a WHERE a.spiel = gs.addon_marketplace_id) ORDER BY gs.id LIMIT 1`);
+        const steckbrief = { adresse: '/kb/plugins/gameserver', titel: 'Gameserver' };
+        const lauf = async (id, guildId, { methode = 'GET', accept = 'text/html,application/xhtml+xml' } = {}) => {
+            const res = { locals: { guildId, locale: 'de-DE', hilfe: steckbrief } };
+            let weiter = 0;
+            await Spielhilfe.fuerServer({ params: { serverId: String(id) }, method: methode, headers: { accept } }, res, () => weiter++);
+            assert.strictEqual(weiter, 1, 'next() nicht genau einmal');
+            return res.locals.hilfe;
+        };
+        if (server) {
+            assert.strictEqual((await lauf(server.id, server.guild_id)).adresse, '/kb/spiele/satisfactory');
+            assert.strictEqual(await lauf(server.id, '1'), steckbrief, 'fremde Guild bekam die Anleitung');
+            assert.strictEqual(await lauf(server.id, server.guild_id, { accept: 'application/json' }), steckbrief);
+            assert.strictEqual(await lauf(server.id, server.guild_id, { accept: 'text/event-stream' }), steckbrief);
+            assert.strictEqual(await lauf(server.id, server.guild_id, { methode: 'POST' }), steckbrief);
+        } else {
+            console.log('      (kein Satisfactory-Server da — der Treffer wird nicht belegt)');
+        }
+        if (anderer) assert.strictEqual(await lauf(anderer.id, anderer.guild_id), steckbrief, 'ein Spiel ohne Anleitung verlor den Steckbrief');
+        assert.strictEqual(await lauf('create', '1'), steckbrief);
+        // Scheitert die Abfrage: ins Log, Steckbrief bleibt, die Seite geht weiter.
+        stoere = (sql) => /FROM gameservers WHERE id = \?/.test(sql);
+        const vorher = geloggt.length;
+        assert.strictEqual(await lauf(server ? server.id : 1, server ? server.guild_id : '1'), steckbrief);
+        stoere = null;
+        assert.strictEqual(geloggt.length, vorher + 1, 'der Fehler steht nicht im Log');
+    });
+
     await pruefe('ein Bereich speichert sich ohne das alte Feld', async () => {
         const [b] = await roh(`SELECT * FROM kb_categories WHERE slug = 'gameserver'`);
         await Wissen.bereichSpeichern({ id: b.id, slug: b.slug, title_de: 'Gameserver', sort_order: b.sort_order, icon: b.icon, plugin: 'gameserver' });
@@ -232,12 +319,24 @@ async function pruefe(name, fn) {
 
     await pruefe('die Verwaltung wählt am Artikel, prüft gegen die Plugins und kennt das Feld am Bereich nicht mehr', () => {
         const r = ohneKommentare(lies('apps/dashboard/routes/admin/kb.router.js'));
-        assert.match(r, /artikelSpeichern\(req\.body \|\| \{\}, autor, bericht, pluginNamen\(\)\)/);
+        assert.match(r, /artikelSpeichern\(req\.body \|\| \{\}, autor, bericht, pluginNamen\(\), spiele\.map\(s => Number\(s\.id\)\)\)/);
         assert.match(r, /availablePlugins/);
         assert.match(lies('apps/dashboard/themes/default/views/admin/kb/artikel.ejs'), /<select class="form-select" id="aPlugin" name="plugin">/);
         assert.ok(!/name="plugin"/.test(lies('apps/dashboard/themes/default/views/admin/kb/bereich.ejs')), 'das Feld am Bereich steht noch im Formular');
         assert.ok(!/\bplugin\b/.test(ohneKommentare(lies('apps/dashboard/helpers/Wissen.js')).split('function bereichSpeichern')[1].split('async function bereichEntfernen')[0]),
             'bereichSpeichern schreibt noch ein Plugin');
+    });
+
+    await pruefe('das Gameserver-Plugin hängt die Anleitung vor alle Router unter /servers', () => {
+        const i = ohneKommentare(lies('plugins/gameserver/dashboard/index.js'));
+        const an = i.indexOf("this.guildRouter.use('/servers/:serverId', require('./helpers/Spielhilfe').fuerServer);");
+        assert.ok(an > 0, 'nicht eingehängt');
+        for (const danach of ["this.guildRouter.use('/servers', serversRouter);", "this.guildRouter.use('/', filesRouter);"]) {
+            assert.ok(an < i.indexOf(danach), `nach ${danach}`);
+        }
+        const a = lies('apps/dashboard/themes/default/views/admin/kb/artikel.ejs');
+        assert.match(a, /<select class="form-select" id="aSpiel" name="spiel">/);
+        assert.match(ohneKommentare(lies('apps/dashboard/routes/admin/kb.router.js')), /if \(fehler\?\.code === 'ER_NO_SUCH_TABLE'\) return \[\];\s*throw fehler;/);
     });
 
     await pruefe('kein Verweis mehr auf /documentation (seit /kb ein 404)', () => {

@@ -76,12 +76,38 @@ function zuHilfe(bericht) {
 /** Die Plugins, die es gibt — für die Auswahl „Hilfe im Dashboard“ und die Prüfung beim Speichern. */
 const pluginNamen = () => [...ServiceManager.get('pluginManager').availablePlugins].sort();
 
+/**
+ * Die Spielpakete für „Anleitung für Spiel“: [{ id, name, slug }].
+ *
+ * Die Tabelle gehört dem Gameserver-Plugin. Fehlt sie, gibt es keine Spiele
+ * und keine Auswahl — die Wissensdatenbank hängt nicht an dem Plugin. Jeder
+ * andere Fehler geht ins Log und weiter nach oben.
+ */
+async function spielListe() {
+    try {
+        return await ServiceManager.get('dbService').query('SELECT id, name, slug FROM addon_marketplace ORDER BY name');
+    } catch (fehler) {
+        if (fehler?.code === 'ER_NO_SUCH_TABLE') return [];
+        throw fehler;
+    }
+}
+
+/** Der Satz, wenn ein anderer Artikel die Anleitung eines Spiels abgab. */
+function zuAnleitung(bericht, spiele) {
+    const a = bericht.anleitung;
+    if (!a) return '';
+    const name = spiele.find(s => Number(s.id) === a.spiel)?.name || `#${a.spiel}`;
+    return ` „Hilfe“ auf den Seiten der ${name}-Server zeigt jetzt hierher statt auf ${a.von}`
+        + (a.entwurf ? ' — solange dieser Artikel Entwurf ist, auf den Steckbrief des Gameserver-Plugins.' : '.');
+}
+
 // ── Übersicht ────────────────────────────────────────────────────────────────
 router.get('/', seite('Übersicht', async (req, res) => {
     await zeige(res, 'admin/kb/index', {
         title: 'Wissensdatenbank',
         bereiche: await Wissen.allesFuerVerwaltung(),
         start: Wissen.START,
+        spiele: await spielListe(),
     });
 }));
 
@@ -115,7 +141,7 @@ router.get('/artikel/neu', seite('Artikel neu', async (req, res) => {
     if (!wahl.length) return res.redirect(MENUE + '/bereich/neu');
     await zeige(res, 'admin/kb/artikel', {
         title: 'Neuer Artikel', artikel: null, bereiche: wahl,
-        vorgabeBereich: Number(req.query.bereich) || wahl[0].id, plugins: pluginNamen(),
+        vorgabeBereich: Number(req.query.bereich) || wahl[0].id, plugins: pluginNamen(), spiele: await spielListe(),
     });
 }));
 
@@ -124,22 +150,25 @@ router.get('/artikel/:id', seite('Artikel', async (req, res) => {
     if (!artikel) return res.redirect(MENUE);
     await zeige(res, 'admin/kb/artikel', {
         title: 'Artikel bearbeiten', artikel, bereiche: await bereichsWahl(), vorgabeBereich: artikel.category_id,
-        plugins: pluginNamen(),
+        plugins: pluginNamen(), spiele: await spielListe(),
     });
 }));
 
 router.post('/artikel/speichern', schreibe('Artikel speichern', async (req) => {
     const autor = req.session?.user?.info?.global_name || req.session?.user?.info?.username || null;
     const bericht = {};
-    const id = await Wissen.artikelSpeichern(req.body || {}, autor, bericht, pluginNamen());
+    const spiele = await spielListe();
+    const id = await Wissen.artikelSpeichern(req.body || {}, autor, bericht, pluginNamen(), spiele.map(s => Number(s.id)));
     const a = await Wissen.artikelRoh(id);
     return { id, adresse: a.istStartseite ? '/kb' : `/kb/${a.bereich_slug}/${a.slug}`,
-        message: 'Artikel gespeichert.' + zuVerweisen(bericht) + zuHilfe(bericht) };
+        message: 'Artikel gespeichert.' + zuVerweisen(bericht) + zuHilfe(bericht) + zuAnleitung(bericht, spiele) };
 }));
 
 router.post('/artikel/:id/entfernen', schreibe('Artikel entfernen', async (req) => {
     const a = await Wissen.artikelEntfernen(req.params.id);
-    return { message: 'Artikel entfernt.' + (a.plugin ? ` Das Plugin ${a.plugin} hat jetzt keinen Hilfe-Artikel mehr — „Hilfe“ führt dort zur Startseite von /kb.` : '') };
+    return { message: 'Artikel entfernt.'
+        + (a.plugin ? ` Das Plugin ${a.plugin} hat jetzt keinen Hilfe-Artikel mehr — „Hilfe“ führt dort zur Startseite von /kb.` : '')
+        + (a.spiel ? ` Das Spiel #${a.spiel} hat jetzt keine Anleitung mehr — „Hilfe“ führt auf seinen Serverseiten zum Steckbrief des Gameserver-Plugins.` : '') };
 }));
 
 // ── Vorschau: dieselbe Funktion, die die öffentliche Seite benutzt ───────────
