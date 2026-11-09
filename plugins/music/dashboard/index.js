@@ -7,7 +7,7 @@
  *
  *   - Rechteschluessel in Punktschreibweise, deckungsgleich mit permissions.json
  *   - `removeNavigation` vor `registerNavigation`, weil letzteres nie loescht
- *   - kein Verlass auf `onUpdate` - der Haken hat projektweit keinen Aufrufer
+ *   - kein `onUpdate` - den Haken gibt es seit 2026-11-09 nicht mehr (K028)
  *   - Nutzer aus der Sitzung, nicht aus `req.user` (das gibt es nicht)
  *   - Lesen mit VIEW, Schreiben mit den engeren Rechten
  *   - Plugin-CSS waere auf `.music-*` eingegrenzt (hier gar keins noetig)

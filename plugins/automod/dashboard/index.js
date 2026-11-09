@@ -183,36 +183,8 @@ class AutoModPlugin extends DashboardPlugin {
         Logger.info(`[AutoMod] Plugin fuer Guild ${guildId} aktiviert`);
     }
 
-    /**
-     * Plugin-Update in einer Guild
-     *
-     * Achtung: Diesen Haken ruft im Projekt derzeit niemand auf - er ist wie
-     * bei core und gameserver totes Gewicht (Punkt 17 in Baustellen.md). Auf
-     * die Navigation wirkt sich das nicht aus, die schreibt `onGuildEnable`
-     * bei jedem Start neu. Die Methode steht hier fuer den Tag, an dem der
-     * Aufrufer gebaut wird, und macht nichts, worauf sich etwas verlaesst.
-     *
-     * @param {string} oldVersion Vorherige Version
-     * @param {string} newVersion Neue Version
-     * @param {string} guildId Discord-Guild-ID
-     */
-    async onUpdate(oldVersion, newVersion, guildId) {
-        const Logger = ServiceManager.get('Logger');
-        const pluginManager = ServiceManager.get('pluginManager');
-
-        Logger.info(`[AutoMod] Update ${oldVersion} → ${newVersion} fuer Guild ${guildId}`);
-
-        try {
-            const plugin = pluginManager.getPlugin('automod');
-            if (plugin) {
-                await pluginManager.registerPluginPermissionsForGuild(plugin, guildId);
-            }
-        } catch (err) {
-            Logger.error(`[AutoMod] Rechte-Update fuer Guild ${guildId} fehlgeschlagen:`, err.message);
-        }
-
-        await this._registerNavigation(guildId);
-    }
+    // `onUpdate` ist am 2026-11-09 entfallen (K028): Niemand rief den Haken auf.
+    // Rechte und Navigation schreibt onGuildEnable bei jedem Start.
 
     /**
      * Plugin in einer Guild deaktivieren

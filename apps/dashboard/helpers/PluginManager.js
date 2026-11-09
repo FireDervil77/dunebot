@@ -162,18 +162,6 @@ class PluginManager extends BasePluginManager {
         this.hooks.doAction('after_register_routes', this.app);
     }
 
-    
-    async getPluginUpdateInfo(pluginName) {
-        const pluginsMeta = await this.getPluginsMeta();
-        const plugin = pluginsMeta.find(p => p.name === pluginName);
-        if (!plugin) return null;
-        return {
-            hasUpdate: plugin.hasUpdate,
-            currentVersion: plugin.currentVersion,
-            latestVersion: plugin.version,
-            repository: plugin.repository
-        };
-    }
 
     /**
      * Prüft ob ein Plugin für eine bestimmte Guild aktiviert ist

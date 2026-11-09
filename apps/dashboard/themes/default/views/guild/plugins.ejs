@@ -5,9 +5,14 @@
  * hier ein `</div>` zu viel — beim alten Rahmen fiel es nicht auf, weil das
  * Layout die Verschachtelung wieder aufgefangen hat.
  *
- * @context {Array}  enabledPlugins   - aktivierte Plugins, ggf. mit updateInfo
+ * @context {Array}  enabledPlugins   - aktivierte Plugins
  * @context {Array}  availablePlugins - installierbare Plugins
- * @context {Array}  pendingUpdates   - anstehende Updates (nur fuer den Hinweis)
+ *
+ * Bis 2026-11-09 stand hier eine Update-Verwaltung „WordPress-Style“: Hinweis
+ * „Plugin-Update(s) verfügbar“, Frist, Changelog und Knopf „Jetzt
+ * aktualisieren“. Nichts davon erschien je — `updateInfo` und
+ * `pendingUpdates` setzte niemand, und die Route dahinter rief eine Methode,
+ * die es nicht gab (K028). Plugins ziehen ihre Fassung beim Start nach.
 %>
 
 <%
@@ -66,21 +71,6 @@ function _stern(p) {
     <div class="alert alert-danger"><%= m %></div>
 <% }); %>
 
-<% if (pendingUpdates && pendingUpdates.length > 0) { %>
-    <div class="alert alert-warning alert-dismissible mb-3" role="alert">
-        <div class="d-flex">
-            <div class="me-3"><i class="fas fa-triangle-exclamation fa-lg"></i></div>
-            <div>
-                <h4 class="alert-title"><%= pendingUpdates.length %> Plugin-Update(s) verfügbar</h4>
-                <div class="text-secondary">
-                    Es stehen Updates für installierte Plugins bereit. Bitte prüfe die Angaben unten und
-                    aktualisiere rechtzeitig vor Ablauf der Frist.
-                </div>
-            </div>
-        </div>
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Schließen"></button>
-    </div>
-<% } %>
 
 <%# ── Umschalter Karten / Tabelle ─────────────────────────────────────────── %>
 <div class="mb-3 text-end">
@@ -107,18 +97,15 @@ function _stern(p) {
             <div class="row row-cards plugin-view-cards">
                 <% enabledPlugins.forEach(p => { %>
                     <div class="col-lg-4 col-md-6">
-                        <div class="card h-100 <%= p.updateInfo ? 'border-warning' : '' %>">
+                        <div class="card h-100">
                             <div class="card-header d-flex align-items-center">
                                 <span class="avatar me-2" style="background-image: url('<%= p.icon %>')"></span>
                                 <div class="flex-grow-1">
                                     <div class="fw-medium">
                                         <%= p.displayName %><%- _abzeichen(p) %><%- _stern(p) %>
-                                        <% if (p.updateInfo) { %>
-                                            <span class="badge bg-warning-lt ms-1"><i class="fas fa-arrow-up me-1"></i>Update</span>
-                                        <% } %>
                                     </div>
                                     <small class="text-secondary">
-                                        v<%= p.version %><% if (p.updateInfo) { %> → v<%= p.updateInfo.available_version %><% } %>
+                                        v<%= p.version %>
                                     </small>
                                 </div>
                             </div>
@@ -127,40 +114,8 @@ function _stern(p) {
                                 <p class="text-secondary small mb-0"><%= tr('ADMIN_PAGE.AUTHOR') %>: <%= p.author %></p>
                                 <% if (p.stempel) { %><p class="text-secondary small mb-0"><i class="fa-solid fa-clock-rotate-left me-1"></i><%= p.stempel %></p><% } %>
 
-                                <% if (p.updateInfo) { %>
-                                    <div class="alert alert-warning p-2 mt-3 mb-0">
-                                        <strong><i class="fas fa-clock me-1"></i>Update verfügbar</strong>
-                                        <div class="small">
-                                            Frist: <%= new Date(p.updateInfo.update_deadline_at).toLocaleDateString('de-DE') %>
-                                            (noch <%= p.updateInfo.daysLeft %> Tag<%= p.updateInfo.daysLeft !== 1 ? 'e' : '' %>)
-                                        </div>
-                                        <% if (p.updateInfo.changelog && p.updateInfo.changelog.length > 0) { %>
-                                            <div class="mt-2 small">
-                                                <strong>Änderungen:</strong>
-                                                <ul class="mb-0 ps-3">
-                                                    <% p.updateInfo.changelog.slice(0, 3).forEach(change => { %>
-                                                        <li><%= change %></li>
-                                                    <% }); %>
-                                                    <% if (p.updateInfo.changelog.length > 3) { %>
-                                                        <li><em>… und <%= p.updateInfo.changelog.length - 3 %> weitere</em></li>
-                                                    <% } %>
-                                                </ul>
-                                            </div>
-                                        <% } %>
-                                    </div>
-                                <% } %>
                             </div>
                             <div class="card-footer d-flex flex-wrap gap-2">
-                                <% if (p.updateInfo) { %>
-                                    <button type="button"
-                                            class="btn btn-warning btn-update-plugin"
-                                            data-plugin="<%= p.name %>"
-                                            data-version="<%= p.updateInfo.available_version %>"
-                                            data-guild="<%= guildId %>">
-                                        <i class="fas fa-sync-alt me-1"></i>Jetzt aktualisieren
-                                    </button>
-                                <% } %>
-
                                 <% if (p.name !== 'core') { %>
                                     <form action="/guild/<%= guildId %>/plugins"
                                           method="POST"
@@ -207,37 +162,18 @@ function _stern(p) {
                         </thead>
                         <tbody>
                             <% enabledPlugins.forEach(p => { %>
-                                <tr class="<%= p.updateInfo ? 'table-warning' : '' %>">
+                                <tr>
                                     <td><span class="avatar" style="background-image: url('<%= p.icon %>')"></span></td>
                                     <td>
                                         <strong><%= p.displayName %></strong><%- _abzeichen(p) %><%- _stern(p) %>
-                                        <% if (p.updateInfo) { %>
-                                            <div class="small text-secondary mt-1">
-                                                Frist: <%= new Date(p.updateInfo.update_deadline_at).toLocaleDateString('de-DE') %>
-                                                (noch <%= p.updateInfo.daysLeft %> Tage)
-                                            </div>
-                                        <% } %>
                                     </td>
                                     <td>
                                         <span class="badge bg-info-lt">v<%= p.version %></span>
-                                        <% if (p.updateInfo) { %>
-                                            <i class="fas fa-arrow-right text-warning mx-1"></i>
-                                            <span class="badge bg-warning-lt">v<%= p.updateInfo.available_version %></span>
-                                        <% } %>
                                     </td>
                                     <td class="text-secondary"><%= p.author %><% if (p.stempel) { %><div class="small"><%= p.stempel %></div><% } %></td>
                                     <td><%= p.description || tr('ADMIN_PAGE.NO_DESCRIPTION') %></td>
                                     <td>
                                         <div class="d-flex flex-wrap gap-1">
-                                            <% if (p.updateInfo) { %>
-                                                <button type="button"
-                                                        class="btn btn-warning btn-sm btn-update-plugin"
-                                                        data-plugin="<%= p.name %>"
-                                                        data-version="<%= p.updateInfo.available_version %>"
-                                                        data-guild="<%= guildId %>">
-                                                    <i class="fas fa-sync-alt me-1"></i>Update
-                                                </button>
-                                            <% } %>
                                             <% if (p.name !== 'core') { %>
                                                 <form action="/guild/<%= guildId %>/plugins"
                                                       method="POST"
@@ -417,69 +353,6 @@ $(document).ready(function() {
         $('.plugin-view-table').removeClass('d-none');
         $(this).addClass('active');
         $('#cardViewBtn').removeClass('active');
-    });
-
-    /**
-     * Meldung oben auf der Seite einblenden.
-     *
-     * Anker ist der Inhaltsbereich des Layouts — seit dem Wegfall des eigenen
-     * Seitenrahmens gibt es hier keinen `.container-fluid` mehr. `main` trifft
-     * beide Gerueste: Tabler (`main.page-body`) und AdminLTE (`main.app-main`).
-     */
-    function meldung(art, symbol, text) {
-        $('main .container-fluid').first().prepend(
-            '<div class="alert alert-' + art + ' alert-dismissible">' +
-            '<i class="fas ' + symbol + ' me-2"></i>' + text +
-            '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Schließen"></button>' +
-            '</div>'
-        );
-    }
-
-    // Plugin aktualisieren
-    $('.btn-update-plugin').on('click', function(e) {
-        e.preventDefault();
-
-        const $btn = $(this);
-        const pluginName = $btn.data('plugin');
-        const version = $btn.data('version');
-        const guildId = $btn.data('guild');
-        const csrfToken = $('input[name="_csrf"]').first().val();
-
-        if (!confirm(`Plugin "${pluginName}" auf Version ${version} aktualisieren?\n\nDies kann einige Sekunden dauern und führt möglicherweise Datenbankmigrationen durch.`)) {
-            return;
-        }
-
-        const originalHtml = $btn.html();
-        $btn.prop('disabled', true);
-        $btn.html('<i class="fas fa-spinner fa-spin me-1"></i>Wird aktualisiert…');
-
-        $.ajax({
-            url: `/guild/${guildId}/plugins/${pluginName}/update`,
-            method: 'POST',
-            headers: { 'X-CSRF-Token': csrfToken },
-            success: function(response) {
-                if (response.success) {
-                    meldung('success', 'fa-check', response.message);
-                    setTimeout(function() { window.location.reload(); }, 1500);
-                } else {
-                    throw new Error(response.message || 'Unbekannter Fehler');
-                }
-            },
-            error: function(xhr) {
-                let errorMsg = 'Ein Fehler ist aufgetreten.';
-                if (xhr.responseJSON && xhr.responseJSON.message) {
-                    errorMsg = xhr.responseJSON.message;
-                } else if (xhr.statusText) {
-                    errorMsg = xhr.statusText;
-                }
-
-                meldung('danger', 'fa-triangle-exclamation', 'Update fehlgeschlagen: ' + errorMsg);
-
-                $btn.prop('disabled', false);
-                $btn.html(originalHtml);
-                $('html, body').animate({ scrollTop: 0 }, 'fast');
-            }
-        });
     });
 });
 </script>

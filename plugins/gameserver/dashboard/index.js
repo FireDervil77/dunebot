@@ -324,24 +324,9 @@ class GameserverPlugin extends DashboardPlugin {
         Logger.success(`[Gameserver] Guild-spezifische Aktivierung abgeschlossen für ${guildId}`);
     }
 
-    /**
-     * Wird bei Versions-Bump automatisch aufgerufen.
-     * Stellt sicher dass neue Permissions in bestehenden Administrator-Gruppen landen.
-     */
-    async onUpdate(oldVersion, newVersion, guildId) {
-        const Logger = ServiceManager.get('Logger');
-        const pluginManager = ServiceManager.get('pluginManager');
-        Logger.info(`[Gameserver] Update ${oldVersion} → ${newVersion} für Guild ${guildId}, aktualisiere Permissions...`);
-        try {
-            const plugin = pluginManager.getPlugin('gameserver');
-            if (plugin) {
-                await pluginManager.registerPluginPermissionsForGuild(plugin, guildId);
-            }
-        } catch (err) {
-            Logger.error(`[Gameserver] Fehler beim Permission-Update für Guild ${guildId}:`, err.message);
-        }
-        await this._registerNavigation(guildId);
-    }
+    // `onUpdate` ist am 2026-11-09 entfallen (K028): Der Kommentar versprach
+    // einen Aufruf „bei Versions-Bump automatisch“, den es nie gab. Rechte und
+    // Navigation schreibt onGuildEnable bei jedem Start.
 
 
     /**

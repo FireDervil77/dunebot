@@ -7,7 +7,7 @@
  * Wird direkt beim Dashboard-Start aufgerufen (ohne Plugin-System).
  *
  * Widget-Bereiche (WordPress-Stil):
- *  - dashboard-top       — Vollbreite, Benachrichtigungen (plugin-updates)
+ *  - dashboard-top       — Vollbreite, Benachrichtigungen (das Widget plugin-updates ist am 2026-11-09 entfallen, K028)
  *  - dashboard-primary   — 3-spaltig, Hauptkennzahlen
  *  - dashboard-secondary — 2-spaltig, Analyse
  *  - dashboard-bottom    — Vollbreite, Support
@@ -31,7 +31,6 @@ function registerKernWidgets(pluginManager, themeManager) {
     try {
         const { getInstance: getWidgetManager } = require('dunebot-sdk/lib/WidgetManager');
         const wm = getWidgetManager();
-        wm.registerWidget('plugin-updates',  { area: 'dashboard-top',       position: 10, size: 12 });
         wm.registerWidget('server-info',     { area: 'dashboard-primary',   position: 10, size: 4  });
         wm.registerWidget('bot-permissions', { area: 'dashboard-primary',   position: 20, size: 4  });
         wm.registerWidget('bot-performance', { area: 'dashboard-primary',   position: 30, size: 4  });

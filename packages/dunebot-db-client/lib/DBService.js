@@ -918,23 +918,6 @@ async getAllConfigs() {
     }
 
     /**
-     * Aktualisiert die Version eines Plugins
-     * @param {string} guildId Guild-ID
-     * @param {string} pluginName Plugin-Name
-     * @param {string} newVersion Neue Version
-     * @returns {Promise<Object>}
-     * @author FireDervil
-     */
-    async updatePluginVersion(guildId, pluginName, newVersion) {
-        return await this.query(`
-            UPDATE guild_plugins
-            SET plugin_version = ?,
-                updated_at = NOW()
-            WHERE guild_id = ? AND plugin_name = ?
-        `, [newVersion, guildId, pluginName]);
-    }
-
-    /**
      * Setzt oder aktualisiert ein GLOBALES Plugin-Badge (für alle Guilds)
      * @param {string} pluginName Plugin-Name
      * @param {string} badgeStatus Badge-Status (new, beta, updated, deprecated)

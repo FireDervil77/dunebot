@@ -65,8 +65,9 @@ router.use("/:guildId/hall-of-fame", CheckAuth, CheckGuildAccess, hallOfFameRout
 router.get("/:guildId/plugins", CheckGuildAccess, guildController.getPlugins);
 router.post("/:guildId/plugins", CheckGuildAccess, guildController.updatePlugins);
 
-// Plugin Update Route
-router.post("/:guildId/plugins/:pluginName/update", CheckGuildAccess, guildController.updatePluginVersion);
+// `POST /:guildId/plugins/:pluginName/update` ist am 2026-11-09 entfallen (K028):
+// Die Route rief `pluginManager.updatePlugin`, das es nie gab, und der Knopf
+// dazu erschien nie. Plugins ziehen ihre Fassung beim Start nach.
 
 // Willkommensseite nach dem Einladen. **Kein requirePermission** — wer den Bot
 // gerade eingeladen hat, hat noch keine Gruppe in dieser Guild; CheckGuildAccess
