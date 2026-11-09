@@ -66,6 +66,12 @@ const welt = {
     bausteine: []      // eigene Textbausteine dieser Guild
 };
 const mitschrift = { auftraege: [], schreibzugriffe: [], unbekannt: [] };
+/**
+ * Unbekannte Abfragen über den GANZEN Lauf (K108, 2026-11-09). `mitschrift.unbekannt`
+ * leert `neuAufsetzen` bei jedem Fall — die Schlussprüfung sah damit nur den letzten,
+ * wie bis zum 2026-09-05 in check-streaming-befehle.js. Diese Liste wird nie geleert.
+ */
+const nieGeleert = [];
 
 ServiceManager.register('Logger', {
     info: () => {}, debug: () => {}, warn: () => {}, error: () => {}, success: () => {}
@@ -190,6 +196,7 @@ ServiceManager.register('dbService', {
         }
 
         mitschrift.unbekannt.push(s.slice(0, 80));
+        nieGeleert.push(s.slice(0, 80));
         return [];
     }
 });
@@ -424,8 +431,8 @@ console.log('\nVon den Chatnachrichten bleibt nichts liegen');
 }
 
 console.log('\nDie Attrappe hat alles verstanden');
-pruefe(mitschrift.unbekannt.length === 0, 'keine unbekannte Abfrage still mit `[]` beantwortet',
-    mitschrift.unbekannt.length ? [...new Set(mitschrift.unbekannt)].join(' | ') : '');
+pruefe(nieGeleert.length === 0, 'keine unbekannte Abfrage still mit `[]` beantwortet',
+    nieGeleert.length ? [...new Set(nieGeleert)].join(' | ') : '');
 
 console.log(abweichungen === 0
     ? `\nErgebnis: ${faelle} Pruefungen, 0 Abweichungen.\n`

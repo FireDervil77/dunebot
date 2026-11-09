@@ -54,6 +54,12 @@ const UMFRAGE_ALT = {
 const welt = {};
 const mitschrift = { abfragen: [], schreibzugriffe: [], unbekannt: [],
                      twitch: [] };
+/**
+ * Unbekannte Abfragen über den GANZEN Lauf (K108, 2026-11-09). `mitschrift.unbekannt`
+ * leert `neuAufsetzen` bei jedem Fall — die Schlussprüfung sah damit nur den letzten,
+ * wie bis zum 2026-09-05 in check-streaming-befehle.js. Diese Liste wird nie geleert.
+ */
+const nieGeleert = [];
 
 /** @returns {void} */
 function neuAufsetzen(welche = {}) {
@@ -119,6 +125,7 @@ ServiceManager.register('dbService', {
         }
 
         mitschrift.unbekannt.push(s);
+        nieGeleert.push(s);
         return [];
     }
 });
@@ -488,9 +495,9 @@ console.log('\nDie Verlosung: „gibt es nicht" und „gerade keine" sind zwei S
 }
 
 console.log('\nDie Attrappe hat alles verstanden');
-pruefe(mitschrift.unbekannt.length === 0,
+pruefe(nieGeleert.length === 0,
     'keine unbekannte Abfrage still mit `[]` beantwortet',
-    [...new Set(mitschrift.unbekannt)].map(a => a.slice(0, 70)).join(' | '));
+    [...new Set(nieGeleert)].map(a => a.slice(0, 70)).join(' | '));
 
 console.log(abweichungen === 0
     ? `\nErgebnis: ${faelle} Pruefungen, 0 Abweichungen.\n`

@@ -46,6 +46,12 @@ const welt = {
     abos:   { ok: true, abgelehnt: false, abonnenten: [{ kontoId: '9', kontoName: 'Anna', stufe: '1000', geschenkt: false }] }
 };
 const mitschrift = { abfragen: [], schreibzugriffe: [], unbekannt: [] };
+/**
+ * Unbekannte Abfragen über den GANZEN Lauf (K108, 2026-11-09). `mitschrift.unbekannt`
+ * leert `neuAufsetzen` bei jedem Fall — die Schlussprüfung sah damit nur den letzten,
+ * wie bis zum 2026-09-05 in check-streaming-befehle.js. Diese Liste wird nie geleert.
+ */
+const nieGeleert = [];
 
 ServiceManager.register('Logger', {
     info: () => {}, debug: () => {}, warn: () => {}, error: () => {}, success: () => {}
@@ -74,6 +80,7 @@ ServiceManager.register('dbService', {
             return welt.zustand ? [welt.zustand] : [];
         }
         mitschrift.unbekannt.push(s.slice(0, 80));
+        nieGeleert.push(s.slice(0, 80));
         return [];
     }
 });
@@ -216,8 +223,8 @@ console.log('\nWenn es gar keinen Zugang gibt');
 }
 
 console.log('\nDie Attrappe hat alles verstanden');
-pruefe(mitschrift.unbekannt.length === 0, 'keine unbekannte Abfrage still mit `[]` beantwortet',
-    [...new Set(mitschrift.unbekannt)].join(' | '));
+pruefe(nieGeleert.length === 0, 'keine unbekannte Abfrage still mit `[]` beantwortet',
+    [...new Set(nieGeleert)].join(' | '));
 
 console.log(abweichungen === 0
     ? `\nErgebnis: ${faelle} Pruefungen, 0 Abweichungen.\n`
