@@ -117,9 +117,23 @@ function verweisIstHarmlos(href) {
         || !/^[a-z][a-z0-9+.-]*:/i.test(h);
 }
 
+/**
+ * Größe eines Bildes als Wort im Titel (Betreiber, 2026-11-09):
+ * `![Text](/uploads/… "klein")`. Daraus wird eine feste Klasse, nie ein
+ * freier Stil — rohes HTML bleibt gesperrt. Jeder andere Titel bleibt Titel.
+ */
+const BILDGROESSEN = ['klein', 'mittel', 'breit'];
+
 const markdown = new Marked({
     gfm: true,
     renderer: {
+        image(token) {
+            const wort = String(token.title || '').trim().toLowerCase();
+            const groesse = BILDGROESSEN.includes(wort) ? wort : null;
+            const titel = !groesse && token.title ? ` title="${escapeHtml(token.title)}"` : '';
+            const klasse = groesse ? ` class="kb-bild-${groesse}"` : '';
+            return `<img src="${escapeHtml(token.href)}" alt="${escapeHtml(token.text)}"${titel}${klasse}>`;
+        },
         // Rohes HTML im Artikel wird TEXT. Bis zum 2026-10-11 ging die Ausgabe
         // von `marked` ungefiltert auf die öffentliche Seite — bei Dateien im
         // Git vertretbar, bei einem Formularfeld nicht.
@@ -658,7 +672,7 @@ async function artikelEntfernen(id) {
 }
 
 module.exports = {
-    SPRACHEN, STAENDE, START, Eingabefehler,
+    SPRACHEN, STAENDE, START, Eingabefehler, BILDGROESSEN,
     sprache, text, kuerzelAus, rendere,
     sichtbarkeit, istAngemeldet, neueAdresse,
     bereiche, bereich, artikelImBereich, artikel, suche,

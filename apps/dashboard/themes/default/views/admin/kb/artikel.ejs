@@ -152,7 +152,8 @@
                                 <button class="btn btn-sm btn-outline-secondary" type="button" data-kb-vorschau="<%= s[0] %>"><i class="fa-solid fa-eye me-1"></i>Vorschau</button>
                             </div>
                             <textarea class="form-control font-monospace" id="aInhalt_<%= s[0] %>" name="content_<%= s[0] %>" rows="24" spellcheck="true"><%= c[s[1]] || '' %></textarea>
-                            <div class="form-hint">Überschriften mit ##, Listen mit -, Befehle in `Rückstrichen`. HTML im Text wird als Text gezeigt, nicht ausgeführt. Der Titel steht schon über dem Artikel — fang mit dem Text an.</div>
+                            <div class="form-hint">Überschriften mit ##, Listen mit -, Befehle in `Rückstrichen`. HTML im Text wird als Text gezeigt, nicht ausgeführt. Der Titel steht schon über dem Artikel — fang mit dem Text an.
+                                Bild: <code>![Ersatztext](/uploads/media/…/….png "mittel")</code> — Größe <code>klein</code>, <code>mittel</code> oder <code>breit</code>, ohne Angabe echte Breite. Die Adresse steht in der Medienbibliothek am Bild.</div>
                             <div class="card mt-3 d-none" data-kb-vorschau-kasten="<%= s[0] %>">
                                 <div class="card-header py-2"><span class="card-title mb-0 small">Vorschau — so rendert die öffentliche Seite</span></div>
                                 <div class="card-body kb-vorschau" data-kb-vorschau-inhalt="<%= s[0] %>"></div>
@@ -175,7 +176,10 @@
   .kb-vorschau table { border-collapse: collapse; margin: 1rem 0; }
   .kb-vorschau th, .kb-vorschau td { border: 1px solid var(--tblr-border-color, #dee2e6); padding: 6px 10px; }
   .kb-vorschau pre { padding: 0.75rem 1rem; border-radius: 6px; overflow-x: auto; }
-  .kb-vorschau img { max-width: 100%; height: auto; }
+  .kb-vorschau img { max-width: 100%; height: auto; border-radius: 0.5rem; }
+  .kb-vorschau img.kb-bild-klein { max-width: 33%; }
+  .kb-vorschau img.kb-bild-mittel { max-width: 66%; }
+  .kb-vorschau img.kb-bild-breit { width: 100%; }
 </style>
 
 <script>

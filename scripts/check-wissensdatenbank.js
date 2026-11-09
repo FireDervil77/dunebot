@@ -139,6 +139,26 @@ function uebersetzer(locale) {
     // ════════════════════════════════════════════════════════════════════════
     console.log('\nRegeln (helpers/Wissen.js)');
 
+    await pruefe('Bildgröße als Wort im Titel: feste Klasse, nie freies HTML (2026-11-09)', () => {
+        const bild = (md) => Wissen.rendere(md).trim().replace(/^<p>|<\/p>$/g, '');
+        assert.deepStrictEqual(Wissen.BILDGROESSEN, ['klein', 'mittel', 'breit']);
+        assert.strictEqual(bild('![Alt](/a.png "klein")'), '<img src="/a.png" alt="Alt" class="kb-bild-klein">');
+        assert.strictEqual(bild('![Alt](/a.png " MITTEL ")'), '<img src="/a.png" alt="Alt" class="kb-bild-mittel">');
+        assert.strictEqual(bild('![Alt](/a.png "breit")'), '<img src="/a.png" alt="Alt" class="kb-bild-breit">');
+        assert.strictEqual(bild('![Alt](/a.png "Ein Titel")'), '<img src="/a.png" alt="Alt" title="Ein Titel">');
+        assert.strictEqual(bild('![Alt](/a.png)'), '<img src="/a.png" alt="Alt">');
+        const boese = bild('![A"b<c](/a.png "klein\\" onerror=\\"x")');
+        assert.ok(!/onerror="/.test(boese) && !/<c/.test(boese), `nicht escapt: ${boese}`);
+        assert.match(bild('![x](javascript:alert(1) "klein")'), /^<img src="#"/);
+        // Die Klassen haben Regeln, auf der Seite UND in der Vorschau des Editors.
+        const css = lies('apps/dashboard/themes/default/assets/css/frontend.css');
+        const vorschau = lies('apps/dashboard/themes/default/views/admin/kb/artikel.ejs');
+        for (const w of Wissen.BILDGROESSEN) {
+            assert.match(css, new RegExp(`\\.kb-article img\\.kb-bild-${w}\\s*\\{`), `frontend.css: ${w}`);
+            assert.match(vorschau, new RegExp(`\\.kb-vorschau img\\.kb-bild-${w}\\s*\\{`), `Vorschau: ${w}`);
+        }
+    });
+
     await pruefe('Rendern: rohes HTML wird Text, ein Verweis mit Skript wird entschärft, Überschriften tragen eine Kennung', () => {
         const html = Wissen.rendere('## Fehler beheben\n\nText <script>alert(1)</script> und `/ban <user>`.\n\n<div onclick="x()">Block</div>\n\n[böse](javascript:alert(1)) [gut](/kb/a/b) [fremd](https://x.de)');
         assert.ok(!/<script|<div|onclick="/.test(html), 'rohes HTML kommt als HTML heraus:\n' + html);

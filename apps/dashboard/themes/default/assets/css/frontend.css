@@ -1824,6 +1824,10 @@ section,
 .kb-article th, .kb-article td { border: 1px solid #dee2e6; padding: 8px 12px; text-align: left; }
 .kb-article th { background: #f8f9fa; font-weight: 600; }
 .kb-article img { max-width: 100%; height: auto; border-radius: 0.5rem; }
+/* Größenwörter im Bildtitel (Wissen.js, BILDGROESSEN) */
+.kb-article img.kb-bild-klein { max-width: 33%; }
+.kb-article img.kb-bild-mittel { max-width: 66%; }
+.kb-article img.kb-bild-breit { width: 100%; }
 .kb-article blockquote {
   border-left: 4px solid var(--accent-color, #4154f1); padding: 0.5rem 1rem; margin: 1rem 0;
   background: rgba(65, 84, 241, 0.05); border-radius: 0 4px 4px 0;
