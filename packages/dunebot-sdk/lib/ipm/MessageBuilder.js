@@ -67,54 +67,6 @@ class MessageBuilder {
   }
 
   /**
-   * Erstellt eine Response-Message (Daemon → Dashboard, Reply zu Command)
-   * 
-   * @param {string} requestId - ID des Original-Commands
-   * @param {boolean} success - Erfolgreich?
-   * @param {Object} [data] - Response-Daten
-   * @param {string} [error] - Fehler-Message (falls success=false)
-   * @returns {Object} Standardisierte Message
-   */
-  static response(requestId, success, data = {}, error = null) {
-    const response = {
-      type: MessageTypes.TYPE_RESPONSE,
-      id: requestId, // Gleiche ID wie Request für Matching
-      timestamp: Date.now(),
-      success,
-      data,
-    };
-
-    if (!success && error) {
-      response.error = error;
-    }
-
-    return response;
-  }
-
-  /**
-   * Erstellt eine Error-Response (Shortcut)
-   * 
-   * @param {string} requestId - ID des Original-Commands
-   * @param {string} error - Fehler-Message
-   * @param {Object} [data] - Optionale Error-Details
-   * @returns {Object} Standardisierte Error-Response
-   */
-  static errorResponse(requestId, error, data = {}) {
-    return this.response(requestId, false, data, error);
-  }
-
-  /**
-   * Erstellt eine Success-Response (Shortcut)
-   * 
-   * @param {string} requestId - ID des Original-Commands
-   * @param {Object} [data] - Response-Daten
-   * @returns {Object} Standardisierte Success-Response
-   */
-  static successResponse(requestId, data = {}) {
-    return this.response(requestId, true, data);
-  }
-
-  /**
    * Validiert ob eine Message die Basis-Struktur hat
    * 
    * @param {Object} message - Zu validierende Message
@@ -130,18 +82,12 @@ class MessageBuilder {
     const validTypes = [
       MessageTypes.TYPE_COMMAND,
       MessageTypes.TYPE_EVENT,
-      MessageTypes.TYPE_RESPONSE
     ];
     if (!validTypes.includes(message.type)) return false;
     
     // Command/Event brauchen Namespace + Action
     if (message.type === MessageTypes.TYPE_COMMAND || message.type === MessageTypes.TYPE_EVENT) {
       if (!message.namespace || !message.action) return false;
-    }
-    
-    // Response braucht success-Flag
-    if (message.type === MessageTypes.TYPE_RESPONSE) {
-      if (typeof message.success !== 'boolean') return false;
     }
     
     return true;

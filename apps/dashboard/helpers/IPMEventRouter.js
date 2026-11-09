@@ -138,11 +138,9 @@ class IPMEventRouter extends EventEmitter {
       // (Baustelle 148). Wer Text in HTML einsetzt, escapet an der Anzeige.
       const validatedMessage = validation.message;
 
-      // 2. Nur Commands und Events routen (Responses werden direkt behandelt)
-      if (validatedMessage.type === MessageTypes.TYPE_RESPONSE) {
-        this.Logger.debug('[IPMEventRouter] Response-Message → überspringe Routing');
-        return;
-      }
+      // 2. Eine Antwortform `response` gibt es seit Etappe 6 nicht mehr (K286,
+      //    2026-11-09); Antworten kommen als `command_response` und gehen nie
+      //    durch den Router.
 
       // 3. Middleware-Stack durchlaufen
       for (const middleware of this.middlewares) {

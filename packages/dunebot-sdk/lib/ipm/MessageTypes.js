@@ -22,11 +22,9 @@ const TYPE_COMMAND = 'command';
  */
 const TYPE_EVENT = 'event';
 
-/**
- * Response - Daemon → Dashboard (Reply)
- * Antwort auf ein Command (z.B. Task-ID nach Start-Request)
- */
-const TYPE_RESPONSE = 'response';
+// Eine dritte Art `response` stand hier bis zum 2026-11-09 (FireBus Etappe 6,
+// K286). Kein Daemon schickte sie: Antworten kommen als `command_response`
+// und gehen am Router vorbei an `IPMServer._resolveCommand`.
 
 // =====================================================
 // NAMESPACES
@@ -303,7 +301,6 @@ module.exports = {
   // Message Types
   TYPE_COMMAND,
   TYPE_EVENT,
-  TYPE_RESPONSE,
   
   // Namespaces
   NS_GAMESERVER,

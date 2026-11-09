@@ -1,5 +1,5 @@
 {
-  "fassung": 10,
+  "fassung": 11,
   "linien": {"S": "Steuerung", "L": "Live", "O": "Output", "V": "Verify", "E": "Events", "D": "Datei"},
   "zeilen": [
     {"name": "register", "art": "steuerung", "von": "daemon", "linie": "V", "verlust": "nie"},
@@ -99,14 +99,6 @@
     {"name": "system.messwerte", "art": "befehl", "von": "dashboard", "linie": "S", "verlust": "nie", "reihe": "keine", "arbeit": "bindet"},
     {"name": "sftp.anwenden", "art": "befehl", "von": "dashboard", "linie": "V", "verlust": "nie", "reihe": "maschine", "arbeit": "bindet"},
     {"name": "sftp.user.sync", "art": "befehl", "von": "dashboard", "linie": "V", "verlust": "nie", "reihe": "maschine", "arbeit": "bindet"},
-    {"name": "sftp.users.replace", "art": "befehl", "von": "dashboard", "linie": "V", "verlust": "nie", "reihe": "maschine", "arbeit": "bindet"},
-    {"name": "gameserver.migrate.download", "art": "befehl", "von": "dashboard", "linie": "S", "verlust": "nie", "reihe": "keine", "arbeit": "frei", "ohne_aufrufer": true},
-    {"name": "gameserver.migrate.upload", "art": "befehl", "von": "dashboard", "linie": "S", "verlust": "nie", "reihe": "keine", "arbeit": "frei", "ohne_aufrufer": true},
-    {"name": "gameserver.apply_config", "art": "befehl", "von": "dashboard", "linie": "S", "verlust": "nie", "reihe": "server", "arbeit": "bindet", "ohne_aufrufer": true},
-    {"name": "rootserver.delete_user", "art": "befehl", "von": "dashboard", "linie": "S", "verlust": "nie", "reihe": "maschine", "arbeit": "bindet", "ohne_aufrufer": true},
-    {"name": "werkbank.platz", "art": "befehl", "von": "dashboard", "linie": "S", "verlust": "nie", "reihe": "keine", "arbeit": "bindet", "ohne_aufrufer": true},
-    {"name": "start", "art": "befehl", "von": "dashboard", "linie": "S", "verlust": "nie", "reihe": "server", "arbeit": "bindet", "ohne_aufrufer": true},
-    {"name": "stop", "art": "befehl", "von": "dashboard", "linie": "S", "verlust": "nie", "reihe": "server", "arbeit": "bindet", "ohne_aufrufer": true},
-    {"name": "restart", "art": "befehl", "von": "dashboard", "linie": "S", "verlust": "nie", "reihe": "server", "arbeit": "bindet", "ohne_aufrufer": true}
+    {"name": "sftp.users.replace", "art": "befehl", "von": "dashboard", "linie": "V", "verlust": "nie", "reihe": "maschine", "arbeit": "bindet"}
   ]
 }

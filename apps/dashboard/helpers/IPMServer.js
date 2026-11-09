@@ -743,14 +743,7 @@ class IPMServer {
                 daemonId,
                 guildId: conn?.metadata?.guild_id ?? null,
             });
-            
-            // Bei Commands: Auch alte Logik beibehalten (für Rückwärtskompatibilität)
-            if (normalizedType === 'command' || normalizedType === 'response') {
-                // Weiterhin durch switch-case laufen lassen
-            } else {
-                // Events wurden bereits geroutet, fertig
-                return;
-            }
+            return;
         }
 
         switch (normalizedType) {
@@ -758,26 +751,24 @@ class IPMServer {
                 await this._handleHeartbeat(daemonId, payload);
                 break;
 
-            case 'response':
-                // Antwort auf Command (Command-ID in payload.commandId)
-                this._resolveCommand(payload.commandId, payload);
-                break;
-
+            // Eine Antwortform, ein Format (FireBus Etappe 6, K286, 2026-11-09).
+            // Bis dahin nahm hier auch `response` an und `command_response` ohne
+            // `payload`. Gemessen: Kein Daemon schickt eins davon — alle fünf
+            // Antwortstellen (client.go) senden `{type, id, payload}`.
             case 'command_response':
-                // ✅ Go-Daemon sendet unterschiedliche Formate:
-                // Format 1: { type: "command_response", id: "...", success: true, data: {...} }
-                // Format 2: { type: "command_response", id: "...", payload: { success: true, ... } }
-                // Versuche payload zuerst, dann message als Fallback
-                const responseData = message.payload || message;
-                this._resolveCommand(id, responseData);
+                if (!payload || typeof payload !== 'object') {
+                    this.Logger.warn(`[IPMServer] Antwort ohne payload von Daemon ${daemonId} (Befehl ${id})`);
+                    this._resolveCommand(id, { success: false, error: 'Antwort ohne payload' });
+                    break;
+                }
+                this._resolveCommand(id, payload);
                 break;
 
+            // Ein Ereignis ohne Namensraum gibt es nicht mehr (Etappe 6): `NewEvent`
+            // im Daemon setzt ihn immer. Der alte Verteiler dafür
+            // (`_handleDaemonEvent`) lief neben dem IPMEventRouter und ist weg.
             case 'event':
-                // Event vom Daemon (Server-Status, Error, etc.)
-                // ✅ ALT: Legacy-Format (ohne namespace/action)
-                if (!message.namespace) {
-                    await this._handleDaemonEvent(daemonId, payload);
-                }
+                this.Logger.warn(`[IPMServer] Ereignis ohne Namensraum von Daemon ${daemonId} verworfen`);
                 break;
 
             // Ein Fall 'log' stand hier bis zum 2026-09-08. Gemessen: Der
@@ -1240,50 +1231,6 @@ class IPMServer {
     }
 
     /**
-     * Daemon-Event verarbeiten
-     * @private
-     */
-    async _handleDaemonEvent(daemonId, payload) {
-        const { event, data } = payload;
-
-        this.Logger.debug(`[IPMServer] Event from Daemon ${daemonId}: ${event}`, data);
-
-        // ✅ Dashboard-Events DIREKT verarbeiten (ohne IPC zum Bot)
-        await this._processDashboardEvent(daemonId, event, data);
-
-        // Event an IPC-Server weiterleiten (Bot benachrichtigen) - TODO: Später implementieren
-        const ipcServer = ServiceManager.get('ipcServer');
-        if (ipcServer) {
-            ipcServer.broadcast('daemon:event', { daemonId, event, data });
-        }
-
-        // Event in DB loggen
-        await this._logDaemonEvent(daemonId, event, data);
-    }
-
-    /**
-     * Dashboard-Events direkt verarbeiten
-     * @private
-     */
-    async _processDashboardEvent(daemonId, event, data) {
-        switch (event) {
-            case 'gameserver.install_complete':
-                await this._handleGameserverInstallComplete(daemonId, data);
-                break;
-
-            case 'gameserver.install_failed':
-                await this._handleGameserverInstallFailed(daemonId, data);
-                break;
-
-            case 'gameserver.status_changed':
-                await this._handleGameserverStatusChanged(daemonId, data);
-                break;
-
-            // Weitere Events hier hinzufügen...
-        }
-    }
-
-    /**
      * Gameserver Installation abgeschlossen
      * @private
      */
@@ -1422,77 +1369,6 @@ class IPMServer {
              WHERE id = ?`,
             [error ? 'Installation fehlgeschlagen: ' + String(error).slice(0, 480) : null, server_id]
         );
-    }
-
-    /**
-     * Gameserver Status-Änderung (z.B. crashed, stopped)
-     * Wird vom Daemon gesendet wenn Health-Check fehlschlägt
-     * 
-     * @param {string} daemonId - Daemon ID
-     * @param {object} data - Event-Daten { server_id, status, timestamp }
-     * @private
-     */
-    async _handleGameserverStatusChanged(daemonId, data) {
-        const { server_id, status, timestamp } = data;
-        
-        this.Logger.info(`[IPMServer] 🔄 Gameserver ${server_id} Status-Änderung: ${status} (von Daemon ${daemonId})`);
-
-        try {
-            // ✅ Status-Mapping: Daemon-States → MySQL ENUM
-            // Daemon-States: offline, starting, running, stopped, stopping, crashed, installing
-            // MySQL ENUM:    offline, starting, online,  offline,  stopping, error,   installing, installed, updating
-            const statusMap = { running: 'online', stopped: 'offline', crashed: 'error' };
-            const dbStatus = statusMap[status] ?? status;
-
-            // Guard: ungültige Status-Werte abfangen
-            const validStatuses = ['installing', 'installed', 'starting', 'online', 'stopping', 'offline', 'error', 'updating'];
-            if (!dbStatus || !validStatuses.includes(dbStatus)) {
-                this.Logger.warn(`[IPMServer] ⚠️ Ungültiger Status '${status}' (mapped: '${dbStatus}') für Server ${server_id} – Update übersprungen`);
-                return;
-            }
-
-            // Server-Status in MySQL aktualisieren
-            const result = await this.dbService.query(
-                `UPDATE gameservers 
-                 SET status = ?, 
-                     updated_at = NOW()
-                     ${dbStatus === 'online' ? ', last_started_at = NOW()' : ''} 
-                 WHERE id = ?`,
-                [dbStatus, server_id]
-            );
-
-            if (result.affectedRows > 0) {
-                this.Logger.success(`[IPMServer] ✅ Gameserver ${server_id} Status → ${dbStatus} (MySQL synchronized)`);
-                
-                // ✅ Guild-ID holen für SSE-Broadcast
-                const [server] = await this.dbService.query(
-                    'SELECT guild_id, name FROM gameservers WHERE id = ?',
-                    [server_id]
-                );
-                
-                if (server) {
-                    // ✅ SSE-Broadcast an Browser-Clients
-                    const sseManager = ServiceManager.get('sseManager');
-                    if (sseManager) {
-                        sseManager.broadcast(server.guild_id, 'gameserver', {
-                            action: 'status_changed',
-                            server_id: server_id,
-                            status: dbStatus,
-                            timestamp: timestamp || Date.now()
-                        });
-                        
-                        this.Logger.debug(`[IPMServer] 📡 SSE-Broadcast gesendet für Server ${server_id} → ${dbStatus}`);
-                    }
-                } else {
-                    this.Logger.warn(`[IPMServer] ⚠️ Konnte Server ${server_id} nicht für SSE-Broadcast laden`);
-                }
-            } else {
-                this.Logger.warn(`[IPMServer] ⚠️ Gameserver ${server_id} nicht in MySQL gefunden`);
-            }
-
-        } catch (error) {
-            this.Logger.error(`[IPMServer] ❌ Fehler beim Status-Update für Server ${server_id}:`, error);
-        }
     }
 
     /**

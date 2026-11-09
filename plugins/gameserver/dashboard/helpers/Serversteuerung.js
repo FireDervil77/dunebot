@@ -54,9 +54,9 @@ function spielerzahl(zeile, jetzt = Date.now()) {
  * Der letzte Start in Millisekunden.
  *
  * `last_started_at` setzen der Startknopf (`routes/servers.js`), der Cronjob
- * (`CronWorker._merkeStart`) und die Meldung des Daemons, dass der Server laeuft
- * (`IPMServer._handleGameserverStatusChanged` - beim Wechsel, nicht bei jeder
- * Abfrage). Ein Nutzer vergleicht den Wert nur auf Gleichheit: Aendert er sich,
+ * (`CronWorker._merkeStart`) und der Bot ueber IPC (`IPCServer.js`). Bis zum
+ * 2026-11-09 stand hier zusaetzlich `IPMServer._handleGameserverStatusChanged`:
+ * Den erreichte nie ein Ereignis, er ist mit dem alten Verteiler entfallen (K286). Ein Nutzer vergleicht den Wert nur auf Gleichheit: Aendert er sich,
  * wurde gestartet.
  *
  * @param {Date|string|null} wert

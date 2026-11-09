@@ -48,7 +48,6 @@ class MessageValidator {
     const validTypes = [
       MessageTypes.TYPE_COMMAND,
       MessageTypes.TYPE_EVENT,
-      MessageTypes.TYPE_RESPONSE
     ];
     if (message.type && !validTypes.includes(message.type)) {
       errors.push(`Ungültiger Type: "${message.type}". Erlaubt: ${validTypes.join(', ')}`);
@@ -71,12 +70,6 @@ class MessageValidator {
       if (message.payload !== undefined && typeof message.payload !== 'object') {
         errors.push('Feld "payload" muss ein Object sein');
       }
-    }
-
-    if (message.type === MessageTypes.TYPE_RESPONSE) {
-      // Response braucht success-Flag und request-ID
-      if (!message.id) errors.push('Feld "id" fehlt (Response-ID)');
-      if (typeof message.success !== 'boolean') errors.push('Feld "success" muss boolean sein');
     }
 
     // 5. Timestamp-Validierung
