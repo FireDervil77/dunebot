@@ -97,6 +97,64 @@ function quellen(ordner, endung = '.js') {
         assert.ok(html.includes('Eingeschaltet am'), 'der Stempel (K158) fehlt');
     });
 
+    console.log('\nTabelle plugin_versions (K358)');
+
+    await pruefe('kein Code nennt die Tabelle mehr', () => {
+        const treffer = [];
+        for (const o of ['apps', 'packages', 'plugins']) {
+            for (const p of quellen(o)) if (/plugin_versions/.test(ohneKommentare(lies(p)))) treffer.push(p);
+        }
+        assert.deepStrictEqual(treffer, []);
+    });
+
+    await pruefe('die Migration reißt sie ab — an einer TEMPORARY-Kopie, die echte bleibt unberührt', async () => {
+        require(path.join(WURZEL, 'node_modules/dotenv')).config({ path: path.join(WURZEL, 'apps/dashboard/.env'), quiet: true });
+        const mysql = require(path.join(WURZEL, 'node_modules/mysql2/promise'));
+        const verbinde = () => mysql.createConnection({
+            host: process.env.MYSQL_HOST, port: Number(process.env.MYSQL_PORT) || 3306,
+            user: process.env.MYSQL_USER, password: process.env.MYSQL_PASSWORD, database: process.env.MYSQL_DATABASE,
+        });
+        const c = await verbinde(), aussen = await verbinde();
+        try {
+            const zahl = async (k) => {
+                const [t] = await k.query(`SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()
+                    AND TABLE_NAME = 'plugin_versions' AND TABLE_TYPE = 'BASE TABLE'`);
+                return t.length ? Number((await k.query('SELECT COUNT(*) AS n FROM plugin_versions'))[0][0].n) : null;
+            };
+            const vorher = await zahl(aussen);
+            if (vorher !== null) {
+                await c.query('CREATE TEMPORARY TABLE fb_k LIKE plugin_versions');
+                await c.query('INSERT INTO fb_k SELECT * FROM plugin_versions');
+                await c.query('CREATE TEMPORARY TABLE plugin_versions LIKE fb_k');
+                await c.query('INSERT INTO plugin_versions SELECT * FROM fb_k');
+                await c.query('DROP TEMPORARY TABLE fb_k');
+            } else {
+                // Nach dem Rollout gibt es die echte nicht mehr: eine leere Kopie genügt.
+                await c.query('CREATE TEMPORARY TABLE plugin_versions (id INT)');
+            }
+            let gedroppt = 0;
+            const db = {
+                query: async (sql, p) => {
+                    const m = /^\s*DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?`?(\w+)`?/i.exec(sql);
+                    if (m) {
+                        const [[k]] = await c.query(`SHOW CREATE TABLE \`${m[1]}\``);
+                        assert.match(k['Create Table'], /^CREATE TEMPORARY TABLE/, `DROP träfe die echte Tabelle ${m[1]}`);
+                        gedroppt++;
+                    } else {
+                        assert.ok(!/^\s*(DROP|ALTER|CREATE|TRUNCATE)\b/i.test(sql), `unerwartetes DDL: ${sql.slice(0, 60)}`);
+                    }
+                    return (await c.query(sql, p))[0];
+                },
+            };
+            const migration = require(path.join(WURZEL, 'migrations/kern/20261109_140000_plugin_versions_entfernen.js'));
+            await migration.up(db);
+            assert.strictEqual(gedroppt, 1, 'die Migration hat nichts abgerissen');
+            assert.strictEqual(await zahl(aussen), vorher, 'die echte Tabelle wurde angefasst');
+        } finally {
+            await c.end(); await aussen.end();
+        }
+    });
+
     console.log(fehler ? `\n❌ Update-Kette: ${fehler} Prüfung(en) rot` : '\n✅ Update-Kette: alles grün');
     process.exit(fehler ? 1 : 0);
 })().catch((e) => { console.error('\n❌ Der Wächter selbst ist gescheitert:', e); process.exit(1); });
