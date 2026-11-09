@@ -13,7 +13,7 @@
  *
  * Drei fertig gebaute Teile hingen nicht aneinander:
  *   `StatsEvent`                        kein Abonnent
- *   `SendGameServerResourceUsage`       kein Aufrufer
+ *   `SendGameServerResourceUsage`       kein Aufrufer (entfernt 2026-11-09, K054)
  *   `sse.on('resource_usage')`          feuerte nie
  *
  * Betreiber am 2026-09-22: „dann B und später C".
