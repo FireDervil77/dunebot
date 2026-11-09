@@ -51,14 +51,21 @@ ServiceManager.register('sseManager', {
  * Eine Datenbank, die nur Ziele kennt: Streamer 1 wird von zwei Guilds
  * beobachtet, Streamer 2 von keiner.
  */
+// Bis zum 2026-11-09 bekam jede Abfrage, in der `streaming_targets` vorkam, die
+// beiden Guilds — gleich welche Bedingung sie stellte —, und alles andere still
+// `[]` (K108). Jetzt erkennt die Attrappe genau die eine Abfrage samt Bedingung,
+// und alles Fremde landet in `unbekannteAbfragen`.
+const unbekannteAbfragen = [];
 ServiceManager.register('dbService', {
     async query(sql, werte) {
         abfragen.push({ sql, werte });
-        if (/streaming_targets/.test(sql)) {
+        const s = String(sql).replace(/\s+/g, ' ').trim();
+        if (s === 'SELECT DISTINCT guild_id FROM streaming_targets WHERE streamer_id = ?') {
             return String(werte[0]) === '1'
                 ? [{ guild_id: '100' }, { guild_id: '200' }]
                 : [];
         }
+        unbekannteAbfragen.push(s.slice(0, 90));
         return [];
     }
 });
@@ -115,7 +122,7 @@ const NACH_SAMMELN = strom.SAMMELN_MS + 120;
     // JEDEN Browser mit offener Guild. Steht hier ein Titel oder ein
     // Fehlertext drin, ist er an der Rechtepruefung vorbei.
     pruefe('nur grund und zeit, sonst nichts',
-        Object.keys(gesendet[0].daten).sort(), ['grund', 'zeit']);
+        Object.keys(gesendet[0]?.daten || {}).sort(), ['grund', 'zeit']);
 
     // -----------------------------------------------------------------
     console.log('\nGeht es nur an die richtigen Guilds?');
@@ -224,6 +231,8 @@ const NACH_SAMMELN = strom.SAMMELN_MS + 120;
     melden({ guildId: '100', grund: 'zu spaet' });
     await warte(NACH_SAMMELN);
     pruefe('abgemeldet -> nichts mehr', gesendet.length, 0);
+
+    pruefe('keine Abfrage lief an der Attrappe vorbei', [...new Set(unbekannteAbfragen)], []);
 
     console.log(abweichungen === 0
         ? `\nErgebnis: ${faelle} Faelle, 0 Abweichungen.\n`

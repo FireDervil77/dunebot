@@ -48,6 +48,11 @@ function pruefe(gut, text, zusatz = '') {
 const daten = { auftraege: [], ziele: [], verknuepfungen: [], abonnenten: [], vergaben: [], zustand: [], heim: {} };
 
 ServiceManager.register('Logger', { info: () => {}, debug: () => {}, warn: () => {}, error: () => {}, success: () => {} });
+/**
+ * Was die Attrappe nicht kennt, beantwortete sie bis zum 2026-11-09 still mit `[]`
+ * (K108). Jetzt landet es hier, und die Schlussprüfung meldet es.
+ */
+const unbekannteAbfragen = [];
 ServiceManager.register('dbService', {
     async query(sql, w = []) {
         const s = String(sql).replace(/\s+/g, ' ').trim();
@@ -79,10 +84,25 @@ ServiceManager.register('dbService', {
             daten.abonnenten.push({ streamer_id: w[0], konto_id: String(w[1]) });
             return [];
         }
+        // Das Buch der vergebenen Rollen (drossel.js). Bis zum 2026-11-09 lief das
+        // still durch — geprueft war nur, DASS der Bot gefragt wurde, nicht, dass
+        // das Plugin es sich merkt. Ohne den Eintrag nimmt der Abgleich die Rolle
+        // spaeter nie zurueck (K108).
+        if (s.startsWith('INSERT INTO streaming_role_grants (guild_id, mitglied_id, rolle_id)')) {
+            if (!daten.vergaben.some(v => v.guild_id === w[0] && v.mitglied_id === w[1] && v.rolle_id === w[2])) {
+                daten.vergaben.push({ guild_id: w[0], mitglied_id: w[1], rolle_id: w[2] });
+            }
+            return [];
+        }
+        if (s.startsWith('DELETE FROM streaming_role_grants WHERE guild_id = ? AND mitglied_id = ? AND rolle_id = ?')) {
+            daten.vergaben = daten.vergaben.filter(v => !(v.guild_id === w[0] && v.mitglied_id === w[1] && v.rolle_id === w[2]));
+            return [];
+        }
         if (s.startsWith('DELETE FROM streaming_subscribers')) {
             daten.abonnenten = daten.abonnenten.filter(a => !(a.streamer_id === w[0] && String(a.konto_id) === String(w[1])));
             return [];
         }
+        unbekannteAbfragen.push(s.slice(0, 90));
         return [];
     },
     // `abonnentenLesen` holt die Client-ID ueber `zugangsdaten`. Hier genuegt
@@ -259,12 +279,16 @@ const drossel    = require('../plugins/streaming/dashboard/ausgabe/drossel');
         'eine LIVE-Rolle wird unterdrueckt, wenn niemand sendet', live.hinweis);
 
     anDenBotGegangen = false;
+    daten.vergaben = [];
     await drossel.ausfuehren({
         id: 2, aktion: 'rolle_geben', guild_id: 'G1', target_id: 1, versuche: 0,
         nutzlast: JSON.stringify({ grund: 'abo', streamer_id: 7, mitglied_id: 'D111', rolle_id: 'R1' })
     });
     pruefe(anDenBotGegangen, 'eine ABO-Rolle wird trotzdem vergeben',
         'ein Abonnement gilt auch nachts um vier');
+    pruefe(daten.vergaben.some(v => v.guild_id === 'G1' && v.mitglied_id === 'D111' && v.rolle_id === 'R1'),
+        'und das Plugin merkt sich die Vergabe — sonst nimmt der Abgleich sie nie zurueck',
+        JSON.stringify(daten.vergaben));
 
     // ---------------------------------------------------------------
     console.log('\nEnde des Abonnements');
@@ -305,6 +329,9 @@ const drossel    = require('../plugins/streaming/dashboard/ausgabe/drossel');
     pruefe(daten.auftraege.every(a => a.nutzlast.grund === 'abo'),
         'auch der Abgleich setzt grund="abo"');
     pruefe(bilanz.geben >= 1 && bilanz.nehmen >= 1, 'die Bilanz stimmt', JSON.stringify(bilanz));
+
+    pruefe(unbekannteAbfragen.length === 0, 'keine Abfrage lief an der Attrappe vorbei',
+        [...new Set(unbekannteAbfragen)].join(' | '));
 
     console.log(`\nErgebnis: ${faelle} Pruefungen, ${abweichungen} Abweichung(en).\n`);
     process.exit(abweichungen ? 1 : 0);

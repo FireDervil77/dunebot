@@ -92,9 +92,18 @@ const karte = (nachweis = NACHWEIS, am = AM) => Serverseite.baueUebersicht({ id:
 
     await pruefe('Handler: speichert bei started, nur bekannte Felder, gekürzt; ohne nachweis bleibt der alte', async () => {
         const schreib = [];
+        // Bis zum 2026-11-09 bekam alles Weitere still `[]` (K108). Gemessen liefen
+        // drei Abfragen von _handleReadiness vorbei: die Bereitschaft schreiben
+        // (zweimal) und den Server nachschlagen. Sie sind hier nicht Gegenstand —
+        // ausdrücklich zugelassen, alles andere wird gemeldet.
+        const fremd = [];
         ServiceManager.register('dbService', { query: async (sql, p) => {
-            if (/^\s*UPDATE gameservers SET einstellungs_nachweis/.test(sql)) schreib.push(p);
-            if (/SELECT guild_id, name FROM gameservers/.test(sql)) return [{ guild_id: 'g', name: 'Bude' }];
+            const s = String(sql).replace(/\s+/g, ' ').trim();
+            if (/^UPDATE gameservers SET einstellungs_nachweis/.test(s)) { schreib.push(p); return []; }
+            if (/SELECT guild_id, name FROM gameservers/.test(s)) return [{ guild_id: 'g', name: 'Bude' }];
+            if (/^UPDATE gameservers SET bereitschaft_stufe = \?/.test(s)) return [];
+            if (s === 'SELECT id, rootserver_id, install_path FROM gameservers WHERE id = ?') return [];
+            fremd.push(s.slice(0, 90));
             return [];
         } });
         ServiceManager.register('sseManager', { broadcast: still });
@@ -115,6 +124,7 @@ const karte = (nachweis = NACHWEIS, am = AM) => Serverseite.baueUebersicht({ id:
         await h({ server_id: 5, art: 'started' });
         await h({ server_id: 5, art: 'ready', nachweis: [] });
         assert.strictEqual(schreib.length, 1, 'ohne nachweis oder bei anderer Art wurde der alte überschrieben');
+        assert.deepStrictEqual([...new Set(fremd)], [], 'Abfragen liefen an der Attrappe vorbei');
     });
 
     await pruefe('Migration: an einer temporären Kopie, legt beide Spalten an, zweiter Lauf tut nichts', async () => {
