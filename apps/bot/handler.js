@@ -1,3 +1,14 @@
+/**
+ * Verteiler für Befehle im Bot: Präfix-Befehle, Slash-Befehle, Kontextmenüs,
+ * dazu die Hilfetexte (`getCommandUsage`, `getSlashUsage`).
+ *
+ * **Eine Datei, im Kern (K334, 2026-11-09).** Bis dahin gab es zwei: die
+ * lebende in `plugins/core/bot/handler.js` (Ereignisse des core-Plugins) und
+ * eine ältere Kopie hier, aus der nur `help.js` zwei Funktionen holte — ohne
+ * den Haken `preInteraction`, mit eigenem Zähler der Abklingzeiten. Die
+ * Verteilung der Befehle aller Plugins ist eine Aufgabe des Kerns; das
+ * core-Plugin lädt sie von hier, wie Plugins im Dashboard Kern-Helfer laden.
+ */
 const { ApplicationCommandOptionType, MessageFlags } = require("discord.js");
 const { MiscUtils, EmbedUtils } = require("dunebot-sdk/utils");
 
@@ -144,6 +155,22 @@ async function handleSlashCommand(interaction, cmd) {
                 }),
                 flags: MessageFlags.Ephemeral,
             });
+        }
+    }
+
+    // Wenn der Command einen preInteraction-Hook hat, diesen VOR dem Defer aufrufen.
+    // Gibt er ein { modal } zurück, wird das Modal gezeigt (kein Defer nötig).
+    if (typeof cmd.preInteraction === 'function') {
+        try {
+            const preResult = await cmd.preInteraction({ interaction });
+            if (preResult?.modal) {
+                await interaction.showModal(preResult.modal);
+                if (cmd.cooldown > 0) applyCooldown("cmd", interaction.user.id, cmd);
+                return;
+            }
+        } catch (preErr) {
+            interaction.client.logger.error("preInteraction", preErr);
+            // Fehler im Hook → normal weiter mit deferReply
         }
     }
 

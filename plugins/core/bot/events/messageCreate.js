@@ -1,4 +1,4 @@
-const { handlePrefixCommand } = require("../handler.js");
+const { handlePrefixCommand } = require("../../../../apps/bot/handler");
 const { parseJsonArray } = require("dunebot-sdk/utils");
 const { ServiceManager } = require("dunebot-core");
 

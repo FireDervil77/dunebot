@@ -1,5 +1,5 @@
 const { MessageFlags } = require("discord.js");
-const { handleSlashCommand, handleContext } = require("../handler");
+const { handleSlashCommand, handleContext } = require("../../../../apps/bot/handler");
 const { ServiceManager } = require("dunebot-core");
 const { parseJsonArray } = require("dunebot-sdk/utils");
 
