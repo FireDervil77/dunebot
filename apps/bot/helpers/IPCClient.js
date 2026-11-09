@@ -406,9 +406,6 @@ class IPCClient {
                 case "PING_PONG":
                     return await this.#handlePingPong(message);
                     
-                case "GET_STATS":
-                    return await this.#handleGetStats(message);
-                    
                 case "GET_GUILD_STATS":
                     return await this.#handleGetGuildStats(message, payload);
                 
@@ -422,9 +419,6 @@ class IPCClient {
                     return await this.#handleGetBotGuilds(message);
                     
                 // SEND_NOTIFICATION → via Kern-IPC-Handler (apps/bot/ipc/SEND_NOTIFICATION.js)
-                    
-                case "GET_CMDS_SUMMARY":
-                    return await this.#handleGetCommandsSummary(message, payload);
                     
                 case "GET_PLUGIN_CMDS":
                     return await this.#handleGetPluginCommands(message, payload);
@@ -444,8 +438,17 @@ class IPCClient {
                 case "GET_GUILD_INFO":
                     return await this.#handleGetGuildInfo(message, payload);
                     
-                case "GET_GUILD_CHANNELS":
-                    return await this.#handleGetGuildChannels(message, payload);
+                // Kanäle liefert EIN Handler: apps/bot/ipc/GET_GUILD_CHANNELS.js (K334,
+                // 2026-11-09). Bis dahin verdeckte hier eine ältere Fassung ihn, die
+                // nur Textkanäle lieferte — die Auswahl nach `types` vom 2026-08-09
+                // (AutoMod, Moderation, Rollenmenüs) wirkte nie. Der Fall bleibt, weil
+                // die Aufrufer `{success, channels}` lesen; der Rückfall unten würde
+                // die Antwort noch einmal in `data` hüllen.
+                case "GET_GUILD_CHANNELS": {
+                    const handler = this.kernIpcHandlers?.get('GET_GUILD_CHANNELS');
+                    if (!handler) return message.reply({ success: false, error: 'Kern-Handler GET_GUILD_CHANNELS fehlt', channels: [] });
+                    return message.reply(await handler(payload, this.discordClient));
+                }
                     
                 case "GET_GUILD_ROLES":
                     return await this.#handleGetGuildRoles(message, payload);
@@ -570,69 +573,6 @@ class IPCClient {
         }
     }
 
-    /**
-     * Liefert alle Text-Channels einer Guild für Dropdown-Selects
-     * @param {object} message - Veza-Nachrichtenobjekt
-     * @param {object} payload - Enthält die Guild-ID
-     * @returns {Promise<void>}
-     * @private
-     * @author FireBot Team
-     */
-    async #handleGetGuildChannels(message, payload) {
-        const { ChannelType } = require('discord.js');
-        
-        try {
-            if (!payload?.guildId) {
-                this.logger.warn('[IPC] GET_GUILD_CHANNELS: Keine guildId im Payload');
-                return message.reply({
-                    success: false,
-                    error: "Guild-ID ist erforderlich"
-                });
-            }
-            
-            const guild = this.discordClient.guilds.cache.get(payload.guildId);
-            if (!guild) {
-                this.logger.warn(`[IPC] GET_GUILD_CHANNELS: Guild ${payload.guildId} nicht gefunden`);
-                return message.reply({
-                    success: false,
-                    error: "Guild nicht gefunden"
-                });
-            }
-
-            // Nur Text-Channels (ChannelType.GuildText = 0)
-            const channels = guild.channels.cache
-                .filter(ch => ch.type === ChannelType.GuildText)
-                .map(ch => ({
-                    id: ch.id,
-                    name: ch.name,
-                    type: ch.type,
-                    parentId: ch.parentId,
-                    parentName: ch.parent?.name || null
-                }))
-                .sort((a, b) => {
-                    // Sortierung: Erst nach Category, dann alphabetisch
-                    if (a.parentName && !b.parentName) return 1;
-                    if (!a.parentName && b.parentName) return -1;
-                    if (a.parentName !== b.parentName) {
-                        return (a.parentName || '').localeCompare(b.parentName || '');
-                    }
-                    return a.name.localeCompare(b.name);
-                });
-
-            this.logger.debug(`[IPC] GET_GUILD_CHANNELS: ${channels.length} Channels für Guild ${payload.guildId}`);
-
-            return message.reply({
-                success: true,
-                channels: channels
-            });
-        } catch (error) {
-            this.logger.error("[IPC] Fehler beim Abrufen der Guild-Channels:", error);
-            return message.reply({
-                success: false,
-                error: error.message
-            });
-        }
-    }
 
     /**
      * Liefert Rollen einer Guild zurück
@@ -951,41 +891,6 @@ class IPCClient {
         }
     }
 
-    /**
-     * Liefert allgemeine Bot-Statistiken
-     * @param {object} message - Veza-Nachrichtenobjekt
-     * @returns {Promise<void>}
-     * @private
-     */
-    async #handleGetStats(message) {
-        try {
-            const client = this.discordClient;
-            const stats = {
-                serverCount: client.guilds.cache.size,
-                userCount: client.guilds.cache.reduce((acc, guild) => acc + (guild.memberCount || 0), 0),
-                channelCount: client.channels.cache.size,
-                uptimeSeconds: Math.floor(client.uptime / 1000),
-                ping: client.ws.ping,
-                shardId: this.shardId,
-                readySince: client.readyTimestamp,
-                systemStats: {
-                    memoryUsage: process.memoryUsage(),
-                    cpuUsage: process.cpuUsage()
-                }
-            };
-            
-            return message.reply({
-                success: true,
-                data: stats
-            });
-        } catch (error) {
-            this.logger.error("[IPC] Fehler beim Abrufen der Bot-Statistiken:", error);
-            return message.reply({
-                success: false,
-                error: error.message
-            });
-        }
-    }
     
     /**
      * Liefert Statistiken für eine bestimmte Guild
@@ -1342,58 +1247,6 @@ class IPCClient {
         }
     }
     
-    /**
-     * Liefert eine Zusammenfassung der verfügbaren Befehle
-     * @param {object} message - Veza-Nachrichtenobjekt
-     * @param {object} payload - Enthält optionale Filter
-     * @returns {Promise<void>}
-     * @private
-     */
-    async #handleGetCommandsSummary(message, payload) {
-        try {
-            const guildId = payload?.guildId;
-            const pluginManager = this.discordClient.pluginManager;
-            
-            if (!pluginManager) {
-                return message.reply({
-                    success: false,
-                    error: "PluginManager nicht verfügbar"
-                });
-            }
-            
-            const plugins = pluginManager.getPlugins();
-            const commandSummary = [];
-            
-            for (const plugin of plugins) {
-                // Prüfen, ob das Plugin für die Guild aktiviert ist
-                if (guildId && !pluginManager.isPluginEnabledForGuild(plugin.id, guildId)) {
-                    continue;
-                }
-                
-                const pluginCommands = {
-                    pluginId: plugin.id,
-                    pluginName: plugin.name,
-                    slashCommands: plugin.slashCommands?.size || 0,
-                    prefixCommands: plugin.prefixCommands?.size || 0
-                };
-                
-                if (pluginCommands.slashCommands > 0 || pluginCommands.prefixCommands > 0) {
-                    commandSummary.push(pluginCommands);
-                }
-            }
-            
-            return message.reply({
-                success: true,
-                data: commandSummary
-            });
-        } catch (error) {
-            this.logger.error("[IPC] Fehler beim Abrufen der Befehls-Zusammenfassung:", error);
-            return message.reply({
-                success: false,
-                error: error.message
-            });
-        }
-    }
     
     /**
      * Liefert detaillierte Informationen zu den Befehlen eines Plugins
@@ -1749,106 +1602,6 @@ class IPCClient {
         }
     }
     
-    /**
-     * Führt Plugin-Aktionen aus (aktivieren, deaktivieren, installieren, deinstallieren)
-     * @param {object} message - Veza-Nachrichtenobjekt
-     * @param {object} payload - Enthält Aktion, Plugin-ID und ggf. Guild-ID
-     * @returns {Promise<void>}
-     * @private
-     */
-    /*
-    async #handleUpdatePlugin(message, payload) {
-        try {
-            const { action, pluginId, guildId } = payload || {};
-            console.log(payload);
-
-            if (!action || !pluginId) {
-                return message.reply({
-                    success: false,
-                    error: "Aktion und Plugin-ID sind erforderlich"
-                });
-            }
-            
-            const pluginManager = this.discordClient.pluginManager;
-            if (!pluginManager) {
-                return message.reply({
-                    success: false,
-                    error: "PluginManager nicht verfügbar"
-                });
-            }
-            
-            let result = false;
-            let errorMessage = null;
-            
-            switch (action) {
-                case 'enable':
-                    result = await pluginManager.enablePlugin(pluginId);
-                    // NEU: Plugin auch für die Guild aktivieren, wenn guildId vorhanden
-                    if (guildId) {
-                        const guildResult = await pluginManager.enablePluginForGuild(pluginId, guildId);
-                        result = result && guildResult;
-                    }
-                    break;
-                    
-                case 'disable':
-                    result = await pluginManager.disablePlugin(pluginId);
-                    // NEU: Plugin auch für die Guild deaktivieren, wenn guildId vorhanden
-                    if (guildId) {
-                        const guildResult = await pluginManager.disablePluginForGuild(pluginId, guildId);
-                        result = result && guildResult;
-                    }
-                    break;
-                    
-                case 'install':
-                    result = await pluginManager.installPlugin(pluginId);
-                    break;
-                    
-                case 'uninstall':
-                    result = await pluginManager.uninstallPlugin(pluginId);
-                    break;
-                    
-                case 'guildEnable':
-                    if (!guildId) {
-                        errorMessage = "Guild-ID ist für guildEnable erforderlich";
-                        break;
-                    }
-                    result = await pluginManager.enablePluginForGuild(pluginId, guildId);
-                    break;
-                    
-                case 'guildDisable':
-                    if (!guildId) {
-                        errorMessage = "Guild-ID ist für guildDisable erforderlich";
-                        break;
-                    }
-                    result = await pluginManager.disablePluginForGuild(pluginId, guildId);
-                    break;
-                    
-                default:
-                    errorMessage = `Unbekannte Aktion: ${action}`;
-            }
-            
-            if (errorMessage) {
-                return message.reply({
-                    success: false,
-                    error: errorMessage
-                });
-            }
-            
-            return message.reply({
-                success: result,
-                message: result 
-                    ? `Plugin-Aktion '${action}' für '${pluginId}' erfolgreich ausgeführt` 
-                    : `Plugin-Aktion '${action}' für '${pluginId}' fehlgeschlagen`
-            });
-        } catch (error) {
-            Logger.error(`[IPC] Fehler bei Plugin-Aktion:`, error);
-            return message.reply({
-                success: false,
-                error: error.message
-            });
-        }
-    }
-    */
     
     async #handleUpdatePlugin(message, payload) {
         console.log("[IPC] handle Update Plugin with payload:", JSON.stringify(payload, null, 2));
