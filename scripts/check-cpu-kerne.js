@@ -96,7 +96,18 @@ const lies = (rel) => fs.readFileSync(path.join(WURZEL, rel), 'utf8');
 
     await pruefe('3-s-Push: dieselbe Rechnung mit der Buchung aus der Datenbank, gemerkt', async () => {
         const abfragen = [];
-        ServiceManager.register('dbService', { query: async (sql, p) => { abfragen.push(p); return [{ allocated_cpu_percent: 800 }]; } });
+        // Bis zum 2026-11-09 kam auf JEDE Abfrage die Buchung zurück, gleich welche
+        // Spalte und welcher Server (K108). Jetzt nur auf die eine, für Server 222.
+        const fremd = [];
+        ServiceManager.register('dbService', { query: async (sql, p) => {
+            const s = String(sql).replace(/\s+/g, ' ').trim();
+            abfragen.push(p);
+            if (s === 'SELECT allocated_cpu_percent FROM gameservers WHERE id = ?' && Number(p?.[0]) === 222) {
+                return [{ allocated_cpu_percent: 800 }];
+            }
+            fremd.push(`${s.slice(0, 80)} ${JSON.stringify(p)}`);
+            return [];
+        } });
         const still = () => {};
         ServiceManager.register('Logger', { debug: still, info: still, warn: still, error: still });
         const gesendet = [];
@@ -110,6 +121,7 @@ const lies = (rel) => fs.readFileSync(path.join(WURZEL, rel), 'utf8');
         assert.strictEqual(gesendet[0].messwerte.cpu.text, '2,6 von 8 Kernen');
         assert.strictEqual(gesendet[1].messwerte.cpu.prozent, 65);
         assert.strictEqual(abfragen.length, 1, `je Push eine Abfrage (${abfragen.length}) — der Merker greift nicht`);
+        assert.deepStrictEqual(fremd, [], 'eine Abfrage lief an der Attrappe vorbei');
     });
 
     await pruefe('Liste, Serverseite und /status holen die Buchung', async () => {
