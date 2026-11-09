@@ -7,6 +7,7 @@ const guildController = require("../controllers/guild.controller");
 
 // Middlewares
 const pluginMiddleware = require("../middlewares/context/plugin.middleware");
+const Wissen = require("../helpers/Wissen");
 const { CheckAuth, CheckGuildAccess } = require("../middlewares/auth.middleware");
 const { loadUserPermissions } = require("../middlewares/permissions.middleware");
 
@@ -83,7 +84,7 @@ router.use("/:guildId/plugin-reload", CheckAuth, CheckGuildAccess, pluginReloadR
 
 
 // Plugin-spezifische Routen (MIT Auth-Check!)
-router.use("/:guildId/plugins/:pluginName", CheckAuth, CheckGuildAccess, pluginMiddleware.loadPlugin, (req, res, next) => {
+router.use("/:guildId/plugins/:pluginName", CheckAuth, CheckGuildAccess, pluginMiddleware.loadPlugin, async (req, res, next) => {
     const plugin = res.locals.plugin;
     const Logger = ServiceManager.get('Logger');
 
@@ -116,6 +117,19 @@ router.use("/:guildId/plugins/:pluginName", CheckAuth, CheckGuildAccess, pluginM
     // Zusätzliche Daten in res.locals setzen
     res.locals.currentPluginName = plugin.name;
     res.locals.currentPluginDisplayName = plugin.displayName || plugin.name;
+
+    // „Hilfe“ in der Kopfleiste zeigt auf den Artikel dieses Plugins (K290,
+    // 2026-11-09). Nur bei Seitenaufrufen: Abrufe aus Skripten und
+    // Ereignisströme laufen auch hier durch und zeigen keine Kopfleiste.
+    // Scheitert die Abfrage, führt „Hilfe“ zur Startseite von /kb — die
+    // Seite selbst darf daran nicht hängen.
+    if (req.method === 'GET' && String(req.headers.accept || '').includes('text/html')) {
+        try {
+            res.locals.hilfe = await Wissen.hilfeFuerPlugin(plugin.name, res.locals.locale);
+        } catch (fehler) {
+            Logger.error(`[Hilfe] Artikel für Plugin ${plugin.name} nicht gelesen:`, fehler);
+        }
+    }
     
     // Router des Plugins ausführen
     plugin.guildRouter(req, res, next);

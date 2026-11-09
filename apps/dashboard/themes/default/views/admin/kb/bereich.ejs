@@ -69,11 +69,6 @@
                         <input class="form-control" id="bReihe" name="sort_order" type="number" value="<%= bereich ? bereich.sort_order : 100 %>">
                         <div class="form-hint">Kleinere Zahl steht weiter vorn.</div>
                     </div>
-                    <div class="col-md-3">
-                        <label class="form-label" for="bPlugin">Hilfe des Plugins</label>
-                        <input class="form-control font-monospace" id="bPlugin" name="plugin" maxlength="60" value="<%= bereich ? (bereich.plugin || '') : '' %>" placeholder="leer = keines">
-                        <div class="form-hint">Name des Plugins, etwa „gameserver" — für spätere Hilfe-Verweise im Dashboard.</div>
-                    </div>
                 </div>
             </div>
             <div class="card-footer d-flex gap-2">

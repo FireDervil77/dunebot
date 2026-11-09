@@ -41,7 +41,6 @@
                     <h3 class="card-title mb-0">
                         <%= b.titel %>
                         <span class="text-secondary small fw-normal font-monospace ms-2">/kb/<%= b.kuerzel %></span>
-                        <% if (b.plugin) { %><span class="badge bg-secondary-lt ms-1" title="Dieser Bereich ist die Hilfe des Plugins <%= b.plugin %>">Plugin: <%= b.plugin %></span><% } %>
                     </h3>
                     <div class="ms-auto btn-group btn-group-sm">
                         <a class="btn btn-outline-success" href="/admin/kb/artikel/neu?bereich=<%= b.id %>" title="Neuer Artikel in diesem Bereich"><i class="fa-solid fa-plus"></i></a>
@@ -77,6 +76,7 @@
                                     <td>
                                         <a href="/admin/kb/artikel/<%= a.id %>"><strong><%= a.titel %></strong></a>
                                         <% if (a.istStartseite) { %><span class="badge bg-primary-lt ms-1" title="Dieser Artikel ist der Text der Startseite von /kb und steht in keiner Liste.">Startseite von /kb</span><% } %>
+                                        <% if (a.plugin) { %><span class="badge bg-azure-lt ms-1" title="Auf den Seiten dieses Plugins im Dashboard zeigt „Hilfe“ hierher<%= a.stand === 'published' ? '' : ' — sobald der Artikel veröffentlicht ist' %>."><i class="fa-solid fa-circle-question me-1"></i>Hilfe: <%= a.plugin %></span><% } %>
                                         <br><small class="text-secondary font-monospace"><%= a.istStartseite ? '/kb' : '/kb/' + b.kuerzel + '/' + a.kuerzel %></small>
                                     </td>
                                     <td>

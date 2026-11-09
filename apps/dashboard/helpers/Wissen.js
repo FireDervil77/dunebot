@@ -41,6 +41,8 @@ const SPRACHEN = ['de-DE', 'en-GB'];
 const STANDARDSPRACHE = 'de-DE';
 const STAENDE = ['draft', 'published'];
 const RE_KUERZEL = /^[a-z0-9][a-z0-9-]{0,79}$/;
+/** Name eines Plugins, wie der Ordner unter `plugins/` heißt. */
+const RE_PLUGIN = /^[a-z0-9][a-z0-9_-]{0,59}$/;
 
 /**
  * Der Text der Startseite von `/kb` ist ein Artikel wie jeder andere — damit
@@ -205,7 +207,6 @@ function bereichFuerAnzeige(zeile, locale) {
         beschreibung: text(zeile.description_translations, locale),
         symbol: zeile.icon || 'bi-journal-text',
         reihenfolge: zeile.sort_order,
-        plugin: zeile.plugin || null,
         artikel: zeile.artikel === undefined ? undefined : Number(zeile.artikel),
     };
 }
@@ -222,6 +223,7 @@ function artikelFuerAnzeige(zeile, locale) {
         stand: zeile.status,
         oeffentlich: Number(zeile.is_public) === 1,
         reihenfolge: zeile.sort_order,
+        plugin: zeile.plugin || null,
         autor: zeile.author || null,
         geaendert: zeile.updated_at,
         istStartseite: zeile.bereich_slug === START.bereich && zeile.slug === START.artikel,
@@ -229,7 +231,7 @@ function artikelFuerAnzeige(zeile, locale) {
 }
 
 const ARTIKEL_SPALTEN = `a.id, a.category_id, a.slug, a.title_translations, a.excerpt_translations,
-       a.content_translations, a.status, a.is_public, a.sort_order, a.author, a.created_at, a.updated_at,
+       a.content_translations, a.status, a.is_public, a.sort_order, a.plugin, a.author, a.created_at, a.updated_at,
        c.slug AS bereich_slug`;
 
 /**
@@ -417,7 +419,7 @@ function pruefeKuerzel(wert, was) {
 /**
  * Bereich anlegen oder ändern. Wirft mit einem Satz, der sagt, was fehlt.
  *
- * @param {object} f  Formular: id?, slug, title_de, title_en, description_de, description_en, icon, sort_order, plugin
+ * @param {object} f  Formular: id?, slug, title_de, title_en, description_de, description_en, icon, sort_order
  * @param {object} [bericht]  bekommt `verweise` ({ artikel, stellen }), wenn das Kürzel sich geändert hat
  * @returns {Promise<number>} id des Bereichs
  */
@@ -441,11 +443,10 @@ async function bereichSpeichern(f, bericht = {}) {
         altesKuerzel = alt.slug;
     }
     const werte = [slug, uebersetzungen(titel, f.title_en), uebersetzungen(f.description_de, f.description_en),
-        String(f.icon || '').trim().slice(0, 60) || null, Number.parseInt(f.sort_order, 10) || 0,
-        String(f.plugin || '').trim().slice(0, 60) || null];
+        String(f.icon || '').trim().slice(0, 60) || null, Number.parseInt(f.sort_order, 10) || 0];
     if (id) {
         const sql = `UPDATE kb_categories SET slug = ?, title_translations = ?, description_translations = ?,
-                    icon = ?, sort_order = ?, plugin = ? WHERE id = ?`;
+                    icon = ?, sort_order = ? WHERE id = ?`;
         if (altesKuerzel === slug) {
             await db().query(sql, [...werte, id]);
             return id;
@@ -458,8 +459,8 @@ async function bereichSpeichern(f, bericht = {}) {
         return id;
     }
     const ergebnis = await db().query(
-        `INSERT INTO kb_categories (slug, title_translations, description_translations, icon, sort_order, plugin)
-         VALUES (?, ?, ?, ?, ?, ?)`, werte);
+        `INSERT INTO kb_categories (slug, title_translations, description_translations, icon, sort_order)
+         VALUES (?, ?, ?, ?, ?)`, werte);
     return ergebnis.insertId;
 }
 
@@ -475,15 +476,39 @@ async function bereichEntfernen(id) {
 }
 
 /**
+ * Das Plugin, dessen Hilfe ein Artikel sein soll — leer heißt keines.
+ *
+ * `bekannte` sind die Plugins, die es gibt (die Verwaltung reicht sie vom
+ * PluginManager durch). Ein vertippter Name wäre sonst eine Zuordnung, die
+ * nie jemand sieht.
+ */
+function pruefePlugin(wert, bekannte) {
+    const name = String(wert || '').trim();
+    if (!name) return null;
+    if (!RE_PLUGIN.test(name) || (Array.isArray(bekannte) && !bekannte.includes(name))) {
+        throw new Eingabefehler(`Artikel: Ein Plugin „${name}" gibt es nicht.`);
+    }
+    return name;
+}
+
+/**
  * Artikel anlegen oder ändern.
  *
+ * **Hilfe im Dashboard (K290, 2026-11-09).** Je Plugin zeigt höchstens EIN
+ * Artikel. Wählt ein Artikel ein Plugin, das ein anderer schon hat, geht es
+ * von dort hierher — so geht das Tauschen über einen „-neu“-Entwurf ohne
+ * Zwischenschritt. Beides in einer Transaktion: Ginge nur das Abgeben
+ * durch, hätte das Plugin keine Hilfe mehr.
+ *
  * @param {object} f  Formular: id?, category_id, slug, title_de/_en, excerpt_de/_en, content_de/_en,
- *                    status, is_public, sort_order
+ *                    status, is_public, sort_order, plugin
  * @param {string|null} autor
- * @param {object} [bericht]  bekommt `verweise` ({ artikel, stellen, von, nach }), wenn die Adresse sich geändert hat
+ * @param {object} [bericht]  bekommt `verweise` ({ artikel, stellen, von, nach }), wenn die Adresse sich geändert hat,
+ *                            und `hilfe` ({ plugin, von, entwurf }), wenn ein anderer Artikel das Plugin abgab
+ * @param {string[]|null} [plugins]  die Plugins, die es gibt; ohne Liste nur die Form des Namens
  * @returns {Promise<number>} id des Artikels
  */
-async function artikelSpeichern(f, autor = null, bericht = {}) {
+async function artikelSpeichern(f, autor = null, bericht = {}, plugins = null) {
     const titel = String(f.title_de || '').trim();
     if (!titel) throw new Eingabefehler('Artikel: Der deutsche Titel fehlt.');
     if (!String(f.content_de || '').trim()) throw new Eingabefehler('Artikel: Der deutsche Inhalt fehlt.');
@@ -493,6 +518,7 @@ async function artikelSpeichern(f, autor = null, bericht = {}) {
     const slug = pruefeKuerzel(f.slug || kuerzelAus(titel), 'Artikel');
     const stand = STAENDE.includes(f.status) ? f.status : 'draft';
     const oeffentlich = f.is_public === true || f.is_public === '1' || f.is_public === 'on' || f.is_public === 1 ? 1 : 0;
+    const plugin = pruefePlugin(f.plugin, plugins);
     const id = f.id ? Number(f.id) : null;
 
     const doppelt = await db().query(
@@ -509,30 +535,70 @@ async function artikelSpeichern(f, autor = null, bericht = {}) {
             throw new Eingabefehler('Artikel: Das ist der Text der Startseite von /kb — er bleibt in seinem Bereich, veröffentlicht und öffentlich. Den Text selbst kannst du ändern.');
         }
     }
+    const istStart = b.slug === START.bereich && slug === START.artikel;
+    if (plugin && istStart) {
+        throw new Eingabefehler('Artikel: Die Startseite von /kb ist keine Hilfe eines Plugins — wähle dafür einen eigenen Artikel.');
+    }
+    const [halter] = plugin ? await db().query(
+        `SELECT a.id, a.slug, c.slug AS bereich_slug
+           FROM kb_articles a JOIN kb_categories c ON c.id = a.category_id
+          WHERE a.plugin = ? AND a.id <> ?`, [plugin, id || 0]) : [];
+    const gibAb = async (q) => {
+        if (!halter) return;
+        await q('UPDATE kb_articles SET plugin = NULL WHERE id = ?', [halter.id]);
+        bericht.hilfe = { plugin, von: `/kb/${halter.bereich_slug}/${halter.slug}`, entwurf: stand !== 'published' };
+    };
+
     const werte = [bereichId, slug, uebersetzungen(titel, f.title_en), uebersetzungen(f.excerpt_de, f.excerpt_en),
-        uebersetzungen(f.content_de, f.content_en), stand, oeffentlich, Number.parseInt(f.sort_order, 10) || 0];
+        uebersetzungen(f.content_de, f.content_en), stand, oeffentlich, Number.parseInt(f.sort_order, 10) || 0, plugin];
     if (id) {
         const sql = `UPDATE kb_articles SET category_id = ?, slug = ?, title_translations = ?, excerpt_translations = ?,
-                    content_translations = ?, status = ?, is_public = ?, sort_order = ? WHERE id = ?`;
+                    content_translations = ?, status = ?, is_public = ?, sort_order = ?, plugin = ? WHERE id = ?`;
         const neueAdresseDesArtikels = `/kb/${b.slug}/${slug}`;
-        if (alteAdresse === neueAdresseDesArtikels) {
+        if (alteAdresse === neueAdresseDesArtikels && !halter) {
             await db().query(sql, [...werte, id]);
             return id;
         }
         // Verschoben oder umbenannt: Die Verweise aus allen Artikeln ziehen mit —
         // erst der Artikel, dann die Verweise, damit auch seine eigenen stimmen.
         await inTransaktion(async (q) => {
+            await gibAb(q);
             await q(sql, [...werte, id]);
-            bericht.verweise = { ...(await verweiseUmschreiben(alteAdresse, neueAdresseDesArtikels, q)),
-                von: alteAdresse, nach: neueAdresseDesArtikels };
+            if (alteAdresse !== neueAdresseDesArtikels) {
+                bericht.verweise = { ...(await verweiseUmschreiben(alteAdresse, neueAdresseDesArtikels, q)),
+                    von: alteAdresse, nach: neueAdresseDesArtikels };
+            }
         });
         return id;
     }
-    const ergebnis = await db().query(
-        `INSERT INTO kb_articles (category_id, slug, title_translations, excerpt_translations,
-                content_translations, status, is_public, sort_order, author)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [...werte, autor ? String(autor).slice(0, 100) : null]);
-    return ergebnis.insertId;
+    const einfuegen = `INSERT INTO kb_articles (category_id, slug, title_translations, excerpt_translations,
+                content_translations, status, is_public, sort_order, plugin, author)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    const neu = [...werte, autor ? String(autor).slice(0, 100) : null];
+    if (!halter) return (await db().query(einfuegen, neu)).insertId;
+    return inTransaktion(async (q) => {
+        await gibAb(q);
+        return (await q(einfuegen, neu)).insertId;
+    });
+}
+
+// ── Hilfe im Dashboard (K290, 2026-11-09) ───────────────────────────────────
+
+/**
+ * Der Artikel, auf den „Hilfe“ auf den Seiten eines Plugins zeigt — nur ein
+ * veröffentlichter. Ob er ein Schloss trägt, spielt keine Rolle: Wer im
+ * Dashboard ist, ist mit Discord angemeldet und liest ihn ganz.
+ *
+ * @returns {Promise<{adresse: string, titel: string}|null>}
+ */
+async function hilfeFuerPlugin(pluginName, locale) {
+    if (!RE_PLUGIN.test(String(pluginName || ''))) return null;
+    const [zeile] = await db().query(
+        `SELECT a.slug, a.title_translations, c.slug AS bereich_slug
+           FROM kb_articles a JOIN kb_categories c ON c.id = a.category_id
+          WHERE a.plugin = ? AND a.status = 'published'`, [pluginName]);
+    if (!zeile) return null;
+    return { adresse: `/kb/${zeile.bereich_slug}/${zeile.slug}`, titel: text(zeile.title_translations, locale) || zeile.slug };
 }
 
 async function artikelEntfernen(id) {
@@ -550,5 +616,6 @@ module.exports = {
     bereiche, bereich, artikelImBereich, artikel, suche,
     allesFuerVerwaltung, bereichRoh, artikelRoh,
     bereichSpeichern, bereichEntfernen, artikelSpeichern, artikelEntfernen,
+    hilfeFuerPlugin,
     ersetzeAdresse, verweiseUmschreiben, inTransaktion,
 };

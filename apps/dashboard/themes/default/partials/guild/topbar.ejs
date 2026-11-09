@@ -86,6 +86,18 @@
         </a>
       </div>
       <% } %>
+      <%# Hilfe (K290, 2026-11-09): Auf der Seite eines Plugins zeigt sie auf
+          dessen Artikel in der Wissensdatenbank (`hilfe` setzt guild.router.js,
+          die Zuordnung steht am Artikel unter /admin/kb), sonst auf /kb. Neues
+          Fenster, damit die Arbeit im Dashboard stehen bleibt. %>
+      <% const _hilfe = locals.hilfe || null; %>
+      <div class="nav-item">
+        <a class="nav-link" href="<%= _hilfe ? _hilfe.adresse : '/kb' %>" target="_blank" rel="noopener"
+           title="<%= _hilfe ? _hilfe.titel : tr('SIDEBAR.HELP_KB') %>">
+          <span class="nav-link-icon"><i class="fa-solid fa-circle-question"></i></span>
+          <span class="nav-link-title d-none d-lg-inline"><%= tr('SIDEBAR.HELP') %></span>
+        </a>
+      </div>
     </div>
 
     <div class="navbar-nav flex-row order-md-last align-items-center">

@@ -65,6 +65,17 @@ function zuVerweisen(bericht) {
         + `${v.artikel} ${v.artikel === 1 ? 'Artikel zeigt' : 'Artikeln zeigen'} jetzt auf die neue.`;
 }
 
+/** Der Satz zur Hilfe im Dashboard, wenn ein anderer Artikel sein Plugin abgab. */
+function zuHilfe(bericht) {
+    const h = bericht.hilfe;
+    if (!h) return '';
+    return ` „Hilfe“ im Plugin ${h.plugin} zeigt jetzt hierher statt auf ${h.von}`
+        + (h.entwurf ? ' — solange dieser Artikel Entwurf ist, führt sie zur Startseite von /kb.' : '.');
+}
+
+/** Die Plugins, die es gibt — für die Auswahl „Hilfe im Dashboard“ und die Prüfung beim Speichern. */
+const pluginNamen = () => [...ServiceManager.get('pluginManager').availablePlugins].sort();
+
 // ── Übersicht ────────────────────────────────────────────────────────────────
 router.get('/', seite('Übersicht', async (req, res) => {
     await zeige(res, 'admin/kb/index', {
@@ -104,7 +115,7 @@ router.get('/artikel/neu', seite('Artikel neu', async (req, res) => {
     if (!wahl.length) return res.redirect(MENUE + '/bereich/neu');
     await zeige(res, 'admin/kb/artikel', {
         title: 'Neuer Artikel', artikel: null, bereiche: wahl,
-        vorgabeBereich: Number(req.query.bereich) || wahl[0].id,
+        vorgabeBereich: Number(req.query.bereich) || wahl[0].id, plugins: pluginNamen(),
     });
 }));
 
@@ -113,20 +124,22 @@ router.get('/artikel/:id', seite('Artikel', async (req, res) => {
     if (!artikel) return res.redirect(MENUE);
     await zeige(res, 'admin/kb/artikel', {
         title: 'Artikel bearbeiten', artikel, bereiche: await bereichsWahl(), vorgabeBereich: artikel.category_id,
+        plugins: pluginNamen(),
     });
 }));
 
 router.post('/artikel/speichern', schreibe('Artikel speichern', async (req) => {
     const autor = req.session?.user?.info?.global_name || req.session?.user?.info?.username || null;
     const bericht = {};
-    const id = await Wissen.artikelSpeichern(req.body || {}, autor, bericht);
+    const id = await Wissen.artikelSpeichern(req.body || {}, autor, bericht, pluginNamen());
     const a = await Wissen.artikelRoh(id);
-    return { id, adresse: a.istStartseite ? '/kb' : `/kb/${a.bereich_slug}/${a.slug}`, message: 'Artikel gespeichert.' + zuVerweisen(bericht) };
+    return { id, adresse: a.istStartseite ? '/kb' : `/kb/${a.bereich_slug}/${a.slug}`,
+        message: 'Artikel gespeichert.' + zuVerweisen(bericht) + zuHilfe(bericht) };
 }));
 
 router.post('/artikel/:id/entfernen', schreibe('Artikel entfernen', async (req) => {
-    await Wissen.artikelEntfernen(req.params.id);
-    return { message: 'Artikel entfernt.' };
+    const a = await Wissen.artikelEntfernen(req.params.id);
+    return { message: 'Artikel entfernt.' + (a.plugin ? ` Das Plugin ${a.plugin} hat jetzt keinen Hilfe-Artikel mehr — „Hilfe“ führt dort zur Startseite von /kb.` : '') };
 }));
 
 // ── Vorschau: dieselbe Funktion, die die öffentliche Seite benutzt ───────────

@@ -9,6 +9,7 @@
   @context {object|null} artikel         Wissen.artikelRoh(id) oder null (neu)
   @context {Array}       bereiche        [{ id, kuerzel, titel }]
   @context {number}      vorgabeBereich
+  @context {string[]}    plugins         Namen der Plugins, für „Hilfe im Dashboard“
 %>
 <%
   const t = (artikel && artikel.title_translations) || {};
@@ -83,6 +84,18 @@
                                 <span class="form-check-label">Öffentlich</span>
                             </label>
                         </div>
+                        <% if (!istStart) { %>
+                        <div class="col-md-3">
+                            <label class="form-label" for="aPlugin">Hilfe im Dashboard für</label>
+                            <select class="form-select" id="aPlugin" name="plugin">
+                                <option value="">— kein Plugin —</option>
+                                <% (typeof plugins !== 'undefined' ? plugins : []).forEach(function (p) { %>
+                                    <option value="<%= p %>" <%= artikel && artikel.plugin === p ? 'selected' : '' %>><%= p %></option>
+                                <% }); %>
+                            </select>
+                            <div class="form-hint">Auf den Seiten dieses Plugins führt „Hilfe“ oben hierher, sobald der Artikel veröffentlicht ist. Hat ein anderer Artikel das Plugin, geht es von dort hierher.</div>
+                        </div>
+                        <% } %>
                         <div class="col-12">
                             <div class="form-hint">
                                 „Öffentlich" aus heißt: Ohne Anmeldung sind nur Titel und Kurztext zu sehen, mit Schloss. Wer mit Discord angemeldet ist, liest jeden veröffentlichten Artikel.

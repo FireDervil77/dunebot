@@ -51,6 +51,8 @@ if (!ServiceManager.has('Logger')) {
 
 const Wissen = require(path.join(WURZEL, 'apps/dashboard/helpers/Wissen'));
 const migration = require(path.join(WURZEL, 'migrations/kern/20261011_150000_wissensdatenbank.js'));
+// Zieht die Hilfe-Zuordnung vom Bereich an den Artikel (K290) — läuft hier hinter der ersten.
+const hilfeMigration = require(path.join(WURZEL, 'migrations/kern/20261109_100000_kb_hilfe_am_artikel.js'));
 const ANSICHTEN = path.join(WURZEL, 'apps/dashboard/themes/default/views');
 const lies = (p) => fs.readFileSync(path.join(WURZEL, p), 'utf8');
 const gibtEs = (p) => fs.existsSync(path.join(WURZEL, p));
@@ -254,7 +256,11 @@ function uebersetzer(locale) {
                 kopiert.add(name);
                 angelegt++;
             }
-            assert.ok(!/^\s*(DROP|ALTER|CREATE|TRUNCATE)\s+TABLE\b/i.test(s) || /TEMPORARY/.test(s),
+            // ALTER nur an einer eigenen Kopie (die Hilfe-Migration, K290) — nachgesehen,
+            // nicht geglaubt: `SHOW CREATE TABLE` muss TEMPORARY sagen.
+            const aendert = /^\s*ALTER\s+TABLE\s+`?(\w+)`?/i.exec(s);
+            const anKopie = aendert && kopiert.has(aendert[1]) && await istKopie(aendert[1]);
+            assert.ok(!/^\s*(DROP|ALTER|CREATE|TRUNCATE)\s+TABLE\b/i.test(s) || /TEMPORARY/.test(s) || anKopie,
                 `der Wächter führt kein DDL an echten Tabellen aus: ${s.trim().slice(0, 60)}`);
             const schreibt = /^\s*(?:INSERT\s+(?:IGNORE\s+)?INTO|UPDATE|DELETE\s+FROM)\s+`?(\w+)`?/i.exec(s);
             if (schreibt && !geprueft.has(schreibt[1])) {
@@ -279,16 +285,13 @@ function uebersetzer(locale) {
     };
     const vorDemWaechter = JSON.parse(vorher).zahlen;
     const schonEcht = Object.keys(vorDemWaechter).length > 0;
-    if (schonEcht) {
-        // Nach dem Rollout gibt es die Tabellen wirklich. Dann laufen Migration
-        // und Modell an Kopien OHNE Inhalt — eingespielt wird in leere Tabellen.
-        for (const tab of ['kb_articles', 'kb_categories']) {
-            await c.query(`CREATE TEMPORARY TABLE fb_k LIKE \`${tab}\``);
-            await c.query(`CREATE TEMPORARY TABLE \`${tab}\` LIKE fb_k`);
-            await c.query('DROP TEMPORARY TABLE fb_k');
-            kopiert.add(tab);
-        }
-    }
+    // Bis 2026-11-09 entstanden die leeren Kopien nach dem Rollout aus den
+    // ECHTEN Tabellen (`LIKE`). Seit der Hilfe-Migration (K290) haben die echten
+    // eine andere Form als die, in die die erste Migration einspielt — die
+    // Kopien legt deshalb immer die erste Migration selbst an, als TEMPORARY
+    // (siehe `query` oben). Eine temporäre Tabelle verdeckt die echte gleichen
+    // Namens in dieser Verbindung; wie auf einer frischen Anlage läuft danach
+    // die Hilfe-Migration.
     ServiceManager.register('dbService', db);
 
     const zahl = async (sql, p) => Number((await db.query(sql, p))[0].n);
@@ -337,6 +340,13 @@ function uebersetzer(locale) {
         assert.strictEqual(gelogen, 1, 'die Leerprüfung der Migration sieht anders aus — der Wächter stellt den Fall nicht mehr nach');
         assert.strictEqual(await zahl('SELECT COUNT(*) AS n FROM kb_articles'), erwartet, 'der zweite Lauf hat den Bestand des ersten angefasst');
         assert.strictEqual(await zahl('SELECT COUNT(*) AS n FROM kb_categories'), ordnerDa ? 6 : 1);
+    });
+
+    await pruefe('die Hilfe-Migration zieht das Plugin vom Bereich an den Artikel, zweimal ohne Schaden', async () => {
+        for (let lauf = 0; lauf < 2; lauf++) await hilfeMigration.up(db);
+        const spalten = async (tab) => (await db.query(`SHOW COLUMNS FROM \`${tab}\``)).map(z => z.Field);
+        assert.ok(!(await spalten('kb_categories')).includes('plugin'), 'kb_categories.plugin ist noch da — zwei Wege');
+        assert.ok((await spalten('kb_articles')).includes('plugin'));
     });
 
     await pruefe('Lesen: Bereiche in ihrer Reihenfolge, die Startseite steht in keiner Liste', async () => {
@@ -574,7 +584,7 @@ function uebersetzer(locale) {
 
         // Der Satz für den Menschen.
         const router = ohneKommentare(lies('apps/dashboard/routes/admin/kb.router.js'));
-        assert.match(router, /artikelSpeichern\(req\.body \|\| \{\}, autor, bericht\)[\s\S]{0,260}zuVerweisen\(bericht\)/);
+        assert.match(router, /artikelSpeichern\(req\.body \|\| \{\}, autor, bericht, pluginNamen\(\)\)[\s\S]{0,260}zuVerweisen\(bericht\)/);
         assert.match(router, /bereichSpeichern\(req\.body \|\| \{\}, bericht\)[\s\S]{0,120}zuVerweisen\(bericht\)/);
 
         for (const id of [quelle, ziel, aehnlich]) await Wissen.artikelEntfernen(id);
