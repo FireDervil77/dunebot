@@ -20,7 +20,7 @@
 const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
-const { ohneKommentare } = require('./lib/quelltext');
+const { ohneKommentare, ohneKommentareEjs } = require('./lib/quelltext');
 
 const WURZEL = path.join(__dirname, '..');
 const DBService = require(path.join(WURZEL, 'packages/dunebot-db-client/lib/DBService'));
@@ -145,7 +145,7 @@ const warte = (ms) => new Promise((r) => setTimeout(r, ms));
             for (const k of ['ENABLED_STAMP', 'ENABLED_STAMP_BY', 'DISABLED_STAMP', 'DISABLED_STAMP_BY']) assert.ok(a[k], `${d}: ${k} fehlt`);
             assert.match(a.ENABLED_STAMP_BY, /\{\{datum\}\}.*\{\{wer\}\}/);
         }
-        const v = fs.readFileSync(path.join(WURZEL, 'apps/dashboard/themes/default/views/guild/plugins.ejs'), 'utf8');
+        const v = ohneKommentareEjs(fs.readFileSync(path.join(WURZEL, 'apps/dashboard/themes/default/views/guild/plugins.ejs'), 'utf8'));
         assert.strictEqual((v.match(/<%= p\.stempel %>/g) || []).length, 4, 'je zweimal für ein- und abgeschaltete');
     });
 

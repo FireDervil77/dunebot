@@ -322,7 +322,7 @@ async function pruefe(name, fn) {
         assert.match(r, /artikelSpeichern\(req\.body \|\| \{\}, autor, bericht, pluginNamen\(\), spiele\.map\(s => Number\(s\.id\)\)\)/);
         assert.match(r, /availablePlugins/);
         assert.match(lies('apps/dashboard/themes/default/views/admin/kb/artikel.ejs'), /<select class="form-select" id="aPlugin" name="plugin">/);
-        assert.ok(!/name="plugin"/.test(lies('apps/dashboard/themes/default/views/admin/kb/bereich.ejs')), 'das Feld am Bereich steht noch im Formular');
+        assert.ok(!/name="plugin"/.test(ohneKommentareEjs(lies('apps/dashboard/themes/default/views/admin/kb/bereich.ejs'))), 'das Feld am Bereich steht noch im Formular');
         assert.ok(!/\bplugin\b/.test(ohneKommentare(lies('apps/dashboard/helpers/Wissen.js')).split('function bereichSpeichern')[1].split('async function bereichEntfernen')[0]),
             'bereichSpeichern schreibt noch ein Plugin');
     });
@@ -345,7 +345,7 @@ async function pruefe(name, fn) {
             for (const e of fs.readdirSync(path.join(WURZEL, o), { withFileTypes: true })) {
                 const p = path.join(o, e.name);
                 if (e.isDirectory()) { if (!['node_modules', 'vendor'].includes(e.name)) sammle(p); continue; }
-                if (/\.(ejs|js)$/.test(e.name) && /["'`]\/documentation["'`/]/.test(lies(p))) treffer.push(p);
+                if (/\.(ejs|js)$/.test(e.name) && /["'`]\/documentation["'`/]/.test((e.name.endsWith('.ejs') ? ohneKommentareEjs : ohneKommentare)(lies(p)))) treffer.push(p);
             }
         })('apps/dashboard/themes');
         assert.deepStrictEqual(treffer, []);

@@ -16,6 +16,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { ohneKommentare } = require('./lib/quelltext');
 
 const SKRIPTE = __dirname;
 const SONDE = path.join(SKRIPTE, 'lib', 'projektions-sonde.js');
@@ -23,7 +24,7 @@ const selbst = path.basename(__filename);
 
 const waechter = fs.readdirSync(SKRIPTE)
     .filter(n => n.startsWith('check-') && n.endsWith('.js') && n !== selbst)
-    .filter(n => /register\(\s*['"]dbService['"]/.test(fs.readFileSync(path.join(SKRIPTE, n), 'utf8')));
+    .filter(n => /register\(\s*['"]dbService['"]/.test(ohneKommentare(fs.readFileSync(path.join(SKRIPTE, n), 'utf8'))));
 
 const lauf = (n, projiziert) => spawnSync(process.execPath, [path.join(SKRIPTE, n)], {
     env: { ...process.env, NODE_OPTIONS: `-r ${SONDE}`, SONDE_PROJIZIEREN: projiziert ? '1' : '0', SONDE_DATEI: '' },

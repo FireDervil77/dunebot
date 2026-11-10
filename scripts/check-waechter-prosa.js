@@ -212,14 +212,28 @@ function pruefeDatei(datei) {
     const inhaltsNamen = new Map(); // Name → { sauber, pfad }
     const befunde = [];
 
+    // Ein Leser, der selbst Kommentare entfernt
+    // (`const lies = (d) => ohneKommentare(fs.readFileSync(…))`), liefert keinen
+    // Rohtext. Bis 2026-11-10 galt jeder Aufruf von `lies` als roh, weil hier nur
+    // der Name ankam — check-plugin-stempel stand deshalb rot, obwohl es sauber
+    // las (K361). Erst alle Leser sammeln, dann die Bindungen werten: Die
+    // Reihenfolge im Text soll nicht entscheiden.
+    const saubereLeser = new Set();
     BINDUNG.lastIndex = 0;
     let m;
+    while ((m = BINDUNG.exec(code)) !== null) {
+        if (istFunktion(m[0]) && geschuetzt(anweisungUm(code, m.index))) saubereLeser.add(m[1]);
+    }
+    const ueberSauberenLeser = (ausdruck) => !/readFileSync/.test(ausdruck)
+        && [...saubereLeser].some(n => new RegExp(`\\b${n}\\s*\\(`).test(ausdruck));
+
+    BINDUNG.lastIndex = 0;
     while ((m = BINDUNG.exec(code)) !== null) {
         const anweisung = anweisungUm(code, m.index);
         if (istFunktion(m[0])) continue;
         const pfad = lesePfad(m[0]);
         if (pfad && KEIN_JS.test(pfad)) continue;
-        inhaltsNamen.set(m[1], { sauber: geschuetzt(anweisung), pfad });
+        inhaltsNamen.set(m[1], { sauber: geschuetzt(anweisung) || ueberSauberenLeser(m[2]), pfad });
     }
 
     const gemeldet = new Set();
@@ -241,7 +255,7 @@ function pruefeDatei(datei) {
     SUCHE_DIREKT.lastIndex = 0;
     while ((m = SUCHE_DIREKT.exec(code)) !== null) {
         const anweisung = anweisungUm(code, m.index);
-        if (geschuetzt(anweisung)) continue;
+        if (geschuetzt(anweisung) || ueberSauberenLeser(m[0])) continue;
         const pfad = lesePfad(anweisung);
         if (pfad && KEIN_JS.test(pfad)) continue;
         befunde.push({ zeile: zeileVon(code, m.index), name: '(ohne Namen)', pfad, stelle: kurz(anweisung) });
