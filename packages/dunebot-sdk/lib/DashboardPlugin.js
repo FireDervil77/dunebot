@@ -304,39 +304,19 @@ class DashboardPlugin {
     }
 
     /**
-     * Wird aufgerufen, wenn das Plugin in einer Guild deaktiviert wird
-     * Entfernt automatisch Permissions aus permission_definitions
-     * 
+     * Wird aufgerufen, wenn das Plugin in einer Guild deaktiviert wird — für
+     * das, was nur das Plugin kennt (Dateien, Gameserver, Daemon-Verzeichnisse).
+     *
+     * Leer mit Absicht. Rechte und Menü nimmt der Kern
+     * (PluginManager.disableInGuild, Schritte 4 und 5), die Zeilen der Guild
+     * nach `guildInhalte` in package.json. Bis 2026-11-10 nahm diese Methode
+     * die Rechte ein zweites Mal weg, und elf Plugins löschten hier ihr Menü
+     * selbst: Scheiterte danach das Löschen der Zeilen, blieb das Plugin an,
+     * aber ohne Menü (K341).
+     *
      * @param {string} guildId - ID der Guild
      */
-    async onGuildDisable(guildId) {
-        const Logger = ServiceManager.get('Logger');
-        Logger.debug(`Plugin ${this.name} in Guild ${guildId} deaktiviert`);
-        
-        // Automatische Permission-Entfernung
-        try {
-            const permissionManager = ServiceManager.get('permissionManager');
-            
-            Logger.info(`[Plugin ${this.name}] Unregistering permissions for guild ${guildId}...`);
-            
-            const result = await permissionManager.unregisterPluginPermissions(
-                this.name,
-                guildId
-            );
-            
-            // Die Meldung nannte bis zum 2026-08-09 `result.permissionsDeleted`
-            // und `result.groupsUpdated` — beides gibt es nicht, sie stand
-            // also immer mit zweimal `undefined` im Protokoll.
-            Logger.success(
-                `[Plugin ${this.name}] Rechte in Guild ${guildId} zurückgenommen: ` +
-                `${result.groupAssignmentsDeleted} Gruppenzuweisung(en), ` +
-                `${result.seedsCleared} Merkposten`
-            );
-        } catch (error) {
-            Logger.error(`[Plugin ${this.name}] Failed to unregister permissions for guild ${guildId}:`, error);
-            // Nicht werfen - Plugin sollte trotzdem deaktiviert werden
-        }
-    }
+    async onGuildDisable(guildId) {} // eslint-disable-line no-unused-vars
     
     /**
      * Lädt permissions.json aus dem Plugin-Verzeichnis

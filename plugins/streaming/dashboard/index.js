@@ -444,12 +444,12 @@ class StreamingDashboardPlugin extends DashboardPlugin {
     }
 
     /**
-     * Plugin in einer Guild deaktivieren - Navigation entfernen.
+     * Plugin in einer Guild deaktivieren.
      *
      * Die Zeilen der Guild löscht der Kern nach `guildInhalte` in package.json
-     * (K067, 2026-11-07); hier bleibt, was außerhalb der eigenen Tabellen liegt.
-     * Die Streamer stehen nicht in der Liste: Sie sind global
-     * (`heim_guild_id`, keine `guild_id`) und gehoeren anderen Guilds mit; wer
+     * (K067, 2026-11-07), Menü und Rechte nimmt er auch (K341). Die Streamer
+     * stehen nicht in der Liste: Sie sind global (`heim_guild_id`, keine
+     * `guild_id`) und gehoeren anderen Guilds mit; wer
      * sie hier loeschte, naehme fremden Servern ihre Ankuendigungen weg.
      * Die verwaisten Abos raeumt der taegliche Abgleich ab (Stufe 6).
      *
@@ -457,7 +457,6 @@ class StreamingDashboardPlugin extends DashboardPlugin {
      * @returns {Promise<boolean>} true bei Erfolg
      */
     async onGuildDisable(guildId) {
-        await ServiceManager.get('navigationManager').removeNavigation(this.name, guildId);
         ServiceManager.get('Logger').info(`[Streaming] Plugin fuer Guild ${guildId} deaktiviert (Streamer bleiben - sie sind global)`);
         return true;
     }

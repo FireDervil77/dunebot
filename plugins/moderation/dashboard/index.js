@@ -113,27 +113,9 @@ class ModerationPlugin extends DashboardPlugin {
         ServiceManager.get('Logger').info(`[Moderation] Plugin fuer Guild ${guildId} aktiviert`);
     }
 
-    /**
-     * Plugin in einer Guild deaktivieren
-     *
-     * Frueher stand hier ein handgeschriebenes DELETE auf `guild_nav_items`.
-     * Der NavigationManager kann das selbst und bleibt die eine Stelle, die
-     * diese Tabelle kennt.
-     *
-     * @param {string} guildId Discord-Guild-ID
-     */
-    async onGuildDisable(guildId) {
-        const Logger = ServiceManager.get('Logger');
-
-        try {
-            await ServiceManager.get('navigationManager').removeNavigation(this.name, guildId);
-            Logger.success(`[Moderation] Navigation fuer Guild ${guildId} entfernt`);
-            return true;
-        } catch (error) {
-            Logger.error(`[Moderation] Fehler beim Aufraeumen fuer Guild ${guildId}:`, error);
-            throw error;
-        }
-    }
+    // `onGuildDisable` entfällt (K341, 2026-11-10): Menü und Rechte nimmt der
+    // Kern (PluginManager.disableInGuild, Schritte 4 und 5), die Zeilen der Guild
+    // nach `guildInhalte` in package.json (K067).
 
     /**
      * Navigation registrieren.

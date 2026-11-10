@@ -152,7 +152,6 @@ class MasterserverDashboardPlugin extends DashboardPlugin {
         const Logger = ServiceManager.get('Logger');
         const dbService = ServiceManager.get('dbService');
         const ipmServer = ServiceManager.get('ipmServer');
-        const navigationManager = ServiceManager.get('navigationManager');
         
         try {
             Logger.warn(`[Masterserver] Deaktiviere Plugin für Guild ${guildId} - Cleanup starten...`);
@@ -246,9 +245,11 @@ class MasterserverDashboardPlugin extends DashboardPlugin {
             // ════════════════════════════════════════════════════════════
             
             // ════════════════════════════════════════════════════════════
-            // 6. Navigation entfernen (wird automatisch vom PluginManager gemacht)
+            // 6. Navigation: nimmt der Kern nach diesem Haken (Schritt 5 in
+            //    PluginManager.disableInGuild). Bis 2026-11-10 stand der Aufruf
+            //    auch hier — scheiterte danach das Löschen der Zeilen, blieb das
+            //    Plugin an, aber ohne Menü (K341).
             // ════════════════════════════════════════════════════════════
-            await navigationManager.removeNavigation(this.name, guildId);
             
             // ════════════════════════════════════════════════════════════
             // 7. Zusammenfassung & Warnungen

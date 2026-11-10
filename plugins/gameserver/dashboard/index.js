@@ -394,8 +394,6 @@ class GameserverPlugin extends DashboardPlugin {
         const [oeffentlich] = await dbService.query(
             'SELECT COUNT(*) AS anzahl FROM addon_marketplace WHERE guild_id = ? AND visibility = "public"', [guildId]);
         Logger.info(`[Gameserver] ${privat.affectedRows} private Pakete gelöscht, ${oeffentlich?.anzahl || 0} öffentliche bleiben`);
-
-        await ServiceManager.get('navigationManager').removeNavigation(this.name, guildId);
         return true;
     }
 

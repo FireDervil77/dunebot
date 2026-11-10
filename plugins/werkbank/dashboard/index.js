@@ -52,11 +52,9 @@ class WerkbankPlugin extends DashboardPlugin {
         ServiceManager.get('Logger').info(`[Werkbank] Plugin für Guild ${guildId} aktiviert`);
     }
 
-    async onGuildDisable(guildId) {
-        const navigationManager = ServiceManager.get('navigationManager');
-        await navigationManager.removeNavigation(this.name, guildId);
-        return true;
-    }
+    // `onGuildDisable` entfällt (K341, 2026-11-10): Menü und Rechte nimmt der
+    // Kern (PluginManager.disableInGuild, Schritte 4 und 5), die Zeilen der Guild
+    // nach `guildInhalte` in package.json (K067).
 
     /**
      * Navigation: ein Punkt, direkt unter dem Gameserver (4500) — Maschinen,

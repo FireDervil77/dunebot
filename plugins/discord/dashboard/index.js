@@ -95,24 +95,9 @@ class DiscordPlugin extends DashboardPlugin {
         Logger.info(`[Discord] Plugin für Guild ${guildId} aktiviert`);
     }
 
-    /**
-     * Plugin in einer Guild deaktivieren.
-     *
-     * @param {string} guildId Discord-Guild-ID
-     */
-    async onGuildDisable(guildId) {
-        const Logger = ServiceManager.get('Logger');
-        const navigationManager = ServiceManager.get('navigationManager');
-
-        try {
-            await navigationManager.removeNavigation(this.name, guildId);
-            Logger.success(`[Discord] Navigation für Guild ${guildId} entfernt`);
-            return true;
-        } catch (error) {
-            Logger.error(`[Discord] Fehler beim Aufräumen für Guild ${guildId}:`, error);
-            throw error;
-        }
-    }
+    // `onGuildDisable` entfällt (K341, 2026-11-10): Menü und Rechte nimmt der
+    // Kern (PluginManager.disableInGuild, Schritte 4 und 5), die Zeilen der Guild
+    // nach `guildInhalte` in package.json (K067).
 
     /**
      * Navigation registrieren.

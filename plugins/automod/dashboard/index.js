@@ -186,34 +186,9 @@ class AutoModPlugin extends DashboardPlugin {
     // `onUpdate` ist am 2026-11-09 entfallen (K028): Niemand rief den Haken auf.
     // Rechte und Navigation schreibt onGuildEnable bei jedem Start.
 
-    /**
-     * Plugin in einer Guild deaktivieren
-     *
-     * Entfernt die Navigation - und sonst nichts. Einstellungen, Strikes und
-     * Protokoll bleiben stehen, damit ein versehentliches Abschalten und
-     * Wiedereinschalten nicht die Arbeit von Monaten kostet.
-     *
-     * In den Modellen standen dafuer `deleteSettings`, `deleteAllStrikes` und
-     * `deleteAllLogs` bereit, mit dem Kommentar "z.B. bei Plugin-Deaktivierung".
-     * Keine davon hatte je einen Aufrufer; am 2026-08-10 wurden sie geloescht.
-     * Wenn Daten wirklich weg sollen, gehoert das in eine eigene, ausdrueckliche
-     * Aktion mit Rueckfrage - nicht stillschweigend an den Abschalter.
-     *
-     * @param {string} guildId Discord-Guild-ID
-     */
-    async onGuildDisable(guildId) {
-        const Logger = ServiceManager.get('Logger');
-        const navigationManager = ServiceManager.get('navigationManager');
-
-        try {
-            await navigationManager.removeNavigation(this.name, guildId);
-            Logger.success(`[AutoMod] Navigation fuer Guild ${guildId} entfernt`);
-            return true;
-        } catch (error) {
-            Logger.error(`[AutoMod] Fehler beim Aufraeumen fuer Guild ${guildId}:`, error);
-            throw error;
-        }
-    }
+    // `onGuildDisable` entfällt (K341, 2026-11-10): Menü und Rechte nimmt der
+    // Kern (PluginManager.disableInGuild, Schritte 4 und 5), die Zeilen der Guild
+    // nach `guildInhalte` in package.json (K067).
 
     /**
      * Navigation registrieren.

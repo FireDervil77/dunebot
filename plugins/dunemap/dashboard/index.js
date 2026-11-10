@@ -931,19 +931,9 @@ class DuneMapPlugin extends DashboardPlugin {
         }
     }
 
-    /**
-     * Plugin in einer Guild deaktivieren - Navigation entfernen.
-     *
-     * Die Zeilen der Guild löscht der Kern nach `guildInhalte` in package.json
-     * (K067, 2026-11-07); hier bleibt, was außerhalb der eigenen Tabellen liegt.
-     *
-     * @param {string} guildId Discord-Guild-ID
-     */
-    async onGuildDisable(guildId) {
-        await ServiceManager.get('navigationManager').removeNavigation(this.name, guildId);
-        ServiceManager.get('Logger').info(`[DuneMap] Plugin fuer Guild ${guildId} deaktiviert`);
-        return true;
-    }
+    // `onGuildDisable` entfällt (K341, 2026-11-10): Menü und Rechte nimmt der
+    // Kern (PluginManager.disableInGuild, Schritte 4 und 5), die Zeilen der Guild
+    // nach `guildInhalte` in package.json (K067).
 
 
     /**

@@ -1221,8 +1221,11 @@ class PluginManager extends BasePluginManager {
             try {
                 const permissionManager = ServiceManager.get('permissionManager');
                 if (permissionManager) {
-                    await permissionManager.unregisterPluginPermissions(pluginName, guildId);
-                    Logger.debug(`Permissions für Plugin ${pluginName} in Guild ${guildId} entfernt`);
+                    // Die Zahlen schrieb bis 2026-11-10 `DashboardPlugin.onGuildDisable`,
+                    // das die Rechte ein zweites Mal wegnahm (K341).
+                    const r = await permissionManager.unregisterPluginPermissions(pluginName, guildId);
+                    Logger.info(`Plugin ${pluginName}: Rechte in Guild ${guildId} zurückgenommen: ` +
+                        `${r?.groupAssignmentsDeleted ?? 0} Gruppenzuweisung(en), ${r?.seedsCleared ?? 0} Merkposten`);
                 } else {
                     Logger.warn('PermissionManager nicht verfügbar - Permissions konnten nicht entfernt werden');
                 }

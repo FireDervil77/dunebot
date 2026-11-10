@@ -199,18 +199,17 @@ class MusicDashboardPlugin extends DashboardPlugin {
     }
 
     /**
-     * Plugin in einer Guild deaktivieren - Navigation und hochgeladene Dateien.
+     * Plugin in einer Guild deaktivieren - hochgeladene Dateien.
      *
      * Die Zeilen der Guild löscht der Kern nach `guildInhalte` in package.json
-     * (K067, 2026-11-07); hier bleibt, was außerhalb der eigenen Tabellen liegt.
-     * Die Dateien liegen auf der Platte, nicht in einer Tabelle: Bis
+     * (K067, 2026-11-07), Menü und Rechte nimmt er auch (K341); hier bleibt, was
+     * außerhalb der eigenen Tabellen liegt. Die Dateien liegen auf der Platte, nicht in einer Tabelle: Bis
      * 2026-11-07 gingen nur die Eintraege in `music_files`, die Dateien unter
      * `uploads/musik/<guildId>/` blieben liegen.
      *
      * @param {string} guildId Discord-Guild-ID
      */
     async onGuildDisable(guildId) {
-        await ServiceManager.get('navigationManager').removeNavigation(this.name, guildId);
         const { entferneGuildVerzeichnis } = require('../shared/dateien');
         await entferneGuildVerzeichnis(guildId);
         ServiceManager.get('Logger').info(`[Musik] Plugin fuer Guild ${guildId} deaktiviert, hochgeladene Dateien entfernt`);

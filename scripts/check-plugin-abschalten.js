@@ -15,6 +15,11 @@
  *               und verliert nur Menü
  *   Abbruch     scheitert onGuildDisable oder das Löschen, bleibt das Plugin an
  *               und nichts weiter wird gelöscht (Betreiber 2026-11-07)
+ *   Menü        nimmt nur der Kern (Schritt 5), Rechte nur Schritt 4: Kein
+ *               `onGuildDisable` — Plugin oder Grundklasse — fasst beides an.
+ *               Bis 2026-11-10 löschten elf Plugins ihr Menü selbst; scheiterte
+ *               danach das Löschen der Zeilen, blieb das Plugin an, ohne Menü
+ *               (K341)
  *
  * Ob die Listen vollständig sind, prüft scripts/check-guild-inhalte.js.
  *
@@ -121,7 +126,11 @@ function formular(name, d) {
         assert.ok(namen.length >= 8, `nur ${namen.length} Plugins im Dialog`);
         for (const n of namen) {
             assert.ok(de[`DISABLE_GOES_${n.toUpperCase()}`] && en[`DISABLE_GOES_${n.toUpperCase()}`], `Text für ${n} fehlt`);
-            assert.match(lies(`plugins/${n}/dashboard/index.js`), /async onGuildDisable/);
+            // Was der Dialog ankündigt, löscht der Kern nach `guildInhalte` oder das
+            // Plugin in `onGuildDisable` — seit K341 haben nicht mehr alle eins.
+            const eigen = /async onGuildDisable/.test(ohneKommentare(lies(`plugins/${n}/dashboard/index.js`)));
+            const liste = JSON.parse(lies(`plugins/${n}/package.json`)).guildInhalte?.loeschen || [];
+            assert.ok(eigen || liste.length, `${n}: der Dialog kündigt Inhalte an, gelöscht wird nichts`);
         }
     });
 
@@ -180,6 +189,7 @@ function formular(name, d) {
         assert.ok(r.abfragen.findIndex(q => /probe_kind/.test(q)) < r.abfragen.findIndex(q => /probe_tabelle/.test(q)),
             'Reihenfolge der Liste nicht gehalten');
         assert.strictEqual(r.abgeschaltet, 1);
+        assert.deepStrictEqual(r.menue, [['probe', '222']], 'Menü nicht genau einmal vom Kern entfernt');
     });
 
     await pruefe('Abbruch: scheitert onGuildDisable, bleibt das Plugin an und nichts wird gelöscht', async () => {
@@ -198,6 +208,7 @@ function formular(name, d) {
             await assert.rejects(schalteAb('222'), /probe: Löschen der Inhalte gescheitert, das Plugin bleibt an/);
             assert.strictEqual(abgeschaltet, 0);
             assert.ok(!abfragen.some(q => /^DELETE FROM configs/.test(q)), 'Konfiguration trotz Fehlschlag gelöscht');
+            assert.deepStrictEqual(menue, [], 'das Menü ging trotz Fehlschlag');
         } finally { zeilenFehler = null; }
     });
 
@@ -207,6 +218,44 @@ function formular(name, d) {
         assert.strictEqual(r.geloescht, 0, 'onGuildDisable lief in der Kontroll-Guild');
         assert.deepStrictEqual(r.abfragen.filter(q => /^DELETE/i.test(q)), [], 'in der Kontroll-Guild wurde gelöscht');
         assert.deepStrictEqual(r.menue, [['probe', '111']]);
+    });
+
+    // ── Menü und Rechte nur im Kern (K341) ───────────────────────────────
+    // Der Text der Methode (Kommentare vorher entfernt): von `onGuildDisable(` bis zur
+    // schließenden Klammer auf gleicher Tiefe. Klammern in Zeichenketten
+    // stehen in diesen Dateien paarig (Vorlagen `${…}`).
+    function rumpf(code, datei) {
+        const m = /\basync\s+onGuildDisable\s*\([^)]*\)\s*\{/.exec(code);
+        if (!m) return null;
+        let tiefe = 1, i = m.index + m[0].length;
+        for (; i < code.length && tiefe; i++) {
+            if (code[i] === '{') tiefe++;
+            else if (code[i] === '}') tiefe--;
+        }
+        assert.strictEqual(tiefe, 0, `${datei}: Ende von onGuildDisable nicht gefunden`);
+        return code.slice(m.index, i);
+    }
+    await pruefe('Menü und Rechte nimmt nur der Kern: kein onGuildDisable ruft removeNavigation oder unregisterPluginPermissions (K341)', async () => {
+        const dateien = fs.readdirSync(path.join(WURZEL, 'plugins'))
+            .map(p => `plugins/${p}/dashboard/index.js`)
+            .filter(rel => fs.existsSync(path.join(WURZEL, rel)));
+        dateien.push('packages/dunebot-sdk/lib/DashboardPlugin.js');
+        assert.ok(dateien.length > 10, `nur ${dateien.length} Dateien gefunden`);
+        const funde = [];
+        let gelesen = 0;
+        for (const rel of dateien) {
+            const r = rumpf(ohneKommentare(lies(rel)), rel);
+            if (r === null) continue;
+            gelesen++;
+            for (const name of ['removeNavigation', 'unregisterPluginPermissions']) {
+                if (r.includes(name)) funde.push(`${rel}: ${name}`);
+            }
+        }
+        assert.ok(gelesen >= 5, `nur ${gelesen} onGuildDisable gelesen — findet die Suche sie noch?`);
+        assert.deepStrictEqual(funde, [], `${funde.length} Stellen: ${funde.join(' · ')}`);
+        const kern = ohneKommentare(lies('apps/dashboard/helpers/PluginManager.js'));
+        assert.ok(/navigationManager\.removeNavigation\(pluginName, guildId\)/.test(kern), 'Kern-Schritt 5 fehlt');
+        assert.ok(/unregisterPluginPermissions\(pluginName, guildId\)/.test(kern), 'Kern-Schritt 4 fehlt');
     });
 
     // ── Gameserver: jeder Server über Loeschung ──────────────────────────
