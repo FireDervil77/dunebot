@@ -42,13 +42,19 @@ module.exports = {
         // wirklich noch nicht. `IF NOT EXISTS` kennt MySQL bei ADD COLUMN
         // nicht durchgaengig, deshalb die Abfrage von Hand statt eines
         // Fehlers, der wie ein kaputter Umzug aussieht.
-        const [vorhanden] = await db.query(`
+        //
+        // Korrigiert 2026-11-10 (K110): Hier stand `const [vorhanden] = …` und
+        // danach `Number(vorhanden)`. Der DBService liefert die Zeilen direkt;
+        // bei vorhandener Spalte war `vorhanden` eine Zeile, `Number(Zeile)`
+        // NaN, `!NaN` wahr — ein Wiederholungslauf nach einem Abbruch weiter
+        // unten hätte die Spalte ein zweites Mal angelegt und geworfen.
+        const vorhanden = await db.query(`
             SELECT COLUMN_NAME FROM information_schema.COLUMNS
              WHERE TABLE_SCHEMA = DATABASE()
                AND TABLE_NAME = 'streaming_targets'
                AND COLUMN_NAME = 'abo_rolle_id'
         `);
-        const schonDa = Array.isArray(vorhanden) ? vorhanden.length : Number(vorhanden || 0);
+        const schonDa = vorhanden.length > 0;
 
         if (!schonDa) {
             await db.query(`

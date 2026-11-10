@@ -5,11 +5,19 @@ module.exports = {
 
     async up(db) {
         // Prüfe ob alte Spalten noch existieren (title VARCHAR statt title_translations)
-        const [columns] = await db.query(`
+        //
+        // Korrigiert 2026-11-10 (K110): Hier stand `const [columns] = …`. Der
+        // DBService liefert die Zeilen direkt, `[columns]` war also nur die
+        // ERSTE Spalte (`id`). Folge auf einer frischen Datenbank: Schritt 1
+        // sah weder `title` noch `message`, die Baseline-Spalten blieben mit
+        // NOT NULL stehen, und jede neue Benachrichtigung aus /admin wäre an
+        // `title` gescheitert. Die laufende Datenbank war nicht betroffen
+        // (gemessen: dort gibt es `title` nicht mehr).
+        const columns = await db.query(`
             SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'notifications'
         `);
-        const colNames = (Array.isArray(columns) ? columns : [columns]).map(c => c.COLUMN_NAME);
+        const colNames = columns.map(c => c.COLUMN_NAME);
 
         // 1. Alte Spalten → neue JSON-Spalten migrieren
         if (colNames.includes('title') && !colNames.includes('title_translations')) {

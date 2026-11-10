@@ -61,7 +61,11 @@ module.exports = {
     description: 'packages: visibility und guild_id entfernen — ein Katalog für alle (E4)',
 
     async up(db) {
-        const [spalten] = await db.query("SHOW COLUMNS FROM packages LIKE 'visibility'");
+        // Korrigiert 2026-11-10 (K110): Hier stand `const [spalten] = …`. Der
+        // DBService liefert die Zeilen direkt; `[spalten]` war die erste Zeile
+        // oder `undefined`, und `.length` warf, sobald die Spalte schon fehlte.
+        // Der erste Lauf ging gut, weil die Spalte da war.
+        const spalten = await db.query("SHOW COLUMNS FROM packages LIKE 'visibility'");
         if (spalten.length === 0) return; // schon geschehen
 
         // 1. Die Bedingung, die beide Spalten liest
@@ -77,7 +81,7 @@ module.exports = {
     },
 
     async down(db) {
-        const [spalten] = await db.query("SHOW COLUMNS FROM packages LIKE 'visibility'");
+        const spalten = await db.query("SHOW COLUMNS FROM packages LIKE 'visibility'");
         if (spalten.length > 0) return; // schon geschehen
 
         await db.query(`

@@ -24,7 +24,10 @@ module.exports = {
                  WHERE table_schema = DATABASE() AND table_name = 'greeting_settings' AND column_name = ?`,
                 [col.name]
             );
-            if (existing[0]?.cnt === 0 || existing?.cnt === 0) {
+            // `[existing]` ist die erste Zeile (der DBService liefert Zeilen
+            // direkt). Bis 2026-11-10 stand hier zusätzlich `existing[0]?.cnt`
+            // für den Fall einer Liste — den es nie gab (K110).
+            if (Number(existing?.cnt) === 0) {
                 await db.query(`ALTER TABLE greeting_settings ADD COLUMN ${col.name} ${col.def}`);
             }
         }
