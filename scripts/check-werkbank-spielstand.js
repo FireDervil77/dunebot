@@ -158,6 +158,18 @@ const lies = (...teile) => fs.readFileSync(path.join(...teile), 'utf8');
             const davor = kopie(S.entwurfAlsPaket(sitzung, liste));
             gleich(davor.files, paket.files, 'schon das Zusammensetzen ändert files');
             gleich(davor.management, paket.management, 'schon das Zusammensetzen ändert management');
+
+            // **Fassungen von vor K356 (2026-11-10)** tragen Welten ohne game/
+            // oder data/ vorn. Die Karte nimmt sie nicht mehr an - und muss dem
+            // Betreiber die Zeile nennen, die er ändern soll. Ist die neue
+            // Fassung freigegeben, läuft das Paket wieder den Weg unten.
+            const alteWelten = (m.saves || []).filter(w => !/^(game|data)\/./.test(String(w)));
+            if (alteWelten.length) {
+                const zeile = alteWelten[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                await wirft(() => S.dateiteilSpeichern(sitzung, formular(stand)), new RegExp(`„${zeile}" — der Ort beginnt mit game/`));
+                console.log(`      (alte Fassung ${paket.identity.version}: Welten ${alteWelten.join(', ')} — neue Fassung mit game/ oder data/ einliefern)`);
+                return;
+            }
             await S.dateiteilSpeichern(sitzung, formular(stand));
             const danach = S.entwurfAlsPaket(sitzung, liste);
             gleich(danach, davor, 'unverändert gespeichert, und das Paket ist anders');
@@ -241,8 +253,15 @@ const lies = (...teile) => fs.readFileSync(path.join(...teile), 'utf8');
         await wirft(() => mit('/home/container/saves'), /ohne führenden Schrägstrich/);
         await wirft(() => mit('../saves'), /aus dem Volume/);
         await wirft(() => mit(Array.from({ length: S.DATEITEIL.max.welten + 1 }, (_, i) => `w${i}`).join('\n')), /höchstens/);
-        await mit('{{setting:level_name}}\n.config/unity3d/IronGate/Valheim/worlds_local');
-        gleich(s.entwurf.management.saves, ['{{setting:level_name}}', '.config/unity3d/IronGate/Valheim/worlds_local']);
+        // K356 (2026-11-10): ab der Wurzel des Volumes, game/ oder data/ vorn.
+        // Die Formen von vorher (Minecraft, Valheim, Factorio) werden abgewiesen.
+        await wirft(() => mit('{{setting:level_name}}'), /beginnt mit game\/ .*oder data\//);
+        await wirft(() => mit('.config/unity3d/IronGate/Valheim/worlds_local'), /beginnt mit game\//);
+        await wirft(() => mit('saves'), /beginnt mit game\//);
+        await wirft(() => mit('cache/saves'), /beginnt mit game\//);
+        await wirft(() => mit('game/'), /beginnt mit game\//);
+        await mit('game/{{setting:level_name}}\ndata/.config/unity3d/IronGate/Valheim/worlds_local');
+        gleich(s.entwurf.management.saves, ['game/{{setting:level_name}}', 'data/.config/unity3d/IronGate/Valheim/worlds_local']);
     });
     await pruefe('Umleitung: von game/ nach data/, ein Ordner, nichts doppelt, nichts ineinander', async () => {
         const s = frisch();
@@ -341,9 +360,30 @@ const lies = (...teile) => fs.readFileSync(path.join(...teile), 'utf8');
             assert.ok(!/management\??\.update\b/.test(ohneKommentare(lies(helfer, datei))), `${datei} liest management.update`);
         }
     });
+    await pruefe('Serverübersicht: Welten mit den Werten des Servers und ihrer Wurzel (K356)', async () => {
+        const { bauePaketkarte } = require('../plugins/gameserver/dashboard/helpers/Serverseite');
+        const paket = {
+            management: { saves: ['game/{{setting:level_name}}', 'data/.config/x', 'saves', 'game/{{setting:pw}}', 'game/{{setting:leer}}'] },
+            settings: [{ key: 'level_name', type: 'text', default: 'welt' }, { key: 'pw', type: 'password', default: 'a' },
+                       { key: 'leer', type: 'text' }],
+        };
+        const welten = (werte) => bauePaketkarte({ paket_werte: JSON.stringify(werte) }, paket, null).welten;
+        gleich(welten({ level_name: 'Insel', pw: 'geheim' }), [
+            { pfad: 'game/Insel', wurzel: 'game' },
+            { pfad: 'data/.config/x', wurzel: 'data' },
+            { pfad: 'saves', wurzel: null },
+            { pfad: 'game/{{setting:pw}}', wurzel: 'game' },
+            { pfad: 'game/{{setting:leer}}', wurzel: 'game' },
+        ]);
+        // Nie gespeichert: es gilt die Vorgabe, wie beim Start.
+        assert.strictEqual(welten({})[0].pfad, 'game/welt');
+        assert.strictEqual(bauePaketkarte({}, { management: {} }, null).welten, null);
+    });
     await pruefe('Dashboard: die Sperrliste liest der Dateimanager, die Welten die Serverübersicht', async () => {
         assert.match(ohneKommentare(lies(WURZEL, 'plugins/gameserver/dashboard/helpers/Sperrliste.js')), /paket\?\.files\?\.denylist/);
-        assert.match(ohneKommentare(lies(WURZEL, 'plugins/gameserver/dashboard/helpers/Serverseite.js')), /welten:\s+paket\.management\?\.saves/);
+        const seite = ohneKommentare(lies(WURZEL, 'plugins/gameserver/dashboard/helpers/Serverseite.js'));
+        assert.match(seite, /welten:\s+baueWelten\(paket,\s*server\)/);
+        assert.match(seite, /function baueWelten[\s\S]{0,200}paket\?\.management\?\.saves/);
         // Ein Eintrag, den die Karte annimmt, sperrt im Dateimanager auch wirklich.
         const { gesperrt } = require('../plugins/gameserver/dashboard/helpers/Sperrliste');
         assert.strictEqual(gesperrt('/game/bin/x64/factorio', ['bin']), true);

@@ -595,7 +595,19 @@
         <% if (u.paket.welten) { %>
           <div style="display:flex;gap:10px;padding:5px 0">
             <div class="fb-muted" style="flex:0 0 74px">Welten</div>
-            <div class="fb-mono" style="word-break:break-all"><%= u.paket.welten.join(', ') %></div>
+            <div style="min-width:0">
+              <%# K356: je Ort der Pfad mit den Werten des Servers, darunter die Wurzel in Worten. %>
+              <% u.paket.welten.forEach(function (w) { %>
+                <div style="margin-bottom:4px">
+                  <div class="fb-mono" style="word-break:break-all"><%= w.pfad %></div>
+                  <div class="fb-muted" style="font-size:12px">
+                    <%= w.wurzel === 'game' ? 'im Spielordner (game/), dort startet das Spiel'
+                      : w.wurzel === 'data' ? 'im Datenordner (data/), HOME des Spiels'
+                      : 'Wurzel unklar — alte Paketfassung' %>
+                  </div>
+                </div>
+              <% }); %>
+            </div>
           </div>
         <% } %>
       </div>

@@ -813,7 +813,7 @@
       "password_variable": "RCON_PASSWORD"
     },
     "saves": [
-      "{{setting:level_name}}"
+      "game/{{setting:level_name}}"
     ]
   },
   "files": {

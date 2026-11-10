@@ -240,6 +240,21 @@ function wirktFelder(bed) {
                 const datei = path.join(ordner, `${slug}.json`);
                 fs.writeFileSync(datei, JSON.stringify(neu));
                 const tor = einl.bestehtPruefung(datei);
+                // **Fassungen von vor K356 (2026-11-10)** nennen Welten ohne
+                // game/ oder data/ vorn. Das Tor hält sie jetzt an - und muss
+                // genau diese Zeile nennen. Erst die neue Fassung (game/… oder
+                // data/…) geht wieder durch; dann gilt der Satz unten.
+                const alteWelten = (paket.management?.saves || []).filter(w => !/^(game|data)\/./.test(String(w)));
+                if (alteWelten.length) {
+                    assert.ok(!tor.ok, 'das Tor lässt Welten ohne game/ oder data/ durch: ' + alteWelten.join(', '));
+                    // Fehlerzeilen sind vier Leerzeichen tief eingerückt; die
+                    // sechs tiefen mit „·" sind Hinweise aus status.open.
+                    const fehler = einl.grundZeilen(tor.text || '').filter(z => /^ {4}\S/.test(z));
+                    assert.ok(fehler.length > 0 && fehler.every(z => /^ {4}Schema: \/management\/saves\/\d+ should match pattern/.test(z)),
+                        'das Tor hält die alte Fassung (auch) aus einem anderen Grund an: ' + fehler.slice(0, 3).join(' | '));
+                    console.log(`      (alte Fassung ${paket.identity.version}: Welten ${alteWelten.join(', ')} — das Tor hält sie an, neue Fassung einliefern)`);
+                    return;
+                }
                 assert.ok(tor.ok, einl.grundZeilen(tor.text || '').slice(0, 3).join(' | '));
             } finally { fs.rmSync(ordner, { recursive: true, force: true }); }
         });

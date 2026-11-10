@@ -1238,6 +1238,39 @@ function baueKanal(server, paket) {
     };
 }
 
+/**
+ * Wo die Welten liegen (`management.saves`), so dass man sie findet (K356).
+ *
+ * Bis zum 2026-11-10 stand hier die Liste roh: Bei Minecraft wörtlich
+ * „{{setting:level_name}}", und ob ein Ort unter game/ oder data/ liegt, sagte
+ * die Zeile nicht. Seitdem gilt (Entscheidung Betreiber): Jeder Eintrag beginnt
+ * ab der Wurzel des Volumes mit game/ oder data/ - die Werkbank weist anderes
+ * ab. Fassungen von vorher tragen noch andere Wurzeln; die bekommen keine
+ * geratene, sondern „unklar".
+ *
+ * Verweise `{{setting:<key>}}` werden mit den Werten gefüllt, die beim Start
+ * gelten (`geltendeWerte`). Ein Kennwort wird nie eingesetzt.
+ *
+ * @returns {Array<{pfad: string, wurzel: 'game'|'data'|null}>|null}
+ */
+function baueWelten(paket, server) {
+    const liste = paket?.management?.saves;
+    if (!Array.isArray(liste) || liste.length === 0) return null;
+
+    const werte = geltendeWerte(paket, server);
+    const art = Object.fromEntries((paket.settings || []).map(e => [e.key, e.type]));
+
+    return liste.map(roh => {
+        const pfad = String(roh).replace(/\{\{setting:([a-z][a-z0-9_]*)\}\}/g, (ganz, key) => {
+            if (art[key] === 'password') return ganz;
+            const wert = werte[key];
+            return (wert === undefined || wert === null || wert === '') ? ganz : String(wert);
+        });
+        const m = /^(game|data)\//.exec(pfad);
+        return { pfad, wurzel: m ? m[1] : null };
+    });
+}
+
 function bauePaketkarte(server, paket, zeile) {
     if (!paket) return null;
     const img = paket.image || {};
@@ -1251,7 +1284,7 @@ function bauePaketkarte(server, paket, zeile) {
         // Woher die Dateien kommen — der erste Installationsschritt.
         quelle:  (paket.install?.steps || []).map(s =>
                     s.type === 'steamcmd' ? 'steamcmd · App ' + s.app : s.type).join(', ') || null,
-        welten:  paket.management?.saves || null,
+        welten:  baueWelten(paket, server),
         // Was das Spiel selbst über sich sagt (Stufe 10 S3) — nur, wenn das
         // Paket die Datei nennt und sie gelesen wurde; sonst steht nichts da.
         spiel:   server?.spielfassung_build

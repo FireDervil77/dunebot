@@ -3715,7 +3715,18 @@ function dateiteilAusFormular(b) {
 
     const welten = zeilenListe(b?.saves);
     if (welten.length > DATEITEIL.max.welten) throw new Error(`Welten: höchstens ${DATEITEIL.max.welten} Einträge.`);
-    for (const w of welten) pruefeVolumePfad(w, 'Welten');
+    for (const w of welten) {
+        pruefeVolumePfad(w, 'Welten');
+        // **Ab der Wurzel des Volumes, mit game/ oder data/ vorn** (K356,
+        // Entscheidung Betreiber 2026-11-10). Bis dahin stand hier jede
+        // Wurzel: Minecraft nannte den Weltordner relativ zum Startordner,
+        // Valheim `.config/…` relativ zu HOME, Astro Colony `data/saves` ab
+        // dem Volume - und die Serverseite konnte nicht sagen, wo die Welt
+        // liegt. Dieselbe Bedingung wie bei den Umleitungen.
+        if (!/^(game|data)\/./.test(w)) {
+            throw new Error(`Welten: „${w}" — der Ort beginnt mit game/ (Spielordner, dort startet das Spiel) oder data/ (HOME des Spiels). Beispiele: game/{{setting:level_name}}, data/.config/unity3d/IronGate/Valheim/worlds_local.`);
+        }
+    }
 
     const roh = Array.isArray(b?.persist) ? b.persist : [];
     const umleitungen = [];

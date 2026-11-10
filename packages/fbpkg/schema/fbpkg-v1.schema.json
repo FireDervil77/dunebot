@@ -1420,9 +1420,10 @@
         "saves": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^(game|data)/."
           },
-          "description": "Wo der Spielstand liegt. ACHTUNG, das ist KEINE Anweisung an die Sicherung: Die tart das ganze Serververzeichnis und hat den Spielstand ohnehin (nachgesehen 2026-08-31). Gelesen wird das Feld an genau einer Stelle — der Serverseite, die es als \"Welten\" anzeigt. Wer Erhaltenswertes aus dem ersetzbaren game/ herausholen will, braucht `persist`."
+          "description": "Wo der Spielstand liegt, ab der Wurzel des Volumes: game/… (Spielordner, dort startet das Spiel) oder data/… (HOME des Spiels). Verweise wie game/{{setting:level_name}} fuellt die Serverseite mit den Werten des Servers (K356, 2026-11-10; vorher stand jede Wurzel hier). ACHTUNG, das ist KEINE Anweisung an die Sicherung: Die tart das ganze Serververzeichnis und hat den Spielstand ohnehin (nachgesehen 2026-08-31). Gelesen wird das Feld an genau einer Stelle — der Serverseite, die es als \"Welten\" anzeigt. Wer Erhaltenswertes aus dem ersetzbaren game/ herausholen will, braucht `persist`."
         },
         "persist": {
           "type": "array",

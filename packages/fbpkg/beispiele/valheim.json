@@ -1188,7 +1188,7 @@
       "port": "query"
     },
     "saves": [
-      ".config/unity3d/IronGate/Valheim/worlds_local"
+      "data/.config/unity3d/IronGate/Valheim/worlds_local"
     ],
     "update": {
       "type": "steamcmd",

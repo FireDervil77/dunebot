@@ -960,12 +960,13 @@
           <div class="row g-3">
             <div class="col-md-6">
               <div class="form-label"><label for="spielstandWelten">Welten</label><%- include('werkbank-hilfe', { text:
-                'Wo der Spielstand liegt, je Zeile ein Ort — so, wie er in der Serverübersicht unter „Welten" stehen soll. '
+                'Wo der Spielstand liegt, je Zeile ein Ort ab der Wurzel des Volumes: game/… (der Spielordner, dort startet das Spiel) oder data/… (HOME des Spiels, dort landet z. B. ~/.config). '
+                + 'Verweise auf Einstellungen gehen: game/{{setting:level_name}}. Die Serverübersicht zeigt den Ort mit den Werten des Servers. '
                 + 'Das ist eine Auskunft für den Betreiber und sonst nichts: Die Sicherung nimmt ohnehin das ganze Verzeichnis, und umgeleitet wird hierdurch nichts. '
                 + 'Mit einer Umleitung steht hier ihr Ziel (data/saves).' }) %></div>
               <textarea class="form-control font-monospace" id="spielstandWelten" name="saves" rows="3" spellcheck="false"
-                        placeholder="data/saves"><%= dt.welten.join('\n') %></textarea>
-              <div class="form-hint">Wird in der Serverübersicht angezeigt.</div>
+                        placeholder="game/saves"><%= dt.welten.join('\n') %></textarea>
+              <div class="form-hint">Beginnt mit game/ oder data/. Wird in der Serverübersicht angezeigt.</div>
             </div>
             <div class="col-md-6">
               <div class="form-label"><label for="spielstandSperren">Sperrliste im Dateimanager</label><%- include('werkbank-hilfe', { text:

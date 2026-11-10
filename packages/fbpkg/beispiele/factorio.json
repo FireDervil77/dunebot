@@ -322,7 +322,7 @@
       "password_variable": "RCON_PASSWORD"
     },
     "saves": [
-      "saves"
+      "game/saves"
     ]
   },
   "files": {
