@@ -33,52 +33,94 @@ class NotificationManager {
     }
 
     /**
-     * Fügt eine neue Benachrichtigung hinzu
-     * @param {Object} notification Benachrichtigungs-Objekt
-     * @returns {Promise<Object>} Die erstellte Benachrichtigung
+     * Eine Meldung in `notifications` anlegen.
+     *
+     * **Der einzige Weg in die Tabelle.** Bis zum 2026-11-10 schrieb diese
+     * Funktion in Spalten, die es seit der Mehrsprachigkeit (Migration
+     * 20260327_111415) nicht mehr gibt (`_id`, `title`, `message`), und der
+     * Admin-Bereich hatte drei eigene `INSERT` daneben (K360). Jetzt rufen die
+     * ihn hier.
+     *
+     * @param {Object} translations `{title, message, action_text}`, je `{ 'de-DE': …, 'en-GB': … }`
+     * @param {Object} [metadata] type, category, action_url, expiry, roles,
+     *   delivery_method (JSON-Text), target_guild_ids (JSON-Text), discord_channel_id
+     * @returns {Promise<{id: number, daten: Object}>} neue Kennung und die
+     *   aufbereiteten Daten (für den Discord-Versand per IPC)
      */
-    async addNotification(notification) {
-        const Logger = ServiceManager.get('Logger');
-        const dbService = ServiceManager.get('dbService');
-
-        try {
-            const result = await dbService.query(`
-                INSERT INTO notifications 
-                (_id, title, message, type, expiry, roles, action_url)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            `, [
-                notification._id || null,
-                notification.title,
-                notification.message,
-                notification.type || 'info',
-                notification.expiry || null,
-                JSON.stringify(notification.roles || null),
-                notification.action_url || null
-            ]);
-
-            return result;
-        } catch (error) {
-            Logger.error('Fehler beim Erstellen der Benachrichtigung:', error);
-            throw error;
-        }
+    async addNotification(translations, metadata = {}) {
+        const daten = this.#aufbereiten(translations, metadata);
+        const result = await ServiceManager.get('dbService').query(`
+            INSERT INTO notifications
+            (title_translations, message_translations, action_text_translations,
+             type, category, action_url, expiry, roles, dismissed,
+             delivery_method, target_guild_ids, discord_channel_id,
+             created_at, updated_at)
+            VALUES (?,?,?,?,?,?,?,?,0,?,?,?,NOW(),NOW())
+        `, this.#spalten(daten));
+        return { id: result.insertId, daten };
     }
 
     /**
-     * Prüft, ob eine Update-Benachrichtigung für eine bestimmte Version existiert
-     * @param {string} version
-     * @returns {Promise<boolean>}
+     * Eine Meldung ändern. Was schon in Discord steht, bleibt dort stehen.
+     *
+     * @param {number|string} id Kennung
+     * @param {Object} translations wie bei `addNotification`
+     * @param {Object} [metadata] wie bei `addNotification`
+     * @returns {Promise<boolean>} true, wenn es die Zeile gab
      */
-    async notificationExistsForVersion(version) {
-        const dbService = ServiceManager.get('dbService');
-        const result = await dbService.query(
-            `SELECT COUNT(*) AS count FROM notifications 
-            WHERE type = 'info' 
-            AND title = 'Update verfügbar!' 
-            AND message LIKE ? 
-            AND (expiry IS NULL OR expiry > NOW())`,
-            [`%${version}%`]
-        );
-        return result[0].count > 0;
+    async updateNotification(id, translations, metadata = {}) {
+        const daten = this.#aufbereiten(translations, metadata);
+        const result = await ServiceManager.get('dbService').query(`
+            UPDATE notifications SET title_translations=?, message_translations=?,
+            action_text_translations=?, type=?, category=?, action_url=?, expiry=?, roles=?,
+            delivery_method=?, target_guild_ids=?, discord_channel_id=?, updated_at=NOW()
+            WHERE id=?
+        `, [...this.#spalten(daten), id]);
+        return Number(result?.affectedRows) > 0;
+    }
+
+    /**
+     * Eine Meldung löschen. Was schon in Discord steht, bleibt dort stehen.
+     *
+     * @param {number|string} id Kennung
+     * @returns {Promise<boolean>} true, wenn es die Zeile gab
+     */
+    async deleteNotification(id) {
+        const result = await ServiceManager.get('dbService').query(
+            'DELETE FROM notifications WHERE id = ?', [id]);
+        return Number(result?.affectedRows) > 0;
+    }
+
+    /**
+     * @param {Object} translations Übersetzungen
+     * @param {Object} metadata Metadaten
+     * @returns {Object} Zeile, wie sie in die Tabelle geht
+     */
+    #aufbereiten(translations, metadata) {
+        const { prepareNotificationForDB } = require('./utils/NotificationHelper');
+        return prepareNotificationForDB(translations || {}, {
+            ...metadata,
+            type: metadata.type || 'info',
+            // Dieselben Vorgaben wie die Tabelle selbst.
+            category: metadata.category || 'announcement',
+            delivery_method: metadata.delivery_method || '["dashboard"]',
+            action_url: metadata.action_url || null,
+            expiry: metadata.expiry || null,
+            roles: Array.isArray(metadata.roles) ? JSON.stringify(metadata.roles) : (metadata.roles || null),
+            target_guild_ids: metadata.target_guild_ids || null,
+            discord_channel_id: metadata.discord_channel_id || null,
+            dismissed: 0
+        });
+    }
+
+    /**
+     * @param {Object} d aufbereitete Zeile
+     * @returns {Array} Werte in der Spaltenfolge von INSERT und UPDATE
+     */
+    #spalten(d) {
+        return [d.title_translations, d.message_translations, d.action_text_translations,
+            d.type, d.category, d.action_url, d.expiry, d.roles,
+            d.delivery_method, d.target_guild_ids, d.discord_channel_id];
     }
 
     /**

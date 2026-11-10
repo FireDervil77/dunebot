@@ -211,6 +211,11 @@ async function pruefe(was, tun) {
         const echteDb = ServiceManager.get('dbService');
         ServiceManager.register('dbService', { query: async (sql, p) => { geschrieben.push(sql.replace(/\s+/g, ' ').trim().slice(0, 40)); return /INSERT INTO notifications/.test(sql) ? { insertId: 77 } : /admin_settings/.test(sql) ? [{ value: '{"channel_id":"1"}' }] : { insertId: 5 }; } });
         ServiceManager.register('ipcServer', { broadcastOne: async (name, daten) => { gesendet.push({ name, url: daten.action_url }); } });
+        // Seit K360 (2026-11-10) legt die Route die Meldung über den Manager an,
+        // nicht mehr mit eigenem INSERT. Der echte Manager schreibt über die
+        // dbService-Attrappe oben - dieselbe Mitschrift wie vorher.
+        const NotificationManager = require(path.join(__dirname, '..', 'packages/dunebot-sdk/lib/NotificationManager'));
+        ServiceManager.register('notificationManager', new NotificationManager());
         try {
             const inhalt = require('../apps/dashboard/routes/admin/content.router.js');
             const speichern = inhalt.stack.find(s => s.route && s.route.path === '/news/save' && s.route.methods.post).route.stack.slice(-1)[0].handle;

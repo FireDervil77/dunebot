@@ -702,26 +702,13 @@ router.post('/news/save', async (req, res) => {
                     target_guild_ids: resolvedGuildId ? JSON.stringify([resolvedGuildId]) : null,
                     discord_channel_id: resolvedChannelId
                 };
-                const notifData = NotificationHelper.prepareNotificationForDB(notifTranslations, notifMeta);
-
-                const notifResult = await dbService.query(`
-                    INSERT INTO notifications
-                    (title_translations, message_translations, action_text_translations,
-                     type, category, action_url, expiry, roles, dismissed,
-                     delivery_method, target_guild_ids, discord_channel_id,
-                     created_at, updated_at)
-                    VALUES (?,?,?,?,?,?,?,?,0,?,?,?,NOW(),NOW())
-                `, [notifData.title_translations, notifData.message_translations,
-                    notifData.action_text_translations, notifData.type,
-                    notifMeta.category, notifData.action_url, notifData.expiry,
-                    notifData.roles, notifMeta.delivery_method,
-                    notifMeta.target_guild_ids, notifMeta.discord_channel_id]);
+                const { id: notifId, daten: notifData } = await ServiceManager.get('notificationManager').addNotification(notifTranslations, notifMeta);
 
                 // Discord-Post via IPC
                 if (wantDiscord) {
                     const ipcServer = ServiceManager.get('ipcServer');
                     await ipcServer.broadcastOne('dashboard:SEND_NOTIFICATION', {
-                        id: notifResult.insertId, ...notifData, ...notifMeta,
+                        id: notifId, ...notifData, ...notifMeta,
                         base_url: baseUrl
                     }, true);
                 }
@@ -819,38 +806,17 @@ router.post('/notifications/save', async (req, res) => {
             target_guild_ids: resolvedGuildId ? JSON.stringify([resolvedGuildId]) : null,
             discord_channel_id: resolvedChannelId
         };
-        const notificationData = NotificationHelper.prepareNotificationForDB(translations, metadata);
-
         if (notificationId) {
-            await dbService.query(`
-                UPDATE notifications SET title_translations=?, message_translations=?,
-                action_text_translations=?, type=?, category=?, action_url=?, expiry=?, roles=?,
-                delivery_method=?, target_guild_ids=?, discord_channel_id=?, updated_at=NOW()
-                WHERE id=?
-            `, [notificationData.title_translations, notificationData.message_translations,
-                notificationData.action_text_translations, notificationData.type,
-                metadata.category, notificationData.action_url, notificationData.expiry, notificationData.roles,
-                metadata.delivery_method, metadata.target_guild_ids, metadata.discord_channel_id,
-                notificationId]);
+            await ServiceManager.get('notificationManager').updateNotification(notificationId, translations, metadata);
             return res.json({ success: true, message: 'Notification erfolgreich aktualisiert' });
         } else {
-            const result = await dbService.query(`
-                INSERT INTO notifications
-                (title_translations, message_translations, action_text_translations,
-                 type, category, action_url, expiry, roles, dismissed,
-                 delivery_method, target_guild_ids, discord_channel_id,
-                 created_at, updated_at)
-                VALUES (?,?,?,?,?,?,?,?,0,?,?,?,NOW(),NOW())
-            `, [notificationData.title_translations, notificationData.message_translations,
-                notificationData.action_text_translations, notificationData.type,
-                metadata.category, notificationData.action_url, notificationData.expiry, notificationData.roles,
-                metadata.delivery_method, metadata.target_guild_ids, metadata.discord_channel_id]);
+            const { id: resultId, daten: notificationData } = await ServiceManager.get('notificationManager').addNotification(translations, metadata);
 
             if (needsDiscord) {
                 const ipcServer = ServiceManager.get('ipcServer');
                 try {
                     await ipcServer.broadcastOne('dashboard:SEND_NOTIFICATION', {
-                        id: result.insertId, ...notificationData, ...metadata,
+                        id: resultId, ...notificationData, ...metadata,
                         base_url: process.env.DASHBOARD_BASE_URL || ''
                     }, true);
                 } catch (ipcError) {
@@ -875,9 +841,8 @@ router.post('/notifications/save', async (req, res) => {
 
 router.post('/notifications/delete/:id', async (req, res) => {
     const Logger = ServiceManager.get('Logger');
-    const dbService = ServiceManager.get('dbService');
     try {
-        await dbService.query('DELETE FROM notifications WHERE id = ?', [req.params.id]);
+        await ServiceManager.get('notificationManager').deleteNotification(req.params.id);
         res.json({ success: true, message: 'Notification erfolgreich gelöscht' });
     } catch (error) {
         Logger.error('[Content] Fehler beim Löschen der Notification:', error);
@@ -1116,20 +1081,7 @@ router.post('/changelogs/save', async (req, res) => {
                     target_guild_ids: resolvedGuildId ? JSON.stringify([resolvedGuildId]) : null,
                     discord_channel_id: resolvedChannelId
                 };
-                const notificationData = NotificationHelper.prepareNotificationForDB(announcementTranslations, announcementMeta);
-
-                const result = await dbService.query(`
-                    INSERT INTO notifications
-                    (title_translations, message_translations, action_text_translations,
-                     type, category, action_url, expiry, roles, dismissed,
-                     delivery_method, target_guild_ids, discord_channel_id,
-                     created_at, updated_at)
-                    VALUES (?,?,?,?,?,?,?,?,0,?,?,?,NOW(),NOW())
-                `, [notificationData.title_translations, notificationData.message_translations,
-                    notificationData.action_text_translations, notificationData.type,
-                    announcementMeta.category, notificationData.action_url, notificationData.expiry,
-                    notificationData.roles, announcementMeta.delivery_method,
-                    announcementMeta.target_guild_ids, announcementMeta.discord_channel_id]);
+                const { id: resultId } = await ServiceManager.get('notificationManager').addNotification(announcementTranslations, announcementMeta);
 
                 if (wantDiscord) {
                     const ipcServer = ServiceManager.get('ipcServer');
@@ -1139,7 +1091,7 @@ router.post('/changelogs/save', async (req, res) => {
                         discordTranslations, announcementMeta
                     );
                     await ipcServer.broadcastOne('dashboard:SEND_NOTIFICATION', {
-                        id: result.insertId, ...discordData, ...announcementMeta,
+                        id: resultId, ...discordData, ...announcementMeta,
                         base_url: baseUrl
                     }, true);
                 }

@@ -214,6 +214,17 @@ module.exports = class App {
                 Logger.error('[Migration] Fehler bei Kern-Migrationen:', err);
             }
 
+            // Abgelaufene Meldungen löschen: beim Start und einmal am Tag. Nach
+            // den Migrationen, damit die Tabelle sicher steht. Bis zum
+            // 2026-11-10 hatte `cleanupExpiredNotifications` keinen Aufrufer
+            // (K360); Fehler protokolliert die Funktion selbst.
+            const meldungenAufraeumen = async () => {
+                const n = await this.app.notificationManager?.cleanupExpiredNotifications?.();
+                if (n) Logger.info(`[Notifications] ${n} abgelaufene Meldung(en) gelöscht`);
+            };
+            meldungenAufraeumen();
+            setInterval(meldungenAufraeumen, 24 * 60 * 60 * 1000).unref();
+
             // Plugins laden (Plugin-Migrationen laufen in enablePlugin())
             await this.loadPlugins();
             
