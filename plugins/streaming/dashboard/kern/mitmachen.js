@@ -374,16 +374,26 @@ const losTakt = new Map();
 /**
  * Was diese Guild an Verlosungen hat.
  *
- * **Ohne Wissen ueber das andere Plugin.** Steht kein Dienst in der Registry,
- * gibt es das Verlosungs-Plugin auf dieser Anlage nicht; liefert
- * `offeneVerlosung` nichts, laeuft gerade keine, die den Stream-Weg zulaesst.
- * Der Unterschied zwischen beidem ist das, was der Streamer hier lesen soll -
- * „gibt es nicht" schickt ihn auf die Plugin-Seite, „gerade keine" nicht.
+ * Ist das Verlosungs-Plugin in **dieser Guild** aus, gibt es hier keine
+ * Verlosungen; liefert `offeneVerlosung` nichts, laeuft gerade keine, die den
+ * Stream-Weg zulaesst. Der Unterschied zwischen beidem ist das, was der
+ * Streamer hier lesen soll - „gibt es nicht" schickt ihn auf die Plugin-Seite,
+ * „gerade keine" nicht.
+ *
+ * **Der Eintrag in der Registry beantwortet das nicht.** Er steht im ganzen
+ * Prozess, sobald das Plugin in irgendeiner Guild geladen ist (K367). Bis zum
+ * 2026-11-10 fragte diese Seite nur ihn: Eine Guild ohne Verlosungen las
+ * „gerade keine" und bekam keinen Weg zur Plugin-Seite. Gefragt wird deshalb
+ * dieselbe Schranke, die auch `!los` im Chat sperrt (`befehle.verfuegbar`) -
+ * eine Antwort fuer Seite und Chat, nicht zwei.
  *
  * @param {string} guildId Guild
  * @returns {Promise<{moeglich: boolean, offen: Object|null, lose: number}>} Stand
  */
 async function verlosungsstand(guildId) {
+    const stand = await require('./befehle').verfuegbar(guildId, 'ticket');
+    if (!stand.ok) return { moeglich: false, offen: null, lose: 0 };
+
     const { LosquellenRegistry } = require('dunebot-sdk');
     const dienst = LosquellenRegistry.dienst();
     if (!dienst) return { moeglich: false, offen: null, lose: 0 };
@@ -416,7 +426,9 @@ async function losZiehen(k) {
 
     // **Steht hier kein Dienst, gibt es das Verlosungs-Plugin nicht.** Das ist
     // etwas anderes als "gerade laeuft keine Verlosung", und der Zuschauer
-    // soll den Unterschied hoeren.
+    // soll den Unterschied hoeren. Ob es in der Heim-Guild an ist, hat
+    // `befehle.fertigAntwort` schon vor diesem Aufruf geprueft (`braucht`) -
+    // der Eintrag hier steht prozessweit und weiss das nicht (K367).
     const dienst = LosquellenRegistry.dienst();
     if (!dienst) return 'Gewinnspiele gibt es auf diesem Server nicht.';
 

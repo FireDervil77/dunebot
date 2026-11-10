@@ -81,6 +81,10 @@ function neuAufsetzen(welche = {}) {
     welt.art = welche.art !== undefined ? welche.art
         : { ok: true, abgelehnt: false, art: 'affiliate', grund: null };
     welt.lose = welche.lose !== undefined ? welche.lose : 0;
+    // In welchen Guilds das Verlosungs-Plugin an ist (K367). Der Eintrag in
+    // der Registry steht prozessweit; diese Liste ist die Antwort je Guild.
+    welt.giveawayAn = welche.giveawayAn !== undefined ? welche.giveawayAn : ['g1'];
+    welt.pluginFragen = [];
 
     mitschrift.abfragen = []; mitschrift.schreibzugriffe = [];
     mitschrift.unbekannt = []; mitschrift.twitch = [];
@@ -88,6 +92,13 @@ function neuAufsetzen(welche = {}) {
 
 ServiceManager.register('Logger', {
     info: () => {}, debug: () => {}, warn: () => {}, error: () => {}, success: () => {}
+});
+
+ServiceManager.register('pluginManager', {
+    async isPluginEnabledForGuild(plugin, guildId) {
+        welt.pluginFragen.push(`${plugin}@${guildId}`);
+        return plugin === 'giveaway' && welt.giveawayAn.includes(guildId);
+    }
 });
 
 ServiceManager.register('dbService', {
@@ -468,6 +479,23 @@ console.log('\nDie Verlosung: „gibt es nicht" und „gerade keine" sind zwei S
     pruefe(b.verlosung.moeglich === true && b.verlosung.offen === null,
         'mit Dienst, aber ohne laufende: moeglich ja, offen nein',
         JSON.stringify(b.verlosung));
+
+    // --- Dienst da, aber in dieser Guild aus (K367) -----------------------
+    //
+    // **Der Eintrag steht prozessweit.** Ist das Verlosungs-Plugin in einer
+    // anderen Guild an, steht der Dienst auch hier. Bis zum 2026-11-10 las die
+    // Seite dann „gerade keine" statt „gibt es hier nicht", und der Weg zur
+    // Plugin-Seite fehlte.
+    neuAufsetzen({ giveawayAn: ['andere-guild'] });
+    let gefragt = false;
+    LosquellenRegistry.dienstSetzen({ offeneVerlosung: async () => { gefragt = true; return null; } });
+    b = await mitmachen.zustand('g1');
+    pruefe(b.verlosung.moeglich === false,
+        'Dienst eingetragen, Plugin in dieser Guild aus: gibt es hier nicht',
+        JSON.stringify(b.verlosung));
+    pruefe(welt.pluginFragen.includes('giveaway@g1'),
+        'gefragt wird die eigene Guild', welt.pluginFragen.join(', '));
+    pruefe(!gefragt, 'und der Dienst gar nicht erst');
 
     // --- Eine laeuft ------------------------------------------------------
     neuAufsetzen({ lose: 3 });
