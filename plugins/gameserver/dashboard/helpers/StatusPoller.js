@@ -75,14 +75,6 @@ class StatusPoller {
         Logger.success('[StatusPoller] Status-Poller gestartet.');
     }
 
-    /** Stoppt den Poller. */
-    stop() {
-        if (this._timer) clearInterval(this._timer);
-        this._timer = null;
-        this._started = false;
-        ServiceManager.get('Logger')?.info('[StatusPoller] Status-Poller gestoppt.');
-    }
-
     // ────────────────────────────────────────────────────────────
     // Interesse (von Routen/Views gemeldet)
     // ────────────────────────────────────────────────────────────

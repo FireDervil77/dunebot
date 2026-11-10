@@ -91,7 +91,7 @@ const START_VERZOEGERUNG_MS = 60_000;
 let laeuftGerade = false;
 let anreicherungLaeuft = false;
 let tagLaeuft = false;
-let uhren = [];
+const uhren = [];
 
 /**
  * Abonnentenlisten auffrischen und Rollen abgleichen.
@@ -1061,14 +1061,4 @@ async function tagesLauf() {
     }
 }
 
-/**
- * Takt anhalten.
- *
- * @returns {void}
- */
-function anhalten() {
-    uhren.forEach(u => clearInterval(u));
-    uhren = [];
-}
-
-module.exports = { TAKT_MS, ANREICHERN_MS, ANSAGE_WARTEN_MS, TAG_MS, alsDatum, starten, anhalten, posteingangLauf, anreicherungsLauf, ansagenLauf, tagesLauf, rollenAuffaechern, chatAnsageVormerken, verarbeiten };
+module.exports = { TAKT_MS, ANREICHERN_MS, ANSAGE_WARTEN_MS, TAG_MS, alsDatum, starten, posteingangLauf, anreicherungsLauf, ansagenLauf, tagesLauf, rollenAuffaechern, chatAnsageVormerken, verarbeiten };

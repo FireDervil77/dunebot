@@ -190,7 +190,7 @@ function weicheBeziehungen(plugins) {
                     // „bieten" oder „nutzen" ist. Bei den Losquellen tun beide
                     // Plugins beides, und eine Einteilung waere dort erfunden.
                     const eintrag = karte.get(stelle);
-                    const topf = /^(register|unregister|dienstSetzen|dienstEntfernen)$/.test(m[1])
+                    const topf = /^(register|unregister|dienstSetzen)$/.test(m[1])
                         ? eintrag.bietet : eintrag.nutzt;
                     topf.add(`${p.ordner} (${m[1]})`);
                 }

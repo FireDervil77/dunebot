@@ -26,18 +26,6 @@ class GiveawayBotPlugin extends BotPlugin {
 
         Logger.success('[Giveaway] Plugin aktiviert');
     }
-
-    async onDisable(client) {
-        const Logger = ServiceManager.get('Logger');
-        Logger.info('[Giveaway] Plugin wird deaktiviert...');
-
-        if (client.giveawayManager) {
-            client.giveawayManager.destroy();
-            delete client.giveawayManager;
-        }
-
-        Logger.success('[Giveaway] Plugin deaktiviert');
-    }
 }
 
 module.exports = new GiveawayBotPlugin();

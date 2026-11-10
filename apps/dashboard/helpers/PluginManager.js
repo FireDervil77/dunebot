@@ -928,51 +928,6 @@ class PluginManager extends BasePluginManager {
         }
     }
 
-    async disablePlugin(pluginName) {
-        // ServiceManager bereit stellen
-        const Logger = ServiceManager.get("Logger");
-        const dbService = ServiceManager.get('dbService');
-
-        // "before_disable_plugin" Hook aufrufen
-        await this.hooks.doAction('before_disable_plugin', pluginName);
-        
-        try {
-            const plugin = this.getPlugin(pluginName);
-            
-            if (!plugin) {
-                Logger.warn(`Plugin ${pluginName} not enabled, cannot disable.`);
-                return;
-            }
-            
-            // Plugin-spezifische onDisable-Methode aufrufen
-            if (plugin.onDisable) {
-                // "before_plugin_disable_method" Hook aufrufen
-                await this.hooks.doAction('before_plugin_disable_method', pluginName, plugin);
-                
-                await plugin.onDisable(this.app, dbService);
-                
-                // "after_plugin_disable_method" Hook aufrufen
-                await this.hooks.doAction('after_plugin_disable_method', pluginName, plugin);
-            }
-            
-            // Plugin aus registrierten Plugins entfernen
-            this.removePlugin(pluginName);
-            
-            // ENABLED_PLUGINS System ist obsolet - guild_plugins Tabelle nutzt jetzt Plugin-Status
-            
-            Logger.success(`Disabled plugin: ${pluginName}`);
-            
-            // "after_disable_plugin" Hook aufrufen
-            await this.hooks.doAction('after_disable_plugin', pluginName);
-            
-        } catch (error) {
-            // "disable_plugin_failed" Hook aufrufen
-            await this.hooks.doAction('disable_plugin_failed', pluginName, error);
-            Logger.error(`Failed to disable plugin ${pluginName}:`, error);
-            throw error;
-        }
-    }
-
     /**
      * Plugin für eine bestimmte Guild aktivieren
      * @param {string} pluginName - Name des zu aktivierenden Plugins

@@ -59,7 +59,6 @@ class BotPlugin {
 
         // Callback-Methoden
         this.onEnable = data.onEnable || this.onEnable;
-        this.onDisable = data.onDisable || this.onDisable;
         this.onGuildEnable = data.onGuildEnable || this.onGuildEnable;
         this.onGuildDisable = data.onGuildDisable || this.onGuildDisable;
         
@@ -369,48 +368,6 @@ class BotPlugin {
     }
 
     /**
-     * Deaktiviert das Plugin
-     * Bereinigt Referenzen und führt Plugin-spezifische Aufräumarbeiten durch
-     * 
-     * @param {import('discord.js').Client} botClient - Discord.js Client
-     * @returns {Promise<void>}
-     * @author FireBot Team
-     */
-    async disable(botClient) {
-        const Logger = ServiceManager.get('Logger');
-        const dbService = ServiceManager.get('dbService');
-
-        try {
-            // Cleanup
-            this.eventHandlers.clear();
-            this.commands.clear();
-            this.contexts.clear();
-            this.prefixCount = 0;
-            this.slashCount = 0;
-
-            // DBService cleanup - nur ausführen, wenn die Methode existiert
-            if (dbService && typeof dbService.close === 'function') {
-                Logger.debug(`Schließe DBService für Plugin ${this.name}`);
-                await dbService.close();
-            } else {
-                // Keine Aktion notwendig, nur ein Debug-Log
-                Logger.debug(`Kein DBService.close für Plugin ${this.name} verfügbar`);
-            }
-
-            // Plugin-spezifische Cleanup
-            if (this.onDisable) {
-                Logger.debug(`Führe onDisable für Plugin ${this.name} aus`);
-                await this.onDisable(botClient);
-            }
-            
-            Logger.debug(`Plugin ${this.name} erfolgreich deaktiviert`);
-        } catch (error) {
-            Logger.error(`Failed to disable plugin ${this.name} in BotPlugin:`, error);
-            throw error;
-        }
-    }
-
-    /**
      * Reload-Methode für Plugin-Komponenten
      * Lädt Schemas, Models, Commands und Events neu ohne Server-Restart
      * 
@@ -659,10 +616,6 @@ class BotPlugin {
 
         if (data.onEnable && typeof data.onEnable !== "function") {
             throw new Error("BotPlugin onEnable must be a function");
-        }
-
-        if (data.onDisable && typeof data.onDisable !== "function") {
-            throw new Error("BotPlugin onDisable must be a function");
         }
 
         if (data.onGuildEnable && typeof data.onGuildEnable !== "function") {

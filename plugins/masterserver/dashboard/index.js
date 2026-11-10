@@ -61,24 +61,10 @@ class MasterserverDashboardPlugin extends DashboardPlugin {
 
         // Alte Daemon-Logs abräumen und täglich dranbleiben.
         await this._raeumeDaemonLogs();
-        this.logAufraeumer = setInterval(() => this._raeumeDaemonLogs(), 24 * 60 * 60 * 1000);
-        this.logAufraeumer.unref?.();
+        const logAufraeumer = setInterval(() => this._raeumeDaemonLogs(), 24 * 60 * 60 * 1000);
+        logAufraeumer.unref?.();
 
         Logger.success('[Masterserver] Dashboard-Plugin aktiviert');
-        return true;
-    }
-
-    /**
-     * Plugin deaktivieren (System-weit)
-     */
-    async onDisable() {
-        const Logger = ServiceManager.get('Logger');
-        Logger.info('Deaktiviere [Masterserver] Dashboard-Plugin...');
-
-        if (this.logAufraeumer) {
-            clearInterval(this.logAufraeumer);
-            this.logAufraeumer = null;
-        }
         return true;
     }
 

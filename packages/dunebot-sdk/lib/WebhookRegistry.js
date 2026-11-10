@@ -50,7 +50,8 @@ function register(name, handler) {
 }
 
 /**
- * Eintrag entfernen - beim Abschalten eines Plugins.
+ * Eintrag entfernen, Gegenstück zu `register`. Plugins rufen es nicht: Ein
+ * geladenes Plugin bleibt bis zum Neustart im Prozess (K366).
  *
  * @param {string} name Name
  * @returns {boolean} true, wenn etwas entfernt wurde

@@ -1041,17 +1041,9 @@ function starten() {
     log().info(`[Streaming] Ausgang gestartet (${JE_LAUF} Auftraege je ${TAKT_MS} ms)`);
 }
 
-/**
- * @returns {void}
- */
-function anhalten() {
-    if (uhr) clearInterval(uhr);
-    uhr = null;
-}
-
 module.exports = {
     TAKT_MS, JE_LAUF, HOECHSTVERSUCHE, HOECHSTVERSUCHE_AUFRAEUMEN, BOT_FRIST_MS, BRAUCHT_KANAL,
     ABSTAND_HOECHST_S, ABSTAND_HOECHST_S_AUFRAEUMEN, versuchsGrenze, abstandS,
-    starten, anhalten, lauf, auswaehlen, abarbeiten, ausfuehren, chatAnsageSenden,
+    starten, lauf, auswaehlen, abarbeiten, ausfuehren, chatAnsageSenden,
     istEndgueltig, istWeg, kanalstau
 };

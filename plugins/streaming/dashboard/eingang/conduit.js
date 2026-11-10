@@ -69,7 +69,6 @@ let wache = null;
 /** @type {NodeJS.Timeout|null} */
 let neuerVersuch = null;
 let fehlversuche = 0;
-let beendet = false;
 
 /**
  * Was ueber den Chat hereinkam - **Zahlen, kein Inhalt.**
@@ -205,7 +204,6 @@ function wacheStellen(sekunden) {
  * @returns {void}
  */
 function neuAufbauen(adresse = EINSTIEG) {
-    if (beendet) return;
     if (wache) { clearTimeout(wache); wache = null; }
     if (draht) {
         // Zuhoerer abraeumen, sonst loest das eigene `close` einen zweiten
@@ -307,7 +305,6 @@ async function verarbeiten(nachricht) {
  * @returns {void}
  */
 function verbinden(adresse = EINSTIEG) {
-    if (beendet) return;
 
     draht = new WebSocket(adresse);
 
@@ -327,7 +324,6 @@ function verbinden(adresse = EINSTIEG) {
 
     draht.on('close', (code, grund) => {
         stand.verbunden = false;
-        if (beendet) return;
         log().warn(`[Streaming/Conduit] Leitung zu (${code} ${grund || ''}) — neu aufbauen`);
         neuAufbauen();
     });
@@ -350,8 +346,6 @@ function verbinden(adresse = EINSTIEG) {
  * @returns {Promise<boolean>} true, wenn die Leitung aufgebaut wird
  */
 async function starten() {
-    beendet = false;
-
     let conduit;
     try {
         conduit = await twitch.conduitSichern(SHARDS);
@@ -384,24 +378,4 @@ async function starten() {
     return true;
 }
 
-/**
- * Den Eingang beenden - fuer Abschalten des Plugins und fuer Tests.
- *
- * @returns {void}
- */
-function beenden() {
-    beendet = true;
-    // Die Zaehler gehen mit: Sie sagen "seit dem Start der Leitung", und eine
-    // Zahl, die eine abgerissene Leitung ueberlebt, behauptet mehr als sie weiss.
-    chat.clear();
-    if (wache) { clearTimeout(wache); wache = null; }
-    if (neuerVersuch) { clearTimeout(neuerVersuch); neuerVersuch = null; }
-    if (draht) {
-        draht.removeAllListeners();
-        try { draht.close(); } catch { /* schon zu */ }
-        draht = null;
-    }
-    stand.verbunden = false;
-}
-
-module.exports = { starten, beenden, zustand, EINSTIEG, SHARDS, WARTEN_MS };
+module.exports = { starten, zustand, EINSTIEG, SHARDS, WARTEN_MS };

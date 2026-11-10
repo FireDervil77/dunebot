@@ -47,16 +47,6 @@ class GreetingDashboardPlugin extends DashboardPlugin {
     }
 
     /**
-     * Plugin deaktivieren (System-weit)
-     */
-    async onDisable() {
-        const Logger = ServiceManager.get('Logger');
-        Logger.info('Deaktiviere Greeting Plugin...');
-        // Cleanup bei Bedarf
-        return true;
-    }
-
-    /**
      * Routen einrichten
      * Unterscheidet zwischen Base-Level (selten) und Guild-Level (häufig)
      * 

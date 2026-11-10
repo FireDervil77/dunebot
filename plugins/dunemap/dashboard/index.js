@@ -821,28 +821,6 @@ class DuneMapPlugin extends DashboardPlugin {
     }  
     
     /**
-     * Plugin deaktivieren und Tabellen entfernen
-     */
-    async onDisable() {
-        const Logger = ServiceManager.get('Logger');
-        const dbService = ServiceManager.get('dbService');
-        
-        try {
-            Logger.info('Deaktiviere [DuneMap] Plugin und entferne Tabellen...');
-            
-            // Tabellen in umgekehrter Reihenfolge löschen (wegen Foreign Keys)
-            //await dbService.query('DROP TABLE IF EXISTS dunemap_storm_timer');
-            //await dbService.query('DROP TABLE IF EXISTS dunemap_markers');
-            
-            Logger.success('[DuneMap] Tabellen erfolgreich entfernt');
-            return true;
-        } catch (error) {
-            Logger.error('Fehler beim Entfernen der [DuneMap] Tabellen:', error);
-            throw error;
-        }
-    }
-    
-    /**
      * Registriert guild-spezifische Navigation
      * Wird aufgerufen, wenn das Plugin in einer Guild aktiviert wird
      * @param {string} guildId - Discord Guild ID

@@ -91,15 +91,4 @@ function starten() {
     uhr.unref?.();
 }
 
-/**
- * Den Aufraeumer stoppen.
- *
- * @returns {void}
- */
-function stoppen() {
-    if (!uhr) return;
-    clearInterval(uhr);
-    uhr = null;
-}
-
-module.exports = { starten, stoppen, einmalAufraeumen };
+module.exports = { starten, einmalAufraeumen };

@@ -146,14 +146,6 @@ class AutoModPlugin extends DashboardPlugin {
     }
 
     /**
-     * Plugin deaktivieren
-     */
-    async onDisable() {
-        ServiceManager.get('Logger').info('[AutoMod] Dashboard-Plugin deaktiviert');
-        return true;
-    }
-
-    /**
      * Plugin in einer Guild aktivieren
      *
      * @param {string} guildId Discord-Guild-ID

@@ -425,7 +425,9 @@ async function einstellungenLesen(name, ctx, logger = null) {
 }
 
 /**
- * Eintrag entfernen - beim Abschalten eines Plugins.
+ * Eintrag entfernen, Gegenstück zu `register`. Plugins rufen es nicht: Ein
+ * geladenes Plugin bleibt bis zum Neustart im Prozess (K366). Die Wächter
+ * räumen damit ihre Proben ab.
  *
  * **Die Verknuepfungen bleiben.** Ein abgeschaltetes Plugin ist kein Widerruf:
  * Der Benutzer hat seine Zugehoerigkeit belegt, und das bleibt wahr, auch

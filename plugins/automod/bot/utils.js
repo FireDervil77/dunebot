@@ -79,19 +79,6 @@ function starteVerlaufAufraeumer() {
 }
 
 /**
- * Stoppt den Aufraeumer und leert den Verlauf (fuer `onDisable`).
- *
- * @returns {void}
- */
-function stoppeVerlaufAufraeumer() {
-    if (aufraeumUhr) {
-        clearInterval(aufraeumUhr);
-        aufraeumUhr = null;
-    }
-    nachrichtenVerlauf.clear();
-}
-
-/**
  * Traegt eine Nachricht in den Verlauf ein und prueft beide Spam-Muster.
  *
  * Anders als frueher wird der Eintrag **bei jeder** Nachricht geschrieben, nicht
@@ -311,6 +298,5 @@ module.exports = {
     ohneEinladungen,
     istBefehlsnachricht,
     starteVerlaufAufraeumer,
-    stoppeVerlaufAufraeumer,
     shouldModerate,
 };

@@ -57,7 +57,6 @@ class DashboardPlugin {
         
         // Callback-Methoden
         this.onEnable = data.onEnable || this.onEnable;
-        this.onDisable = data.onDisable || this.onDisable;
         this.onGuildEnable = data.onGuildEnable || this.onGuildEnable;
         this.onGuildDisable = data.onGuildDisable || this.onGuildDisable;
         
@@ -96,16 +95,6 @@ class DashboardPlugin {
             Logger.error(`Failed to enable plugin ${this.name}:`, error);
             throw error;
         }
-    }
-
-    /**
-     * Wird aufgerufen, wenn das Plugin deaktiviert wird
-     * @param {Object} app - Express App-Instanz
-     * @param {Object} dbService - Datenbank-Service
-     */
-    async onDisable(app) {
-        const Logger = ServiceManager.get('Logger');
-        Logger.debug(`Plugin ${this.name} deaktiviert`);
     }
 
     /**
@@ -512,10 +501,6 @@ class DashboardPlugin {
 
         if (data.onEnable && typeof data.onEnable !== "function") {
             throw new Error("DashboardPlugin onEnable must be a function");
-        }
-
-        if (data.onDisable && typeof data.onDisable !== "function") {
-            throw new Error("DashboardPlugin onDisable must be a function");
         }
 
         if (data.onGuildEnable && typeof data.onGuildEnable !== "function") {

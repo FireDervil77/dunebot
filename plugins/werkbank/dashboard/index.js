@@ -42,11 +42,6 @@ class WerkbankPlugin extends DashboardPlugin {
         return true;
     }
 
-    async onDisable() {
-        ServiceManager.get('Logger').info('[Werkbank] Dashboard-Plugin deaktiviert');
-        return true;
-    }
-
     async onGuildEnable(guildId) {
         await this._registerNavigation(guildId);
         ServiceManager.get('Logger').info(`[Werkbank] Plugin für Guild ${guildId} aktiviert`);

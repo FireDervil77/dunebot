@@ -36,23 +36,6 @@ class ModerationBotPlugin extends BotPlugin {
         Logger.success('Moderation-Plugin aktiviert');
     }
 
-    /**
-     * Wird aufgerufen, wenn das Plugin deaktiviert wird
-     * 
-     * @param {import('discord.js').Client} client - Discord.js Client
-     * @returns {Promise<void>}
-     * @author FireBot Team
-     */
-    async onDisable(client) {
-        const Logger = ServiceManager.get("Logger");
-        Logger.info('Moderation-Plugin wird deaktiviert...');
-        
-        // Keine Tabellen löschen hier - das macht das Dashboard-Plugin
-        // Bot-Plugin kümmert sich nur um Commands/Events cleanup
-
-        Logger.success('Moderation-Plugin deaktiviert');
-    }
-
 
     /**
      * Wird aufgerufen, wenn das Plugin für eine bestimmte Guild aktiviert wird

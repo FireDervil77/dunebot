@@ -409,31 +409,6 @@ class StreamingDashboardPlugin extends DashboardPlugin {
     }
 
     /**
-     * @returns {Promise<boolean>} true bei Erfolg
-     */
-    async onDisable() {
-        try {
-            require('../shared/lose').abmelden();
-            require('./kern/takt').anhalten();
-            require('./ausgabe/drossel').anhalten();
-            require('./ausgabe/strom').anhalten();
-            // **Die Leitung muss ausdruecklich zu.** Ein WebSocket haelt den
-            // Vorgang am Leben und baut sich nach jedem Abriss selbst wieder
-            // auf - ein abgeschaltetes Plugin haette sonst eine Verbindung,
-            // die niemand mehr abfragt und die trotzdem weiterlaeuft.
-            require('./eingang/conduit').beenden();
-        } catch { /* beim Abschalten ist ein stehengebliebener Takt das kleinere Uebel */ }
-
-        WebhookRegistry.unregister('streaming');
-        // Der Anbieter verschwindet, die Verknuepfungen bleiben. Ein
-        // abgeschaltetes Plugin ist kein Widerruf — der Benutzer hat seine
-        // Zugehoerigkeit belegt, und das bleibt wahr. Loesen darf nur er.
-        VerbindungsRegistry.unregister('twitch');
-        ServiceManager.get('Logger').info('[Streaming] Dashboard-Plugin deaktiviert, Eingang und Verknuepfung abgemeldet');
-        return true;
-    }
-
-    /**
      * Plugin in einer Guild aktivieren.
      *
      * @param {string} guildId Discord-Guild-ID

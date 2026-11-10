@@ -96,15 +96,6 @@ class GiveawayDashboardPlugin extends DashboardPlugin {
         Logger.info('[Giveaway] Routen registriert (4 Router)');
     }
 
-    async onDisable() {
-        // Der Eintrag muss weg, sonst behauptet die Registry weiter, es gaebe
-        // hier Verlosungen - und der Chat antwortete "gerade keine offen"
-        // statt "gibt es hier nicht".
-        LosquellenRegistry.dienstEntfernen();
-        ServiceManager.get('Logger').info('[Giveaway] Dashboard-Plugin deaktiviert');
-        return true;
-    }
-
     /**
      * Plugin in einer Guild aktivieren
      *

@@ -43,17 +43,6 @@ class StreamingBotPlugin extends BotPlugin {
         require('../shared/lose').anmelden();
         ServiceManager.get('Logger').success('[Streaming] Bot-Plugin aktiviert');
     }
-
-    /**
-     * @param {Object} client Discord-Client
-     */
-    async onDisable(client) {
-        // Der Eintrag muss weg. Bliebe er stehen, zoege die Verlosung weiter
-        // Lose aus einem Plugin, das gar nicht mehr laeuft - und der Gewinner
-        // erfuehre nie davon, weil niemand mehr in den Chat schreibt.
-        require('../shared/lose').abmelden();
-        ServiceManager.get('Logger').info('[Streaming] Bot-Plugin deaktiviert');
-    }
 }
 
 // **Eine Instanz, keine Klasse.** `PluginManager.js:241` prueft

@@ -66,10 +66,6 @@ class BasePluginManager {
         this.#pluginMap.set(pluginName, plugin);
     }
 
-    removePlugin(pluginName) {
-        this.#pluginMap.delete(pluginName);
-    }
-
     // ==============================
     // Plugin Lifecycle Management
     // ==============================
@@ -290,15 +286,10 @@ class BasePluginManager {
         throw new Error("Not implemented");
     }
 
-    /**
-     * Deaktiviert ein Plugin
-     * @param {string} pluginName - Name des Plugins
-     * @throws {Error} Muss von abgeleiteter Klasse implementiert werden
-     * @author FireDervil
-     */
-    async disablePlugin(pluginName) {
-        throw new Error("Not implemented");
-    }
+    // Ein globales Abschalten gibt es bewusst nicht (K366, Betreiber 2026-11-10):
+    // Ein Plugin wird nur in einer Guild ab- und wieder eingeschaltet
+    // (`disableInGuild`), `core` ist immer an. Einmal geladen bleibt es bis
+    // zum Neustart im Prozess, Takte und Registries sind prozessweit.
 
     /**
      * Darf dieses Plugin in dieser Guild erscheinen?

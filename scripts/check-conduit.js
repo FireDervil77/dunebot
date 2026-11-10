@@ -15,10 +15,7 @@
  *      niemand wuesste mehr, welcher der echte ist.
  *   3. **Verdrahtet, nicht nur vorhanden.** Ein Eingang, den niemand startet,
  *      ist das Muster, das dieses Projekt an anderen bemaengelt.
- *   4. **Die Leitung muss ausdruecklich geschlossen werden.** Ein WebSocket
- *      baut sich nach jedem Abriss selbst wieder auf; ohne `beenden()` laeuft
- *      er nach dem Abschalten des Plugins weiter.
- *   5. **Eine Wache gegen die stille Leitung.** Eine TCP-Verbindung kann offen
+ *   4. **Eine Wache gegen die stille Leitung.** Eine TCP-Verbindung kann offen
  *      aussehen und nichts mehr liefern; `close` kommt dann nie.
  *
  * Nebenwirkungsfrei: Quelltext und Attrappen, kein Twitch, keine Datenbank.
@@ -119,9 +116,6 @@ console.log('\n3. Verdrahtet, nicht nur vorhanden');
 pruefe(/require\('\.\/eingang\/conduit'\)\.starten\(\)/.test(indexQuelle),
     'das Plugin startet den Eingang',
     'ein Eingang ohne Aufrufer ist genau das Muster, das dieses Projekt jagt');
-pruefe(/require\('\.\/eingang\/conduit'\)\.beenden\(\)/.test(indexQuelle),
-    'und schliesst ihn beim Abschalten',
-    'ohne das baut sich der WebSocket nach jedem Abriss weiter selbst auf');
 
 // Der Start darf das Plugin nicht aufhalten und nicht mitreissen.
 const startBlock = indexQuelle.slice(indexQuelle.indexOf("require('./eingang/conduit').starten()"));

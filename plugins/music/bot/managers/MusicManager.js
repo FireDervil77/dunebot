@@ -246,13 +246,6 @@ class MusicManager {
 
         abspieler.kanalbelegungGeaendert(jemandKam);
     }
-
-    /** Alles beenden - beim Abschalten des Plugins. */
-    zerstoeren() {
-        for (const guildId of Array.from(this.abspieler.keys())) {
-            this.beenden(guildId);
-        }
-    }
 }
 
 /**

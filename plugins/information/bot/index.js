@@ -54,21 +54,6 @@ class InfoBotPlugin extends BotPlugin {
     }
 
 
-    /**
-     * Wird aufgerufen, wenn das Plugin deaktiviert wird
-     * 
-     * @param {import('discord.js').Client} client - Discord.js Client
-     * @returns {Promise<void>}
-     * @author FireBot Team
-     */
-    async onDisable(client) {
-        const Logger = ServiceManager.get("Logger");
-        Logger.info('Information-Bot-Plugin wird deaktiviert...');
-        // Aufräumarbeiten hier durchführen
-        
-        Logger.success('Information-Bot-Plugin deaktiviert');
-    }
-
 
 
     /**

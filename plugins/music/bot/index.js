@@ -81,22 +81,6 @@ class MusicBotPlugin extends BotPlugin {
 
         Logger.success('[Musik] Plugin aktiviert');
     }
-
-    /**
-     * @param {Object} client Discord-Client
-     */
-    async onDisable(client) {
-        const Logger = ServiceManager.get('Logger');
-
-        if (client.musicManager) {
-            client.musicManager.zerstoeren();
-            delete client.musicManager;
-        }
-
-        require('./aufraeumer').stoppen();
-
-        Logger.success('[Musik] Plugin deaktiviert');
-    }
 }
 
 module.exports = new MusicBotPlugin();

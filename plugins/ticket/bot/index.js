@@ -32,23 +32,6 @@ class TicketBotPlugin extends BotPlugin {
         Logger.success('[Ticket]-Plugin aktiviert');
     }
 
-    /**
-     * Wird aufgerufen, wenn das Plugin deaktiviert wird
-     * 
-     * @param {import('discord.js').Client} client - Discord.js Client
-     * @returns {Promise<void>}
-     * @author FireBot Team
-     */
-    async onDisable(client) {
-        const Logger = ServiceManager.get("Logger");
-        Logger.info('[Ticket]-Plugin wird deaktiviert...');
-        
-        // Keine Tabellen löschen hier - das macht das Dashboard-Plugin
-        // Bot-Plugin kümmert sich nur um Commands/Events cleanup
-
-        Logger.success('[Ticket]-Plugin deaktiviert');
-    }
-
 
     /**
      * Wird aufgerufen, wenn das Plugin für eine bestimmte Guild aktiviert wird

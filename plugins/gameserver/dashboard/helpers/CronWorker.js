@@ -78,28 +78,6 @@ class CronWorker {
         Logger.success('[CronWorker] Cron-Worker gestartet.');
     }
 
-    /**
-     * Stoppt den Worker und alle laufenden Tasks.
-     */
-    stop() {
-        for (const [id, task] of this._tasks) {
-            task.stop();
-            this._tasks.delete(id);
-        }
-        if (this._aufbewahrung) {
-            this._aufbewahrung.stop();
-            this._aufbewahrung = null;
-        }
-        if (this._kennzahlen) {
-            this._kennzahlen.stop();
-            this._kennzahlen = null;
-        }
-        this._jobs.clear();
-        this._started = false;
-        const Logger = ServiceManager.get('Logger');
-        Logger.info('[CronWorker] Cron-Worker gestoppt.');
-    }
-
     // ────────────────────────────────────────────────────────────
     // Dynamisches Job-Management (wird von Routes aufgerufen)
     // ────────────────────────────────────────────────────────────

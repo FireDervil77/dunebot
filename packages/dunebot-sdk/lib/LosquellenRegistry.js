@@ -93,7 +93,8 @@ function register(name, quelle) {
 }
 
 /**
- * Eintrag entfernen - beim Abschalten eines Plugins.
+ * Eintrag entfernen, Gegenstück zu `register`. Plugins rufen es nicht: Ein
+ * geladenes Plugin bleibt bis zum Neustart im Prozess (K366).
  *
  * @param {string} name Name
  * @returns {boolean} true, wenn etwas entfernt wurde
@@ -188,24 +189,6 @@ function dienstSetzen(dienst) {
 }
 
 /**
- * Den Dienst wieder herausnehmen - beim Abschalten des Plugins.
- *
- * **Ohne das waere der Eintrag eine Behauptung.** Er sagt "es gibt hier
- * Verlosungen"; bleibt er nach dem Abschalten stehen, fragt das Streaming-
- * Plugin weiter nach und bekommt jedes Mal `null` - also dieselbe Antwort wie
- * bei einer Guild ohne laufende Verlosung. Der Unterschied zwischen "gerade
- * keine" und "gibt es hier gar nicht" waere weg, und der Zuschauer bekaeme im
- * Chat den falschen Satz.
- *
- * @returns {boolean} true, wenn etwas entfernt wurde
- */
-function dienstEntfernen() {
-    const hatte = dienstEintrag !== null;
-    dienstEintrag = null;
-    return hatte;
-}
-
-/**
  * @returns {Verlosungsdienst|null} der Dienst, oder null wenn es keinen gibt
  */
 function dienst() {
@@ -250,5 +233,5 @@ function leeren() {
 
 module.exports = {
     register, unregister, get, list, nennung, leeren, NAME_MUSTER, EIGEN,
-    bedingungsarten, dienstSetzen, dienstEntfernen, dienst
+    bedingungsarten, dienstSetzen, dienst
 };

@@ -98,11 +98,6 @@ class ModerationPlugin extends DashboardPlugin {
         Logger.info('[Moderation] Routen registriert (6 Router)');
     }
 
-    async onDisable() {
-        ServiceManager.get('Logger').info('[Moderation] Dashboard-Plugin deaktiviert');
-        return true;
-    }
-
     /**
      * Plugin in einer Guild aktivieren
      *

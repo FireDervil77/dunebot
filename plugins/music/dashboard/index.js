@@ -183,11 +183,6 @@ class MusicDashboardPlugin extends DashboardPlugin {
         Logger.info('[Musik] Routen registriert (4 Router)');
     }
 
-    async onDisable() {
-        ServiceManager.get('Logger').info('[Musik] Dashboard-Plugin deaktiviert');
-        return true;
-    }
-
     /**
      * Plugin in einer Guild aktivieren
      *

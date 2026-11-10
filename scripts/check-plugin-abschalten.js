@@ -20,6 +20,9 @@
  *               Bis 2026-11-10 löschten elf Plugins ihr Menü selbst; scheiterte
  *               danach das Löschen der Zeilen, blieb das Plugin an, ohne Menü
  *               (K341)
+ *   Global      es gibt keinen globalen Abschaltweg: kein `onDisable`, kein
+ *               `disablePlugin`, kein `BotPlugin.disable`, keine Hooks dazu.
+ *               Ein Plugin geht nur je Guild aus, `core` nie (K366)
  *
  * Ob die Listen vollständig sind, prüft scripts/check-guild-inhalte.js.
  *
@@ -461,6 +464,54 @@ function formular(name, d) {
             assert.strictEqual(a?.success, false, `angenommen: ${JSON.stringify(payload)}`);
         }
         assert.deepStrictEqual(rufe, [], `gerufen: ${JSON.stringify(rufe)}`);
+    });
+
+    // ── Kein globaler Abschaltweg (K366) ──────────────────────────────────
+    // Betreiber 2026-11-10: nie für alle Guilds, nur je Guild, core immer an.
+    // Bis dahin standen `disablePlugin` und 22 `onDisable` ohne Aufrufer da;
+    // `BotPlugin.disable` hätte nebenbei `dbService.close()` gerufen.
+    await pruefe('Kein globaler Abschaltweg: kein onDisable, disablePlugin, BotPlugin.disable oder Hook dazu (K366)', async () => {
+        const AUSLASSEN = new Set(['node_modules', 'assets', 'public', 'vendor']);
+        const dateien = [];
+        const sammle = (rel) => {
+            for (const e of fs.readdirSync(path.join(WURZEL, rel), { withFileTypes: true })) {
+                const kind = `${rel}/${e.name}`;
+                if (e.isDirectory()) { if (!AUSLASSEN.has(e.name)) sammle(kind); }
+                else if (e.name.endsWith('.js')) dateien.push(kind);
+            }
+        };
+        for (const p of fs.readdirSync(path.join(WURZEL, 'plugins'))) {
+            for (const teil of ['bot', 'dashboard', 'shared']) {
+                if (fs.existsSync(path.join(WURZEL, 'plugins', p, teil))) sammle(`plugins/${p}/${teil}`);
+            }
+        }
+        sammle('packages/dunebot-sdk/lib');
+        sammle('packages/dunebot-core/lib');
+        dateien.push('apps/dashboard/helpers/PluginManager.js', 'apps/bot/helpers/PluginManager.js');
+        assert.ok(dateien.length > 300, `nur ${dateien.length} Dateien gefunden`);
+
+        const MUSTER = [
+            /\bonDisable\b/,
+            /^\s*(async\s+)?disablePlugin\s*\(/m,
+            /\.disablePlugin\s*\(/,
+            /^\s*(async\s+)?disable\s*\(\s*botClient/m,
+            /['"](before|after)_disable_plugin['"]/,
+            /['"](before|after)_plugin_disable_method['"]/,
+            /['"]disable_plugin_failed['"]/,
+        ];
+        const funde = [];
+        for (const rel of dateien) {
+            const q = ohneKommentare(lies(rel));
+            for (const m of MUSTER) if (m.test(q)) funde.push(`${rel}: ${m}`);
+        }
+        assert.deepStrictEqual(funde, [], `${funde.length} Stellen: ${funde.join(' · ')}`);
+
+        // Gegenprobe: Der Weg je Guild ist da, sonst wäre die Leere nichts wert.
+        for (const rel of ['apps/dashboard/helpers/PluginManager.js', 'apps/bot/helpers/PluginManager.js']) {
+            assert.ok(/^\s*async disableInGuild\s*\(/m.test(ohneKommentare(lies(rel))), `${rel}: disableInGuild fehlt`);
+        }
+        const probe = ohneKommentare('class P { async onDisable() {} }');
+        assert.ok(MUSTER[0].test(probe), 'das Muster erkennt ein onDisable nicht mehr');
     });
 
     console.log(fehler ? `\n✗ ${fehler} Prüfung(en) rot` : '\n✅ Abschalten nur mit Namen, die Kontroll-Guild behält ihre Inhalte');

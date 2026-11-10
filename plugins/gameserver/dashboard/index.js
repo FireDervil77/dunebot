@@ -284,26 +284,6 @@ class GameserverPlugin extends DashboardPlugin {
         Logger.success('[Gameserver] Dashboard-Plugin aktiviert');
         return true;
     }
-
-    /**
-     * Plugin deaktivieren (System-weit)
-     */
-    async onDisable() {
-        const Logger = ServiceManager.get('Logger');
-        Logger.info('Deaktiviere [Gameserver] Dashboard-Plugin...');
-        try {
-            require('dunebot-sdk').ServersteuerungRegistry.unregister('gameserver');
-        } catch (err) {
-            Logger.warn('[Gameserver] Serversteuerung nicht ausgetragen:', err);
-        }
-        // CronWorker stoppen
-        const cronWorker = ServiceManager.get('gameserverCronWorker');
-        if (cronWorker) cronWorker.stop();
-        // StatusPoller stoppen
-        const statusPoller = ServiceManager.get('gameserverStatusPoller');
-        if (statusPoller) statusPoller.stop();
-        return true;
-    }
     
 
     /**

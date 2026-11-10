@@ -71,17 +71,6 @@ class GiveawayManager {
         }
     }
 
-    destroy() {
-        for (const [id, timer] of this.timers) {
-            clearTimeout(timer);
-        }
-        this.timers.clear();
-        for (const [id, timer] of this.claimTimers) {
-            clearTimeout(timer);
-        }
-        this.claimTimers.clear();
-    }
-
     // ─── Core Operations ────────────────────────────────────
 
     async createGiveaway(guildId, channelId, options) {

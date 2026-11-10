@@ -293,17 +293,8 @@ function anmelden() {
     return LosquellenRegistry.register(QUELLE, quelle);
 }
 
-/**
- * Eintrag zuruecknehmen.
- *
- * @returns {boolean} true, wenn entfernt
- */
-function abmelden() {
-    return LosquellenRegistry.unregister(QUELLE);
-}
-
 module.exports = {
     QUELLE, AUFBEWAHRUNG_TAGE, STUFEN,
     eintragen, fuerVerlosung, zaehlen, ansageEinreihen, aufraeumen,
-    bedingungen, pruefen, quelle, anmelden, abmelden
+    bedingungen, pruefen, quelle, anmelden
 };

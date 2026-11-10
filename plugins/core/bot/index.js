@@ -52,21 +52,6 @@ class CoreBotPlugin extends BotPlugin {
     }
     
     /**
-     * Wird aufgerufen, wenn das Plugin deaktiviert wird
-     * 
-     * @param {import('discord.js').Client} client - Discord.js Client
-     * @returns {Promise<void>}
-     * @author FireBot Team
-     */
-    async onDisable(client) {
-        const Logger = ServiceManager.get("Logger");
-        Logger.info('Core-Bot-Plugin wird deaktiviert...');
-        // Aufräumarbeiten hier durchführen
-        
-        Logger.success('Core-Bot-Plugin deaktiviert');
-    }
-    
-    /**
      * Wird aufgerufen, wenn das Plugin für eine bestimmte Guild aktiviert wird
      * 
      * @param {string} guildId - ID der Discord-Guild

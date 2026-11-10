@@ -89,11 +89,6 @@ class TicketPlugin extends DashboardPlugin {
         Logger.info('[Ticket] Routen registriert (5 Router)');
     }
 
-    async onDisable() {
-        ServiceManager.get('Logger').info('[Ticket] Dashboard-Plugin deaktiviert');
-        return true;
-    }
-
     /**
      * Plugin in einer Guild aktivieren
      *

@@ -77,14 +77,6 @@ class DiscordPlugin extends DashboardPlugin {
     }
 
     /**
-     * Plugin deaktivieren.
-     */
-    async onDisable() {
-        ServiceManager.get('Logger').info('[Discord] Dashboard-Plugin deaktiviert');
-        return true;
-    }
-
-    /**
      * Plugin in einer Guild aktivieren.
      *
      * @param {string} guildId Discord-Guild-ID
