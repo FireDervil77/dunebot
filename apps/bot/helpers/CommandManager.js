@@ -700,24 +700,6 @@ class CommandManager {
     }
 
     /**
-     * Get a summary of registered commands
-     */
-    getSummary() {
-        return {
-            prefixCommands: this.prefixCommands.size,
-            slashCommands: this.slashCommands.size,
-            contextMenus: this.contextMenus.size,
-            userContexts: this.contextMenus.filter(
-                (ctx) => ctx.type === ApplicationCommandType.User,
-            ).size,
-            messageContexts: this.contextMenus.filter(
-                (ctx) => ctx.type === ApplicationCommandType.Message,
-            ).size,
-        };
-    }
-
-    
-    /**
      * Druckt eine Zusammenfassung der registrierten Befehle und Event-Handler
      * Hilfreich für Debug-Zwecke
      */
@@ -753,81 +735,6 @@ class CommandManager {
         }
         
         Logger.info('======================================');
-    }
-
-    /**
-     * Deregistriert alle Befehle und Kontextmenüs eines Plugins
-     * Gegenstück zu registerPlugin - wird beim Deaktivieren eines Plugins aufgerufen
-     * 
-     * @param {import("dunebot-sdk").BotPlugin} plugin - Das Plugin, dessen Befehle deregistriert werden sollen
-     * @returns {Object} Statistik über die entfernten Befehle
-     */
-    unregisterPlugin(plugin) {
-        Logger.info(`Deregistriere Befehle aus Plugin ${plugin.name}...`);
-        
-        // Hook vor der Befehlsderegistrierung ausführen
-        if (this.hooks) {
-            this.hooks.doAction('before_unregister_commands', { plugin });
-        }
-        
-        // Zähler für die Statistik
-        let removedPrefix = 0;
-        let removedSlash = 0;
-        let removedContexts = 0;
-        
-        // Prefix-Befehle entfernen
-        for (const [name, cmd] of this.prefixCommands.entries()) {
-            if (cmd.plugin && cmd.plugin.name === plugin.name) {
-                this.prefixCommands.delete(name);
-                removedPrefix++;
-                
-                // Hook nach dem Entfernen eines Prefix-Befehls
-                if (this.hooks) {
-                    this.hooks.doAction('after_unregister_prefix_command', { command: cmd });
-                }
-            }
-        }
-        
-        // Slash-Befehle entfernen
-        for (const [name, cmd] of this.slashCommands.entries()) {
-            if (cmd.plugin && cmd.plugin.name === plugin.name) {
-                this.slashCommands.delete(name);
-                removedSlash++;
-                
-                // Hook nach dem Entfernen eines Slash-Befehls
-                if (this.hooks) {
-                    this.hooks.doAction('after_unregister_slash_command', { command: cmd });
-                }
-            }
-        }
-        
-        // Kontextmenüs entfernen
-        for (const [name, ctx] of this.contextMenus.entries()) {
-            if (ctx.plugin && ctx.plugin.name === plugin.name) {
-                this.contextMenus.delete(name);
-                removedContexts++;
-                
-                // Hook nach dem Entfernen eines Kontextmenüs
-                if (this.hooks) {
-                    this.hooks.doAction('after_unregister_context', { context: ctx });
-                }
-            }
-        }
-        
-        // Statistik ausgeben
-        Logger.info(`${removedPrefix + removedSlash} Befehle deregistriert [${removedPrefix} Prefix, ${removedSlash} Slash]`);
-        Logger.info(`${removedContexts} Kontextmenüs deregistriert`);
-        
-        // Hook nach der Befehlsderegistrierung ausführen
-        if (this.hooks) {
-            this.hooks.doAction('after_unregister_commands', { 
-                plugin, 
-                stats: { removedPrefix, removedSlash, removedContexts } 
-            });
-        }
-        
-        // Statistik zurückgeben
-        return { removedPrefix, removedSlash, removedContexts };
     }
 }
 module.exports = CommandManager;

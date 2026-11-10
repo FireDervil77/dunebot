@@ -370,6 +370,50 @@ function formular(name, d) {
         assert.match(c, /await pluginManager\.disableInGuild\(plugin, guildId, req\) !== true/);
     });
 
+    // K340 (2026-11-10): Der Bot nahm daneben globale Fälle ohne Guild an —
+    // `uninstall` löschte das Plugin-Verzeichnis. Jede Methode des Managers,
+    // die gerufen wird, steht in `rufe`; was nicht die Form des Dashboards
+    // hat, darf gar nichts rufen.
+    await pruefe('Bot: UPDATE_PLUGIN nimmt nur { guildId, action enable|disable, plugins: [ein Name] } (K340)', async () => {
+        process.env.IPC_SERVER_PORT = process.env.IPC_SERVER_PORT || '1';
+        process.env.IPC_SERVER_HOST = process.env.IPC_SERVER_HOST || '127.0.0.1';
+        const IPCClient = require('../apps/bot/helpers/IPCClient');
+        class OhneLeitung extends IPCClient { createNode() { return null; } }
+        const rufe = [];
+        const pluginManager = new Proxy({}, {
+            get: (_, name) => async (...args) => { rufe.push([name, ...args]); return true; },
+        });
+        const guilds = { cache: new Map([['222', { name: 'Testguild' }]]) };
+        const client = new OhneLeitung({ shard: { ids: [0] }, pluginManager, guilds });
+        client.logger = { info() {}, warn() {}, error() {}, debug() {}, success() {} };
+        const sende = async (payload) => {
+            let antwort = null;
+            await client.handleMessage({ data: { event: 'dashboard:UPDATE_PLUGIN', payload }, reply: (a) => { antwort = a; } });
+            return antwort;
+        };
+
+        assert.strictEqual((await sende({ guildId: '222', action: 'disable', plugins: ['music'] })).success, true);
+        assert.strictEqual((await sende({ guildId: '222', action: 'enable', plugins: ['ticket'] })).success, true);
+        assert.deepStrictEqual(rufe, [['disableInGuild', 'music', '222'], ['enableInGuild', 'ticket', '222']]);
+
+        rufe.length = 0;
+        const abgelehnt = [
+            { action: 'uninstall', pluginId: 'music' },
+            { action: 'install', pluginId: 'music' },
+            { action: 'disable', plugins: ['music'] },
+            { action: 'enable', pluginId: 'music' },
+            { action: 'guildDisable', guildId: '222', pluginId: 'music' },
+            { action: 'guildDisable', guildId: '222', pluginName: 'music' },
+            { guildId: '222', action: 'disable', plugins: ['music', 'ticket'] },
+            { guildId: '999', action: 'disable', plugins: ['music'] },
+        ];
+        for (const payload of abgelehnt) {
+            const a = await sende(payload);
+            assert.strictEqual(a?.success, false, `angenommen: ${JSON.stringify(payload)}`);
+        }
+        assert.deepStrictEqual(rufe, [], `gerufen: ${JSON.stringify(rufe)}`);
+    });
+
     console.log(fehler ? `\n✗ ${fehler} Prüfung(en) rot` : '\n✅ Abschalten nur mit Namen, die Kontroll-Guild behält ihre Inhalte');
     process.exit(fehler ? 1 : 0);
 })();

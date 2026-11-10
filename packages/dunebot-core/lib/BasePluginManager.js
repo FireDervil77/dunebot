@@ -514,41 +514,6 @@ class BasePluginManager {
         this.logger.success(`Installed plugin: ${pluginName}`);
     }
 
-    /**
-     * Deinstalliert ein Plugin
-     * @param {string} pluginName - Name des Plugins
-     * @returns {Promise<void>}
-     * @throws {Error} Bei Fehlern während der Deinstallation
-     * @author FireDervil
-     */
-    async uninstallPlugin(pluginName) {
-        const pluginDir = path.join(this.pluginsDir, pluginName);
-        // Create an empty file for locking if it doesn't exist
-        await fsPromises.writeFile(pluginDir + ".lock", "", { flag: "a" });
-
-        let release;
-        try {
-            release = await lockfile.lock(pluginDir + ".lock", {
-                retries: {
-                    retries: 60,
-                    factor: 1,
-                    minTimeout: 1000,
-                    maxTimeout: 5000,
-                },
-            });
-
-            if (this.#pluginMap.has()) {
-                throw new Error(`Plugin: ${pluginName} is enabled. Disable it first.`);
-            }
-            await fsPromises.rm(pluginDir, { recursive: true, force: true });
-            await fsPromises.unlink(pluginDir + ".lock").catch(() => {});
-        } finally {
-            if (release) await release();
-        }
-
-        this.logger.success(`Uninstalled plugin: ${pluginName}`);
-    }
-
     // ==============================
     // Private Utility Methods
     // ==============================

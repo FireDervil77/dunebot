@@ -420,9 +420,6 @@ class IPCClient {
                     
                 // SEND_NOTIFICATION → via Kern-IPC-Handler (apps/bot/ipc/SEND_NOTIFICATION.js)
                     
-                case "GET_PLUGIN_CMDS":
-                    return await this.#handleGetPluginCommands(message, payload);
-                    
                 case "GET_LOCALE_BUNDLE":
                     return await this.#handleGetLocaleBundle(message, payload);
                     
@@ -1045,289 +1042,6 @@ class IPCClient {
     }
     
     /**
-     * Sendet eine mehrsprachige Notification an Discord
-     * @param {object} message - Veza-Nachrichtenobjekt
-     * @param {object} payload - Notification-Daten
-     * @returns {Promise<void>}
-     * @private
-     */
-    async #handleSendNotification(message, payload) {
-        try {
-            const { ServiceManager } = require('dunebot-core');
-            const { EmbedBuilder } = require('discord.js');
-            const dbService = ServiceManager.get('dbService');
-            
-            this.logger.debug('[IPC] sendNotification aufgerufen mit Payload:', payload);
-            
-            const {
-                id,
-                title_translations,
-                message_translations,
-                action_text_translations,
-                type,
-                action_url,
-                delivery_method,
-                target_guild_ids,
-                discord_channel_id
-            } = payload;
-            
-            // Parse JSON-Felder
-            const titleTranslations = typeof title_translations === 'string' 
-                ? JSON.parse(title_translations) 
-                : title_translations;
-            const messageTranslations = typeof message_translations === 'string' 
-                ? JSON.parse(message_translations) 
-                : message_translations;
-            const actionTextTranslations = typeof action_text_translations === 'string' 
-                ? JSON.parse(action_text_translations) 
-                : action_text_translations;
-            const targetGuildIds = typeof target_guild_ids === 'string' 
-                ? JSON.parse(target_guild_ids) 
-                : (target_guild_ids || []);
-            
-            // delivery_method: Backward-compat (String → Array)
-            let methods;
-            try {
-                methods = typeof delivery_method === 'string' ? JSON.parse(delivery_method) : delivery_method;
-                if (!Array.isArray(methods)) methods = [delivery_method];
-            } catch (e) {
-                methods = [delivery_method || 'dashboard'];
-            }
-            if (methods.includes('all')) {
-                methods = ['dashboard', 'system_channel', 'discord_channel', 'discord_dm'];
-            }
-            this.logger.info(`[IPC] Notification #${id} delivery methods: ${JSON.stringify(methods)}, target guilds: ${targetGuildIds.length}`);
-            
-            // Tracking für gesendete Messages
-            const sentMessageIds = {};
-            
-            // Embed-Farben je nach Type
-            const embedColors = {
-                info: 0x3498db,     // Blau
-                warning: 0xf39c12,  // Orange
-                error: 0xe74c3c,    // Rot
-                success: 0x2ecc71   // Grün
-            };
-            
-            // Über alle Ziel-Guilds iterieren
-            for (const guildId of targetGuildIds) {
-                const guild = this.discordClient.guilds.cache.get(guildId);
-                if (!guild) {
-                    this.logger.warn(`[IPC] Guild ${guildId} nicht im Cache, überspringe`);
-                    continue;
-                }
-                
-                // Guild-Locale aus Datenbank laden
-                const [guildLocaleRow] = await dbService.query(
-                    "SELECT config_value FROM configs WHERE plugin_name = 'core' AND config_key = 'LOCALE' AND guild_id = ? AND context = 'shared'",
-                    [guildId]
-                );
-                
-                const guildLocale = guildLocaleRow?.config_value || 'de-DE';
-                this.logger.debug(`[IPC] Guild ${guild.name} hat Locale: ${guildLocale}`);
-                
-                // Wähle richtige Übersetzung basierend auf Guild-Locale
-                const title = titleTranslations[guildLocale] || titleTranslations['de-DE'] || 'Notification';
-                const messageText = messageTranslations[guildLocale] || messageTranslations['de-DE'] || '';
-                const actionText = actionTextTranslations[guildLocale] || actionTextTranslations['de-DE'] || 'Mehr erfahren';
-                
-                // Embed erstellen
-                const embed = new EmbedBuilder()
-                    .setTitle(title)
-                    .setDescription(messageText)
-                    .setColor(embedColors[type] || embedColors.info)
-                    .setTimestamp()
-                    .setFooter({ text: `Notification #${id}` });
-                
-                // Action URL hinzufügen (falls vorhanden)
-                if (action_url) {
-                    embed.addFields({
-                        name: actionText,
-                        value: `[🔗 ${action_url}](${action_url})`,
-                        inline: false
-                    });
-                }
-                
-                // Je nach Delivery-Methode senden
-                if (methods.includes('system_channel')) {
-                    const systemChannel = guild.systemChannel;
-                    if (systemChannel?.isTextBased()) {
-                        try {
-                            const sentMessage = await systemChannel.send({ embeds: [embed] });
-                            sentMessageIds[guildId] = sentMessageIds[guildId] || {};
-                            sentMessageIds[guildId].systemChannel = sentMessage.id;
-                            this.logger.info(`[IPC] Notification an System-Channel ${systemChannel.name} in ${guild.name} gesendet`);
-                        } catch (channelError) {
-                            this.logger.error(`[IPC] Fehler beim Senden an System-Channel in ${guild.name}:`, channelError);
-                        }
-                    } else {
-                        this.logger.warn(`[IPC] Kein System-Channel für Guild ${guild.name} gefunden`);
-                    }
-                }
-
-                if (methods.includes('discord_channel') && discord_channel_id) {
-                    const targetChannel = guild.channels.cache.get(discord_channel_id);
-                    
-                    if (targetChannel && targetChannel.isTextBased()) {
-                        try {
-                            const sentMessage = await targetChannel.send({ embeds: [embed] });
-                            sentMessageIds[guildId] = sentMessageIds[guildId] || {};
-                            sentMessageIds[guildId].channel = sentMessage.id;
-                            this.logger.info(`[IPC] Notification an Channel ${targetChannel.name} in ${guild.name} gesendet`);
-                        } catch (channelError) {
-                            this.logger.error(`[IPC] Fehler beim Senden an Channel in ${guild.name}:`, channelError);
-                        }
-                    } else {
-                        this.logger.warn(`[IPC] Channel ${discord_channel_id} nicht gefunden in Guild ${guild.name}`);
-                    }
-                }
-                
-                if (methods.includes('discord_dm')) {
-                    // An alle Admins per DM senden
-                    try {
-                        // Hole alle Members mit ManageGuild-Permission.
-                        // Eine unvollstaendige Liste ist hier nicht gefaehrlich
-                        // (es werden dann weniger Admins erreicht), aber sie
-                        // darf den Aufrufer nicht zwei Minuten aufhalten.
-                        const { mitglieder: members } = await Mitglieder.holen(guild, this.logger);
-                        const admins = members.filter(member => 
-                            member.permissions.has('ManageGuild') && !member.user.bot
-                        );
-                        
-                        this.logger.debug(`[IPC] Sende DMs an ${admins.size} Admins in ${guild.name}`);
-                        
-                        const dmIds = [];
-                        for (const [memberId, member] of admins) {
-                            try {
-                                const dmChannel = await member.createDM();
-                                const sentDM = await dmChannel.send({ embeds: [embed] });
-                                dmIds.push(sentDM.id);
-                                this.logger.debug(`[IPC] DM an ${member.user.tag} gesendet`);
-                            } catch (dmError) {
-                                this.logger.warn(`[IPC] Konnte keine DM an ${member.user.tag} senden:`, dmError.message);
-                            }
-                        }
-                        
-                        if (dmIds.length > 0) {
-                            sentMessageIds[guildId] = sentMessageIds[guildId] || {};
-                            sentMessageIds[guildId].dms = dmIds;
-                        }
-                    } catch (membersError) {
-                        this.logger.error(`[IPC] Fehler beim Abrufen der Members in ${guild.name}:`, membersError);
-                    }
-                }
-            }
-            
-            // Tracking in Datenbank speichern
-            if (Object.keys(sentMessageIds).length > 0) {
-                await dbService.query(`
-                    UPDATE notifications 
-                    SET sent_to_discord = 1,
-                        discord_message_ids = ?
-                    WHERE id = ?
-                `, [JSON.stringify(sentMessageIds), id]);
-                
-                this.logger.info(`[IPC] Notification #${id} erfolgreich an ${Object.keys(sentMessageIds).length} Guilds gesendet`);
-            }
-            
-            return message.reply({
-                success: true,
-                data: {
-                    sentToGuilds: Object.keys(sentMessageIds).length,
-                    messageIds: sentMessageIds
-                }
-            });
-            
-        } catch (error) {
-            this.logger.error('[IPC] Fehler in sendNotification:', error);
-            return message.reply({
-                success: false,
-                error: error.message
-            });
-        }
-    }
-    
-    
-    /**
-     * Liefert detaillierte Informationen zu den Befehlen eines Plugins
-     * @param {object} message - Veza-Nachrichtenobjekt
-     * @param {object} payload - Enthält Plugin-ID und Befehlstyp
-     * @returns {Promise<void>}
-     * @private
-     */
-    async #handleGetPluginCommands(message, payload) {
-        try {
-            const { pluginId, type, guildId } = payload || {};
-            
-            if (!pluginId) {
-                return message.reply({
-                    success: false,
-                    error: "Plugin-ID ist erforderlich"
-                });
-            }
-            
-            const plugin = this.discordClient.pluginManager.getPlugin(pluginId);
-            if (!plugin) {
-                return message.reply({
-                    success: false,
-                    error: "Plugin nicht gefunden"
-                });
-            }
-            
-            // Prüfen, ob das Plugin für die Guild aktiviert ist
-            if (guildId && !this.discordClient.pluginManager.isPluginEnabledForGuild(pluginId, guildId)) {
-                return message.reply({
-                    success: false,
-                    error: "Plugin ist für diese Guild nicht aktiviert"
-                });
-            }
-            
-            let commands = [];
-            
-            if (type === 'slash' || !type) {
-                // Slash-Befehle
-                if (plugin.slashCommands) {
-                    commands = [...commands, ...Array.from(plugin.slashCommands.values()).map(cmd => ({
-                        name: cmd.data.name,
-                        description: cmd.data.description,
-                        type: 'slash',
-                        options: cmd.data.options,
-                        defaultPermission: cmd.data.default_permission
-                    }))];
-                }
-            }
-            
-            if (type === 'prefix' || !type) {
-                // Prefix-Befehle
-                if (plugin.prefixCommands) {
-                    commands = [...commands, ...Array.from(plugin.prefixCommands.values()).map(cmd => ({
-                        name: cmd.name,
-                        description: cmd.description || 'Keine Beschreibung',
-                        type: 'prefix',
-                        aliases: cmd.aliases || [],
-                        usage: cmd.usage || null
-                    }))];
-                }
-            }
-            
-            return message.reply({
-                success: true,
-                data: {
-                    pluginId,
-                    pluginName: plugin.name,
-                    commands
-                }
-            });
-        } catch (error) {
-            this.logger.error("[IPC] Fehler beim Abrufen der Plugin-Befehle:", error);
-            return message.reply({
-                success: false,
-                error: error.message
-            });
-        }
-    }
-    
-    /**
      * Liefert erweiterte Statistiken für eine bestimmte Guild
      * @param {object} message - Veza-Nachrichtenobjekt
      * @param {object} payload - Enthält die Guild-ID
@@ -1603,130 +1317,60 @@ class IPCClient {
     }
     
     
+    /**
+     * Ein Plugin in einer Guild ein- oder abschalten, nachdem das Dashboard es
+     * getan hat.
+     *
+     * Einziger Absender: `guild.controller.updatePlugins`, eine Nachricht je
+     * Plugin, `{ guildId, action: 'enable' | 'disable', plugins: [name] }`.
+     * Bis 2026-11-10 nahm der Handler daneben `pluginId`, die Namen
+     * `guildEnable`/`guildDisable` und globale Fälle ohne Guild (`enable`,
+     * `disable`, `install`, `uninstall`) an. Erreichbar waren sie nur aus der
+     * toten Middleware `pluginMiddleware.dashboard`, die `pluginName` schickte
+     * und deshalb hier nie ankam; `disable` warf „Not implemented“ und
+     * `uninstall` löschte das Plugin-Verzeichnis (K340).
+     *
+     * @param {object} message - Veza-Nachrichtenobjekt
+     * @param {{guildId: string, action: string, plugins: string[]}} payload
+     * @private
+     */
     async #handleUpdatePlugin(message, payload) {
-        console.log("[IPC] handle Update Plugin with payload:", JSON.stringify(payload, null, 2));
-        try {
-            let { action, pluginId, guildId, plugins } = payload || {};
-            
-            // Kompatibilität: plugins-Array zu pluginId konvertieren
-            if (!pluginId && plugins && Array.isArray(plugins) && plugins.length > 0) {
-                pluginId = plugins[0]; // Nimm das erste Plugin aus dem Array
-                this.logger.warn(`[IPC] 'plugins' Array erkannt, verwende erstes Plugin: ${pluginId}`);
-            }
-            
-            const pluginName = pluginId; // Alias für Kompatibilität
+        const { action, guildId, plugins } = payload || {};
+        const pluginName = Array.isArray(plugins) && plugins.length === 1 ? plugins[0] : null;
 
-            if (!action || !pluginName) {
-                this.logger.error(`[IPC] Fehlende Parameter: action=${action}, pluginName=${pluginName}`);
-                return message.reply({
-                    success: false,
-                    error: "Aktion und Plugin-ID sind erforderlich"
-                });
-            }
-            
+        if (!guildId || !pluginName || (action !== 'enable' && action !== 'disable')) {
+            const fehler = `UPDATE_PLUGIN erwartet guildId, action enable|disable und genau ein Plugin, kam: ${JSON.stringify(payload)}`;
+            this.logger.error(`[IPC] ${fehler}`);
+            return message.reply({ success: false, error: fehler });
+        }
+
+        try {
             const pluginManager = this.discordClient.pluginManager;
             if (!pluginManager) {
-                return message.reply({
-                    success: false,
-                    error: "PluginManager nicht verfügbar"
-                });
+                return message.reply({ success: false, error: "PluginManager nicht verfügbar" });
             }
-            
-            let result = false;
-            let errorMessage = null;
-            
-            // Action-Mapping: 'enable' mit guildId → 'guildEnable'
-            if (action === 'enable' && guildId) {
-                this.logger.info(`[IPC] Konvertiere 'enable' → 'guildEnable' für Guild ${guildId}`);
-                action = 'guildEnable';
+
+            const guild = this.discordClient.guilds.cache.get(guildId);
+            if (!guild) {
+                this.logger.error(`[IPC] Guild ${guildId} nicht im Cache gefunden`);
+                return message.reply({ success: false, error: `Guild ${guildId} nicht gefunden` });
             }
-            if (action === 'disable' && guildId) {
-                this.logger.info(`[IPC] Konvertiere 'disable' → 'guildDisable' für Guild ${guildId}`);
-                action = 'guildDisable';
-            }
-            
-            this.logger.info(`[IPC] Führe Plugin-Aktion aus: ${action} für Plugin '${pluginName}'${guildId ? ` in Guild ${guildId}` : ''}`);
-            
-            switch (action) {
-                case "enable":
-                    result = await pluginManager.enablePlugin(pluginName);
-                    this.logger.info(`[IPC] Plugin ${pluginName} global aktiviert: ${result}`);
-                    break;
 
-                case "disable":
-                    result = await pluginManager.disablePlugin(pluginName);
-                    this.logger.info(`[IPC] Plugin ${pluginName} global deaktiviert: ${result}`);
-                    break;
+            this.logger.info(`[IPC] ${action === 'enable' ? 'Aktiviere' : 'Deaktiviere'} Plugin ${pluginName} für Guild ${guild.name} (${guildId})`);
+            const result = action === 'enable'
+                ? await pluginManager.enableInGuild(pluginName, guildId)
+                : await pluginManager.disableInGuild(pluginName, guildId);
+            this.logger.info(`[IPC] Plugin ${pluginName} in Guild ${guildId} ${action}: ${result}`);
 
-                case "install":
-                    result = await pluginManager.installPlugin(pluginName);
-                    this.logger.info(`[IPC] Plugin ${pluginName} installiert: ${result}`);
-                    break;
-
-                case "uninstall":
-                    result = await pluginManager.uninstallPlugin(pluginName);
-                    this.logger.info(`[IPC] Plugin ${pluginName} deinstalliert: ${result}`);
-                    break;
-
-                case "guildEnable": {
-                    if (!guildId) {
-                        errorMessage = "Guild-ID ist für guildEnable erforderlich";
-                        break;
-                    }
-                    const guild = this.discordClient.guilds.cache.get(guildId);
-                    if (!guild) {
-                        errorMessage = `Guild ${guildId} nicht gefunden`;
-                        this.logger.error(`[IPC] Guild ${guildId} nicht im Cache gefunden`);
-                        break;
-                    }
-                    this.logger.info(`[IPC] Aktiviere Plugin ${pluginName} für Guild ${guild.name} (${guildId})`);
-                    result = await pluginManager.enableInGuild(pluginName, guildId);
-                    this.logger.success(`[IPC] Plugin ${pluginName} für Guild ${guildId} aktiviert: ${result}`);
-                    break;
-                }
-
-                case "guildDisable": {
-                    if (!guildId) {
-                        errorMessage = "Guild-ID ist für guildDisable erforderlich";
-                        break;
-                    }
-                    const guild = this.discordClient.guilds.cache.get(guildId);
-                    if (!guild) {
-                        errorMessage = `Guild ${guildId} nicht gefunden`;
-                        this.logger.error(`[IPC] Guild ${guildId} nicht im Cache gefunden`);
-                        break;
-                    }
-                    this.logger.info(`[IPC] Deaktiviere Plugin ${pluginName} für Guild ${guild.name} (${guildId})`);
-                    result = await pluginManager.disableInGuild(pluginName, guildId);
-                    this.logger.success(`[IPC] Plugin ${pluginName} für Guild ${guildId} deaktiviert: ${result}`);
-                    break;
-                }
-                
-                default:
-                    errorMessage = `Unbekannte Aktion: ${action}`;
-                    this.logger.error(`[IPC] ${errorMessage}`);
-                    break;
-            }
-            
-            if (errorMessage) {
-                return message.reply({
-                    success: false,
-                    error: errorMessage
-                });
-            }
-            
             return message.reply({
                 success: result,
-                message: result 
-                    ? `Plugin-Aktion '${action}' für '${pluginName}' erfolgreich ausgeführt` 
+                message: result
+                    ? `Plugin-Aktion '${action}' für '${pluginName}' erfolgreich ausgeführt`
                     : `Plugin-Aktion '${action}' für '${pluginName}' fehlgeschlagen`
             });
         } catch (error) {
             this.logger.error(`[IPC] Fehler bei Plugin-Aktion:`, error);
-            return message.reply({
-                success: false,
-                error: error.message
-            });
+            return message.reply({ success: false, error: error.message });
         }
     }
 
