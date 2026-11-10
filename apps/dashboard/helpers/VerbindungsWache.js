@@ -50,6 +50,26 @@ class VerbindungsWache {
         this.uhren = new Map();
         this.angekuendigt = new Map();
         this.nachAusfall = new Set();
+        this.reihen = new Map();
+    }
+
+    /**
+     * Was einem Daemon geschieht, kommt der Reihe nach dran (K362, 2026-11-10).
+     *
+     * Jeder Schritt liest den Stand und schreibt danach, dazwischen liegen Abfragen.
+     * Am 2026-11-10 um 00:58:37 liefen der Ablauf der Frist und die Anmeldung von 54
+     * gleichzeitig, nach einem Stillstand des Dashboards: Beide lasen `neu_verbinden`,
+     * die Anmeldung schrieb `da`, die Frist danach `daemon_weg`. Das Nachprüfen sah
+     * den Daemon verbunden und tat nichts, die Serverseite meldete ihn acht Stunden
+     * als nicht erreichbar, der Masterserver über den Herzschlag als online.
+     */
+    _nacheinander(daemonId, schritt) {
+        const davor = this.reihen.get(daemonId) || Promise.resolve();
+        const dieser = davor.then(schritt, schritt);
+        const ende = dieser.catch(() => {});
+        this.reihen.set(daemonId, ende);
+        ende.then(() => { if (this.reihen.get(daemonId) === ende) this.reihen.delete(daemonId); });
+        return dieser;
     }
 
     /** Beim Start des Dashboards: Niemand ist verbunden, alle bekommen ihre Frist. */
@@ -88,14 +108,22 @@ class VerbindungsWache {
     }
 
     /** Die letzte Leitung des Daemons ist weg. */
-    async getrennt(daemonId) {
+    getrennt(daemonId) {
+        return this._nacheinander(daemonId, () => this._getrennt(daemonId));
+    }
+
+    async _getrennt(daemonId) {
         const gewollt = this._istAngekuendigt(daemonId);
         await this._setze(daemonId, gewollt ? 'angekuendigt' : 'neu_verbinden');
         this._plane(daemonId, gewollt ? ANKUENDIGUNG_MS : GNADENFRIST_MS);
     }
 
     /** Der Daemon ist angemeldet. */
-    async angemeldet(daemonId) {
+    angemeldet(daemonId) {
+        return this._nacheinander(daemonId, () => this._angemeldet(daemonId));
+    }
+
+    async _angemeldet(daemonId) {
         this._halte(daemonId);
         this.angekuendigt.delete(daemonId);
         const m = await this._maschine(daemonId);
@@ -119,7 +147,11 @@ class VerbindungsWache {
      * @param {string} daemonId
      * @param {Array<{server_id: *, status?: string}>} gemeldet
      */
-    async herzschlag(daemonId, gemeldet) {
+    herzschlag(daemonId, gemeldet) {
+        return this._nacheinander(daemonId, () => this._herzschlag(daemonId, gemeldet));
+    }
+
+    async _herzschlag(daemonId, gemeldet) {
         if (!this.nachAusfall.delete(daemonId)) return;
         const m = await this._maschine(daemonId);
         if (!m) return;
@@ -158,8 +190,14 @@ class VerbindungsWache {
     }
 
     /** Die Frist ist um, oder es wird erneut nachgesehen. */
-    async _pruefeNach(daemonId) {
+    _pruefeNach(daemonId) {
+        // Sofort beim Feuern, nicht erst, wenn der Schritt dran ist: Bis dahin kann
+        // eine neue Frist gestellt sein, und die bleibt.
         this.uhren.delete(daemonId);
+        return this._nacheinander(daemonId, () => this._pruefeNachJetzt(daemonId));
+    }
+
+    async _pruefeNachJetzt(daemonId) {
         if (this.istVerbunden(daemonId)) return;
 
         // Ohne Bahnhof sagt das Anklopfen nichts: Die Maschine antwortet, der Daemon

@@ -211,6 +211,27 @@ async function pruefe(was, tun) {
             assert.strictEqual((await stand()).verbindung, 'neu_verbinden');
             await wache.angemeldet(m.daemon_id);
         });
+        await pruefe('meldet er sich an, während die Frist den Ausfall verbucht: am Ende da (K362)', async () => {
+            // 2026-11-10 00:58:37, 54: Die Anmeldung schrieb `da`, die Frist danach
+            // `daemon_weg`, und das blieb acht Stunden stehen.
+            let anmeldung = null;
+            const rwache = new VerbindungsWache({
+                db: () => db, istVerbunden: () => verbunden, pruefe: async () => true,
+                ausgefallen: async (id) => {
+                    verbunden = true;
+                    anmeldung = rwache.angemeldet(id);
+                    await new Promise(r => setTimeout(r, 300));
+                },
+            });
+            verbunden = false;
+            await rwache.getrennt(m.daemon_id);
+            rwache.beende();
+            await rwache._pruefeNach(m.daemon_id);
+            await anmeldung;
+            assert.strictEqual((await stand()).verbindung, 'da');
+            assert.strictEqual(rwache.uhren.has(m.daemon_id), false, 'das Nachprüfen bliebe gestellt');
+            rwache.beende();
+        });
         await pruefe('ein angekündigtes Update ist kein Ausfall', async () => {
             wache.kuendigeAn(m.daemon_id);
             verbunden = false;
