@@ -1050,7 +1050,7 @@ router.get('/streamserver', requirePermission('STREAMING.VIEW'), async (req, res
     const entscheidung = require('../kern/serverstoppEntscheidung');
 
     try {
-        const anbieter = serverstopp.anbieter();
+        const anbieter = await serverstopp.anbieter(guildId);
         const [server, einstellungen, kandidaten, letzte, zone, darfStoppen] = await Promise.all([
             anbieter ? anbieter.server(guildId) : Promise.resolve([]),
             serverstopp.einstellungen(guildId),
@@ -1108,7 +1108,7 @@ router.post('/streamserver/:serverId', requirePermission('STREAMING.SETTINGS.EDI
         // von Hand duerfen.
         if (!(await hatRecht(res, guildId, 'GAMESERVER.STOP'))) return res.redirect(`${zurueck}?fehler=recht`);
 
-        const anbieter = serverstopp.anbieter();
+        const anbieter = await serverstopp.anbieter(guildId);
         if (!anbieter) return res.redirect(`${zurueck}?fehler=anbieter`);
         if (!(await anbieter.zustand(guildId, serverId))) return res.redirect(`${zurueck}?fehler=server`);
 

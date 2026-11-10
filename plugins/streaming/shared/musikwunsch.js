@@ -64,12 +64,23 @@ function log() {
 }
 
 /**
- * Die Ablage, aus der gespielt werden darf.
+ * Die Ablage, aus der gespielt werden darf - fuer **diese Guild**.
  *
- * @returns {Object|null} Die eingetragene Ablage oder null
+ * **Der Eintrag allein reicht nicht.** `MusikablageRegistry` haelt ihn im ganzen
+ * Prozess, sobald das Musik-Plugin in irgendeiner Guild geladen ist. Bis zum
+ * 2026-11-10 fragte diese Funktion nur ihn: Eine Guild mit abgeschaltetem
+ * Musik-Plugin bekam weiter Titel nachgelegt, und die Musikseite zeigte die
+ * Ablage als da (K368). Gesperrt waren nur die Chat-Befehle. Jetzt dieselbe
+ * Schranke wie dort (`shared/nachbar`); die Warteschlange bleibt stehen.
+ *
+ * @param {string} guildId Guild
+ * @returns {Promise<Object|null>} Die eingetragene Ablage oder null
  */
-function ablage() {
-    return MusikablageRegistry.fuerStream();
+async function ablage(guildId) {
+    const quelle = MusikablageRegistry.fuerStream();
+    if (!quelle) return null;
+    const { an } = await require('./nachbar').pluginAn('music', guildId);
+    return an ? quelle : null;
 }
 
 /* ======================================================================
@@ -239,7 +250,7 @@ async function aktueller(guildId) {
  * @returns {Promise<{ok: boolean, grund?: string, titel?: string, offen?: number}>} Ergebnis
  */
 async function wuenschen(guildId, streamerId, begriff, wer) {
-    const quelle = ablage();
+    const quelle = await ablage(guildId);
     if (!quelle) return { ok: false, grund: 'keine_ablage' };
 
     const suche = String(begriff || '').trim();
@@ -389,7 +400,7 @@ async function abspielen(guildId, an) {
  * @returns {Promise<boolean>} true, wenn etwas nachgelegt wurde
  */
 async function nachlegen(guildId, nichtDatei) {
-    const quelle = ablage();
+    const quelle = await ablage(guildId);
     if (!quelle) return false;
 
     const alle = await quelle.suchen(guildId, null);
@@ -484,7 +495,7 @@ async function naechster(guildId, wie = {}) {
     const z = await zustand(guildId);
     if (!z?.aktiv) return { spielen: false, grund: 'angehalten' };
 
-    const quelle = ablage();
+    const quelle = await ablage(guildId);
     if (!quelle) return { spielen: false, grund: 'keine_ablage' };
 
     // Der laufende Titel, wenn nicht ausdruecklich weitergerueckt werden soll.
@@ -553,7 +564,7 @@ async function naechster(guildId, wie = {}) {
  * @returns {Promise<{anzahl: number, text: string|null}>} Text nur, wenn er passt
  */
 async function ablageAufzaehlen(guildId) {
-    const quelle = ablage();
+    const quelle = await ablage(guildId);
     if (!quelle) return { anzahl: 0, text: null };
 
     const alle = await quelle.suchen(guildId, null);
@@ -581,7 +592,7 @@ async function ablageAufzaehlen(guildId) {
  * @returns {Promise<{ok: boolean, grund?: string, anzahl?: number}>} Ergebnis
  */
 async function ablageEinreihen(guildId) {
-    const quelle = ablage();
+    const quelle = await ablage(guildId);
     if (!quelle) return { ok: false, grund: 'keine_ablage' };
 
     const alle = await quelle.suchen(guildId, null);

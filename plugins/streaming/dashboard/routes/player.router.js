@@ -287,9 +287,9 @@ router.get('/:schluessel/ton/:id', async (req, res) => {
     const dateiId = zeilen?.[0]?.datei_id;
     if (!dateiId) return res.status(404).type('text/plain').send('Nicht gefunden.');
 
-    const ablage = musik.ablage();
+    const ablage = await musik.ablage(guildId);
     if (!ablage) {
-        log().warn('[Streaming] Player: keine Musikablage eingetragen');
+        log().warn(`[Streaming] Player: keine Musikablage für Guild ${guildId} (Musik-Plugin dort aus oder nicht geladen)`);
         return res.status(503).type('text/plain').send('Ablage nicht verfuegbar.');
     }
 

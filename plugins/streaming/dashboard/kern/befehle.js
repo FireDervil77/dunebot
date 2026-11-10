@@ -442,19 +442,14 @@ async function verfuegbar(guildId, wort) {
     const braucht = FERTIG[wort]?.braucht || null;
     if (!braucht) return { ok: true, grund: null, braucht: null };
 
-    // **`has` und nicht `get`.** `ServiceManager.get` wirft bei einem
-    // unbekannten Dienst (`ServiceManager.js:24`), es gibt kein `null` zurueck
-    // - ein `if (!dienst)` dahinter waere toter Code, und der Wurf landete auf
-    // der Befehlsseite als Fehlerseite. Genau so stand es hier im ersten
-    // Entwurf.
-    if (!ServiceManager.has('pluginManager')) {
+    // Dieselbe Frage stellen Musikablage und Streamserver (K368, K369) - die
+    // Antwort steht deshalb an einer Stelle (`shared/nachbar`).
+    const { an, pruefbar } = await require('../../shared/nachbar').pluginAn(braucht.plugin, guildId);
+    if (!pruefbar) {
         // Ohne Auskunft nicht raten. "Verfuegbar" waere die bequeme Annahme
         // und die falsche: Der Befehl liefe dann ins Leere.
         return { ok: false, grund: `${braucht.sache} lassen sich gerade nicht prüfen.`, braucht };
     }
-    const pluginManager = ServiceManager.get('pluginManager');
-
-    const an = await pluginManager.isPluginEnabledForGuild(braucht.plugin, guildId);
     return an
         ? { ok: true, grund: null, braucht }
         : { ok: false, grund: `Dafür muss das Plugin „${braucht.name}" aktiv sein.`, braucht };

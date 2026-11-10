@@ -40,9 +40,25 @@ const db = () => ServiceManager.get('dbService');
 /** @returns {Object} Logger */
 const log = () => ServiceManager.get('Logger');
 
-/** @returns {Object|null} Der eingetragene Anbieter */
-function anbieter() {
-    return require('dunebot-sdk').ServersteuerungRegistry.get(ANBIETER);
+/**
+ * Der Anbieter fuer **diese Guild**.
+ *
+ * **Der Eintrag allein reicht nicht.** `ServersteuerungRegistry` haelt ihn im
+ * ganzen Prozess, sobald das Gameserver-Plugin in irgendeiner Guild geladen
+ * ist. Bis zum 2026-11-10 fragte diese Funktion nur ihn: In einer Guild mit
+ * abgeschaltetem Gameserver-Plugin listete die Seite die Server, und beim
+ * Streamende wurden sie gestoppt (K369). Jetzt heisst "Plugin hier aus" dasselbe
+ * wie "kein Anbieter": Die Seite zeigt den Hinweis, ein vorgemerkter Stopp
+ * wird mit `kein_anbieter` verworfen und gemeldet.
+ *
+ * @param {string} guildId Guild
+ * @returns {Promise<Object|null>} Der eingetragene Anbieter oder null
+ */
+async function anbieter(guildId) {
+    const eintrag = require('dunebot-sdk').ServersteuerungRegistry.get(ANBIETER);
+    if (!eintrag) return null;
+    const { an } = await require('../../shared/nachbar').pluginAn(ANBIETER, guildId);
+    return an ? eintrag : null;
 }
 
 /** @param {*} nutzlast @returns {Object} */
@@ -218,7 +234,7 @@ async function vormerken(streamerId) {
 
     for (const e of betroffen || []) {
         const live = await liveInAuswahl(e.guild_id, e.server_id);
-        const a = anbieter();
+        const a = await anbieter(e.guild_id);
         // Kein `.catch(() => null)`: Ein gescheiterter Abruf ist kein „Server
         // fehlt". Er wird genannt, und die uebrigen Server dieses Streamers laufen weiter.
         let server;
@@ -339,7 +355,7 @@ async function ausfuehren(auftrag) {
     const guildId = auftrag.guild_id;
     const serverId = Number(n.server_id);
 
-    const a = anbieter();
+    const a = await anbieter(guildId);
     const einstellungZeilen = await db().query(
         'SELECT aktiv, modus FROM streaming_serverstopp WHERE guild_id = ? AND server_id = ?',
         [guildId, serverId]);

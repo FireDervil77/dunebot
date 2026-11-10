@@ -88,7 +88,7 @@ router.get('/', requirePermission('STREAMING.CHAT.MANAGE'), async (req, res) => 
         const [laeuft, offen, ablage] = await Promise.all([
             musik.aktueller(guildId),
             musik.warteschlange(guildId, { nurOffene: true, grenze: 25 }),
-            Promise.resolve(musik.ablage())
+            musik.ablage(guildId)
         ]);
 
         // **Wie viele Dateien ueberhaupt freigegeben sind.** Ohne diese Zahl

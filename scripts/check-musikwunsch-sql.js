@@ -314,6 +314,14 @@ async function lauf() {
         async tonquelle() { return { art: 'datei', pfad: '/dev/null' }; }
     });
 
+    // **Und das Plugin muss in der Guild an sein.** Seit K368 (2026-11-10)
+    // fragt `ablage(guildId)` neben der Registry auch die Guild. Ohne diese
+    // Attrappe gilt das als "nicht pruefbar" - `ablage()` gibt `null`, und es
+    // geschieht genau das, was der Absatz darueber beschreibt.
+    ServiceManager.register('pluginManager', {
+        async isPluginEnabledForGuild(plugin) { return plugin === 'music'; }
+    });
+
     const musik = require(path.join(WURZEL, MODUL));
 
     console.log('1. Findet das Modul seine Ablage?\n');
