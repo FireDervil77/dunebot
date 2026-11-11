@@ -16,14 +16,37 @@ const cooldownCache = new Map();
 const OWNER_IDS = process.env.OWNER_IDS?.split(",").map((id) => id.trim());
 
 /**
+ * Eine Präfix-Nachricht in Befehlsname und Argumente zerlegen — die eine
+ * Stelle dafür.
+ *
+ * Bis 2026-11-11 zerlegten messageCreate und handlePrefixCommand je für
+ * sich, mit verschiedenen Regeln: messageCreate entfernte den Leerraum nach
+ * dem Präfix, der Handler nicht. Bei `!fb help` fand messageCreate „help“,
+ * der Handler bekam einen leeren Befehlsnamen und „help“ als erstes Argument.
+ * Beim Präfix `!` fiel das nicht auf, weil dort niemand ein Leerzeichen
+ * dahinter setzt; mit längeren Präfixen (K372, bis 5 Zeichen) liegt es nahe.
+ *
+ * @param {string} inhalt Nachrichtentext
+ * @param {string} prefix
+ * @returns {{invoke: string, args: string[]}|null} null, wenn die Nachricht nicht mit dem Präfix beginnt oder kein Befehlsname folgt
+ */
+function zerlegePraefixBefehl(inhalt, prefix) {
+    if (typeof inhalt !== "string" || !prefix || !inhalt.startsWith(prefix)) return null;
+    const teile = inhalt.slice(prefix.length).trim().split(/\s+/);
+    const invoke = (teile.shift() || "").toLowerCase();
+    if (!invoke) return null;
+    return { invoke, args: teile };
+}
+
+/**
  * @param {import('discord.js').Message} message
  * @param {import('dunebot-sdk').CommandType} cmd
  * @param {string} prefix
+ * @param {{invoke: string, args: string[]}} zerlegt aus zerlegePraefixBefehl
  */
-async function handlePrefixCommand(message, cmd, prefix) {
+async function handlePrefixCommand(message, cmd, prefix, zerlegt) {
 
-    const args = message.content.replace(prefix, "").split(/\s+/);
-    const invoke = args.shift().toLowerCase();
+    const { invoke, args } = zerlegt;
 
     const data = {};
     data.prefix = prefix;
@@ -314,6 +337,7 @@ function getRemainingCooldown(type, memberId, cmd) {
 
 module.exports = {
     handlePrefixCommand,
+    zerlegePraefixBefehl,
     handleSlashCommand,
     getCommandUsage,
     getSlashUsage,

@@ -39,7 +39,10 @@
  *                 höchstens 5 = maxlength des Feldes); die Route weist ab,
  *                 ohne etwas zu schreiben; IPC `core:PRAEFIX_SETZEN` verlangt
  *                 den Auslöser und CORE.SETTINGS.EDIT; /setprefix schreibt
- *                 nichts selbst, fragt das Dashboard und meldet den Grund
+ *                 nichts selbst, fragt das Dashboard und meldet den Grund;
+ *                 eine Nachricht wird an einer Stelle zerlegt
+ *                 (`zerlegePraefixBefehl`), mit und ohne Leerzeichen nach dem
+ *                 Präfix gleich
  *
  *   node scripts/check-befehlsschalter.js
  */
@@ -537,6 +540,38 @@ async function teilPraefix() {
             for (const k of ['EMPTY', 'WHITESPACE', 'FAILED', 'SUCCESS']) assert.ok(t[k], `${l} PREFIX.${k}`);
             assert.ok(t.FAILED.includes('{{grund}}'), `${l} FAILED ohne {{grund}}`);
         }
+    });
+
+    // Zerlegen: eine Stelle für messageCreate und den Handler. Bis 2026-11-11
+    // bekam der Handler bei `!fb help` einen leeren Namen und „help“ als Argument.
+    const { zerlegePraefixBefehl } = require(path.join(WURZEL, 'apps/bot/handler.js'));
+    await pruefe('Zerlegen: mit und ohne Leerzeichen nach dem Präfix gleich', () => {
+        assert.deepStrictEqual(zerlegePraefixBefehl('!fb help', '!fb'), { invoke: 'help', args: [] });
+        assert.deepStrictEqual(zerlegePraefixBefehl('!fbhelp', '!fb'), { invoke: 'help', args: [] });
+        assert.deepStrictEqual(zerlegePraefixBefehl('!fb  Help  a b', '!fb'), { invoke: 'help', args: ['a', 'b'] });
+        assert.deepStrictEqual(zerlegePraefixBefehl('!help x', '!'), { invoke: 'help', args: ['x'] });
+        assert.strictEqual(zerlegePraefixBefehl('!fb', '!fb'), null);
+        assert.strictEqual(zerlegePraefixBefehl('x !fb help', '!fb'), null);
+    });
+    await pruefe('messageCreate → Handler: `!fb setprefix ?` ruft setprefix mit Argument „?“', async () => {
+        ServiceManager.register('dbService', {
+            query: async () => [{ 1: 1 }],
+            getConfigs: async () => ({ PREFIX_COMMANDS_ENABLED: '1', PREFIX_COMMANDS_PREFIX: '!fb' }),
+            getEnabledPlugins: async () => [],
+        });
+        const messageCreate = require(path.join(WURZEL, 'plugins/core/bot/events/messageCreate.js'));
+        let lauf = null;
+        const cmd = { name: 'setprefix', plugin: { name: 'kern' }, command: { minArgsCount: 1 },
+            messageRun: async (c) => { lauf = { invoke: c.invoke, args: c.args }; } };
+        const guild = { id: 'G1', name: 'Probe', members: { me: {} },
+            client: { user: { id: 'BOT' }, commandManager: { findPrefixCommand: (n) => (n === 'setprefix' ? cmd : null) } } };
+        await messageCreate({
+            guild, author: { bot: false, id: 'U1' }, member: {}, content: '!fb setprefix ?',
+            client: { guilds: { cache: new Map([['G1', guild]]) } },
+            channel: { permissionsFor: () => ({ has: () => true }), send: async () => {} },
+            reply: async () => {}, replyT: async () => {},
+        });
+        assert.deepStrictEqual(lauf, { invoke: 'setprefix', args: ['?'] });
     });
 }
 

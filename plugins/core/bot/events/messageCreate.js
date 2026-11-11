@@ -1,4 +1,4 @@
-const { handlePrefixCommand } = require("../../../../apps/bot/handler");
+const { handlePrefixCommand, zerlegePraefixBefehl } = require("../../../../apps/bot/handler");
 const { istAn } = require("dunebot-sdk/utils");
 const { ServiceManager } = require("dunebot-core");
 
@@ -69,9 +69,9 @@ module.exports = async (message, plugin) => {
         }
 
         // Prefix-Befehl verarbeiten
-        if (message.content && message.content.startsWith(prefix)) {
-            const invoke = message.content.replace(`${prefix}`, "").trim().split(/\s+/)[0];
-            const cmd = guild.client.commandManager.findPrefixCommand(invoke);
+        const zerlegt = zerlegePraefixBefehl(message.content, prefix);
+        if (zerlegt) {
+            const cmd = guild.client.commandManager.findPrefixCommand(zerlegt.invoke);
             
             if (cmd) {
                 // Prüfen, ob das Plugin aktiviert ist (kern-Commands sind immer aktiv)
@@ -81,7 +81,7 @@ module.exports = async (message, plugin) => {
                 }
 
                 message.isCommand = true;
-                await handlePrefixCommand(message, cmd, prefix);
+                await handlePrefixCommand(message, cmd, prefix, zerlegt);
             }
         }
     } catch (error) {

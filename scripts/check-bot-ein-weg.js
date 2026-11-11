@@ -104,7 +104,10 @@ function absenderQuellen() {
     await pruefe('ein Verteiler: apps/bot/handler.js, das core-Plugin lädt ihn von dort', () => {
         assert.ok(!fs.existsSync(path.join(WURZEL, 'plugins/core/bot/handler.js')), 'die Kopie im core-Plugin ist wieder da');
         const h = require(path.join(WURZEL, 'apps/bot/handler.js'));
-        assert.deepStrictEqual(Object.keys(h).sort(), ['getCommandUsage', 'getSlashUsage', 'handleContext', 'handlePrefixCommand', 'handleSlashCommand']);
+        // zerlegePraefixBefehl seit 2026-11-11: die eine Stelle, an der eine
+        // Präfix-Nachricht zerlegt wird (messageCreate und Handler teilten sich
+        // das vorher mit zwei Regeln).
+        assert.deepStrictEqual(Object.keys(h).sort(), ['getCommandUsage', 'getSlashUsage', 'handleContext', 'handlePrefixCommand', 'handleSlashCommand', 'zerlegePraefixBefehl']);
         for (const p of ['plugins/core/bot/events/interactionCreate.js', 'plugins/core/bot/events/messageCreate.js']) {
             assert.match(ohneKommentare(lies(p)), /require\("\.\.\/\.\.\/\.\.\/\.\.\/apps\/bot\/handler"\)/, p);
         }
