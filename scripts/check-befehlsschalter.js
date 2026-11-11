@@ -30,6 +30,10 @@
  *   Rückbau       DISABLED_PREFIX, DISABLED_SLASH, INTERACTIONS_CONTEXT und
  *                 CMD_DISABLED kommen im Code nicht mehr vor; coreConfig legt
  *                 die Schalter nicht ein drittes Mal aus
+ *   Ein Weg       (K371) Präfix und Schalter schreibt im Dashboard nur die
+ *                 Route Einstellungen → Allgemein; der tote zweite Weg
+ *                 `guild.controller.updateSettings` (nie an eine Route
+ *                 gehängt, ohne Rechteprüfung) bleibt weg
  *
  *   node scripts/check-befehlsschalter.js
  */
@@ -348,6 +352,20 @@ async function teilRueckbau() {
         const ab = code.indexOf('async coreConfig()');
         const stueck = code.slice(ab, code.indexOf('get defaultLanguage', ab));
         assert.ok(!/INTERACTIONS|PREFIX_COMMANDS/.test(stueck), 'coreConfig nennt INTERACTIONS oder PREFIX_COMMANDS');
+    });
+    await pruefe('Ein Speicherweg im Dashboard: guild.controller hat kein updateSettings, Präfix und Schalter setzt nur settings.router (K371)', () => {
+        const ctrl = ohneKommentare(lies('apps/dashboard/controllers/guild.controller.js'));
+        assert.ok(!/updateSettings/.test(ctrl), 'guild.controller nennt updateSettings');
+        const treffer = [];
+        for (const rel of [...dateien('apps'), ...dateien('plugins'), ...dateien('packages')]) {
+            // Nur die Dashboard-Seite. Der Discord-Befehl /setprefix ist ein
+            // echter zweiter Weg mit eigener Regel — eigener Eintrag K372.
+            const dashboard = rel.startsWith('apps/dashboard/') || /^(plugins|packages)\/[^/]+\/dashboard\//.test(rel);
+            if (!dashboard || !rel.endsWith('.js') || rel === 'apps/dashboard/routes/guild/settings.router.js') continue;
+            const code = ohneKommentare(lies(rel));
+            if (/setConfig\(\s*['"]core['"]\s*,\s*['"](PREFIX_COMMANDS_PREFIX|PREFIX_COMMANDS_ENABLED|INTERACTIONS_SLASH)['"]/.test(code)) treffer.push(rel);
+        }
+        assert.deepStrictEqual(treffer, []);
     });
     await pruefe('Vorgaben neuer Guilds: beide Schalter da, die drei alten Schlüssel nicht', () => {
         for (const rel of ['packages/dunebot-core/config/guild-defaults.json', 'plugins/core/dashboard/config.json']) {

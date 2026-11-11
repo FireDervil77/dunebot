@@ -174,63 +174,6 @@ exports.getDashboard = async (req, res) => {
     }
 };
 
-
-
-/**
- * Guild-Einstellungen aktualisieren
- * @author firedervil
- * @param {import('express').Request} req - Express Request Objekt
- * @param {import('express').Response} res - Express Response Objekt
- * @returns {Promise<void>}
- */
-exports.updateSettings = async (req, res) => {
-    const Logger = ServiceManager.get('Logger');
-    const dbService = ServiceManager.get('dbService');
-    const ipcServer = ServiceManager.get('ipcServer');
-
-    try {
-        const guildId = req.params.guildId;
-        const updates = req.body;
-
-        if (!updates || typeof updates !== 'object') {
-            return res.status(400).json({
-                success: false,
-                message: "Keine oder ungültige Einstellungen übermittelt"
-            });
-        }
-
-        // Settings in der Datenbank aktualisieren via configs Tabelle
-        try {
-            // Prefix speichern
-            if (updates.prefix) {
-                await dbService.setConfig('core', 'PREFIX_COMMANDS_PREFIX', updates.prefix, 'shared', guildId);
-            }
-            
-            // Locale speichern
-            if (updates.locale) {
-                await dbService.setConfig('core', 'LOCALE', updates.locale, 'shared', guildId);
-            }
-        } catch (dbError) {
-            Logger.error(`Fehler beim Aktualisieren der Settings für Guild ${guildId}:`, dbError);
-            return res.status(500).json({
-                success: false,
-                message: "Fehler beim Speichern der Einstellungen"
-            });
-        }
-
-        res.json({
-            success: true,
-            message: "Einstellungen erfolgreich gespeichert"
-        });
-    } catch (error) {
-        Logger.error(`Fehler beim Aktualisieren der Server-Einstellungen für ${req.params.guildId}:`, error);
-        res.status(500).json({
-            success: false,
-            message: "Ein Fehler ist aufgetreten."
-        });
-    }
-};
-
 /**
  * Guild Plugins anzeigen
  * @author firedervil
