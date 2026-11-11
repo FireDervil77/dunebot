@@ -18,7 +18,8 @@
  *
  *   DirGame  = "game"    Spieldateien. **Ersetzbar** — jederzeit neu ladbar.
  *   DirData  = "data"    HOME des Spielprozesses. Das Erhaltenswerte.
- *   DirCache = "cache"   wird nie gesichert, darf jederzeit verschwinden.
+ *   DirCache = "cache"   darf jederzeit verschwinden (gesichert wird er mit dem
+ *                        ganzen Volume, K370).
  *   DirFB    = ".fb"     unsere Ablage: Rezeptstand, Prüfsummen, **Marker**.
  *                        Vom Spiel nie berührt, übersteht ein Zurücksetzen.
  *
