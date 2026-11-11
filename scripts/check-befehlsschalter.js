@@ -34,6 +34,12 @@
  *                 Route Einstellungen → Allgemein; der tote zweite Weg
  *                 `guild.controller.updateSettings` (nie an eine Route
  *                 gehängt, ohne Rechteprüfung) bleibt weg
+ *   Präfix        (K372) eine Regel für Seite und Discord in
+ *                 `Kerneinstellungen` (nicht leer, keine Leerzeichen,
+ *                 höchstens 5 = maxlength des Feldes); die Route weist ab,
+ *                 ohne etwas zu schreiben; IPC `core:PRAEFIX_SETZEN` verlangt
+ *                 den Auslöser und CORE.SETTINGS.EDIT; /setprefix schreibt
+ *                 nichts selbst, fragt das Dashboard und meldet den Grund
  *
  *   node scripts/check-befehlsschalter.js
  */
@@ -358,8 +364,8 @@ async function teilRueckbau() {
         assert.ok(!/updateSettings/.test(ctrl), 'guild.controller nennt updateSettings');
         const treffer = [];
         for (const rel of [...dateien('apps'), ...dateien('plugins'), ...dateien('packages')]) {
-            // Nur die Dashboard-Seite. Der Discord-Befehl /setprefix ist ein
-            // echter zweiter Weg mit eigener Regel — eigener Eintrag K372.
+            // Nur die Dashboard-Seite. Der Discord-Befehl /setprefix speichert
+            // seit K372 über das Dashboard; das prüft teilPraefix.
             const dashboard = rel.startsWith('apps/dashboard/') || /^(plugins|packages)\/[^/]+\/dashboard\//.test(rel);
             if (!dashboard || !rel.endsWith('.js') || rel === 'apps/dashboard/routes/guild/settings.router.js') continue;
             const code = ohneKommentare(lies(rel));
@@ -377,6 +383,163 @@ async function teilRueckbau() {
     });
 }
 
+// ── Präfix (K372) ────────────────────────────────────────────────────────
+async function teilPraefix() {
+    console.log('Präfix (K372)');
+    const K = require(path.join(WURZEL, 'apps/dashboard/helpers/Kerneinstellungen.js'));
+
+    await pruefe('Regel: höchstens 5, nicht leer, keine Leerzeichen, äusserer Leerraum fällt weg', () => {
+        assert.strictEqual(K.PRAEFIX_MAX, 5);
+        assert.deepStrictEqual(K.pruefePraefix('!'), { ok: true, praefix: '!' });
+        assert.deepStrictEqual(K.pruefePraefix('  ?? '), { ok: true, praefix: '??' });
+        assert.deepStrictEqual(K.pruefePraefix('fb!fb'), { ok: true, praefix: 'fb!fb' });
+        assert.strictEqual(K.pruefePraefix('fb!fb!').code, 'ZU_LANG');
+        assert.strictEqual(K.pruefePraefix('').code, 'LEER');
+        assert.strictEqual(K.pruefePraefix(undefined).code, 'LEER');
+        assert.strictEqual(K.pruefePraefix('a b').code, 'LEERZEICHEN');
+    });
+    await pruefe('Eingabefeld hat dieselbe Grenze als maxlength', () => {
+        const ansicht = ohneKommentareEjs(lies('apps/dashboard/themes/default/views/guild/settings/general.ejs'));
+        // Bis zum Ende des Elements; `[^>]` ginge nicht, das value-Attribut enthält `%>`.
+        const ab = ansicht.indexOf('name="prefix"');
+        assert.ok(ab >= 0, 'Feld prefix fehlt');
+        const feld = ansicht.slice(ab, ansicht.indexOf('required', ab));
+        assert.ok(new RegExp(`maxlength="${K.PRAEFIX_MAX}"`).test(feld), feld);
+    });
+
+    // Route: dieselben Attrappen wie in teilSeite, neu gesetzt.
+    const geschrieben = {};
+    ServiceManager.register('dbService', {
+        query: async (sql, p) => {
+            if (/INSERT INTO configs/.test(sql)) { geschrieben[p[0]] = p[1]; return []; }
+            throw new Error('unbekannte Abfrage: ' + sql.trim().slice(0, 60));
+        },
+    });
+    ServiceManager.register('ipcServer', {
+        broadcastOne: async () => ({ success: true, data: { success: true } }),
+        broadcast: async () => ({ success: true }),
+    });
+    const router = require(path.join(WURZEL, 'apps/dashboard/routes/guild/settings.router.js'));
+    const schicht = router.stack.find((x) => x.route?.path === '/general' && x.route.methods.put);
+    const put = schicht.route.stack[schicht.route.stack.length - 1].handle;
+    const res = () => { const r = { locals: { guildId: 'G1' }, code: 200, gesendet: null }; r.json = (x) => { r.gesendet = x; return r; }; r.status = (c) => { r.code = c; return r; }; return r; };
+    const leeren = () => { for (const k of Object.keys(geschrieben)) delete geschrieben[k]; };
+
+    await pruefe('Route: 6 Zeichen → 400 mit Grund, nichts geschrieben', async () => {
+        leeren();
+        const r = res();
+        await put({ body: { prefix: 'fb!fb!', slashCommands: 'on' }, session: {} }, r);
+        assert.strictEqual(r.code, 400);
+        assert.strictEqual(r.gesendet.success, false);
+        assert.ok(/höchstens 5/.test(r.gesendet.message), r.gesendet.message);
+        assert.deepStrictEqual(geschrieben, {});
+    });
+    await pruefe('Route: Präfix fehlt → 400, nichts geschrieben', async () => {
+        leeren();
+        const r = res();
+        await put({ body: { slashCommands: 'on' }, session: {} }, r);
+        assert.strictEqual(r.code, 400);
+        assert.deepStrictEqual(geschrieben, {});
+    });
+    await pruefe('Route: speichert den bereinigten Präfix', async () => {
+        leeren();
+        const r = res();
+        await put({ body: { prefix: ' fb! ', locale: 'de-DE' }, session: {} }, r);
+        assert.strictEqual(r.gesendet.success, true);
+        assert.strictEqual(geschrieben.PREFIX_COMMANDS_PREFIX, 'fb!');
+    });
+
+    // IPC im Dashboard: der echte Handler, Rechte über die echte _akteurDarfNicht.
+    const IPCServer = require(path.join(WURZEL, 'apps/dashboard/helpers/IPCServer.js'));
+    const ipc = Object.create(IPCServer.prototype);
+    // Der Handler holt ihn am Anfang für UPDATE_PLUGIN_STATUS; hier unbenutzt.
+    ServiceManager.register('pluginManager', {});
+    let erlaubt = true;
+    const gefragt = [];
+    ServiceManager.register('permissionManager', {
+        hasPermission: async (u, g, k) => { gefragt.push([u, g, k]); return erlaubt; },
+    });
+    const sende = async (payload) => {
+        let antwort = null;
+        await ipc._handleCoreEvent('PRAEFIX_SETZEN', payload, { reply: (x) => { antwort = x; } });
+        return antwort;
+    };
+    await pruefe('IPC ohne Auslöser: abgewiesen, nichts geschrieben', async () => {
+        leeren();
+        const a = await sende({ guild_id: 'G1', praefix: '?' });
+        assert.strictEqual(a.success, false);
+        assert.deepStrictEqual(geschrieben, {});
+    });
+    await pruefe('IPC ohne CORE.SETTINGS.EDIT: abgewiesen, nichts geschrieben', async () => {
+        leeren(); erlaubt = false; gefragt.length = 0;
+        const a = await sende({ guild_id: 'G1', actor_user_id: 'U1', praefix: '?' });
+        assert.strictEqual(a.success, false);
+        assert.deepStrictEqual(gefragt, [['U1', 'G1', 'CORE.SETTINGS.EDIT']]);
+        assert.deepStrictEqual(geschrieben, {});
+    });
+    await pruefe('IPC mit Recht: schreibt nur den Präfix, Antwort nennt ihn', async () => {
+        leeren(); erlaubt = true;
+        const a = await sende({ guild_id: 'G1', actor_user_id: 'U1', praefix: ' ?? ' });
+        assert.deepStrictEqual(a, { success: true, data: { praefix: '??' } });
+        assert.deepStrictEqual(geschrieben, { PREFIX_COMMANDS_PREFIX: '??' });
+    });
+    await pruefe('IPC zu lang: Code ZU_LANG mit Grenze, nichts geschrieben', async () => {
+        leeren();
+        const a = await sende({ guild_id: 'G1', actor_user_id: 'U1', praefix: 'fb!fb!' });
+        assert.strictEqual(a.success, false);
+        assert.strictEqual(a.code, 'ZU_LANG');
+        assert.strictEqual(a.max, 5);
+        assert.deepStrictEqual(geschrieben, {});
+    });
+
+    // Bot: der echte Befehl, das Dashboard als Attrappe.
+    const befehl = require(path.join(WURZEL, 'apps/bot/commands/setprefix.js'));
+    await pruefe('/setprefix schreibt nichts selbst', () => {
+        const code = ohneKommentare(lies('apps/bot/commands/setprefix.js'));
+        assert.ok(!/setConfig|dbService|INSERT/.test(code), 'setprefix.js schreibt selbst');
+        assert.ok(!('userPermissions' in befehl) || Array.isArray(befehl.userPermissions));
+    });
+    const lauf = async (ipcAntwort, { ohneIpc = false } = {}) => {
+        const gesendet = [];
+        ServiceManager.register('ipcClient', ohneIpc ? null : {
+            sendToDashboard: async (ev, daten) => { gesendet.push([ev, daten]); return ipcAntwort; },
+        });
+        let text = null;
+        const guild = { id: 'G1', getT: (k, v) => `${k}${v ? ' ' + JSON.stringify(v) : ''}` };
+        await befehl.interactionRun({ interaction: {
+            guild, user: { id: 'U7' },
+            options: { getString: () => 'fb!' },
+            followUp: async (t) => { text = t; },
+        } });
+        return { gesendet, text };
+    };
+    await pruefe('/setprefix fragt das Dashboard mit Guild, Auslöser und Eingabe', async () => {
+        const { gesendet, text } = await lauf({ success: true, data: { praefix: 'fb!' } });
+        assert.deepStrictEqual(gesendet, [['core:PRAEFIX_SETZEN', { guild_id: 'G1', actor_user_id: 'U7', praefix: 'fb!' }]]);
+        assert.strictEqual(text, 'core:PREFIX.SUCCESS {"prefix":"fb!"}');
+    });
+    await pruefe('/setprefix meldet die Grenze aus dem Dashboard', async () => {
+        const { text } = await lauf({ success: false, code: 'ZU_LANG', max: 5, error: 'x' });
+        assert.strictEqual(text, 'core:PREFIX.TOO_LONG {"max":5}');
+    });
+    await pruefe('/setprefix ohne Dashboard: Grund statt Erfolg', async () => {
+        const { text } = await lauf(null, { ohneIpc: true });
+        assert.ok(/^core:PREFIX\.FAILED /.test(text) && /Dashboard/.test(text), text);
+    });
+    await pruefe('/setprefix: Recht fehlt → Grund aus dem Dashboard', async () => {
+        const { text } = await lauf({ success: false, error: 'Dir fehlt die Berechtigung CORE.SETTINGS.EDIT.' });
+        assert.ok(text.includes('CORE.SETTINGS.EDIT'), text);
+    });
+    await pruefe('Bot-Texte: TOO_LONG nennt {{max}}, EMPTY, WHITESPACE, FAILED in de-DE und en-GB', () => {
+        for (const l of ['de-DE', 'en-GB']) {
+            const t = JSON.parse(lies(`plugins/core/bot/locales/${l}.json`)).PREFIX;
+            assert.ok(t.TOO_LONG.includes('{{max}}') && !/\b2\b/.test(t.TOO_LONG), `${l} TOO_LONG`);
+            for (const k of ['EMPTY', 'WHITESPACE', 'FAILED', 'SUCCESS']) assert.ok(t[k], `${l} PREFIX.${k}`);
+            assert.ok(t.FAILED.includes('{{grund}}'), `${l} FAILED ohne {{grund}}`);
+        }
+    });
+}
+
 (async () => {
     await teilIstAn();
     await teilAnmeldung();
@@ -384,6 +547,7 @@ async function teilRueckbau() {
     await teilIpc();
     await teilSeite();
     await teilRueckbau();
+    await teilPraefix();
     console.log(fehler ? `\n${fehler} Prüfung(en) rot` : '\nalle grün');
     process.exit(fehler ? 1 : 0);
 })();

@@ -12,6 +12,7 @@ const router = express.Router({ mergeParams: true });
 const { ServiceManager } = require('dunebot-core');
 const { requirePermission } = require('../../middlewares/permissions.middleware');
 const { istAn } = require('dunebot-sdk/utils');
+const Kerneinstellungen = require('../../helpers/Kerneinstellungen');
 
 // GET /settings → Overview
 router.get('/', requirePermission('CORE.SETTINGS.VIEW'), async (req, res) => {
@@ -112,24 +113,23 @@ router.put('/general', requirePermission('CORE.SETTINGS.EDIT'), async (req, res)
     const guildId = res.locals.guildId;
     const { prefix, locale, slashCommands, praefixBefehle } = req.body;
 
+    // Dieselbe Regel wie /setprefix in Discord (K372): Beide gehen durch
+    // `Kerneinstellungen`. Bis 2026-11-11 prüfte die Route nichts — nur das
+    // Eingabefeld, und das lässt sich umgehen.
+    const praefix = Kerneinstellungen.pruefePraefix(prefix);
+    if (!praefix.ok) {
+        return res.status(400).json({ success: false, message: praefix.grund });
+    }
+
     try {
-        const settingsMap = {
-            'PREFIX_COMMANDS_PREFIX': prefix,
+        await Kerneinstellungen.schreibe(dbService, guildId, {
+            'PREFIX_COMMANDS_PREFIX': praefix.praefix,
             'LOCALE': locale,
             // Ein abgewähltes Kästchen schickt der Browser gar nicht mit — fehlt
             // das Feld, heisst das „aus“.
             'INTERACTIONS_SLASH': slashCommands === 'on' ? 1 : 0,
             'PREFIX_COMMANDS_ENABLED': praefixBefehle === 'on' ? 1 : 0
-        };
-
-        for (const [configKey, value] of Object.entries(settingsMap)) {
-            const configValue = typeof value === 'number' ? value.toString() : value;
-            await dbService.query(`
-                INSERT INTO configs (plugin_name, config_key, config_value, context, guild_id, is_global)
-                VALUES ('core', ?, ?, 'shared', ?, 0)
-                ON DUPLICATE KEY UPDATE config_value = VALUES(config_value)
-            `, [configKey, configValue, guildId]);
-        }
+        });
 
         // Session-Locale löschen → sofortiger Sprachwechsel
         delete req.session.locale;

@@ -96,7 +96,10 @@
     "PREFIX": {
         "DESCRIPTION": "setzt einen neuen Prefix für diesen Server",
         "NEW_PREFIX": "neuer Prefix",
-        "TOO_LONG": "Der Prefix ist zu lang! Er muss 2 Zeichen oder weniger haben.",
+        "TOO_LONG": "Der Präfix ist zu lang. Er darf höchstens {{max}} Zeichen haben.",
+        "EMPTY": "Der Präfix darf nicht leer sein.",
+        "WHITESPACE": "Der Präfix darf keine Leerzeichen enthalten.",
+        "FAILED": "Der Präfix wurde nicht gespeichert: {{grund}}",
         "SUCCESS": "Der neue Prefix wurde auf `{{prefix}}` gesetzt"
     },
      "SETTINGS": {

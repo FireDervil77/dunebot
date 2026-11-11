@@ -96,7 +96,10 @@
     "PREFIX": {
         "DESCRIPTION": "sets a new prefix for this server",
         "NEW_PREFIX": "new Prefix",
-        "TOO_LONG": "The prefix is too long! It must be 2 characters or less.",
+        "TOO_LONG": "The prefix is too long. It may have at most {{max}} characters.",
+        "EMPTY": "The prefix must not be empty.",
+        "WHITESPACE": "The prefix must not contain spaces.",
+        "FAILED": "The prefix was not saved: {{grund}}",
         "SUCCESS": "New prefix has been set to `{{prefix}}`"
     },
     "SETTINGS": {

@@ -7,6 +7,7 @@ const bcrypt = require("bcrypt");
 const { pruefeAktion: pruefeServerAktion } =
     require("../../../plugins/gameserver/dashboard/helpers/ServerState");
 const Serverloeschung = require("../../../plugins/gameserver/dashboard/helpers/Loeschung");
+const Kerneinstellungen = require("./Kerneinstellungen");
 
 class IPCServer {
     constructor() {
@@ -302,6 +303,28 @@ class IPCServer {
                 }
 
                 return message.reply({ success: ergebnisse.every(e => e.ok), data: { ergebnisse } });
+            }
+            case 'PRAEFIX_SETZEN': {
+                // Discord `/setprefix` (K372, Betreiber 2026-11-11): Der Befehl
+                // bleibt, gespeichert wird hier — mit derselben Regel und
+                // demselben Recht wie die Seite Einstellungen → Allgemein.
+                // Ohne Auslöser keine Änderung: `_akteurDarfNicht` liesse ihn
+                // sonst ungeprüft durch.
+                const { guild_id: guildId, actor_user_id: actorId, praefix } = payload || {};
+                if (!guildId) return message.reply({ success: false, error: 'guild_id fehlt' });
+                if (!actorId) return message.reply({ success: false, error: 'actor_user_id fehlt' });
+                if (await this._akteurDarfNicht('Kern', action, payload, message, 'CORE.SETTINGS.EDIT')) return;
+
+                try {
+                    const ergebnis = await Kerneinstellungen.setzePraefix(ServiceManager.get('dbService'), guildId, praefix);
+                    if (!ergebnis.ok) {
+                        return message.reply({ success: false, error: ergebnis.grund, code: ergebnis.code, max: ergebnis.max });
+                    }
+                    return message.reply({ success: true, data: { praefix: ergebnis.praefix } });
+                } catch (err) {
+                    Logger.error(`[IPC/core] PRAEFIX_SETZEN für Guild ${guildId} gescheitert:`, err);
+                    return message.reply({ success: false, error: err.message });
+                }
             }
             default:
                 return message.reply({ success: false, error: `Unbekannte core-Aktion: ${action}` });
