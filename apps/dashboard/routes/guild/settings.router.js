@@ -11,6 +11,7 @@ const express = require('express');
 const router = express.Router({ mergeParams: true });
 const { ServiceManager } = require('dunebot-core');
 const { requirePermission } = require('../../middlewares/permissions.middleware');
+const { istAn } = require('dunebot-sdk/utils');
 
 // GET /settings → Overview
 router.get('/', requirePermission('CORE.SETTINGS.VIEW'), async (req, res) => {
@@ -47,7 +48,7 @@ router.get('/general', requirePermission('CORE.SETTINGS.VIEW'), async (req, res)
 
     // Kein `THEME` mehr (2026-11-04): Das aktive Theme steht in `guild_themes`
     // und wird unter /themes gesetzt. `configs.THEME` las niemand.
-    const settings = { prefix: '!', locale: 'de-DE', slashCommands: true };
+    const settings = { prefix: '!', locale: 'de-DE', slashCommands: true, praefixBefehle: true };
 
     try {
         const configs = await dbService.query(`
@@ -56,23 +57,25 @@ router.get('/general', requirePermission('CORE.SETTINGS.VIEW'), async (req, res)
             WHERE plugin_name = 'core'
               AND guild_id = ?
               AND context = 'shared'
-              AND config_key IN ('PREFIX_COMMANDS_PREFIX', 'LOCALE', 'INTERACTIONS_SLASH')
+              AND config_key IN ('PREFIX_COMMANDS_PREFIX', 'LOCALE', 'INTERACTIONS_SLASH', 'PREFIX_COMMANDS_ENABLED')
         `, [guildId]);
 
         const keyMap = {
             'PREFIX_COMMANDS_PREFIX': 'prefix',
             'LOCALE': 'locale',
-            'INTERACTIONS_SLASH': 'slashCommands'
+            'INTERACTIONS_SLASH': 'slashCommands',
+            'PREFIX_COMMANDS_ENABLED': 'praefixBefehle'
         };
 
+        // Die zwei Schalter mit derselben Auslegung wie der Bot (`istAn`, K365):
+        // Sonst zeigte die Seite „an“, während der Bot „aus“ liest, oder umgekehrt.
+        const schalter = new Set(['slashCommands', 'praefixBefehle']);
         configs.forEach(row => {
             const viewKey = keyMap[row.config_key];
             if (viewKey) {
-                let value = row.config_value;
-                if (viewKey === 'slashCommands') {
-                    value = value === '1' || value === 1 || value === true;
-                }
-                settings[viewKey] = value;
+                settings[viewKey] = schalter.has(viewKey)
+                    ? istAn(row.config_value)
+                    : row.config_value;
             }
         });
     } catch (err) {
@@ -107,13 +110,16 @@ router.put('/general', requirePermission('CORE.SETTINGS.EDIT'), async (req, res)
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
     const guildId = res.locals.guildId;
-    const { prefix, locale, slashCommands } = req.body;
+    const { prefix, locale, slashCommands, praefixBefehle } = req.body;
 
     try {
         const settingsMap = {
             'PREFIX_COMMANDS_PREFIX': prefix,
             'LOCALE': locale,
-            'INTERACTIONS_SLASH': slashCommands === 'on' ? 1 : 0
+            // Ein abgewähltes Kästchen schickt der Browser gar nicht mit — fehlt
+            // das Feld, heisst das „aus“.
+            'INTERACTIONS_SLASH': slashCommands === 'on' ? 1 : 0,
+            'PREFIX_COMMANDS_ENABLED': praefixBefehle === 'on' ? 1 : 0
         };
 
         for (const [configKey, value] of Object.entries(settingsMap)) {
@@ -142,6 +148,28 @@ router.put('/general', requirePermission('CORE.SETTINGS.EDIT'), async (req, res)
             } catch (err) {
                 Logger.warn(`[KernSettings] Bot über die neue Sprache nicht erreicht: ${err.message}`);
             }
+        }
+
+        // Slash-Befehle wirken bei Discord nur über die Registrierung (K365).
+        // Der Bot meldet die Befehle der Guild neu an — bei „aus“ einen leeren
+        // Satz. Hat sich nichts geändert, sendet er nichts (Prüfsumme).
+        // Präfix-Befehle brauchen das nicht: Der Bot liest den Schalter bei
+        // jeder Nachricht.
+        let botMeldung = null;
+        try {
+            const ipcServer = ServiceManager.get('ipcServer');
+            const huelle = await ipcServer.broadcastOne('dashboard:BEFEHLE_NEU_ANMELDEN', { guildId }, true, { timeout: 5000 });
+            const antwort = huelle?.data ?? huelle;
+            if (!antwort?.success) botMeldung = antwort?.error || huelle?.error || 'keine Antwort';
+        } catch (err) {
+            botMeldung = err.message;
+        }
+        if (botMeldung) {
+            Logger.warn(`[KernSettings] Bot hat die Befehle von Guild ${guildId} nicht neu angemeldet: ${botMeldung}`);
+            return res.json({
+                success: true,
+                message: `Gespeichert. Der Bot hat die Slash-Befehle nicht neu angemeldet (${botMeldung}) — in Discord ändern sie sich erst bei seinem nächsten Start.`
+            });
         }
 
         res.json({ success: true, message: 'Einstellungen erfolgreich gespeichert!' });

@@ -1,6 +1,6 @@
 const crypto = require("crypto");
 const { Collection, ApplicationCommandType } = require("discord.js");
-const { Logger } = require("dunebot-sdk/utils");
+const { Logger, istAn } = require("dunebot-sdk/utils");
 const { ServiceManager } = require("dunebot-core");
 
 /**
@@ -427,14 +427,16 @@ class CommandManager {
          // Config aus der DB laden
         const configs = await dbService.getConfigs(guildId, "core", "shared");
 
-        // Sicherer Zugriff mit Optional Chaining und Fallback
-        const slashEnabled = configs?.INTERACTIONS_SLASH ?? true;
-        const contextEnabled = configs?.INTERACTIONS_CONTEXT ?? false;
-
-        if (!slashEnabled && !contextEnabled) {
-            Logger.info("Skipping command registration - no interactions enabled");
-            return;
-        }
+        // Ein Schalter je Guild für alles, was Discord als Anwendungsbefehl
+        // führt: Slash-Befehle und Kontextmenüs (K365, 2026-11-11).
+        //
+        // Bis dahin stand hier `INTERACTIONS_SLASH ?? true` und ein zweiter
+        // Schlüssel `INTERACTIONS_CONTEXT`. Die Werte kommen als Text ("1"/"0"),
+        // "0" ist wahr — beide waren in jeder Guild an, egal was gespeichert
+        // war. Und war doch einmal alles aus, kehrte die Methode vorzeitig
+        // zurück: Bei Discord blieb der alte Satz stehen. Jetzt wird bei „aus“
+        // ein leerer Satz gesendet, damit die Befehle dort verschwinden.
+        const slashAn = istAn(configs?.INTERACTIONS_SLASH);
 
         const toRegister = [];
 
@@ -459,17 +461,10 @@ class CommandManager {
 
         Logger.debug(`Aktivierte Plugins für Guild ${guildId}: ${enabledPlugins.join(', ')}`);
         
-        // Get list of disabled commands
-        const disabledSlashCommands = configs?.DISABLED_SLASH || [];
-
         // Filter commands from enabled plugins
-        if (slashEnabled) {
+        if (slashAn) {
             Array.from(this.slashCommands.values())
                 .filter((cmd) => {
-                    if (Array.isArray(disabledSlashCommands) && disabledSlashCommands.includes(cmd.name)) {
-                        Logger.debug(`Command ${cmd.name} ist für Guild ${guildId} deaktiviert`);
-                        return false;
-                    }
                     const plugin = cmd.plugin;
                     if (plugin.name === 'kern') return true;
                     const isGloballyEnabled = this.client.pluginManager.isPluginEnabled(plugin.name);
@@ -487,7 +482,7 @@ class CommandManager {
         }
 
         // Filter context menus from enabled plugins
-        if (configs["INTERACTIONS_CONTEXT"]) {
+        if (slashAn) {
             Array.from(this.contextMenus.values())
                 .filter((ctx) => {
                     // Check if the plugin is globally enabled AND enabled for this guild

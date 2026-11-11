@@ -123,15 +123,11 @@ class BotClient extends Client {
                 config[row.config_key] = row.config_value;
             }
 
+            // Nur die Sprache. Hier standen bis 2026-11-11 (K365) auch
+            // INTERACTIONS und PREFIX_COMMANDS — gelesen hat sie niemand, und
+            // sie legten die Schalter anders aus als der Bot selbst. Die
+            // Schalter gelten je Guild und werden dort gelesen (`istAn`).
             return {
-                INTERACTIONS: {
-                    SLASH: config["INTERACTIONS_SLASH"] !== "false",
-                    CONTEXT: config["INTERACTIONS_CONTEXT"] === "true"
-                },
-                PREFIX_COMMANDS: {
-                    ENABLED: config["PREFIX_COMMANDS_ENABLED"] !== "false",
-                    DEFAULT_PREFIX: config["PREFIX_COMMANDS_PREFIX"] || "!"
-                },
                 LOCALE: {
                     DEFAULT: config["LOCALE"] || "de-DE"
                 }
@@ -140,8 +136,6 @@ class BotClient extends Client {
         } catch (error) {
             this.logger.error("Failed to load core config, using defaults:", error);
             return {
-                INTERACTIONS: { SLASH: true, CONTEXT: false },
-                PREFIX_COMMANDS: { ENABLED: true, DEFAULT_PREFIX: "!" },
                 LOCALE: { DEFAULT: "de-DE" }
             };
         }

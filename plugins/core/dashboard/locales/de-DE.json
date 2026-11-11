@@ -201,8 +201,10 @@
       "THEME_HELP": "Das Aussehen deines Dashboards wählst du unter Themes.",
       "THEME_LINK": "Zu den Themes",
       "FEATURES_TITLE": "Features",
-      "SLASH_LABEL": "Slash-Commands aktivieren",
-      "SLASH_HELP": "Ermöglicht die Nutzung von Discord Slash-Commands (<code>/help</code> statt <code>!help</code>)",
+      "SLASH_LABEL": "Slash-Befehle",
+      "SLASH_HELP": "Befehle wie <code>/help</code> und die Kontextmenüs des Bots (Rechtsklick → Apps). Aus heißt: Der Bot meldet sie auf diesem Server ab, sie verschwinden aus Discord.",
+      "PRAEFIX_SWITCH_LABEL": "Präfix-Befehle",
+      "PRAEFIX_SWITCH_HELP": "Befehle mit Präfix wie <code>!help</code>. Aus heißt: Der Bot reagiert auf diesem Server auf keinen davon, auch nicht auf eine Erwähnung.",
       "RESET_BTN": "Zurücksetzen",
       "SAVE_BTN": "Einstellungen speichern"
     },
@@ -219,6 +221,7 @@
       "LOCALE": "Sprache",
       "THEME": "Theme",
       "SLASH": "Slash-Commands",
+      "PRAEFIX_BEFEHLE": "Präfix-Befehle",
       "ACTIVE": "Aktiv",
       "INACTIVE": "Deaktiviert"
     }
@@ -231,7 +234,7 @@
       "PREFIX": "Bot-Präfix anpassen",
       "LOCALE": "Sprache festlegen",
       "THEME": "Theme auswählen",
-      "SLASH": "Slash-Commands verwalten"
+      "SLASH": "Slash- und Präfix-Befehle an- und abschalten"
     },
     "USER_TITLE": "Benutzer-Verwaltung",
     "USER_SUBTITLE": "Rollen & Permissions",

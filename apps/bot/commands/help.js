@@ -9,7 +9,7 @@ const {
     ComponentType,
 } = require("discord.js");
 const { getCommandUsage, getSlashUsage } = require("../handler");
-const { EmbedUtils, parseJsonArray } = require("dunebot-sdk/utils");
+const { EmbedUtils } = require("dunebot-sdk/utils");
 const { ServiceManager } = require("dunebot-core");
 
 const CMDS_PER_PAGE = 5;
@@ -47,11 +47,8 @@ module.exports = {
         let trigger = args[0];
 
         try {
-            // Get coreConfig from database
-            const coreConfig = await dbService.getConfigs(message.guild.id);
             // NEU: Aktivierte Plugins aus guild_plugins laden
             const enabledPlugins = await dbService.getEnabledPlugins(message.guild.id);
-            const disabledPrefix = parseJsonArray(coreConfig.disabled_prefix, []);
 
             // !help
             if (!trigger) {
@@ -61,19 +58,19 @@ module.exports = {
                     plugin 
                 });
                 const sentMsg = await message.reply(response);
-                return waiter(sentMsg, message.author.id, prefix, disabledPrefix);
+                return waiter(sentMsg, message.author.id, prefix);
             }
 
             // check if category help (!help cat)
             if (message.client.commandManager.plugins.some(
                 (p) => p.name === trigger && !p.ownerOnly && enabledPlugins.includes(p.name)
             )) {
-                return pluginWaiter(message, trigger, prefix, disabledPrefix);
+                return pluginWaiter(message, trigger, prefix);
             }
 
             // check if command help (!help cmdName)
             const cmd = message.client.commandManager.findPrefixCommand(trigger);
-            if (cmd && !disabledPrefix.includes(trigger)) {
+            if (cmd) {
                 const embed = getCommandUsage(message.guild, cmd, prefix, trigger);
                 return message.reply({ embeds: [embed] });
             }
@@ -92,11 +89,8 @@ module.exports = {
         let cmdName = interaction.options.getString("command");
 
         try {
-            // Get coreConfig from database
-            const coreConfig = await dbService.getConfigs(interaction.guild.id);
             // NEU: Aktivierte Plugins aus guild_plugins laden
             const enabledPlugins = await dbService.getEnabledPlugins(interaction.guild.id);
-            const disabledSlash = parseJsonArray(coreConfig.disabled_slash, []);
 
             // !help
             if (!cmdName && !pluginName) {
@@ -106,7 +100,7 @@ module.exports = {
                     plugin 
                 });
                 const sentMsg = await interaction.followUp(response);
-                return waiter(sentMsg, interaction.user.id, null, disabledSlash);
+                return waiter(sentMsg, interaction.user.id, null);
             }
 
             // check if category help (!help cat)
@@ -114,7 +108,7 @@ module.exports = {
                 if (interaction.client.commandManager.plugins.some(
                     (p) => p.name === pluginName && !p.ownerOnly && enabledPlugins.includes(p.name)
                 )) {
-                    return pluginWaiter(interaction, pluginName, null, disabledSlash);
+                    return pluginWaiter(interaction, pluginName, null);
                 }
                 return interaction.followUpT("core:HELP.NOT_FOUND");
             }
@@ -122,7 +116,7 @@ module.exports = {
             // check if command help (!help cmdName)
             if (cmdName) {
                 const cmd = interaction.client.commandManager.findSlashCommand(cmdName);
-                if (cmd && !disabledSlash.includes(cmd.name)) {
+                if (cmd) {
                     const embed = getSlashUsage(interaction.guild, cmd);
                     return interaction.followUp({ embeds: [embed] });
                 }
@@ -213,9 +207,8 @@ async function getHelpMenu({ client, guild }) {
  * @param {Message} msg
  * @param {string} userId
  * @param {string} prefix
- * @param {string[]} disabledCmds
  */
-const waiter = (msg, userId, prefix, disabledCmds) => {
+const waiter = (msg, userId, prefix) => {
     const collector = msg.channel.createMessageComponentCollector({
         filter: (reactor) => reactor.user.id === userId && msg.id === reactor.message.id,
         idle: IDLE_TIMEOUT * 1000,
@@ -236,8 +229,8 @@ const waiter = (msg, userId, prefix, disabledCmds) => {
             case "help-menu": {
                 const cat = response.values[0];
                 arrEmbeds = prefix
-                    ? getPrefixPluginCommandEmbed(msg.guild, cat, prefix, disabledCmds)
-                    : getSlashPluginCommandsEmbed(msg.guild, cat, disabledCmds);
+                    ? getPrefixPluginCommandEmbed(msg.guild, cat, prefix)
+                    : getSlashPluginCommandsEmbed(msg.guild, cat);
                 currentPage = 0;
 
                 // Buttons Row
@@ -291,12 +284,11 @@ const waiter = (msg, userId, prefix, disabledCmds) => {
  * @param {import('discord.js').ChatInputCommandInteraction | import('discord.js').Message} arg0
  * @param {string} pluginName
  * @param {string} prefix
- * @param {string[]} disabledCmds
  */
-const pluginWaiter = async (arg0, pluginName, prefix, disabledCmds) => {
+const pluginWaiter = async (arg0, pluginName, prefix) => {
     let arrEmbeds = prefix
-        ? getPrefixPluginCommandEmbed(arg0.guild, pluginName, prefix, disabledCmds)
-        : getSlashPluginCommandsEmbed(arg0.guild, pluginName, disabledCmds, disabledCmds);
+        ? getPrefixPluginCommandEmbed(arg0.guild, pluginName, prefix)
+        : getSlashPluginCommandsEmbed(arg0.guild, pluginName);
 
     let currentPage = 0;
     let buttonsRow = [];
@@ -374,12 +366,11 @@ const pluginWaiter = async (arg0, pluginName, prefix, disabledCmds) => {
  * Returns an array of message embeds for a particular command category [SLASH COMMANDS]
  * @param {import('discord.js').Guild} guild
  * @param {string} pluginName
- * @param {string[]} disabledCmds
  */
-function getSlashPluginCommandsEmbed(guild, pluginName, disabledCmds) {
+function getSlashPluginCommandsEmbed(guild, pluginName) {
     const commands = [
         ...guild.client.pluginManager.plugins.find((p) => p.name === pluginName).commands,
-    ].filter((cmd) => cmd.slashCommand?.enabled && !disabledCmds.includes(cmd.name));
+    ].filter((cmd) => cmd.slashCommand?.enabled);
 
     if (commands.length === 0) {
         const embed = EmbedUtils.embed()
@@ -439,10 +430,10 @@ function getSlashPluginCommandsEmbed(guild, pluginName, disabledCmds) {
  * @param {string} prefix
  *
  */
-function getPrefixPluginCommandEmbed(guild, pluginName, prefix, disabledCmds) {
+function getPrefixPluginCommandEmbed(guild, pluginName, prefix) {
     const commands = [
         ...guild.client.pluginManager.plugins.find((p) => p.name === pluginName).commands,
-    ].filter((cmd) => cmd.command?.enabled && !disabledCmds.includes(cmd.name));
+    ].filter((cmd) => cmd.command?.enabled);
 
     if (commands.length === 0) {
         const embed = EmbedUtils.embed()

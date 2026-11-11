@@ -1,7 +1,7 @@
 const { MessageFlags } = require("discord.js");
 const { handleSlashCommand, handleContext } = require("../../../../apps/bot/handler");
 const { ServiceManager } = require("dunebot-core");
-const { parseJsonArray } = require("dunebot-sdk/utils");
+const { istAn } = require("dunebot-sdk/utils");
 
 
 /**
@@ -88,6 +88,21 @@ module.exports = async (interaction) => {
     
     Logger.debug(`✅ Interaction von valider Guild: ${guild.name} (${guild.id})`);
 
+    // Slash-Befehle und Kontextmenüs aus (Einstellungen → Allgemein, K365).
+    // Beim Speichern meldet der Bot sie bei Discord ab; bis Discord das zeigt,
+    // kann noch einer ankommen. Der bekommt eine Antwort statt einer Ausführung.
+    if (interaction.isChatInputCommand() || interaction.isContextMenuCommand()) {
+        const kern = await dbService.getConfigs(guild.id);
+        if (!istAn(kern?.INTERACTIONS_SLASH)) {
+            return interaction
+                .reply({
+                    content: guild.getT("core:HANDLER.SLASH_DISABLED"),
+                    flags: MessageFlags.Ephemeral,
+                })
+                .catch((err) => Logger.warn(`[K365] Antwort „Slash aus“ in Guild ${guild.id} nicht gesendet: ${err.message}`));
+        }
+    }
+
     // Slash Commands
     if (interaction.isChatInputCommand()) {
         const cmd = interaction.client.commandManager.findSlashCommand(interaction.commandName);
@@ -101,28 +116,14 @@ module.exports = async (interaction) => {
         }
 
         try {
-            // Settings aus der Datenbank holen
-            const settings = await dbService.getConfigs(guild.id);
-
             // NEU: Aktivierte Plugins aus guild_plugins laden
             const enabledPlugins = await dbService.getEnabledPlugins(guild.id);
-            const disabledSlash = parseJsonArray(settings.disabled_slash, []);
             
             // check if the plugin is disabled (kern-Commands sind immer aktiv)
             if (cmd.plugin.name !== 'kern' && !enabledPlugins.includes(cmd.plugin.name)) {
                 return interaction
                     .reply({
                         content: guild.getT("core:HANDLER.PLUGIN_DISABLED"),
-                        flags: MessageFlags.Ephemeral,
-                    })
-                    .catch(() => {});
-            }
-
-            // check if the command is disabled
-            if (disabledSlash.includes(cmd.name)) {
-                return interaction
-                    .reply({
-                        content: guild.getT("core:HANDLER.CMD_DISABLED"),
                         flags: MessageFlags.Ephemeral,
                     })
                     .catch(() => {});

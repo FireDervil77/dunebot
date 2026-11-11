@@ -6,6 +6,7 @@ const Logger = require("./lib/utils/Logger");
 const MiscUtils = require("./lib/utils/MiscUtils");
 const permissions = require("./lib/utils/permissions");
 const parseJsonArray = require("./lib/utils/ParseJsonArray");
+const istAn = require("./lib/utils/IstAn");
 const NewsHelper =  require("./lib/utils/NewsHelper");
 const ChangelogHelper = require("./lib/utils/ChangelogHelper");
 const NotificationHelper = require("./lib/utils/NotificationHelper");
@@ -19,6 +20,7 @@ module.exports = {
     MiscUtils,
     permissions,
     parseJsonArray,
+    istAn,
     NewsHelper,
     ChangelogHelper,
     NotificationHelper

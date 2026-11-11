@@ -1,5 +1,5 @@
 const { handlePrefixCommand } = require("../../../../apps/bot/handler");
-const { parseJsonArray } = require("dunebot-sdk/utils");
+const { istAn } = require("dunebot-sdk/utils");
 const { ServiceManager } = require("dunebot-core");
 
 /**
@@ -50,15 +50,14 @@ module.exports = async (message, plugin) => {
             Logger.warn(`Keine Konfiguration für Guild ${guild.id} gefunden, verwende Standards`);
         }
 
-        // Prefix-Commands-Status prüfen
-        const prefixCommandsEnabled = configs?.PREFIX_COMMANDS_ENABLED ?? true;
-        if (!prefixCommandsEnabled) return;
+        // Präfix-Befehle aus (Einstellungen → Allgemein, K365). Der Wert kommt
+        // als Text; bis 2026-11-11 stand hier `?? true`, und "0" ist wahr —
+        // abschalten ging nicht. Aus heisst ganz aus, auch die Antwort auf
+        // eine Erwähnung des Bots.
+        if (!istAn(configs?.PREFIX_COMMANDS_ENABLED)) return;
 
         // NEU: Aktivierte Plugins aus guild_plugins laden
         const enabledPlugins = await dbService.getEnabledPlugins(guild.id);
-        
-        // Deaktivierte Befehle aus der Config laden
-        const disabledPrefix = configs?.DISABLED_PREFIX || [];
 
         // Prefix aus der Config laden
         const prefix = configs?.PREFIX_COMMANDS_PREFIX || "!";
@@ -78,12 +77,6 @@ module.exports = async (message, plugin) => {
                 // Prüfen, ob das Plugin aktiviert ist (kern-Commands sind immer aktiv)
                 if (cmd.plugin.name !== 'kern' && !enabledPlugins.includes(cmd.plugin.name)) {
                     Logger.debug(`Command ${cmd.name} ignoriert - Plugin ${cmd.plugin.name} nicht aktiviert`);
-                    return;
-                }
-
-                // Prüfen, ob der Befehl deaktiviert ist
-                if (disabledPrefix.includes(cmd.name)) {
-                    Logger.debug(`Command ${cmd.name} ignoriert - In Guild deaktiviert`);
                     return;
                 }
 

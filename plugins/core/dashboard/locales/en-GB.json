@@ -201,8 +201,10 @@
       "THEME_HELP": "You choose your dashboard's look under Themes.",
       "THEME_LINK": "Go to Themes",
       "FEATURES_TITLE": "Features",
-      "SLASH_LABEL": "Enable Slash Commands",
-      "SLASH_HELP": "Allows the use of Discord Slash Commands (<code>/help</code> instead of <code>!help</code>)",
+      "SLASH_LABEL": "Slash commands",
+      "SLASH_HELP": "Commands like <code>/help</code> and the bot's context menus (right-click → Apps). Off means the bot unregisters them on this server and they disappear from Discord.",
+      "PRAEFIX_SWITCH_LABEL": "Prefix commands",
+      "PRAEFIX_SWITCH_HELP": "Commands with a prefix like <code>!help</code>. Off means the bot ignores all of them on this server, including mentions.",
       "RESET_BTN": "Reset",
       "SAVE_BTN": "Save Settings"
     },
@@ -219,6 +221,7 @@
       "LOCALE": "Language",
       "THEME": "Theme",
       "SLASH": "Slash Commands",
+      "PRAEFIX_BEFEHLE": "Prefix commands",
       "ACTIVE": "Active",
       "INACTIVE": "Disabled"
     }
@@ -231,7 +234,7 @@
       "PREFIX": "Customize Bot Prefix",
       "LOCALE": "Set Language",
       "THEME": "Select Theme",
-      "SLASH": "Manage Slash Commands"
+      "SLASH": "Turn slash and prefix commands on or off"
     },
     "USER_TITLE": "User Management",
     "USER_SUBTITLE": "Roles & Permissions",

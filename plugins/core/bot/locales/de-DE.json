@@ -6,7 +6,7 @@
 
     "HANDLER": {
         "PLUGIN_DISABLED": "Dieses Plugin ist vom Serveradministrator deaktiviert",
-        "CMD_DISABLED": "Dieser Befehl ist vom Serveradministrator deaktiviert",
+        "SLASH_DISABLED": "Slash-Befehle sind auf diesem Server abgeschaltet.",
         "CMD_NOT_FOUND": "Befehl nicht gefunden",
         "OWNER_ONLY": "Dieser Befehl ist nur für den Bot-Besitzer verfügbar",
         "USER_PERMISSIONS": "Du benötigst die folgenden Berechtigungen, um diesen Befehl auszuführen: {{permissions}}",

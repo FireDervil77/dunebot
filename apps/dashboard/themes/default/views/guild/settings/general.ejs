@@ -101,6 +101,27 @@
             </div>
           </div>
 
+          <%# Präfix-Befehle ganz aus (K365, 2026-11-11). Der Bot las den Schlüssel
+              schon immer, eine Stelle zum Umlegen gab es nicht. %>
+          <div class="mb-3">
+            <div class="form-check form-switch">
+              <input 
+                class="form-check-input" 
+                type="checkbox" 
+                id="praefixBefehle" 
+                name="praefixBefehle"
+                <%= (settings?.praefixBefehle !== false) ? 'checked' : '' %>
+              >
+              <label class="form-check-label" for="praefixBefehle">
+                <i class="fa-solid fa-terminal me-1 text-primary"></i>
+                <strong><%= tr('core:SETTINGS.GENERAL.PRAEFIX_SWITCH_LABEL') %></strong>
+                <div class="text-secondary small">
+                  <%- tr('core:SETTINGS.GENERAL.PRAEFIX_SWITCH_HELP') %>
+                </div>
+              </label>
+            </div>
+          </div>
+
           <%# „Erweiterte Logs" und „Debug-Modus" standen hier bis 2026-11-04 als
               Schalter. Die Speicherroute nahm sie nie an, gelesen hat sie auch
               niemand — zwei Schalter, die sich bedienen lassen und nichts tun. %>
@@ -168,6 +189,14 @@
           <li class="mb-2">
             <strong><%= tr('core:SETTINGS.STATUS.SLASH') %>:</strong>
             <% if (settings?.slashCommands !== false) { %>
+              <span class="badge bg-success"><%= tr('core:SETTINGS.STATUS.ACTIVE') %></span>
+            <% } else { %>
+              <span class="badge bg-secondary"><%= tr('core:SETTINGS.STATUS.INACTIVE') %></span>
+            <% } %>
+          </li>
+          <li class="mb-2">
+            <strong><%= tr('core:SETTINGS.STATUS.PRAEFIX_BEFEHLE') %>:</strong>
+            <% if (settings?.praefixBefehle !== false) { %>
               <span class="badge bg-success"><%= tr('core:SETTINGS.STATUS.ACTIVE') %></span>
             <% } else { %>
               <span class="badge bg-secondary"><%= tr('core:SETTINGS.STATUS.INACTIVE') %></span>

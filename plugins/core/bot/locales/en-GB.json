@@ -6,7 +6,7 @@
 
     "HANDLER": {
         "PLUGIN_DISABLED": "This plugin is disabled by the server administrator",
-        "CMD_DISABLED": "This command is disabled by the server administrator",
+        "SLASH_DISABLED": "Slash commands are turned off on this server.",
         "CMD_NOT_FOUND": "Command not found",
         "OWNER_ONLY": "This command is only available to the bot owner",
         "USER_PERMISSIONS": "You need the following permissions to run this command: {{permissions}}",
