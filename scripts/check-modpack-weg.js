@@ -243,36 +243,44 @@ const Modrinth = require(path.join(WURZEL, 'plugins/gameserver/dashboard/helpers
     //
     // „One block horror" fuehrt alle Dateien als `required`; der Server brach
     // an Oculus ab. Modrinth weiss es am Projekt der Mod besser.
+    //
+    // Seit K226 rechnet das `PackBefund.rechneEins` (einmal je Fassung,
+    // gespeichert) statt `Modrinth.clientDateien` bei jedem Einspielen. Der
+    // Befund als Ganzes hat seinen eigenen Wächter (`check-pack-befund.js`);
+    // hier bleibt der gemessene Fall vom 2026-10-12.
     abrufe.length = 0;
-    const cl = await Modrinth.clientDateien('horror-paket', '1.0.4');
+    const PackBefund = require(path.join(WURZEL, 'plugins/gameserver/dashboard/helpers/PackBefund.js'));
+    const eins = await PackBefund.rechneEins(ABGLEICH.fassungen[0], { hole: Modrinth.hole });
+    const cl = { namen: eins.client.map(c => c.name).sort(), sha1: eins.client.flatMap(c => c.sha1) };
     pruefe(JSON.stringify(cl.namen) === JSON.stringify(['Just Zoom', 'Oculus']),
         'gemeldet werden die Mods, die Modrinth als reine Client-Mods fuehrt — und nur die',
         `gemeldet: ${cl.namen.join(', ')}`);
     pruefe(JSON.stringify([...cl.sha1].sort()) === JSON.stringify([SHA('a'), SHA('b'), SHA('c')]),
         'als Pruefsummen ALLER ihrer Dateien, klein geschrieben, ohne das, was keine Pruefsumme ist',
         `Pruefsummen: ${cl.sha1.join(', ')}`);
-    pruefe(cl.geprueft === 3 && cl.ohneAuskunft === 1,
+    pruefe(eins.einzelheiten.mit_herkunft === 3 && eins.einzelheiten.ohne_herkunft === 1,
         'und die Antwort sagt, wie viele Eintraege keine Auskunft haben (lose beigelegte Mods)',
-        `geprueft ${cl.geprueft}, ohne Auskunft ${cl.ohneAuskunft}`);
-    pruefe(abrufe.length === 3,
-        'drei Abrufe: die Fassung, die Projekte, die Fassungen der Client-Mods — das Archiv wird nicht geladen',
+        `mit Herkunft ${eins.einzelheiten.mit_herkunft}, ohne ${eins.einzelheiten.ohne_herkunft}`);
+    pruefe(abrufe.length === 2,
+        'zwei Abrufe: die Projekte, die Fassungen der Client-Mods — das Archiv wird nicht geladen',
         `${abrufe.length} Abrufe: ${abrufe.map(a => new URL(a).pathname).join(', ')}`);
     pruefe(!abrufe.some(a => a.includes('vj')),
         'nach den Dateien einer servertauglichen Mod wird gar nicht erst gefragt');
 
-    const leer = await Modrinth.clientDateien('horror-paket', '1.0.3');
-    pruefe(leer.sha1.length === 0 && leer.geprueft === 0, 'ein Paket ohne Liste ergibt keine Pruefsummen — und keinen Fehler');
-    let geworfen = null;
-    try { await Modrinth.clientDateien('horror-paket', '9.9.9'); } catch (e) { geworfen = e.message; }
-    pruefe(/gibt es nicht/.test(geworfen || ''), 'eine Fassung, die es nicht gibt, wird gemeldet statt als „nichts gefunden" durchzugehen');
+    const leer = await PackBefund.rechneEins(ABGLEICH.fassungen[1], { hole: Modrinth.hole });
+    pruefe(leer.client.length === 0 && leer.einzelheiten.mit_herkunft === 0, 'ein Paket ohne Liste ergibt keine Pruefsummen — und keinen Fehler');
 
     // Der Auftrag an den Daemon traegt die Liste — und ein ausgefallener
     // Abgleich wird gesagt, nicht verschluckt.
     const holenAbgleich = ohneKommentare(roh(path.join(WURZEL, 'plugins/gameserver/dashboard/helpers/InhalteHolen.js')) || '');
-    pruefe(/auslassen:\s+abgleich\.sha1/.test(holenAbgleich) && holenAbgleich.includes("require('./Modrinth').clientDateien(paket.kennung, paket.fassung)"),
-        'der Auftrag „Modpaket einspielen" schickt die Pruefsummen mit');
+    pruefe(/auslassen:\s+abgleich\.sha1/.test(holenAbgleich) && /PackBefund\.befund\(paket, \{ stufe: 2/.test(holenAbgleich),
+        'der Auftrag „Modpaket einspielen" schickt die Pruefsummen mit — aus dem Befund');
+    const modrinthCode = ohneKommentare(roh(path.join(WURZEL, 'plugins/gameserver/dashboard/helpers/Modrinth.js')) || '');
+    pruefe(!/clientDateien/.test(holenAbgleich) && !/clientDateien/.test(modrinthCode),
+        'und der alte Abgleich je Einspielen ist weg — ein Weg',
+        'Der Befund ERSETZT `Modrinth.clientDateien`, er laeuft nicht daneben (K226).');
     // Seit K190 (2026-11-07) in `holeAbgleich`, das Pruefung und Installation teilen.
-    pruefe(/abgleichFehler: fehler\.message/.test(holenAbgleich) && /Abgleich mit Modrinth nicht möglich/.test(holenAbgleich) && /fehler: abgleichFehler/.test(holenAbgleich),
+    pruefe(/abgleichFehler: fehler\.message/.test(holenAbgleich) && /Befund nicht möglich/.test(holenAbgleich) && /fehler: abgleichFehler/.test(holenAbgleich),
         'faellt die Nachfrage aus, steht das im Protokoll und im Ergebnis',
         'Ein Abgleich, der still ausfaellt, sieht aus wie einer, der nichts gefunden hat.');
     pruefe(/daten\.ausgelassen_abgleich !== undefined/.test(holenAbgleich),

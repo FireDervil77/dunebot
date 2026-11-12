@@ -63,7 +63,11 @@ const Spielfassung = require(H('Spielfassung'));
 const ALT = { status: 'installiert', kennung: 'alt', dateien: JSON.stringify(['game/mods/alt.jar', 'game/config/alt.toml']) };
 Inhalte.fuerServer = async () => ({ modpack: ALT, mods: [], lader: null });
 let modrinthFragen = 0;
-Modrinth.clientDateien = async () => { modrinthFragen++; return { sha1: ['aa11'], namen: ['Optik'], geprueft: 3, ohneAuskunft: 0 }; };
+// Seit K226 kommt die Liste aus dem Pack-Befund (eine Stelle), nicht mehr aus
+// `Modrinth.clientDateien`.
+const PackBefund = require(H('PackBefund'));
+PackBefund.befund = async () => { modrinthFragen++; return { urteil: 'laeuft_ohne_client', stufe: 2,
+    auslassen: { sha1: ['aa11'], namen: ['Optik'] }, fehlt: [], einzelheiten: { mit_herkunft: 3, ohne_herkunft: 0 } }; };
 const PAKET = { kennung: 'pixel', name: 'Pixelmon', fassung: '9.1', lader: 'forge', url: 'https://cdn.modrinth.com/data/p/p.mrpack', sha1: 'ff00' };
 Modrinth.modpackFassung = async () => ({ ...PAKET });
 Spielfassung.merkzettel = async () => 'forge';
@@ -116,6 +120,42 @@ const SERVERZEILE = { id: 7, guild_id: 'g', rootserver_id: 3, install_path: '', 
         const p = await InhalteHolen.pruefeModpack({ server: SERVERZEILE, paket: PAKET, laderDesServers: 'forge' });
         assert.strictEqual(p.passt, false);
         assert.match(p.fehler, /erst den Daemon aktualisieren/);
+    });
+
+    // ── Ein unvollständiges Paket wird nicht eingespielt (K226) ──────────────
+    const befundEcht = PackBefund.befund;
+    const UNVOLLSTAENDIG = { urteil: 'unvollstaendig', stufe: 2, auslassen: { sha1: [], namen: [] },
+        fehlt: [{ kennung: 'flib', name: 'FLIB', gebraucht_von: ['Simple Storage Network'], grund: 'extern', host: 'www.curseforge.com' }],
+        einzelheiten: { mit_herkunft: 3, ohne_herkunft: 0 } };
+
+    await pruefe('Helfer: ein unvollständiges Paket geht gar nicht erst zum Daemon, und der Satz nennt, was fehlt', async () => {
+        gesendet = [];
+        PackBefund.befund = async () => UNVOLLSTAENDIG;
+        try {
+            const p = await InhalteHolen.pruefeModpack({ server: SERVERZEILE, paket: PAKET, laderDesServers: 'forge' });
+            assert.strictEqual(p.passt, false);
+            assert.match(p.fehler, /Pixelmon/);
+            assert.match(p.fehler, /FLIB \(gebraucht von Simple Storage Network\)/);
+            assert.match(p.fehler, /Am Server wurde nichts geändert/);
+            assert.strictEqual(gesendet.length, 0);
+        } finally { PackBefund.befund = befundEcht; }
+    });
+
+    await pruefe('Helfer: auch die Installation selbst lehnt es ab — bevor das alte Paket weicht', async () => {
+        gesendet = [];
+        const eingetragen = [];
+        const eintragenEcht = Inhalte.eintragen;
+        Inhalte.eintragen = async (z) => { eingetragen.push(z.status); };
+        PackBefund.befund = async () => UNVOLLSTAENDIG;
+        try {
+            const e = await InhalteHolen.installiereModpack({ server: SERVERZEILE, guildId: 'g', paket: PAKET, laderDesServers: 'forge' });
+            assert.strictEqual(e.success, false);
+            assert.match(e.fehler, /FLIB/);
+            // Kein Auftrag an den Daemon: nichts entfernt, nichts eingespielt. Und
+            // die Zeile des alten, installierten Pakets bleibt, wie sie ist.
+            assert.deepStrictEqual(gesendet, []);
+            assert.deepStrictEqual(eingetragen, []);
+        } finally { PackBefund.befund = befundEcht; Inhalte.eintragen = eintragenEcht; }
     });
 
     // Die Route, echt — ersetzt sind nur Stopp, Installation und das Ende.

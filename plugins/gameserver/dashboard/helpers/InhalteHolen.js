@@ -708,24 +708,47 @@ function pruefeLader(paket, laderDesServers) {
 }
 
 /**
- * Reine Client-Mods, die das Paket nicht als solche ausweist.
+ * Der Server-Befund dieser Fassung — was ausgelassen wird und ob etwas fehlt.
  *
- * Modrinth wird gefragt, der Daemon bekommt die Pruefsummen (siehe
- * `Modrinth.clientDateien`). Scheitert die Nachfrage, wird trotzdem
- * installiert — wie vor dem Abgleich, nur mit dem, was das Paket selbst sagt.
- * Das steht dann im Protokoll UND im Ergebnis: Ein Abgleich, der still
- * ausfaellt, saehe aus wie einer, der nichts gefunden hat.
+ * Eine Stelle rechnet (`PackBefund.befund`, Stufe 2), Vorprüfung und
+ * Installation lesen dasselbe (K226). Bis dahin fragte diese Funktion Modrinth
+ * bei jedem Einspielen selbst (`Modrinth.clientDateien`).
  *
- * @returns {Promise<{abgleich: Object, abgleichFehler: string|null}>}
+ * Scheitert der Befund ganz (Modrinth nicht erreichbar), wird trotzdem
+ * installiert — nur mit dem, was das Paket selbst sagt. Das steht dann im
+ * Protokoll UND im Ergebnis: Ein Abgleich, der still ausfällt, sähe aus wie
+ * einer, der nichts gefunden hat.
+ *
+ * @returns {Promise<{abgleich: Object, abgleichFehler: string|null, unvollstaendig: string|null}>}
+ *          `unvollstaendig`: der Satz, warum dieses Paket nicht eingespielt wird
  */
-async function holeAbgleich(paket) {
+async function holeAbgleich(paket, beiFortschritt = () => {}) {
+    // Erst hier geladen: PackBefund lädt Modrinth.js, und das kennt diese Datei.
+    const PackBefund = require('./PackBefund');
     try {
-        // Erst hier geladen: Modrinth.js und diese Datei kennen einander.
-        return { abgleich: await require('./Modrinth').clientDateien(paket.kennung, paket.fassung), abgleichFehler: null };
+        const b = await PackBefund.befund(paket, { stufe: 2, beiFortschritt });
+        return {
+            abgleich: {
+                sha1: b.auslassen.sha1,
+                namen: b.auslassen.namen,
+                geprueft: b.einzelheiten.mit_herkunft || 0,
+                ohneAuskunft: b.einzelheiten.ohne_herkunft || 0,
+                urteil: b.urteil,
+                stufe: b.stufe,
+                behalten: (b.einzelheiten.behalten || []).map(x => x.name),
+            },
+            // Stufe 1 steht, die gründliche Prüfung fiel aus — auch das wird gesagt.
+            abgleichFehler: b.stufe2Fehler ? `gründliche Prüfung nicht möglich: ${b.stufe2Fehler}` : null,
+            unvollstaendig: b.urteil === PackBefund.URTEIL.UNVOLLSTAENDIG ? PackBefund.satzUnvollstaendig(paket, b) : null,
+        };
     } catch (fehler) {
-        ServiceManager.get('Logger').warn(`[Gameserver/Modpack] ${paket.kennung} ${paket.fassung}: Abgleich mit Modrinth nicht möglich `
+        ServiceManager.get('Logger').warn(`[Gameserver/Modpack] ${paket.kennung} ${paket.fassung}: Befund nicht möglich `
             + `(${fehler.message}) — installiert wird nach den Angaben des Pakets allein`);
-        return { abgleich: { sha1: [], namen: [], geprueft: 0, ohneAuskunft: 0 }, abgleichFehler: fehler.message };
+        return {
+            abgleich: { sha1: [], namen: [], geprueft: 0, ohneAuskunft: 0, urteil: null, stufe: 0, behalten: [] },
+            abgleichFehler: fehler.message,
+            unvollstaendig: null,
+        };
     }
 }
 
@@ -760,7 +783,11 @@ async function pruefeModpack({ server, paket, laderDesServers, beiFortschritt = 
     if (!ipmServer?.isDaemonOnline(daemonId)) return { passt: false, fehler: 'Daemon ist offline' };
 
     beiFortschritt({ phase: 'abgleich' });
-    const abgleich = await holeAbgleich(paket);
+    const abgleich = await holeAbgleich(paket, beiFortschritt);
+    if (abgleich.unvollstaendig) {
+        Logger.info(`[Gameserver/Modpack] ${paket.kennung} ${paket.fassung} nicht auf Server ${server.id}: unvollständig`);
+        return { passt: false, fehler: `${abgleich.unvollstaendig} Am Server wurde nichts geändert.` };
+    }
 
     const { modpack: altes } = await Inhalte.fuerServer(server.id);
     const weicht = altes && altes.status === 'installiert' ? Inhalte.dateienAus(altes) : [];
@@ -823,6 +850,25 @@ async function installiereModpack({ server, guildId, paket, laderDesServers, abg
         mitgebracht: false,
     };
 
+    // ── Der Befund zuerst — bevor irgendetwas weicht ────────────────────────
+    //
+    // Die Vorprüfung hat ihn schon geholt; dieselbe Antwort, damit Prüfung und
+    // Installation dieselben Dateien meinen. Ohne Vorprüfung (Anlegen) wird er
+    // hier geholt. Ein unvollständiges Paket wird nicht eingespielt (K226):
+    // Der Server bräche beim Start ab, und das alte Paket wäre schon weg.
+    if (!vorher) beiFortschritt({ phase: 'abgleich' });
+    const { abgleich, abgleichFehler, unvollstaendig } = vorher || await holeAbgleich(paket, beiFortschritt);
+    if (unvollstaendig) {
+        Logger.warn(`[Gameserver/Modpack] ${paket.kennung} ${paket.fassung} nicht installiert: unvollständig`);
+        const { modpack: liegt } = await Inhalte.fuerServer(server.id);
+        // Die Zeile sagt es auf der Mods-Seite — aber nur, wo kein Paket liegt,
+        // dessen Zeile sie überschriebe.
+        if (!liegt || liegt.status !== 'installiert') {
+            await Inhalte.eintragen({ ...grundzeile, status: 'fehlgeschlagen', fehler: unvollstaendig });
+        }
+        return { success: false, fehler: unvollstaendig, aufgeraeumt: null };
+    }
+
     // ── Das Alte zuerst weg ────────────────────────────────────────────────
     //
     // Sonst liegen zwei Modpacks uebereinander: Die Zeile wird per
@@ -846,13 +892,6 @@ async function installiereModpack({ server, guildId, paket, laderDesServers, abg
     }
 
     await Inhalte.eintragen({ ...grundzeile, status: 'geplant' });
-
-    // ── Reine Client-Mods, die das Paket nicht als solche ausweist ──────────
-    //
-    // Die Vorpruefung hat Modrinth schon gefragt; dieselbe Antwort, damit
-    // Pruefung und Installation dieselben Dateien meinen.
-    if (!vorher) beiFortschritt({ phase: 'abgleich' });
-    const { abgleich, abgleichFehler } = vorher || await holeAbgleich(paket);
 
     const antwort = await ipmServer.sendCommand(daemonId, 'gameserver.content.modpack', {
         server_id:     String(server.id),

@@ -98,19 +98,76 @@ function istErlaubt(adresse) {
     return HERKUNFT.includes(u.hostname);
 }
 
-/** Ein Aufruf gegen die API — mit Frist, mit Fehlertext, ohne stille Rueckfaelle. */
+/**
+ * Das Limit von Modrinth: 300 Abfragen je Minute und IP (K226).
+ *
+ * Alle Guilds teilen sich die Adresse des Dashboards. Jede Antwort nennt den
+ * Rest (`X-Ratelimit-Remaining`) und die Sekunden bis zum Auffuellen
+ * (`X-Ratelimit-Reset`) — gemessen 2026-11-12: `300 / 299 / 0`. Ein Token
+ * hebt das Limit nicht (nachgelesen 2026-10-14).
+ */
+const limit = { rest: null, bis: 0 };
+/** Laenger wartet kein Aufruf auf das Limit — danach sagt er es. */
+const LIMIT_WARTEN_MS = 65000;
+
+function merkeLimit(antwort) {
+    const rest = parseInt(antwort.headers?.get('x-ratelimit-remaining'), 10);
+    const sekunden = parseInt(antwort.headers?.get('x-ratelimit-reset'), 10);
+    if (Number.isFinite(rest)) limit.rest = rest;
+    if (Number.isFinite(sekunden)) limit.bis = Date.now() + sekunden * 1000;
+}
+
+/**
+ * Wie viel vom Limit ist uebrig?
+ *
+ * Fuer Arbeit, die warten kann (Befunde fuer Suchtreffer): Sie fragt hier und
+ * stellt sich zurueck, statt denen die Abfragen zu nehmen, die jemand gerade
+ * braucht.
+ *
+ * @returns {{rest: number|null, wartenMs: number}} `rest` null: noch nie gefragt
+ */
+function limitStand() {
+    const wartenMs = Math.max(0, limit.bis - Date.now());
+    // Nach dem Auffuellen gilt die alte Zahl nicht mehr.
+    return { rest: wartenMs === 0 && limit.rest !== null && limit.rest < 300 ? null : limit.rest, wartenMs };
+}
+
+const warte = (ms) => new Promise(fertig => setTimeout(fertig, ms));
+
+/**
+ * Ein Aufruf gegen die API — mit Frist, mit Fehlertext, ohne stille Rueckfaelle.
+ *
+ * Bei 429 wird EINMAL gewartet, bis Modrinth wieder auffuellt, und wiederholt.
+ * Vorher brach der Aufruf ab — mitten in einem Abgleich mit sechs Abfragen
+ * hiess das: kein Abgleich.
+ */
 async function hole(pfad) {
-    const antwort = await fetch(`${BASIS}${pfad}`, {
-        headers: KOPF,
-        signal: AbortSignal.timeout(FRIST_MS),
-    });
-    if (antwort.status === 404) {
-        throw new Error(`Modrinth kennt ${pfad.split('?')[0]} nicht (404)`);
+    for (let versuch = 0; ; versuch++) {
+        const antwort = await fetch(`${BASIS}${pfad}`, {
+            headers: KOPF,
+            signal: AbortSignal.timeout(FRIST_MS),
+        });
+        merkeLimit(antwort);
+        if (antwort.status === 429 && versuch === 0) {
+            const sekunden = parseInt(antwort.headers?.get('x-ratelimit-reset'), 10);
+            const wartenMs = (Number.isFinite(sekunden) ? sekunden : 60) * 1000 + 500;
+            if (wartenMs <= LIMIT_WARTEN_MS) {
+                ServiceManager.get('Logger').warn(`[Gameserver/Modrinth] Limit erreicht — warte ${Math.round(wartenMs / 1000)} s`);
+                await warte(wartenMs);
+                continue;
+            }
+        }
+        if (antwort.status === 404) {
+            throw new Error(`Modrinth kennt ${pfad.split('?')[0]} nicht (404)`);
+        }
+        if (antwort.status === 429) {
+            throw new Error('Modrinth nimmt gerade keine Abfragen an (Limit erreicht) — in einer Minute noch einmal');
+        }
+        if (!antwort.ok) {
+            throw new Error(`Modrinth antwortete ${antwort.status} auf ${pfad}`);
+        }
+        return antwort.json();
     }
-    if (!antwort.ok) {
-        throw new Error(`Modrinth antwortete ${antwort.status} auf ${pfad}`);
-    }
-    return antwort.json();
 }
 
 /** JSON-Listen wandern bei Modrinth als Zeichenkette in die Abfrage. */
@@ -490,6 +547,9 @@ async function modpackFassung(kennung, fassung = null) {
         kennung: slug,
         name: projektDaten.name,
         fassung: gewaehlt.version_number,
+        // Der Schluessel des Pack-Befunds (`PackBefund.js`): Eine Fassung
+        // aendert sich bei Modrinth nie, ihre Nummer kann es doppelt geben.
+        fassungId: gewaehlt.id,
         url: datei.url,
         sha1: datei.hashes?.sha1 || null,
         bytes: datei.size || 0,
@@ -498,84 +558,10 @@ async function modpackFassung(kennung, fassung = null) {
     };
 }
 
-/**
- * Welche Dateien eines Modpacks sind reine Client-Mods — nach Modrinths
- * EIGENER Auskunft, nicht nach der des Pakets?
- *
- * ── Warum das Paket allein nicht reicht (2026-10-12) ────────────────────────
- *
- * Jede Zeile im Verzeichnis eines Pakets traegt `env.server`, und der Daemon
- * laesst weg, was dort `unsupported` sagt. Die Angabe macht aber der Autor des
- * PAKETS. „One block horror" 1.0.4 markiert alle 42 Dateien als `required`,
- * darunter Oculus, Rubidium, Just Zoom und Essential — der Server brach beim
- * Start ab („… for invalid dist DEDICATED_SERVER"), und ausgelassen hatten wir
- * nichts. Modrinth fuehrt dieselben Mods an ihrem PROJEKT als
- * `server_side: unsupported`: Das sagt der Autor der Mod, und der weiss es.
- *
- * ── Ohne das Archiv zu laden ────────────────────────────────────────────────
- *
- * Die Fassung eines Pakets nennt, was sie enthaelt (`dependencies`, je mit
- * `project_id` und `version_id`). Drei Sorten Abrufe: die Fassung, die
- * Projekte (in Stuecken), die Fassungen der Client-Mods fuer ihre Pruefsummen.
- * Gemessen: „One block horror" 42 Eintraege → 10 Client-Sachen; „ATM: All Tech
- * Mods" 241 → 81.
- *
- * Der Daemon bekommt die PRUEFSUMMEN (sha1) und vergleicht sie mit denen aus
- * dem Verzeichnis des Pakets — ein Dateiname liesse sich verwechseln.
- *
- * ── Was es nicht kann ───────────────────────────────────────────────────────
- *
- * - Mods, die ein Paket lose beilegt (`overrides/mods`), stehen nicht in der
- *   Liste und haben keine Auskunft (bei „One block horror" 19 Eintraege).
- * - Eine Mod, deren Autor sie als servertauglich fuehrt und die trotzdem
- *   abbricht (Palladium in „ATM", 2026-10-12: `server: optional`).
- *
- * @param {string} kennung  Kennung des Pakets
- * @param {string} fassung  Fassungsnummer
- * @returns {Promise<{sha1: string[], namen: string[], geprueft: number, ohneAuskunft: number}>}
- */
-async function clientDateien(kennung, fassung) {
-    const slug = String(kennung || '').trim();
-    if (!slug) throw new Error('Keine Kennung');
-
-    const liste = await hole(`/project/${encodeURIComponent(slug)}/version`);
-    const gewaehlt = (Array.isArray(liste) ? liste : []).find(v => v.version_number === fassung);
-    if (!gewaehlt) throw new Error(`${slug}: Fassung ${fassung} gibt es nicht (mehr)`);
-
-    const alle = gewaehlt.dependencies || [];
-    const enthalten = alle.filter(d => d.project_id && d.version_id);
-    const leer = { sha1: [], namen: [], geprueft: enthalten.length, ohneAuskunft: alle.length - enthalten.length };
-    if (!enthalten.length) return leer;
-
-    const stuecke = (werte) => {
-        const aus = [];
-        for (let i = 0; i < werte.length; i += ABGLEICH_STUECK) aus.push(werte.slice(i, i + ABGLEICH_STUECK));
-        return aus;
-    };
-
-    const projekte = new Map();
-    for (const teil of stuecke([...new Set(enthalten.map(d => d.project_id))])) {
-        for (const p of await hole(`/projects?ids=${encodeURIComponent(alsListe(teil))}`)) projekte.set(p.id, p);
-    }
-    const nurClient = enthalten.filter(d => projekte.get(d.project_id)?.server_side === 'unsupported');
-    if (!nurClient.length) return leer;
-
-    const sha1 = new Set();
-    const namen = new Set();
-    for (const teil of stuecke(nurClient.map(d => d.version_id))) {
-        for (const f of await hole(`/versions?ids=${encodeURIComponent(alsListe(teil))}`)) {
-            for (const datei of f.files || []) {
-                const summe = String(datei.hashes?.sha1 || '').toLowerCase();
-                if (/^[0-9a-f]{40}$/.test(summe)) sha1.add(summe);
-            }
-            namen.add(projekte.get(f.project_id)?.title || f.project_id);
-        }
-    }
-    return { ...leer, sha1: [...sha1], namen: [...namen].sort() };
-}
-
-/** So viele Kennungen je Sammelabruf — die Adresse bleibt damit weit unter jeder Grenze. */
-const ABGLEICH_STUECK = 80;
+// Welche Dateien eines Modpacks reine Client-Mods sind, rechnete bis zum
+// 2026-11-12 `clientDateien` an dieser Stelle — bei jedem Einspielen neu. Das
+// steht jetzt in `PackBefund.js` (Stufe 1), einmal je Fassung gerechnet und
+// gespeichert (K226).
 
 /** Die Seite zum Stoebern — Plugins und Mods liegen bei Modrinth getrennt. */
 function verzeichnis(raum) {
@@ -915,8 +901,9 @@ async function aktualisierungen(raum, zeilen) {
 }
 
 module.exports = {
-    sucheModpacks, modpackFassung, clientDateien, laderBeiUns, laderBeiModrinth,
+    sucheModpacks, modpackFassung, laderBeiUns, laderBeiModrinth,
     KENNUNG, TITEL, RAUM_NAME, HERKUNFT, PRO_SEITE, MANAGER,
     istErlaubt, suche, verzeichnis, adresse, paket, aufloesen, aktualisierungen, fassungen,
     hoeher, neuerAls,
+    hole, limitStand, KOPF,
 };
