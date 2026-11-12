@@ -74,6 +74,7 @@ const BEKANNT = new Set([
     'check-spieler-liste.js',        // rendert die echte Vorlage und prüft die Ausgabe (2026-11-07)
     'check-streaming-sprache.js',    // rendert die echten Vorlagen und prüft die Ausgabe; Quelltext-Suchen ohne Kommentare (2026-11-07)
     'check-wartung.js',              // statisches HTML der Wartungsseite und die gebaute Seite, kein JavaScript (2026-11-07)
+    'check-rootserver-loeschen.js',  // schneidet am EJS-Kommentar „Sperre (K375)“ aus und rendert die echte Vorlage; Grund an der Stelle (2026-11-12)
     'check-adminlte.js',
     'check-anlagenkonten.js',
     'check-chatabos.js',
