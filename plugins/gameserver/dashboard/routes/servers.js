@@ -1701,7 +1701,7 @@ router.get('/:serverId/panels', requirePermission('GAMESERVER.VIEW'), async (req
 
         const panels = await dbService.query(
             `SELECT id, channel_id, message_id, enabled, min_interval_s,
-                    show_players, show_controls, show_refresh, show_password, last_pushed_at, last_error
+                    show_players, show_controls, show_refresh, show_password, show_address, last_pushed_at, last_error
              FROM gameserver_status_panels
              WHERE server_id = ? AND guild_id = ?
              ORDER BY id`,
@@ -1753,7 +1753,7 @@ router.post('/:serverId/panels', requirePermission('GAMESERVER.EDIT'), async (re
     try {
         const guildId  = res.locals.guildId;
         const serverId = Number(req.params.serverId);
-        const { channel_id: channelId, show_players, show_controls, show_refresh, show_password, min_interval_s } = req.body;
+        const { channel_id: channelId, show_players, show_controls, show_refresh, show_password, show_address, min_interval_s } = req.body;
 
         if (!channelId) {
             return res.status(400).json({ success: false, error: 'Kanal fehlt' });
@@ -1776,6 +1776,7 @@ router.post('/:serverId/panels', requirePermission('GAMESERVER.EDIT'), async (re
             showControls: show_controls === undefined ? true : toBool(show_controls),
             showRefresh:  show_refresh  === undefined ? true : toBool(show_refresh),
             showPassword: toBool(show_password),
+            showAddress:  show_address  === undefined ? true : toBool(show_address),
             minIntervalS: Number(min_interval_s) || 60,
             createdBy:    res.locals.user?.id || null,
         });
@@ -1801,7 +1802,7 @@ router.patch('/:serverId/panels/:panelId', requirePermission('GAMESERVER.EDIT'),
     const Logger = ServiceManager.get('Logger');
 
     try {
-        const { show_players, show_controls, show_refresh, show_password, min_interval_s } = req.body;
+        const { show_players, show_controls, show_refresh, show_password, show_address, min_interval_s } = req.body;
 
         const panel = await PanelService.update({
             guildId:      res.locals.guildId,
@@ -1810,6 +1811,7 @@ router.patch('/:serverId/panels/:panelId', requirePermission('GAMESERVER.EDIT'),
             showControls: show_controls  === undefined ? undefined : toBool(show_controls),
             showRefresh:  show_refresh   === undefined ? undefined : toBool(show_refresh),
             showPassword: show_password  === undefined ? undefined : toBool(show_password),
+            showAddress:  show_address   === undefined ? undefined : toBool(show_address),
             minIntervalS: min_interval_s === undefined ? undefined : Number(min_interval_s),
         });
 

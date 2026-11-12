@@ -240,6 +240,12 @@ module.exports = {
                         required: false,
                     },
                     {
+                        name: 'adresse',
+                        type: ApplicationCommandOptionType.Boolean,
+                        description: 'gameserver:SERVER.OPT_PANEL_ADDRESS',
+                        required: false,
+                    },
+                    {
                         name: 'abstand',
                         type: ApplicationCommandOptionType.Integer,
                         description: 'gameserver:SERVER.OPT_PANEL_INTERVAL',
@@ -291,6 +297,12 @@ module.exports = {
                         name: 'passwort',
                         type: ApplicationCommandOptionType.Boolean,
                         description: 'gameserver:SERVER.OPT_PANEL_PASSWORD',
+                        required: false,
+                    },
+                    {
+                        name: 'adresse',
+                        type: ApplicationCommandOptionType.Boolean,
+                        description: 'gameserver:SERVER.OPT_PANEL_ADDRESS',
                         required: false,
                     },
                     {
@@ -584,6 +596,7 @@ module.exports = {
                         show_refresh:   interaction.options.getBoolean('neu_laden')    ?? true,
                         show_players:   interaction.options.getBoolean('spielernamen') ?? false,
                         show_password:  interaction.options.getBoolean('passwort')     ?? false,
+                        show_address:   interaction.options.getBoolean('adresse')      ?? true,
                         min_interval_s: interaction.options.getInteger('abstand')      ?? 60,
                         actor_user_id:  interaction.user.id,
                     }, 30_000);
@@ -631,6 +644,7 @@ module.exports = {
                         show_refresh:   interaction.options.getBoolean('neu_laden'),
                         show_players:   interaction.options.getBoolean('spielernamen'),
                         show_password:  interaction.options.getBoolean('passwort'),
+                        show_address:   interaction.options.getBoolean('adresse'),
                         min_interval_s: interaction.options.getInteger('abstand'),
                         actor_user_id:  interaction.user.id,
                     }, 30_000);
@@ -647,6 +661,7 @@ module.exports = {
                                 { name: 'Neu laden',     value: d.show_refresh  ? 'an' : 'aus',                 inline: true },
                                 { name: 'Spielernamen',  value: d.show_players  ? '⚠️ sichtbar' : 'verborgen',  inline: true },
                                 { name: 'Passwort',      value: d.show_password ? '⚠️ als Spoiler' : 'verborgen', inline: true },
+                                { name: 'Adresse',       value: d.show_address  ? 'an' : 'aus',                 inline: true },
                                 { name: 'Mindestabstand', value: `${d.min_interval_s} s`,                        inline: true },
                             )
                             .setColor(0x57F287)
@@ -703,6 +718,7 @@ module.exports = {
                             buttons.length ? buttons.join(' + ') : 'nur Anzeige',
                             p.show_players  ? '⚠️ Namen sichtbar' : 'ohne Namen',
                             p.show_password ? '⚠️ Passwort als Spoiler' : null,
+                            p.show_address  ? null : 'ohne Adresse',
                             p.enabled ? `alle ${p.min_interval_s} s` : '⛔ stillgelegt',
                         ].filter(Boolean);
                         embed.addFields({

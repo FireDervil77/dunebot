@@ -96,6 +96,17 @@
                     steht ohnehin immer im Panel.
                 </div>
 
+                <%# K373 (2026-11-12): Die Adresse wie auf der Serverseite — Vorgabe an,
+                    denn damit treten Spieler bei. Der Besitzer schaltet sie je Panel. %>
+                <div class="form-check form-switch mb-2">
+                    <input class="form-check-input" type="checkbox" id="panel-address" checked>
+                    <label class="form-check-label" for="panel-address">Adresse anzeigen</label>
+                </div>
+                <div class="form-text mb-3">
+                    IP und Port wie auf der Serverseite, zum Kopieren mit einem Klick. Hat das
+                    Spiel einen eigenen Port für die Serverliste, stehen beide Zeilen.
+                </div>
+
                 <%# Stufe 9 S5: nur wenn das Paket ein Beitrittspasswort nennt
                     (`join_password`) — load() blendet den Block dann ein. %>
                 <div id="panel-password-block" hidden>
@@ -190,6 +201,7 @@
                  +     toggle(p, 'show_controls', 'Start/Stop')
                  +     toggle(p, 'show_refresh', 'Neu laden')
                  +     toggle(p, 'show_players', 'Spielernamen', 'text-warning-emphasis')
+                 +     toggle(p, 'show_address', 'Adresse')
                  // Auch ohne Paketangabe sichtbar, solange er an ist — sonst
                  // ließe er sich nicht mehr abschalten.
                  +     ((passwort || p.show_password)
@@ -311,6 +323,7 @@
                     show_controls:  document.getElementById('panel-controls').checked,
                     show_refresh:   document.getElementById('panel-refresh').checked,
                     show_password:  !!passwort && document.getElementById('panel-password').checked,
+                    show_address:   document.getElementById('panel-address').checked,
                     min_interval_s: Number(document.getElementById('panel-interval').value) || 60,
                 }),
             });

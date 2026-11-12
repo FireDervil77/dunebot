@@ -187,48 +187,68 @@ class PanelService {
     }
 
     /**
-     * Was das Panel aus dem Paket braucht — einmal geladen, zwei Angaben.
+     * Was das Panel aus Paket und Server braucht — einmal geladen, zwei Angaben.
      *
-     * Verbindung (Stufe 9): dieselbe Rechnung wie auf der Serverseite
-     * (`baueVerbindung`), als fertiges Label/Text-Paar. Nur wenn das Paket
-     * `connect` nennt: Bisher stand im Panel keine Adresse, und ein Feld, das
-     * plötzlich in jedem Panel auftaucht, wäre eine Änderung, die niemand
-     * bestellt hat.
+     * Verbindung (Stufe 9, K373): dieselbe Rechnung wie auf der Serverseite,
+     * als fertige Zeilen (Label/Text). Ohne `connect` im Paket die Adresse aus
+     * `baueAdresse` — bis zum 2026-11-12 stand sie nur mit `connect` im Panel,
+     * und kein freigegebenes Paket hatte eines; das Panel schwieg, wo die
+     * Serverseite längst Name und IP zeigte. Ob die Zeilen im Panel stehen,
+     * entscheidet der Schalter `show_address` am Panel (der Presenter fragt ihn).
      *
      * Passwort (S5): nur die Einstellung mit `join_password`; ob es im Panel
      * steht, entscheidet der Schalter am Panel (der Presenter fragt ihn).
      *
-     * Ein Fehler beim Laden kostet nur diese beiden Felder.
+     * Ein Fehler beim Laden des Pakets kostet nur das Passwort und eine
+     * Verbindungsangabe aus `connect` — die Adresse braucht das Paket nicht.
      *
      * @private
-     * @returns {Promise<{verbindung: {label, text}|null, passwort: {name, wert}|null}>}
+     * @returns {Promise<{verbindung: Array<{label: string, text: string}>, passwort: {name, wert}|null}>}
      */
     static async _ausDemPaket(dbService, server) {
-        const leer = { verbindung: null, passwort: null };
+        const { beitrittsPasswort } = require('./Serverseite');
+        let paket = null;
         try {
             const { ladePaketFuerServer } = require('./Paketfassung');
-            const { baueVerbindung, baueAdresse, beitrittsPasswort } = require('./Serverseite');
             const zeile = await ladePaketFuerServer(dbService, server.id);
-            if (!zeile) return leer;
-            const paket = typeof zeile.paket_json === 'string' ? JSON.parse(zeile.paket_json) : zeile.paket_json;
-            const pw = beitrittsPasswort(paket, server);
-            const passwort = pw ? { name: pw.name, wert: pw.wert } : null;
-
-            const v = baueVerbindung(paket, server);
-            if (!v) return { verbindung: null, passwort };
-            if (v.art === 'einstellung') {
-                return { verbindung: { label: v.label, text: v.wert || 'noch nicht festgelegt' }, passwort };
-            }
-            const adresse = baueAdresse(server);
-            const zeile1 = adresse?.zeilen?.find(z => z.zweck === 'game') || adresse?.zeilen?.[0];
-            return {
-                verbindung: zeile1 ? { label: v.label || 'Adresse', text: zeile1.ip || zeile1.text } : null,
-                passwort,
-            };
+            if (zeile) paket = typeof zeile.paket_json === 'string' ? JSON.parse(zeile.paket_json) : zeile.paket_json;
         } catch (err) {
-            ServiceManager.get('Logger')?.warn?.(`[PanelService] Angaben aus dem Paket für Server ${server.id} nicht gebaut: ${err.message}`);
-            return leer;
+            ServiceManager.get('Logger')?.warn?.(`[PanelService] Paket für Server ${server.id} nicht geladen: ${err.message}`);
         }
+        const pw = beitrittsPasswort(paket, server);   // ohne Paket: null
+        const passwort = pw ? { name: pw.name, wert: pw.wert } : null;
+        return { verbindung: PanelService._verbindung(paket, server), passwort };
+    }
+
+    /**
+     * Die Zeilen, womit Spieler verbinden — wie auf der Serverseite (K373).
+     *
+     * Sagt das Paket per `connect` eine Einstellung (Windrose: Einladungscode),
+     * steht deren Wert. Sonst die Adresszeilen aus `baueAdresse`: „Adresse“,
+     * oder bei einem eigenen Abfrageport „Serverliste“ und „Direktverbindung“
+     * (Valheim 25003/25002). Immer als IP:Port, nicht als Name: Manche Spiele
+     * nehmen im Beitreten-Feld keinen Namen an (StarRupture, 2026-10-06), und
+     * im Panel gibt es keine zweite Spalte für beides.
+     *
+     * @param {object|null} paket - FBPKG oder null (dann nur die Adresse)
+     * @param {object} server - Zeile aus pushForServer (ports, bind_ip, rootserver_ip, fqdn, fqdn_gilt, paket_werte)
+     * @returns {Array<{label: string, text: string}>} leer = Adresse unbekannt (kein Port belegt)
+     */
+    static _verbindung(paket, server) {
+        const { baueVerbindung, baueAdresse } = require('./Serverseite');
+        const v = paket ? baueVerbindung(paket, server) : null;
+        if (v && v.art === 'einstellung') {
+            return [{ label: v.label, text: v.wert || 'noch nicht festgelegt' }];
+        }
+        const adresse = baueAdresse(server);
+        const zeilen = (adresse?.zeilen || []).map(z => ({ label: z.label, text: z.ip || z.text }));
+        // Eine eigene Bezeichnung aus `connect` gilt der Direktverbindung —
+        // die Serverliste behält ihr Wort, sonst stünde zweimal dasselbe.
+        if (v?.label) {
+            const spiel = zeilen.find((z, i) => (adresse.zeilen[i].zweck === 'game'));
+            if (spiel) spiel.label = v.label;
+        }
+        return zeilen;
     }
 
     /**
@@ -372,6 +392,8 @@ class PanelService {
             show_controls: !!panel.show_controls,
             show_refresh:  !!panel.show_refresh,
             show_password: !!panel.show_password,
+            // Bestandszeile ohne Spalte (vor der Migration): Adresse an, wie die Vorgabe.
+            show_address:  panel.show_address === undefined || panel.show_address === null ? true : !!panel.show_address,
         };
     }
 
@@ -389,30 +411,33 @@ class PanelService {
      * @param {boolean} [args.showPlayers]
      * @param {boolean} [args.showControls]
      * @param {boolean} [args.showPassword] - Beitrittspasswort als Spoiler (Vorgabe aus)
+     * @param {boolean} [args.showAddress] - Adresse wie auf der Serverseite (Vorgabe an, K373)
      * @param {number} [args.minIntervalS]
      * @param {string} [args.createdBy]
      * @returns {Promise<object>} angelegtes Panel
      */
     static async create({ guildId, serverId, channelId, showPlayers = false,
                           showControls = true, showRefresh = true, showPassword = false,
-                          minIntervalS = 60, createdBy = null }) {
+                          showAddress = true, minIntervalS = 60, createdBy = null }) {
         const dbService = ServiceManager.get('dbService');
 
         await dbService.query(
             `INSERT INTO gameserver_status_panels
                 (guild_id, server_id, channel_id, show_players, show_controls, show_refresh,
-                 show_password, min_interval_s, created_by)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 show_password, show_address, min_interval_s, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE
                 show_players   = VALUES(show_players),
                 show_controls  = VALUES(show_controls),
                 show_refresh   = VALUES(show_refresh),
                 show_password  = VALUES(show_password),
+                show_address   = VALUES(show_address),
                 min_interval_s = VALUES(min_interval_s),
                 enabled        = 1,
                 last_error     = NULL`,
             [guildId, serverId, channelId, showPlayers ? 1 : 0, showControls ? 1 : 0,
-             showRefresh ? 1 : 0, showPassword ? 1 : 0, Math.max(MIN_INTERVAL_UNTERGRENZE, Number(minIntervalS) || 60), createdBy]
+             showRefresh ? 1 : 0, showPassword ? 1 : 0, showAddress ? 1 : 0,
+             Math.max(MIN_INTERVAL_UNTERGRENZE, Number(minIntervalS) || 60), createdBy]
         );
 
         PanelService.invalidateIndex();
@@ -443,11 +468,12 @@ class PanelService {
      * @param {boolean} [args.showControls]
      * @param {boolean} [args.showRefresh]
      * @param {boolean} [args.showPassword]
+     * @param {boolean} [args.showAddress]
      * @param {number}  [args.minIntervalS]
      * @returns {Promise<object|null>} geändertes Panel oder null
      */
     static async update({ guildId, panelId, serverId, channelId, showPlayers, showControls,
-                          showRefresh, showPassword, minIntervalS }) {
+                          showRefresh, showPassword, showAddress, minIntervalS }) {
         const dbService = ServiceManager.get('dbService');
 
         // Zwei Wege zum selben Panel: Das Dashboard kennt die id, der Bot-Befehl
@@ -469,6 +495,7 @@ class PanelService {
         if (showControls !== undefined && showControls !== null) { sets.push('show_controls = ?'); values.push(showControls ? 1 : 0); }
         if (showRefresh  !== undefined && showRefresh  !== null) { sets.push('show_refresh = ?');  values.push(showRefresh  ? 1 : 0); }
         if (showPassword !== undefined && showPassword !== null) { sets.push('show_password = ?'); values.push(showPassword ? 1 : 0); }
+        if (showAddress  !== undefined && showAddress  !== null) { sets.push('show_address = ?');  values.push(showAddress  ? 1 : 0); }
         if (minIntervalS !== undefined && minIntervalS !== null) {
             sets.push('min_interval_s = ?');
             values.push(Math.max(MIN_INTERVAL_UNTERGRENZE, Number(minIntervalS) || 60));

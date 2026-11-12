@@ -986,6 +986,7 @@ class IPCServer {
                         showControls: show_controls === undefined ? true : !!show_controls,
                         showRefresh:  payload.show_refresh === undefined ? true : !!payload.show_refresh,
                         showPassword: !!payload.show_password,
+                        showAddress:  payload.show_address === undefined || payload.show_address === null ? true : !!payload.show_address,
                         minIntervalS: Number(min_interval_s) || 60,
                         createdBy:    payload.actor_user_id || null,
                     });
@@ -998,6 +999,7 @@ class IPCServer {
                             show_controls: !!panel?.show_controls,
                             show_refresh:  !!panel?.show_refresh,
                             show_password: !!panel?.show_password,
+                            show_address:  !!panel?.show_address,
                             last_error:    panel?.last_error || null,
                         },
                     });
@@ -1021,6 +1023,7 @@ class IPCServer {
                         showControls: payload.show_controls,
                         showRefresh:  payload.show_refresh,
                         showPassword: payload.show_password,
+                        showAddress:  payload.show_address,
                         minIntervalS: payload.min_interval_s,
                     });
 
@@ -1034,6 +1037,7 @@ class IPCServer {
                             show_controls:  !!panel.show_controls,
                             show_refresh:   !!panel.show_refresh,
                             show_password:  !!panel.show_password,
+                            show_address:   !!panel.show_address,
                             min_interval_s: panel.min_interval_s,
                         },
                     });
@@ -1101,7 +1105,7 @@ class IPCServer {
 
                     const panels = await dbService.query(
                         `SELECT p.id, p.server_id, p.channel_id, p.enabled, p.min_interval_s,
-                                p.show_players, p.show_controls, p.show_refresh, p.show_password,
+                                p.show_players, p.show_controls, p.show_refresh, p.show_password, p.show_address,
                                 p.last_pushed_at, p.last_error,
                                 gs.name AS server_name
                          FROM gameserver_status_panels p

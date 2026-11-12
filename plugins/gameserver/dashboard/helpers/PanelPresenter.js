@@ -212,11 +212,11 @@ function passwortField(passwort) {
  * @param {object} args.snapshot - Snapshot aus dem StatusService
  * @param {object} args.display - display-Block des Addons
  * @param {string} [args.gameName]
- * @param {{label: string, text: string}|null} [args.verbindung] - PanelService._ausDemPaket
+ * @param {Array<{label: string, text: string}>} [args.verbindung] - PanelService._verbindung; nur gezeigt bei panel.show_address
  * @param {{name: string, wert: string|null}|null} [args.passwort] - nur gezeigt bei panel.show_password
  * @returns {object} Nutzlast für gameserver:UPDATE_STATUS_PANEL
  */
-function buildPanelPayload({ panel, server, snapshot, display, gameName, verbindung = null, passwort = null }) {
+function buildPanelPayload({ panel, server, snapshot, display, gameName, verbindung = [], passwort = null }) {
     const online = !!snapshot.online;
 
     // Die Feld-Quellen aus display.fields zeigen auf die Query-Form (map, ping,
@@ -236,11 +236,14 @@ function buildPanelPayload({ panel, server, snapshot, display, gameName, verbind
         ...buildFields(display?.fields, data),
     ];
 
-    // Womit Spieler verbinden (Stufe 9, `connect` im Paket) — fertig gerechnet
-    // in PanelService._verbindung, dieselbe Rechnung wie auf der Serverseite.
-    // Als Code-Feld, damit es sich in Discord mit einem Klick kopieren lässt.
-    if (verbindung && verbindung.label && verbindung.text) {
-        fields.push({ name: verbindung.label, value: `\`${verbindung.text}\``, inline: false });
+    // Womit Spieler verbinden (Stufe 9, K373) — fertig gerechnet in
+    // PanelService._verbindung, dieselbe Rechnung wie auf der Serverseite. Eine
+    // Zeile je Feld, als Code, damit es sich in Discord mit einem Klick kopieren
+    // lässt. Der Besitzer schaltet es je Panel (show_address), wie das Passwort.
+    if (panel.show_address) {
+        for (const z of Array.isArray(verbindung) ? verbindung : []) {
+            if (z && z.label && z.text) fields.push({ name: z.label, value: `\`${z.text}\``, inline: false });
+        }
     }
 
     if (panel.show_password) {
