@@ -54,7 +54,7 @@ const db = {
             Object.assign(this.backups.find(b => b.id === Number(p[1])), { status: 'completed', wiederhergestellt: p[0] });
             return {};
         }
-        if (/SELECT id, name FROM gameserver_backups WHERE id = \? AND server_id = \? AND guild_id = \? AND status = 'completed'/.test(sql)) {
+        if (/SELECT id, name, pruned_at FROM gameserver_backups WHERE id = \? AND server_id = \? AND guild_id = \? AND status = 'completed'/.test(sql)) {
             return this.backups.filter(b => b.id === Number(p[0]));
         }
         if (/SELECT gs\.id, gs\.install_path, gs\.status, r\.daemon_id FROM gameservers/.test(sql)) {

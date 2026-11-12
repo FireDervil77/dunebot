@@ -78,6 +78,8 @@
             </table>
         </div>
     </div>
+    <!-- Von der Aufbewahrung entfernte Sicherungen: eingeklappt, auf Wunsch sichtbar (K350) -->
+    <div id="backups-entfernt" class="text-secondary small mt-2" style="display:none;"></div>
 </div>
 
 <script>
@@ -106,6 +108,14 @@
     // die Antwort da ist, gilt "nein" - ein Knopf, der auf eine tote Adresse
     // zeigt, ist schlimmer als keiner (Baustelle 106).
     let ABRUF_MOEGLICH = false;
+
+    // Von der Aufbewahrung entfernte Sicherungen (pruned_at): Das Archiv ist
+    // beim Daemon gelöscht, die Zeile bleibt, damit es nicht nach Datenverlust
+    // aussieht (Migration 2026-08-10). Bis K350 (2026-11-12) standen sie hier
+    // als „Fertig" mit Herunterladen und Wiederherstellen — beides lief ins
+    // Leere (Server 186: 3 von 5). Jetzt stehen sie eingeklappt unter der
+    // Tabelle; dieser Schalter klappt sie auf.
+    let ZEIGE_ENTFERNTE = false;
 
     function formatBytes(bytes) {
         if (!bytes || bytes === 0) return '—';
@@ -148,54 +158,80 @@
 
             if (!data.success) throw new Error(data.message);
 
-            const backups = data.backups || [];
-            LETZTE = backups;
+            LETZTE = data.backups || [];
             ABRUF_MOEGLICH = Boolean(data.abruf);
             document.getElementById('backups-loading').style.display = 'none';
-
-            if (backups.length === 0) {
-                document.getElementById('backups-empty').style.display = '';
-                return;
-            }
-
-            const tbody = document.getElementById('backups-tbody');
-            tbody.innerHTML = backups.map(b => `
-                <tr data-backup-id="${b.id}">
-                    <td><strong>${escHtml(b.name)}</strong></td>
-                    <td>${formatBytes(b.size_bytes)}${b.datenbanken ? `
-                        <span class="badge bg-azure-lt ms-1" title="Die Datenbank des Spiels steckt mit im Archiv und wird beim Wiederherstellen zurückgesetzt">
-                            <i class="fas fa-database me-1"></i>mit Datenbank</span>` : ''}</td>
-                    <td>${statusBadge(b.status)}</td>
-                    <td class="text-secondary small">${escHtml(b.note) || '—'}${b.wiederhergestellt ? `
-                        <div class="${/gescheitert/.test(b.wiederhergestellt) ? 'text-danger fw-bold' : 'text-secondary'} mt-1">
-                            <i class="fas fa-undo me-1"></i>${escHtml(b.wiederhergestellt)}</div>` : ''}</td>
-                    <td><small>${fmtDate(b.created_at)}</small></td>
-                    <td>
-                        <div class="btn-group btn-group-sm">
-                            ${CAN_DOWNLOAD && ABRUF_MOEGLICH && b.status === 'completed' ? `
-                                <a class="btn btn-secondary btn-sm" href="${BASE_URL}/${b.id}/download" title="Herunterladen">
-                                    <i class="fas fa-download"></i>
-                                </a>` : ''}
-                            ${CAN_RESTORE && b.status === 'completed' ? `
-                                <button class="btn btn-warning btn-sm" onclick="restoreBackup(${b.id}, '${escHtml(b.name)}')" title="Wiederherstellen">
-                                    <i class="fas fa-undo"></i>
-                                </button>` : ''}
-                            ${CAN_DELETE ? `
-                                <button class="btn btn-danger btn-sm" ${b.laeuft ? 'disabled' : ''}
-                                        onclick="deleteBackup(${b.id}, '${escHtml(b.name)}')"
-                                        title="${b.laeuft ? 'Gerade in Arbeit, Löschen geht, sobald sie fertig ist' : 'Löschen'}">
-                                    <i class="fas fa-trash"></i>
-                                </button>` : ''}
-                        </div>
-                    </td>
-                </tr>
-            `).join('');
-
-            document.getElementById('backups-table-wrapper').style.display = '';
+            rendere();
         } catch (err) {
             document.getElementById('backups-loading').innerHTML =
                 `<div class="text-center text-danger py-4"><i class="fas fa-exclamation-triangle me-1"></i> Fehler: ${escHtml(err.message)}</div>`;
         }
+    };
+
+    // Eine Zeile der Tabelle. Eine entfernte Sicherung (pruned_at) steht grau
+    // da, trägt „Entfernt" statt „Fertig" und bietet weder Herunterladen noch
+    // Wiederherstellen an — das Archiv gibt es nicht mehr. Löschen bleibt: Es
+    // räumt den Eintrag ab, der Daemon meldet ein fehlendes Archiv als Erfolg.
+    function zeile(b) {
+        const entfernt = Boolean(b.pruned_at);
+        return `
+            <tr data-backup-id="${b.id}"${entfernt ? ' class="text-secondary"' : ''}>
+                <td><strong>${escHtml(b.name)}</strong></td>
+                <td>${formatBytes(b.size_bytes)}${b.datenbanken ? `
+                    <span class="badge bg-azure-lt ms-1" title="Die Datenbank des Spiels steckt mit im Archiv und wird beim Wiederherstellen zurückgesetzt">
+                        <i class="fas fa-database me-1"></i>mit Datenbank</span>` : ''}</td>
+                <td>${entfernt ? `
+                    <span class="badge bg-secondary-lt" title="Von der Aufbewahrung entfernt am ${fmtDate(b.pruned_at)}">
+                        <i class="fa-solid fa-broom me-1"></i>Entfernt</span>` : statusBadge(b.status)}</td>
+                <td class="text-secondary small">${escHtml(b.note) || '—'}${b.wiederhergestellt ? `
+                    <div class="${/gescheitert/.test(b.wiederhergestellt) ? 'text-danger fw-bold' : 'text-secondary'} mt-1">
+                        <i class="fas fa-undo me-1"></i>${escHtml(b.wiederhergestellt)}</div>` : ''}</td>
+                <td><small>${fmtDate(b.created_at)}</small></td>
+                <td>
+                    <div class="btn-group btn-group-sm">
+                        ${CAN_DOWNLOAD && ABRUF_MOEGLICH && !entfernt && b.status === 'completed' ? `
+                            <a class="btn btn-secondary btn-sm" href="${BASE_URL}/${b.id}/download" title="Herunterladen">
+                                <i class="fas fa-download"></i>
+                            </a>` : ''}
+                        ${CAN_RESTORE && !entfernt && b.status === 'completed' ? `
+                            <button class="btn btn-warning btn-sm" onclick="restoreBackup(${b.id}, '${escHtml(b.name)}')" title="Wiederherstellen">
+                                <i class="fas fa-undo"></i>
+                            </button>` : ''}
+                        ${CAN_DELETE ? `
+                            <button class="btn btn-danger btn-sm" ${b.laeuft ? 'disabled' : ''}
+                                    onclick="deleteBackup(${b.id}, '${escHtml(b.name)}')"
+                                    title="${b.laeuft ? 'Gerade in Arbeit, Löschen geht, sobald sie fertig ist' : entfernt ? 'Eintrag entfernen (das Archiv ist schon weg)' : 'Löschen'}">
+                                <i class="fas fa-trash"></i>
+                            </button>` : ''}
+                    </div>
+                </td>
+            </tr>`;
+    }
+
+    // Zeichnen, getrennt vom Laden: „anzeigen"/„ausblenden" lädt nicht neu.
+    function rendere() {
+        const vorhanden = LETZTE.filter(b => !b.pruned_at);
+        const entfernt  = LETZTE.filter(b => b.pruned_at);
+        const sichtbar  = ZEIGE_ENTFERNTE ? LETZTE : vorhanden;
+
+        document.getElementById('backups-empty').style.display = sichtbar.length ? 'none' : '';
+        document.getElementById('backups-table-wrapper').style.display = sichtbar.length ? '' : 'none';
+        document.getElementById('backups-tbody').innerHTML = sichtbar.map(zeile).join('');
+
+        const hinweis = document.getElementById('backups-entfernt');
+        if (!entfernt.length) { hinweis.style.display = 'none'; return; }
+        const zuletzt = Math.max(...entfernt.map(b => new Date(b.pruned_at).getTime()));
+        hinweis.innerHTML = `<i class="fa-solid fa-broom me-1"></i>Die Aufbewahrung hat `
+            + (entfernt.length === 1 ? 'eine ältere Sicherung' : `${entfernt.length} ältere Sicherungen`)
+            + ` entfernt, zuletzt am ${fmtDate(zuletzt)}. `
+            + `<a href="#" onclick="zeigeEntfernteSicherungen(event)">${ZEIGE_ENTFERNTE ? 'ausblenden' : 'anzeigen'}</a>`;
+        hinweis.style.display = '';
+    }
+
+    window.zeigeEntfernteSicherungen = function(ev) {
+        ev.preventDefault();
+        ZEIGE_ENTFERNTE = !ZEIGE_ENTFERNTE;
+        rendere();
     };
 
     window.createBackup = function() {

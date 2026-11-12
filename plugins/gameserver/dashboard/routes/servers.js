@@ -2256,9 +2256,12 @@ router.get('/:serverId', requirePermission('GAMESERVER.VIEW'), async (req, res) 
             // sagte nur, WANN zuletzt gesichert wurde. Die Frage vor einem
             // Update ist aber, ob es einen Stand gibt, auf den man zurueck
             // kann - dafuer braucht es mehrere Zeitpunkte.
+            // Ohne die von der Aufbewahrung entfernten (pruned_at): deren Archiv
+            // ist weg, als Rückkehrpunkt taugen sie nicht (K350, 2026-11-12).
             const sicherungen = await dbService.query(
                 `SELECT id, name, size_bytes, completed_at FROM gameserver_backups
                   WHERE server_id = ? AND status = 'completed' AND completed_at IS NOT NULL
+                    AND pruned_at IS NULL
                   ORDER BY completed_at DESC LIMIT 5`, [server.id]);
 
             paketFuerKonsole = paket;
@@ -4059,7 +4062,7 @@ router.get('/:serverId/backups/:backupId/download',
         const guildId = res.locals.guildId;
 
         const [zeile] = await dbService.query(
-            `SELECT b.name, b.status,
+            `SELECT b.name, b.status, b.pruned_at,
                     r.host, r.fqdn, r.fqdn_gilt, r.abruf_port, r.api_key, r.abruf_zertifikat
                FROM gameserver_backups b
                JOIN gameservers gs ON gs.id = b.server_id
@@ -4069,6 +4072,15 @@ router.get('/:serverId/backups/:backupId/download',
 
         if (!zeile) {
             return res.status(404).json({ success: false, message: 'Sicherung nicht gefunden' });
+        }
+        if (zeile.pruned_at) {
+            // Die Aufbewahrung hat das Archiv beim Daemon gelöscht, die Zeile
+            // blieb (status weiter 'completed'). Bis K350 lief der Abruf hier
+            // durch und scheiterte erst beim Daemon.
+            return res.status(410).json({
+                success: false,
+                message: 'Diese Sicherung hat die Aufbewahrung bereits entfernt — das Archiv gibt es nicht mehr.'
+            });
         }
         if (zeile.status !== 'completed') {
             return res.status(409).json({
@@ -4293,10 +4305,18 @@ router.post('/:serverId/backups/:backupId/restore', requirePermission('GAMESERVE
         const guildId = res.locals.guildId;
 
         const [backup] = await dbService.query(
-            "SELECT id, name FROM gameserver_backups WHERE id = ? AND server_id = ? AND guild_id = ? AND status = 'completed'",
+            "SELECT id, name, pruned_at FROM gameserver_backups WHERE id = ? AND server_id = ? AND guild_id = ? AND status = 'completed'",
             [backupId, serverId, guildId]
         );
         if (!backup) return res.status(404).json({ success: false, message: 'Backup nicht gefunden oder nicht abgeschlossen' });
+        if (backup.pruned_at) {
+            // Archiv von der Aufbewahrung gelöscht, Zeile noch da (K350): Der
+            // Daemon fände nichts, die Zeile stünde danach auf „gescheitert“.
+            return res.status(410).json({
+                success: false,
+                message: 'Diese Sicherung hat die Aufbewahrung bereits entfernt — das Archiv gibt es nicht mehr.'
+            });
+        }
 
         const [server] = await dbService.query(
             'SELECT gs.id, gs.install_path, gs.status, r.daemon_id FROM gameservers gs LEFT JOIN rootserver r ON gs.rootserver_id = r.id WHERE gs.id = ? AND gs.guild_id = ?',
