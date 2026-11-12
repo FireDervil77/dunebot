@@ -524,4 +524,52 @@ async function gespeichert(fassungIds, optionen = {}) {
     return aus;
 }
 
-module.exports = { befund, laeuft, gespeichert, satzUnvollstaendig, URTEIL, REGEL, rechneEins, rechneZwei };
+/**
+ * Der Befund in der Form, die eine Seite zeigt — ohne Prüfsummen.
+ *
+ * @returns {{urteil: string, stufe: number, clientMods: number, clientNamen: string[],
+ *           fehlt: Object[], behalten: string[], satz: string|null, hinweis: string|null}}
+ */
+function fuerAnzeige(paket, b) {
+    return {
+        urteil: b.urteil,
+        stufe: b.stufe,
+        clientMods: b.auslassen.namen.length,
+        clientNamen: b.auslassen.namen.slice(0, 12),
+        fehlt: b.fehlt.slice(0, 20).map(f => ({ name: f.name, gebraucht_von: f.gebraucht_von, grund: f.grund })),
+        behalten: (b.einzelheiten.behalten || []).map(x => x.name),
+        satz: b.urteil === URTEIL.UNVOLLSTAENDIG ? satzUnvollstaendig(paket, b) : null,
+        // Stufe 1 statt 2: Die gründliche Prüfung fiel aus, und die Seite sagt es.
+        hinweis: b.stufe2Fehler ? `Die gründliche Prüfung war nicht möglich (${b.stufe2Fehler}).` : null,
+    };
+}
+
+/**
+ * Eine Trefferliste der Suche mit dem, was über die Pakete schon bekannt ist.
+ *
+ * „Unvollständiges für alle ausblenden" (Betreiber, 2026-10-29): Ein Paket,
+ * dessen Fassung als unvollständig befunden wurde, steht nicht in der Liste —
+ * für niemanden, denn der Befund ist Katalogwissen. Gerechnet wird hier
+ * nichts: Stufe 2 läuft beim Auswählen, die Suche liest nur.
+ *
+ * Wie viele ausgeblendet wurden, steht in der Antwort. Eine Liste, die
+ * kürzer ist als erwartet, soll ihren Grund nennen können.
+ *
+ * @param {{treffer: Object[]}} ergebnis  wie von `Modrinth.sucheModpacks`
+ */
+async function fuerSuche(ergebnis, optionen = {}) {
+    const befunde = await gespeichert((ergebnis.treffer || []).map(t => t.fassungId), optionen);
+    const treffer = [];
+    let ausgeblendet = 0;
+    for (const t of ergebnis.treffer || []) {
+        const b = befunde.get(t.fassungId);
+        if (b && b.urteil === URTEIL.UNVOLLSTAENDIG) { ausgeblendet++; continue; }
+        treffer.push({ ...t, befund: b ? { urteil: b.urteil, stufe: b.stufe, clientMods: b.auslassen.namen.length } : null });
+    }
+    return { ...ergebnis, treffer, ausgeblendet };
+}
+
+module.exports = {
+    befund, laeuft, gespeichert, fuerSuche, fuerAnzeige, satzUnvollstaendig,
+    URTEIL, REGEL, rechneEins, rechneZwei,
+};

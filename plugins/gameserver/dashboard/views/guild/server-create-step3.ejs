@@ -577,6 +577,20 @@
     if (ausgabeFeld) ausgabeFeld.readOnly = false;
   }
 
+  // Was die Prüfung des Pakets ergab — auch dann ein Satz, wenn sie ausfiel.
+  function befundSatz(b, fehler) {
+    if (!b) return 'Nicht geprüft, ob es auf einem Server läuft' + (fehler ? ' (' + fehler + ').' : '.');
+    const ohne = b.clientMods
+      ? ' ' + b.clientMods + (b.clientMods === 1 ? ' reine Client-Mod bleibt' : ' reine Client-Mods bleiben') + ' weg.'
+      : '';
+    const hinweis = b.hinweis ? ' ' + b.hinweis : '';
+    if (b.urteil === 'unklar') {
+      return 'Geprüft, aber nicht sicher: Es könnten Pflicht-Mods fehlen ('
+           + b.fehlt.map(function (f) { return f.name; }).slice(0, 5).join(', ') + ').' + ohne + hinweis;
+    }
+    return (b.stufe >= 2 ? 'Geprüft: läuft auf einem Server.' : 'Nur grob geprüft.') + ohne + hinweis;
+  }
+
   async function waehle(slug, name) {
     treffer.style.display = 'none';
     zeigeGewaehlt('… ' + name + ' wird geprüft', null);
@@ -585,6 +599,17 @@
       const d = await a.json();
       if (!d.success) throw new Error(d.message || 'unbekannt');
       const m = d.modpack;
+      // ── Der Befund entscheidet mit (K226) ───────────────────────────────
+      //
+      // Ein Paket, dem Pflicht-Mods fehlen, wird nicht gewählt: Der Server
+      // bräche beim Start ab. Der Satz nennt, was fehlt und wer es braucht.
+      // Die Anlegeroute prüft dasselbe noch einmal.
+      const b = d.befund;
+      if (b && b.urteil === 'unvollstaendig') {
+        zuruecksetzen();
+        zeigeGewaehlt(b.satz, 'rot');
+        return;
+      }
       kennung.value = m.kennung;
       fassung.value = m.fassung;
       suche.value = m.name;
@@ -594,7 +619,7 @@
       zeigeGewaehlt(m.name + ' ' + m.fassung + ' — Lader ' + m.lader
                   + (m.spielfassung ? ', Ausgabe ' + m.spielfassung : '')
                   + ' (' + Math.max(1, Math.round(m.bytes / 1024)) + ' KB). '
-                  + 'Lader und Ausgabe kommen aus dem Paket.', null);
+                  + 'Lader und Ausgabe kommen aus dem Paket. ' + befundSatz(b, d.befundFehler), null);
     } catch (f) {
       zuruecksetzen();
       zeigeGewaehlt(f.message, 'rot');
@@ -629,7 +654,16 @@
           z.addEventListener('click', function () { waehle(t.kennung, t.name); });
           treffer.appendChild(z);
         });
-        treffer.style.display = (d.treffer || []).length ? '' : 'none';
+        // Eine Liste, die kürzer ist als erwartet, nennt ihren Grund (K226).
+        if (d.ausgeblendet) {
+          const notiz = document.createElement('div');
+          notiz.className = 'fb-muted';
+          notiz.style.cssText = 'font-size:12px;padding:4px 2px';
+          notiz.textContent = (d.ausgeblendet === 1 ? 'Ein Paket ist' : d.ausgeblendet + ' Pakete sind')
+            + ' ausgeblendet: Pflicht-Mods liegen nicht bei, auf einem Server liefe es nicht.';
+          treffer.appendChild(notiz);
+        }
+        treffer.style.display = ((d.treffer || []).length || d.ausgeblendet) ? '' : 'none';
       } catch (f) {
         treffer.style.display = 'none';
         zeigeGewaehlt(f.message, 'rot');

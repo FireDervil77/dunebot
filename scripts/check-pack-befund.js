@@ -310,6 +310,14 @@ const rechne = (p) => PackBefund.rechneZwei(p.paket, p.version, p.eins,
             const b = await ModBeschreibung.beschreibe(ZipFern.pufferQuelle(probe.jars['beide.jar']), lader);
             assert.deepStrictEqual(b.braucht, ['lib'], `${lader}: ${b.braucht.join(', ')}`);
         }
+        // Die andere Richtung, und sie unterscheidet die zwei Regeln: Eine
+        // Pflicht nur in `mods.toml` gilt unter Forge ganz, unter NeoForge nicht.
+        const nurForge = baueZip({
+            'META-INF/mods.toml': toml('zwei', 'Zwei', [{ id: 'nurforge' }]),
+            'META-INF/neoforge.mods.toml': toml('zwei', 'Zwei', []),
+        });
+        assert.deepStrictEqual((await ModBeschreibung.beschreibe(ZipFern.pufferQuelle(nurForge), 'forge')).braucht, ['nurforge']);
+        assert.deepStrictEqual((await ModBeschreibung.beschreibe(ZipFern.pufferQuelle(nurForge), 'neoforge')).braucht, []);
         // Nur `neoforge.mods.toml`: Dann gilt sie.
         const nurNeo = baueZip({ 'META-INF/neoforge.mods.toml': toml('neo', 'Neo', [{ id: 'nurneo', type: 'required' }]) });
         assert.deepStrictEqual((await ModBeschreibung.beschreibe(ZipFern.pufferQuelle(nurNeo), 'neoforge')).braucht, ['nurneo']);
@@ -574,6 +582,145 @@ const rechne = (p) => PackBefund.rechneZwei(p.paket, p.version, p.eins,
             && pruefen.indexOf('abgleich.unvollstaendig') < pruefen.indexOf("'gameserver.content.modpack.pruefen'"));
         assert.ok(installieren.indexOf('if (unvollstaendig)') > 0
             && installieren.indexOf('if (unvollstaendig)') < installieren.indexOf('entferneDateien('));
+    });
+
+    // ════════════════════════════════════════════════════════════════════════
+    // Suche und Auswahl (Betreiber 2026-10-29: Stufe 2 beim Auswählen,
+    // Unvollständiges für alle ausblenden)
+    // ════════════════════════════════════════════════════════════════════════
+    const TREFFER = [
+        { kennung: 'gut', name: 'Gut', fassungId: 'v-gut' },
+        { kennung: 'luecke', name: 'Lücke', fassungId: 'v-luecke' },
+        { kennung: 'neu', name: 'Neu', fassungId: 'v-neu' },
+        { kennung: 'vage', name: 'Vage', fassungId: 'v-vage' },
+        { kennung: 'ohne', name: 'Ohne Fassung', fassungId: null },
+    ];
+    const zeile = (id, urteil, stufe, regel = PackBefund.REGEL) => ({ quelle: 'modrinth', fassung_id: id, kennung: id, fassung: '1',
+        stufe, regel, urteil, auslassen: JSON.stringify({ sha1: ['x'], namen: ['Optik', 'Zoom'] }), fehlt: '[]', einzelheiten: '{}' });
+    const BESTAND = [zeile('v-gut', 'laeuft_ohne_client', 2), zeile('v-luecke', 'unvollstaendig', 2), zeile('v-vage', 'unklar', 2)];
+    const sucheDb = (bestand) => ({ query: async (sql, werte) => bestand.filter(z => z.regel === werte[1] && werte.slice(2).includes(z.fassung_id)) });
+
+    await pruefe('Suche: was als unvollständig befunden ist, steht nicht in der Liste — und die Zahl steht da', async () => {
+        const e = await PackBefund.fuerSuche({ treffer: TREFFER, gesamt: 5, seite: 1 }, { umgebung: { db: sucheDb(BESTAND) } });
+        assert.deepStrictEqual(e.treffer.map(t => t.kennung), ['gut', 'neu', 'vage', 'ohne']);
+        assert.deepStrictEqual([e.ausgeblendet, e.gesamt, e.seite], [1, 5, 1]);
+        assert.deepStrictEqual(e.treffer[0].befund, { urteil: 'laeuft_ohne_client', stufe: 2, clientMods: 2 });
+        assert.deepStrictEqual([e.treffer[1].befund, e.treffer[2].befund.urteil, e.treffer[3].befund], [null, 'unklar', null]);
+    });
+
+    await pruefe('Suche: ein Urteil nach älterer Regel blendet nichts aus', async () => {
+        const alt = [zeile('v-luecke', 'unvollstaendig', 2, PackBefund.REGEL - 1)];
+        const e = await PackBefund.fuerSuche({ treffer: TREFFER }, { umgebung: { db: sucheDb(alt) } });
+        assert.deepStrictEqual([e.treffer.length, e.ausgeblendet], [5, 0]);
+    });
+
+    await pruefe('Suche: gerechnet wird dabei nichts — kein Abruf, eine Abfrage', async () => {
+        let abfragen = 0;
+        const db = { query: async () => { abfragen++; return []; } };
+        const hole = async () => { throw new Error('die Suche hat Modrinth gefragt'); };
+        await PackBefund.fuerSuche({ treffer: TREFFER }, { umgebung: { db, hole, abruf: hole } });
+        assert.strictEqual(abfragen, 1);
+        await PackBefund.fuerSuche({ treffer: [] }, { umgebung: { db, hole, abruf: hole } });
+        assert.strictEqual(abfragen, 1, 'ohne Treffer keine Abfrage');
+    });
+
+    await pruefe('der Treffer der Suche nennt die Fassung, an der der Befund hängt', async () => {
+        const Modrinth = require(H('Modrinth'));
+        const echt = global.fetch;
+        const antwort = (k) => ({ ok: true, status: 200, json: async () => k });
+        global.fetch = async (adresse) => {
+            const u = new URL(String(adresse));
+            if (u.pathname === '/v2/search') return antwort({ total_hits: 2, hits: [
+                { slug: 'eins', title: 'Eins', project_id: 'p1', latest_version: 'neueste-1' },
+                { slug: 'zwei', title: 'Zwei', project_id: 'p2', latest_version: 'neueste-2' }] });
+            if (u.pathname === '/v2/versions') return antwort([
+                { id: 'neueste-1', project_id: 'p1', version_number: '9', loaders: ['forge'], game_versions: ['1.20.1'] },
+                { id: 'neueste-2', project_id: 'p2', version_number: '9', loaders: ['fabric'], game_versions: ['1.20.1'] }]);
+            if (u.pathname === '/v2/project/zwei/version') return antwort([
+                { id: 'aeltere-2', project_id: 'p2', version_number: '8', loaders: ['forge'], game_versions: ['1.20.1'] }]);
+            throw new Error(`Attrappe kennt ${u.pathname} nicht`);
+        };
+        try {
+            // Ohne Lader (Anlegen): die neueste. Mit Lader: die, die passt.
+            assert.deepStrictEqual((await Modrinth.sucheModpacks('', {})).treffer.map(t => t.fassungId), ['neueste-1', 'neueste-2']);
+            assert.deepStrictEqual((await Modrinth.sucheModpacks('', { lader: 'forge' })).treffer.map(t => t.fassungId), ['neueste-1', 'aeltere-2']);
+        } finally { global.fetch = echt; }
+    });
+
+    // Die Routen, echt — ersetzt sind nur Modrinth und der Befund.
+    ServiceManager.register('dbService', { query: async () => [] });
+    ServiceManager.register('ipmServer', { isDaemonOnline: () => true, sendCommand: async () => ({ success: true }) });
+    const router = require(path.join(WURZEL, 'plugins/gameserver/dashboard/routes/inhalte.js'));
+    const rufe = async (pfad, query) => {
+        const schicht = router.stack.find(l => l.route && l.route.path === pfad && l.route.methods.get);
+        const handler = schicht.route.stack[schicht.route.stack.length - 1].handle;
+        const aus = { code: 200, d: null };
+        await handler({ query, params: {} }, { locals: { guildId: 'g' }, status(c) { aus.code = c; return this; }, json(d) { aus.d = d; return this; } });
+        return aus;
+    };
+    const Modrinth = require(H('Modrinth'));
+    const echt = { suche: Modrinth.sucheModpacks, fassung: Modrinth.modpackFassung, befund: PackBefund.befund, fuerSuche: PackBefund.fuerSuche };
+    const PAKET = { kennung: 'probe', name: 'Probepaket', fassung: '1.0', fassungId: 'vprobe', lader: 'forge', spielfassung: '1.20.1', bytes: 5 };
+    const UNVOLLSTAENDIG = { urteil: 'unvollstaendig', stufe: 2, auslassen: { sha1: ['geheim'], namen: [] }, einzelheiten: {},
+        fehlt: [{ kennung: 'flib', name: 'FLIB', gebraucht_von: ['Lager'], grund: 'extern', host: 'www.curseforge.com' }] };
+
+    await pruefe('Route: die Suche beim Anlegen blendet aus und nennt die Zahl', async () => {
+        Modrinth.sucheModpacks = async () => ({ treffer: TREFFER, gesamt: 5 });
+        PackBefund.fuerSuche = (e) => echt.fuerSuche(e, { umgebung: { db: sucheDb(BESTAND) } });
+        try {
+            const a = await rufe('/modpacks/suche', { q: '' });
+            assert.deepStrictEqual([a.code, a.d.success, a.d.ausgeblendet, a.d.treffer.length], [200, true, 1, 4]);
+            assert.ok(!a.d.treffer.some(t => t.kennung === 'luecke'));
+        } finally { Modrinth.sucheModpacks = echt.suche; PackBefund.fuerSuche = echt.fuerSuche; }
+    });
+
+    await pruefe('Route: beim Auswählen läuft Stufe 2, und die Antwort trägt den Satz — aber keine Prüfsummen', async () => {
+        const gefragt = [];
+        Modrinth.modpackFassung = async () => ({ ...PAKET });
+        PackBefund.befund = async (paket, o) => { gefragt.push([paket.fassungId, o.stufe]); return UNVOLLSTAENDIG; };
+        try {
+            const a = await rufe('/modpacks/fassung', { kennung: 'probe' });
+            assert.deepStrictEqual(gefragt, [['vprobe', 2]]);
+            assert.deepStrictEqual([a.code, a.d.success, a.d.befund.urteil, a.d.befundFehler], [200, true, 'unvollstaendig', null]);
+            assert.match(a.d.befund.satz, /FLIB \(gebraucht von Lager\)/);
+            assert.ok(!JSON.stringify(a.d.befund).includes('geheim'));
+        } finally { Modrinth.modpackFassung = echt.fassung; PackBefund.befund = echt.befund; }
+    });
+
+    await pruefe('Route: lässt sich der Befund nicht holen, bleibt die Auswahl möglich — und es wird gesagt', async () => {
+        Modrinth.modpackFassung = async () => ({ ...PAKET });
+        PackBefund.befund = async () => { throw new Error('Modrinth antwortete 502'); };
+        try {
+            const a = await rufe('/modpacks/fassung', { kennung: 'probe' });
+            assert.deepStrictEqual([a.code, a.d.success, a.d.befund, a.d.befundFehler], [200, true, null, 'Modrinth antwortete 502']);
+        } finally { Modrinth.modpackFassung = echt.fassung; PackBefund.befund = echt.befund; }
+    });
+
+    await pruefe('beide Suchen gehen durch den Befund, und das Anlegen lehnt Unvollständiges selbst ab', async () => {
+        const routen = lies('plugins/gameserver/dashboard/routes/inhalte.js');
+        assert.strictEqual((routen.match(/Modrinth\.sucheModpacks\(/g) || []).length, 2);
+        assert.strictEqual((routen.match(/PackBefund\.fuerSuche\(\s*await Modrinth\.sucheModpacks\(/g) || []).length, 2);
+        const anlegen = lies('plugins/gameserver/dashboard/routes/servers.js');
+        const tor = anlegen.indexOf('befund.urteil === PackBefund.URTEIL.UNVOLLSTAENDIG');
+        assert.ok(tor > 0 && tor < anlegen.indexOf('const paketWerte = paketWerteAnlegen('), 'das Tor steht nicht vor dem Anlegen');
+        assert.match(anlegen.slice(tor, tor + 200), /res\.status\(400\)[\s\S]*satzUnvollstaendig\(mp, befund\)/);
+    });
+
+    await pruefe('Seiten: der Assistent wählt Unvollständiges nicht, beide Listen nennen das Ausgeblendete', async () => {
+        const { ohneKommentareEjs } = require('./lib/quelltext');
+        const liesEjs = (p) => ohneKommentareEjs(fs.readFileSync(path.join(WURZEL, p), 'utf8'));
+        const assistent = liesEjs('plugins/gameserver/dashboard/views/guild/server-create-step3.ejs');
+        const wahl = assistent.slice(assistent.indexOf('async function waehle('), assistent.indexOf("suche.addEventListener('input'"));
+        // Zurückgesetzt und der Satz gezeigt, BEVOR die Kennung ins Formular geschrieben wird.
+        const ab = wahl.indexOf("b.urteil === 'unvollstaendig'");
+        assert.ok(ab > 0 && ab < wahl.indexOf('kennung.value = m.kennung'));
+        assert.match(wahl.slice(ab, ab + 200), /zuruecksetzen\(\);\s*zeigeGewaehlt\(b\.satz, 'rot'\);\s*return;/);
+        assert.match(assistent, /befundSatz\(b, d\.befundFehler\)/);
+        assert.match(assistent, /if \(d\.ausgeblendet\)/);
+        const reiter = liesEjs('plugins/gameserver/dashboard/views/guild/partials/server-detail-inhalte.ejs');
+        assert.match(reiter, /const ausgeblendet = d\.ausgeblendet \?/);
+        assert.match(reiter, /\.join\(''\) \+ ausgeblendet \+ blaettern/);
+        assert.match(reiter, /befund_archiv:[^\n]+\n\s+befund:[^\n]+\n\s+befund_eingebettet:/);
     });
 
     await pruefe('Modrinth: Das Limit wird gelesen, und bei 429 wird einmal gewartet statt abgebrochen', async () => {

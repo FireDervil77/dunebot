@@ -960,6 +960,22 @@ router.post('/', requirePermission('GAMESERVER.CREATE'), async (req, res) => {
                 eingaben.modpack_version = mp.fassung;
                 Logger.info(`[Gameserver] Modpack „${mp.name}" ${mp.fassung}: Lader ${mp.lader}, `
                           + `Ausgabe ${mp.spielfassung || '?'} (${Math.round(mp.bytes / 1024)} KB)`);
+
+                // ── Ein unvollständiges Paket wird nicht angelegt (K226) ────
+                //
+                // Die Auswahlseite hat den Befund schon geholt und zeigt ihn;
+                // hier wird er gelesen, nicht geglaubt. Sonst entstünde ein
+                // Server mit dem Lader des Pakets, auf den das Paket dann
+                // nicht eingespielt wird. Lässt sich der Befund nicht holen,
+                // wird angelegt — das Einspielen fragt noch einmal.
+                const PackBefund = require('../helpers/PackBefund');
+                const befund = await PackBefund.befund(mp, { stufe: 2 }).catch((fehler) => {
+                    Logger.warn(`[Gameserver] Befund für ${mp.kennung} ${mp.fassung} nicht möglich:`, fehler);
+                    return null;
+                });
+                if (befund && befund.urteil === PackBefund.URTEIL.UNVOLLSTAENDIG) {
+                    return res.status(400).json({ success: false, message: PackBefund.satzUnvollstaendig(mp, befund) });
+                }
             } catch (fehler) {
                 Logger.warn('[Gameserver] Modpack abgelehnt:', fehler);
                 return res.status(400).json({ success: false, message: fehler.message });

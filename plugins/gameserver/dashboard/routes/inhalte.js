@@ -35,6 +35,7 @@ const { ladePaketFuerServer, ladePaketFuerAnlegen } = require('../helpers/StartP
 const { loeseInhaltAuf } = require('../helpers/InhaltJeLader');
 const Inhalte = require('../helpers/Inhalte');
 const InhalteHolen = require('../helpers/InhalteHolen');
+const PackBefund = require('../helpers/PackBefund');
 const Quellen = require('../helpers/Quellen');
 const BepInExLog = require('../helpers/BepInExLog');
 const Spielfassung = require('../helpers/Spielfassung');
@@ -416,7 +417,9 @@ router.get('/modpacks/suche', requirePermission('GAMESERVER.CREATE'), async (req
     const Logger = ServiceManager.get('Logger');
     try {
         const Modrinth = require('../helpers/Modrinth');
-        const treffer = await Modrinth.sucheModpacks(req.query.q, { seite: req.query.seite });
+        // Was als unvollständig befunden wurde, steht nicht in der Liste (K226).
+        const treffer = await PackBefund.fuerSuche(
+            await Modrinth.sucheModpacks(req.query.q, { seite: req.query.seite }));
         return res.json({ success: true, ...treffer });
     } catch (error) {
         Logger.warn('[Gameserver/Inhalte] Modpack-Suche fehlgeschlagen:', error);
@@ -437,7 +440,22 @@ router.get('/modpacks/fassung', requirePermission('GAMESERVER.CREATE'), async (r
     try {
         const Modrinth = require('../helpers/Modrinth');
         const f = await Modrinth.modpackFassung(req.query.kennung, req.query.fassung || null);
-        return res.json({ success: true, modpack: f });
+
+        // ── Der Befund beim Auswählen (K226, Betreiber 2026-10-29) ─────────
+        //
+        // Hier läuft Stufe 2: Sekunden, bei großen Paketen länger — einmal je
+        // Fassung, danach wird gelesen. Scheitert er (Modrinth nicht
+        // erreichbar), bleibt die Auswahl möglich, und die Antwort sagt, dass
+        // nicht geprüft wurde. Beim Einspielen wird ohnehin noch einmal gefragt.
+        let befund = null;
+        let befundFehler = null;
+        try {
+            befund = PackBefund.fuerAnzeige(f, await PackBefund.befund(f, { stufe: 2 }));
+        } catch (fehler) {
+            Logger.warn(`[Gameserver/Inhalte] Befund für ${f.kennung} ${f.fassung} nicht möglich:`, fehler);
+            befundFehler = fehler.message;
+        }
+        return res.json({ success: true, modpack: f, befund, befundFehler });
     } catch (error) {
         Logger.warn('[Gameserver/Inhalte] Modpack-Fassung fehlgeschlagen:', error);
         return res.status(400).json({ success: false, message: error.message });
@@ -665,9 +683,10 @@ router.get('/:serverId/inhalte/modpacks/suche', requirePermission('GAMESERVER.VI
         }
 
         const Modrinth = require('../helpers/Modrinth');
-        const treffer = await Modrinth.sucheModpacks(req.query.q, {
+        // Was als unvollständig befunden wurde, steht nicht in der Liste (K226).
+        const treffer = await PackBefund.fuerSuche(await Modrinth.sucheModpacks(req.query.q, {
             seite: req.query.seite, lader, spielfassung,
-        });
+        }));
 
         return res.json({ success: true, unterstuetzt: true, lader, spielfassung, ...treffer });
     } catch (error) {

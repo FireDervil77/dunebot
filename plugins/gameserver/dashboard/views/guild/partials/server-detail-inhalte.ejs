@@ -1190,12 +1190,32 @@
           raum.innerHTML = `<div class="fb-muted" style="font-size:12px">${escape(d.grund || 'Hier gibt es keine Modpacks.')}</div>`;
           return;
         }
+        // ── Ausgeblendetes wird genannt (K226) ────────────────────────────
+        //
+        // Pakete, denen Pflicht-Mods fehlen, stehen nicht in der Liste. Die
+        // Zahl steht da — sonst sähe „nichts gefunden" nach einem Fehler aus.
+        const ausgeblendet = d.ausgeblendet ? `
+          <div class="fb-muted" style="font-size:12px;padding-top:6px">
+            ${d.ausgeblendet === 1 ? 'Ein Paket ist' : escape(String(d.ausgeblendet)) + ' Pakete sind'} ausgeblendet:
+            Pflicht-Mods liegen nicht bei, auf einem Server liefe es nicht.
+          </div>` : '';
+
         if (!d.treffer.length) {
           raum.innerHTML = `<div class="fb-muted" style="font-size:12px">
             Nichts gefunden, das zu <span class="fb-mono">${escape(d.lader)}</span>${
-              d.spielfassung ? ' und <span class="fb-mono">' + escape(d.spielfassung) + '</span>' : ''} passt.</div>`;
+              d.spielfassung ? ' und <span class="fb-mono">' + escape(d.spielfassung) + '</span>' : ''} passt.</div>` + ausgeblendet;
           return;
         }
+
+        // Was über ein Paket schon bekannt ist — gerechnet wird beim Einspielen.
+        const befundMarke = (t) => {
+          const b = t.befund;
+          if (!b || b.stufe < 2) return '';
+          if (b.urteil === 'unklar') return marke('nicht sicher', 'warn', 'Geprüft: Es könnten Pflicht-Mods fehlen.');
+          return marke('geprüft', 'gut', b.clientMods
+            ? `Läuft auf einem Server; ${b.clientMods} reine Client-Mod(s) bleiben weg.`
+            : 'Läuft auf einem Server.');
+        };
 
         // ── Wogegen gefiltert wurde, steht über der Liste ─────────────────
         //
@@ -1245,7 +1265,7 @@
             k.marke ? ';box-shadow:inset 3px 0 0 var(--fb-success);padding-left:8px' : ''}">
             ${t.bild ? `<img src="${escape(t.bild)}" alt="" width="32" height="32" style="border-radius:4px;flex:0 0 auto">` : ''}
             <div style="flex:1 1 auto;min-width:0">
-              <div style="font-weight:600;font-size:13px">${escape(t.name)} ${k.marke}</div>
+              <div style="font-weight:600;font-size:13px">${escape(t.name)} ${k.marke} ${befundMarke(t)}</div>
               <div class="fb-muted" style="font-size:12px">${escape(t.beschreibung).slice(0, 160)}</div>
               <div class="fb-muted" style="font-size:11px;margin-top:2px">
                 <span class="fb-mono">${escape(t.kennung)}</span> ·
@@ -1256,7 +1276,7 @@
             ${DARF ? `<button class="btn ${k.klasse} btn-sm" style="flex:0 0 auto"
                         onclick="modpackInstallieren('${escape(t.kennung)}', '${escape(t.fassung || '')}', this)"
                       >${escape(k.text)}</button>` : ''}
-          </div>`; }).join('') + blaettern;
+          </div>`; }).join('') + ausgeblendet + blaettern;
       })
       .catch(e => {
         raum.innerHTML = `<div style="font-size:12px;color:var(--fb-danger)">Suche fehlgeschlagen: ${escape(e.message)}</div>`;

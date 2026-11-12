@@ -348,6 +348,9 @@ async function sucheModpacks(begriff, optionen = {}) {
         lader:        passend ? laderBeiUns(passend.loaders) : null,
         spielfassung: passend ? (passend.game_versions || [])[0] || null : null,
         fassung:      passend ? passend.version_number : null,
+        // Woran der Pack-Befund haengt (K226): die passende Fassung, sonst die
+        // neueste — dieselbe, die `modpackFassung` ohne Nummer waehlt.
+        fassungId:    passend ? passend.id : (t.latest_version || null),
     });
 
     // Ohne Lader: die alte, ungefilterte Auskunft.
