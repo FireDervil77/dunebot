@@ -633,8 +633,9 @@ sudo journalctl -u firebot-daemon -n 50</code></pre>
                                             </td>
                                         </tr>
                                         <tr>
+                                            <%# Rundlauf Daemon → Panel → Daemon, vom Daemon gemessen (K346); „–" solange keine Messung vorliegt (Fassung vor 1.1.24). %>
                                             <td class="text-secondary">Letzter Ping</td>
-                                            <td id="rs-ping"><%= rootserver.last_ping_ms != null ? rootserver.last_ping_ms + ' ms' : '–' %></td>
+                                            <td id="rs-ping" title="Herzschlag bis zur Bestätigung des Panels, vom Daemon gemessen"><%= rootserver.last_ping_ms != null ? rootserver.last_ping_ms + ' ms' : '–' %></td>
                                         </tr>
                                         <tr>
                                             <td class="text-secondary">Verpasste Heartbeats</td>

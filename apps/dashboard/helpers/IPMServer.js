@@ -846,8 +846,23 @@ class IPMServer {
         this.zaehler.belegung(daemonId, 'arbeit', payload.arbeit);
         this.zaehler.last(daemonId, { druck: payload.druck, hardware: payload.hardware });
 
-        // Latenz aus Heartbeat-Timestamp berechnen (Daemon sendet Unix-Timestamp in Sekunden)
-        const pingMs = payload.timestamp ? Math.max(0, Date.now() - (payload.timestamp * 1000)) : null;
+        // Rundlaufzeit zum Daemon (K346): Der Daemon misst sie selbst — er
+        // nummeriert jeden Herzschlag (`folge`), wir geben die Nummer im
+        // heartbeat_ack zurück, und die Zeit bis dahin schickt er im nächsten
+        // Herzschlag als `ping_ms`. Eine Uhr, ein Weg hin und zurück.
+        //
+        // Bis 2026-11-12 stand hier „Date.now() − timestamp × 1000". Der
+        // Zeitstempel kommt in ganzen Sekunden; heraus kam der Bruchteil der
+        // laufenden Sekunde (auf 54 konstant ~917 ms), keine Laufzeit.
+        //
+        // Drei Fälle: Zahl → speichern. Nummer da, aber keine Zahl → der
+        // Daemon hat diese Runde nichts gemessen (Ack verloren oder vom
+        // Bahnhof), der letzte Wert bleibt (undefined: Spalte nicht anfassen).
+        // Keine Nummer → Fassung vor 1.1.24 ohne Messung: NULL statt eines
+        // Artefakts aus der Datenbank.
+        let pingMs;
+        if (Number.isFinite(payload.ping_ms)) pingMs = Math.round(payload.ping_ms);
+        else if (payload.folge === undefined) pingMs = null;
 
         // Hardware-Stats in Connection-Metadata speichern
         if (payload.hardware) {
@@ -869,7 +884,7 @@ class IPMServer {
                 ram_total_gb:  hw.ram?.total_gb,
                 disk_used_gb:  hw.disk?.used_gb,
                 disk_total_gb: hw.disk?.total_gb,
-            }, { network: hw.network ?? null, ping_ms: pingMs });
+            }, { network: hw.network ?? null, ping_ms: pingMs ?? null });
         }
 
         // Kein `updateInfo` mehr aus dem Herzschlag: Der Daemon schickt es nicht
@@ -882,10 +897,11 @@ class IPMServer {
         // Eintrag von selbst.
         await RootServer.processHeartbeat(daemonId, pingMs);
 
-        // ACK senden
+        // ACK senden; `folge` geht zurück, daran misst der Daemon den Rundlauf.
         this._sende(conn.ws, {
             type: 'heartbeat_ack',
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            folge: payload.folge
         });
         this.innenhaut?.merke(daemonId).catch(error =>
             this.Logger.error(`[Innenhaut] Marke von ${daemonId} nicht geschrieben`, error));

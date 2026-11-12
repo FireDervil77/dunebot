@@ -269,11 +269,17 @@ class RootServer {
      * offline (`ausgefallen` → `markOffline`), geprüft in `check-verbindung.js`.
      */
 
-    static async processHeartbeat(daemonId, latencyMs = null) {
+    /*
+     * `latencyMs` (K346): Zahl → Rundlaufzeit speichern; null → Spalte leeren
+     * (ein Daemon ohne Messung meldet sich, kein alter Wert darf als Ping
+     * stehen bleiben); undefined → Spalte nicht anfassen (diese Runde nichts
+     * gemessen, der letzte Wert gilt weiter).
+     */
+    static async processHeartbeat(daemonId, latencyMs) {
         const dbService = ServiceManager.get('dbService');
         const fields = ['daemon_status = ?', 'last_seen = NOW()', 'missed_heartbeats = 0'];
         const values = ['online'];
-        if (latencyMs !== null) { fields.push('last_ping_ms = ?'); values.push(latencyMs); }
+        if (latencyMs !== undefined) { fields.push('last_ping_ms = ?'); values.push(latencyMs); }
         values.push(daemonId);
         await dbService.query(
             `UPDATE rootserver SET ${fields.join(', ')} WHERE daemon_id = ?`, values
