@@ -298,6 +298,9 @@ const UDP = (purpose, mehr = {}) => ({ purpose, protocol: 'udp', assign: 'pool',
         assert.strictEqual(von('valheim').belegbar, true);
         assert.strictEqual(von('minecraft').belegbar, false);
         assert.strictEqual(von('a2s').belegbar, true);
+        // K259: 7 Days erbt in GameDig von valve und ist gemessen; DayZ erbt auch, ist aber nicht gemessen.
+        assert.strictEqual(von('sdtd').belegbar, true, 'sdtd ist nicht belegbar');
+        assert.strictEqual(von('dayz').belegbar, false);
         // Dieselbe Liste, die der Daemon eingebaut hat (erzeuge-a2s-kennungen.js).
         const go = ohneKommentare(fs.readFileSync(path.join(DAEMON, 'internal/probe/kennungen_gen.go'), 'utf8'));
         const imDaemon = [...go.matchAll(/^\t"([a-z0-9_-]+)":\s+true,$/gm)].map(m => m[1]).sort();

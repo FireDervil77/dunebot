@@ -2427,14 +2427,15 @@ async function portSpeichern(sitzung, b) {
  * `scripts/check-pakete.js`: GameDigs Katalog, dazu unser `a2s` für Spiele, die
  * Source Query sprechen und dort fehlen (Baustelle 160).
  *
- * `belegbar`: fb-init spricht genau GameDigs `valve`-Protokoll selbst — aus
- * derselben Tabelle erzeugt `scripts/erzeuge-a2s-kennungen.js` seine Liste.
+ * `belegbar`: was fb-init selbst abfragen kann — GameDigs `valve`-Protokoll und
+ * die gemessenen Erben (`sdtd`, K259). Die Regel steht in `A2sProtokolle.js`;
+ * aus ihr erzeugt `scripts/erzeuge-a2s-kennungen.js` die Tabelle des Daemons.
  */
 function abfrageKennungen() {
     const katalog = require('gamedig').games;
     const aus = [{ kennung: 'a2s', name: 'Source Query (Spiel steht nicht im Katalog)', belegbar: true }];
     for (const k of Object.keys(katalog).sort()) {
-        aus.push({ kennung: k, name: katalog[k].name || k, belegbar: katalog[k].options?.protocol === 'valve' });
+        aus.push({ kennung: k, name: katalog[k].name || k, belegbar: require('./A2sProtokolle').sprichtA2S(katalog[k]) });
     }
     return aus;
 }
