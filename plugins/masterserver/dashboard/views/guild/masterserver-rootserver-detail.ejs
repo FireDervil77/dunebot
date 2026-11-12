@@ -804,7 +804,7 @@ sudo journalctl -u firebot-daemon -f</code></pre>
                             <h5><i class="fa-solid fa-triangle-exclamation me-2"></i>RootServer löschen</h5>
                             <p class="mb-3">Diese Aktion löscht den RootServer permanent und kann <strong>nicht rückgängig gemacht werden</strong>.</p>
                             <p class="text-secondary" style="font-size:.85rem;">Alle zugehörigen Gameserver müssen vorher entfernt werden.</p>
-                            <button class="btn btn-danger" onclick="confirmDeleteRootserver()">
+                            <button class="btn btn-danger" id="rootserverLoeschenOeffnen">
                                 <i class="fa-solid fa-trash me-1"></i><%= rootserver.name %> löschen
                             </button>
                         </div>
@@ -837,6 +837,70 @@ sudo journalctl -u firebot-daemon -f</code></pre>
         <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal">Abbrechen</button>
         <button type="button" class="btn btn-warning fw-bold" id="tokenErneuernKnopf" disabled>
           <i class="fa-solid fa-key me-1"></i>Erneuern
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# Zerstörende Rückfragen nach Vorlage #paketEntfernenModal: rot, fett, Name eintippen (K348). Bis 2026-11-12 fragten beide mit confirm(). %>
+<div class="modal modal-blur fade" id="rootserverLoeschenModal" tabindex="-1" aria-labelledby="rootserverLoeschenTitel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content border border-danger border-2">
+      <div class="modal-status bg-danger"></div>
+      <div class="modal-header bg-danger-lt">
+        <h5 class="modal-title text-danger fw-bold" id="rootserverLoeschenTitel">
+          <i class="fa-solid fa-triangle-exclamation me-2"></i>RootServer ENDGÜLTIG löschen
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-danger fw-bold fs-3 mb-2">„<%= rootserver.name %>" wird aus dem Panel entfernt.</p>
+        <p class="text-danger fw-bold mb-3">Das lässt sich nicht zurücknehmen.</p>
+        <div class="fw-bold mb-1">Es gehen mit:</div>
+        <ul class="mb-3">
+          <li>alle Zusatz-IPs, Portbuchungen und Kontingente dieser Maschine</li>
+          <li>ihr Eintrag beim Daemon, wenn er gerade verbunden ist — die Maschine müsste danach neu eingerichtet werden</li>
+        </ul>
+        <p class="mb-3">Geht nur, solange kein Gameserver mehr auf der Maschine liegt.</p>
+        <label class="form-label fw-bold" for="rootserverLoeschenEingabe">
+          Zum Bestätigen den Namen eintippen: <span class="font-monospace text-danger" id="rootserverLoeschenSoll"><%= rootserver.name %></span>
+        </label>
+        <input type="text" class="form-control font-monospace" id="rootserverLoeschenEingabe" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal">Abbrechen</button>
+        <button type="button" class="btn btn-danger fw-bold" id="rootserverLoeschenKnopf" disabled>
+          <i class="fa-solid fa-trash me-1"></i>Endgültig löschen
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal modal-blur fade" id="ipEntfernenModal" tabindex="-1" aria-labelledby="ipEntfernenTitel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content border border-danger border-2">
+      <div class="modal-status bg-danger"></div>
+      <div class="modal-header bg-danger-lt">
+        <h5 class="modal-title text-danger fw-bold" id="ipEntfernenTitel">
+          <i class="fa-solid fa-triangle-exclamation me-2"></i>Zusatz-IP ENDGÜLTIG entfernen
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-danger fw-bold fs-3 mb-2">„<span id="ipEntfernenAdresse"></span>" wird von „<%= rootserver.name %>" entfernt.</p>
+        <p class="text-danger fw-bold mb-3">Das lässt sich nicht zurücknehmen.</p>
+        <p class="mb-3">Die Adresse und ihre Bezeichnung verschwinden aus dem Panel; neue Server können sie nicht mehr wählen. Solange ein Gameserver an ihr lauscht, lehnt das Panel das Entfernen ab.</p>
+        <label class="form-label fw-bold" for="ipEntfernenEingabe">
+          Zum Bestätigen die Adresse eintippen: <span class="font-monospace text-danger" id="ipEntfernenSoll"></span>
+        </label>
+        <input type="text" class="form-control font-monospace" id="ipEntfernenEingabe" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal">Abbrechen</button>
+        <button type="button" class="btn btn-danger fw-bold" id="ipEntfernenKnopf" disabled>
+          <i class="fa-solid fa-trash me-1"></i>Endgültig entfernen
         </button>
       </div>
     </div>
@@ -1124,20 +1188,42 @@ sudo journalctl -u firebot-daemon -f</code></pre>
     }
 })();
 
-// ── RootServer löschen ───────────────────────────────────────
-function confirmDeleteRootserver() {
-    if (!confirm('RootServer wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden!')) return;
-    fetch('/guild/<%= guildId %>/plugins/masterserver/rootservers/<%= rootserver.id %>', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' }
-    }).then(r => r.json()).then(d => {
-        if (d.success !== false) {
+// ── RootServer löschen (K348) ────────────────────────────────
+// Rote Rückfrage statt confirm(): Der Knopf bleibt gesperrt, bis der Name
+// genau dasteht; die Route prüft ihn noch einmal.
+(function () {
+    const oeffnen = document.getElementById('rootserverLoeschenOeffnen');
+    const modalEl = document.getElementById('rootserverLoeschenModal');
+    if (!oeffnen || !modalEl) return;
+    const eingabe = document.getElementById('rootserverLoeschenEingabe');
+    const knopf = document.getElementById('rootserverLoeschenKnopf');
+    const soll = document.getElementById('rootserverLoeschenSoll').textContent;
+
+    oeffnen.addEventListener('click', function () {
+        eingabe.value = '';
+        knopf.disabled = true;
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    });
+    eingabe.addEventListener('input', function () {
+        knopf.disabled = eingabe.value.trim() !== soll;
+    });
+    knopf.addEventListener('click', async function () {
+        knopf.disabled = true;
+        try {
+            const r = await fetch('/guild/<%= guildId %>/plugins/masterserver/rootservers/<%= rootserver.id %>', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bestaetigung: eingabe.value.trim() })
+            });
+            const d = await r.json();
+            if (!r.ok || !d.success) throw new Error(d.message || 'Nicht gelöscht.');
             window.location.href = d.redirectUrl || '/guild/<%= guildId %>/plugins/masterserver/rootservers';
-        } else {
-            alert('Fehler: ' + (d.message || 'Unbekannter Fehler'));
+        } catch (e) {
+            knopf.disabled = eingabe.value.trim() !== soll;
+            GuildAjaxHandler.showToast('error', e.message);
         }
-    }).catch(() => alert('Netzwerkfehler'));
-}
+    });
+})();
 
 // ── IP-Verwaltung ────────────────────────────────────────────
 const IP_API = '/guild/<%= guildId %>/plugins/masterserver/rootservers/<%= rootserver.id %>/ips';
@@ -1184,7 +1270,7 @@ async function loadIPs() {
                 <td>${ip.label || '<span class="text-secondary">–</span>'}</td>
                 <td><span class="badge bg-secondary-lt">Zusatz-IP</span></td>
                 <td class="text-end">
-                    <button class="btn btn-sm btn-outline-danger" onclick="removeIP(${ip.id})">
+                    <button class="btn btn-sm btn-outline-danger" onclick="removeIP(${ip.id}, this)">
                         <i class="fa-solid fa-trash"></i>
                     </button>
                 </td>`;
@@ -1214,7 +1300,7 @@ async function addIP() {
             <td>${label || '<span class="text-secondary">–</span>'}</td>
             <td><span class="badge bg-secondary-lt">Zusatz-IP</span></td>
             <td class="text-end">
-                <button class="btn btn-sm btn-outline-danger" onclick="removeIP(${d.data.id})">
+                <button class="btn btn-sm btn-outline-danger" onclick="removeIP(${d.data.id}, this)">
                     <i class="fa-solid fa-trash"></i>
                 </button>
             </td>`;
@@ -1224,15 +1310,53 @@ async function addIP() {
     } catch (_) { alert('Netzwerkfehler'); }
 }
 
-async function removeIP(ipId) {
-    if (!confirm('IP-Adresse entfernen?')) return;
-    try {
-        const r = await fetch(IP_API + '/' + ipId, { method: 'DELETE' });
-        const d = await r.json();
-        if (!d.success) return alert('Fehler: ' + d.message);
-        const row = document.querySelector('tr[data-ip-id="' + ipId + '"]');
-        if (row) row.remove();
-    } catch (_) { alert('Netzwerkfehler'); }
+// ── Zusatz-IP entfernen (K348) ───────────────────────────────
+// Rote Rückfrage statt confirm(): Die Adresse eintippen; die Route prüft sie
+// noch einmal und lehnt ab, solange ein Gameserver an ihr lauscht.
+const ipEntfernen = (function () {
+    const modalEl = document.getElementById('ipEntfernenModal');
+    const eingabe = document.getElementById('ipEntfernenEingabe');
+    const knopf = document.getElementById('ipEntfernenKnopf');
+    const sollEl = document.getElementById('ipEntfernenSoll');
+    let ipId = null;
+
+    eingabe.addEventListener('input', function () {
+        knopf.disabled = eingabe.value.trim() !== sollEl.textContent;
+    });
+    knopf.addEventListener('click', async function () {
+        knopf.disabled = true;
+        try {
+            const r = await fetch(IP_API + '/' + ipId, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bestaetigung: eingabe.value.trim() })
+            });
+            const d = await r.json();
+            if (!r.ok || !d.success) throw new Error(d.message || 'Nicht entfernt.');
+            bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+            const row = document.querySelector('tr[data-ip-id="' + ipId + '"]');
+            if (row) row.remove();
+            GuildAjaxHandler.showToast('success', d.message);
+        } catch (e) {
+            knopf.disabled = eingabe.value.trim() !== sollEl.textContent;
+            GuildAjaxHandler.showToast('error', e.message);
+        }
+    });
+    return function (id, adresse) {
+        ipId = id;
+        sollEl.textContent = adresse;
+        document.getElementById('ipEntfernenAdresse').textContent = adresse;
+        eingabe.value = '';
+        knopf.disabled = true;
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    };
+})();
+
+// Die Adresse kommt aus der Zeile selbst (textContent), nicht aus einem
+// Zeichenkettenliteral im onclick — so landet nichts Ungeprüftes im Attribut.
+function removeIP(ipId, knopf) {
+    const zeile = knopf && knopf.closest('tr');
+    ipEntfernen(ipId, zeile ? zeile.querySelector('code').textContent : '');
 }
 
 // IPs laden wenn Tab aktiv wird (Bootstrap 4 = jQuery-Events!)

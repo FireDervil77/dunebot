@@ -548,6 +548,12 @@ router.delete('/:id', requirePermission('MASTERSERVER.ROOTSERVER.DELETE'), async
             });
         }
 
+        // Rote Rückfrage (K348): Der Name steht auch hier noch einmal, nicht
+        // nur im Browser — ein Aufruf ohne Fenster löscht nichts aus Versehen.
+        if (String(req.body?.bestaetigung || '').trim() !== rootserver.name) {
+            return res.status(400).json({ success: false, message: 'Zum Löschen den Namen des RootServers eintippen.' });
+        }
+
         // 2. Prüfen ob Gameserver darauf laufen
         const gameserverCount = await dbService.query(
             'SELECT COUNT(*) as count FROM gameservers WHERE rootserver_id = ?',
@@ -797,16 +803,30 @@ router.delete('/:id/ips/:ipId', requirePermission('MASTERSERVER.ROOTSERVER.EDIT'
         if (!rootserver || rootserver.guild_id !== guildId) {
             return res.status(404).json({ success: false, message: 'RootServer nicht gefunden' });
         }
-        // Prüfen ob die IP noch von einem Gameserver genutzt wird
-        const [used] = await dbService.query(
-            'SELECT id FROM rootserver_ips WHERE id = ? AND rootserver_id = ?',
+        const [ip] = await dbService.query(
+            'SELECT id, ip_address FROM rootserver_ips WHERE id = ? AND rootserver_id = ?',
             [ipId, rootserverId]
         );
-        if (!used) {
+        if (!ip) {
             return res.status(404).json({ success: false, message: 'IP nicht gefunden' });
         }
+        // Rote Rückfrage (K348): Die Adresse steht auch hier noch einmal.
+        if (String(req.body?.bestaetigung || '').trim() !== ip.ip_address) {
+            return res.status(400).json({ success: false, message: 'Zum Entfernen die Adresse eintippen.' });
+        }
+        // Bis K348 stand hier nur der Kommentar „prüfen, ob ein Gameserver sie
+        // nutzt" — geprüft wurde nichts. gameservers.bind_ip ist die Adresse,
+        // an der ein Server lauscht (K304).
+        const [{ n }] = await dbService.query(
+            'SELECT COUNT(*) AS n FROM gameservers WHERE rootserver_id = ? AND bind_ip = ?',
+            [rootserverId, ip.ip_address]
+        );
+        if (Number(n) > 0) {
+            return res.status(409).json({ success: false,
+                message: `${n} Gameserver ${Number(n) === 1 ? 'lauscht' : 'lauschen'} an ${ip.ip_address} — erst umziehen oder löschen.` });
+        }
         await dbService.query('DELETE FROM rootserver_ips WHERE id = ?', [ipId]);
-        res.json({ success: true, message: 'IP-Adresse entfernt' });
+        res.json({ success: true, message: `${ip.ip_address} entfernt` });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
