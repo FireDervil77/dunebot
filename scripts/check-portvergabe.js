@@ -8,6 +8,15 @@
  * startete, fiel es niemandem auf. Genau darum steht der Test hier.
  *
  *   node scripts/check-portvergabe.js
+ *
+ * Der Wächter bucht echte Zeilen im Vorrat (server_id 0 und 999) und gibt sie
+ * wieder frei. Bis 2026-11-12 nahm er sich dafür „den Nachbarn des nächsten
+ * freien Ports" nach Rootserver und NUMMER — ohne zu fragen, wem die Zeile
+ * gehört. Am 2026-11-02 11:17 war der Nachbar 25004 auf Maschine 54 der
+ * Spielport von Server 221; der Wächter setzte ihn auf 999 und dann auf NULL,
+ * und der Server lief sechs Tage ohne Buchung (K349). Seitdem: Prüfzeilen nur
+ * aus wirklich freien, Zurücknehmen nur mit dem eigenen Kennzeichen in der
+ * WHERE-Klausel, und vorher/nachher ein Schnappschuss der fremden Buchungen.
  */
 'use strict';
 require('dotenv').config({ path: require('path').join(__dirname, '../apps/dashboard/.env') });
@@ -42,10 +51,25 @@ function pruefe(ok, was, zusatz = '') {
         + (gekoppelt.map(k => `${k.zweck}=+${k.abstand}`).join(', ') || '(keine)'));
     console.log(`▸ Maschine #${maschine}`);
 
+    // Fremde Buchungen auf der Maschine, bevor der Wächter etwas anfasst. Am
+    // Ende muss jede davon unverändert dastehen — das ist die Gegenprobe zu
+    // K349, nicht die Hoffnung, dass die Abfragen schon richtig filtern.
+    const fremdeBuchungen = async () => {
+        const [z] = await c.query(
+            `SELECT id, port, server_id FROM port_allocations
+              WHERE rootserver_id = ? AND server_id IS NOT NULL AND server_id NOT IN (0, 999)
+              ORDER BY id`, [maschine]);
+        return JSON.stringify(z.map(x => [x.id, Number(x.port), Number(x.server_id)]));
+    };
+    const vorher = await fremdeBuchungen();
+
     const zurueck = [];
+    // Nur Zeilen, die WIR vorgemerkt haben (server_id = 0). Trüge eine davon
+    // inzwischen einen echten Server, bliebe sie stehen.
     const buchungenLoesen = async () => {
         for (const id of zurueck) {
-            await c.query('UPDATE port_allocations SET server_id = NULL, assigned_at = NULL WHERE id = ?', [id]);
+            await c.query(
+                'UPDATE port_allocations SET server_id = NULL, assigned_at = NULL WHERE id = ? AND server_id = 0', [id]);
         }
         zurueck.length = 0;
     };
@@ -74,23 +98,41 @@ function pruefe(ok, was, zusatz = '') {
         pruefe(inDB.length === zurueck.length, 'Die Buchung steht auch wirklich in der Datenbank');
 
         console.log('\n▸ 2. Der Nachbarport ist weg → Ablehnung mit Grund');
-        // Den Nachbarn des naechsten freien Ports belegen.
-        const [nf] = await c.query(
-            `SELECT port FROM port_allocations WHERE rootserver_id = ? AND server_id IS NULL
-              ORDER BY port ASC LIMIT 1`, [maschine]);
-        const kandidat = Number(nf[0].port);
-        const nachbar = kandidat + (gekoppelt[0] ? gekoppelt[0].abstand : 1);
-        await c.query('UPDATE port_allocations SET server_id = 999 WHERE rootserver_id = ? AND port = ?',
-            [maschine, nachbar]);
-        try {
-            await vergibPortsAusPaket(db, maschine, paket, kandidat);
-            pruefe(false, `Wunschport ${kandidat} wurde vergeben, obwohl ${nachbar} belegt ist`);
-        } catch (e) {
-            pruefe(/nicht frei|Nachbarport/.test(e.message),
-                `Wunschport ${kandidat} wird abgelehnt, weil ${nachbar} belegt ist`, e.message);
+        // Ein Paar aus zwei FREIEN Zeilen suchen: Wunschport und sein Nachbar.
+        // Den Nachbarn kennzeichnen wir mit 999 — nur, wenn er in diesem Moment
+        // noch frei ist (affectedRows), und nur über seine id. Eine Zeile mit
+        // einem echten Server kommt so nie unter den Stift.
+        const abstand = gekoppelt[0] ? gekoppelt[0].abstand : 1;
+        const [freie] = await c.query(
+            `SELECT id, port FROM port_allocations WHERE rootserver_id = ? AND server_id IS NULL
+              ORDER BY port ASC`, [maschine]);
+        const freiNachPort = new Map(freie.map(z => [Number(z.port), z.id]));
+        const paar = freie.map(z => Number(z.port)).find(p => freiNachPort.has(p + abstand));
+        if (paar === undefined) {
+            pruefe(false, 'Kein freies Portpaar für die Nachbarprobe im Vorrat',
+                `Maschine #${maschine}, Abstand ${abstand}`);
+        } else {
+            const kandidat = paar;
+            const nachbar = kandidat + abstand;
+            const nachbarId = freiNachPort.get(nachbar);
+            const [belegt] = await c.query(
+                'UPDATE port_allocations SET server_id = 999 WHERE id = ? AND server_id IS NULL', [nachbarId]);
+            if (belegt.affectedRows !== 1) {
+                pruefe(false, `Nachbar ${nachbar} war zwischen Lesen und Schreiben nicht mehr frei`);
+            } else {
+                try {
+                    await vergibPortsAusPaket(db, maschine, paket, kandidat);
+                    pruefe(false, `Wunschport ${kandidat} wurde vergeben, obwohl ${nachbar} belegt ist`);
+                } catch (e) {
+                    pruefe(/nicht frei|Nachbarport/.test(e.message),
+                        `Wunschport ${kandidat} wird abgelehnt, weil ${nachbar} belegt ist`, e.message);
+                } finally {
+                    const [frei] = await c.query(
+                        'UPDATE port_allocations SET server_id = NULL WHERE id = ? AND server_id = 999', [nachbarId]);
+                    pruefe(frei.affectedRows === 1, `Prüfkennzeichen 999 auf ${nachbar} wieder entfernt`);
+                }
+            }
         }
-        await c.query('UPDATE port_allocations SET server_id = NULL WHERE rootserver_id = ? AND port = ?',
-            [maschine, nachbar]);
 
         console.log('\n▸ 3. Maschine ohne Vorrat → sprechender Fehler');
         const [ohne] = await c.query(
@@ -113,6 +155,62 @@ function pruefe(ok, was, zusatz = '') {
 
     const [rest] = await c.query('SELECT COUNT(*) n FROM port_allocations WHERE server_id IS NOT NULL AND server_id NOT IN (SELECT id FROM gameservers)');
     pruefe(Number(rest[0].n) === 0, 'Keine verwaisten Buchungen zurückgelassen', `gefunden: ${rest[0].n}`);
+
+    const nachher = await fremdeBuchungen();
+    pruefe(nachher === vorher, `Fremde Buchungen auf Maschine #${maschine} unverändert (K349)`,
+        nachher === vorher ? '' : `vorher ${vorher}\n       nachher ${nachher}`);
+
+    // ── Jede Freigabe im Code nennt den Besitzer (K349, 2026-11-12) ──────────
+    //
+    // `UPDATE port_allocations SET server_id = NULL` darf nur treffen, was dem
+    // Aufrufer gehört: `server_id = ?` (der Server), `server_id = 0`
+    // (Vormerkung) oder `server_id = 999` (Prüfkennzeichen). Eine Freigabe
+    // allein nach Rootserver und Portnummer war die Ursache von K349.
+    console.log('\n▸ Jede Freigabe im Code filtert nach server_id');
+    {
+        const fs = require('fs');
+        const path = require('path');
+        const { ohneKommentare } = require('./lib/quelltext');
+        const wurzel = path.join(__dirname, '..');
+        const dateien = [];
+        const sammle = (ordner) => {
+            for (const e of fs.readdirSync(ordner, { withFileTypes: true })) {
+                if (e.name === 'node_modules' || e.name.startsWith('.')) continue;
+                const voll = path.join(ordner, e.name);
+                if (e.isDirectory()) sammle(voll);
+                else if (e.name.endsWith('.js')) dateien.push(voll);
+            }
+        };
+        for (const o of ['apps', 'plugins', 'packages', 'scripts']) sammle(path.join(wurzel, o));
+
+        let abfragen = 0, muster = 0;
+        const verstoesse = [];
+        const anfang = /UPDATE\s+port_allocations\s+SET\s+server_id\s*=\s*NULL/g;
+        for (const datei of dateien) {
+            const code = ohneKommentare(fs.readFileSync(datei, 'utf8'));
+            let m;
+            while ((m = anfang.exec(code)) !== null) {
+                // Das Anführungszeichen vor UPDATE sagt, wo die Abfrage endet.
+                const davor = code.slice(0, m.index).replace(/\s+$/, '');
+                const zeichen = davor.slice(-1);
+                const zeile = code.slice(0, m.index).split('\n').length;
+                if (zeichen !== "'" && zeichen !== '"' && zeichen !== '`') {
+                    muster++;   // Regex einer Attrappe (/^UPDATE …/), keine Abfrage
+                    continue;
+                }
+                const ende = code.indexOf(zeichen, m.index);
+                const sql = code.slice(m.index, ende === -1 ? m.index + 400 : ende);
+                abfragen++;
+                const where = (sql.split(/\bWHERE\b/i)[1] || '');
+                if (!/\bserver_id\s*(=|IN\b)/.test(where)) {
+                    verstoesse.push(`${path.relative(wurzel, datei)}:${zeile}  ${sql.replace(/\s+/g, ' ').trim()}`);
+                }
+            }
+        }
+        pruefe(abfragen > 0, `${abfragen} Freigabe-Abfragen gelesen (${muster} Attrappen-Muster übersprungen)`);
+        pruefe(verstoesse.length === 0, 'Jede Freigabe nennt server_id in der WHERE-Klausel',
+            verstoesse.join('\n       '));
+    }
 
     await c.end();
     // ── Jeder Zweck des Pakets bekommt wirklich einen Port (2026-09-22) ─────────
