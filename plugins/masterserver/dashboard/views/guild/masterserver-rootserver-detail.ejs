@@ -845,7 +845,9 @@ sudo journalctl -u firebot-daemon -f</code></pre>
 </div>
 
 <%# Zerstörende Rückfragen nach Vorlage #paketEntfernenModal: rot, fett, Name eintippen (K348). Bis 2026-11-12 fragten beide mit confirm(). %>
-<div class="modal modal-blur fade" id="rootserverLoeschenModal" tabindex="-1" aria-labelledby="rootserverLoeschenTitel" aria-hidden="true">
+<%# Sperre (K375): Umzugsverlauf an der Maschine. Die Variable ist neu, deshalb mit typeof gelesen. Eingabe und Knopf werden immer gerendert und nur gesperrt. %>
+<% const verlaufSperre = (typeof umzugsverlauf !== 'undefined' && Array.isArray(umzugsverlauf)) ? umzugsverlauf : []; %>
+<div class="modal modal-blur fade" id="rootserverLoeschenModal" data-gesperrt="<%= verlaufSperre.length > 0 ? '1' : '0' %>" tabindex="-1" aria-labelledby="rootserverLoeschenTitel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered" role="document">
     <div class="modal-content border border-danger border-2">
       <div class="modal-status bg-danger"></div>
@@ -864,10 +866,21 @@ sudo journalctl -u firebot-daemon -f</code></pre>
           <li>ihr Eintrag beim Daemon, wenn er gerade verbunden ist — die Maschine müsste danach neu eingerichtet werden</li>
         </ul>
         <p class="mb-3">Geht nur, solange kein Gameserver mehr auf der Maschine liegt.</p>
+        <% if (verlaufSperre.length > 0) { %>
+        <div class="alert alert-danger" id="rootserverLoeschenSperre" role="alert">
+          <div class="fw-bold mb-1"><i class="fa-solid fa-lock me-2"></i>Gesperrt: An dieser Maschine hängt ein Umzugsverlauf.</div>
+          <ul class="mb-2">
+            <% verlaufSperre.forEach(function (v) { %>
+            <li><%= v.name %> — <%= Number(v.umzuege) === 1 ? '1 Umzug' : Number(v.umzuege) + ' Umzüge' %> von oder zu dieser Maschine</li>
+            <% }) %>
+          </ul>
+          <div>Solange es <%= verlaufSperre.length === 1 ? 'diesen Gameserver' : 'diese Gameserver' %> gibt, lässt sich die Maschine nicht löschen — auch wenn <%= verlaufSperre.length === 1 ? 'er' : 'sie' %> inzwischen woanders <%= verlaufSperre.length === 1 ? 'liegt' : 'liegen' %>.</div>
+        </div>
+        <% } %>
         <label class="form-label fw-bold" for="rootserverLoeschenEingabe">
           Zum Bestätigen den Namen eintippen: <span class="font-monospace text-danger" id="rootserverLoeschenSoll"><%= rootserver.name %></span>
         </label>
-        <input type="text" class="form-control font-monospace" id="rootserverLoeschenEingabe" autocomplete="off" spellcheck="false">
+        <input type="text" class="form-control font-monospace" id="rootserverLoeschenEingabe" autocomplete="off" spellcheck="false"<%= verlaufSperre.length > 0 ? ' disabled' : '' %>>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal">Abbrechen</button>
@@ -902,6 +915,36 @@ sudo journalctl -u firebot-daemon -f</code></pre>
         <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal">Abbrechen</button>
         <button type="button" class="btn btn-danger fw-bold" id="ipEntfernenKnopf" disabled>
           <i class="fa-solid fa-trash me-1"></i>Endgültig entfernen
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# Port-Allocation löschen (K374): einzeln die Portnummer, in der Sammelaktion die Zahl der Ports eintippen. Ein freier Port lässt sich neu anlegen — deshalb steht hier nicht „lässt sich nicht zurücknehmen“, sondern was dabei verloren geht. %>
+<div class="modal modal-blur fade" id="portLoeschenModal" tabindex="-1" aria-labelledby="portLoeschenTitel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content border border-danger border-2">
+      <div class="modal-status bg-danger"></div>
+      <div class="modal-header bg-danger-lt">
+        <h5 class="modal-title text-danger fw-bold" id="portLoeschenTitel">
+          <i class="fa-solid fa-triangle-exclamation me-2"></i>Port-Allocation löschen
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-danger fw-bold fs-3 mb-2"><span id="portLoeschenWas"></span> aus dem Vorrat von „<%= rootserver.name %>" genommen.</p>
+        <p class="text-danger fw-bold mb-3">Alias und Notiz gehen dabei verloren.</p>
+        <p class="mb-3">Neue Gameserver bekommen diese Ports danach nicht mehr. Du kannst sie später neu anlegen. Ports, die einem Gameserver zugewiesen sind, bleiben stehen.</p>
+        <label class="form-label fw-bold" for="portLoeschenEingabe">
+          <span id="portLoeschenFrage"></span> <span class="font-monospace text-danger" id="portLoeschenSoll"></span>
+        </label>
+        <input type="text" class="form-control font-monospace" id="portLoeschenEingabe" autocomplete="off" spellcheck="false" inputmode="numeric">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal">Abbrechen</button>
+        <button type="button" class="btn btn-danger fw-bold" id="portLoeschenKnopf" disabled>
+          <i class="fa-solid fa-trash me-1"></i>Löschen
         </button>
       </div>
     </div>
@@ -1199,6 +1242,9 @@ sudo journalctl -u firebot-daemon -f</code></pre>
     const eingabe = document.getElementById('rootserverLoeschenEingabe');
     const knopf = document.getElementById('rootserverLoeschenKnopf');
     const soll = document.getElementById('rootserverLoeschenSoll').textContent;
+    // Sperre durch Umzugsverlauf (K375): Der Knopf geht dann nie auf; die
+    // Route lehnt mit 409 ab, falls doch jemand ohne Fenster anfragt.
+    const gesperrt = modalEl.dataset.gesperrt === '1';
 
     oeffnen.addEventListener('click', function () {
         eingabe.value = '';
@@ -1206,7 +1252,7 @@ sudo journalctl -u firebot-daemon -f</code></pre>
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
     });
     eingabe.addEventListener('input', function () {
-        knopf.disabled = eingabe.value.trim() !== soll;
+        knopf.disabled = gesperrt || eingabe.value.trim() !== soll;
     });
     knopf.addEventListener('click', async function () {
         knopf.disabled = true;
@@ -1220,7 +1266,7 @@ sudo journalctl -u firebot-daemon -f</code></pre>
             if (!r.ok || !d.success) throw new Error(d.message || 'Nicht gelöscht.');
             window.location.href = d.redirectUrl || '/guild/<%= guildId %>/plugins/masterserver/rootservers';
         } catch (e) {
-            knopf.disabled = eingabe.value.trim() !== soll;
+            knopf.disabled = gesperrt || eingabe.value.trim() !== soll;
             GuildAjaxHandler.showToast('error', e.message);
         }
     });
@@ -1391,7 +1437,7 @@ const allocTable = new DuneDataTable({
         { key: 'notes', label: 'Notizen', render: (val) => val ? `<small class="text-secondary">${val}</small>` : '' },
         { key: '_actions', label: '', render: (_, row) => 
             !row.server_id 
-                ? `<button class="btn btn-sm btn-outline-danger" onclick="deleteAllocation(${row.id})"><i class="fa-solid fa-trash"></i></button>`
+                ? `<button class="btn btn-sm btn-outline-danger" onclick="deleteAllocation(${Number(row.id)}, this)"><i class="fa-solid fa-trash"></i></button>`
                 : ''
         }
     ],
@@ -1409,20 +1455,12 @@ const allocTable = new DuneDataTable({
     ],
     rowClass: (row) => row.server_id ? '' : 'table-light',
     bulkActions: [
-        { key: 'delete', label: 'Löschen', icon: 'fa-trash', class: 'btn-danger', confirm: '{count} freie Allocations wirklich löschen?' }
+        // Ohne `confirm:` — die Tabelle fragte damit über confirm(). Die rote
+        // Rückfrage öffnet onBulkAction selbst (K374).
+        { key: 'delete', label: 'Löschen', icon: 'fa-trash', class: 'btn-danger' }
     ],
     onBulkAction: async (action, ids) => {
-        if (action === 'delete') {
-            let deleted = 0, skipped = 0;
-            for (const id of ids) {
-                const r = await fetch(ALLOC_API + '/' + id, { method: 'DELETE' });
-                const d = await r.json();
-                if (d.success) deleted++; else skipped++;
-            }
-            if (typeof toastr !== 'undefined') {
-                toastr.success(`${deleted} Allocations gelöscht${skipped > 0 ? `, ${skipped} übersprungen (zugewiesen)` : ''}`);
-            }
-        }
+        if (action === 'delete') await portLoeschen.mehrere(ids);
     },
     onLoad: (data) => {
         // Badge im Tab-Header aktualisieren
@@ -1477,14 +1515,80 @@ async function addAllocations() {
     } catch (_) { alert('Netzwerkfehler'); }
 }
 
-async function deleteAllocation(allocId) {
-    if (!confirm('Port-Allocation wirklich löschen?')) return;
-    try {
-        const r = await fetch(ALLOC_API + '/' + allocId, { method: 'DELETE' });
-        const d = await r.json();
-        if (!d.success) return alert('Fehler: ' + d.message);
-        allocTable.load();
-    } catch (_) { alert('Netzwerkfehler'); }
+// ── Port-Allocation löschen (K374) ───────────────────────────
+// Rote Rückfrage statt confirm(): einzeln die Portnummer eintippen, in der
+// Sammelaktion die Zahl der ausgewählten Ports; die Routen prüfen beides noch
+// einmal. Das Fenster liefert ein Versprechen, das erst mit dem Schließen
+// endet — die Tabelle lädt danach neu und leert ihre Auswahl.
+const portLoeschen = (function () {
+    const modalEl = document.getElementById('portLoeschenModal');
+    const eingabe = document.getElementById('portLoeschenEingabe');
+    const knopf = document.getElementById('portLoeschenKnopf');
+    const sollEl = document.getElementById('portLoeschenSoll');
+    let auftrag = null;   // { adresse, body }
+    let fertig = null;    // löst das Versprechen des offenen Fensters ein
+    let geloescht = false;
+
+    eingabe.addEventListener('input', function () {
+        knopf.disabled = eingabe.value.trim() !== sollEl.textContent;
+    });
+    knopf.addEventListener('click', async function () {
+        if (!auftrag) return;
+        knopf.disabled = true;
+        try {
+            const r = await fetch(auftrag.adresse, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(Object.assign({}, auftrag.body, { bestaetigung: eingabe.value.trim() }))
+            });
+            const d = await r.json();
+            if (!r.ok || !d.success) throw new Error(d.message || 'Nicht gelöscht.');
+            geloescht = true;
+            bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+            GuildAjaxHandler.showToast('success', d.message);
+        } catch (e) {
+            knopf.disabled = eingabe.value.trim() !== sollEl.textContent;
+            GuildAjaxHandler.showToast('error', e.message);
+        }
+    });
+    modalEl.addEventListener('hidden.bs.modal', function () {
+        const f = fertig; fertig = null; auftrag = null;
+        if (f) f(geloescht);
+    });
+
+    function oeffne(was, frage, soll, neuerAuftrag) {
+        document.getElementById('portLoeschenWas').textContent = was;
+        document.getElementById('portLoeschenFrage').textContent = frage;
+        sollEl.textContent = String(soll);
+        eingabe.value = '';
+        knopf.disabled = true;
+        auftrag = neuerAuftrag;
+        geloescht = false;
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        return new Promise(function (ja) { fertig = ja; });
+    }
+    return {
+        einer: function (id, ip, port) {
+            return oeffne('Port ' + port + (ip ? ' an ' + ip : '') + ' wird',
+                'Zum Bestätigen die Portnummer eintippen:', port,
+                { adresse: ALLOC_API + '/' + id, body: {} });
+        },
+        mehrere: function (ids) {
+            return oeffne(ids.length === 1 ? '1 ausgewählter Port wird' : ids.length + ' ausgewählte Ports werden',
+                'Zum Bestätigen die Zahl der ausgewählten Ports eintippen:', ids.length,
+                { adresse: ALLOC_API + '-bulk', body: { ids: ids.map(Number) } });
+        }
+    };
+})();
+
+// IP und Port kommen aus der Zeile selbst (textContent), nicht aus einem
+// Zeichenkettenliteral im onclick.
+async function deleteAllocation(allocId, knopf) {
+    const zellen = knopf && knopf.closest('tr') ? knopf.closest('tr').querySelectorAll('code') : [];
+    const ip = zellen[0] ? zellen[0].textContent.trim() : '';
+    const port = zellen[1] ? zellen[1].textContent.trim() : '';
+    if (!port) return GuildAjaxHandler.showToast('error', 'Die Portnummer der Zeile ließ sich nicht lesen — nichts gelöscht.');
+    if (await portLoeschen.einer(allocId, ip, port)) allocTable.load();
 }
 
 // Allocations laden wenn Tab aktiv wird (Bootstrap 4 = jQuery-Events!)

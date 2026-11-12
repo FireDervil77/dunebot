@@ -226,6 +226,28 @@ router.post('/', requirePermission('MASTERSERVER.ROOTSERVER.CREATE'), async (req
     }
 });
 
+/**
+ * Gameserver, deren Umzugsverlauf an dieser Maschine hängt (K375).
+ *
+ * `gameserver_migrations` zeigt mit `ON DELETE RESTRICT` auf Quelle und Ziel
+ * (am 2026-11-12 in `information_schema.REFERENTIAL_CONSTRAINTS` nachgesehen).
+ * Die Zeilen leben, solange es den Gameserver gibt (CASCADE an `server_id`) —
+ * auch dann, wenn er längst auf einer anderen Maschine liegt. Bis K375 lief
+ * das Löschen hier in den Fremdschlüssel: 500, und der Eintrag beim Daemon
+ * war da schon entfernt.
+ */
+async function umzugsverlaufAn(dbService, rootserverId) {
+    return dbService.query(
+        `SELECT gs.id, gs.name, COUNT(*) AS umzuege
+           FROM gameserver_migrations m
+           JOIN gameservers gs ON gs.id = m.server_id
+          WHERE m.source_rootserver_id = ? OR m.target_rootserver_id = ?
+          GROUP BY gs.id, gs.name
+          ORDER BY gs.name`,
+        [rootserverId, rootserverId]
+    );
+}
+
 // =====================================================
 // Route: RootServer Details
 // GET /guild/:guildId/plugins/masterserver/rootservers/:id
@@ -287,6 +309,10 @@ router.get('/:id', requirePermission('MASTERSERVER.ROOTSERVER.VIEW'), async (req
                   ORDER BY gs.name`, [rootserverId])
             : [];
 
+        // Sperre fürs Löschen (K375): steht schon im roten Fenster, nicht erst
+        // in der Antwort der Route.
+        const umzugsverlauf = await umzugsverlaufAn(dbService, rootserverId);
+
         await renderView(res, 'guild/masterserver-rootserver-detail', {
             title: `RootServer: ${rootserver.name}`,
             activeMenu: `/guild/${guildId}/plugins/masterserver/rootservers`,
@@ -294,6 +320,7 @@ router.get('/:id', requirePermission('MASTERSERVER.ROOTSERVER.VIEW'), async (req
             isOnline,
             gameserverStats,
             gameservers,
+            umzugsverlauf,
             dbBetroffen,
             guildId
         });
@@ -564,6 +591,19 @@ router.delete('/:id', requirePermission('MASTERSERVER.ROOTSERVER.DELETE'), async
             return res.status(400).json({
                 success: false,
                 message: `RootServer kann nicht gelöscht werden: ${gameserverCount[0].count} Gameserver noch aktiv!`
+            });
+        }
+
+        // 2b. Umzugsverlauf (K375, Betreiber 2026-11-12: sperren). Vor dem
+        //     Daemon prüfen — sonst wäre der Eintrag dort schon weg, wenn die
+        //     Datenbank das Löschen ablehnt.
+        const verlauf = await umzugsverlaufAn(dbService, rootserverId);
+        if (verlauf.length > 0) {
+            const namen = verlauf.map(v => `„${v.name}“`).join(', ');
+            return res.status(409).json({
+                success: false,
+                message: `RootServer kann nicht gelöscht werden: An ihm hängt der Umzugsverlauf von ${namen}. `
+                    + `Solange es ${verlauf.length === 1 ? 'diesen Gameserver' : 'diese Gameserver'} gibt, bleibt die Maschine gesperrt.`
             });
         }
 
@@ -1008,8 +1048,20 @@ router.delete('/:id/allocations/:allocId', requirePermission('MASTERSERVER.ROOTS
         if (alloc.server_id) {
             return res.status(400).json({ success: false, message: 'Allocation ist einem Gameserver zugewiesen und kann nicht gelöscht werden' });
         }
+        // Rote Rückfrage (K374): Die Portnummer steht auch hier noch einmal.
+        if (String(req.body?.bestaetigung || '').trim() !== String(alloc.port)) {
+            return res.status(400).json({ success: false, message: 'Zum Löschen die Portnummer eintippen.' });
+        }
 
-        await dbService.query('DELETE FROM port_allocations WHERE id = ?', [allocId]);
+        // `server_id IS NULL` noch einmal im Löschbefehl: Zwischen Lesen und
+        // Löschen kann eine Vergabe den Port buchen (Besitzerfilter, K349).
+        const ergebnis = await dbService.query(
+            'DELETE FROM port_allocations WHERE id = ? AND rootserver_id = ? AND server_id IS NULL',
+            [allocId, rootserverId]
+        );
+        if (!ergebnis.affectedRows) {
+            return res.status(409).json({ success: false, message: 'Der Port wurde inzwischen vergeben — nichts gelöscht.' });
+        }
         res.json({ success: true, message: 'Allocation gelöscht' });
 
     } catch (error) {
@@ -1018,7 +1070,12 @@ router.delete('/:id/allocations/:allocId', requirePermission('MASTERSERVER.ROOTS
 });
 
 // DELETE /guild/:guildId/plugins/masterserver/rootservers/:id/allocations-bulk
-// Alle freien Allocations für eine IP löschen
+// Die ausgewählten freien Allocations löschen (Sammelaktion der Tabelle, K374).
+//
+// Bis 2026-11-12 löschte diese Route ALLE freien Allocations einer IP, ohne
+// Rückfrage — und hatte keinen Aufrufer; die Tabelle rief je Zeile die
+// Einzelroute und fragte mit confirm(). Jetzt: genau die mitgeschickten
+// Kennungen, und die Zahl der Ports als Bestätigung.
 router.delete('/:id/allocations-bulk', requirePermission('MASTERSERVER.ROOTSERVER.EDIT'), async (req, res) => {
     const Logger = ServiceManager.get('Logger');
     const dbService = ServiceManager.get('dbService');
@@ -1031,22 +1088,30 @@ router.delete('/:id/allocations-bulk', requirePermission('MASTERSERVER.ROOTSERVE
             return res.status(404).json({ success: false, message: 'RootServer nicht gefunden' });
         }
 
-        const { ip } = req.body;
-        if (!ip) {
-            return res.status(400).json({ success: false, message: 'IP-Adresse fehlt' });
+        const roh = Array.isArray(req.body?.ids) ? req.body.ids : [];
+        const ids = [...new Set(roh.map(Number).filter(n => Number.isInteger(n) && n > 0))];
+        if (ids.length === 0 || ids.length !== roh.length) {
+            return res.status(400).json({ success: false, message: 'Keine gültige Auswahl.' });
+        }
+        if (String(req.body?.bestaetigung || '').trim() !== String(ids.length)) {
+            return res.status(400).json({ success: false, message: 'Zum Löschen die Zahl der ausgewählten Ports eintippen.' });
         }
 
+        const platzhalter = ids.map(() => '?').join(',');
         const result = await dbService.query(
-            'DELETE FROM port_allocations WHERE rootserver_id = ? AND ip = ? AND server_id IS NULL',
-            [rootserverId, ip]
+            `DELETE FROM port_allocations WHERE rootserver_id = ? AND server_id IS NULL AND id IN (${platzhalter})`,
+            [rootserverId, ...ids]
         );
+        const geloescht = Number(result.affectedRows) || 0;
+        const uebersprungen = ids.length - geloescht;
 
-        Logger.info(`[Masterserver] ${result.affectedRows} freie Allocations für IP ${ip} gelöscht (RS ${rootserverId})`);
+        Logger.info(`[Masterserver] ${geloescht} freie Allocations gelöscht, ${uebersprungen} übersprungen (RS ${rootserverId})`);
 
         res.json({
             success: true,
-            message: `${result.affectedRows} freie Allocations gelöscht`,
-            data: { deleted: result.affectedRows }
+            message: `${geloescht} ${geloescht === 1 ? 'Allocation' : 'Allocations'} gelöscht`
+                + (uebersprungen > 0 ? `, ${uebersprungen} übersprungen (vergeben oder nicht mehr da)` : ''),
+            data: { deleted: geloescht, skipped: uebersprungen }
         });
 
     } catch (error) {
