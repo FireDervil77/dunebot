@@ -316,6 +316,50 @@ async function lies(rootserverId, serverId, pfad, grenze) {
     });
 }
 
+/**
+ * Teilstücke einer Datei beim Daemon holen — in der Form von `fetch` (K379).
+ *
+ * `ZipFern` liest Archive über Bereichsanfragen und kennt dafür `fetch`. Der
+ * Abruf des Daemons verlangt aber genau sein Zertifikat, und das kann `fetch`
+ * ohne eigenen Dispatcher nicht. Diese Hülle gibt `ZipFern` dasselbe Gesicht
+ * (`status`, `headers.get`, `arrayBuffer`), das TLS-Wissen bleibt hier.
+ *
+ * Eine Verbindung für alle Teilstücke (keepAlive): Ein Mod-Ordner mit 300 Jars
+ * sind rund 900 Anfragen, und je ein TLS-Handschlag wäre der größte Posten.
+ *
+ * @param {object} maschine wie `maschineVon`
+ * @returns {{abruf: Function, schliessen: Function}}
+ */
+function teilAbruf(maschine) {
+    const agent = new https.Agent({ ...tlsOptionen(maschine), keepAlive: true, maxSockets: 8 });
+    const abruf = (adresse, optionen = {}) => new Promise((fertig, nein) => {
+        const anfrage = https.get(adresse, {
+            agent, headers: optionen.headers || {}, timeout: 15000, signal: optionen.signal,
+        }, (antwort) => {
+            const teile = [];
+            let laenge = 0;
+            antwort.on('data', (stueck) => {
+                teile.push(stueck);
+                laenge += stueck.length;
+                // Wie ZipFern.GANZ_GRENZE: Mehr nimmt niemand ungefragt in den Speicher.
+                if (laenge > 64 * 1024 * 1024) antwort.destroy(new Error('Antwort zu groß'));
+            });
+            antwort.on('error', nein);
+            antwort.on('end', () => {
+                const puffer = Buffer.concat(teile);
+                fertig({
+                    status: antwort.statusCode,
+                    headers: { get: (name) => antwort.headers[String(name).toLowerCase()] ?? null },
+                    arrayBuffer: async () => puffer.buffer.slice(puffer.byteOffset, puffer.byteOffset + puffer.length),
+                });
+            });
+        });
+        anfrage.on('timeout', () => anfrage.destroy(new Error('der Rootserver antwortet nicht')));
+        anfrage.on('error', nein);
+    });
+    return { abruf, schliessen: () => agent.destroy() };
+}
+
 /** Ein PUT an den Abruf. Was der Daemon ablehnt, kommt mit seinem Grund als Wurf zurück. */
 function sende(adresse, maschine, inhalt) {
     return new Promise((fertig, nein) => {
@@ -360,4 +404,4 @@ async function legeAb(rootserverId, auftrag, inhalt) {
 }
 
 module.exports = { wirt, wirtFuerBrowser, basis, downloadAdresse, gibtFrei, reicheDurch, dateiAdresse, anhangKopf,
-    leseAnfang, maschineVon, gesichert, lies, schreibe, legeAb };
+    leseAnfang, maschineVon, gesichert, lies, schreibe, legeAb, teilAbruf };

@@ -343,7 +343,108 @@ async function installiere({ server, inhalt, guildId, quelle, kennung, fassung =
     const raum = Quellen.raumAus(inhalt, gewaehlt);
 
     const { pakete, fehlend, wurzel } = await anbieter.aufloesen(raum, kennung, fassung, { spielfassung });
-    return legeAb({ server, inhalt, guildId, quelle: gewaehlt, pakete, fehlend, wurzel, wurzelGewaehlt });
+    // Vor dem Ablegen, damit Vorschau und Ergebnis dieselbe Lage beschreiben
+    // (K379). Die Prüfung wirft nie — sie nennt, sie sperrt nicht.
+    const pflichten = await pflichtenPruefen({ server, inhalt, quelle: gewaehlt, raum, pakete });
+    const ergebnis = await legeAb({ server, inhalt, guildId, quelle: gewaehlt, pakete, fehlend, wurzel, wurzelGewaehlt });
+    if (pflichten) {
+        ergebnis.pflichten = pflichten;
+        if (pflichten.fehlt?.length) {
+            ServiceManager.get('Logger').warn(`[Gameserver/Inhalte] ${kennung} auf Server ${server.id}: `
+                + pflichten.satz.text);
+        }
+    }
+    return ergebnis;
+}
+
+/**
+ * Die Jars im Mod-Ordner des Servers — zum Lesen über den Abruf des Daemons.
+ *
+ * Gelesen wird, was WIRKLICH dort liegt (K379), nicht was die Zeilen sagen:
+ * Ein Modpack führt seine Mods nicht einzeln, und hochgeladene Jars haben keine
+ * Herkunft. `oeffne` liefert eine `ZipFern`-Quelle, die nur Teilstücke holt.
+ *
+ * @returns {Promise<{dateien: Object[], oeffne: Function, schluessel: string, schliessen: Function}|{grund: string}>}
+ */
+async function modOrdnerLesen(server, inhalt) {
+    const dbService = ServiceManager.get('dbService');
+    const ipmServer = ServiceManager.get('ipmServer');
+    const Abruf = require('./Abruf');
+    const ZipFern = require('./ZipFern');
+    const ModPflichten = require('./ModPflichten');
+
+    const pfad = String(inhalt?.path || '').replace(/^\/+|\/+$/g, '');
+    if (!pfad) return { grund: 'Das Paket nennt keinen Ablageort für Mods' };
+    const daemonId = await daemonVon(dbService, server);
+    if (!daemonId || !ipmServer?.isDaemonOnline(daemonId)) return { grund: 'Der Daemon ist gerade nicht erreichbar' };
+
+    const liste = await ipmServer.sendCommand(daemonId, 'gameserver.files.list', {
+        server_id: String(server.id), rootserver_id: String(server.rootserver_id),
+        install_path: server.install_path, path: `/${pfad}`,
+    }, 15000).catch(fehler => ({ success: false, error: fehler.message }));
+    if (!liste?.success) return { grund: liste?.error || 'Der Daemon hat nicht geantwortet' };
+
+    const dateien = (liste.data?.files || [])
+        .filter(f => !f.is_dir && /\.jar$/i.test(f.name))
+        .map(f => ({ name: f.name, groesse: Number(f.size) || 0, zeit: f.mod_time || '' }));
+
+    let maschine;
+    try {
+        maschine = await Abruf.maschineVon(server.rootserver_id);
+    } catch (fehler) {
+        return { grund: fehler.message };
+    }
+    const { abruf, schliessen } = Abruf.teilAbruf(maschine);
+    return {
+        dateien,
+        schluessel: `${server.rootserver_id}|${server.id}|${pfad}`,
+        schliessen,
+        // Die Adresse gilt fünf Minuten: Sie wird je Datei beim Öffnen gebaut.
+        oeffne: (d) => ZipFern.fernQuelle(Abruf.dateiAdresse(maschine, server.id, `/${pfad}/${d.name}`),
+            { abruf, groesse: d.groesse, schwanz: ModPflichten.JAR_SCHWANZ }),
+    };
+}
+
+/**
+ * Nennt die Mod Pflichten, die weder mitkommen noch auf dem Server liegen? (K379)
+ *
+ * Nur für Modrinth und die Lader, die ihre Mods in einer Datei beschreiben
+ * (Forge, NeoForge, Fabric). Sonst `null` — dann gibt es nichts zu sagen.
+ *
+ * @returns {Promise<null|Object>} das Ergebnis von `ModPflichten.pruefe` samt `satz`
+ */
+async function pflichtenPruefen({ server, inhalt, quelle, raum, pakete }) {
+    const ModPflichten = require('./ModPflichten');
+    if (quelle !== 'modrinth' || !ModPflichten.LADER.includes(raum)) return null;
+    // Ein Ordner je Mod (`{{content:key}}`) ist kein Mod-Ordner, den der Lader
+    // als Ganzes liest — für Minecraft gibt es das nicht.
+    if (Inhalte.jeMod(inhalt?.path || '')) return null;
+
+    let bestand = null;
+    try {
+        bestand = await modOrdnerLesen(server, inhalt);
+        const e = await ModPflichten.pruefe({ lader: raum, pakete, bestand });
+        return e && { ...e, satz: ModPflichten.satz(e) };
+    } catch (fehler) {
+        ServiceManager.get('Logger').warn(`[Gameserver/Inhalte] Pflichten nicht prüfbar (Server ${server?.id}): ${fehler.message}`);
+        return { fehlt: [], fehler: fehler.message,
+            satz: { ton: 'leise', text: `Nicht geprüft, was die Mod selbst als Pflicht nennt: ${fehler.message}` } };
+    } finally {
+        if (bestand?.schliessen) bestand.schliessen();
+    }
+}
+
+/**
+ * Die Prüfung für die Vorschau — eigene Anfrage, damit die Vorschau nicht wartet.
+ *
+ * Löst noch einmal auf (wie die Vorschau). Die Dateien liest sie dann aus dem
+ * Zwischenspeicher von `ModPflichten`, wenn sie schon einmal gelesen wurden.
+ */
+async function pflichten({ server, inhalt, quelle, kennung, fassung = null, spielfassung = null }) {
+    const anbieter = Quellen.fuer(quelle);
+    const raum = Quellen.raumAus(inhalt, quelle);
+    const { pakete } = await anbieter.aufloesen(raum, kennung, fassung, { spielfassung });
+    return pflichtenPruefen({ server, inhalt, quelle, raum, pakete });
 }
 
 /**
@@ -1053,6 +1154,6 @@ async function holeGeplantesModpack({ server, guildId }) {
 
 module.exports = {
     daemonVon, istLader,
-    vorschau, installiere, holeGeplante, aktualisiere, entferneDateien, entferneMitWaisen,
+    vorschau, pflichten, pflichtenPruefen, installiere, holeGeplante, aktualisiere, entferneDateien, entferneMitWaisen,
     installiereModpack, pruefeModpack, holeGeplantesModpack, fremdeModDateien, MOD_ORDNER,
 };

@@ -858,6 +858,38 @@ router.get('/:serverId/inhalte/vorschau', requirePermission('GAMESERVER.VIEW'), 
 });
 
 /**
+ * Nennt die Mod selbst Pflichten, die fehlen? (K379)
+ *
+ * Eigene Anfrage neben der Vorschau: Sie liest die Mod und den Mod-Ordner des
+ * Servers und kann bei einem großen Ordner Sekunden dauern. Die Vorschau
+ * steht vorher, diese Zeile kommt nach.
+ */
+router.get('/:serverId/inhalte/pflichten', requirePermission('GAMESERVER.VIEW'), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const dbService = ServiceManager.get('dbService');
+
+    try {
+        const geladen = await ladeServerUndPaket(dbService, req.params.serverId, res.locals.guildId);
+        if (!geladen) return res.status(404).json({ success: false, message: 'Server nicht gefunden' });
+
+        const inhalt = geladen.paket?.content || null;
+        const gewaehlt = quelleWaehlen(res, inhalt, req.query.quelle);
+        if (gewaehlt.absage) return;
+        if (!req.query.kennung) return res.status(400).json({ success: false, message: 'kennung fehlt' });
+
+        const ergebnis = await InhalteHolen.pflichten({
+            server: geladen.server, inhalt, quelle: gewaehlt.quelle,
+            kennung: String(req.query.kennung), fassung: req.query.fassung ? String(req.query.fassung) : null,
+            spielfassung: await spielfassungVonServer(null, dbService, geladen),
+        });
+        return res.json({ success: true, pflichten: ergebnis });
+    } catch (error) {
+        Logger.warn('[Gameserver/Inhalte] Pflichten nicht prüfbar:', error);
+        return res.status(502).json({ success: false, message: error.message });
+    }
+});
+
+/**
  * Welche Fassungen gibt es? (Betreiber, 2026-09-23)
  *
  * *„muss noch die versionierung ausprobieren. wenn ich mit verschiedenen

@@ -48,7 +48,10 @@ const { ServiceManager } = require('dunebot-core');
 const ZipFern = require('./ZipFern');
 const ModBeschreibung = require('./ModBeschreibung');
 
-const REGEL = 1;
+// 2 (2026-11-13, K379): `ModBeschreibung` liest eingebettete Jars auch aus der
+// Manifest-Angabe `Embedded-Dependencies-Mod` und direkt aus `META-INF/jarjar/`
+// (Connector). Ein Befund nach Regel 1 konnte `connectormod` als fehlend führen.
+const REGEL = 2;
 const QUELLE = 'modrinth';
 
 const URTEIL = Object.freeze({
@@ -572,4 +575,6 @@ async function fuerSuche(ergebnis, optionen = {}) {
 module.exports = {
     befund, laeuft, gespeichert, fuerSuche, fuerAnzeige, satzUnvollstaendig,
     URTEIL, REGEL, rechneEins, rechneZwei,
+    // Auch für einzelne Mods (`ModPflichten.js`, K379): eine Liste, ein Weg.
+    EINGEBAUT, nebeneinander,
 };

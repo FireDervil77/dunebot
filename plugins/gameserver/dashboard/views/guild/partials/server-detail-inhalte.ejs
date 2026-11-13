@@ -149,6 +149,11 @@
       melde('info', `${b.kennung} ${b.fassung} bleibt — verlangt war ${b.verlangt}. `
             + 'Der Lader wird nie herabgestuft.', 10000);
     }
+    // K379: Nennt die Mod Pflichten, die fehlen, steht es auch hier — wer
+    // nicht auf die Vorschau gewartet hat, soll es trotzdem erfahren.
+    if (d.pflichten && d.pflichten.satz && d.pflichten.fehlt && d.pflichten.fehlt.length) {
+      melde('warning', d.pflichten.satz.text, 20000);
+    }
     if (d.installiert.length) wirkungMelden(d);
   };
 
@@ -875,6 +880,7 @@
             ${d.fehlend && d.fehlend.length ? `
               <div style="font-size:12px;color:var(--fb-danger);margin-top:6px">
                 Nicht auflösbar: ${escape(d.fehlend.join('; '))}</div>` : ''}
+            <div id="ts-pflichten" style="font-size:12px;margin-top:6px"></div>
             <div style="display:flex;gap:8px;margin-top:10px">
               <button class="btn btn-primary btn-sm"
                       onclick="inhaltInstallieren('${escape(kennung)}', this)">Installieren</button>
@@ -882,12 +888,44 @@
             </div>
             <div id="ts-meldung" style="font-size:12px;margin-top:6px"></div>
           </div>`;
+        pflichtenLaden(kennung);
       })
       .catch(e => {
         raum.innerHTML = `<div style="font-size:12px;color:var(--fb-danger)">${escape(e.message)}</div>`;
       })
       .finally(() => { if (knopf) knopf.disabled = false; });
   };
+
+  // ── Was die Mod selbst als Pflicht nennt (K379) ───────────────────────────
+  //
+  // Nach der Vorschau geholt, nicht mit ihr: Gelesen werden die Mod und der
+  // Mod-Ordner des Servers, das kann Sekunden dauern. Kommt die Antwort, wenn
+  // schon eine andere Mod angesehen wird, wird sie verworfen.
+  const PFLICHT_FARBE = { warn: 'var(--fb-warning)', gut: 'var(--fb-success)', leise: 'var(--fb-text-muted)' };
+  let PFLICHT_ZUG = 0;
+  function pflichtenLaden(kennung) {
+    const zug = ++PFLICHT_ZUG;
+    const feld = () => (zug === PFLICHT_ZUG ? document.getElementById('ts-pflichten') : null);
+    if (feld()) feld().innerHTML = '<span class="fb-muted">Prüfe, was die Mod selbst als Pflicht nennt …</span>';
+    const mitFassung = FASSUNG ? `&fassung=${encodeURIComponent(FASSUNG)}` : '';
+    fetch(`${BASIS}/pflichten?quelle=${encodeURIComponent(quelleJetzt() || '')}`
+          + `&kennung=${encodeURIComponent(kennung)}${mitFassung}`, { headers: { Accept: 'application/json' } })
+      .then(async (a) => {
+        const d = await a.json().catch(() => null);
+        if (!a.ok || !d || !d.success) throw new Error((d && d.message) || `HTTP ${a.status}`);
+        return d.pflichten;
+      })
+      .then((p) => {
+        const f = feld();
+        if (!f) return;
+        if (!p || !p.satz) { f.innerHTML = ''; return; }
+        f.innerHTML = `<span style="color:${PFLICHT_FARBE[p.satz.ton] || PFLICHT_FARBE.leise}">${escape(p.satz.text)}</span>`;
+      })
+      .catch((e) => {
+        const f = feld();
+        if (f) f.innerHTML = `<span class="fb-muted">Nicht geprüft, was die Mod selbst als Pflicht nennt: ${escape(e.message)}</span>`;
+      });
+  }
 
   /**
    * Die Fassungswahl über der Vorschau.

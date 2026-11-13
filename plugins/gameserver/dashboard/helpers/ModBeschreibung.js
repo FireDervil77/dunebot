@@ -48,6 +48,25 @@ const FORGE_DATEIEN = ['META-INF/mods.toml', 'META-INF/neoforge.mods.toml'];
 const FABRIC_DATEI = 'fabric.mod.json';
 const ALT_DATEI = 'mcmod.info';
 const JARJAR = 'META-INF/jarjar/metadata.json';
+const MANIFEST = 'META-INF/MANIFEST.MF';
+/** Ein Jar, das direkt in `META-INF/jarjar/` liegt. */
+const JARJAR_DATEI = /^META-INF\/jarjar\/[^/]+\.jar$/i;
+
+/**
+ * Eine Angabe aus `MANIFEST.MF` — Fortsetzungszeilen beginnen mit einem Leerzeichen.
+ * @returns {string[]} durch Kommas oder Leerzeichen getrennte Werte
+ */
+function manifestWerte(text, schluessel) {
+    const zeilen = String(text).replace(/\r/g, '').split('\n');
+    const zusammen = [];
+    for (const z of zeilen) {
+        if (z.startsWith(' ') && zusammen.length) zusammen[zusammen.length - 1] += z.slice(1);
+        else zusammen.push(z);
+    }
+    const zeile = zusammen.find(z => z.toLowerCase().startsWith(`${schluessel.toLowerCase()}:`));
+    if (!zeile) return [];
+    return zeile.slice(schluessel.length + 1).split(/[,\s]+/).map(w => w.trim()).filter(Boolean);
+}
 
 /** `forge` und `neoforge` lesen dieselbe Beschreibung. */
 function familie(lader) {
@@ -209,6 +228,24 @@ async function beschreibe(quelle, lader) {
         }
     }
 
+    // ── Eingebettet ohne `metadata.json` (gemessen 2026-11-13) ──────────────
+    //
+    // Connector (Sinytra) 1.0.0-beta.49 trägt seine eigentliche Mod
+    // (`connectormod`) als `META-INF/jarjar/Connector-…-mod.jar` und nennt sie
+    // nur im Manifest (`Embedded-Dependencies-Mod`), ohne `metadata.json`.
+    // Ohne diese Angabe galt `connectormod` als fehlend — für jede Fabric-Mod
+    // auf Forge, die Connector verlangt. Nachsichtig: Jedes Jar direkt in
+    // `META-INF/jarjar/` zählt mit, auch ohne Angabe.
+    const manifest = finde(MANIFEST);
+    if (manifest) {
+        try {
+            for (const pfad of manifestWerte(await text(manifest), 'Embedded-Dependencies-Mod')) eingebettet.add(pfad);
+        } catch (fehler) {
+            unlesbar = unlesbar || `${MANIFEST}: ${fehler.message}`;
+        }
+    }
+    for (const e of eintraege) if (JARJAR_DATEI.test(e.name)) eingebettet.add(e.name);
+
     const fabric = finde(FABRIC_DATEI);
     if (fabric) {
         gefunden = true;
@@ -287,4 +324,4 @@ async function eingebetteteKennungen(quelle, beschreibung, lader, tiefe = TIEFE)
     return { kennungen: [...kennungen], unlesbar };
 }
 
-module.exports = { beschreibe, eingebetteteKennungen, leseModsToml, familie };
+module.exports = { beschreibe, eingebetteteKennungen, leseModsToml, manifestWerte, familie };
