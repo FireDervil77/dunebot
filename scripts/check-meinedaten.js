@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Die Orte von G-04c (K380, 2026-11-13): `/meinedaten` im Bot, Seite
+ * Die Orte von G-04c (K380, 2026-11-13): `/mydata` im Bot, Seite
  * „Meine Daten“, „Server löschen“ unter Einstellungen → Allgemein.
  *
  * Gezählt, exportiert und gelöscht wird nur in `Datenauskunft` (G-04b, eigener
@@ -172,7 +172,7 @@ function meinedatenEingehaengt(text) {
         const IPCServer = require(datei('apps/dashboard/helpers/IPCServer.js'));
         const ipc = (action, payload) => new Promise((fertig) =>
             IPCServer.prototype._handleCoreEvent.call({}, action, payload, { reply: fertig }));
-        const befehl = fs.readFileSync(datei('apps/bot/commands/meinedaten.js'), 'utf8');
+        const befehl = fs.readFileSync(datei('apps/bot/commands/mydata.js'), 'utf8');
         await pruefe('jedes Ereignis, das der Befehl sendet, hat eine Stelle im Dashboard', async () => {
             const gesendet = [...new Set([...ohneKommentare(befehl).matchAll(/"core:([A-Z_]+)"/g)].map(m => m[1]))];
             assert.deepStrictEqual(gesendet.sort(), ['MEINEDATEN_AUSKUNFT', 'MEINEDATEN_EXPORT', 'MEINEDATEN_LOESCHEN']);
@@ -199,7 +199,7 @@ function meinedatenEingehaengt(text) {
             const g = ueb.guilds[0].guildId;
             const h = await ipc('MEINEDATEN_LOESCHEN', { userId, guildId: g });
             const u = await ipc('MEINEDATEN_LOESCHEN', { userId, guildId: null });
-            assert.deepStrictEqual(auftraege.map(a => [a.userId, a.guildId, a.anlass]), [[userId, g, '/meinedaten'], [userId, null, '/meinedaten']]);
+            assert.deepStrictEqual(auftraege.map(a => [a.userId, a.guildId, a.anlass]), [[userId, g, '/mydata'], [userId, null, '/mydata']]);
             assert.strictEqual(h.data.ueberall, false);
             assert.strictEqual(u.data.ueberall, true);
             assert.deepStrictEqual(h.data.plugins[0], { plugin: 'leveling', ok: true, geloescht: 2, mitgeloescht: 0, anonymisiert: 0, bleibt: [], nurUeberall: 0, fehler: null });
@@ -388,10 +388,11 @@ function meinedatenEingehaengt(text) {
             assert.deepStrictEqual(gegangen, ['1']);
         });
         await pruefe('Befehl: Auskunft, Datei, falscher Name, hier und überall', async () => {
-            const meinedaten = require(datei('apps/bot/commands/meinedaten.js'));
+            const meinedaten = require(datei('apps/bot/commands/mydata.js'));
+            assert.strictEqual(meinedaten.name, 'mydata', 'Befehlsnamen sind englisch (Betreiber 2026-11-13)');
             assert.strictEqual(meinedaten.command.enabled, false, 'Präfix-Fassung hätte kein Bestätigungsfenster');
             assert.ok(!meinedaten.userPermissions?.length, 'jedes Mitglied muss fragen dürfen');
-            assert.ok(Array.isArray(meinedaten.slashCommand.options), '/help meinedaten liest slashCommand.options');
+            assert.ok(Array.isArray(meinedaten.slashCommand.options), '/help mydata liest slashCommand.options');
             const gesendet = [];
             const daten = {
                 hier: { plugins: [{ plugin: 'leveling', loeschen: 3, anonymisieren: 0, mitgeloescht: 0, bleibt: [], ausgenommen: [] }], summe: { loeschen: 3, anonymisieren: 0, mitgeloescht: 0, bleibt: 0, ausgenommen: 0 } },
@@ -428,19 +429,19 @@ function meinedatenEingehaengt(text) {
                 return ausgabe;
             };
             // Ablauf 1: Datei, falscher Name, Fenster läuft ab, dann hier löschen.
-            const a1 = await lauf([klick('meinedaten-export'), klick('meinedaten-hier', 'Falsch'),
-                klick('meinedaten-hier', null), klick('meinedaten-hier', ' testGUILD ')]);
+            const a1 = await lauf([klick('mydata-export'), klick('mydata-hier', 'Falsch'),
+                klick('mydata-hier', null), klick('mydata-hier', ' testGUILD ')]);
             assert.ok(a1.some(a => a.export?.files?.length === 1), 'keine Datei beim Export');
             assert.ok(a1.some(a => /FENSTER_FALSCH/.test(a.falsch || '')), 'falscher Name nicht gemeldet');
             const knoepfe = JSON.stringify(a1[0].antwort.components);
-            assert.ok(/meinedaten-hier/.test(knoepfe) && /meinedaten-ueberall/.test(knoepfe), 'Knöpfe fehlen: ' + knoepfe);
+            assert.ok(/mydata-hier/.test(knoepfe) && /mydata-ueberall/.test(knoepfe), 'Knöpfe fehlen: ' + knoepfe);
             assert.match(JSON.stringify(a1[0].antwort.embeds[0].data), /ANDERE_GUILDS\{\\"n\\":2\}/);
             const loesch = gesendet.filter(g => g.event === 'core:MEINEDATEN_LOESCHEN');
             assert.deepStrictEqual(loesch.map(g => [g.payload.userId, g.payload.guildId]), [['444444444444444444', '333333333333333333']]);
             assert.match(JSON.stringify(a1.at(-1).antwort.embeds[0].data), /ERG_TITEL_OK/);
             // Ablauf 2: überall, bestätigt mit dem eigenen Namen, nicht dem der Guild.
             gesendet.length = 0;
-            await lauf([klick('meinedaten-ueberall', 'Testguild'), klick('meinedaten-ueberall', 'PROBE')]);
+            await lauf([klick('mydata-ueberall', 'Testguild'), klick('mydata-ueberall', 'PROBE')]);
             assert.deepStrictEqual(gesendet.filter(g => g.event === 'core:MEINEDATEN_LOESCHEN').map(g => g.payload.guildId), [null]);
             // Ablauf 3: niemand klickt → Knöpfe weg, nichts gelöscht.
             gesendet.length = 0;

@@ -354,7 +354,7 @@ class IPCServer {
             case 'MEINEDATEN_AUSKUNFT':
             case 'MEINEDATEN_EXPORT':
             case 'MEINEDATEN_LOESCHEN': {
-                // Discord `/meinedaten` (G-04c, K380, F-G1 A): Der Bot fragt,
+                // Discord `/mydata` (G-04c, K380, F-G1 A): Der Bot fragt,
                 // gezählt, exportiert und gelöscht wird nur hier, über
                 // `Datenauskunft` (discord-funktionen-abbilden). Der Bot hat
                 // die ID aus der Interaktion; ein Mitglied fragt nur nach
@@ -373,7 +373,7 @@ class IPCServer {
                         aus.guildNamen = await MeineDaten.guildNamen(guildId ? [guildId] : aus.guilds);
                         return message.reply({ success: true, data: aus });
                     }
-                    const ergebnis = await Datenauskunft.mitgliedLoeschen(userId, { guildId, anlass: '/meinedaten' });
+                    const ergebnis = await Datenauskunft.mitgliedLoeschen(userId, { guildId, anlass: '/mydata' });
                     return message.reply({ success: ergebnis.ok, data: MeineDaten.rueckmeldung(ergebnis) });
                 } catch (err) {
                     Logger.error(`[IPC/core] ${action} für ${userId} gescheitert:`, err);

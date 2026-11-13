@@ -9,7 +9,7 @@
  * Auf diese Adresse können AGB und Datenschutz verweisen.
  *
  * Gezählt, exportiert und gelöscht wird über `Datenauskunft`, geformt über
- * `MeineDaten`, also genau wie beim Befehl `/meinedaten` im Bot.
+ * `MeineDaten`, also genau wie beim Befehl `/mydata` im Bot.
  *
  * Jeder sieht und löscht nur sich selbst: Die ID kommt aus der Sitzung, nie
  * aus der Anfrage.

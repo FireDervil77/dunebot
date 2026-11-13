@@ -13,7 +13,7 @@ const { EmbedUtils } = require("dunebot-sdk/utils");
 const { ServiceManager } = require("dunebot-core");
 
 /**
- * `/meinedaten` — Was speichert der Bot über mich, und weg damit (G-04c, K380).
+ * `/mydata` — Was speichert der Bot über mich, und weg damit (G-04c, K380).
  *
  * Für Mitglieder ohne Dashboard-Zugang (F-G1 A, 2026-11-13). Die Aufgaben
  * sind geteilt wie bei `/plugin status` (discord-funktionen-abbilden): Das
@@ -31,7 +31,7 @@ const { ServiceManager } = require("dunebot-core");
  * @type {import('dunebot-sdk').CommandType}
  */
 module.exports = {
-    name: "meinedaten",
+    name: "mydata",
     description: "core:MEINEDATEN.DESCRIPTION",
     command: {
         enabled: false,
@@ -39,7 +39,7 @@ module.exports = {
     slashCommand: {
         enabled: true,
         ephemeral: true,
-        // Leer, aber da: `/help meinedaten` (getSlashUsage) liest options.find.
+        // Leer, aber da: `/help mydata` (getSlashUsage) liest options.find.
         options: [],
     },
 
@@ -57,7 +57,7 @@ const FENSTER_MS = 2 * 60 * 1000;
 /** Höchste Dateigröße, die Discord einem Bot ohne Boost abnimmt. */
 const DATEI_HOECHSTENS = 8 * 1024 * 1024;
 
-const KNOPF = { EXPORT: "meinedaten-export", HIER: "meinedaten-hier", UEBERALL: "meinedaten-ueberall" };
+const KNOPF = { EXPORT: "mydata-export", HIER: "mydata-hier", UEBERALL: "mydata-ueberall" };
 
 function frage(event, payload) {
     const ipcClient = ServiceManager.get("ipcClient");
@@ -185,7 +185,7 @@ async function meineDaten(interaction) {
         }).catch(() => null);
         if (!klick) {
             await interaction.editReply({ components: [] })
-                .catch((e) => Logger.debug(`[meinedaten] Knöpfe nicht entfernt: ${e.message}`));
+                .catch((e) => Logger.debug(`[mydata] Knöpfe nicht entfernt: ${e.message}`));
             return;
         }
 
@@ -196,7 +196,7 @@ async function meineDaten(interaction) {
 
         const ueberall = klick.customId === KNOPF.UEBERALL;
         const soll = ueberall ? user.username : guild.name;
-        const fensterId = `meinedaten-fenster-${klick.id}`;
+        const fensterId = `mydata-fenster-${klick.id}`;
         await klick.showModal(new ModalBuilder({
             customId: fensterId,
             title: t(ueberall ? "FENSTER_TITEL_UEBERALL" : "FENSTER_TITEL_HIER").slice(0, 45),

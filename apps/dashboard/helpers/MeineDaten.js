@@ -116,7 +116,7 @@ async function uebersicht(userId) {
 
 /**
  * Was liegt über ein Mitglied in dieser Guild, und wie viel anderswo
- * (Befehl `/meinedaten`). Dieselbe Zählung wie die Seite.
+ * (Befehl `/mydata`). Dieselbe Zählung wie die Seite.
  *
  * @param {string} userId Discord-ID
  * @param {string} guildId die Guild, in der gefragt wurde

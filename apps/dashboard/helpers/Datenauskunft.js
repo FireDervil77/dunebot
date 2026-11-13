@@ -10,7 +10,7 @@
  *   guildLoeschen(guildId, { … })              alle Plugins abschalten, dann
  *                                              alle `guildInhalte`, zuletzt der Kern
  *
- * Die Orte (Befehl `/meinedaten`, Seite „Meine Daten“, „Guild löschen“) baut
+ * Die Orte (Befehl `/mydata`, Seite „Meine Daten“, „Guild löschen“) baut
  * G-04c; der Bot fragt dann per IPC hier an und meldet zurück
  * (discord-funktionen-abbilden). Hier entscheidet nichts über Rechte: Wer
  * aufruft, hat geprüft, dass es um sich selbst bzw. die eigene Guild geht.
@@ -372,7 +372,7 @@ async function inTransaktion(trocken, tun) {
  * @param {Object} [optionen]
  * @param {string|null} [optionen.guildId] nur in dieser Guild; null = überall (dann auch Konto und Sitzungen)
  * @param {boolean} [optionen.trocken] Probelauf mit Rollback, ohne Haken
- * @param {string} [optionen.anlass] für das Log (z. B. „/meinedaten“)
+ * @param {string} [optionen.anlass] für das Log (z. B. „/mydata“)
  * @returns {Promise<{userId, guildId, trocken, ok, plugins: Object[]}>}
  */
 async function mitgliedLoeschen(userId, { guildId = null, trocken = false, anlass = 'unbekannt' } = {}) {
