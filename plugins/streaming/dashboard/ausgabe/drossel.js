@@ -1045,5 +1045,5 @@ module.exports = {
     TAKT_MS, JE_LAUF, HOECHSTVERSUCHE, HOECHSTVERSUCHE_AUFRAEUMEN, BOT_FRIST_MS, BRAUCHT_KANAL,
     ABSTAND_HOECHST_S, ABSTAND_HOECHST_S_AUFRAEUMEN, versuchsGrenze, abstandS,
     starten, lauf, auswaehlen, abarbeiten, ausfuehren, chatAnsageSenden,
-    istEndgueltig, istWeg, kanalstau
+    istEndgueltig, istWeg, kanalstau, anDenBot
 };

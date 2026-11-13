@@ -437,6 +437,38 @@ class StreamingDashboardPlugin extends DashboardPlugin {
     }
 
     /**
+     * Datenauskunft (G-04b): Vor dem Loeschen eines Mitglieds die Rollen
+     * zuruecknehmen, die dieses Plugin ihm gegeben hat.
+     *
+     * `streaming_role_grants` ist das Buch, nach dem der Abgleich spaeter
+     * nimmt (siehe `drossel.rolleSetzen`). Geht die Zeile, ohne dass die Rolle
+     * geht, nimmt sie niemand mehr: Das Mitglied traegt „ist live“ fuer
+     * immer. Deshalb zuerst der Bot, direkt und nicht ueber die Outbox — die
+     * Rueckmeldung an das Mitglied soll sagen, ob es geklappt hat.
+     *
+     * Wirft, wenn eine Rolle nicht zurueckging: Dann bleiben alle Zeilen
+     * dieses Plugins, die Rueckmeldung nennt den Grund. Ist der Bot nicht mehr
+     * in der Guild (10004) oder das Mitglied nicht mehr dort, ist nichts
+     * zurueckzunehmen.
+     *
+     * @param {{userId: string, guildId: string|null}} ctx
+     */
+    async vorMitgliedLoeschen(ctx) {
+        const drossel = require('./ausgabe/drossel');
+        const zeilen = await ServiceManager.get('dbService').query(
+            `SELECT guild_id, rolle_id FROM streaming_role_grants WHERE mitglied_id = ?${ctx.guildId ? ' AND guild_id = ?' : ''}`,
+            ctx.guildId ? [ctx.userId, ctx.guildId] : [ctx.userId]);
+        const offen = [];
+        for (const z of zeilen) {
+            const antwort = await drossel.anDenBot('streaming:role', {
+                guildId: z.guild_id, userId: ctx.userId, roleId: z.rolle_id, aktion: 'nehmen'
+            });
+            if (!antwort.ok && antwort.code !== 10004) offen.push(`Rolle ${z.rolle_id} in Guild ${z.guild_id}: ${antwort.fehler}`);
+        }
+        if (offen.length) throw new Error(`Rolle nicht zurueckgenommen (${offen.join('; ')})`);
+    }
+
+    /**
      * Navigation registrieren.
      *
      * Laeuft bei jedem Start ueber `onGuildEnable`. Das vorangestellte

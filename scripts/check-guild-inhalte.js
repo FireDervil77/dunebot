@@ -15,6 +15,11 @@
  * gelöscht wurde nur, was ein `onGuildDisable` von Hand löschte: automod,
  * moderation und discord gar nichts, streaming neun von zwölf Tabellen nicht.
  *
+ * Der Kern (`plugins/core`) lässt sich nicht abschalten. Seine Liste gilt für
+ * „Guild löschen“ (G-04b, `Datenauskunft.guildLoeschen`) und nennt alle
+ * Tabellen, die kein Plugin anlegt (Besitz wie bei G-01/G-04a). Die Guild
+ * steht dort auch in `guildId` (Navigation) und in `guilds._id`.
+ *
  *   Besitz       jede Tabelle aus einem CREATE TABLE im Plugin-Ordner gehört
  *                genau einem Plugin
  *   Vollständig  jede eigene Tabelle mit `guild_id` steht in `loeschen` oder in
@@ -39,6 +44,7 @@ require('dotenv').config({ path: path.join(WURZEL, 'apps/dashboard/.env'), quiet
 const { ServiceManager } = require('dunebot-core');
 const { ohneKommentare, ohneKommentareEjs } = require('./lib/quelltext');
 
+const KERN = 'core';
 let fehler = 0;
 async function pruefe(was, tun) {
     try { await tun(); console.log(`  ✓ ${was}`); }
@@ -94,12 +100,16 @@ function abschalter(plugin) {
     const db = new DBService();
     ServiceManager.register('dbService', db);
     try {
-        const spalten = await db.query(
-            'SELECT TABLE_NAME AS t FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND COLUMN_NAME = ?', ['guild_id']);
-        const mitGuild = new Set(spalten.map(r => r.t));
-        const vorhanden = new Set((await db.query(
-            'SELECT TABLE_NAME AS t FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()')).map(r => r.t));
+        const tabellen = await db.query(
+            'SELECT TABLE_NAME AS t, TABLE_TYPE AS art FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()');
+        const vorhanden = new Set(tabellen.map(r => r.t));
+        const sichten = new Set(tabellen.filter(r => r.art === 'VIEW').map(r => r.t));
+        const guildSpalte = await db.guildSpalten([...vorhanden].filter(t => !sichten.has(t)));
+        const mitGuild = new Set(Object.keys(guildSpalte).filter(t => guildSpalte[t]));
         const besitz = Object.fromEntries(plugins.map(p => [p, angelegt(p)]));
+        // Was kein Plugin anlegt, gehört dem Kern.
+        const vonPlugins = new Set(plugins.flatMap(p => [...besitz[p]]));
+        for (const t of vorhanden) if (!sichten.has(t) && !vonPlugins.has(t)) besitz[KERN].add(t);
 
         await pruefe('Besitz: jede vorhandene Tabelle legt genau ein Plugin an', async () => {
             const wer = {};
@@ -120,7 +130,7 @@ function abschalter(plugin) {
                 }
                 for (const t of [...loeschen, ...Object.keys(bleiben)]) {
                     if (!vorhanden.has(t)) meldungen.push(`${p}: ${t} gibt es nicht`);
-                    else if (!mitGuild.has(t)) meldungen.push(`${p}: ${t} hat keine Spalte guild_id`);
+                    else if (!mitGuild.has(t)) meldungen.push(`${p}: ${t} hat keine Guild-Spalte (guild_id, guildId, guilds._id)`);
                     else if (!besitz[p].has(t)) meldungen.push(`${p}: ${t} legt ein anderes Plugin an`);
                 }
                 for (const [t, grund] of Object.entries(bleiben)) {
@@ -155,7 +165,7 @@ function abschalter(plugin) {
                 const l = listen[p].loeschen;
                 if (!l.length) continue;
                 for (const t of l) {
-                    const [{ n }] = await db.query(`SELECT COUNT(*) AS n FROM \`${t}\` WHERE guild_id = ?`, ['0']);
+                    const [{ n }] = await db.query(`SELECT COUNT(*) AS n FROM \`${t}\` WHERE \`${guildSpalte[t]}\` = ?`, ['0']);
                     assert.strictEqual(Number(n), 0, `${t} hat Zeilen mit guild_id 0 — die Probe würde sie löschen`);
                 }
                 const ergebnis = await db.loescheGuildZeilen(l, '0');
@@ -183,7 +193,7 @@ function abschalter(plugin) {
         await pruefe('Dialog: nennt genau die Plugins mit Liste, Texte in beiden Sprachen', async () => {
             const q = ohneKommentareEjs(lies('apps/dashboard/themes/default/views/guild/plugins.ejs'));
             const imDialog = [...q.match(/MIT_INHALTEN = \[([^\]]+)\]/)[1].matchAll(/'([a-z]+)'/g)].map(t => t[1]).sort();
-            const soll = plugins.filter(p => listen[p].loeschen.length && !meta[p].nurKontrollGuild).sort();
+            const soll = plugins.filter(p => p !== KERN && listen[p].loeschen.length && !meta[p].nurKontrollGuild).sort();
             assert.deepStrictEqual(imDialog, soll);
             const de = JSON.parse(lies('apps/dashboard/locales/de-DE.json')).ADMIN_PAGE;
             const en = JSON.parse(lies('apps/dashboard/locales/en-GB.json')).ADMIN_PAGE;

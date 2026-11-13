@@ -12,10 +12,30 @@
     "dunebot-sdk": "*"
   },
   "guildInhalte": {
-    "loeschen": [],
+    "loeschen": [
+      "ereignisbuch",
+      "configs",
+      "user_configs",
+      "guild_command_state",
+      "guild_toast_logs",
+      "guild_widget_config",
+      "guild_media",
+      "guild_nav_items",
+      "guild_nav_items_backup_20251102",
+      "guild_themes",
+      "guild_staff",
+      "guild_groups_permissions_backup",
+      "guild_permission_seeds",
+      "permission_definitions",
+      "plugin_migrations",
+      "guild_groups",
+      "guild_users",
+      "guild_plugins",
+      "guilds"
+    ],
     "bleiben": {
-      "guild_groups_permissions_backup": "core lässt sich nicht abschalten",
-      "guild_permission_seeds": "core lässt sich nicht abschalten; die Rechte eines Plugins nimmt unregisterPluginPermissions"
+      "user_feedback": "Rückmeldung an den Betreiber, guild-übergreifend; blieb schon beim Verlassen (GuildManager)",
+      "donations": "Zahlungsbeleg, gesetzliche Aufbewahrung; die Frist legt G-05 fest"
     }
   },
   "ereignisse": {

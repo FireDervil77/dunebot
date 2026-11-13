@@ -152,25 +152,61 @@ class DBService extends DBClient {
      * Tabelle, ist keine geleert. Wer Fremdschlüssel ohne CASCADE hat, steht
      * vor seiner Elterntabelle.
      *
-     * @param {string[]} tabellen Tabellennamen mit Spalte `guild_id`
+     * Die Guild steht meist in `guild_id`, in den Navigations-Tabellen in
+     * `guildId` und in `guilds` selbst in `_id` (siehe `guildSpalten`). Seit
+     * „Guild löschen“ (G-04b) nennt auch der Kern seine Tabellen, darunter diese.
+     *
+     * Mit `verbindung` läuft es in der Transaktion des Aufrufers (Datenauskunft,
+     * auch als Probelauf mit Rollback), sonst in einer eigenen.
+     *
+     * @param {string[]} tabellen Tabellennamen mit einer Guild-Spalte
      * @param {string} guildId Discord-Guild-ID
+     * @param {Object} [optionen]
+     * @param {Object} [optionen.verbindung] offene Verbindung in einer Transaktion
      * @returns {Promise<Object<string, number>>} gelöschte Zeilen je Tabelle
      */
-    async loescheGuildZeilen(tabellen, guildId) {
+    async loescheGuildZeilen(tabellen, guildId, { verbindung = null } = {}) {
         // Ohne Guild hieße `WHERE guild_id = NULL` nichts, `= 'undefined'`
         // auch nichts — beides sähe aus wie gelungen.
         if (!/^\d+$/.test(String(guildId ?? ''))) throw new Error(`loescheGuildZeilen: ungültige Guild-ID „${guildId}"`);
         for (const t of tabellen) {
             if (!/^[a-z][a-z0-9_]*$/.test(t)) throw new Error(`loescheGuildZeilen: ungültiger Tabellenname „${t}"`);
         }
-        return this.transaction(async (verbindung) => {
+        const tun = async (v) => {
+            const spalten = await this.guildSpalten(tabellen, v);
+            const ohne = tabellen.filter(t => !spalten[t]);
+            if (ohne.length) throw new Error(`loescheGuildZeilen: keine Guild-Spalte in ${ohne.join(', ')}`);
             const geloescht = {};
             for (const t of tabellen) {
-                const [ergebnis] = await verbindung.query(`DELETE FROM \`${t}\` WHERE guild_id = ?`, [String(guildId)]);
+                const [ergebnis] = await v.query(`DELETE FROM \`${t}\` WHERE \`${spalten[t]}\` = ?`, [String(guildId)]);
                 geloescht[t] = ergebnis.affectedRows;
             }
             return geloescht;
-        });
+        };
+        return verbindung ? tun(verbindung) : this.transaction(tun);
+    }
+
+    /**
+     * Welche Spalte nennt in einer Tabelle die Guild? `guild_id`, sonst
+     * `guildId` (Navigation), in `guilds` selbst `_id`; `null`, wenn keine.
+     * Gemessen 2026-11-13: andere Namen gibt es nicht.
+     *
+     * @param {string[]} tabellen Tabellennamen
+     * @param {Object} [verbindung] offene Verbindung, sonst der Pool
+     * @returns {Promise<Object<string, string|null>>} Spalte je Tabelle
+     */
+    async guildSpalten(tabellen, verbindung = null) {
+        if (!tabellen.length) return {};
+        const sql = `SELECT TABLE_NAME AS t, COLUMN_NAME AS s FROM information_schema.COLUMNS
+                      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (${tabellen.map(() => '?').join(', ')})
+                        AND COLUMN_NAME IN ('guild_id', 'guildId', '_id')`;
+        const zeilen = verbindung ? (await verbindung.query(sql, tabellen))[0] : await this.query(sql, tabellen);
+        const aus = {};
+        for (const t of tabellen) {
+            const da = new Set(zeilen.filter(z => z.t === t).map(z => z.s));
+            aus[t] = da.has('guild_id') ? 'guild_id' : da.has('guildId') ? 'guildId' : (t === 'guilds' && da.has('_id')) ? '_id' : null;
+        }
+        return aus;
     }
 
     /**

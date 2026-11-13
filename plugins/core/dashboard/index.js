@@ -62,5 +62,35 @@ class CoreDashboardPlugin extends DashboardPlugin {
         }
     }
 
+    /**
+     * Datenauskunft (G-04b): Löscht ein Mitglied seine Daten überall, gehen
+     * seine Stimmen (`user_feedback_votes`, übergreifend). `upvotes` ist
+     * mitgezählt (feedback.router.js zählt ±1) und stimmte danach nicht mehr.
+     * Hier merken, welche Rückmeldungen betroffen sind, …
+     *
+     * @param {{userId: string, guildId: string|null, merk: Object}} ctx
+     */
+    async vorMitgliedLoeschen(ctx) {
+        if (ctx.guildId) return;
+        const zeilen = await ServiceManager.get('dbService').query(
+            'SELECT DISTINCT feedback_id FROM user_feedback_votes WHERE user_id = ?', [ctx.userId]);
+        ctx.merk.rueckmeldungen = zeilen.map(z => z.feedback_id);
+    }
+
+    /**
+     * … und nach dem Löschen, in derselben Transaktion, nachzählen.
+     *
+     * @param {{merk: Object}} ctx
+     * @param {Object} verbindung offene Verbindung der Transaktion
+     */
+    async nachMitgliedLoeschen(ctx, verbindung) {
+        const ids = ctx.merk.rueckmeldungen || [];
+        if (!ids.length) return;
+        await verbindung.query(`
+            UPDATE user_feedback uf
+               SET upvotes = (SELECT COUNT(*) FROM user_feedback_votes v WHERE v.feedback_id = uf.id)
+             WHERE uf.id IN (?)`, [ids]);
+    }
+
 }
 module.exports = CoreDashboardPlugin;

@@ -310,6 +310,38 @@ class GameserverPlugin extends DashboardPlugin {
 
 
     /**
+     * Datenauskunft (G-04b): Bewertungen (`addon_ratings`) sind übergreifend und
+     * gehen nur beim Löschen „überall“. `rating_avg`/`rating_count` im Anker
+     * sind abgeleitet. Hier merken, welche Pakete betroffen sind, …
+     *
+     * @param {{userId: string, guildId: string|null, merk: Object}} ctx
+     */
+    async vorMitgliedLoeschen(ctx) {
+        if (ctx.guildId) return;
+        const zeilen = await ServiceManager.get('dbService').query(
+            'SELECT DISTINCT addon_id FROM addon_ratings WHERE user_id = ?', [ctx.userId]);
+        ctx.merk.pakete = zeilen.map(z => z.addon_id);
+    }
+
+    /**
+     * … und nur für diese nachrechnen. Nicht für alle: Gemessen 2026-11-13
+     * schreibt kein Code `addon_ratings`; Zähler anderer Pakete könnten aus
+     * einer Einlieferung stammen und gingen sonst auf 0.
+     *
+     * @param {{merk: Object}} ctx
+     * @param {Object} verbindung offene Verbindung der Transaktion
+     */
+    async nachMitgliedLoeschen(ctx, verbindung) {
+        const ids = ctx.merk.pakete || [];
+        if (!ids.length) return;
+        await verbindung.query(`
+            UPDATE addon_marketplace am
+               SET rating_count = (SELECT COUNT(*) FROM addon_ratings r WHERE r.addon_id = am.id),
+                   rating_avg = COALESCE((SELECT AVG(r.rating) FROM addon_ratings r WHERE r.addon_id = am.id), 0)
+             WHERE am.id IN (?)`, [ids]);
+    }
+
+    /**
      * Guild-spezifische Deaktivierung: alle Gameserver der Guild löschen.
      *
      * Jeder Server geht den Weg des normalen Löschens (`Loeschung`, K067,
