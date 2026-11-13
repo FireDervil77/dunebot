@@ -229,6 +229,15 @@ module.exports = class App {
             meldungenAufraeumen();
             setInterval(meldungenAufraeumen, 24 * 60 * 60 * 1000).unref();
 
+            // Zeitplan-Register (G-06): nach den Kern-Migrationen (Tabelle
+            // zeitplan_laeufe), vor den Plugins, damit sie beim Laden eintragen
+            // können. Verpasstes holt es selbst erst nach NACHHOLEN_MS nach.
+            try {
+                await require('./helpers/Zeitplan').starten();
+            } catch (error) {
+                Logger.error('[INIT] Zeitplan-Register konnte nicht starten:', error);
+            }
+
             // Plugins laden (Plugin-Migrationen laufen in enablePlugin())
             await this.loadPlugins();
             

@@ -29,7 +29,8 @@
  *
  * Läufe: auf jeden Anstoß des Bots, `START_MS` nach dem Start des Dashboards
  * (dann sind die Daemons wieder verbunden, sonst scheiterte jeder Gameserver)
- * und danach stündlich. Es läuft immer nur ein Lauf, Guild für Guild.
+ * und danach stündlich über den Zeitplan (G-06, `core:verlassene-guilds`).
+ * Es läuft immer nur ein Lauf, Guild für Guild.
  *
  * # Was nicht gelöscht wird
  *
@@ -51,14 +52,15 @@
 
 const { ServiceManager } = require('dunebot-core');
 const Datenauskunft = require('./Datenauskunft');
+const Zeitplan = require('./Zeitplan');
 
 /** Erster Lauf nach dem Start: Die Daemons brauchen eine Weile, bis sie wieder verbunden sind. */
 const START_MS = 2 * 60 * 1000;
-/** Danach stündlich, für alles, was gescheitert ist. */
-const TAKT_MS = 60 * 60 * 1000;
+/** Danach stündlich (Minute 23) über den Zeitplan, für alles, was gescheitert ist. */
+const TAKT = '23 * * * *';
 const ANLASS = 'Bot hat die Guild verlassen';
 
-let uhr = null;
+let gestartet = false;
 let laeuft = false;
 let nochmal = false;
 /** Letzter Lauf, für das Log und den Wächter. */
@@ -128,7 +130,7 @@ async function eine(g) {
  * danach ein weiterer (der Anstoß kam vielleicht für eine Guild, die der
  * laufende nicht mehr sah).
  *
- * @returns {Promise<{geloescht: number, zurueck: number, gescheitert: number, kontrollGuild: boolean}|null>}
+ * @returns {Promise<{geloescht: number, zurueck: number, gescheitert: number, kontrollGuild: boolean, abgebrochen?: boolean}|null>}
  *          null, wenn schon ein Lauf ging
  */
 async function lauf() {
@@ -151,6 +153,7 @@ async function lauf() {
             }
         } while (nochmal);
     } catch (e) {
+        stand.abgebrochen = true;
         log().error('[Verlassen] Lauf gescheitert', e);
     } finally {
         laeuft = false;
@@ -164,16 +167,37 @@ function wecken() {
     lauf();
 }
 
-/** Nach dem Laden der Plugins: erster Lauf nach `START_MS`, dann stündlich. */
+/**
+ * Der stündliche Lauf im Zeitplan (G-06). Bleibt etwas stehen, gilt der Lauf
+ * als gescheitert, damit es unter /admin/zeitplan rot steht; die Gründe je
+ * Guild stehen im Log unter `[Verlassen]`.
+ *
+ * @returns {Promise<string>}
+ */
+async function stuendlich() {
+    const s = await lauf();
+    if (!s) return 'lief schon (Anstoß des Bots), ein weiterer Durchgang folgt';
+    const text = `gelöscht ${s.geloescht}, zurückgekehrt ${s.zurueck}, gescheitert ${s.gescheitert}`;
+    const offen = [];
+    if (s.abgebrochen) offen.push('Lauf abgebrochen');
+    if (s.gescheitert) offen.push(`${s.gescheitert} Guild(s) nicht gelöscht`);
+    if (s.kontrollGuild) offen.push('der Bot ist nicht mehr in der Kontroll-Guild');
+    if (offen.length) throw new Error(`${offen.join(', ')} (${text}); Gründe im Log unter [Verlassen]`);
+    return text;
+}
+
+/**
+ * Nach dem Laden der Plugins: erster Lauf nach `START_MS`, dann stündlich
+ * über den Zeitplan (`core:verlassene-guilds`), dazu sofort auf jeden Anstoß.
+ */
 function starten() {
-    if (uhr) return;
+    if (gestartet) return;
+    gestartet = true;
     ServiceManager.register('verlasseneGuilds', module.exports);
-    setTimeout(() => {
-        lauf();
-        uhr = setInterval(() => { lauf(); }, TAKT_MS);
-        uhr.unref();
-    }, START_MS).unref();
+    setTimeout(() => { lauf(); }, START_MS).unref();
+    // Nachholen nicht nötig: Der Lauf nach START_MS kommt bei jedem Start.
+    Zeitplan.eintragen('core:verlassene-guilds', TAKT, stuendlich, { nachholen: false });
     log().info(`[Verlassen] Aufräumer bereit (erster Lauf in ${START_MS / 60000} min, dann stündlich, sofort auf Anstoß des Bots)`);
 }
 
-module.exports = { starten, wecken, lauf, letzter: () => letzter, START_MS, TAKT_MS, ANLASS };
+module.exports = { starten, wecken, lauf, stuendlich, letzter: () => letzter, START_MS, TAKT, ANLASS };

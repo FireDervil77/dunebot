@@ -397,6 +397,52 @@ router.post('/ereignisse/probe', async (req, res) => {
 });
 
 // ================================================================
+// ZEITPLAN-REGISTER (G-06)
+// Stand je Aufgabe, von Hand ausführen, gestrichene Zeilen vergessen.
+// ================================================================
+
+router.get('/zeitplan', async (req, res) => {
+    const themeManager = ServiceManager.get('themeManager');
+    const Logger = ServiceManager.get('Logger');
+    try {
+        const aufgaben = ServiceManager.has('zeitplan') ? await ServiceManager.get('zeitplan').stand() : null;
+        await themeManager.renderView(res, 'admin/zeitplan', {
+            title: 'Zeitplan',
+            activeMenu: '/admin/zeitplan',
+            aufgaben,
+        });
+    } catch (error) {
+        Logger.error('[Admin] Zeitplan nicht lesbar:', error);
+        res.status(500).send('Der Stand des Zeitplans ließ sich nicht lesen.');
+    }
+});
+
+router.post('/zeitplan/jetzt', (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    if (!ServiceManager.has('zeitplan')) return res.status(503).json({ success: false, message: 'Der Zeitplan läuft nicht.' });
+    const name = String(req.body?.name || '');
+    try {
+        const r = ServiceManager.get('zeitplan').jetzt(name);
+        if (!r.gestartet) return res.status(409).json({ success: false, message: `${name} läuft schon seit ${r.seit.toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })}.` });
+        Logger.info(`[Admin] Zeitplan: ${name} von Hand gestartet`);
+        res.json({ success: true, message: `${name} läuft. Das Ergebnis steht nach dem Neuladen in der Tabelle.` });
+    } catch (error) {
+        res.status(404).json({ success: false, message: error.message });
+    }
+});
+
+router.post('/zeitplan/vergessen', async (req, res) => {
+    if (!ServiceManager.has('zeitplan')) return res.status(503).json({ success: false, message: 'Der Zeitplan läuft nicht.' });
+    const name = String(req.body?.name || '');
+    try {
+        const weg = await ServiceManager.get('zeitplan').vergessen(name);
+        res.json({ success: true, message: weg ? `Zeile ${name} entfernt.` : 'Die Zeile war schon weg.' });
+    } catch (error) {
+        res.status(409).json({ success: false, message: error.message });
+    }
+});
+
+// ================================================================
 // WARTUNGSSEITE
 // Geschaltet wird hier, ausgeliefert vom Apache (helpers/Wartung.js).
 // ================================================================

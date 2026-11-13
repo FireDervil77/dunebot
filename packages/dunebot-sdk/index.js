@@ -26,6 +26,7 @@ const ServersteuerungRegistry = require("./lib/ServersteuerungRegistry");
 const FormAntwort = require("./lib/FormAntwort");
 const Nachbar = require("./lib/nachbar");
 const Ereignisse = require("./ereignisse");
+const Zeitplan = require("./lib/Zeitplan");
 
 module.exports = {
     BotPlugin,
@@ -51,6 +52,7 @@ module.exports = {
     FormAntwort,
     Nachbar,
     Ereignisse,
+    Zeitplan,
     // IPM (Inter-Process Messaging) - Event-Bus Architecture
     MessageTypes,
     MessageBuilder,

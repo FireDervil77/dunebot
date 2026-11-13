@@ -185,7 +185,7 @@ function quelltextBot(gm) {
      * Gilden: { id: { name, zurueck?, ergebnis } }. `ergebnis` ist, was
      * guildLoeschen liefert ('wirft' wirft).
      */
-    async function dashboardFall(gilden, { waehrend } = {}) {
+    async function dashboardFall(gilden, { waehrend, aufruf = () => V.lauf() } = {}) {
         const logger = mitschreiber();
         const aufrufe = [];
         const offen = () => Object.entries(gilden).filter(([, g]) => !g.weg).map(([id, g]) => ({ _id: id, guild_name: g.name }));
@@ -204,7 +204,7 @@ function quelltextBot(gm) {
             return g.ergebnis;
         };
         try {
-            const stand = await V.lauf();
+            const stand = await aufruf();
             return { stand, logger, aufrufe };
         } finally {
             D.guildLoeschen = echtesGuildLoeschen;
@@ -245,6 +245,18 @@ function quelltextBot(gm) {
         assert.strictEqual(await parallel, null, 'zweiter Lauf lief parallel');
         assert.deepStrictEqual(r.aufrufe.map(a => a.id), ['666666666666666666', '777777777777777777']);
         assert.strictEqual(r.stand.geloescht, 2);
+    });
+    await pruefe('Stündlich über den Zeitplan: Ergebnis als Text, Stehengebliebenes als Fehler', async () => {
+        const gut = await dashboardFall({ '888888888888888888': { name: 'Weg', ergebnis: ok({ core: { guilds: 1 } }) } },
+            { aufruf: () => V.stuendlich() });
+        assert.strictEqual(gut.stand, 'gelöscht 1, zurückgekehrt 0, gescheitert 0');
+        let fehler = null;
+        await dashboardFall({ '999999999999999999': { name: 'Klemmt', ergebnis: gescheitert } },
+            { aufruf: () => V.stuendlich().catch(e => { fehler = e; }) });
+        assert(fehler && /1 Guild\(s\) nicht gelöscht.*\[Verlassen\]/.test(fehler.message), fehler?.message || 'warf nicht');
+        const v = code('apps/dashboard/helpers/VerlasseneGuilds.js');
+        assert(/Zeitplan\.eintragen\('core:verlassene-guilds', TAKT, stuendlich/.test(v), 'stündlicher Lauf nicht im Zeitplan');
+        assert(!/setInterval\(/.test(v), 'eigener setInterval neben dem Zeitplan');
     });
     await pruefe('Nichts offen: kein Löschaufruf', async () => {
         const r = await dashboardFall({});

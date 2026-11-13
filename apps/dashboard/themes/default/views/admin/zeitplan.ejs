@@ -1,0 +1,89 @@
+<%# Zeitplan-Register (G-06, 2026-11-13): je eingetragener Aufgabe der letzte Lauf.
+    Eingetragen wird im Code über Zeitplan.eintragen('plugin:aufgabe', takt, handler).
+    Zeilen ohne Eintrag stammen von Aufgaben, die seit dem letzten Start niemand mehr einträgt. %>
+<%
+  const liste = typeof aufgaben !== 'undefined' ? aufgaben : null;
+  const zeit = (w) => w ? new Date(w).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' }) : '–';
+  const dauer = (ms) => ms === null || ms === undefined ? '–' : (ms < 1000 ? `${ms} ms` : (ms < 120000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms / 60000)} min`));
+  const ANLASS = { takt: 'Takt', nachgeholt: 'nachgeholt', von_hand: 'von Hand' };
+  const zustand = (a) => {
+    if (!a.eingetragen) return ['bg-secondary-lt', 'nicht eingetragen'];
+    if (a.laeuft) return ['bg-blue-lt', 'läuft'];
+    if (!a.laeufe) return ['bg-secondary-lt', 'noch nie gelaufen'];
+    const fehlerZuletzt = a.letzter_fehler_am && (!a.letzter_erfolg_am || new Date(a.letzter_fehler_am) > new Date(a.letzter_erfolg_am));
+    return fehlerZuletzt ? ['bg-red-lt', 'Fehler'] : ['bg-green-lt', 'in Ordnung'];
+  };
+%>
+<div class="container-fluid">
+  <% if (!liste) { %>
+    <div class="alert alert-danger"><i class="fa-solid fa-triangle-exclamation me-2"></i>Der Zeitplan läuft nicht. Keine eingetragene Aufgabe wird ausgeführt. Ursache steht im Log des Dashboards beim Start (<code>[INIT] Zeitplan-Register</code>).</div>
+  <% } else { %>
+  <div class="card">
+    <div class="card-header"><h3 class="card-title mb-0"><i class="fa-solid fa-clock-rotate-left me-2"></i>Wiederkehrende Aufgaben</h3></div>
+    <div class="card-body">
+      <p class="text-secondary">Takte als Cron-Ausdruck, Zeitzone Europe/Berlin. Je Aufgabe läuft immer nur ein Lauf; ist der Takt wieder dran, während der vorige noch geht, fällt er aus („übersprungen“). War das Dashboard aus, als eine Aufgabe dran war, holt es sie nach dem Start einmal nach. Den Verlauf jedes Laufs findest du im Log des Dashboards unter <code>[Zeitplan]</code>.</p>
+      <% if (!liste.length) { %>
+        <div class="text-secondary">Keine Aufgabe eingetragen.</div>
+      <% } else { %>
+        <div class="table-responsive">
+          <table class="table table-sm table-vcenter mb-0">
+            <thead><tr><th>Aufgabe</th><th>Takt</th><th>Zustand</th><th>Letzter Lauf</th><th>Ergebnis oder Fehler</th><th class="text-end">Läufe</th><th>Nächster Lauf</th><th></th></tr></thead>
+            <tbody>
+              <% liste.forEach(function (a) { const z = zustand(a); %>
+                <tr>
+                  <td><span class="font-monospace"><%= a.name %></span><div class="small text-secondary"><%= a.plugin %><% if (a.eingetragen && !a.nachholen) { %> · holt nicht nach<% } %></div></td>
+                  <td class="font-monospace small text-nowrap"><%= a.takt %></td>
+                  <td><span class="badge <%= z[0] %>"><%= z[1] %></span><% if (a.laeuft) { %><div class="small text-secondary">seit <%= zeit(a.laeuft.seit) %></div><% } %></td>
+                  <td class="text-nowrap small"><%= zeit(a.letzter_start) %><% if (a.letzter_anlass) { %><div class="text-secondary"><%= ANLASS[a.letzter_anlass] || a.letzter_anlass %>, <%= dauer(a.letzte_dauer_ms) %></div><% } %></td>
+                  <td class="small">
+                    <% if (a.letztes_ergebnis) { %><div><%= a.letztes_ergebnis %></div><% } %>
+                    <% if (a.letzter_fehler) { %><div class="text-red"><%= zeit(a.letzter_fehler_am) %>: <%= a.letzter_fehler %></div><% } %>
+                    <% if (!a.letztes_ergebnis && !a.letzter_fehler) { %><span class="text-secondary">–</span><% } %>
+                  </td>
+                  <td class="text-end small text-nowrap"><%= a.laeufe || 0 %><% if (a.fehler) { %> <span class="text-red">(<%= a.fehler %> Fehler)</span><% } %><% if (a.uebersprungen) { %><div class="text-secondary"><%= a.uebersprungen %> übersprungen</div><% } %></td>
+                  <td class="text-nowrap small"><%= a.eingetragen ? zeit(a.naechster_lauf) : '–' %></td>
+                  <td class="text-end text-nowrap">
+                    <% if (a.eingetragen) { %>
+                      <button type="button" class="btn btn-sm btn-outline-primary" data-zeitplan-jetzt="<%= a.name %>" <%= a.laeuft ? 'disabled' : '' %>><i class="fa-solid fa-play me-1"></i>Jetzt</button>
+                    <% } else { %>
+                      <button type="button" class="btn btn-sm btn-outline-secondary" data-zeitplan-vergessen="<%= a.name %>" title="Die Aufgabe trägt niemand mehr ein. Entfernt nur diese Zeile."><i class="fa-solid fa-broom me-1"></i>Vergessen</button>
+                    <% } %>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <div class="text-secondary small mt-2">„Jetzt“ startet einen Lauf mit dem Anlass „von Hand“. Die Aufgabe prüft selbst, ob es etwas zu tun gibt.</div>
+      <% } %>
+    </div>
+  </div>
+  <% } %>
+</div>
+
+<script>
+(function () {
+  function melde(art, text) {
+    if (window.GuildAjaxHandler && GuildAjaxHandler.showToast) GuildAjaxHandler.showToast(art, text);
+  }
+  async function sende(url, daten, knopf) {
+    knopf.disabled = true;
+    try {
+      var r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(daten) });
+      var d = await r.json().catch(function () { return {}; });
+      if (!r.ok || !d.success) throw new Error(d.message || 'Fehlgeschlagen.');
+      melde('success', d.message);
+      setTimeout(function () { location.reload(); }, 2000);
+    } catch (e) {
+      melde('error', e.message);
+      knopf.disabled = false;
+    }
+  }
+  document.querySelectorAll('[data-zeitplan-jetzt]').forEach(function (k) {
+    k.addEventListener('click', function () { sende('/admin/zeitplan/jetzt', { name: k.dataset.zeitplanJetzt }, k); });
+  });
+  document.querySelectorAll('[data-zeitplan-vergessen]').forEach(function (k) {
+    k.addEventListener('click', function () { sende('/admin/zeitplan/vergessen', { name: k.dataset.zeitplanVergessen }, k); });
+  });
+})();
+</script>
