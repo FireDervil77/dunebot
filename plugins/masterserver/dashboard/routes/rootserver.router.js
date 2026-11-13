@@ -19,6 +19,9 @@ const RootServer = require('../models/RootServer');
 const Maschinenbefund = require('../helpers/Maschinenbefund');
 const RootServerAnlegen = require('../helpers/RootServerAnlegen');
 const { dbGrenzeFehler } = RootServerAnlegen;
+// Die Liste der laufenden Umzugszustände gibt es einmal (Vorbild: werkbank
+// liest Serverseite aus dem Gameserver-Plugin).
+const { LAEUFT: UMZUG_LAEUFT } = require('../../../gameserver/dashboard/helpers/Umzugsstand');
 
 /** Der Bereich, aus dem diese Maschine Spielports vergibt — oder null, solange keiner angelegt ist. */
 async function spielportBereich(rootserverId) {
@@ -227,24 +230,36 @@ router.post('/', requirePermission('MASTERSERVER.ROOTSERVER.CREATE'), async (req
 });
 
 /**
- * Gameserver, deren Umzugsverlauf an dieser Maschine hängt (K375).
+ * Gameserver, deren Umzugsverlauf an dieser Maschine hängt (K375, K377).
  *
  * `gameserver_migrations` zeigt mit `ON DELETE RESTRICT` auf Quelle und Ziel
- * (am 2026-11-12 in `information_schema.REFERENTIAL_CONSTRAINTS` nachgesehen).
- * Die Zeilen leben, solange es den Gameserver gibt (CASCADE an `server_id`) —
- * auch dann, wenn er längst auf einer anderen Maschine liegt. Bis K375 lief
- * das Löschen hier in den Fremdschlüssel: 500, und der Eintrag beim Daemon
- * war da schon entfernt.
+ * (am 2026-11-12 und 2026-11-13 in `information_schema.REFERENTIAL_CONSTRAINTS`
+ * nachgesehen; es sind die einzigen RESTRICT auf `rootserver`). Die Zeilen
+ * leben, solange es den Gameserver gibt (CASCADE an `server_id`) — auch dann,
+ * wenn er längst auf einer anderen Maschine liegt.
+ *
+ * K375 sperrte deshalb das Löschen. Seit K377 (Betreiber 2026-11-13: „wenn
+ * keine gameserver mehr dort sind, bringt es ja nichts an einem starren
+ * verlauf zu hängen") geht der Verlauf mit der Maschine. Gesperrt bleibt sie
+ * nur, solange ein Umzug von oder zu ihr läuft: `laufend` zählt Zeilen, die
+ * die jüngste ihres Servers sind und einen Zustand aus `Umzugsstand.LAEUFT`
+ * tragen — dieselbe Lesart wie Serverliste und Serverseite. Ein Umzug HIERHER
+ * lässt die Maschine leer aussehen, bis er die Datenbank umschreibt.
+ *
+ * `laufend` ist eine SUMME und kommt als Text ("0"), `umzuege` als Zahl —
+ * beide mit Number() lesen.
  */
 async function umzugsverlaufAn(dbService, rootserverId) {
     return dbService.query(
-        `SELECT gs.id, gs.name, COUNT(*) AS umzuege
+        `SELECT gs.id, gs.name, COUNT(*) AS umzuege,
+                SUM(m.status IN (${UMZUG_LAEUFT.map(() => '?').join(', ')})
+                    AND m.id = (SELECT MAX(j.id) FROM gameserver_migrations j WHERE j.server_id = m.server_id)) AS laufend
            FROM gameserver_migrations m
            JOIN gameservers gs ON gs.id = m.server_id
           WHERE m.source_rootserver_id = ? OR m.target_rootserver_id = ?
           GROUP BY gs.id, gs.name
           ORDER BY gs.name`,
-        [rootserverId, rootserverId]
+        [...UMZUG_LAEUFT, rootserverId, rootserverId]
     );
 }
 
@@ -594,16 +609,17 @@ router.delete('/:id', requirePermission('MASTERSERVER.ROOTSERVER.DELETE'), async
             });
         }
 
-        // 2b. Umzugsverlauf (K375, Betreiber 2026-11-12: sperren). Vor dem
-        //     Daemon prüfen — sonst wäre der Eintrag dort schon weg, wenn die
-        //     Datenbank das Löschen ablehnt.
+        // 2b. Laufender Umzug von oder zu der Maschine (K377). Vor dem Daemon
+        //     prüfen — sonst wäre der Eintrag dort schon weg. Abgeschlossener
+        //     Verlauf sperrt nicht mehr (bis K377: jeder Verlauf, 409).
         const verlauf = await umzugsverlaufAn(dbService, rootserverId);
-        if (verlauf.length > 0) {
-            const namen = verlauf.map(v => `„${v.name}“`).join(', ');
+        const laufend = verlauf.filter(v => Number(v.laufend) > 0);
+        if (laufend.length > 0) {
+            const namen = laufend.map(v => `„${v.name}“`).join(', ');
             return res.status(409).json({
                 success: false,
-                message: `RootServer kann nicht gelöscht werden: An ihm hängt der Umzugsverlauf von ${namen}. `
-                    + `Solange es ${verlauf.length === 1 ? 'diesen Gameserver' : 'diese Gameserver'} gibt, bleibt die Maschine gesperrt.`
+                message: `RootServer kann gerade nicht gelöscht werden: Ein Umzug von oder zu dieser Maschine läuft (${namen}). `
+                    + 'Wenn er fertig ist, geht es.'
             });
         }
 
@@ -633,17 +649,28 @@ router.delete('/:id', requirePermission('MASTERSERVER.ROOTSERVER.DELETE'), async
             Logger.warn(`[Masterserver] Daemon offline - Virtual Server ${rootserverId} muss manuell gelöscht werden`);
         }
 
-        // 4. RootServer aus Datenbank löschen
-        await dbService.query(
-            'DELETE FROM rootserver WHERE id = ? AND guild_id = ?',
-            [rootserverId, guildId]
-        );
+        // 4. Umzugsverlauf und RootServer aus der Datenbank löschen (K377).
+        //    Eine Transaktion: Scheitert die Maschine, bleibt der Verlauf.
+        //    Quotas, IPs und Ports nimmt CASCADE mit.
+        const verlaufWeg = await dbService.transaction(async (verbindung) => {
+            const [weg] = await verbindung.query(
+                'DELETE FROM gameserver_migrations WHERE source_rootserver_id = ? OR target_rootserver_id = ?',
+                [rootserverId, rootserverId]
+            );
+            await verbindung.query(
+                'DELETE FROM rootserver WHERE id = ? AND guild_id = ?',
+                [rootserverId, guildId]
+            );
+            return weg.affectedRows;
+        });
 
-        Logger.success(`[Masterserver] RootServer ${rootserverId} erfolgreich gelöscht`);
+        Logger.success(`[Masterserver] RootServer ${rootserverId} erfolgreich gelöscht (Umzugsverlauf: ${verlaufWeg} Zeile(n) mit)`);
 
         res.json({
             success: true,
-            message: 'RootServer erfolgreich gelöscht!'
+            message: verlaufWeg > 0
+                ? `RootServer gelöscht, ${verlaufWeg === 1 ? '1 Eintrag im Umzugsverlauf ging' : `${verlaufWeg} Einträge im Umzugsverlauf gingen`} mit.`
+                : 'RootServer erfolgreich gelöscht!'
         });
 
     } catch (error) {

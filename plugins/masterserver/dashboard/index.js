@@ -224,10 +224,14 @@ class MasterserverDashboardPlugin extends DashboardPlugin {
             // nachgesehen, nicht angenommen). Ihr Löschen ist Sache des
             // Gameserver-Plugins, das vorher abgeschaltet sein muss.
             //
-            // ⚠ `gameserver_migrations` steht auf `RESTRICT`: Gibt es einen
-            // Umzugseintrag auf diese Maschine, scheitert das Löschen im Kern —
-            // dann bricht das Abschalten ab, und die Meldung nennt den
-            // Fremdschlüssel. Ungeprüft, ob dieser Fall im Betrieb schon vorkam.
+            // `gameserver_migrations` steht auf `RESTRICT` gegen Quelle und
+            // Ziel, hier aber ohne Folge (geprüft 2026-11-13, K377): Schritt 1
+            // verlangt das Gameserver-Plugin abgeschaltet, dessen guildInhalte
+            // löschen `gameservers` der Guild, und CASCADE an `server_id`
+            // nimmt jeden Umzug mit. Umzüge gehen nur zwischen Maschinen
+            // derselben Guild (MigrationManager liest das Ziel mit guild_id).
+            // Das Löschen einer einzelnen Maschine nimmt den Verlauf selbst
+            // mit (rootserver.router.js, DELETE /:id).
             // ════════════════════════════════════════════════════════════
             
             // ════════════════════════════════════════════════════════════

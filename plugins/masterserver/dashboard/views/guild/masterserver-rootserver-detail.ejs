@@ -845,8 +845,10 @@ sudo journalctl -u firebot-daemon -f</code></pre>
 </div>
 
 <%# Zerstörende Rückfragen nach Vorlage #paketEntfernenModal: rot, fett, Name eintippen (K348). Bis 2026-11-12 fragten beide mit confirm(). %>
-<%# Sperre (K375): Umzugsverlauf an der Maschine. Die Variable ist neu, deshalb mit typeof gelesen. Eingabe und Knopf werden immer gerendert und nur gesperrt. %>
-<% const verlaufSperre = (typeof umzugsverlauf !== 'undefined' && Array.isArray(umzugsverlauf)) ? umzugsverlauf : []; %>
+<%# Umzugsverlauf an der Maschine (K375, K377). Die Variable ist neu, deshalb mit typeof gelesen. Seit K377 geht der Verlauf mit; gesperrt nur, solange ein Umzug von oder zu der Maschine läuft (laufend kommt als Text). Eingabe und Knopf werden immer gerendert und nur gesperrt. %>
+<% const verlaufAlle = (typeof umzugsverlauf !== 'undefined' && Array.isArray(umzugsverlauf)) ? umzugsverlauf : []; %>
+<% const verlaufZeilen = verlaufAlle.reduce(function (n, v) { return n + Number(v.umzuege || 0); }, 0); %>
+<% const verlaufSperre = verlaufAlle.filter(function (v) { return Number(v.laufend) > 0; }); %>
 <div class="modal modal-blur fade" id="rootserverLoeschenModal" data-gesperrt="<%= verlaufSperre.length > 0 ? '1' : '0' %>" tabindex="-1" aria-labelledby="rootserverLoeschenTitel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered" role="document">
     <div class="modal-content border border-danger border-2">
@@ -864,17 +866,20 @@ sudo journalctl -u firebot-daemon -f</code></pre>
         <ul class="mb-3">
           <li>alle Zusatz-IPs, Portbuchungen und Kontingente dieser Maschine</li>
           <li>ihr Eintrag beim Daemon, wenn er gerade verbunden ist — die Maschine müsste danach neu eingerichtet werden</li>
+          <% if (verlaufZeilen > 0) { %>
+          <li id="rootserverLoeschenVerlauf"><%= verlaufZeilen === 1 ? '1 Eintrag' : verlaufZeilen + ' Einträge' %> im Umzugsverlauf von oder zu dieser Maschine (<%= verlaufAlle.map(function (v) { return v.name + ': ' + Number(v.umzuege); }).join(', ') %>) — die Gameserver selbst bleiben</li>
+          <% } %>
         </ul>
         <p class="mb-3">Geht nur, solange kein Gameserver mehr auf der Maschine liegt.</p>
         <% if (verlaufSperre.length > 0) { %>
         <div class="alert alert-danger" id="rootserverLoeschenSperre" role="alert">
-          <div class="fw-bold mb-1"><i class="fa-solid fa-lock me-2"></i>Gesperrt: An dieser Maschine hängt ein Umzugsverlauf.</div>
+          <div class="fw-bold mb-1"><i class="fa-solid fa-lock me-2"></i>Gesperrt: Gerade läuft ein Umzug von oder zu dieser Maschine.</div>
           <ul class="mb-2">
             <% verlaufSperre.forEach(function (v) { %>
-            <li><%= v.name %> — <%= Number(v.umzuege) === 1 ? '1 Umzug' : Number(v.umzuege) + ' Umzüge' %> von oder zu dieser Maschine</li>
+            <li><%= v.name %></li>
             <% }) %>
           </ul>
-          <div>Solange es <%= verlaufSperre.length === 1 ? 'diesen Gameserver' : 'diese Gameserver' %> gibt, lässt sich die Maschine nicht löschen — auch wenn <%= verlaufSperre.length === 1 ? 'er' : 'sie' %> inzwischen woanders <%= verlaufSperre.length === 1 ? 'liegt' : 'liegen' %>.</div>
+          <div>Wenn <%= verlaufSperre.length === 1 ? 'er' : 'sie' %> fertig <%= verlaufSperre.length === 1 ? 'ist' : 'sind' %>, lässt sich die Maschine löschen.</div>
         </div>
         <% } %>
         <label class="form-label fw-bold" for="rootserverLoeschenEingabe">

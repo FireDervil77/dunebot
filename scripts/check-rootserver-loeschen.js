@@ -12,10 +12,14 @@
  * (gameservers.bind_ip); die Ansicht öffnet die roten Fenster und schickt die
  * Bestätigung mit.
  *
- * K375 (2026-11-12): Hängt ein Umzugsverlauf an der Maschine
- * (gameserver_migrations, FK RESTRICT), lehnt die Route mit 409 ab — VOR dem
- * Daemon, sonst wäre der Eintrag dort schon weg; das rote Fenster nennt die
- * Sperre und hält Eingabe und Knopf zu (gerendert, nicht am Quelltext gelesen).
+ * K375 (2026-11-12) sperrte das Löschen, sobald ein Umzugsverlauf an der
+ * Maschine hing (gameserver_migrations, FK RESTRICT). K377 (Betreiber
+ * 2026-11-13: mitlöschen): Der Verlauf geht in EINER Transaktion mit der
+ * Maschine; gesperrt (409, VOR dem Daemon) nur noch, solange ein Umzug von
+ * oder zu ihr läuft — die Liste der laufenden Zustände kommt aus
+ * Umzugsstand.LAEUFT. Das rote Fenster nennt die mitgehenden Zeilen bzw. die
+ * Sperre und hält dann Eingabe und Knopf zu (gerendert, nicht am Quelltext
+ * gelesen).
  *
  * K374 (2026-11-12): Port-Allocation löschen verlangt die Portnummer, die
  * Sammelaktion die Zahl der Ports; beide löschen nur freie Zeilen dieser
@@ -44,9 +48,32 @@ let nutzer = 0;
 let verlauf = [];
 let port = { id: 9, rootserver_id: 54, port: 27015, server_id: null };
 let betroffen = 1;
+let verlaufWeg = 0;
+let maschineScheitert = false;
+let transaktionen = 0;
 const abfragen = [];
 const werte = [];
 ServiceManager.register('dbService', {
+    // Wie DBService.transaction: eine Verbindung, deren query [ergebnis, felder]
+    // liefert; wirft der Rückruf, gilt nichts davon (zurückgerollt).
+    async transaction(fn) {
+        transaktionen++;
+        const vorher = abfragen.length;
+        const verbindung = {
+            async query(sql, w) {
+                const s = String(sql);
+                abfragen.push(s); werte.push(w);
+                if (/^\s*DELETE FROM gameserver_migrations/.test(s)) return [{ affectedRows: verlaufWeg }];
+                if (/^\s*DELETE FROM rootserver /.test(s)) {
+                    if (maschineScheitert) throw new Error('ER_ROW_IS_REFERENCED_2');
+                    return [{ affectedRows: 1 }];
+                }
+                throw new Error('unbekannte Abfrage in der Transaktion: ' + s);
+            },
+        };
+        try { return await fn(verbindung); }
+        catch (e) { abfragen.length = vorher; werte.length = vorher; throw e; }
+    },
     async query(sql, w) {
         const s = String(sql);
         abfragen.push(s);
@@ -83,7 +110,7 @@ const geloescht = () => abfragen.filter(s => /^DELETE FROM/.test(s.trim()));
 
 let bestanden = 0;
 async function pruefe(name, fn) {
-    abfragen.length = 0; werte.length = 0; daemonGefragt = 0;
+    abfragen.length = 0; werte.length = 0; daemonGefragt = 0; transaktionen = 0;
     try { await fn(); console.log(`  ✓ ${name}`); bestanden++; }
     catch (e) { console.error(`  ✗ ${name}\n    ${e.message}`); process.exitCode = 1; }
 }
@@ -111,22 +138,58 @@ async function pruefe(name, fn) {
         gameserverZahl = 0;
         a = await rufe(loeschen, { id: '54' }, { bestaetigung: ' DeinServerHost ' });
         assert.strictEqual(a.code, 200, JSON.stringify(a.d));
-        assert.strictEqual(geloescht().length, 1);
-        assert.match(geloescht()[0], /DELETE FROM rootserver WHERE id = \? AND guild_id = \?/);
+        assert.strictEqual(transaktionen, 1, 'Verlauf und Maschine in einer Transaktion');
+        assert.strictEqual(geloescht().length, 2);
+        assert.match(geloescht()[0], /DELETE FROM gameserver_migrations WHERE source_rootserver_id = \? OR target_rootserver_id = \?/);
+        assert.deepStrictEqual(werte[abfragen.indexOf(geloescht()[0])], ['54', '54']);
+        assert.match(geloescht()[1], /DELETE FROM rootserver WHERE id = \? AND guild_id = \?/);
         assert.strictEqual(daemonGefragt, 1, 'virtual.delete an den Daemon');
+        assert.strictEqual(a.d.message, 'RootServer erfolgreich gelöscht!', 'ohne Verlauf kein Satz dazu');
     });
 
-    await pruefe('Umzugsverlauf an der Maschine (K375): 409 mit den Namen, nichts gelöscht, Daemon nicht gefragt', async () => {
-        verlauf = [{ id: 217, name: 'Fires Core Keeper Bude', umzuege: 6 }, { id: 233, name: 'Fires Minecraft Bude', umzuege: 1 }];
+    await pruefe('abgeschlossener Umzugsverlauf (K377): geht mit, die Antwort nennt die Zahl', async () => {
+        verlauf = [{ id: 217, name: 'Fires Core Keeper Bude', umzuege: 6, laufend: '0' }, { id: 233, name: 'Fires Minecraft Bude', umzuege: 1, laufend: null }];
+        verlaufWeg = 7;
+        const a = await rufe(loeschen, { id: '54' }, { bestaetigung: 'DeinServerHost' });
+        assert.strictEqual(a.code, 200, JSON.stringify(a.d));
+        assert.strictEqual(daemonGefragt, 1);
+        assert.strictEqual(geloescht().length, 2);
+        assert.match(geloescht()[0], /DELETE FROM gameserver_migrations/);
+        assert.match(a.d.message, /7 Einträge im Umzugsverlauf gingen mit/);
+        verlaufWeg = 1;
+        const b = await rufe(loeschen, { id: '54' }, { bestaetigung: 'DeinServerHost' });
+        assert.match(b.d.message, /1 Eintrag im Umzugsverlauf ging mit\./);
+        verlaufWeg = 0;
+    });
+
+    await pruefe('laufender Umzug von oder zu der Maschine (K377): 409 mit dem Namen, nichts gelöscht, Daemon nicht gefragt', async () => {
+        verlauf = [{ id: 217, name: 'Fires Core Keeper Bude', umzuege: 6, laufend: '0' }, { id: 233, name: 'Fires Minecraft Bude', umzuege: 2, laufend: '1' }];
         const a = await rufe(loeschen, { id: '54' }, { bestaetigung: 'DeinServerHost' });
         assert.strictEqual(a.code, 409, JSON.stringify(a.d));
-        assert.match(a.d.message, /Umzugsverlauf von „Fires Core Keeper Bude“, „Fires Minecraft Bude“/);
-        assert.match(a.d.message, /bleibt die Maschine gesperrt/);
+        assert.match(a.d.message, /Umzug von oder zu dieser Maschine läuft \(„Fires Minecraft Bude“\)/);
+        assert.doesNotMatch(a.d.message, /Core Keeper/, 'abgeschlossener Verlauf wird nicht genannt');
         assert.strictEqual(geloescht().length, 0);
+        assert.strictEqual(transaktionen, 0);
         assert.strictEqual(daemonGefragt, 0, 'der Daemon darf vor der Sperre nichts erfahren');
         verlauf = [];
-        const b = await rufe(loeschen, { id: '54' }, { bestaetigung: 'DeinServerHost' });
-        assert.strictEqual(b.code, 200, 'ohne Verlauf geht es weiter');
+    });
+
+    await pruefe('die Abfrage liest die laufenden Zustände aus Umzugsstand.LAEUFT und nur den jüngsten Umzug je Server', async () => {
+        const { LAEUFT } = require(path.join(WURZEL, 'plugins/gameserver/dashboard/helpers/Umzugsstand.js'));
+        await rufe(loeschen, { id: '54' }, { bestaetigung: 'DeinServerHost' });
+        const i = abfragen.findIndex(s => /FROM gameserver_migrations m\s+JOIN/.test(s));
+        assert.ok(i >= 0, 'Verlaufsabfrage fehlt');
+        assert.deepStrictEqual(werte[i], [...LAEUFT, '54', '54']);
+        assert.match(abfragen[i], new RegExp(`m\\.status IN \\(${LAEUFT.map(() => '\\?').join(', ')}\\)`));
+        assert.match(abfragen[i], /m\.id = \(SELECT MAX\(j\.id\) FROM gameserver_migrations j WHERE j\.server_id = m\.server_id\)/);
+    });
+
+    await pruefe('scheitert die Maschine, bleibt der Verlauf (Transaktion) und die Antwort ist 500', async () => {
+        verlaufWeg = 3; maschineScheitert = true;
+        const a = await rufe(loeschen, { id: '54' }, { bestaetigung: 'DeinServerHost' });
+        assert.strictEqual(a.code, 500, JSON.stringify(a.d));
+        assert.strictEqual(geloescht().length, 0, 'zurückgerollt');
+        verlaufWeg = 0; maschineScheitert = false;
     });
 
     console.log('\nPort-Allocation löschen (K374)');
@@ -225,26 +288,36 @@ async function pruefe(name, fn) {
         assert.match(seite, /onclick="removeIP\(\$\{ip\.id\}, this\)"/);
     });
 
-    await pruefe('gerendert: mit Umzugsverlauf steht die Sperre da, Eingabe und Knopf sind zu; ohne (auch ohne Variable) ist die Eingabe offen', async () => {
+    await pruefe('gerendert: abgeschlossener Verlauf steht unter „Es gehen mit“; laufender Umzug sperrt Eingabe und Knopf; ohne (auch ohne Variable) offen', async () => {
         const roh = fs.readFileSync(
             path.join(WURZEL, 'plugins/masterserver/dashboard/views/guild/masterserver-rootserver-detail.ejs'), 'utf8');
         // Vom Kommentar vor dem Fenster bis zum nächsten Fenster schneiden — ganze Klammern.
-        const von = roh.indexOf('<%# Sperre (K375)');
+        const von = roh.indexOf('<%# Umzugsverlauf an der Maschine (K375, K377)');
         const bis = roh.indexOf('<div class="modal modal-blur fade" id="ipEntfernenModal"');
         assert.ok(von > 0 && bis > von, 'Ausschnitt des Löschfensters nicht gefunden');
         const stueck = roh.slice(von, bis);
+        const verlaufFertig = [{ id: 217, name: 'Fires <Core> Bude', umzuege: 6, laufend: '0' }, { id: 233, name: 'Minecraft', umzuege: 1, laufend: null }];
+        const fertig = ejs.render(stueck, { rootserver: MASCHINE, umzugsverlauf: verlaufFertig });
+        assert.match(fertig, /id="rootserverLoeschenModal" data-gesperrt="0"/, 'abgeschlossener Verlauf sperrt nicht (K377)');
+        assert.doesNotMatch(fertig, /rootserverLoeschenSperre/);
+        assert.doesNotMatch(fertig, /id="rootserverLoeschenEingabe"[^>]* disabled/);
+        assert.match(fertig, /id="rootserverLoeschenVerlauf">7 Einträge im Umzugsverlauf von oder zu dieser Maschine \(Fires &lt;Core&gt; Bude: 6, Minecraft: 1\) — die Gameserver selbst bleiben</);
+        const eins = ejs.render(stueck, { rootserver: MASCHINE, umzugsverlauf: [{ id: 233, name: 'Minecraft', umzuege: 1, laufend: '0' }] });
+        assert.match(eins, />1 Eintrag im Umzugsverlauf/);
         const mit = ejs.render(stueck, { rootserver: MASCHINE,
-            umzugsverlauf: [{ id: 217, name: 'Fires <Core> Bude', umzuege: 6 }, { id: 233, name: 'Minecraft', umzuege: 1 }] });
+            umzugsverlauf: [{ id: 217, name: 'Fires <Core> Bude', umzuege: 6, laufend: '0' }, { id: 233, name: 'Minecraft', umzuege: 2, laufend: '1' }] });
         assert.match(mit, /id="rootserverLoeschenModal" data-gesperrt="1"/);
         assert.match(mit, /id="rootserverLoeschenSperre"/);
-        assert.match(mit, /Fires &lt;Core&gt; Bude — 6 Umzüge/);
-        assert.match(mit, /Minecraft — 1 Umzug /);
+        assert.match(mit, /Gerade läuft ein Umzug von oder zu dieser Maschine/);
+        assert.match(mit, /<li>Minecraft<\/li>/);
+        assert.doesNotMatch(mit.slice(mit.indexOf('rootserverLoeschenSperre')), /Fires &lt;Core&gt; Bude<\/li>/, 'nur der laufende steht in der Sperre');
         assert.match(mit, /id="rootserverLoeschenEingabe"[^>]* disabled>/);
         assert.match(mit, /id="rootserverLoeschenKnopf" disabled>/);
         for (const daten of [{ rootserver: MASCHINE, umzugsverlauf: [] }, { rootserver: MASCHINE }]) {
             const ohne = ejs.render(stueck, daten);
             assert.match(ohne, /id="rootserverLoeschenModal" data-gesperrt="0"/);
             assert.doesNotMatch(ohne, /rootserverLoeschenSperre/);
+            assert.doesNotMatch(ohne, /rootserverLoeschenVerlauf/);
             assert.doesNotMatch(ohne, /id="rootserverLoeschenEingabe"[^>]* disabled/);
             assert.match(ohne, /id="rootserverLoeschenEingabe"/);
         }
