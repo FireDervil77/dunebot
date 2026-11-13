@@ -33,5 +33,32 @@
             "streaming.live.beendet"
         ],
         "hoert": []
+    },
+    "mitgliedInhalte": {
+        "streaming_announcements": {
+            "angelegt_von": "anonymisieren"
+        },
+        "streaming_commands": {
+            "angelegt_von": "anonymisieren"
+        },
+        "streaming_variables": {
+            "angelegt_von": "anonymisieren"
+        },
+        "streaming_serverstopp": {
+            "geaendert_von": "anonymisieren"
+        },
+        "streaming_targets": {
+            "angelegt_von": "anonymisieren",
+            "mitglied_id": "anonymisieren"
+        },
+        "streaming_role_grants": {
+            "mitglied_id": "loeschen"
+        },
+        "streaming_music_queue": {
+            "gewuenscht_von": {
+                "weg": "ausgenommen",
+                "grund": "Name eines Zuschauers auf der Streaming-Plattform, keine Discord-ID"
+            }
+        }
     }
 }

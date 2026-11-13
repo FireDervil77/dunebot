@@ -31,5 +31,31 @@
             "automod.raid"
         ],
         "hoert": []
+    },
+    "mitgliedInhalte": {
+        "automod_logs": {
+            "member_id": {
+                "weg": "frist",
+                "grund": "Automod-Treffer mit Nachrichtentext. Moderations- und Sicherheitsfall: bleibt bis zum Ende seiner Frist (G-05), die Auskunft nennt ihn (F-G2 A)"
+            }
+        },
+        "automod_raid_events": {
+            "user_id": {
+                "weg": "frist",
+                "grund": "Raid-Erkennung. Moderations- und Sicherheitsfall: bleibt bis zum Ende seiner Frist (G-05), die Auskunft nennt ihn (F-G2 A)"
+            }
+        },
+        "automod_strikes": {
+            "member_id": {
+                "weg": "frist",
+                "grund": "Verwarnstand. Moderations- und Sicherheitsfall: bleibt bis zum Ende seiner Frist (G-05), die Auskunft nennt ihn (F-G2 A)"
+            }
+        },
+        "automod_exemptions": {
+            "target_id": {
+                "weg": "ausgenommen",
+                "grund": "type ist ENUM(role, channel), nie ein Mitglied"
+            }
+        }
     }
 }

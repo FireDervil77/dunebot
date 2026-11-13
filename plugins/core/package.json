@@ -35,5 +35,100 @@
     "hoert": [
       "kern.ereignis.probe"
     ]
+  },
+  "mitgliedInhalte": {
+    "users": {
+      "_id": "loeschen"
+    },
+    "user_configs": {
+      "user_id": "loeschen"
+    },
+    "user_connections": {
+      "user_id": "loeschen"
+    },
+    "user_feedback": {
+      "user_id": {
+        "weg": "anonymisieren",
+        "mit": [
+          "user_tag"
+        ]
+      },
+      "resolved_by": "anonymisieren"
+    },
+    "user_feedback_votes": {
+      "user_id": "loeschen"
+    },
+    "guild_users": {
+      "user_id": "loeschen",
+      "invited_by": "anonymisieren"
+    },
+    "guild_user_groups": {
+      "assigned_by": "anonymisieren"
+    },
+    "guild_staff": {
+      "user_id": "loeschen",
+      "granted_by": "anonymisieren"
+    },
+    "guild_toast_logs": {
+      "user_id": "loeschen"
+    },
+    "guild_plugins": {
+      "enabled_by": {
+        "weg": "anonymisieren",
+        "mit": [
+          "enabled_by_name"
+        ]
+      },
+      "disabled_by": {
+        "weg": "anonymisieren",
+        "mit": [
+          "disabled_by_name"
+        ]
+      }
+    },
+    "guild_media": {
+      "uploaded_by": "anonymisieren"
+    },
+    "guilds": {
+      "_id": {
+        "weg": "ausgenommen",
+        "grund": "die Guild selbst, kein Mitglied"
+      },
+      "owner_id": {
+        "weg": "ausgenommen",
+        "grund": "Besitzer der Guild, kommt bei jedem Start neu von Discord; geht mit „Guild löschen“"
+      },
+      "active_user_id": "anonymisieren"
+    },
+    "supporter_badges": {
+      "user_id": "loeschen"
+    },
+    "donations": {
+      "user_id": {
+        "weg": "frist",
+        "grund": "Zahlungsbeleg, gesetzliche Aufbewahrung; die Frist legt G-05 fest, Rechtsprüfung beim Betreiber"
+      }
+    },
+    "frontend_pages": {
+      "created_by": "anonymisieren"
+    },
+    "changelogs": {
+      "author_id": {
+        "weg": "anonymisieren",
+        "mit": [
+          "author"
+        ]
+      }
+    },
+    "ereignisbuch": {
+      "akteur": {
+        "weg": "frist",
+        "grund": "Zustellbuch der Fachereignisse, Frist 7 Tage (G-05); was ein Hörer daraus speichert, erklärt der Hörer"
+      },
+      "betroffen": {
+        "weg": "frist",
+        "grund": "wie akteur"
+      }
+    }
   }
 }

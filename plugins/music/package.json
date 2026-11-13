@@ -24,5 +24,22 @@
             "music_files",
             "music_settings"
         ]
+    },
+    "mitgliedInhalte": {
+        "music_files": {
+            "hochgeladen_von": "anonymisieren"
+        },
+        "music_history": {
+            "requested_by": "loeschen"
+        },
+        "music_playlists": {
+            "created_by": "anonymisieren"
+        },
+        "music_playlist_tracks": {
+            "added_by": "anonymisieren"
+        },
+        "music_queue": {
+            "requested_by": "anonymisieren"
+        }
     }
 }

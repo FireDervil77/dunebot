@@ -35,5 +35,46 @@
             "gameserver.spieler.getrennt"
         ],
         "hoert": []
+    },
+    "mitgliedInhalte": {
+        "addon_comments": {
+            "user_id": "loeschen",
+            "deleted_by": "anonymisieren"
+        },
+        "addon_favorites": {
+            "user_id": "loeschen"
+        },
+        "addon_ratings": {
+            "user_id": "loeschen"
+        },
+        "addon_image_builds": {
+            "admin_user_id": "anonymisieren"
+        },
+        "addon_marketplace": {
+            "author_user_id": "anonymisieren",
+            "verified_by": "anonymisieren"
+        },
+        "packages": {
+            "author_user_id": "anonymisieren"
+        },
+        "package_versions": {
+            "published_by": "anonymisieren",
+            "released_by": "anonymisieren"
+        },
+        "gameservers": {
+            "user_id": "anonymisieren"
+        },
+        "gameserver_backups": {
+            "created_by": "anonymisieren"
+        },
+        "gameserver_cronjobs": {
+            "created_by": "anonymisieren"
+        },
+        "gameserver_status_panels": {
+            "created_by": "anonymisieren"
+        },
+        "gameserver_migrations": {
+            "initiated_by": "anonymisieren"
+        }
     }
 }

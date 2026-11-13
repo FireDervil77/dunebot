@@ -27,5 +27,27 @@
             "giveaway.beendet"
         ],
         "hoert": []
+    },
+    "mitgliedInhalte": {
+        "giveaways": {
+            "created_by": "anonymisieren",
+            "hosted_by": "anonymisieren"
+        },
+        "giveaway_entries": {
+            "user_id": "loeschen"
+        },
+        "giveaway_winners": {
+            "user_id": "loeschen"
+        },
+        "giveaway_templates": {
+            "created_by": "anonymisieren"
+        },
+        "giveaway_blacklist": {
+            "user_id": {
+                "weg": "frist",
+                "grund": "Sperre durch die Guild. Moderations- und Sicherheitsfall: bleibt bis zum Ende seiner Frist (G-05), die Auskunft nennt ihn (F-G2 A)"
+            },
+            "blocked_by": "anonymisieren"
+        }
     }
 }

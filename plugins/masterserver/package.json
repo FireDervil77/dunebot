@@ -17,5 +17,13 @@
             "daemon_logs",
             "rootserver"
         ]
+    },
+    "mitgliedInhalte": {
+        "daemon_logs": {
+            "user_id": "anonymisieren"
+        },
+        "rootserver": {
+            "owner_user_id": "anonymisieren"
+        }
     }
 }

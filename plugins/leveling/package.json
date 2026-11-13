@@ -36,5 +36,6 @@
             "gameserver.spieler.verbunden",
             "gameserver.spieler.getrennt"
         ]
-    }
+    },
+    "mitgliedInhalte": {}
 }

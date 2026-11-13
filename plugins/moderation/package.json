@@ -27,5 +27,26 @@
             "moderation.fall.zurueckgenommen"
         ],
         "hoert": []
+    },
+    "mitgliedInhalte": {
+        "moderation_logs": {
+            "member_id": {
+                "weg": "frist",
+                "grund": "Moderations- und Sicherheitsfall: bleibt bis zum Ende seiner Frist (G-05), die Auskunft nennt ihn (F-G2 A)"
+            },
+            "admin_id": {
+                "weg": "anonymisieren",
+                "mit": [
+                    "admin_tag"
+                ]
+            }
+        },
+        "moderation_notes": {
+            "user_id": {
+                "weg": "frist",
+                "grund": "Notiz zu einem Mitglied. Moderations- und Sicherheitsfall: bleibt bis zum Ende seiner Frist (G-05), die Auskunft nennt ihn (F-G2 A)"
+            },
+            "author_id": "anonymisieren"
+        }
     }
 }

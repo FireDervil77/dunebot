@@ -17,5 +17,13 @@
             "dunemap_markers",
             "dunemap_storm_timer"
         ]
+    },
+    "mitgliedInhalte": {
+        "dunemap_markers": {
+            "placed_by": "anonymisieren"
+        },
+        "dunemap_storm_timer": {
+            "created_by": "anonymisieren"
+        }
     }
 }

@@ -30,5 +30,19 @@
             "ticket.geschlossen"
         ],
         "hoert": []
+    },
+    "mitgliedInhalte": {
+        "tickets": {
+            "created_by": "loeschen",
+            "claimed_by": "anonymisieren",
+            "closed_by": "anonymisieren",
+            "reopened_by": "anonymisieren"
+        },
+        "ticket_feedback": {
+            "user_id": "loeschen"
+        },
+        "ticket_tags": {
+            "created_by": "anonymisieren"
+        }
     }
 }

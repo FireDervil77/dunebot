@@ -16,5 +16,10 @@
         "loeschen": [
             "werkbank_sitzungen"
         ]
+    },
+    "mitgliedInhalte": {
+        "werkbank_sitzungen": {
+            "angelegt_von": "anonymisieren"
+        }
     }
 }

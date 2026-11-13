@@ -102,4 +102,17 @@ function ohneKommentareCss(inhalt) {
     return String(inhalt).replace(/\/\*[\s\S]*?\*\//g, ' ');
 }
 
-module.exports = { ohneKommentare, ohneKommentareEjs, ohneKommentareShell, ohneKommentareCss };
+/**
+ * Dasselbe fuer .sql-Dateien (2026-11-13, check-mitglied-inhalte).
+ *
+ * `/* … *\/` und Zeilen, die mit `--` beginnen. Ein `--` hinter Code bleibt
+ * stehen, wie bisher in check-guild-inhalte von Hand.
+ *
+ * @param {string} inhalt Roher Inhalt einer .sql-Datei
+ * @returns {string}
+ */
+function ohneKommentareSql(inhalt) {
+    return String(inhalt).replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*--.*$/gm, '');
+}
+
+module.exports = { ohneKommentare, ohneKommentareEjs, ohneKommentareShell, ohneKommentareCss, ohneKommentareSql };
