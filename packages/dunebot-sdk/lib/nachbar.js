@@ -19,13 +19,20 @@
  *
  * Jetzt fragen alle hier. Eine Antwort, nicht vier.
  *
+ * Seit 2026-11-13 (G-03) steht die Datei im SDK statt in
+ * `plugins/streaming/shared/`: Der Zusteller der Fachereignisse (G-02) und
+ * die neuen Plugins stellen dieselbe Frage. Aufruf ueber
+ * `require('dunebot-sdk').Nachbar.pluginAn(plugin, guildId)`.
+ * `scripts/check-streaming-nachbar.js` haelt fest, dass es nur diese Stelle
+ * gibt.
+ *
  * # Was die Antwort heisst
  *
  * `pruefbar: false` heisst: Es gibt keinen `pluginManager` (Tests, Bot ohne
  * Dashboard). Dann **nicht raten** - "an" waere die bequeme Annahme und die
  * falsche: Der Befehl liefe ins Leere, der Server wuerde gestoppt.
  *
- * @module streaming/shared/nachbar
+ * @module dunebot-sdk/lib/nachbar
  */
 
 const { ServiceManager } = require('dunebot-core');

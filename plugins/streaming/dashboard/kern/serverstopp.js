@@ -57,7 +57,7 @@ const log = () => ServiceManager.get('Logger');
 async function anbieter(guildId) {
     const eintrag = require('dunebot-sdk').ServersteuerungRegistry.get(ANBIETER);
     if (!eintrag) return null;
-    const { an } = await require('../../shared/nachbar').pluginAn(ANBIETER, guildId);
+    const { an } = await require('dunebot-sdk').Nachbar.pluginAn(ANBIETER, guildId);
     return an ? eintrag : null;
 }
 

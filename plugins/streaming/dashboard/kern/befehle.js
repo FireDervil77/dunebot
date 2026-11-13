@@ -443,8 +443,8 @@ async function verfuegbar(guildId, wort) {
     if (!braucht) return { ok: true, grund: null, braucht: null };
 
     // Dieselbe Frage stellen Musikablage und Streamserver (K368, K369) - die
-    // Antwort steht deshalb an einer Stelle (`shared/nachbar`).
-    const { an, pruefbar } = await require('../../shared/nachbar').pluginAn(braucht.plugin, guildId);
+    // Antwort steht deshalb an einer Stelle (`Nachbar` im SDK).
+    const { an, pruefbar } = await require('dunebot-sdk').Nachbar.pluginAn(braucht.plugin, guildId);
     if (!pruefbar) {
         // Ohne Auskunft nicht raten. "Verfuegbar" waere die bequeme Annahme
         // und die falsche: Der Befehl liefe dann ins Leere.

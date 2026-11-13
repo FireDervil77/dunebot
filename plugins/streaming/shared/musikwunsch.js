@@ -31,7 +31,7 @@
 
 const crypto = require('crypto');
 const { ServiceManager } = require('dunebot-core');
-const { MusikablageRegistry } = require('dunebot-sdk');
+const { MusikablageRegistry, Nachbar } = require('dunebot-sdk');
 
 /**
  * Wie lange eine gespielte Zeile aufgehoben wird.
@@ -71,7 +71,7 @@ function log() {
  * 2026-11-10 fragte diese Funktion nur ihn: Eine Guild mit abgeschaltetem
  * Musik-Plugin bekam weiter Titel nachgelegt, und die Musikseite zeigte die
  * Ablage als da (K368). Gesperrt waren nur die Chat-Befehle. Jetzt dieselbe
- * Schranke wie dort (`shared/nachbar`); die Warteschlange bleibt stehen.
+ * Schranke wie dort (`Nachbar` im SDK); die Warteschlange bleibt stehen.
  *
  * @param {string} guildId Guild
  * @returns {Promise<Object|null>} Die eingetragene Ablage oder null
@@ -79,7 +79,7 @@ function log() {
 async function ablage(guildId) {
     const quelle = MusikablageRegistry.fuerStream();
     if (!quelle) return null;
-    const { an } = await require('./nachbar').pluginAn('music', guildId);
+    const { an } = await Nachbar.pluginAn('music', guildId);
     return an ? quelle : null;
 }
 

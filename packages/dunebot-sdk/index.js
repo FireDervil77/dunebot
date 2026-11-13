@@ -24,6 +24,7 @@ const LosquellenRegistry = require("./lib/LosquellenRegistry");
 const MusikablageRegistry = require("./lib/MusikablageRegistry");
 const ServersteuerungRegistry = require("./lib/ServersteuerungRegistry");
 const FormAntwort = require("./lib/FormAntwort");
+const Nachbar = require("./lib/nachbar");
 const Ereignisse = require("./ereignisse");
 
 module.exports = {
@@ -48,6 +49,7 @@ module.exports = {
     ServersteuerungRegistry,
     VerbindungsRegistry,
     FormAntwort,
+    Nachbar,
     Ereignisse,
     // IPM (Inter-Process Messaging) - Event-Bus Architecture
     MessageTypes,

@@ -18,7 +18,8 @@
  *   war.
  *
  * Nur die Chat-Befehle fragten die Guild, mit eigenem Code. Jetzt steht die
- * Frage an einer Stelle (`shared/nachbar.pluginAn`).
+ * Frage an einer Stelle: `Nachbar.pluginAn` im SDK (bis G-03, 2026-11-13, in
+ * `plugins/streaming/shared/nachbar.js`).
  *
  * ## Was hier geprueft wird
  *
@@ -26,9 +27,12 @@
  *    `anbieter()` geben `null`. In der anderen Guild geben sie den Eintrag.
  *    Ohne `pluginManager` nicht raten → `null`.
  * 2. **Quelltext:** `isPluginEnabledForGuild` steht im Streaming-Plugin nur in
- *    `shared/nachbar.js`; die Registry-Eintraege werden nur an den Stellen
- *    gelesen, die danach die Guild fragen. Ein neuer Weg an der Schranke vorbei
- *    faellt hier auf.
+ *    `dashboard/entwuerfe.js` (nur als Text); die Registry-Eintraege werden
+ *    nur an den Stellen gelesen, die danach die Guild fragen. Ein neuer Weg an
+ *    der Schranke vorbei faellt hier auf.
+ * 3. **Eine Stelle (G-03):** `pluginAn` ist nur im SDK erklaert, und eine Datei
+ *    `nachbar.js` gibt es nur dort. Eine zweite Antwort auf dieselbe Frage
+ *    faellt hier auf, auch ausserhalb von Streaming.
  *
  *     node scripts/check-streaming-nachbar.js
  */
@@ -54,7 +58,7 @@ ServiceManager.register('Logger', {
 });
 ServiceManager.register('dbService', { async query() { return []; } });
 
-const nachbar = require(path.join(WURZEL, 'plugins/streaming/shared/nachbar'));
+const nachbar = sdk.Nachbar;
 const musik = require(path.join(WURZEL, 'plugins/streaming/shared/musikwunsch'));
 const serverstopp = require(path.join(WURZEL, 'plugins/streaming/dashboard/kern/serverstopp'));
 
@@ -119,7 +123,7 @@ console.log('\n4. Quelltext: kein Weg an der Schranke vorbei');
     const ERLAUBT = [
         // `entwuerfe.js` nennt den Namen nur als Text in einer Zeichenkette
         // (Entwurfsseite: „wo“ eine Sache nachgesehen wird), ruft ihn nicht.
-        { muster: /isPluginEnabledForGuild\s*\(/, nur: ['shared/nachbar.js', 'dashboard/entwuerfe.js'] },
+        { muster: /isPluginEnabledForGuild\s*\(/, nur: ['dashboard/entwuerfe.js'] },
         { muster: /MusikablageRegistry\s*\.\s*fuerStream\s*\(/, nur: ['shared/musikwunsch.js'] },
         { muster: /ServersteuerungRegistry\s*\.\s*get\s*\(/, nur: ['dashboard/kern/serverstopp.js'] },
         { muster: /LosquellenRegistry\s*\.\s*dienst\s*\(/, nur: ['dashboard/kern/mitmachen.js'] }
@@ -157,6 +161,40 @@ console.log('\n4. Quelltext: kein Weg an der Schranke vorbei');
     const eintrag = rumpf.search(/LosquellenRegistry\s*\.\s*dienst\s*\(/);
     pruefe(anfang >= 0 && schranke >= 0 && eintrag > schranke,
         'verlosungsstand fragt die Guild vor dem Eintrag (K367)', `Schranke ${schranke}, Eintrag ${eintrag}`);
+}
+
+console.log('\n5. Eine Stelle: pluginAn und nachbar.js nur im SDK (G-03)');
+{
+    const SOLL = 'packages/dunebot-sdk/lib/nachbar.js';
+    // Nur der Code, der laeuft: `scripts/` traegt Gegenproben als Text.
+    const alle = [];
+    const lauf = (d) => {
+        for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+            if (['node_modules', 'backups', 'public', 'assets', 'vendor'].includes(e.name) || e.name.startsWith('.')) continue;
+            const p = path.join(d, e.name);
+            if (e.isDirectory()) lauf(p);
+            else if (e.name.endsWith('.js')) alle.push(path.relative(WURZEL, p).split(path.sep).join('/'));
+        }
+    };
+    for (const o of ['apps', 'packages', 'plugins']) lauf(path.join(WURZEL, o));
+
+    const ERKLAERT = /(?:function\s+pluginAn\b|\bpluginAn\s*[:=]\s*(?:async\b|function\b|\())/;
+    const findeZweite = (dateiliste, lesen) => ({
+        dateien: dateiliste.filter(r => r !== SOLL && /(^|\/)nachbar\.js$/i.test(r)),
+        erklaert: dateiliste.filter(r => r !== SOLL && ERKLAERT.test(lesen(r)))
+    });
+    const lesen = (r) => ohneKommentare(fs.readFileSync(path.join(WURZEL, r), 'utf8'));
+    const echt = findeZweite(alle, lesen);
+    pruefe(alle.includes(SOLL) && ERKLAERT.test(lesen(SOLL)), `pluginAn ist in ${SOLL} erklaert`);
+    pruefe(echt.dateien.length === 0, 'keine zweite nachbar.js', echt.dateien.join(', '));
+    pruefe(echt.erklaert.length === 0, 'pluginAn nirgends sonst erklaert', echt.erklaert.join(', '));
+    pruefe(nachbar === require(path.join(WURZEL, SOLL)), 'das SDK reicht genau diese Datei aus');
+
+    // Gegenproben: eine zweite Datei und eine zweite Erklaerung muessen auffallen.
+    const probe = { 'plugins/clan/shared/nachbar.js': '', 'plugins/leveling/x.js': 'const pluginAn = async (p, g) => true;' };
+    const gegen = findeZweite([...alle, ...Object.keys(probe)], r => (r in probe ? probe[r] : lesen(r)));
+    pruefe(gegen.dateien.includes('plugins/clan/shared/nachbar.js'), 'Gegenprobe: zweite nachbar.js faellt auf');
+    pruefe(gegen.erklaert.includes('plugins/leveling/x.js'), 'Gegenprobe: zweites pluginAn faellt auf');
 }
 
 console.log(abweichungen === 0
