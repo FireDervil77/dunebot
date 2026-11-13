@@ -1,0 +1,177 @@
+<%# Fachereignisse (G-02, 2026-11-13): Stand des Zustellers, Liegengebliebenes, Probe.
+    Ereignisse werden in Bot und Dashboard gemeldet, gehört und zugestellt nur im Dashboard.
+    Inhalte (Spalte daten) zeigt die Seite nie, nur Name, Guild und Abnehmer. %>
+<%
+  const s = typeof stand !== 'undefined' ? stand : null;
+  const zeit = (w) => w ? new Date(w).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' }) : '–';
+  const zahl = (o, k) => Number((o || {})[k] || 0).toLocaleString('de-DE');
+  const QUITTUNG = {
+    erledigt: ['bg-green-lt', 'erledigt'], offen: ['bg-blue-lt', 'offen'], plugin_aus: ['bg-secondary-lt', 'Plugin aus'],
+    liegen_geblieben: ['bg-red-lt', 'liegen geblieben']
+  };
+%>
+<div class="container-fluid">
+  <% if (!s) { %>
+    <div class="alert alert-danger"><i class="fa-solid fa-triangle-exclamation me-2"></i>Der Zusteller läuft nicht. Ereignisse werden weiter ins Buch geschrieben, aber niemand stellt sie zu. Ursache steht im Log des Dashboards beim Start (<code>[INIT] Zusteller der Fachereignisse</code>).</div>
+  <% } else { %>
+  <div class="row g-3 mb-3">
+    <div class="col-md-6 col-xl-3">
+      <div class="card"><div class="card-body">
+        <div class="subheader">Ereignisbuch</div>
+        <div class="h2 mb-1"><%= zahl(s.buch, 'verteilt') %> <span class="text-secondary fs-5">verteilt</span></div>
+        <div class="text-secondary small"><%= zahl(s.buch, 'neu') %> warten aufs Verteilen</div>
+      </div></div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+      <div class="card"><div class="card-body">
+        <div class="subheader">Quittungen</div>
+        <div class="h2 mb-1"><%= zahl(s.quittungen, 'erledigt') %> <span class="text-secondary fs-5">erledigt</span></div>
+        <div class="text-secondary small"><%= zahl(s.quittungen, 'offen') %> offen, <%= zahl(s.quittungen, 'plugin_aus') %> Plugin aus</div>
+      </div></div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+      <div class="card"><div class="card-body">
+        <div class="subheader">Liegen geblieben</div>
+        <div class="h2 mb-1 <%= (s.quittungen.liegen_geblieben || 0) ? 'text-red' : '' %>"><%= zahl(s.quittungen, 'liegen_geblieben') %></div>
+        <div class="text-secondary small">nach <%= s.hoechstversuche %> Versuchen aufgegeben</div>
+      </div></div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+      <div class="card"><div class="card-body">
+        <div class="subheader">Hörer</div>
+        <% if (!s.hoerer.length) { %>
+          <div class="text-secondary">keiner</div>
+        <% } else { s.hoerer.forEach(function (h) { %>
+          <div class="small"><strong><%= h.plugin %></strong> <span class="font-monospace text-secondary"><%= h.muster.join(', ') %></span></div>
+        <% }) } %>
+      </div></div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h3 class="card-title mb-0"><i class="fa-solid fa-envelopes-bulk me-2"></i>Liegen geblieben</h3>
+      <% if (s.liegen.length) { %>
+        <button type="button" class="btn btn-sm btn-primary" id="ereignisseAlleErneut"><i class="fa-solid fa-rotate-right me-1"></i>Alle erneut zustellen</button>
+      <% } %>
+    </div>
+    <div class="card-body">
+      <p class="text-secondary mb-3">Ein Hörer hat das Ereignis <%= s.hoechstversuche %>-mal nicht angenommen, mit wachsendem Abstand. Erneut zustellen beginnt die Zählung von vorn. Eine leere Liste ist der Normalfall.</p>
+      <% if (!s.liegen.length) { %>
+        <div class="alert alert-success mb-0"><i class="fa-solid fa-check me-2"></i>Nichts liegen geblieben.</div>
+      <% } else { %>
+        <div class="table-responsive">
+          <table class="table table-sm table-vcenter mb-0">
+            <thead><tr><th>Gemeldet</th><th>Ereignis</th><th>Guild</th><th>Abnehmer</th><th>Letzter Fehler</th><th></th></tr></thead>
+            <tbody>
+              <% s.liegen.forEach(function (q) { %>
+                <tr>
+                  <td class="text-nowrap"><%= zeit(q.zeit) %></td>
+                  <td class="font-monospace">#<%= q.ereignis_id %> <%= q.name %><% if (q.schwere !== 'info') { %> <span class="badge <%= q.schwere === 'kritisch' ? 'bg-red' : 'bg-yellow' %>"><%= q.schwere %></span><% } %></td>
+                  <td class="font-monospace small"><%= q.guild_id %></td>
+                  <td><%= q.abnehmer %></td>
+                  <td class="small text-secondary"><%= q.fehlertext || '–' %></td>
+                  <td class="text-end"><button type="button" class="btn btn-sm btn-outline-primary" data-erneut="<%= q.id %>">Erneut</button></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h3 class="card-title mb-0"><i class="fa-solid fa-vial me-2"></i>Probe über den Bot</h3></div>
+    <div class="card-body">
+      <p class="text-secondary">Der Bot meldet <code>kern.ereignis.probe</code> für die Kontroll-Guild<%= kontrollGuild ? '' : ' (CONTROL_GUILD_ID fehlt)' %>, der Kern hört es hier. Mit Verzögerung kannst du das Dashboard dazwischen neu starten: Die Probe muss danach trotzdem genau einmal ankommen. „Doppelt melden“ schickt denselben Schlüssel zweimal: erwartet ist eine Zeile und ein Aufruf.</p>
+      <div class="row g-2 align-items-end mb-3">
+        <div class="col-auto">
+          <label class="form-label" for="probeVerzoegerung">Verzögerung in Sekunden</label>
+          <input class="form-control" type="number" id="probeVerzoegerung" min="0" max="300" value="0" style="width:9rem">
+        </div>
+        <div class="col-auto">
+          <div class="form-check form-switch mb-2">
+            <input class="form-check-input" type="checkbox" role="switch" id="probeDoppelt">
+            <label class="form-check-label" for="probeDoppelt">Doppelt melden</label>
+          </div>
+        </div>
+        <div class="col-auto">
+          <button type="button" class="btn btn-primary" id="probeSenden"><i class="fa-solid fa-paper-plane me-1"></i>Probe senden</button>
+        </div>
+      </div>
+      <% if (!s.proben.length) { %>
+        <div class="text-secondary">Noch keine Probe.</div>
+      <% } else { %>
+        <div class="table-responsive">
+          <table class="table table-sm table-vcenter mb-0">
+            <thead><tr><th>Nr.</th><th>Schlüssel</th><th>Gemeldet</th><th class="text-end">Doppelt</th><th>Quittung</th><th class="text-end">Aufrufe seit Start</th><th>Zugestellt</th></tr></thead>
+            <tbody>
+              <% s.proben.forEach(function (p) { const q = QUITTUNG[p.quittung] || ['bg-secondary-lt', p.quittung || (p.zustand === 'neu' ? 'nicht verteilt' : 'ohne Quittung')]; %>
+                <tr>
+                  <td class="font-monospace">#<%= p.id %></td>
+                  <td class="font-monospace small"><%= p.schluessel %></td>
+                  <td class="text-nowrap"><%= zeit(p.angelegt_am) %></td>
+                  <td class="text-end"><%= p.doppelt %></td>
+                  <td><span class="badge <%= q[0] %>"><%= q[1] %></span><% if (p.versuche) { %> <span class="small text-secondary"><%= p.versuche %> Fehlversuch(e)</span><% } %></td>
+                  <td class="text-end"><%= p.aufrufe %></td>
+                  <td class="text-nowrap"><%= zeit(p.erledigt_am) %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <div class="text-secondary small mt-2">„Aufrufe seit Start“ zählt im Speicher des Dashboards. Nach einem Neustart steht dort für ältere Proben 0, die Quittung bleibt.</div>
+      <% } %>
+    </div>
+  </div>
+  <% } %>
+</div>
+
+<script>
+(function () {
+  function melde(art, text) {
+    if (window.GuildAjaxHandler && GuildAjaxHandler.showToast) GuildAjaxHandler.showToast(art, text);
+  }
+  async function sende(url, daten) {
+    var r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(daten) });
+    var d = await r.json().catch(function () { return {}; });
+    if (!r.ok || !d.success) throw new Error(d.message || 'Fehlgeschlagen.');
+    return d;
+  }
+  async function erneut(daten, knopf) {
+    knopf.disabled = true;
+    try {
+      var d = await sende('/admin/ereignisse/erneut', daten);
+      melde('success', d.message);
+      setTimeout(function () { location.reload(); }, 1500);
+    } catch (e) {
+      melde('error', e.message);
+      knopf.disabled = false;
+    }
+  }
+  var alle = document.getElementById('ereignisseAlleErneut');
+  if (alle) alle.addEventListener('click', function () { erneut({ alle: true }, alle); });
+  document.querySelectorAll('[data-erneut]').forEach(function (k) {
+    k.addEventListener('click', function () { erneut({ ids: [Number(k.dataset.erneut)] }, k); });
+  });
+
+  var probe = document.getElementById('probeSenden');
+  if (probe) probe.addEventListener('click', async function () {
+    probe.disabled = true;
+    try {
+      var d = await sende('/admin/ereignisse/probe', {
+        verzoegerung_s: Number(document.getElementById('probeVerzoegerung').value) || 0,
+        doppelt: document.getElementById('probeDoppelt').checked
+      });
+      melde('success', d.message);
+      var warten = (d.ergebnis && d.ergebnis.verzoegerung_s ? d.ergebnis.verzoegerung_s * 1000 : 0) + 3000;
+      setTimeout(function () { location.reload(); }, warten);
+    } catch (e) {
+      melde('error', e.message);
+    } finally {
+      probe.disabled = false;
+    }
+  });
+})();
+</script>

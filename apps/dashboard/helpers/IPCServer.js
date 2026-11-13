@@ -326,6 +326,16 @@ class IPCServer {
                     return message.reply({ success: false, error: err.message });
                 }
             }
+            case 'EREIGNISSE_ANSTOSS': {
+                // Der Bot hat ein Fachereignis gemeldet (G-02). Die Zeile steht
+                // schon im Ereignisbuch; hier wird nur der Zusteller geweckt.
+                // Ohne Zusteller holt niemand ab, das soll der Bot erfahren.
+                if (!ServiceManager.has('ereignisZusteller')) {
+                    return message.reply({ success: false, error: 'Zusteller läuft nicht' });
+                }
+                ServiceManager.get('ereignisZusteller').wecken();
+                return message.reply({ success: true });
+            }
             default:
                 return message.reply({ success: false, error: `Unbekannte core-Aktion: ${action}` });
         }

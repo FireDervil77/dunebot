@@ -29,8 +29,11 @@
       "kern.termin.angelegt",
       "kern.termin.geaendert",
       "kern.termin.abgesagt",
-      "kern.termin.anwesenheit"
+      "kern.termin.anwesenheit",
+      "kern.ereignis.probe"
     ],
-    "hoert": []
+    "hoert": [
+      "kern.ereignis.probe"
+    ]
   }
 }

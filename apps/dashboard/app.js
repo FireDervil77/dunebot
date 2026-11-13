@@ -234,6 +234,15 @@ module.exports = class App {
                 Logger.debug('Plugin-View-Pfade nach Plugin-Load aktualisiert');
             }
             
+            // Zusteller der Fachereignisse (G-02): erst nach den Plugins, sonst
+            // fänden die Ereignisse, die während des Neustarts liegen blieben,
+            // keine Hörer und wären ohne Quittung verteilt.
+            try {
+                require('./helpers/EreignisZusteller').starten();
+            } catch (error) {
+                Logger.error('[INIT] Zusteller der Fachereignisse konnte nicht starten:', error);
+            }
+
             // Hook nach der Initialisierung ausführen
             if (this.app.pluginManager && this.app.pluginManager.hooks) {
                 await this.app.pluginManager.hooks.doAction('after_dashboard_initialize', this.app);

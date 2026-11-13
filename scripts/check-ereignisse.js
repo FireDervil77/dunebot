@@ -15,11 +15,13 @@
  *     steht, und umgekehrt hört jeder dort Genannte es auch. Zwei Stellen
  *     müssen also zustimmen, ein `*` allein reicht nicht.
  *   - Im Code zählt nur `Ereignisse.melde('name', …)` und
- *     `Ereignisse.hoere('name', …)`, mit dem Namen als Zeichenkette. Andere
- *     Schreibweisen (Variable, Zerlegen, Weiterreichen) sind ein Fehler, sonst
- *     sähe der Wächter sie nicht.
+ *     `Ereignisse.hoere('name', 'plugin', …)`, mit Name und Plugin als
+ *     Zeichenkette. Das Plugin beim Hören muss das sein, dem die Datei gehört
+ *     (G-02: Der Zusteller führt die Quittung je Plugin). Andere Schreibweisen
+ *     (Variable, Zerlegen, Weiterreichen) sind ein Fehler, sonst sähe der
+ *     Wächter sie nicht.
  *   - `stand: aktiv` heißt: Der Absender meldet es im Code. `geplant` heißt:
- *     Niemand meldet es. Bis G-02 gibt es `melde` nicht, also ist alles geplant.
+ *     Niemand meldet es. Das SDK weist geplante Meldungen auch zur Laufzeit ab.
  *
  * Danach Gegenproben im Speicher: Jede eingebaute Verletzung muss rot werden,
  * der richtige Fall (aktiv mit Aufruf) grün. Nichts wird geschrieben.
@@ -85,7 +87,7 @@ function leseQuellen() {
 }
 
 // ── Aufrufe im Code ──────────────────────────────────────────────────────────
-const RE_AUFRUF = /\bEreignisse\s*\.\s*(melde|hoere)\s*\(\s*(['"])([^'"\n]*)\2/g;
+const RE_AUFRUF = /\bEreignisse\s*\.\s*(melde|hoere)\s*\(\s*(['"])([^'"\n]*)\2(?:\s*,\s*(['"])([^'"\n]*)\4)?/g;
 const RE_JEDER = /\bEreignisse\s*\.\s*(melde|hoere)\s*\(/g;
 const RE_OHNE_KLAMMER = /\bEreignisse\s*\.\s*(melde|hoere)\b(?!\s*\()/g;
 const RE_ZERLEGT = /\{[^{}]*\b(melde|hoere)\b[^{}]*\}\s*=\s*[^;\n]*\bEreignisse\b/g;
@@ -95,7 +97,12 @@ function aufrufe(quellen) {
     const fehler = [];
     for (const q of quellen) {
         const gefunden = [...q.text.matchAll(RE_AUFRUF)];
-        for (const m of gefunden) treffer.push({ art: m[1], name: m[3], datei: q.datei, plugin: q.plugin });
+        for (const m of gefunden) {
+            treffer.push({ art: m[1], name: m[3], datei: q.datei, plugin: q.plugin });
+            if (m[1] !== 'hoere') continue;
+            if (m[5] === undefined) fehler.push(`${q.datei}: hört ${m[3]} ohne Plugin als Zeichenkette`);
+            else if (m[5] !== q.plugin) fehler.push(`${q.datei}: hört ${m[3]} als ${m[5]}, die Datei gehört ${q.plugin}`);
+        }
         const alle = [...q.text.matchAll(RE_JEDER)].length;
         if (alle > gefunden.length) fehler.push(`${q.datei}: ${alle - gefunden.length} Aufruf(e) ohne Namen als Zeichenkette`);
         for (const m of q.text.matchAll(RE_OHNE_KLAMMER)) fehler.push(`${q.datei}: \`Ereignisse.${m[1]}\` wird weitergereicht statt gerufen`);
@@ -264,10 +271,12 @@ rotProbe('Hören ohne Freigabe in `hoerer`', mit(d => erk(d, 'clan').hoert.push(
 rotProbe('Freigabe in `hoerer` ohne Erklärung', mit(d => eintrag(d, 'kern.mitglied.verlassen').hoerer.push('giveaway')), 'erklärt das Hören aber nicht');
 rotProbe('`*` ohne Freigabe', mit(d => erk(d, 'ticket').hoert.push('*')), 'ticket hört kern.mitglied.verlassen');
 rotProbe('Erklärung fehlt', mit(d => { erk(d, 'ticket').sendet = erk(d, 'ticket').sendet.filter(n => n !== 'ticket.geoeffnet'); }), 'erklärt es nicht');
-rotProbe('Hören im Code ohne Erklärung', mit(() => {}, [quelle('plugins/clan/x.js', "Ereignisse.hoere('ticket.geschlossen', fn)")]), 'clan erklärt es nicht');
+rotProbe('Hören im Code ohne Erklärung', mit(() => {}, [quelle('plugins/clan/x.js', "Ereignisse.hoere('ticket.geschlossen', 'clan', fn)")]), 'clan erklärt es nicht');
 gruenProbe('Hören im Code mit Erklärung, auch über `*`', mit(() => {}, [
-    quelle('plugins/leveling/x.js', "Ereignisse.hoere('ticket.geschlossen', fn)"),
-    quelle('plugins/logging/x.js', "Ereignisse.hoere('*', fn)")]));
+    quelle('plugins/leveling/x.js', "Ereignisse.hoere('ticket.geschlossen', 'leveling', fn)"),
+    quelle('plugins/logging/x.js', "Ereignisse.hoere('*', 'logging', fn)")]));
+rotProbe('Hören ohne Plugin', mit(() => {}, [quelle('plugins/leveling/x.js', "Ereignisse.hoere('ticket.geschlossen', fn)")]), 'ohne Plugin als Zeichenkette');
+rotProbe('Hören unter fremdem Namen', mit(() => {}, [quelle('plugins/leveling/x.js', "Ereignisse.hoere('ticket.geschlossen', 'logging', fn)")]), 'die Datei gehört leveling');
 rotProbe('Kern meldet aus apps/', mit(() => {}, [quelle(path.join('apps', 'bot', 'x.js'), "Ereignisse.melde('kern.mitglied.verlassen', {})")]), 'steht auf geplant');
 rotProbe('unbekannte Feldart', mit(d => { eintrag(d, 'ticket.geschlossen').felder.x = 'irgendwas'; }), 'Art irgendwas');
 

@@ -334,6 +334,69 @@ router.get('/firebus', async (req, res) => {
 });
 
 // ================================================================
+// FACHEREIGNISSE: ZUSTELLER (G-02)
+// Liegengebliebenes erneut zustellen, Probe über den Bot.
+// ================================================================
+
+router.get('/ereignisse', async (req, res) => {
+    const themeManager = ServiceManager.get('themeManager');
+    const Logger = ServiceManager.get('Logger');
+    try {
+        const stand = ServiceManager.has('ereignisZusteller')
+            ? await ServiceManager.get('ereignisZusteller').stand()
+            : null;
+        await themeManager.renderView(res, 'admin/ereignisse', {
+            title: 'Fachereignisse',
+            activeMenu: '/admin/ereignisse',
+            stand,
+            kontrollGuild: process.env.CONTROL_GUILD_ID || '',
+        });
+    } catch (error) {
+        Logger.error('[Admin] Fachereignisse nicht lesbar:', error);
+        res.status(500).send('Der Stand des Zustellers ließ sich nicht lesen.');
+    }
+});
+
+router.post('/ereignisse/erneut', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    if (!ServiceManager.has('ereignisZusteller')) return res.status(503).json({ success: false, message: 'Der Zusteller läuft nicht.' });
+    try {
+        const ids = req.body?.alle === true ? null : req.body?.ids;
+        if (ids !== null && !Array.isArray(ids)) return res.status(400).json({ success: false, message: 'Keine Quittung gewählt.' });
+        const n = await ServiceManager.get('ereignisZusteller').erneut(ids);
+        res.json({ success: true, anzahl: n, message: n ? `${n} Quittung(en) werden erneut zugestellt.` : 'Nichts lag mehr.' });
+    } catch (error) {
+        Logger.error('[Admin] Erneut zustellen gescheitert:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+router.post('/ereignisse/probe', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const guildId = process.env.CONTROL_GUILD_ID;
+    if (!guildId) return res.status(500).json({ success: false, message: 'CONTROL_GUILD_ID fehlt.' });
+    try {
+        const huelle = await ServiceManager.get('ipcServer').broadcastOne('dashboard:EREIGNIS_PROBE', {
+            guild_id: guildId,
+            verzoegerung_s: Number(req.body?.verzoegerung_s) || 0,
+            doppelt: req.body?.doppelt === true,
+        }, true, { timeout: 10_000 });
+        // Kern-Handler im Bot antworten in der Hülle `{ success, data }`.
+        if (!huelle?.success) {
+            return res.status(502).json({ success: false, message: `Der Bot hat nicht gemeldet: ${huelle?.error || 'keine Antwort'}` });
+        }
+        const d = huelle.data || {};
+        const message = d.verzoegerung_s
+            ? `Der Bot meldet ${d.schluessel} in ${d.verzoegerung_s} s.`
+            : `Der Bot hat ${d.schluessel} gemeldet: ${(d.ergebnisse || []).map(e => `#${e.id} ${e.neu ? 'neu' : 'doppelt'}`).join(', ')}.`;
+        res.json({ success: true, message, ergebnis: d });
+    } catch (error) {
+        Logger.error('[Admin] Probe der Fachereignisse gescheitert:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// ================================================================
 // WARTUNGSSEITE
 // Geschaltet wird hier, ausgeliefert vom Apache (helpers/Wartung.js).
 // ================================================================
