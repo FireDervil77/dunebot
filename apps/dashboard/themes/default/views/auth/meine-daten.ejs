@@ -1,0 +1,240 @@
+<%#
+ * Meine Daten (G-04c, K380): Was speichert der Bot über mich, Export, löschen.
+ *
+ * Im Anmelde-Bereich, weil hier keine Guild nötig ist (F-G1 A). Die Zahlen
+ * kommen aus `MeineDaten.uebersicht`, dieselbe Zählung wie `/meinedaten` im Bot.
+ *
+ * Die Rückfrage vor dem Löschen folgt `#paketEntfernenModal`
+ * (zerstoerende-rueckfrage): roter Rahmen, „lässt sich nicht zurücknehmen“,
+ * Name eintippen, Knopf bis dahin gesperrt. Ob der Name stimmt, entscheidet
+ * der Server, der Knopf ist nur die Hilfe davor.
+ *
+ * Namen von Guilds und Gründe kommen aus der Datenbank bzw. aus
+ * `package.json`: im HTML immer escaped ausgegeben, im Skript als Text gesetzt.
+%>
+<%
+  const _d = locals.daten;
+  const _zeilen = (teil) => {
+    const aus = [];
+    for (const p of teil.plugins) {
+      const teile = [];
+      if (p.loeschen) teile.push(tr('MEINEDATEN.ZAHL_LOESCHEN', { n: p.loeschen }));
+      if (p.mitgeloescht) teile.push(tr('MEINEDATEN.ZAHL_MIT', { n: p.mitgeloescht }));
+      if (p.anonymisieren) teile.push(tr('MEINEDATEN.ZAHL_ANONYM', { n: p.anonymisieren }));
+      if (teile.length) aus.push({ art: 'weg', plugin: p.plugin, text: teile.join(' · ') });
+      for (const b of p.bleibt) aus.push({ art: 'frist', plugin: p.plugin, text: tr('MEINEDATEN.ZAHL_FRIST', { n: b.zeilen, grund: b.grund }) });
+      for (const b of p.ausgenommen) aus.push({ art: 'bleibt', plugin: p.plugin, text: tr('MEINEDATEN.ZAHL_BLEIBT', { n: b.zeilen, grund: b.grund }) });
+    }
+    return aus;
+  };
+  const _hatWeg = (teil) => teil.summe.loeschen + teil.summe.anonymisieren + teil.summe.mitgeloescht > 0;
+  const _symbol = { weg: 'fa-trash text-danger', frist: 'fa-hourglass-half text-warning', bleibt: 'fa-circle-info text-secondary' };
+%>
+<div class="container container-narrow py-4" id="meineDaten"
+     data-text-ok="<%= tr('MEINEDATEN.ERG_TITEL_OK') %>"
+     data-text-teilweise="<%= tr('MEINEDATEN.ERG_TITEL_TEILWEISE') %>"
+     data-text-geloescht="<%= tr('MEINEDATEN.ERG_GELOESCHT') %>"
+     data-text-mit="<%= tr('MEINEDATEN.ERG_MIT') %>"
+     data-text-anonym="<%= tr('MEINEDATEN.ERG_ANONYM') %>"
+     data-text-fehler="<%= tr('MEINEDATEN.ERG_FEHLER') %>"
+     data-text-frist="<%= tr('MEINEDATEN.ZAHL_FRIST') %>"
+     data-text-nur-ueberall="<%= tr('MEINEDATEN.ERG_NUR_UEBERALL') %>"
+     data-text-nichts="<%= tr('MEINEDATEN.ERG_NICHTS') %>"
+     data-text-abgemeldet="<%= tr('MEINEDATEN.ERG_ABGEMELDET') %>"
+     data-text-laeuft="<%= tr('MEINEDATEN.LAEUFT') %>">
+
+  <div class="text-center mb-4">
+    <img src="/themes/default/assets/images/kit/logo/web/emblem-256.png" width="96" height="96" alt="FireBot">
+    <h1 class="mt-2 mb-1"><%= tr('MEINEDATEN.TITEL') %></h1>
+    <p class="text-secondary mb-0"><%= tr('MEINEDATEN.EINLEITUNG') %></p>
+  </div>
+
+  <div id="meineDatenErgebnis"></div>
+
+  <% if (locals.fehler) { %>
+    <div class="alert alert-danger"><%= tr('MEINEDATEN.FEHLER') %> <code><%= fehler %></code></div>
+  <% } else if (_d && !_d.guilds.length && !_d.uebergreifend.plugins.length) { %>
+    <div class="alert alert-success"><i class="fa-solid fa-circle-check me-2"></i><%= tr('MEINEDATEN.NICHTS') %></div>
+  <% } else if (_d) { %>
+
+    <% _d.guilds.forEach(g => { const z = _zeilen(g); const name = g.name || g.guildId; %>
+      <div class="card mb-3">
+        <div class="card-header">
+          <h3 class="card-title"><i class="fa-brands fa-discord me-2"></i><%= name %></h3>
+        </div>
+        <div class="card-body">
+          <ul class="list-unstyled mb-0">
+            <% z.forEach(e => { %>
+              <li class="mb-1"><i class="fa-solid <%= _symbol[e.art] %> me-2"></i><strong><%= e.plugin %></strong>: <%= e.text %></li>
+            <% }); %>
+          </ul>
+        </div>
+        <div class="card-footer d-flex gap-2 flex-wrap">
+          <a class="btn btn-outline-secondary btn-sm" href="/meinedaten/export?guild=<%= g.guildId %>">
+            <i class="fa-solid fa-file-arrow-down me-1"></i><%= tr('MEINEDATEN.BTN_EXPORT') %>
+          </a>
+          <% if (_hatWeg(g)) { %>
+            <button type="button" class="btn btn-outline-danger btn-sm ms-auto" data-loeschen="<%= g.guildId %>"
+                    data-soll="<%= name %>" data-titel="<%= name %>"
+                    data-zeilen="<%= JSON.stringify(z.filter(e => e.art === 'weg').map(e => `${e.plugin}: ${e.text}`)) %>">
+              <i class="fa-solid fa-trash me-1"></i><%= tr('MEINEDATEN.BTN_HIER') %>
+            </button>
+          <% } %>
+        </div>
+      </div>
+    <% }); %>
+
+    <% if (_d.uebergreifend.plugins.length) { const z = _zeilen(_d.uebergreifend); %>
+      <div class="card mb-3">
+        <div class="card-header">
+          <h3 class="card-title"><i class="fa-solid fa-globe me-2"></i><%= tr('MEINEDATEN.UEBERGREIFEND') %></h3>
+        </div>
+        <div class="card-body">
+          <p class="text-secondary small"><%= tr('MEINEDATEN.UEBERGREIFEND_HILFE') %></p>
+          <ul class="list-unstyled mb-0">
+            <% z.forEach(e => { %>
+              <li class="mb-1"><i class="fa-solid <%= _symbol[e.art] %> me-2"></i><strong><%= e.plugin %></strong>: <%= e.text %></li>
+            <% }); %>
+          </ul>
+        </div>
+      </div>
+    <% } %>
+
+    <div class="card border-danger mb-3">
+      <div class="card-body d-flex gap-2 flex-wrap align-items-center">
+        <a class="btn btn-outline-secondary" href="/meinedaten/export">
+          <i class="fa-solid fa-file-arrow-down me-1"></i><%= tr('MEINEDATEN.BTN_EXPORT_ALLE') %>
+        </a>
+        <% const alleWeg = [..._d.guilds.flatMap(g => _zeilen(g).filter(e => e.art === 'weg').map(e => `${g.name || g.guildId} · ${e.plugin}: ${e.text}`)),
+                            ..._zeilen(_d.uebergreifend).filter(e => e.art === 'weg').map(e => `${tr('MEINEDATEN.UEBERGREIFEND')} · ${e.plugin}: ${e.text}`)]; %>
+        <% if (alleWeg.length) { %>
+          <button type="button" class="btn btn-danger ms-auto" data-loeschen="alle"
+                  data-soll="<%= locals.benutzername %>" data-titel="<%= tr('MEINEDATEN.ALLE_TITEL') %>"
+                  data-zeilen="<%= JSON.stringify([...alleWeg, tr('MEINEDATEN.ALLE_ABMELDUNG')]) %>">
+            <i class="fa-solid fa-trash me-1"></i><%= tr('MEINEDATEN.BTN_UEBERALL') %>
+          </button>
+        <% } %>
+      </div>
+    </div>
+    <p class="text-secondary small"><%= tr('MEINEDATEN.HINWEIS_ZUGANG') %></p>
+  <% } %>
+
+  <div class="text-center mt-4">
+    <a href="/auth/server-selector" class="btn btn-link"><i class="fa-solid fa-arrow-left me-1"></i><%= tr('MEINEDATEN.ZURUECK') %></a>
+  </div>
+</div>
+
+<div class="modal modal-blur fade" id="meineDatenModal" tabindex="-1" aria-labelledby="meineDatenTitel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content border border-danger border-2">
+      <div class="modal-status bg-danger"></div>
+      <div class="modal-header bg-danger-lt">
+        <h5 class="modal-title text-danger fw-bold" id="meineDatenTitel">
+          <i class="fa-solid fa-triangle-exclamation me-2"></i><%= tr('MEINEDATEN.MODAL_TITEL') %>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="<%= tr('MEINEDATEN.ABBRECHEN') %>"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-danger fw-bold fs-3 mb-2" id="meineDatenName"></p>
+        <p class="text-danger fw-bold mb-3"><%= tr('MEINEDATEN.MODAL_ENDGUELTIG') %></p>
+        <div class="fw-bold mb-1"><%= tr('MEINEDATEN.MODAL_LISTE') %></div>
+        <ul class="mb-3" id="meineDatenListe"></ul>
+        <label class="form-label fw-bold" for="meineDatenEingabe">
+          <%= tr('MEINEDATEN.MODAL_EINTIPPEN') %> <span class="font-monospace text-danger" id="meineDatenSoll"></span>
+        </label>
+        <input type="text" class="form-control font-monospace" id="meineDatenEingabe" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal"><%= tr('MEINEDATEN.ABBRECHEN') %></button>
+        <button type="button" class="btn btn-danger fw-bold" id="meineDatenKnopf" disabled>
+          <i class="fa-solid fa-trash me-1"></i><%= tr('MEINEDATEN.MODAL_KNOPF') %>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const wurzel = document.getElementById('meineDaten');
+  const text = (k, werte = {}) => String(wurzel.dataset['text' + k] || '')
+    .replace(/\{\{(\w+)\}\}/g, (_, n) => (werte[n] ?? ''));
+  const dialogEl = document.getElementById('meineDatenModal');
+  const dialog = new bootstrap.Modal(dialogEl);
+  const eingabe = document.getElementById('meineDatenEingabe');
+  const knopf = document.getElementById('meineDatenKnopf');
+  const ergebnis = document.getElementById('meineDatenErgebnis');
+  let ziel = null, soll = '';
+  const knopfInhalt = knopf.innerHTML;
+
+  const gleich = () => eingabe.value.trim().toLowerCase() === soll.trim().toLowerCase();
+
+  document.querySelectorAll('[data-loeschen]').forEach(b => b.addEventListener('click', () => {
+    ziel = b.dataset.loeschen;
+    soll = b.dataset.soll || '';
+    document.getElementById('meineDatenName').textContent = b.dataset.titel || '';
+    document.getElementById('meineDatenSoll').textContent = soll;
+    const liste = document.getElementById('meineDatenListe');
+    liste.replaceChildren(...JSON.parse(b.dataset.zeilen || '[]').map(z => {
+      const li = document.createElement('li'); li.textContent = z; return li;
+    }));
+    eingabe.value = '';
+    knopf.innerHTML = knopfInhalt;
+    knopf.disabled = true;
+    dialog.show();
+  }));
+  dialogEl.addEventListener('shown.bs.modal', () => eingabe.focus());
+  eingabe.addEventListener('input', () => { knopf.disabled = !gleich(); });
+
+  function zeige(art, titel, zeilen) {
+    const box = document.createElement('div');
+    box.className = `alert alert-${art}`;
+    const h = document.createElement('h4'); h.className = 'alert-title'; h.textContent = titel;
+    const ul = document.createElement('ul'); ul.className = 'mb-0';
+    zeilen.forEach(z => { const li = document.createElement('li'); li.textContent = z; ul.appendChild(li); });
+    box.append(h, ul);
+    ergebnis.replaceChildren(box);
+    ergebnis.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  knopf.addEventListener('click', async () => {
+    if (!gleich()) return;
+    knopf.disabled = true;
+    knopf.textContent = text('Laeuft');
+    let antwort;
+    try {
+      const r = await fetch('/meinedaten/loeschen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ guildId: ziel, bestaetigung: eingabe.value }),
+      });
+      antwort = await r.json().catch(() => ({ success: false, message: `HTTP ${r.status}` }));
+    } catch (e) {
+      antwort = { success: false, message: e.message };
+    }
+    dialog.hide();
+    if (!antwort.data) {
+      zeige('danger', text('Teilweise'), [antwort.message || '?']);
+      return;
+    }
+    const zeilen = [];
+    for (const p of antwort.data.plugins) {
+      if (!p.ok) { zeilen.push(`${p.plugin}: ${text('Fehler', { grund: p.fehler || '?' })}`); continue; }
+      const teile = [];
+      if (p.geloescht) teile.push(text('Geloescht', { n: p.geloescht }));
+      if (p.mitgeloescht) teile.push(text('Mit', { n: p.mitgeloescht }));
+      if (p.anonymisiert) teile.push(text('Anonym', { n: p.anonymisiert }));
+      if (teile.length) zeilen.push(`${p.plugin}: ${teile.join(' · ')}`);
+      p.bleibt.forEach(b => zeilen.push(`${p.plugin}: ${text('Frist', { n: b.zeilen, grund: b.grund })}`));
+      if (p.nurUeberall) zeilen.push(`${p.plugin}: ${text('NurUeberall', { n: p.nurUeberall })}`);
+    }
+    if (!zeilen.length) zeilen.push(text('Nichts'));
+    if (antwort.abgemeldet) zeilen.push(text('Abgemeldet'));
+    zeige(antwort.data.ok ? 'success' : 'warning', text(antwort.data.ok ? 'Ok' : 'Teilweise'), zeilen);
+    // Die Karten zeigen den alten Stand. Neu laden nur, solange die
+    // Anmeldung noch gilt; nach „überall“ führt der Weg zur Startseite.
+    document.querySelectorAll('[data-loeschen]').forEach(b => { b.disabled = true; });
+    if (!antwort.abgemeldet) setTimeout(() => location.reload(), 6000);
+  });
+});
+</script>

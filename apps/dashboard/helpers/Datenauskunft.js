@@ -398,6 +398,13 @@ async function mitgliedLoeschen(userId, { guildId = null, trocken = false, anlas
                     if (Number(n)) r.nurUeberall.push(`${tab.tabelle}.${e.spalte}`);
                     continue;
                 }
+                // Zeilen mit leerer Guild-Spalte (öffentliche Pakete, eigene
+                // Einstellungen) erreicht nur „überall“; die Rückmeldung nennt sie.
+                if (guildId != null) {
+                    const [{ n: ohne }] = await db().query(
+                        `SELECT COUNT(*) AS n FROM ${q(tab.tabelle)} z WHERE z.${q(e.spalte)} = ? AND ${guildAusdruck(tab)} IS NULL`, [userId]);
+                    if (Number(ohne)) r.nurUeberall.push(`${tab.tabelle}.${e.spalte}`);
+                }
                 const [{ n }] = await db().query(`SELECT COUNT(*) AS n FROM ${q(tab.tabelle)} WHERE ${wo.sql}`, wo.werte);
                 if (!Number(n)) continue;
                 if (e.weg === 'frist') r.bleibt[`${tab.tabelle}.${e.spalte}`] = { zeilen: Number(n), grund: e.grund };

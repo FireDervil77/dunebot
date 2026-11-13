@@ -8,6 +8,8 @@ const { pruefeAktion: pruefeServerAktion } =
     require("../../../plugins/gameserver/dashboard/helpers/ServerState");
 const Serverloeschung = require("../../../plugins/gameserver/dashboard/helpers/Loeschung");
 const Kerneinstellungen = require("./Kerneinstellungen");
+const Datenauskunft = require("./Datenauskunft");
+const MeineDaten = require("./MeineDaten");
 
 class IPCServer {
     constructor() {
@@ -335,6 +337,35 @@ class IPCServer {
                 }
                 ServiceManager.get('ereignisZusteller').wecken();
                 return message.reply({ success: true });
+            }
+            case 'MEINEDATEN_AUSKUNFT':
+            case 'MEINEDATEN_EXPORT':
+            case 'MEINEDATEN_LOESCHEN': {
+                // Discord `/meinedaten` (G-04c, K380, F-G1 A): Der Bot fragt,
+                // gezählt, exportiert und gelöscht wird nur hier, über
+                // `Datenauskunft` (discord-funktionen-abbilden). Der Bot hat
+                // die ID aus der Interaktion; ein Mitglied fragt nur nach
+                // sich selbst, deshalb gibt es keine Rechteprüfung.
+                const userId = String(payload?.userId ?? '');
+                const guildId = payload?.guildId == null ? null : String(payload.guildId);
+                if (!/^\d{17,20}$/.test(userId)) return message.reply({ success: false, error: 'userId fehlt' });
+                if (guildId !== null && !/^\d{17,20}$/.test(guildId)) return message.reply({ success: false, error: 'guildId ungültig' });
+                try {
+                    if (action === 'MEINEDATEN_AUSKUNFT') {
+                        if (!guildId) return message.reply({ success: false, error: 'guildId fehlt' });
+                        return message.reply({ success: true, data: await MeineDaten.fuerGuild(userId, guildId) });
+                    }
+                    if (action === 'MEINEDATEN_EXPORT') {
+                        const aus = await Datenauskunft.auskunft(userId, { guildId, mitZeilen: true });
+                        aus.guildNamen = await MeineDaten.guildNamen(guildId ? [guildId] : aus.guilds);
+                        return message.reply({ success: true, data: aus });
+                    }
+                    const ergebnis = await Datenauskunft.mitgliedLoeschen(userId, { guildId, anlass: '/meinedaten' });
+                    return message.reply({ success: ergebnis.ok, data: MeineDaten.rueckmeldung(ergebnis) });
+                } catch (err) {
+                    Logger.error(`[IPC/core] ${action} für ${userId} gescheitert:`, err);
+                    return message.reply({ success: false, error: err.message });
+                }
             }
             default:
                 return message.reply({ success: false, error: `Unbekannte core-Aktion: ${action}` });

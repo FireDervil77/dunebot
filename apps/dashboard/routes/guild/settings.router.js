@@ -10,7 +10,9 @@
 const express = require('express');
 const router = express.Router({ mergeParams: true });
 const { ServiceManager } = require('dunebot-core');
-const { requirePermission } = require('../../middlewares/permissions.middleware');
+const { requirePermission, requireGuildOwner } = require('../../middlewares/permissions.middleware');
+const { csrfProtection } = require('../../middlewares/security/csrf-protection.middleware');
+const Datenauskunft = require('../../helpers/Datenauskunft');
 const { istAn } = require('dunebot-sdk/utils');
 const Kerneinstellungen = require('../../helpers/Kerneinstellungen');
 
@@ -96,13 +98,25 @@ router.get('/general', requirePermission('CORE.SETTINGS.VIEW'), async (req, res)
         Logger.warn(`[KernSettings] Aktives Theme nicht lesbar: ${err.message}`);
     }
 
+    // „Guild löschen“ (G-04c) sieht nur der Besitzer, und nie in der Kontroll-Guild.
+    let guildLoeschen = null;
+    try {
+        const [g] = await dbService.query('SELECT owner_id, guild_name FROM guilds WHERE _id = ?', [guildId]);
+        if (g && g.owner_id === req.session.user?.info?.id && String(guildId) !== String(process.env.CONTROL_GUILD_ID)) {
+            guildLoeschen = { name: g.guild_name || String(guildId) };
+        }
+    } catch (err) {
+        Logger.warn(`[KernSettings] Besitzer nicht lesbar: ${err.message}`);
+    }
+
     await themeManager.renderView(res, 'guild/settings/general', {
         title: 'Allgemeine Einstellungen',
         activeMenu: `/guild/${guildId}/settings/general`,
         guildId,
         settings,
         languagesMeta,
-        aktivesTheme
+        aktivesTheme,
+        guildLoeschen
     });
 });
 
@@ -177,6 +191,90 @@ router.put('/general', requirePermission('CORE.SETTINGS.EDIT'), async (req, res)
         Logger.error('[KernSettings] Fehler beim Speichern:', error);
         res.status(500).json({ success: false, message: error.message });
     }
+});
+
+/**
+ * Guild löschen (G-04c, K380): nur der Besitzer, nie die Kontroll-Guild.
+ *
+ * Die Probe zählt mit `Datenauskunft.guildLoeschen(…, { trocken: true })`, was
+ * ginge: dieselben Anweisungen, zurückgerollt. Abgeschaltet wird dabei nichts.
+ * Das rote Fenster zeigt die Zahlen, bevor jemand den Namen eintippt.
+ *
+ * Gelöscht wird in dieser Reihenfolge: Plugins abschalten (Gameserver werden
+ * dabei gestoppt), Zeilen über die Erklärungen, **dann** verlässt der Bot die
+ * Guild (`GUILD_VERLASSEN`). Umgekehrt liefe zuerst `guildDelete` über
+ * `SHOW TABLES` und nähme Gameserver-Zeilen ohne Stoppen mit (K381).
+ */
+async function guildFuerLoeschen(guildId) {
+    if (String(guildId) === String(process.env.CONTROL_GUILD_ID)) return { fehler: 'Die Kontroll-Guild wird nicht gelöscht.' };
+    const [zeile] = await ServiceManager.get('dbService').query('SELECT guild_name FROM guilds WHERE _id = ?', [guildId]);
+    if (!zeile) return { fehler: 'Guild nicht gefunden' };
+    return { name: zeile.guild_name || String(guildId) };
+}
+
+// GET /settings/general/loeschen-probe → was ginge (Probelauf)
+router.get('/general/loeschen-probe', requirePermission('CORE.SETTINGS.VIEW'), requireGuildOwner(), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const guildId = res.locals.guildId;
+    const g = await guildFuerLoeschen(guildId);
+    if (g.fehler) return res.status(400).json({ success: false, message: g.fehler });
+    try {
+        const plugins = (await ServiceManager.get('dbService').getEnabledPlugins(guildId)).filter(p => p !== 'core');
+        const probe = await Datenauskunft.guildLoeschen(guildId, { trocken: true, anlass: 'Probe Einstellungen' });
+        if (!probe.ok) return res.status(500).json({ success: false, message: probe.fehler });
+        const zeilen = Object.fromEntries(Object.entries(probe.geloescht)
+            .map(([p, t]) => [p, Object.values(t).reduce((a, b) => a + b, 0)]));
+        return res.json({ success: true, data: { name: g.name, plugins, zeilen } });
+    } catch (err) {
+        Logger.error(`[KernSettings] Probe „Guild löschen“ für ${guildId} gescheitert:`, err);
+        return res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// POST /settings/general/loeschen { bestaetigung } → Guild löschen, Bot geht
+router.post('/general/loeschen', csrfProtection, requirePermission('CORE.SETTINGS.VIEW'), requireGuildOwner(), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const guildId = res.locals.guildId;
+    const g = await guildFuerLoeschen(guildId);
+    if (g.fehler) return res.status(400).json({ success: false, message: g.fehler });
+    // Was eingetippt werden muss, steht hier fest, nicht im Browser.
+    if (String(req.body?.bestaetigung ?? '').trim().toLowerCase() !== g.name.trim().toLowerCase()) {
+        return res.status(400).json({ success: false, message: `Der Name stimmt nicht, es wurde nichts gelöscht. Erwartet: ${g.name}` });
+    }
+
+    const info = req.session.user.info;
+    let ergebnis;
+    try {
+        ergebnis = await Datenauskunft.guildLoeschen(guildId, {
+            wer: { userId: info.id, userName: info.global_name || info.username || null },
+            anlass: 'Einstellungen → Allgemein',
+        });
+    } catch (err) {
+        Logger.error(`[KernSettings] „Guild löschen“ für ${guildId} gescheitert:`, err);
+        return res.status(500).json({ success: false, message: err.message });
+    }
+    if (!ergebnis.ok) {
+        // Abgebrochen: Was schon abgeschaltet ist, bleibt abgeschaltet, Zeilen
+        // sind keine gelöscht (Datenauskunft bricht vor dem Löschen ab).
+        return res.status(500).json({ success: false, message: ergebnis.fehler, data: { abgeschaltet: ergebnis.abgeschaltet } });
+    }
+
+    let verlassenFehler = null;
+    try {
+        const huelle = await ServiceManager.get('ipcServer')
+            .broadcastOne('dashboard:GUILD_VERLASSEN', { guildId }, true, { timeout: 15000 });
+        const antwort = huelle?.data ?? huelle;
+        if (!antwort?.success) verlassenFehler = antwort?.error || huelle?.error || 'keine Antwort';
+    } catch (err) {
+        verlassenFehler = err.message;
+    }
+    if (verlassenFehler) Logger.warn(`[KernSettings] Guild ${guildId} gelöscht, der Bot hat sie nicht verlassen: ${verlassenFehler}`);
+
+    const zeilen = Object.values(ergebnis.geloescht).flatMap(t => Object.values(t)).reduce((a, b) => a + b, 0);
+    return res.json({
+        success: true,
+        data: { abgeschaltet: ergebnis.abgeschaltet.map(a => a.plugin), zeilen, verlassen: !verlassenFehler, verlassenFehler },
+    });
 });
 
 // GET /settings/theme → Redirect auf neuen Themes-Bereich

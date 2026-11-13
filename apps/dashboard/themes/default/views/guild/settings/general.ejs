@@ -142,6 +142,157 @@
         </form>
       </div>
     </div>
+
+    <%# Server löschen (G-04c, K380): nur der Besitzer, nie die Kontroll-Guild
+        (entscheidet die Route, `guildLoeschen` ist sonst null). Rückfrage nach
+        `#paketEntfernenModal` (zerstoerende-rueckfrage). Was mitgeht, zählt
+        beim Öffnen ein Probelauf mit Rollback, nicht eine Schätzung. %>
+    <% if (typeof guildLoeschen !== 'undefined' && guildLoeschen) { %>
+    <div class="card border-danger mb-4" id="guildLoeschen"
+         data-name="<%= guildLoeschen.name %>"
+         data-text-probe="<%= tr('core:SETTINGS.LOESCHEN.MODAL_PROBE') %>"
+         data-text-probe-fehler="<%= tr('core:SETTINGS.LOESCHEN.MODAL_PROBE_FEHLER') %>"
+         data-text-plugins="<%= tr('core:SETTINGS.LOESCHEN.MODAL_PLUGINS') %>"
+         data-text-keine-plugins="<%= tr('core:SETTINGS.LOESCHEN.MODAL_KEINE_PLUGINS') %>"
+         data-text-zeilen="<%= tr('core:SETTINGS.LOESCHEN.MODAL_ZEILEN') %>"
+         data-text-bot="<%= tr('core:SETTINGS.LOESCHEN.MODAL_BOT') %>"
+         data-text-laeuft="<%= tr('core:SETTINGS.LOESCHEN.LAEUFT') %>"
+         data-text-fertig="<%= tr('core:SETTINGS.LOESCHEN.FERTIG') %>"
+         data-text-fertig-bot-bleibt="<%= tr('core:SETTINGS.LOESCHEN.FERTIG_BOT_BLEIBT') %>"
+         data-text-gescheitert="<%= tr('core:SETTINGS.LOESCHEN.GESCHEITERT') %>">
+      <div class="card-header bg-danger-lt">
+        <h5 class="mb-0 text-danger">
+          <i class="fa-solid fa-triangle-exclamation me-2"></i>
+          <%= tr('core:SETTINGS.LOESCHEN.TITEL') %>
+        </h5>
+      </div>
+      <div class="card-body">
+        <p class="mb-2"><%= tr('core:SETTINGS.LOESCHEN.TEXT') %></p>
+        <ul class="small text-secondary mb-3">
+          <li><%= tr('core:SETTINGS.LOESCHEN.PUNKT_PLUGINS') %></li>
+          <li><%= tr('core:SETTINGS.LOESCHEN.PUNKT_DATEN') %></li>
+          <li><%= tr('core:SETTINGS.LOESCHEN.PUNKT_BOT') %></li>
+          <li><%= tr('core:SETTINGS.LOESCHEN.PUNKT_MITGLIEDER') %></li>
+        </ul>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <span class="text-secondary small"><%= tr('core:SETTINGS.LOESCHEN.NUR_BESITZER') %></span>
+          <button type="button" class="btn btn-outline-danger ms-auto" id="guildLoeschenOeffnen">
+            <i class="fa-solid fa-trash me-1"></i><%= tr('core:SETTINGS.LOESCHEN.BTN') %>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal modal-blur fade" id="guildLoeschenModal" tabindex="-1" aria-labelledby="guildLoeschenTitel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content border border-danger border-2">
+          <div class="modal-status bg-danger"></div>
+          <div class="modal-header bg-danger-lt">
+            <h5 class="modal-title text-danger fw-bold" id="guildLoeschenTitel">
+              <i class="fa-solid fa-triangle-exclamation me-2"></i><%= tr('core:SETTINGS.LOESCHEN.MODAL_TITEL') %>
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="<%= tr('core:SETTINGS.LOESCHEN.ABBRECHEN') %>"></button>
+          </div>
+          <div class="modal-body">
+            <p class="text-danger fw-bold fs-3 mb-2"><%= tr('core:SETTINGS.LOESCHEN.MODAL_NAME', { name: guildLoeschen.name }) %></p>
+            <p class="text-danger fw-bold mb-3"><%= tr('core:SETTINGS.LOESCHEN.MODAL_ENDGUELTIG') %></p>
+            <div class="fw-bold mb-1"><%= tr('core:SETTINGS.LOESCHEN.MODAL_LISTE') %></div>
+            <ul class="mb-3" id="guildLoeschenListe"></ul>
+            <label class="form-label fw-bold" for="guildLoeschenEingabe">
+              <%= tr('core:SETTINGS.LOESCHEN.MODAL_EINTIPPEN') %> <span class="font-monospace text-danger"><%= guildLoeschen.name %></span>
+            </label>
+            <input type="text" class="form-control font-monospace" id="guildLoeschenEingabe" autocomplete="off" spellcheck="false">
+            <div class="form-text"><%= tr('core:SETTINGS.LOESCHEN.MODAL_DAUER') %></div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal"><%= tr('core:SETTINGS.LOESCHEN.ABBRECHEN') %></button>
+            <button type="button" class="btn btn-danger fw-bold" id="guildLoeschenKnopf" disabled>
+              <i class="fa-solid fa-trash me-1"></i><%= tr('core:SETTINGS.LOESCHEN.MODAL_KNOPF') %>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const karte = document.getElementById('guildLoeschen');
+      const text = (k, werte = {}) => String(karte.dataset['text' + k] || '')
+        .replace(/\{\{(\w+)\}\}/g, (_, n) => (werte[n] ?? ''));
+      const basis = '/guild/<%= guildId %>/settings/general';
+      const name = karte.dataset.name;
+      const dialog = new bootstrap.Modal(document.getElementById('guildLoeschenModal'));
+      const liste = document.getElementById('guildLoeschenListe');
+      const eingabe = document.getElementById('guildLoeschenEingabe');
+      const knopf = document.getElementById('guildLoeschenKnopf');
+      const knopfInhalt = knopf.innerHTML;
+      let probeOk = false;
+
+      const punkt = (t, klasse) => { const li = document.createElement('li'); li.textContent = t; if (klasse) li.className = klasse; return li; };
+      const gleich = () => eingabe.value.trim().toLowerCase() === name.trim().toLowerCase();
+      const pruefe = () => { knopf.disabled = !(probeOk && gleich()); };
+
+      document.getElementById('guildLoeschenOeffnen').addEventListener('click', async () => {
+        eingabe.value = '';
+        knopf.innerHTML = knopfInhalt;
+        probeOk = false;
+        pruefe();
+        liste.replaceChildren(punkt(text('Probe')));
+        dialog.show();
+        try {
+          const r = await fetch(basis + '/loeschen-probe', { headers: { 'Accept': 'application/json' } });
+          const a = await r.json();
+          if (!a.success) throw new Error(a.message || ('HTTP ' + r.status));
+          const punkte = [punkt(a.data.plugins.length ? text('Plugins', { liste: a.data.plugins.join(', ') }) : text('KeinePlugins'))];
+          for (const [plugin, n] of Object.entries(a.data.zeilen)) punkte.push(punkt(text('Zeilen', { plugin, n })));
+          punkte.push(punkt(text('Bot')));
+          liste.replaceChildren(...punkte);
+          probeOk = true;
+        } catch (e) {
+          // Ohne Zählung kein Löschen: Wer nicht sieht, was geht, bestätigt blind.
+          liste.replaceChildren(punkt(text('ProbeFehler') + ' ' + e.message, 'text-danger'));
+        }
+        pruefe();
+      });
+      document.getElementById('guildLoeschenModal').addEventListener('shown.bs.modal', () => eingabe.focus());
+      eingabe.addEventListener('input', pruefe);
+
+      knopf.addEventListener('click', async () => {
+        if (!probeOk || !gleich()) return;
+        knopf.disabled = true;
+        eingabe.disabled = true;
+        knopf.textContent = text('Laeuft');
+        let a;
+        try {
+          const r = await fetch(basis + '/loeschen', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ bestaetigung: eingabe.value }),
+          });
+          a = await r.json().catch(() => ({ success: false, message: 'HTTP ' + r.status }));
+        } catch (e) {
+          a = { success: false, message: e.message };
+        }
+        eingabe.disabled = false;
+        if (!a.success) {
+          knopf.innerHTML = knopfInhalt;
+          pruefe();
+          showToast('error', text('Gescheitert', { grund: a.message || '?' }), { timeOut: 0 });
+          return;
+        }
+        dialog.hide();
+        const d = a.data;
+        if (d.verlassen) {
+          showToast('success', text('Fertig', { n: d.zeilen, plugins: d.abgeschaltet.length }), { timeOut: 0 });
+        } else {
+          showToast('warning', text('FertigBotBleibt', { n: d.zeilen, grund: d.verlassenFehler || '?' }), { timeOut: 0 });
+        }
+        // Die Guild gibt es nicht mehr; jede Seite darunter liefe ins Leere.
+        setTimeout(() => { location.href = '/auth/server-selector'; }, 8000);
+      });
+    });
+    </script>
+    <% } %>
   </div>
 
   <!-- Seitenleiste mit Hilfe -->

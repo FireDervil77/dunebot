@@ -171,6 +171,10 @@ module.exports = class App {
                 // werden; mit einer Guild-ID darin waere sie je Guild eine
                 // andere. Wohin es danach zurueckgeht, merkt sich der `state`.
                 .register('/verbindungen', require('./routes/verbindungen.router'))
+                // Meine Daten (G-04c): nur angemeldet, ohne Guild-Zugang.
+                // Nicht unter /guild, denn dorthin kommt nur, wer vom
+                // Besitzer Zugang bekommen hat.
+                .register('/meinedaten', require('./routes/meinedaten.router'), { auth: true })
                 .register('/downloads', this.routers.downloads) // Öffentlich, keine Auth
                 .register('/guild', this.routers.guild, { 
                     auth: true,  // Aktiviert CheckAuth Middleware

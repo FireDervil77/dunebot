@@ -161,6 +161,13 @@ const errorMessage = locals.errorMessage || null;
         </a>
       </div>
     <% } %>
+
+    <%# Meine Daten (G-04c): für jeden Angemeldeten, auch ohne Guild-Zugang. %>
+    <div class="text-center mt-4">
+      <a href="/meinedaten" class="btn btn-link link-secondary">
+        <i class="fa-solid fa-user-shield me-1"></i><%= tr('MEINEDATEN.LINK') %>
+      </a>
+    </div>
   </div>
 
   <script>
