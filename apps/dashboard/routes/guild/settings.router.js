@@ -202,8 +202,9 @@ router.put('/general', requirePermission('CORE.SETTINGS.EDIT'), async (req, res)
  *
  * Gelöscht wird in dieser Reihenfolge: Plugins abschalten (Gameserver werden
  * dabei gestoppt), Zeilen über die Erklärungen, **dann** verlässt der Bot die
- * Guild (`GUILD_VERLASSEN`). Umgekehrt liefe zuerst `guildDelete` über
- * `SHOW TABLES` und nähme Gameserver-Zeilen ohne Stoppen mit (K381).
+ * Guild (`GUILD_VERLASSEN`). So sieht der Besitzer das Ergebnis im Fenster.
+ * Das danach folgende `guildDelete` findet keine Zeile mehr und tut nichts
+ * (G-04d, `GuildManager.removeGuild`).
  */
 async function guildFuerLoeschen(guildId) {
     if (String(guildId) === String(process.env.CONTROL_GUILD_ID)) return { fehler: 'Die Kontroll-Guild wird nicht gelöscht.' };

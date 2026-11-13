@@ -263,7 +263,8 @@ class IPCServer {
 
     /**
      * Core-Events vom Bot verarbeiten (Bot→Dashboard)
-     * Aktuell: UPDATE_PLUGIN_STATUS – Discord `/plugin status` schaltet über das Dashboard ein und ab
+     * Aktuell: UPDATE_PLUGIN_STATUS – Discord `/plugin status` schaltet über das Dashboard ein und ab;
+     * PRAEFIX_SETZEN, EREIGNISSE_ANSTOSS, VERLASSEN_ANSTOSS, MEINEDATEN_*
      * @private
      */
     async _handleCoreEvent(action, payload, message) {
@@ -336,6 +337,18 @@ class IPCServer {
                     return message.reply({ success: false, error: 'Zusteller läuft nicht' });
                 }
                 ServiceManager.get('ereignisZusteller').wecken();
+                return message.reply({ success: true });
+            }
+            case 'VERLASSEN_ANSTOSS': {
+                // Der Bot hat eine Guild verlassen (G-04d, K381). `left_at`
+                // steht schon in `guilds`, das ist der Auftrag; hier wird nur
+                // der Aufräumer geweckt. Er antwortet nicht auf das Ergebnis:
+                // Mit Gameservern dauert es Minuten, die Rückmeldung je Plugin
+                // steht im Log des Dashboards.
+                if (!ServiceManager.has('verlasseneGuilds')) {
+                    return message.reply({ success: false, error: 'Aufräumer läuft nicht' });
+                }
+                ServiceManager.get('verlasseneGuilds').wecken();
                 return message.reply({ success: true });
             }
             case 'MEINEDATEN_AUSKUNFT':

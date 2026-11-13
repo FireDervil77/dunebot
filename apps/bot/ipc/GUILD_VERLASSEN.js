@@ -8,11 +8,11 @@
  * gelöscht: Plugins abgeschaltet (Gameserver gestoppt), Zeilen über die
  * Erklärungen. Erst danach verlässt der Bot die Guild.
  *
- * Die Reihenfolge ist Absicht. Ginge der Bot zuerst, liefe `guildDelete` →
- * `GuildManager._cleanupAllGuildData` über `SHOW TABLES` und nähme die
- * Gameserver-Zeilen mit, ohne die Container zu stoppen (K381). So findet
- * dieser Weg nur noch Reste, die zwischen Löschen und Verlassen neu angelegt
- * wurden.
+ * Die Reihenfolge ist Absicht: So kann der Besitzer im Dashboard sehen, ob
+ * das Löschen geklappt hat, bevor der Bot geht. Ginge der Bot zuerst, liefe
+ * `guildDelete` → `left_at` → das Dashboard löscht im Hintergrund über
+ * denselben Weg (G-04d), nur ohne Rückmeldung im Fenster. Ist die Guild schon
+ * gelöscht, fehlt ihre Zeile, und `removeGuild` hat nichts mehr zu tun.
  *
  * Die Kontroll-Guild verlässt der Bot nie, egal wer fragt.
  *

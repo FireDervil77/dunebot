@@ -9,7 +9,7 @@ const { spracheAusDiscord } = require("./Sprachwahl");
  * Kapselt den kompletten Lebenszyklus einer Guild:
  *  - Registrierung / Re-Join
  *  - Sync beim Bot-Start
- *  - Cleanup beim Verlassen
+ *  - Verlassen markieren (gelöscht wird im Dashboard, G-04d)
  *  - Default-Konfiguration initialisieren
  *  - Core-Plugin-Aktivierung pro Guild
  *
@@ -136,31 +136,55 @@ class GuildManager {
     }
 
     /**
-     * Markiert Guild als verlassen und löscht alle Guild-Daten (guildDelete-Event)
+     * Guild verlassen (guildDelete-Event): als verlassen markieren und das
+     * Dashboard zum Löschen anstoßen (G-04d, K381, F-G3 C: sofort).
+     *
+     * Gelöscht wird nicht hier, sondern im Dashboard
+     * (`apps/dashboard/helpers/VerlasseneGuilds.js`) über
+     * `Datenauskunft.guildLoeschen`: Jedes Plugin schaltet über seinen eigenen
+     * Weg ab, gameserver stoppt und löscht dabei seine Server, danach gehen die
+     * Zeilen nach den Erklärungen (`guildInhalte`). Bis 2026-11-13 löschte
+     * `_cleanupAllGuildData` hier über `SHOW TABLES` aus jeder Tabelle mit
+     * `guild_id`, auch Gameserver-Zeilen ohne Stoppen, auch in der
+     * Kontroll-Guild.
+     *
+     * `left_at` ist der Auftrag: Erreicht der Anstoß das Dashboard nicht, holt
+     * es beim Start und stündlich nach. Fehlt die Zeile schon, hat „Server
+     * löschen“ (G-04c) vorher gelöscht und den Bot dann gehen lassen.
+     *
      * @param {import('discord.js').Guild} guild
      */
     async removeGuild(guild) {
         const Logger = ServiceManager.get("Logger");
         const dbService = ServiceManager.get("dbService");
 
+        // Ausfall bei Discord, kein Verlassen.
         if (!guild.available) return;
 
-        Logger.info(`Guild verlassen: ${guild.name} (${guild.id}) – Starte Datenbereinigung...`);
-
-        // 1. Als verlassen markieren (nicht löschen!)
-        await dbService.query(
+        const erg = await dbService.query(
             "UPDATE guilds SET left_at = NOW(), updated_at = NOW() WHERE _id = ?",
             [guild.id]
         );
+        if (!erg?.affectedRows) {
+            Logger.info(`Guild verlassen: ${guild.name} (${guild.id}) – schon gelöscht, nichts zu tun`);
+            return;
+        }
 
-        // 2. Alle Guild-Daten dynamisch bereinigen
-        const stats = await this._cleanupAllGuildData(guild.id, dbService, Logger);
+        if (String(guild.id) === String(process.env.CONTROL_GUILD_ID)) {
+            Logger.error(`Der Bot ist nicht mehr in der Kontroll-Guild ${guild.name} (${guild.id}). ` +
+                "Ihre Inhalte bleiben. Bot wieder einladen.");
+            return;
+        }
 
-        Logger.success(`Guild-Bereinigung abgeschlossen für ${guild.name} (${guild.id}):`);
-        Logger.success(`  ${stats.tablesProcessed} Tabellen verarbeitet, ${stats.totalDeleted} Datensätze gelöscht`);
-
-        if (stats.errors.length > 0) {
-            stats.errors.forEach(e => Logger.warn(`  Fehler: ${e}`));
+        const ipcClient = ServiceManager.has("ipcClient") ? ServiceManager.get("ipcClient") : null;
+        const antwort = ipcClient
+            ? await ipcClient.sendToDashboard("core:VERLASSEN_ANSTOSS", {}, 5000)
+            : { success: false, error: "kein IPC" };
+        if (antwort?.success) {
+            Logger.info(`Guild verlassen: ${guild.name} (${guild.id}) – das Dashboard löscht jetzt, Rückmeldung je Plugin in seinem Log ([Verlassen])`);
+        } else {
+            Logger.warn(`Guild verlassen: ${guild.name} (${guild.id}) – Dashboard nicht angestoßen (${antwort?.error || "keine Antwort"}). ` +
+                "Es löscht beim nächsten Start oder spätestens in einer Stunde.");
         }
     }
 
@@ -401,54 +425,6 @@ class GuildManager {
             }
         }
         return result;
-    }
-
-    /**
-     * Löscht dynamisch alle Guild-Daten aus allen Tabellen mit guild_id-Spalte
-     * @param {string} guildId
-     * @param {Object} dbService
-     * @param {Object} Logger
-     * @returns {Promise<{tablesProcessed: number, totalDeleted: number, errors: string[]}>}
-     */
-    async _cleanupAllGuildData(guildId, dbService, Logger) {
-        const stats = { tablesProcessed: 0, totalDeleted: 0, errors: [] };
-
-        const tables = await dbService.query("SHOW TABLES");
-        const tableNames = (Array.isArray(tables) ? tables : []).map(r => Object.values(r)[0]);
-
-        for (const tableName of tableNames) {
-            try {
-                const columns = await dbService.query(`DESCRIBE ${tableName}`);
-                const colNames = (Array.isArray(columns) ? columns : []).map(c => c.Field);
-
-                const guildCol = colNames.includes("guild_id")
-                    ? "guild_id"
-                    : colNames.includes("guildId")
-                        ? "guildId"
-                        : null;
-
-                if (!guildCol) continue;
-
-                // Ausnahmen: Tabellen deren Daten aus historischen Gründen erhalten bleiben
-                if (tableName === "user_feedback") {
-                    Logger.debug(`Überspringe ${tableName} (historisch)`);
-                    continue;
-                }
-
-                const result = await dbService.query(
-                    `DELETE FROM \`${tableName}\` WHERE \`${guildCol}\` = ?`,
-                    [guildId]
-                );
-
-                stats.tablesProcessed++;
-                stats.totalDeleted += result?.affectedRows || 0;
-                Logger.debug(`Bereinigt: ${tableName} (${result?.affectedRows || 0} Zeilen)`);
-            } catch (err) {
-                stats.errors.push(`${tableName}: ${err.message}`);
-            }
-        }
-
-        return stats;
     }
 }
 

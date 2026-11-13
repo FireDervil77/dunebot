@@ -247,6 +247,14 @@ module.exports = class App {
                 Logger.error('[INIT] Zusteller der Fachereignisse konnte nicht starten:', error);
             }
 
+            // Verlassene Guilds löschen (G-04d, K381): erst nach den Plugins,
+            // denn gelöscht wird über deren `disableInGuild`.
+            try {
+                require('./helpers/VerlasseneGuilds').starten();
+            } catch (error) {
+                Logger.error('[INIT] Aufräumer für verlassene Guilds konnte nicht starten:', error);
+            }
+
             // Hook nach der Initialisierung ausführen
             if (this.app.pluginManager && this.app.pluginManager.hooks) {
                 await this.app.pluginManager.hooks.doAction('after_dashboard_initialize', this.app);
