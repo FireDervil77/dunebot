@@ -1,0 +1,25 @@
+{
+    "name": "logging",
+    "displayName": "Logging",
+    "description": "Protokoll der Guild: Discord-Ereignisse und Fachereignisse der Plugins",
+    "version": "0.1.0",
+    "author": "FireBot Team",
+    "license": "none",
+    "nurKontrollGuild": true,
+    "type": "commonjs",
+    "peerDependencies": {
+        "discord.js": "^14.19.0",
+        "express": "^5.1.0",
+        "dunebot-core": "*",
+        "dunebot-sdk": "*"
+    },
+    "guildInhalte": {
+        "loeschen": []
+    },
+    "ereignisse": {
+        "sendet": [],
+        "hoert": [
+            "*"
+        ]
+    }
+}

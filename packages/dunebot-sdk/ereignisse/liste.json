@@ -1,0 +1,97 @@
+{
+  "fassung": 1,
+  "umschlag": {
+    "id": "fortlaufende Nummer im Ereignisbuch (G-02)",
+    "name": "ein Name aus dieser Liste",
+    "version": "die Version des Eintrags beim Melden",
+    "guild_id": "die Guild, in der es geschah",
+    "quelle": "das sendende Plugin, `kern` für den Kern",
+    "schluessel": "fachlich eindeutig je Quelle, z. B. `giveaway:123:teilnahme:<mitglied>`; dasselbe zweimal gemeldet ergibt eine Zeile",
+    "schutz": "die Schutzklasse aus dieser Liste",
+    "schwere": "die Schwere aus dieser Liste",
+    "akteur": "Discord-ID des Auslösers oder `system`",
+    "betroffen": "Discord-ID des betroffenen Mitglieds oder leer",
+    "bezug": "Kanal und Objekt, z. B. `{ kanal, objekt: 'ticket:42' }`",
+    "daten": "die Felder des Eintrags",
+    "zeit": "wann es geschah"
+  },
+  "schutzklassen": {
+    "allgemein": "nennt keinen Menschen; jedes Plugin darf es hören",
+    "personenbezogen": "nennt ein Mitglied (Akteur, Betroffener oder Feld der Art mitglied, mitglieder, konto); hören darf nur, wer in `hoerer` steht",
+    "inhalt": "trägt Text, den ein Mensch geschrieben hat (Feld der Art text); hören darf nur, wer in `hoerer` steht"
+  },
+  "schweren": {
+    "info": "Alltag",
+    "warnung": "jemand sollte es sehen",
+    "kritisch": "geht nie verloren, umgeht jeden Ausschluss im Logging"
+  },
+  "feldarten": {
+    "mitglied": "Discord-ID eines Menschen",
+    "mitglieder": "Liste von Discord-IDs von Menschen",
+    "konto": "Name eines Kontos außerhalb von Discord (Spielname, Twitch-Kanal)",
+    "text": "freier Text, den ein Mensch geschrieben hat (Grund, Begründung)",
+    "name": "Bezeichnung, die die Verwaltung der Guild vergibt (Titel, Clanname)",
+    "discord_id": "Kanal, Rolle oder Nachricht, kein Mensch",
+    "id": "Zeile oder Nummer bei uns",
+    "kennung": "fester Bezeichner (`leveling:community`, Pluginname, Einladungscode)",
+    "wert": "einer aus einer festen Liste",
+    "werte": "mehrere aus einer festen Liste",
+    "zahl": "Zahl",
+    "zeit": "Zeitpunkt",
+    "ja_nein": "wahr oder falsch"
+  },
+  "ereignisse": [
+    {"name": "kern.mitglied.beigetreten", "version": 1, "von": "kern", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "mitglied", "betroffen": null, "felder": {"einlader": "mitglied?", "einladung": "kennung?", "sicherheit": "wert"}, "hoerer": ["logging", "leveling"], "text": "Ein Mitglied ist der Guild beigetreten, mit der erkannten Einladung (G-16); `sicherheit` ist eindeutig, mehrdeutig oder unbekannt."},
+    {"name": "kern.mitglied.verlassen", "version": 1, "von": "kern", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "mitglied", "betroffen": null, "felder": {}, "hoerer": ["logging", "leveling", "clan"], "text": "Ein Mitglied hat die Guild verlassen."},
+    {"name": "kern.plugin.eingeschaltet", "version": 1, "von": "kern", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "mitglied", "betroffen": null, "felder": {"plugin": "kennung"}, "hoerer": ["logging"], "text": "Ein Plugin wurde in der Guild eingeschaltet."},
+    {"name": "kern.plugin.abgeschaltet", "version": 1, "von": "kern", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "mitglied", "betroffen": null, "felder": {"plugin": "kennung"}, "hoerer": ["logging"], "text": "Ein Plugin wurde in der Guild abgeschaltet."},
+    {"name": "kern.dashboard.geaendert", "version": 1, "von": "kern", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "mitglied", "betroffen": null, "felder": {"plugin": "kennung", "seite": "kennung", "handlung": "wert"}, "hoerer": ["logging", "leveling"], "text": "Jemand hat im Dashboard der Guild etwas gespeichert (G-14 Stufe 1, ohne Werte)."},
+    {"name": "kern.dashboard.anmeldung", "version": 1, "von": "kern", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "mitglied", "betroffen": null, "felder": {}, "hoerer": ["logging"], "text": "Jemand hat das Dashboard dieser Guild geöffnet."},
+    {"name": "kern.termin.angelegt", "version": 1, "von": "kern", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "mitglied", "betroffen": null, "felder": {"termin": "id", "bereich": "kennung", "titel": "name", "beginn": "zeit"}, "hoerer": ["logging"], "text": "Ein Termin wurde angelegt (G-19)."},
+    {"name": "kern.termin.geaendert", "version": 1, "von": "kern", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "mitglied", "betroffen": null, "felder": {"termin": "id", "bereich": "kennung", "titel": "name", "beginn": "zeit"}, "hoerer": ["logging"], "text": "Ein Termin wurde geändert (G-19)."},
+    {"name": "kern.termin.abgesagt", "version": 1, "von": "kern", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "mitglied", "betroffen": null, "felder": {"termin": "id", "bereich": "kennung"}, "hoerer": ["logging"], "text": "Ein Termin wurde abgesagt (G-19)."},
+    {"name": "kern.termin.anwesenheit", "version": 1, "von": "kern", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "beides", "betroffen": "mitglied", "felder": {"termin": "id", "bereich": "kennung", "anwesend": "ja_nein"}, "hoerer": ["logging", "leveling", "clan"], "text": "Die Anwesenheit eines Mitglieds bei einem Termin wurde festgehalten, aus Sprachpräsenz oder von Hand (G-19)."},
+
+    {"name": "leveling.level.erreicht", "version": 1, "von": "leveling", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "system", "betroffen": "mitglied", "felder": {"fortschritt": "kennung", "stufe": "zahl", "vorher": "zahl"}, "hoerer": ["logging"], "text": "Ein Mitglied hat eine neue Community-Stufe erreicht (G-20)."},
+    {"name": "leveling.xp.korrigiert", "version": 1, "von": "leveling", "stand": "geplant", "schwere": "info", "schutz": "inhalt", "akteur": "mitglied", "betroffen": "mitglied", "felder": {"fortschritt": "kennung", "xp": "zahl", "grund": "text"}, "hoerer": ["logging"], "text": "Die Verwaltung hat XP eines Mitglieds von Hand geändert, mit Grund."},
+    {"name": "leveling.belohnung.vergeben", "version": 1, "von": "leveling", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "system", "betroffen": "mitglied", "felder": {"stufe": "zahl", "art": "wert"}, "hoerer": ["logging"], "text": "Ein Mitglied hat die Belohnung einer Stufe bekommen (Rolle, Abzeichen, XP)."},
+    {"name": "leveling.saison.gewechselt", "version": 1, "von": "leveling", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "beides", "betroffen": null, "felder": {"fortschritt": "kennung", "saison": "id"}, "hoerer": ["logging"], "text": "Eine neue Saison hat begonnen, nach Zeitplan oder von Hand (G-20)."},
+
+    {"name": "clan.angelegt", "version": 1, "von": "clan", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "mitglied", "betroffen": null, "felder": {"clan": "id", "clanname": "name"}, "hoerer": ["logging"], "text": "Ein Clan wurde angelegt (Clan-Idee §19.2 `clan.created`)."},
+    {"name": "clan.mitglied.aufgenommen", "version": 1, "von": "clan", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "mitglied", "betroffen": "mitglied", "felder": {"clan": "id"}, "hoerer": ["logging"], "text": "Ein Mitglied wurde in den Clan aufgenommen (§19.2 `clan.member.joined`)."},
+    {"name": "clan.mitglied.ausgetreten", "version": 1, "von": "clan", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "beides", "betroffen": "mitglied", "felder": {"clan": "id", "art": "wert"}, "hoerer": ["logging"], "text": "Ein Mitglied hat den Clan verlassen: selbst, entfernt oder weil es die Guild verließ (§19.2 `clan.member.left`)."},
+    {"name": "clan.rang.geaendert", "version": 1, "von": "clan", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "mitglied", "betroffen": "mitglied", "felder": {"clan": "id", "vorher": "id", "nachher": "id"}, "hoerer": ["logging"], "text": "Der Rang eines Clanmitglieds wurde geändert (§19.2 `clan.member.rank_changed`)."},
+    {"name": "clan.bewerbung.eingereicht", "version": 1, "von": "clan", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "mitglied", "betroffen": null, "felder": {"clan": "id", "bewerbung": "id"}, "hoerer": ["logging"], "text": "Ein Mitglied hat sich beim Clan beworben. Der Text der Bewerbung reist nicht mit."},
+    {"name": "clan.bewerbung.angenommen", "version": 1, "von": "clan", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "mitglied", "betroffen": "mitglied", "felder": {"clan": "id", "bewerbung": "id"}, "hoerer": ["logging"], "text": "Eine Bewerbung wurde angenommen."},
+    {"name": "clan.bewerbung.abgelehnt", "version": 1, "von": "clan", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "mitglied", "betroffen": "mitglied", "felder": {"clan": "id", "bewerbung": "id"}, "hoerer": ["logging"], "text": "Eine Bewerbung wurde abgelehnt."},
+    {"name": "clan.spielkonto.geprueft", "version": 1, "von": "clan", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "beides", "betroffen": "mitglied", "felder": {"clan": "id", "spiel": "kennung", "konto": "konto"}, "hoerer": ["logging"], "text": "Ein Spielkonto eines Mitglieds wurde bestätigt (§19.2 `clan.game_account.verified`)."},
+    {"name": "clan.mission.abgeschlossen", "version": 1, "von": "clan", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "beides", "betroffen": null, "felder": {"clan": "id", "mission": "id", "beteiligte": "mitglieder"}, "hoerer": ["logging"], "text": "Eine Clan-Mission ist erfüllt (§19.2 `clan.mission.completed`)."},
+    {"name": "clan.wettbewerb.ergebnis", "version": 1, "von": "clan", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "mitglied", "betroffen": null, "felder": {"clan": "id", "wettbewerb": "id", "ergebnis": "wert"}, "hoerer": ["logging"], "text": "Das Ergebnis eines Matches oder Wettbewerbs wurde eingetragen (§19.2 `clan.competition.result_recorded`)."},
+    {"name": "clan.level.erreicht", "version": 1, "von": "clan", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "system", "betroffen": "mitglied", "felder": {"fortschritt": "kennung", "stufe": "zahl", "vorher": "zahl"}, "hoerer": ["logging"], "text": "Ein Mitglied hat eine neue persönliche Clan-Stufe erreicht (G-20, `clan:<clan_id>`)."},
+    {"name": "clan.xp.korrigiert", "version": 1, "von": "clan", "stand": "geplant", "schwere": "info", "schutz": "inhalt", "akteur": "mitglied", "betroffen": "mitglied", "felder": {"fortschritt": "kennung", "xp": "zahl", "grund": "text"}, "hoerer": ["logging"], "text": "Clan-XP eines Mitglieds wurden von Hand geändert, mit Grund."},
+
+    {"name": "moderation.fall.angelegt", "version": 1, "von": "moderation", "stand": "geplant", "schwere": "warnung", "schutz": "inhalt", "akteur": "mitglied", "betroffen": "mitglied", "felder": {"fall": "zahl", "art": "wert", "bis": "zeit?", "grund": "text?"}, "hoerer": ["logging", "leveling", "clan"], "text": "Ein Moderationsfall wurde angelegt; `art` aus `moderation_logs.type`, `fall` ist `case_number`."},
+    {"name": "moderation.fall.zurueckgenommen", "version": 1, "von": "moderation", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "mitglied", "betroffen": "mitglied", "felder": {"fall": "zahl", "art": "wert"}, "hoerer": ["logging", "leveling", "clan"], "text": "Ein Moderationsfall wurde aufgehoben (Timeout beendet, Bann zurückgenommen)."},
+
+    {"name": "automod.verstoss", "version": 1, "von": "automod", "stand": "geplant", "schwere": "warnung", "schutz": "personenbezogen", "akteur": "system", "betroffen": "mitglied", "felder": {"kanal": "discord_id", "nachricht": "discord_id", "gruende": "werte", "strikes": "zahl"}, "hoerer": ["logging", "leveling"], "text": "Automod hat eine Nachricht beanstandet; Leveling storniert die XP dafür (`msg:<nachricht>`)."},
+    {"name": "automod.raid", "version": 1, "von": "automod", "stand": "geplant", "schwere": "kritisch", "schutz": "personenbezogen", "akteur": "system", "betroffen": "mitglied", "felder": {"art": "wert", "massnahme": "wert?", "einladung": "kennung?"}, "hoerer": ["logging"], "text": "Raid-Erkennung hat angeschlagen; `art` aus `automod_raid_events.event_type`, `betroffen` leer bei JOIN_SPIKE und Lockdown."},
+
+    {"name": "giveaway.angelegt", "version": 1, "von": "giveaway", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "mitglied", "betroffen": null, "felder": {"verlosung": "id", "titel": "name", "ende": "zeit"}, "hoerer": ["logging"], "text": "Eine Verlosung wurde angelegt."},
+    {"name": "giveaway.teilnahme", "version": 1, "von": "giveaway", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "mitglied", "betroffen": null, "felder": {"verlosung": "id", "lose": "zahl"}, "hoerer": ["logging", "leveling"], "text": "Ein Mitglied nimmt an einer Verlosung teil."},
+    {"name": "giveaway.gezogen", "version": 1, "von": "giveaway", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "beides", "betroffen": null, "felder": {"verlosung": "id", "gewinner": "mitglieder"}, "hoerer": ["logging"], "text": "Die Gewinner einer Verlosung wurden gezogen, nach Ablauf oder von Hand."},
+    {"name": "giveaway.beendet", "version": 1, "von": "giveaway", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "beides", "betroffen": null, "felder": {"verlosung": "id"}, "hoerer": ["logging"], "text": "Eine Verlosung ist beendet."},
+
+    {"name": "ticket.geoeffnet", "version": 1, "von": "ticket", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "mitglied", "betroffen": null, "felder": {"ticket": "id", "nummer": "zahl", "kategorie": "id?", "kanal": "discord_id"}, "hoerer": ["logging"], "text": "Ein Ticket wurde geöffnet."},
+    {"name": "ticket.uebernommen", "version": 1, "von": "ticket", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "mitglied", "betroffen": null, "felder": {"ticket": "id", "nummer": "zahl"}, "hoerer": ["logging"], "text": "Ein Teammitglied hat ein Ticket übernommen (`claimed_by`)."},
+    {"name": "ticket.geschlossen", "version": 1, "von": "ticket", "stand": "geplant", "schwere": "info", "schutz": "inhalt", "akteur": "mitglied", "betroffen": null, "felder": {"ticket": "id", "nummer": "zahl", "ersteller": "mitglied", "bearbeiter": "mitglied?", "grund": "text?"}, "hoerer": ["logging", "leveling"], "text": "Ein Ticket wurde geschlossen; Akteur ist `closed_by`, Ersteller `created_by`, Bearbeiter `claimed_by`, Grund `close_reason`."},
+
+    {"name": "streaming.live.begonnen", "version": 1, "von": "streaming", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "system", "betroffen": "mitglied", "felder": {"plattform": "wert", "kanal": "konto"}, "hoerer": ["logging"], "text": "Ein beobachteter Kanal ist live gegangen; `betroffen` ist das verknüpfte Mitglied, falls es eines gibt."},
+    {"name": "streaming.live.beendet", "version": 1, "von": "streaming", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "system", "betroffen": "mitglied", "felder": {"plattform": "wert", "kanal": "konto"}, "hoerer": ["logging"], "text": "Ein beobachteter Kanal ist nicht mehr live."},
+
+    {"name": "gameserver.gestartet", "version": 1, "von": "gameserver", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "beides", "betroffen": null, "felder": {"server": "id", "ausloeser": "wert"}, "hoerer": ["logging"], "text": "Ein Gameserver wurde gestartet, von Hand, nach Zeitplan oder nach Absturz."},
+    {"name": "gameserver.gestoppt", "version": 1, "von": "gameserver", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "beides", "betroffen": null, "felder": {"server": "id", "ausloeser": "wert"}, "hoerer": ["logging"], "text": "Ein Gameserver wurde gestoppt."},
+    {"name": "gameserver.abgestuerzt", "version": 1, "von": "gameserver", "stand": "geplant", "schwere": "warnung", "schutz": "allgemein", "akteur": "system", "betroffen": null, "felder": {"server": "id"}, "text": "Ein Gameserver ist abgestürzt."},
+    {"name": "gameserver.spieler.verbunden", "version": 1, "von": "gameserver", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "system", "betroffen": null, "felder": {"server": "id", "spieler": "konto"}, "hoerer": ["logging", "leveling"], "text": "Ein Spieler hat sich verbunden; `spieler` ist der Spielname aus der Abfrage, keine Discord-ID."},
+    {"name": "gameserver.spieler.getrennt", "version": 1, "von": "gameserver", "stand": "geplant", "schwere": "info", "schutz": "personenbezogen", "akteur": "system", "betroffen": null, "felder": {"server": "id", "spieler": "konto"}, "hoerer": ["logging", "leveling"], "text": "Ein Spieler hat sich getrennt."}
+  ]
+}

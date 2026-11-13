@@ -55,11 +55,22 @@ pruefe('die Werkbank gibt es in der Kontroll-Guild, in einer fremden nicht', () 
 pruefe('ohne gesetzte Kontroll-Guild gibt es sie nirgends', () => mitKontrolle(null, () => {
     assert.strictEqual(manager.istVerfuegbar('werkbank', KONTROLLE), false);
 }));
-pruefe('alle anderen Plugins bleiben für jede Guild da', () => mitKontrolle(KONTROLLE, () => {
-    const andere = fs.readdirSync(manager.pluginsDir, { withFileTypes: true })
-        .filter(e => e.isDirectory() && !e.name.startsWith('.') && e.name !== 'werkbank').map(e => e.name);
-    assert.ok(andere.length > 5);
-    for (const name of andere) assert.strictEqual(manager.istVerfuegbar(name, FREMD), true, name);
+/**
+ * Wer außer der Werkbank intern ist, steht hier mit Grund. Ein Schalter, der
+ * still in einer weiteren package.json auftaucht, macht diese Prüfung rot.
+ */
+const INTERN = {
+    werkbank: 'W-2, vorerst nur wir',
+    leveling: 'Gerüst ohne Code bis Leveling Stufe 1 (K382, G-01 2026-11-13); einschalten schlüge fehl',
+    logging: 'Gerüst ohne Code bis Logging Stufe 1 (K382, G-01 2026-11-13); einschalten schlüge fehl',
+    clan: 'Gerüst ohne Code bis Clan Stufe 1 (K382, G-01 2026-11-13); einschalten schlüge fehl',
+};
+pruefe(`intern sind genau ${Object.keys(INTERN).join(', ')}, alle anderen Plugins bleiben für jede Guild da`, () => mitKontrolle(KONTROLLE, () => {
+    const alle = fs.readdirSync(manager.pluginsDir, { withFileTypes: true })
+        .filter(e => e.isDirectory() && !e.name.startsWith('.')).map(e => e.name);
+    assert.ok(alle.length - Object.keys(INTERN).length > 5);
+    for (const name of alle) assert.strictEqual(manager.istVerfuegbar(name, FREMD), !(name in INTERN), name);
+    for (const name of Object.keys(INTERN)) assert.strictEqual(manager.istVerfuegbar(name, KONTROLLE), true, name);
 }));
 
 console.log('\nJeder Weg');

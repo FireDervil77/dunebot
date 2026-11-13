@@ -18,5 +18,14 @@
             "giveaway_templates",
             "giveaway_blacklist"
         ]
+    },
+    "ereignisse": {
+        "sendet": [
+            "giveaway.angelegt",
+            "giveaway.teilnahme",
+            "giveaway.gezogen",
+            "giveaway.beendet"
+        ],
+        "hoert": []
     }
 }

@@ -25,5 +25,15 @@
         "bleiben": {
             "addon_marketplace": "guild_id ist die Guild, die das Paket eingestellt hat; öffentliche Pakete gehören allen, die privaten löscht onGuildDisable"
         }
+    },
+    "ereignisse": {
+        "sendet": [
+            "gameserver.gestartet",
+            "gameserver.gestoppt",
+            "gameserver.abgestuerzt",
+            "gameserver.spieler.verbunden",
+            "gameserver.spieler.getrennt"
+        ],
+        "hoert": []
     }
 }

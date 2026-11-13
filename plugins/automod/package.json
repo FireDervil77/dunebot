@@ -24,5 +24,12 @@
             "automod_settings",
             "automod_strikes"
         ]
+    },
+    "ereignisse": {
+        "sendet": [
+            "automod.verstoss",
+            "automod.raid"
+        ],
+        "hoert": []
     }
 }

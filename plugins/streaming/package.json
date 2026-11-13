@@ -26,5 +26,12 @@
             "streaming_targets",
             "streaming_variables"
         ]
+    },
+    "ereignisse": {
+        "sendet": [
+            "streaming.live.begonnen",
+            "streaming.live.beendet"
+        ],
+        "hoert": []
     }
 }

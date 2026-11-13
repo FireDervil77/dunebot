@@ -20,5 +20,12 @@
             "moderation_protected_roles",
             "moderation_settings"
         ]
+    },
+    "ereignisse": {
+        "sendet": [
+            "moderation.fall.angelegt",
+            "moderation.fall.zurueckgenommen"
+        ],
+        "hoert": []
     }
 }

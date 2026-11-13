@@ -1,0 +1,41 @@
+{
+    "name": "clan",
+    "displayName": "Clan",
+    "description": "Clan-Verwaltung: Mitglieder, Ränge, Teams, Bewerbungen",
+    "version": "0.1.0",
+    "author": "FireBot Team",
+    "license": "none",
+    "nurKontrollGuild": true,
+    "type": "commonjs",
+    "peerDependencies": {
+        "discord.js": "^14.19.0",
+        "express": "^5.1.0",
+        "dunebot-core": "*",
+        "dunebot-sdk": "*"
+    },
+    "guildInhalte": {
+        "loeschen": []
+    },
+    "ereignisse": {
+        "sendet": [
+            "clan.angelegt",
+            "clan.mitglied.aufgenommen",
+            "clan.mitglied.ausgetreten",
+            "clan.rang.geaendert",
+            "clan.bewerbung.eingereicht",
+            "clan.bewerbung.angenommen",
+            "clan.bewerbung.abgelehnt",
+            "clan.spielkonto.geprueft",
+            "clan.mission.abgeschlossen",
+            "clan.wettbewerb.ergebnis",
+            "clan.level.erreicht",
+            "clan.xp.korrigiert"
+        ],
+        "hoert": [
+            "kern.mitglied.verlassen",
+            "kern.termin.anwesenheit",
+            "moderation.fall.angelegt",
+            "moderation.fall.zurueckgenommen"
+        ]
+    }
+}

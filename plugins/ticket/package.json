@@ -22,5 +22,13 @@
             "ticket_tags",
             "ticket_settings"
         ]
+    },
+    "ereignisse": {
+        "sendet": [
+            "ticket.geoeffnet",
+            "ticket.uebernommen",
+            "ticket.geschlossen"
+        ],
+        "hoert": []
     }
 }

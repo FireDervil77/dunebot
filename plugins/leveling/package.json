@@ -1,0 +1,40 @@
+{
+    "name": "leveling",
+    "displayName": "Leveling",
+    "description": "Community-Level, XP und Ranglisten je Guild",
+    "version": "0.1.0",
+    "author": "FireBot Team",
+    "license": "none",
+    "nurKontrollGuild": true,
+    "type": "commonjs",
+    "peerDependencies": {
+        "discord.js": "^14.19.0",
+        "express": "^5.1.0",
+        "dunebot-core": "*",
+        "dunebot-sdk": "*"
+    },
+    "guildInhalte": {
+        "loeschen": []
+    },
+    "ereignisse": {
+        "sendet": [
+            "leveling.level.erreicht",
+            "leveling.xp.korrigiert",
+            "leveling.belohnung.vergeben",
+            "leveling.saison.gewechselt"
+        ],
+        "hoert": [
+            "kern.mitglied.beigetreten",
+            "kern.mitglied.verlassen",
+            "kern.dashboard.geaendert",
+            "kern.termin.anwesenheit",
+            "moderation.fall.angelegt",
+            "moderation.fall.zurueckgenommen",
+            "automod.verstoss",
+            "giveaway.teilnahme",
+            "ticket.geschlossen",
+            "gameserver.spieler.verbunden",
+            "gameserver.spieler.getrennt"
+        ]
+    }
+}
