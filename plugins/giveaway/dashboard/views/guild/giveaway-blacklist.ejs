@@ -60,4 +60,7 @@
   <% } %>
 </div>
 
+<%# Aufbewahrung (G-05): wie lange eine Sperre gilt, bevor sie ausläuft. %>
+<%- include('shared/aufbewahrung', { guildId, tr, plugin: 'giveaway' }) %>
+
 <%- include('partials/giveaway-modals', { tr, channels: [], roles: [], vorlagen: [], streamWeg: false, nur: ['sperren'] }) %>

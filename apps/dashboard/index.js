@@ -158,33 +158,9 @@ process.on('uncaughtException', (error) => {
         const port = process.env.DASHBOARD_PORT || 3000;
         app.listen(port);
 
-        // Toast-Logs Cleanup: Einmalig beim Start
-        Logger.info("Führe Toast-Logs Cleanup durch...");
-        try {
-            const cleanupResult = await dbService.query(`
-                DELETE FROM guild_toast_logs 
-                WHERE created_at < DATE_SUB(NOW(), INTERVAL 7 DAY)
-            `);
-            Logger.info(`🗑️  Toast-Logs Cleanup: ${cleanupResult.affectedRows || 0} alte Einträge entfernt`);
-        } catch (cleanupError) {
-            Logger.warn('Fehler beim Toast-Logs Cleanup:', cleanupError.message);
-        }
-
-        // Toast-Logs Cleanup: Cronjob (täglich um 3 Uhr)
-        const cron = require('node-cron');
-        cron.schedule('0 3 * * *', async () => {
-            Logger.info('[Cron] Starte Toast-Logs Cleanup...');
-            try {
-                const result = await dbService.query(`
-                    DELETE FROM guild_toast_logs 
-                    WHERE created_at < DATE_SUB(NOW(), INTERVAL 7 DAY)
-                `);
-                Logger.info(`🗑️  [Cron] Toast-Logs bereinigt: ${result.affectedRows || 0} Einträge gelöscht`);
-            } catch (error) {
-                Logger.error('[Cron] Fehler beim Toast-Logs Cleanup:', error);
-            }
-        });
-        Logger.success('Toast-Logs Cleanup-Cronjob aktiviert (täglich 3:00 Uhr)');
+        // Toast-Logs nach 7 Tagen löschen: seit 2026-11-14 eine Frist des
+        // Kerns (`plugins/core/package.json` `aufbewahrung`, G-05), nicht mehr
+        // ein eigener node-cron hier.
 
         // Graceful Shutdown
         process.on('SIGINT', async () => {

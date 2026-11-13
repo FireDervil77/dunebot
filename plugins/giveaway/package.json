@@ -45,9 +45,21 @@
         "giveaway_blacklist": {
             "user_id": {
                 "weg": "frist",
-                "grund": "Sperre durch die Guild. Moderations- und Sicherheitsfall: bleibt bis zum Ende seiner Frist (G-05), die Auskunft nennt ihn (F-G2 A)"
+                "grund": "Sperre für Gewinnspiele durch die Guild"
             },
             "blocked_by": "anonymisieren"
         }
-    }
+    },
+    "aufbewahrung": [
+        {
+            "name": "sperren",
+            "tabelle": "giveaway_blacklist",
+            "zeitspalte": "created_at",
+            "vorgabe_tage": 365,
+            "hoechstens_tage": 730,
+            "guild": true,
+            "recht": "GIVEAWAY.MANAGE",
+            "titel": "giveaway:AUFBEWAHRUNG.SPERREN"
+        }
+    ]
 }

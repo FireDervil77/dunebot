@@ -23,7 +23,10 @@
  *   Besitz       jede Tabelle aus einem CREATE TABLE im Plugin-Ordner gehört
  *                genau einem Plugin
  *   Vollständig  jede eigene Tabelle mit `guild_id` steht in `loeschen` oder in
- *                `bleiben` (mit Grund); nichts Fremdes, nichts Erfundenes
+ *                `bleiben` (mit Grund); nichts Fremdes, nichts Erfundenes. Eine
+ *                Tabelle, die erst eine offene (noch nicht gelaufene) Migration
+ *                anlegt, ist kein Fehler; sie wird genannt und beim Echt-Lauf
+ *                ausgelassen (seit G-05: `aufbewahrung_tage` bis zum Neustart)
  *   Reihenfolge  ein Fremdschlüssel ohne CASCADE: Kind vor Eltern
  *   Echt         DBService.loescheGuildZeilen läuft je Liste gegen die echte
  *                Datenbank, mit einer Guild ohne Zeilen (`0`)
@@ -46,6 +49,26 @@ const { ohneKommentare, ohneKommentareEjs } = require('./lib/quelltext');
 
 const KERN = 'core';
 let fehler = 0;
+
+/**
+ * Tabellen aus Migrationen, die noch nicht gelaufen sind (Quelle wie in der
+ * Tabelle `migrations`: `kern` oder der Plugin-Name).
+ */
+async function ausOffenenMigrationen(db, plugins) {
+    const gelaufen = new Set((await db.query('SELECT source, filename FROM migrations WHERE success = 1')).map(r => `${r.source}:${r.filename}`));
+    const orte = [['kern', 'migrations/kern'], ...plugins.map(p => [p, `plugins/${p}/migrations`])];
+    const aus = new Map();
+    for (const [quelle, ordner] of orte) {
+        const voll = path.join(WURZEL, ordner);
+        if (!fs.existsSync(voll)) continue;
+        for (const datei of fs.readdirSync(voll).filter(d => d.endsWith('.js'))) {
+            if (gelaufen.has(`${quelle}:${datei}`)) continue;
+            const q = ohneKommentare(fs.readFileSync(path.join(voll, datei), 'utf8'));
+            for (const m of q.matchAll(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`?(\w+)`?/gi)) aus.set(m[1], `${quelle}:${datei}`);
+        }
+    }
+    return aus;
+}
 async function pruefe(was, tun) {
     try { await tun(); console.log(`  ✓ ${was}`); }
     catch (e) { fehler++; console.log(`  ✗ ${was}\n      ${String(e.message).split('\n').slice(0, 12).join('\n      ')}`); }
@@ -105,6 +128,8 @@ function abschalter(plugin) {
         const vorhanden = new Set(tabellen.map(r => r.t));
         const sichten = new Set(tabellen.filter(r => r.art === 'VIEW').map(r => r.t));
         const guildSpalte = await db.guildSpalten([...vorhanden].filter(t => !sichten.has(t)));
+        const offen = await ausOffenenMigrationen(db, plugins);
+        const kommt = [];
         const mitGuild = new Set(Object.keys(guildSpalte).filter(t => guildSpalte[t]));
         const besitz = Object.fromEntries(plugins.map(p => [p, angelegt(p)]));
         // Was kein Plugin anlegt, gehört dem Kern.
@@ -129,7 +154,8 @@ function abschalter(plugin) {
                     if (n === 2) meldungen.push(`${p}: ${t} steht in loeschen UND bleiben`);
                 }
                 for (const t of [...loeschen, ...Object.keys(bleiben)]) {
-                    if (!vorhanden.has(t)) meldungen.push(`${p}: ${t} gibt es nicht`);
+                    if (!vorhanden.has(t) && offen.has(t)) kommt.push(`${p}: ${t} (${offen.get(t)})`);
+                    else if (!vorhanden.has(t)) meldungen.push(`${p}: ${t} gibt es nicht`);
                     else if (!mitGuild.has(t)) meldungen.push(`${p}: ${t} hat keine Guild-Spalte (guild_id, guildId, guilds._id)`);
                     else if (!besitz[p].has(t)) meldungen.push(`${p}: ${t} legt ein anderes Plugin an`);
                 }
@@ -139,6 +165,7 @@ function abschalter(plugin) {
                 if (new Set(loeschen).size !== loeschen.length) meldungen.push(`${p}: loeschen nennt eine Tabelle doppelt`);
             }
             assert.deepStrictEqual(meldungen, []);
+            for (const k of kommt) console.log(`      kommt mit offener Migration: ${k}`);
         });
 
         await pruefe('Reihenfolge: Fremdschlüssel ohne CASCADE — Kind vor Eltern', async () => {
@@ -162,7 +189,8 @@ function abschalter(plugin) {
 
         await pruefe('Echt: loescheGuildZeilen läuft je Liste, mit einer Guild ohne Zeilen', async () => {
             for (const p of plugins) {
-                const l = listen[p].loeschen;
+                // Was erst eine offene Migration anlegt, gibt es noch nicht.
+                const l = listen[p].loeschen.filter(t => vorhanden.has(t) || !offen.has(t));
                 if (!l.length) continue;
                 for (const t of l) {
                     const [{ n }] = await db.query(`SELECT COUNT(*) AS n FROM \`${t}\` WHERE \`${guildSpalte[t]}\` = ?`, ['0']);

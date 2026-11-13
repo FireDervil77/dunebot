@@ -155,14 +155,14 @@ function meinedatenEingehaengt(text) {
                 { plugin: 'a', ok: true, geloescht: { t1: 2, t2: 3 }, mitgeloescht: { k: 1 }, anonymisiert: { 't.s': 4 }, bleibt: {}, nurUeberall: [], fehler: null },
                 { plugin: 'b', ok: true, geloescht: {}, mitgeloescht: {}, anonymisiert: {}, bleibt: {}, nurUeberall: [], fehler: null },
                 { plugin: 'c', ok: false, geloescht: {}, mitgeloescht: {}, anonymisiert: {}, bleibt: {}, nurUeberall: [], fehler: 'vorher: Bot weg' },
-                { plugin: 'd', ok: true, geloescht: {}, mitgeloescht: {}, anonymisiert: {}, bleibt: { 'm.x': { zeilen: 2, grund: 'Fall' } }, nurUeberall: ['u.v'], fehler: null },
+                { plugin: 'd', ok: true, geloescht: {}, mitgeloescht: {}, anonymisiert: {}, bleibt: { 'm.x': { zeilen: 2, grund: 'Fall', tage: 365 } }, nurUeberall: ['u.v'], fehler: null },
             ] });
             assert.strictEqual(r.ok, false);
             assert.strictEqual(r.ueberall, true);
             assert.deepStrictEqual(r.plugins.map(p => p.plugin), ['a', 'c', 'd']);
             assert.deepStrictEqual([r.plugins[0].geloescht, r.plugins[0].mitgeloescht, r.plugins[0].anonymisiert], [5, 1, 4]);
             assert.strictEqual(r.plugins[1].fehler, 'vorher: Bot weg');
-            assert.deepStrictEqual(r.plugins[2].bleibt, [{ was: 'm.x', zeilen: 2, grund: 'Fall' }]);
+            assert.deepStrictEqual(r.plugins[2].bleibt, [{ was: 'm.x', zeilen: 2, grund: 'Fall', tage: 365 }]);
             assert.strictEqual(r.plugins[2].nurUeberall, 1);
             assert.strictEqual(MeineDaten.rueckmeldung({ ok: true, guildId: '1', plugins: [] }).ueberall, false);
         });

@@ -36,19 +36,19 @@
         "automod_logs": {
             "member_id": {
                 "weg": "frist",
-                "grund": "Automod-Treffer mit Nachrichtentext. Moderations- und Sicherheitsfall: bleibt bis zum Ende seiner Frist (G-05), die Auskunft nennt ihn (F-G2 A)"
+                "grund": "Automod-Treffer mit Nachrichtentext, Sicherheitsfall der Guild"
             }
         },
         "automod_raid_events": {
             "user_id": {
                 "weg": "frist",
-                "grund": "Raid-Erkennung. Moderations- und Sicherheitsfall: bleibt bis zum Ende seiner Frist (G-05), die Auskunft nennt ihn (F-G2 A)"
+                "grund": "Raid-Erkennung, Sicherheitsfall der Guild"
             }
         },
         "automod_strikes": {
             "member_id": {
                 "weg": "frist",
-                "grund": "Verwarnstand. Moderations- und Sicherheitsfall: bleibt bis zum Ende seiner Frist (G-05), die Auskunft nennt ihn (F-G2 A)"
+                "grund": "Verwarnstand bei Automod, Sicherheitsfall der Guild"
             }
         },
         "automod_exemptions": {
@@ -57,5 +57,37 @@
                 "grund": "type ist ENUM(role, channel), nie ein Mitglied"
             }
         }
-    }
+    },
+    "aufbewahrung": [
+        {
+            "name": "treffer",
+            "tabelle": "automod_logs",
+            "zeitspalte": "logged_at",
+            "vorgabe_tage": 90,
+            "hoechstens_tage": 365,
+            "guild": true,
+            "recht": "AUTOMOD.SETTINGS.EDIT",
+            "titel": "automod:AUFBEWAHRUNG.TREFFER"
+        },
+        {
+            "name": "raid",
+            "tabelle": "automod_raid_events",
+            "zeitspalte": "created_at",
+            "vorgabe_tage": 90,
+            "hoechstens_tage": 365,
+            "guild": true,
+            "recht": "AUTOMOD.SETTINGS.EDIT",
+            "titel": "automod:AUFBEWAHRUNG.RAID"
+        },
+        {
+            "name": "verwarnstand",
+            "tabelle": "automod_strikes",
+            "zeitspalte": "updated_at",
+            "vorgabe_tage": 90,
+            "hoechstens_tage": 365,
+            "guild": true,
+            "recht": "AUTOMOD.SETTINGS.EDIT",
+            "titel": "automod:AUFBEWAHRUNG.VERWARNSTAND"
+        }
+    ]
 }

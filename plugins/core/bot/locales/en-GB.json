@@ -115,6 +115,7 @@
         "ZAHL_MIT": "{{n}} go along",
         "ZAHL_ANONYM": "{{n}} stay without your name",
         "ZAHL_FRIST": "{{n}} stay until the retention period ends: {{grund}}",
+        "ZAHL_FRIST_TAGE": "{{n}} stay until the retention period ends, at most {{tage}} days: {{grund}}",
         "ZAHL_BLEIBT": "{{n}} stay: {{grund}}",
         "ANDERE_GUILDS": "There is data about you on {{n}} other servers as well. “Delete everywhere” removes it.",
         "UEBERGREIFEND": "Not tied to a server (only goes with “Delete everywhere”):",

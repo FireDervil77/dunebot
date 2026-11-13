@@ -1,0 +1,127 @@
+<%
+/**
+ * Aufbewahrung eines Plugins einstellen — Kern-Teil (G-05, 2026-11-14).
+ *
+ * Zeigt die Fristen, die das Plugin in seiner package.json unter
+ * `aufbewahrung` mit `guild: true` erklärt, und lässt die Tage ändern.
+ * Schnittstellen: GET/PUT /guild/ID/settings/aufbewahrung/PLUGIN
+ * (ansehen mit Zugang zur Guild, ändern mit dem Recht der Frist).
+ *
+ * Aufruf, AUSSERHALB eines anderen Formulars (eigener Speichern-Knopf):
+ *
+ *     include('shared/aufbewahrung', { guildId, tr, plugin: 'moderation' })
+ *
+ * Die Karte steht immer da und wird per Skript gefüllt; hat das Plugin keine
+ * einstellbare Frist, blendet sie sich aus.
+ */
+const _plugin = typeof plugin !== 'undefined' ? plugin : '';
+const _t = (k, o) => tr('core:AUFBEWAHRUNG.' + k, o);
+%>
+<div class="card mt-3" data-aufbewahrung="<%= _plugin %>"
+     data-adresse="/guild/<%= guildId %>/settings/aufbewahrung/<%= _plugin %>"
+     data-text-tage="<%= _t('TAGE') %>"
+     data-text-vorgabe="<%= _t('VORGABE') %>"
+     data-text-begrenzt="<%= _t('BEGRENZT') %>"
+     data-text-speichern="<%= _t('SPEICHERN') %>"
+     data-text-gespeichert="<%= _t('GESPEICHERT') %>"
+     data-text-kein-recht="<%= _t('KEIN_RECHT') %>"
+     data-text-ladefehler="<%= _t('LADEFEHLER') %>">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fa-solid fa-hourglass-half me-2"></i><%= _t('TITEL') %></h3>
+  </div>
+  <div class="card-body">
+    <p class="text-secondary"><%= _t('TEXT') %></p>
+    <div data-aufbewahrung-liste><div class="text-secondary"><i class="fa-solid fa-spinner fa-spin me-2"></i></div></div>
+  </div>
+</div>
+<script>
+(function () {
+  var karte = document.currentScript.previousElementSibling;
+  if (!karte || !karte.hasAttribute('data-aufbewahrung')) return;
+  var liste = karte.querySelector('[data-aufbewahrung-liste]');
+  var adresse = karte.dataset.adresse;
+  function text(name, werte) {
+    var t = karte.dataset['text' + name] || '';
+    Object.keys(werte || {}).forEach(function (k) { t = t.split('{{' + k + '}}').join(String(werte[k])); });
+    return t;
+  }
+  function melde(art, t) {
+    if (typeof showToast === 'function') showToast(art, t);
+    else if (window.GuildAjaxHandler && GuildAjaxHandler.showToast) GuildAjaxHandler.showToast(art, t);
+  }
+  function zeile(f) {
+    var z = document.createElement('div');
+    z.className = 'mb-3';
+    var id = 'aufbewahrung-' + karte.dataset.aufbewahrung + '-' + f.name;
+    var label = document.createElement('label');
+    label.className = 'form-label';
+    label.htmlFor = id;
+    label.textContent = f.titel;
+    var gruppe = document.createElement('div');
+    gruppe.className = 'input-group';
+    var feld = document.createElement('input');
+    feld.type = 'number'; feld.min = '1'; feld.max = String(f.obergrenze); feld.step = '1';
+    feld.className = 'form-control'; feld.id = id;
+    feld.placeholder = String(f.vorgabe);
+    feld.value = f.eingestellt === null ? '' : String(f.eingestellt);
+    feld.disabled = !f.darf;
+    var einheit = document.createElement('span');
+    einheit.className = 'input-group-text';
+    einheit.textContent = text('Tage');
+    var knopf = document.createElement('button');
+    knopf.type = 'button'; knopf.className = 'btn btn-primary';
+    knopf.disabled = !f.darf;
+    knopf.innerHTML = '<i class="fa-solid fa-floppy-disk me-1"></i>';
+    knopf.appendChild(document.createTextNode(text('Speichern')));
+    gruppe.append(feld, einheit, knopf);
+    var hinweis = document.createElement('div');
+    hinweis.className = 'form-hint';
+    hinweis.textContent = text('Vorgabe', { tage: f.vorgabe, max: f.obergrenze });
+    z.append(label, gruppe, hinweis);
+    if (f.eingestellt !== null && f.eingestellt > f.obergrenze) {
+      var warn = document.createElement('div');
+      warn.className = 'form-hint text-warning';
+      warn.textContent = text('Begrenzt', { tage: f.eingestellt, max: f.obergrenze });
+      z.appendChild(warn);
+    }
+    if (!f.darf) {
+      var recht = document.createElement('div');
+      recht.className = 'form-hint';
+      recht.textContent = text('KeinRecht', { recht: f.recht });
+      z.appendChild(recht);
+    }
+    knopf.addEventListener('click', async function () {
+      knopf.disabled = true;
+      try {
+        var r = await fetch(adresse, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({ name: f.name, tage: feld.value })
+        });
+        var a = await r.json().catch(function () { return { success: false, message: 'HTTP ' + r.status }; });
+        if (!a.success) throw new Error(a.message || 'HTTP ' + r.status);
+        melde('success', text('Gespeichert', { tage: a.data.wirksam }));
+      } catch (e) {
+        melde('error', e.message);
+      }
+      knopf.disabled = false;
+    });
+    return z;
+  }
+  fetch(adresse, { headers: { 'Accept': 'application/json' } })
+    .then(function (r) { return r.json().catch(function () { return { success: false, message: 'HTTP ' + r.status }; }); })
+    .then(function (a) {
+      if (!a.success) throw new Error(a.message || '?');
+      liste.innerHTML = '';
+      if (!a.data.length) { karte.classList.add('d-none'); return; }
+      a.data.forEach(function (f) { liste.appendChild(zeile(f)); });
+    })
+    .catch(function (e) {
+      liste.innerHTML = '';
+      var d = document.createElement('div');
+      d.className = 'text-danger';
+      d.textContent = text('Ladefehler', { grund: e.message });
+      liste.appendChild(d);
+    });
+})();
+</script>

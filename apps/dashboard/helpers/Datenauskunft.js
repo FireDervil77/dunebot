@@ -26,8 +26,8 @@
  *   loeschen       Zeilen, die das Mitglied nennen, gehen
  *   anonymisieren  die ID wird `'0'` (steht schon als „kein Besitzer“ in
  *                  `gameservers.user_id`), `mit`-Spalten werden NULL bzw. ''
- *   frist          bleibt bis zum Ende der Aufbewahrung (G-05), die Auskunft
- *                  nennt es mit Grund
+ *   frist          bleibt bis zum Ende der Aufbewahrung (G-05, `Aufbewahrung.js`),
+ *                  die Auskunft nennt es mit Grund und höchstens Tagen
  *   ausgenommen    keine Mitglieds-Spalte; gezählt wird trotzdem, damit die
  *                  Auskunft z. B. „Besitzer von Guild X“ nicht verschweigt
  *
@@ -287,6 +287,9 @@ async function auskunft(userId, { guildId = null, mitZeilen = false } = {}) {
     const { plugins, fehler } = await plan();
     const summe = { ...Object.fromEntries(WEGE.map(w => [w, 0])), mitgeloescht: 0 };
     const tabVon = new Map(plugins.flatMap(p => p.tabellen.map(t => [t.tabelle, t])));
+    // Wie lange `frist`-Zeilen höchstens bleiben (G-05): in der Guild deren
+    // Tage, über alle Guilds das Längste.
+    const fristTage = await require('./Aufbewahrung').tageJeTabelle(guildId);
     const guilds = new Set();
     const aus = [];
 
@@ -309,6 +312,7 @@ async function auskunft(userId, { guildId = null, mitZeilen = false } = {}) {
                 }
                 eintraege.push({
                     tabelle: tab.tabelle, spalte: e.spalte, weg: e.weg, grund: e.grund || undefined,
+                    tage: e.weg === 'frist' ? fristTage.get(tab.tabelle) ?? null : undefined,
                     bereich: tab.bereich.art, zeilen: n, jeGuild: verteilt,
                 });
                 summe[e.weg] += n;
@@ -365,7 +369,7 @@ async function inTransaktion(trocken, tun) {
  *
  * Je Plugin eine Transaktion und eine Rückmeldung: `{ plugin, ok, geloescht:
  * {tabelle: n}, mitgeloescht: {tabelle: n} (CASCADE), anonymisiert: {'tabelle.spalte': n}, bleibt: {'tabelle.spalte':
- * {zeilen, grund}}, nurUeberall: [...], fehler }`. Scheitert ein Plugin,
+ * {zeilen, grund, tage}}, nurUeberall: [...], fehler }`. Scheitert ein Plugin,
  * laufen die anderen weiter; die Rückmeldung sagt, welches.
  *
  * @param {string} userId Discord-ID
@@ -381,6 +385,7 @@ async function mitgliedLoeschen(userId, { guildId = null, trocken = false, anlas
     const pm = ServiceManager.has('pluginManager') ? ServiceManager.get('pluginManager') : null;
     if (!trocken && !pm) throw new Error('Datenauskunft: PluginManager fehlt, die Haken der Plugins wären übergangen');
     const { plugins } = await plan();
+    const fristTage = await require('./Aufbewahrung').tageJeTabelle(guildId);
     const ergebnisse = [];
 
     for (const p of plugins) {
@@ -407,7 +412,7 @@ async function mitgliedLoeschen(userId, { guildId = null, trocken = false, anlas
                 }
                 const [{ n }] = await db().query(`SELECT COUNT(*) AS n FROM ${q(tab.tabelle)} WHERE ${wo.sql}`, wo.werte);
                 if (!Number(n)) continue;
-                if (e.weg === 'frist') r.bleibt[`${tab.tabelle}.${e.spalte}`] = { zeilen: Number(n), grund: e.grund };
+                if (e.weg === 'frist') r.bleibt[`${tab.tabelle}.${e.spalte}`] = { zeilen: Number(n), grund: e.grund, tage: fristTage.get(tab.tabelle) ?? null };
                 else zuTun += Number(n);
             }
         }

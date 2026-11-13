@@ -443,6 +443,57 @@ router.post('/zeitplan/vergessen', async (req, res) => {
 });
 
 // ================================================================
+// AUFBEWAHRUNG (G-05)
+// Fristen aller Plugins, Obergrenze des Betreibers, Probelauf.
+// ================================================================
+
+router.get('/aufbewahrung', async (req, res) => {
+    const themeManager = ServiceManager.get('themeManager');
+    const Logger = ServiceManager.get('Logger');
+    try {
+        const Aufbewahrung = require('../helpers/Aufbewahrung');
+        const fristen = await Aufbewahrung.stand();
+        await themeManager.renderView(res, 'admin/aufbewahrung', {
+            title: 'Aufbewahrung',
+            activeMenu: '/admin/aufbewahrung',
+            fristen,
+            eingetragen: ServiceManager.has('aufbewahrung'),
+            takt: Aufbewahrung.TAKT,
+            tageMax: Aufbewahrung.TAGE_MAX,
+        });
+    } catch (error) {
+        Logger.error('[Admin] Aufbewahrung nicht lesbar:', error);
+        res.status(500).send(`Die Fristen ließen sich nicht lesen: ${error.message}`);
+    }
+});
+
+router.post('/aufbewahrung/grenze', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const plugin = String(req.body?.plugin || '');
+    const name = String(req.body?.name || '');
+    try {
+        const r = await require('../helpers/Aufbewahrung').setzeGrenze(plugin, name, req.body?.tage);
+        if (!r.ok) return res.status(400).json({ success: false, message: r.grund });
+        Logger.info(`[Admin] Aufbewahrung ${plugin}:${name}: Obergrenze ${r.obergrenze} Tage`);
+        res.json({ success: true, message: `${plugin}:${name}: höchstens ${r.obergrenze} Tage.` });
+    } catch (error) {
+        Logger.error('[Admin] Obergrenze nicht gespeichert:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+router.post('/aufbewahrung/probe', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    try {
+        const r = await require('../helpers/Aufbewahrung').laufen({ trocken: true });
+        res.json({ success: true, ergebnis: r, message: r.zeilen ? `Heute Nacht gingen ${r.zeilen} Zeile(n).` : 'Heute Nacht ginge nichts.' });
+    } catch (error) {
+        Logger.error('[Admin] Probelauf der Aufbewahrung gescheitert:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// ================================================================
 // WARTUNGSSEITE
 // Geschaltet wird hier, ausgeliefert vom Apache (helpers/Wartung.js).
 // ================================================================

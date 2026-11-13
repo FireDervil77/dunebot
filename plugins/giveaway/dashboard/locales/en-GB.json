@@ -173,5 +173,8 @@
     "MANAGE_DESC": "Allows editing, pausing, ending and rerolling giveaways",
     "DELETE": "Delete giveaways",
     "DELETE_DESC": "Allows deleting giveaways permanently"
+  },
+  "AUFBEWAHRUNG": {
+    "SPERREN": "Giveaway bans (expire afterwards)"
   }
 }

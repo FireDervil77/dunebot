@@ -1,0 +1,115 @@
+<%# Aufbewahrung (G-05, 2026-11-14): je Frist aus den package.json der Plugins
+    die Obergrenze des Betreibers, was Guilds eingestellt haben, und der letzte Lauf.
+    Gelöscht wird nachts über den Zeitplan (core:aufbewahrung). %>
+<%
+  const liste = typeof fristen !== 'undefined' ? fristen : [];
+  const an = typeof eingetragen !== 'undefined' ? eingetragen : false;
+  const _takt = typeof takt !== 'undefined' ? takt : '';
+  const _max = typeof tageMax !== 'undefined' ? tageMax : 3653;
+  const _tr = (k) => (typeof tr === 'function' ? tr(k) : k);
+  const zeit = (w) => w ? new Date(w).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' }) : '–';
+  const datum = (w) => w ? new Date(w).toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin' }) : '–';
+%>
+<div class="container-fluid">
+  <% if (!an) { %>
+    <div class="alert alert-danger"><i class="fa-solid fa-triangle-exclamation me-2"></i>Die Aufbewahrung ist nicht im Zeitplan eingetragen. Es wird nichts nach Frist gelöscht. Ursache steht im Log des Dashboards beim Start (<code>[INIT] Aufbewahrung</code>).</div>
+  <% } %>
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title mb-0"><i class="fa-solid fa-hourglass-half me-2"></i>Fristen</h3>
+      <div class="card-actions">
+        <button type="button" class="btn btn-sm btn-outline-primary" data-aufbewahrung-probe><i class="fa-solid fa-calculator me-1"></i>Probelauf</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <p class="text-secondary">Jedes Plugin erklärt in seiner <code>package.json</code> unter <code>aufbewahrung</code>, was es wie lange behält. Jede Nacht (<code class="font-monospace"><%= _takt %></code>, Aufgabe <a href="/admin/zeitplan"><code>core:aufbewahrung</code></a>) wird gelöscht, was älter ist. Bei „Guild“ stellt die Guild die Tage auf der Seite des Plugins ein, höchstens bis zur Obergrenze. Die Obergrenze hier gilt für alle Guilds; leer heißt: die aus der Erklärung. Wer mehr eingestellt hat, wird begrenzt, seine Einstellung bleibt. Der Probelauf zählt nur.</p>
+      <div class="table-responsive">
+        <table class="table table-sm table-vcenter mb-0">
+          <thead><tr><th>Frist</th><th>Tabelle</th><th class="text-end">Vorgabe</th><th>Obergrenze</th><th>Guilds</th><th class="text-end">Bestand</th><th>Letzter Lauf</th><th class="text-end">Probe</th></tr></thead>
+          <tbody>
+            <% liste.forEach(function (f) { %>
+              <tr data-frist="<%= f.schluessel %>">
+                <td>
+                  <div><%= _tr(f.titel) %></div>
+                  <div class="small text-secondary font-monospace"><%= f.schluessel %></div>
+                  <% if (f.wo || f.ohne) { %><div class="small text-secondary">nur<% if (f.wo) { %> <%= Object.entries(f.wo).map(([s, w]) => `${s} ∈ {${w.join(', ')}}`).join(', ') %><% } %><% if (f.ohne) { %>, ohne <%= f.ohne.tabelle %><% if (f.ohne.wo) { %> (<%= Object.entries(f.ohne.wo).map(([s, w]) => `${s} ∈ {${w.join(', ')}}`).join(', ') %>)<% } %><% } %></div><% } %>
+                </td>
+                <td class="small font-monospace"><%= f.tabelle %><div class="text-secondary"><%= f.zeitspalte %></div></td>
+                <td class="text-end text-nowrap"><%= f.vorgabe %> T.<% if (f.vorgabe !== f.vorgabe_tage) { %><div class="small text-secondary">erklärt <%= f.vorgabe_tage %></div><% } %></td>
+                <td style="min-width: 13rem">
+                  <div class="input-group input-group-sm">
+                    <input type="number" class="form-control" min="1" max="<%= _max %>" step="1" placeholder="<%= f.hoechstens_tage %>" value="<%= f.grenze_gesetzt ? f.obergrenze : '' %>" data-grenze-feld>
+                    <span class="input-group-text">T.</span>
+                    <button type="button" class="btn btn-outline-primary" data-grenze-speichern data-plugin="<%= f.plugin %>" data-name="<%= f.name %>"><i class="fa-solid fa-floppy-disk"></i></button>
+                  </div>
+                  <div class="small text-secondary">erklärt <%= f.hoechstens_tage %><% if (f.grenze_gesetzt) { %>, gesetzt <%= f.obergrenze %><% } %></div>
+                </td>
+                <td class="small">
+                  <% if (!f.guild) { %><span class="text-secondary">nur Betreiber</span>
+                  <% } else if (!f.guilds) { %>alle mit Vorgabe
+                  <% } else { %><%= f.guilds %> abweichend, <%= f.kuerzeste %>–<%= f.laengste %> T.<% if (f.begrenzt) { %><div class="text-warning"><%= f.begrenzt %> begrenzt</div><% } %><% } %>
+                </td>
+                <td class="text-end small text-nowrap">
+                  <% if (f.bestand && f.bestand.fehler) { %><span class="text-red"><%= f.bestand.fehler %></span>
+                  <% } else if (f.bestand) { %><%= f.bestand.zeilen %><div class="text-secondary">älteste <%= datum(f.bestand.aelteste) %></div><% } %>
+                </td>
+                <td class="small text-nowrap">
+                  <%= zeit(f.letzter_lauf) %>
+                  <% if (f.letzter_lauf) { %><div class="text-secondary"><%= f.zuletzt_geloescht %> gelöscht, gesamt <%= f.geloescht_gesamt %></div><% } %>
+                  <% if (f.letzter_fehler) { %><div class="text-red text-wrap"><%= f.letzter_fehler %></div><% } %>
+                </td>
+                <td class="text-end small" data-probe-zahl>–</td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  function melde(art, text) {
+    if (window.GuildAjaxHandler && GuildAjaxHandler.showToast) GuildAjaxHandler.showToast(art, text);
+    else if (typeof showToast === 'function') showToast(art, text);
+  }
+  async function sende(url, daten) {
+    var r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(daten) });
+    var d = await r.json().catch(function () { return {}; });
+    if (!r.ok || !d.success) throw new Error(d.message || 'Fehlgeschlagen.');
+    return d;
+  }
+  document.querySelectorAll('[data-grenze-speichern]').forEach(function (k) {
+    k.addEventListener('click', async function () {
+      var feld = k.closest('td').querySelector('[data-grenze-feld]');
+      k.disabled = true;
+      try {
+        var d = await sende('/admin/aufbewahrung/grenze', { plugin: k.dataset.plugin, name: k.dataset.name, tage: feld.value });
+        melde('success', d.message);
+        setTimeout(function () { location.reload(); }, 1500);
+      } catch (e) {
+        melde('error', e.message);
+        k.disabled = false;
+      }
+    });
+  });
+  var probe = document.querySelector('[data-aufbewahrung-probe]');
+  probe.addEventListener('click', async function () {
+    probe.disabled = true;
+    try {
+      var d = await sende('/admin/aufbewahrung/probe', {});
+      d.ergebnis.je.forEach(function (r) {
+        var zelle = document.querySelector('tr[data-frist="' + CSS.escape(r.frist) + '"] [data-probe-zahl]');
+        if (!zelle) return;
+        zelle.textContent = r.fehler ? r.fehler : String(r.zeilen);
+        zelle.className = 'text-end small ' + (r.fehler ? 'text-red' : (r.zeilen ? 'text-warning' : 'text-secondary'));
+      });
+      melde('success', d.message);
+    } catch (e) {
+      melde('error', e.message);
+    }
+    probe.disabled = false;
+  });
+})();
+</script>

@@ -173,5 +173,8 @@
     "MANAGE_DESC": "Berechtigung um Giveaways zu bearbeiten, pausieren, beenden und rerolls durchzuführen",
     "DELETE": "Giveaways löschen",
     "DELETE_DESC": "Berechtigung um Giveaways dauerhaft zu löschen"
+  },
+  "AUFBEWAHRUNG": {
+    "SPERREN": "Sperren für Gewinnspiele (laufen danach aus)"
   }
 }

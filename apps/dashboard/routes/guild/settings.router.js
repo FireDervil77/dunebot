@@ -336,6 +336,62 @@ router.get('/integrations', requirePermission('CORE.SETTINGS.EDIT'), async (req,
 });
 
 // =============================================
+// AUFBEWAHRUNG (G-05)
+// Kern-Teil `shared/aufbewahrung` auf den Seiten der Plugins. Sehen darf es
+// jeder mit Zugang zur Guild, ändern nur, wer das Recht der Frist hat
+// (`recht` in der Erklärung des Plugins).
+// =============================================
+
+const PLUGIN_NAME = /^[a-z0-9_-]{1,32}$/;
+
+// GET /settings/aufbewahrung/:plugin → die einstellbaren Fristen des Plugins
+router.get('/aufbewahrung/:plugin', async (req, res) => {
+    const guildId = res.locals.guildId;
+    const plugin = String(req.params.plugin);
+    if (!PLUGIN_NAME.test(plugin)) return res.status(400).json({ success: false, message: 'Unbekanntes Plugin' });
+    try {
+        const pm = ServiceManager.get('permissionManager');
+        const userId = req.session.user?.info?.id;
+        const fristen = await require('../../helpers/Aufbewahrung').fuerGuild(guildId, plugin);
+        const rechte = {};
+        for (const f of fristen) {
+            if (!(f.recht in rechte)) rechte[f.recht] = Boolean(userId && await pm.hasPermission(userId, guildId, f.recht));
+        }
+        res.json({
+            success: true,
+            data: fristen.map(f => ({ ...f, titel: req.translate(f.titel), darf: rechte[f.recht] })),
+        });
+    } catch (err) {
+        ServiceManager.get('Logger').error(`[Aufbewahrung] Fristen von ${plugin} für ${guildId} nicht lesbar:`, err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// PUT /settings/aufbewahrung/:plugin { name, tage } → tage leer = Vorgabe
+router.put('/aufbewahrung/:plugin', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const guildId = res.locals.guildId;
+    const plugin = String(req.params.plugin);
+    const name = String(req.body?.name ?? '');
+    if (!PLUGIN_NAME.test(plugin)) return res.status(400).json({ success: false, message: 'Unbekanntes Plugin' });
+    const Aufbewahrung = require('../../helpers/Aufbewahrung');
+    const frist = Aufbewahrung.erklaerungen().find(e => e.plugin === plugin && e.name === name && e.guild);
+    if (!frist) return res.status(404).json({ success: false, message: `Keine einstellbare Frist ${plugin}:${name}` });
+    // Das Recht steht in der Erklärung, also erst hier bekannt.
+    return requirePermission(frist.recht)(req, res, async () => {
+        try {
+            const r = await Aufbewahrung.setzeGuild(guildId, plugin, name, req.body?.tage);
+            if (!r.ok) return res.status(400).json({ success: false, message: r.grund });
+            Logger.info(`[Aufbewahrung] ${plugin}:${name} in ${guildId}: ${r.wirksam} Tage (von ${req.session.user.info.id})`);
+            res.json({ success: true, data: { wirksam: r.wirksam } });
+        } catch (err) {
+            Logger.error(`[Aufbewahrung] ${plugin}:${name} in ${guildId} nicht gespeichert:`, err);
+            res.status(500).json({ success: false, message: err.message });
+        }
+    });
+});
+
+// =============================================
 // CHANNEL-VERWALTUNG (Discord Channels Mirror)
 // =============================================
 

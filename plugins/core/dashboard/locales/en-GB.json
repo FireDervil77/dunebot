@@ -396,5 +396,20 @@
     "ROLES_VIEW_DESC": "Allows viewing Discord roles and their permissions",
     "ROLES_EDIT": "Edit Roles",
     "ROLES_EDIT_DESC": "Allows creating, editing and deleting Discord roles (CRITICAL)"
+  },
+  "AUFBEWAHRUNG": {
+    "TITEL": "Data retention",
+    "TEXT": "How long the bot keeps these entries. Older ones are deleted every night. Empty means: the default applies.",
+    "TAGE": "days",
+    "VORGABE": "Default {{tage}} days, at most {{max}}",
+    "BEGRENZT": "{{tage}} days are set, the operator allows at most {{max}}. {{max}} apply.",
+    "SPEICHERN": "Save",
+    "GESPEICHERT": "Saved. {{tage}} days apply.",
+    "KEIN_RECHT": "Only members with the permission {{recht}} can change this.",
+    "LADEFEHLER": "Could not load the retention periods: {{grund}}",
+    "TOAST": "Log of dashboard notices",
+    "EREIGNISBUCH": "Domain events, fully delivered",
+    "EREIGNISBUCH_SPAETESTENS": "Domain events, at the latest (including stuck ones)",
+    "SPENDEN": "Donations (payment records)"
   }
 }

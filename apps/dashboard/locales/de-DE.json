@@ -265,6 +265,7 @@
     "ZAHL_MIT": "{{n}} gehen mit",
     "ZAHL_ANONYM": "{{n}} bleiben ohne deinen Namen",
     "ZAHL_FRIST": "{{n}} bleiben bis zum Ende der Frist: {{grund}}",
+    "ZAHL_FRIST_TAGE": "{{n}} bleiben bis zum Ende der Frist, höchstens {{tage}} Tage: {{grund}}",
     "ZAHL_BLEIBT": "{{n}} bleiben: {{grund}}",
     "UEBERGREIFEND": "Nicht an einen Server gebunden",
     "UEBERGREIFEND_HILFE": "Dein Konto, Bewertungen und ähnliches gehören zu keinem Server. Sie gehen nur mit „Überall löschen“.",

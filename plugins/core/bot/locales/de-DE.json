@@ -115,6 +115,7 @@
         "ZAHL_MIT": "{{n}} gehen mit",
         "ZAHL_ANONYM": "{{n}} bleiben ohne deinen Namen",
         "ZAHL_FRIST": "{{n}} bleiben bis zum Ende der Frist: {{grund}}",
+        "ZAHL_FRIST_TAGE": "{{n}} bleiben bis zum Ende der Frist, höchstens {{tage}} Tage: {{grund}}",
         "ZAHL_BLEIBT": "{{n}} bleiben: {{grund}}",
         "ANDERE_GUILDS": "Auf {{n}} weiteren Servern liegen auch Daten über dich. Die löscht „Überall löschen“.",
         "UEBERGREIFEND": "Nicht an einen Server gebunden (geht nur mit „Überall löschen“):",

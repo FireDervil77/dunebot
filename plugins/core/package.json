@@ -31,11 +31,12 @@
       "guild_groups",
       "guild_users",
       "guild_plugins",
+      "aufbewahrung_tage",
       "guilds"
     ],
     "bleiben": {
       "user_feedback": "Rückmeldung an den Betreiber, guild-übergreifend; blieb schon beim Verlassen (GuildManager)",
-      "donations": "Zahlungsbeleg, gesetzliche Aufbewahrung; die Frist legt G-05 fest"
+      "donations": "Zahlungsbeleg, gesetzliche Aufbewahrung; gelöscht nach der Frist `spenden` (G-05)"
     }
   },
   "ereignisse": {
@@ -126,7 +127,7 @@
     "donations": {
       "user_id": {
         "weg": "frist",
-        "grund": "Zahlungsbeleg, gesetzliche Aufbewahrung; die Frist legt G-05 fest, Rechtsprüfung beim Betreiber"
+        "grund": "Zahlungsbeleg, gesetzliche Aufbewahrung"
       }
     },
     "frontend_pages": {
@@ -143,12 +144,65 @@
     "ereignisbuch": {
       "akteur": {
         "weg": "frist",
-        "grund": "Zustellbuch der Fachereignisse, Frist 7 Tage (G-05); was ein Hörer daraus speichert, erklärt der Hörer"
+        "grund": "Zustellbuch der Fachereignisse zwischen den Plugins; was ein Plugin daraus speichert, erklärt das Plugin"
       },
       "betroffen": {
         "weg": "frist",
-        "grund": "wie akteur"
+        "grund": "Zustellbuch der Fachereignisse zwischen den Plugins; was ein Plugin daraus speichert, erklärt das Plugin"
       }
     }
-  }
+  },
+  "aufbewahrung": [
+    {
+      "name": "toast-protokoll",
+      "tabelle": "guild_toast_logs",
+      "zeitspalte": "created_at",
+      "vorgabe_tage": 7,
+      "hoechstens_tage": 30,
+      "guild": false,
+      "titel": "core:AUFBEWAHRUNG.TOAST"
+    },
+    {
+      "name": "ereignisbuch",
+      "tabelle": "ereignisbuch",
+      "zeitspalte": "angelegt_am",
+      "vorgabe_tage": 7,
+      "hoechstens_tage": 30,
+      "guild": false,
+      "titel": "core:AUFBEWAHRUNG.EREIGNISBUCH",
+      "wo": {
+        "zustand": [
+          "verteilt"
+        ]
+      },
+      "ohne": {
+        "tabelle": "ereignis_quittungen",
+        "spalte": "ereignis_id",
+        "wo": {
+          "zustand": [
+            "offen",
+            "liegen_geblieben"
+          ]
+        }
+      }
+    },
+    {
+      "name": "ereignisbuch-spaetestens",
+      "tabelle": "ereignisbuch",
+      "zeitspalte": "angelegt_am",
+      "vorgabe_tage": 30,
+      "hoechstens_tage": 90,
+      "guild": false,
+      "titel": "core:AUFBEWAHRUNG.EREIGNISBUCH_SPAETESTENS"
+    },
+    {
+      "name": "spenden",
+      "tabelle": "donations",
+      "zeitspalte": "created_at",
+      "vorgabe_tage": 3653,
+      "hoechstens_tage": 3653,
+      "guild": false,
+      "titel": "core:AUFBEWAHRUNG.SPENDEN"
+    }
+  ]
 }

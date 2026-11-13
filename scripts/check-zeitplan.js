@@ -62,7 +62,6 @@ const warte = (ms) => new Promise(r => setTimeout(r, ms));
  */
 const BESTAND = {
     'apps/dashboard/helpers/Zeitplan.js': 'der Zeitplan selbst',
-    'apps/dashboard/index.js': 'Toast-Logs nach 7 Tagen löschen; zieht mit G-05 (Aufbewahrung) um',
     'plugins/gameserver/dashboard/helpers/CronWorker.js': 'Cronjobs, die Nutzer je Gameserver anlegen (eigene Tabelle), dazu Aufbewahrung und Kennzahlen nachts',
 };
 

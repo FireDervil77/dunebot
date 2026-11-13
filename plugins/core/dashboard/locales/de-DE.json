@@ -396,5 +396,20 @@
     "ROLES_VIEW_DESC": "Erlaubt das Ansehen der Discord-Rollen und deren Berechtigungen",
     "ROLES_EDIT": "Rollen bearbeiten",
     "ROLES_EDIT_DESC": "Erlaubt das Erstellen, Bearbeiten und Löschen von Discord-Rollen (KRITISCH)"
+  },
+  "AUFBEWAHRUNG": {
+    "TITEL": "Aufbewahrung",
+    "TEXT": "So lange bewahrt der Bot diese Einträge auf. Ältere löscht er jede Nacht. Leer heißt: Es gilt die Vorgabe.",
+    "TAGE": "Tage",
+    "VORGABE": "Vorgabe {{tage}} Tage, höchstens {{max}}",
+    "BEGRENZT": "Eingestellt sind {{tage}} Tage, der Betreiber erlaubt höchstens {{max}}. Es gelten {{max}}.",
+    "SPEICHERN": "Speichern",
+    "GESPEICHERT": "Gespeichert. Es gelten {{tage}} Tage.",
+    "KEIN_RECHT": "Ändern darf nur, wer das Recht {{recht}} hat.",
+    "LADEFEHLER": "Die Fristen ließen sich nicht laden: {{grund}}",
+    "TOAST": "Protokoll der Hinweise im Dashboard",
+    "EREIGNISBUCH": "Fachereignisse, fertig zugestellt",
+    "EREIGNISBUCH_SPAETESTENS": "Fachereignisse, spätestens (auch liegen gebliebene)",
+    "SPENDEN": "Spenden (Zahlungsbelege)"
   }
 }

@@ -191,5 +191,9 @@
     "PROTECTED_ROLES_MANAGE_DESC": "Berechtigung um geschützte Rollen zu konfigurieren (kritische Aktion)",
     "CHANNEL_RULES_MANAGE": "Channel-Regeln verwalten",
     "CHANNEL_RULES_MANAGE_DESC": "Berechtigung um channel-spezifische Moderationsregeln zu konfigurieren"
+  },
+  "AUFBEWAHRUNG": {
+    "FAELLE": "Moderationsfälle",
+    "NOTIZEN": "Notizen zu Mitgliedern"
   }
 }

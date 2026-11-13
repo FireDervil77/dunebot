@@ -191,5 +191,9 @@
     "PROTECTED_ROLES_MANAGE_DESC": "Allows configuring protected roles (critical action)",
     "CHANNEL_RULES_MANAGE": "Manage channel rules",
     "CHANNEL_RULES_MANAGE_DESC": "Allows configuring channel-specific moderation rules"
+  },
+  "AUFBEWAHRUNG": {
+    "FAELLE": "Moderation cases",
+    "NOTIZEN": "Notes on members"
   }
 }

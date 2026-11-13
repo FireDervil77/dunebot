@@ -258,6 +258,7 @@
     "ZAHL_MIT": "{{n}} go along",
     "ZAHL_ANONYM": "{{n}} stay without your name",
     "ZAHL_FRIST": "{{n}} stay until the retention period ends: {{grund}}",
+    "ZAHL_FRIST_TAGE": "{{n}} stay until the retention period ends, at most {{tage}} days: {{grund}}",
     "ZAHL_BLEIBT": "{{n}} stay: {{grund}}",
     "UEBERGREIFEND": "Not tied to a server",
     "UEBERGREIFEND_HILFE": "Your account, ratings and the like belong to no server. They only go with “Delete everywhere”.",

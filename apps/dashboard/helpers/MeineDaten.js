@@ -41,7 +41,7 @@ function zusammenzaehlen(plugins, nur = () => true) {
                 summe[e.weg] += e.zeilen;
             } else if (e.weg === 'frist' || e.weg === 'ausgenommen') {
                 const liste = e.weg === 'frist' ? z.bleibt : z.ausgenommen;
-                liste.push({ was: `${e.tabelle}.${e.spalte}`, zeilen: e.zeilen, grund: e.grund || '' });
+                liste.push({ was: `${e.tabelle}.${e.spalte}`, zeilen: e.zeilen, grund: e.grund || '', tage: e.tage ?? null });
                 summe[e.weg === 'frist' ? 'bleibt' : 'ausgenommen'] += e.zeilen;
             }
         }
@@ -151,7 +151,7 @@ function rueckmeldung(ergebnis) {
             geloescht: summe(r.geloescht),
             mitgeloescht: summe(r.mitgeloescht),
             anonymisiert: summe(r.anonymisiert),
-            bleibt: Object.entries(r.bleibt || {}).map(([was, b]) => ({ was, zeilen: b.zeilen, grund: b.grund || '' })),
+            bleibt: Object.entries(r.bleibt || {}).map(([was, b]) => ({ was, zeilen: b.zeilen, grund: b.grund || '', tage: b.tage ?? null })),
             nurUeberall: (r.nurUeberall || []).length,
             fehler: r.fehler || null,
         };

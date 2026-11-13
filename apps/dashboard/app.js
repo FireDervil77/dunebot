@@ -264,6 +264,14 @@ module.exports = class App {
                 Logger.error('[INIT] Aufräumer für verlassene Guilds konnte nicht starten:', error);
             }
 
+            // Aufbewahrung (G-05): nachts alte Zeilen nach den Fristen der
+            // Plugins löschen. Wirft, wenn eine Erklärung fehlerhaft ist.
+            try {
+                require('./helpers/Aufbewahrung').starten();
+            } catch (error) {
+                Logger.error('[INIT] Aufbewahrung konnte nicht starten, es wird nichts nach Frist gelöscht:', error);
+            }
+
             // Hook nach der Initialisierung ausführen
             if (this.app.pluginManager && this.app.pluginManager.hooks) {
                 await this.app.pluginManager.hooks.doAction('after_dashboard_initialize', this.app);

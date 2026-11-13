@@ -22,7 +22,7 @@
       if (p.mitgeloescht) teile.push(tr('MEINEDATEN.ZAHL_MIT', { n: p.mitgeloescht }));
       if (p.anonymisieren) teile.push(tr('MEINEDATEN.ZAHL_ANONYM', { n: p.anonymisieren }));
       if (teile.length) aus.push({ art: 'weg', plugin: p.plugin, text: teile.join(' · ') });
-      for (const b of p.bleibt) aus.push({ art: 'frist', plugin: p.plugin, text: tr('MEINEDATEN.ZAHL_FRIST', { n: b.zeilen, grund: b.grund }) });
+      for (const b of p.bleibt) aus.push({ art: 'frist', plugin: p.plugin, text: tr(b.tage ? 'MEINEDATEN.ZAHL_FRIST_TAGE' : 'MEINEDATEN.ZAHL_FRIST', { n: b.zeilen, grund: b.grund, tage: b.tage }) });
       for (const b of p.ausgenommen) aus.push({ art: 'bleibt', plugin: p.plugin, text: tr('MEINEDATEN.ZAHL_BLEIBT', { n: b.zeilen, grund: b.grund }) });
     }
     return aus;
@@ -38,6 +38,7 @@
      data-text-anonym="<%= tr('MEINEDATEN.ERG_ANONYM') %>"
      data-text-fehler="<%= tr('MEINEDATEN.ERG_FEHLER') %>"
      data-text-frist="<%= tr('MEINEDATEN.ZAHL_FRIST') %>"
+     data-text-frist-tage="<%= tr('MEINEDATEN.ZAHL_FRIST_TAGE') %>"
      data-text-nur-ueberall="<%= tr('MEINEDATEN.ERG_NUR_UEBERALL') %>"
      data-text-nichts="<%= tr('MEINEDATEN.ERG_NICHTS') %>"
      data-text-abgemeldet="<%= tr('MEINEDATEN.ERG_ABGEMELDET') %>"
@@ -225,7 +226,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (p.mitgeloescht) teile.push(text('Mit', { n: p.mitgeloescht }));
       if (p.anonymisiert) teile.push(text('Anonym', { n: p.anonymisiert }));
       if (teile.length) zeilen.push(`${p.plugin}: ${teile.join(' · ')}`);
-      p.bleibt.forEach(b => zeilen.push(`${p.plugin}: ${text('Frist', { n: b.zeilen, grund: b.grund })}`));
+      p.bleibt.forEach(b => zeilen.push(`${p.plugin}: ${text(b.tage ? 'FristTage' : 'Frist', { n: b.zeilen, grund: b.grund, tage: b.tage })}`));
       if (p.nurUeberall) zeilen.push(`${p.plugin}: ${text('NurUeberall', { n: p.nurUeberall })}`);
     }
     if (!zeilen.length) zeilen.push(text('Nichts'));

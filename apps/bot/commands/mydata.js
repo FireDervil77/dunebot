@@ -91,7 +91,7 @@ function auskunftZeilen(teil, t) {
         if (p.mitgeloescht) teile.push(t("ZAHL_MIT", { n: p.mitgeloescht }));
         if (p.anonymisieren) teile.push(t("ZAHL_ANONYM", { n: p.anonymisieren }));
         if (teile.length) zeilen.push(`**${p.plugin}**: ${teile.join(" · ")}`);
-        for (const b of p.bleibt) zeilen.push(`⏳ **${p.plugin}**: ${t("ZAHL_FRIST", { n: b.zeilen, grund: b.grund })}`);
+        for (const b of p.bleibt) zeilen.push(`⏳ **${p.plugin}**: ${t(b.tage ? "ZAHL_FRIST_TAGE" : "ZAHL_FRIST", { n: b.zeilen, grund: b.grund, tage: b.tage })}`);
         for (const b of p.ausgenommen) zeilen.push(`ℹ️ **${p.plugin}**: ${t("ZAHL_BLEIBT", { n: b.zeilen, grund: b.grund })}`);
     }
     return zeilen;
@@ -120,7 +120,7 @@ function ergebnisEmbed(r, t) {
         if (p.mitgeloescht) teile.push(t("ERG_MIT", { n: p.mitgeloescht }));
         if (p.anonymisiert) teile.push(t("ERG_ANONYM", { n: p.anonymisiert }));
         if (teile.length) zeilen.push(`✅ **${p.plugin}**: ${teile.join(" · ")}`);
-        for (const b of p.bleibt) zeilen.push(`⏳ **${p.plugin}**: ${t("ZAHL_FRIST", { n: b.zeilen, grund: b.grund })}`);
+        for (const b of p.bleibt) zeilen.push(`⏳ **${p.plugin}**: ${t(b.tage ? "ZAHL_FRIST_TAGE" : "ZAHL_FRIST", { n: b.zeilen, grund: b.grund, tage: b.tage })}`);
         if (p.nurUeberall) zeilen.push(`ℹ️ **${p.plugin}**: ${t("ERG_NUR_UEBERALL", { n: p.nurUeberall })}`);
     }
     if (!zeilen.length) zeilen.push(t("ERG_NICHTS"));

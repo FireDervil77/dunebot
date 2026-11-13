@@ -371,5 +371,10 @@
     "LOGS_VIEW_DESC": "Allows viewing AutoMod actions (deleted messages, warnings, etc.)",
     "KEYWORDS_MANAGE": "Manage keyword lists",
     "KEYWORDS_MANAGE_DESC": "Allows editing keyword lists and their words. Whoever may do this also sees the wording of the lists."
+  },
+  "AUFBEWAHRUNG": {
+    "TREFFER": "Violations with message text",
+    "RAID": "Raid events",
+    "VERWARNSTAND": "Strikes, counted from the last strike"
   }
 }

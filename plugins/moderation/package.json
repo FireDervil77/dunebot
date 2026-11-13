@@ -32,7 +32,7 @@
         "moderation_logs": {
             "member_id": {
                 "weg": "frist",
-                "grund": "Moderations- und Sicherheitsfall: bleibt bis zum Ende seiner Frist (G-05), die Auskunft nennt ihn (F-G2 A)"
+                "grund": "Moderationsfall (Verwarnung, Timeout, Kick, Bann), Sicherheitsfall der Guild"
             },
             "admin_id": {
                 "weg": "anonymisieren",
@@ -44,9 +44,31 @@
         "moderation_notes": {
             "user_id": {
                 "weg": "frist",
-                "grund": "Notiz zu einem Mitglied. Moderations- und Sicherheitsfall: bleibt bis zum Ende seiner Frist (G-05), die Auskunft nennt ihn (F-G2 A)"
+                "grund": "Notiz der Moderation zu einem Mitglied, Sicherheitsfall der Guild"
             },
             "author_id": "anonymisieren"
         }
-    }
+    },
+    "aufbewahrung": [
+        {
+            "name": "faelle",
+            "tabelle": "moderation_logs",
+            "zeitspalte": "created_at",
+            "vorgabe_tage": 365,
+            "hoechstens_tage": 730,
+            "guild": true,
+            "recht": "MODERATION.SETTINGS.EDIT",
+            "titel": "moderation:AUFBEWAHRUNG.FAELLE"
+        },
+        {
+            "name": "notizen",
+            "tabelle": "moderation_notes",
+            "zeitspalte": "created_at",
+            "vorgabe_tage": 365,
+            "hoechstens_tage": 730,
+            "guild": true,
+            "recht": "MODERATION.SETTINGS.EDIT",
+            "titel": "moderation:AUFBEWAHRUNG.NOTIZEN"
+        }
+    ]
 }

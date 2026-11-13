@@ -371,5 +371,10 @@
     "LOGS_VIEW_DESC": "Berechtigung um AutoMod-Aktionen zu sehen (Gelöschte Nachrichten, Warns, etc.)",
     "KEYWORDS_MANAGE": "Stichwortlisten verwalten",
     "KEYWORDS_MANAGE_DESC": "Berechtigung um Stichwortlisten und ihre Wörter zu bearbeiten. Wer das darf, sieht auch den Wortlaut der Listen."
+  },
+  "AUFBEWAHRUNG": {
+    "TREFFER": "Treffer mit Nachrichtentext",
+    "RAID": "Raid-Ereignisse",
+    "VERWARNSTAND": "Strikes, gezählt ab dem letzten Strike"
   }
 }
