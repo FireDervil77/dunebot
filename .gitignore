@@ -59,13 +59,9 @@ cookies.txt
 # Excluded Plugins (nicht für Repo)
 plugins/fun/
 plugins/economy/
-plugins/image-builder/
 plugins/statistik/
-plugins/voiceserver/
-plugins/dunemap/
-plugins/leveling/
 plugins/social-alerts/
-plugins/clan-manager/
+
 
 # tabler_source
 tabler_source/
