@@ -26,8 +26,38 @@ class BotClient extends Client {
                 GatewayIntentBits.GuildVoiceStates,
                 GatewayIntentBits.GuildModeration,
                 GatewayIntentBits.GuildExpressions,
+                // G-13 (K382, 2026-11-13): fuer Logging und Termine (G-19).
+                // Keiner davon ist privilegiert, im Entwicklerportal ist
+                // nichts zu schalten.
+                GatewayIntentBits.GuildScheduledEvents,
+                GatewayIntentBits.GuildWebhooks,
+                GatewayIntentBits.GuildIntegrations,
+                GatewayIntentBits.AutoModerationExecution,
             ],
-            partials: [Partials.User, Partials.Message, Partials.Reaction],
+            // **GuildMember und ThreadMember seit G-13.** Gemessen an
+            // discord.js 14.22.1 (scripts/check-partials.js):
+            //
+            //  - `guildMemberRemove` kommt jetzt auch fuer Mitglieder, die
+            //    nicht im Cache stehen — als Partial: `joinedAt` null, Rollen
+            //    nur @everyone. Vorher kam fuer sie gar nichts.
+            //  - `guildMemberUpdate` kommt fuer ungecachte Mitglieder mit einem
+            //    LEEREN alten Mitglied (`old.partial`, `premiumSince` null,
+            //    keine Rollen). Vorher kam stattdessen `guildMemberAvailable`.
+            //    Wer alt und neu vergleicht, MUSS `oldMember.partial` zuerst
+            //    pruefen, sonst sieht er „alle Rollen neu“ oder einen Boost,
+            //    den es nicht gab. Der Waechter ruft jeden Handler damit auf.
+            //
+            // **`Partials.Channel` bewusst NICHT.** Geplant war es fuer
+            // „Threads ohne Cache“; das traegt nicht: Bei Nachrichten,
+            // Reaktionen und Tippen gibt discord.js nur `{id, guild_id}` ohne
+            // Kanaltyp weiter, und ohne Typ entsteht in einer Gilde kein
+            // Kanal — das Ereignis faellt mit und ohne Partial weg. Wirken
+            // wuerde es nur bei DMs (Intent fehlt) und bei Interaktionen.
+            // Dort baut es aus einem Kanal-Datensatz ohne `guild_id` einen
+            // `DMChannel`, auch fuer einen Gilden-Thread. Ein Schalter, der
+            // fuer seinen Zweck nichts tut und daneben etwas Unerprobtes,
+            // bleibt aus.
+            partials: [Partials.User, Partials.Message, Partials.Reaction, Partials.GuildMember, Partials.ThreadMember],
             allowedMentions: {
                 repliedUser: false,
             },

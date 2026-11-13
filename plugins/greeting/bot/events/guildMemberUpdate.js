@@ -10,6 +10,14 @@ module.exports = async (oldMember, newMember) => {
     const dbService = ServiceManager.get('dbService');
     const logger = ServiceManager.get('Logger');
 
+    // Seit Partials.GuildMember (G-13) kommt fuer ein ungecachtes Mitglied
+    // ein LEERES altes Mitglied: `premiumSince` ist dort immer null. Ohne
+    // diese Zeile bekaeme jeder boostende Nutzer bei jeder Aenderung (Nick,
+    // Rolle) erneut die Boost-Nachricht. Den Vorher-Stand kennen wir nicht —
+    // vor G-13 kam hier fuer solche Mitglieder gar kein Aufruf an, es bleibt
+    // also beim alten Verhalten.
+    if (oldMember.partial) return;
+
     // Check if member just started boosting
     const wasBoosting = oldMember.premiumSince !== null;
     const isBoosting = newMember.premiumSince !== null;
