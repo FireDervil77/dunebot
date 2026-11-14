@@ -443,6 +443,49 @@ router.post('/zeitplan/vergessen', async (req, res) => {
 });
 
 // ================================================================
+// BILDKARTEN (G-10)
+// Jede Vorlage mit Beispielwerten gezeichnet, in der Palette der
+// Kontroll-Guild, mit Zeit und Größe. Ein Name zum Testen von Emoji und
+// Schriften ersetzt den Anzeigenamen des Beispiel-Mitglieds.
+// ================================================================
+
+router.get('/bildkarten', async (req, res) => {
+    const themeManager = ServiceManager.get('themeManager');
+    const { Bildkarte } = require('dunebot-sdk');
+    const guildId = String(process.env.CONTROL_GUILD_ID || '');
+    const testname = String(req.query.name || '').slice(0, 64);
+    const sprache = req.query.sprache === 'en-GB' ? 'en-GB' : 'de-DE';
+    const nutzer = { ...(req.session.user?.info || {}) };
+    if (testname) nutzer.global_name = testname;
+    const karten = [];
+    let guildName = '';
+    try {
+        const zeilen = await ServiceManager.get('dbService').query('SELECT guild_name FROM guilds WHERE _id = ?', [guildId]);
+        guildName = zeilen?.[0]?.guild_name || '';
+    } catch { /* ohne Namen */ }
+    for (const name of Bildkarte.liste()) {
+        try {
+            const v = Bildkarte.vorlage(name);
+            const k = await Bildkarte.beispiel(name, { guildId, guildName, nutzer, sprache });
+            karten.push({
+                name, titel: v.titel || name, breite: v.breite, hoehe: v.hoehe, ebenen: v.ebenen.length,
+                werte: (v.werte || []).map((w) => w.name),
+                ms: k.ms, bytes: k.bytes, typ: k.typ, hinweise: k.hinweise,
+                bild: `data:image/${k.typ};base64,${k.puffer.toString('base64')}`,
+            });
+        } catch (err) {
+            karten.push({ name, fehler: err.message });
+        }
+    }
+    await themeManager.renderView(res, 'admin/bildkarten', {
+        title: 'Bildkarten',
+        activeMenu: '/admin/bildkarten',
+        karten, schriften: Bildkarte.schriftStand(), testname, sprache, guildName,
+        grenzeBytes: Bildkarte.PNG_MAX_BYTES,
+    });
+});
+
+// ================================================================
 // AUFBEWAHRUNG (G-05)
 // Fristen aller Plugins, Obergrenze des Betreibers, Probelauf.
 // ================================================================

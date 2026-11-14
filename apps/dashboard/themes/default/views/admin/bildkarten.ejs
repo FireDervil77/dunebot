@@ -1,0 +1,79 @@
+<%# Bildkarten (G-10, 2026-11-14): jede Vorlage aus packages/dunebot-sdk/bildkarten/ und plugins/*/bildkarten/
+    mit Beispielwerten gezeichnet, Palette der Kontroll-Guild. Zeit und Größe sind von diesem Aufruf. %>
+<%
+  const liste = typeof karten !== 'undefined' ? karten : [];
+  const stand = typeof schriften !== 'undefined' ? schriften : { theme: {}, themeFehlt: [], system: [] };
+  const name = typeof testname !== 'undefined' ? testname : '';
+  const spr = typeof sprache !== 'undefined' ? sprache : 'de-DE';
+  const grenze = typeof grenzeBytes !== 'undefined' ? grenzeBytes : 1048576;
+  const kb = (b) => `${(b / 1024).toFixed(1)} KB`;
+%>
+<div class="container-fluid">
+  <div class="card mb-3">
+    <div class="card-header"><h3 class="card-title mb-0"><i class="fa-solid fa-font me-2"></i>Schriften</h3></div>
+    <div class="card-body">
+      <p class="text-secondary">Die Karten zeichnen mit den Schriften des Dashboard-Themes. Was diese nicht kennen, kommt aus den Systemschriften in dieser Reihenfolge. Fehlt ein Paket, stehen an der Stelle Kästchen.</p>
+      <div class="table-responsive">
+        <table class="table table-sm table-vcenter mb-0">
+          <thead><tr><th>Schrift</th><th>Wofür</th><th>Paket</th><th>Stand</th></tr></thead>
+          <tbody>
+            <% Object.entries(stand.theme).forEach(function ([rolle, familien]) { %>
+              <tr><td class="font-monospace small"><%= familien.join(', ') || '–' %></td><td>Rolle „<%= rolle %>“</td><td class="small text-secondary">npm (@fontsource)</td>
+                <td><span class="badge <%= familien.length ? 'bg-green-lt' : 'bg-red-lt' %>"><%= familien.length ? 'da' : 'fehlt' %></span></td></tr>
+            <% }) %>
+            <% stand.system.forEach(function (s) { %>
+              <tr><td class="font-monospace small"><%= s.familie %></td><td><%= s.wofuer %></td><td class="font-monospace small"><%= s.paket %></td>
+                <td><span class="badge <%= s.da ? 'bg-green-lt' : 'bg-red-lt' %>"><%= s.da ? 'da' : 'fehlt' %></span></td></tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <% if (stand.themeFehlt.length) { %><div class="text-red small mt-2">Fehlende Dateien: <%= stand.themeFehlt.join(', ') %></div><% } %>
+      <% if (stand.system.some(function (s) { return !s.da; })) { %><div class="small text-secondary mt-2">Nachinstallieren: <code>sudo apt install <%= stand.system.filter(function (s) { return !s.da; }).map(function (s) { return s.paket; }).join(' ') %></code>, danach Bot und Dashboard neu starten.</div><% } %>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <form method="get" action="/admin/bildkarten" class="row g-2 align-items-end">
+        <div class="col-md-5">
+          <label class="form-label" for="bildkarten-name">Name zum Testen</label>
+          <input type="text" class="form-control" id="bildkarten-name" name="name" maxlength="64" value="<%= name %>" placeholder="z. B. Łukasz 🔥 火影 Ψ">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label" for="bildkarten-sprache">Sprache der festen Wörter</label>
+          <select class="form-select" id="bildkarten-sprache" name="sprache">
+            <option value="de-DE" <%= spr === 'de-DE' ? 'selected' : '' %>>Deutsch</option>
+            <option value="en-GB" <%= spr === 'en-GB' ? 'selected' : '' %>>Englisch</option>
+          </select>
+        </div>
+        <div class="col-md-2"><button type="submit" class="btn btn-primary w-100"><i class="fa-solid fa-rotate me-1"></i>Neu zeichnen</button></div>
+      </form>
+      <div class="small text-secondary mt-2">Mitglied ist dein Konto, Palette, Logo und Banner die der Kontroll-Guild<%= typeof guildName !== 'undefined' && guildName ? ` (${guildName})` : '' %>. Die Zeit enthält das Laden der Bilder. Ziel: unter 300 ms und unter <%= kb(grenze) %>; darüber geht die Karte als JPEG hinaus.</div>
+    </div>
+  </div>
+
+  <% if (!liste.length) { %>
+    <div class="alert alert-warning">Keine Vorlage gefunden.</div>
+  <% } %>
+  <% liste.forEach(function (k) { %>
+    <div class="card mb-3">
+      <div class="card-header">
+        <h3 class="card-title mb-0"><span class="font-monospace"><%= k.name %></span><% if (k.titel) { %> <span class="text-secondary fw-normal">· <%= k.titel %></span><% } %></h3>
+      </div>
+      <div class="card-body">
+        <% if (k.fehler) { %>
+          <div class="text-red"><i class="fa-solid fa-triangle-exclamation me-1"></i><%= k.fehler %></div>
+        <% } else { %>
+          <img src="<%= k.bild %>" alt="<%= k.name %>" class="img-fluid rounded border mb-2" style="max-width: <%= Math.min(k.breite, 934) %>px;">
+          <div class="small">
+            <span class="badge <%= k.ms < 300 ? 'bg-green-lt' : 'bg-red-lt' %>"><%= k.ms %> ms</span>
+            <span class="badge <%= k.bytes < grenze ? 'bg-green-lt' : 'bg-red-lt' %>"><%= kb(k.bytes) %> <%= k.typ.toUpperCase() %></span>
+            <span class="text-secondary ms-2"><%= k.breite %> × <%= k.hoehe %>, <%= k.ebenen %> Ebenen, Werte: <span class="font-monospace"><%= k.werte.join(', ') || '–' %></span></span>
+          </div>
+          <% k.hinweise.forEach(function (h) { %><div class="small text-orange mt-1"><i class="fa-solid fa-circle-info me-1"></i><%= h %></div><% }) %>
+        <% } %>
+      </div>
+    </div>
+  <% }) %>
+</div>

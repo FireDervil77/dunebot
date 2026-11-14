@@ -1,0 +1,24 @@
+{
+  "titel": "Willkommensbild",
+  "breite": 1024,
+  "hoehe": 450,
+  "werte": [
+    { "name": "hintergrund1", "beispiel": "#1a1a2e" },
+    { "name": "hintergrund2", "beispiel": "#16213e" },
+    { "name": "hintergrund3", "beispiel": "#0f3460" },
+    { "name": "akzent", "beispiel": "#5865f2" },
+    { "name": "text", "beispiel": "Willkommen {member:nick}!" }
+  ],
+  "ebenen": [
+    { "art": "flaeche", "x": 0, "y": 0, "b": 1024, "h": 450, "verlauf": ["{hintergrund1}", "{hintergrund2}", "{hintergrund3}"], "richtung": "diagonal" },
+    { "art": "gitter", "abstand": 40, "farbe": "rgba(255, 255, 255, 0.03)", "breite": 1 },
+    { "art": "flaeche", "x": 0, "y": 444, "b": 1024, "h": 6, "farbe": "{akzent}" },
+    { "art": "leuchten", "mx": 512, "my": 140, "r_innen": 50, "r_aussen": 150, "farbe": "{akzent}40" },
+    { "art": "avatar", "x": 432, "y": 60, "groesse": 160, "ersatz_farbe": "{akzent}",
+      "ringe": [ { "abstand": 4, "breite": 4, "farbe": "{akzent}" }, { "abstand": 10, "breite": 2, "farbe": "{akzent}60" } ] },
+    { "art": "text", "x": 512, "y": 260, "text": "{text}", "gross": true, "groesse": 20, "farbe": "rgba(255, 255, 255, 0.6)", "ausrichtung": "mitte", "grundlinie": "mitte", "max_breite": 960 },
+    { "art": "text", "x": 512, "y": 305, "text": "{member:name}", "fett": true, "groesse": 40, "farbe": "#ffffff", "ausrichtung": "mitte", "grundlinie": "mitte", "max_breite": 960 },
+    { "art": "text", "x": 512, "y": 340, "text": "Member #{guild:memberCount}", "groesse": 18, "farbe": "{akzent}", "ausrichtung": "mitte", "grundlinie": "mitte" },
+    { "art": "text", "x": 512, "y": 30, "text": "{guild:name}", "groesse": 16, "farbe": "rgba(255, 255, 255, 0.4)", "ausrichtung": "mitte", "grundlinie": "mitte", "max_breite": 960 }
+  ]
+}

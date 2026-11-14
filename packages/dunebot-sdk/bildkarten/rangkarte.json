@@ -1,0 +1,41 @@
+{
+  "titel": "Rangkarte (Schablone für Leveling)",
+  "breite": 934,
+  "hoehe": 282,
+  "ecken": 24,
+  "werte": [
+    { "name": "system", "beispiel": "Community" },
+    { "name": "level", "beispiel": "12" },
+    { "name": "position", "beispiel": "3" },
+    { "name": "xp_level", "beispiel": "750" },
+    { "name": "xp_level_max", "beispiel": "1200" },
+    { "name": "xp_gesamt", "beispiel": "14250" },
+    { "name": "hintergrund", "beispiel": "" },
+    { "name": "abzeichen", "beispiel": [] }
+  ],
+  "texte": {
+    "rang": { "de": "Rang", "en": "Rank" },
+    "level": { "de": "Level", "en": "Level" },
+    "xp": { "de": "XP", "en": "XP" },
+    "gesamt": { "de": "gesamt", "en": "total" }
+  },
+  "ebenen": [
+    { "art": "flaeche", "x": 0, "y": 0, "b": 934, "h": 282, "verlauf": ["#15171e", "#1d2130"], "richtung": "diagonal" },
+    { "art": "bild", "x": 0, "y": 0, "b": 934, "h": 282, "quelle": "{hintergrund}", "passung": "fuellen", "abdunkeln": 0.55 },
+    { "art": "flaeche", "x": 0, "y": 0, "b": 8, "h": 282, "farbe": "{farbe:akzent}" },
+    { "art": "leuchten", "mx": 140, "my": 141, "r_innen": 60, "r_aussen": 170, "farbe": "{farbe:akzent}33" },
+    { "art": "avatar", "x": 50, "y": 51, "groesse": 180, "ersatz_farbe": "{farbe:akzent}",
+      "ringe": [ { "abstand": 5, "breite": 5, "farbe": "{farbe:akzent}" } ] },
+    { "art": "bild", "x": 186, "y": 187, "b": 44, "h": 44, "quelle": "{gestaltung:logo}", "passung": "einpassen", "radius": 22 },
+    { "art": "text", "x": 270, "y": 62, "text": "{system}", "gross": true, "fett": true, "groesse": 16, "farbe": "rgba(255, 255, 255, 0.55)", "max_breite": 380 },
+    { "art": "text", "x": 270, "y": 112, "text": "{member:nick}", "fett": true, "groesse": 38, "min_groesse": 22, "farbe": "#ffffff", "max_breite": 380 },
+    { "art": "text", "x": 760, "y": 62, "text": "{text:rang}", "gross": true, "fett": true, "groesse": 16, "farbe": "rgba(255, 255, 255, 0.55)", "ausrichtung": "rechts" },
+    { "art": "text", "x": 760, "y": 112, "text": "#{position}", "schrift": "anzeige", "groesse": 44, "farbe": "#ffffff", "ausrichtung": "rechts", "max_breite": 100 },
+    { "art": "text", "x": 894, "y": 62, "text": "{text:level}", "gross": true, "fett": true, "groesse": 16, "farbe": "rgba(255, 255, 255, 0.55)", "ausrichtung": "rechts" },
+    { "art": "text", "x": 894, "y": 112, "text": "{level}", "schrift": "anzeige", "groesse": 44, "farbe": "{farbe:akzent}", "ausrichtung": "rechts", "max_breite": 110 },
+    { "art": "balken", "x": 270, "y": 150, "b": 624, "h": 30, "wert": "{xp_level}", "max": "{xp_level_max}", "farbe": "{farbe:akzent}", "grund": "rgba(255, 255, 255, 0.10)" },
+    { "art": "text", "x": 270, "y": 212, "text": "{xp_level} / {xp_level_max} {text:xp}", "schrift": "mono", "groesse": 18, "farbe": "rgba(255, 255, 255, 0.85)", "max_breite": 360 },
+    { "art": "text", "x": 894, "y": 212, "text": "{xp_gesamt} {text:xp} {text:gesamt}", "schrift": "mono", "groesse": 16, "farbe": "rgba(255, 255, 255, 0.55)", "ausrichtung": "rechts", "max_breite": 250 },
+    { "art": "bildreihe", "x": 270, "y": 228, "groesse": 36, "abstand": 8, "liste": "abzeichen", "max": 14, "radius": 6 }
+  ]
+}

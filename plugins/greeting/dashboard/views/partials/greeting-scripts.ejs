@@ -94,6 +94,37 @@
   }
 
   // Global exports
+  // ──── Vorschau Willkommensbild (G-10) ────
+  // Der Server zeichnet mit dem Kern-Renderer wie der Bot; hier nur die
+  // Adresse mit den Werten aus dem Formular. Nach dem ersten Klick folgt die
+  // Vorschau jeder Änderung.
+  (function bildvorschau() {
+    const knopf = document.querySelector('[data-greeting-bildvorschau]');
+    const rahmen = document.querySelector('[data-greeting-bildvorschau-rahmen]');
+    const bild = document.querySelector('[data-greeting-bildvorschau-bild]');
+    if (!knopf || !rahmen || !bild) return;
+    const feld = (n) => document.querySelector(`[name="${n}"]`);
+    let an = false;
+    let warte = null;
+    function zeige() {
+      const q = new URLSearchParams({
+        bg: feld('welcome_image_bg')?.value || 'default',
+        text: feld('welcome_image_text')?.value || '',
+        color: feld('welcome_image_color')?.value || '#5865f2',
+        _: String(Date.now())
+      });
+      bild.src = `/guild/${guildId}/plugins/greeting/willkommensbild?${q}`;
+      rahmen.classList.remove('d-none');
+      an = true;
+    }
+    bild.addEventListener('error', () => { if (window.showError) showError(bild.dataset.fehler); });
+    knopf.addEventListener('click', zeige);
+    ['welcome_image_bg', 'welcome_image_text', 'welcome_image_color'].forEach((n) => {
+      const f = feld(n);
+      if (f) f.addEventListener('input', () => { if (!an) return; clearTimeout(warte); warte = setTimeout(zeige, 400); });
+    });
+  })();
+
   window.updateGreeting = updateGreeting;
   window.toggleGreeting = toggleGreeting;
   window.removeAutorole = removeAutorole;

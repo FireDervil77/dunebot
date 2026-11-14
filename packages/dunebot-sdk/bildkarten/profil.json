@@ -1,0 +1,40 @@
+{
+  "titel": "Mitgliederprofil (Schablone für G-12)",
+  "breite": 934,
+  "hoehe": 360,
+  "ecken": 24,
+  "werte": [
+    { "name": "titel1", "beispiel": "Community-Level" },
+    { "name": "wert1", "beispiel": "12" },
+    { "name": "titel2", "beispiel": "Clan" },
+    { "name": "wert2", "beispiel": "Sandläufer" },
+    { "name": "titel3", "beispiel": "Abzeichen" },
+    { "name": "wert3", "beispiel": "4" },
+    { "name": "abzeichen", "beispiel": [] }
+  ],
+  "texte": {
+    "dabei_seit": { "de": "Dabei seit", "en": "Member since" }
+  },
+  "ebenen": [
+    { "art": "flaeche", "x": 0, "y": 0, "b": 934, "h": 360, "verlauf": ["#15171e", "#1d2130"], "richtung": "diagonal" },
+    { "art": "flaeche", "x": 0, "y": 0, "b": 934, "h": 120, "farbe": "{farbe:akzent}", "deckkraft": 0.85 },
+    { "art": "bild", "x": 0, "y": 0, "b": 934, "h": 120, "quelle": "{gestaltung:banner}", "passung": "fuellen", "abdunkeln": 0.25 },
+    { "art": "avatar", "x": 40, "y": 60, "groesse": 140, "ersatz_farbe": "{farbe:akzent}",
+      "ringe": [ { "abstand": 4, "breite": 8, "farbe": "#181b25" } ] },
+    { "art": "bild", "x": 870, "y": 20, "b": 44, "h": 44, "quelle": "{gestaltung:logo}", "passung": "einpassen", "radius": 10 },
+    { "art": "text", "x": 200, "y": 162, "text": "{member:nick}", "fett": true, "groesse": 34, "min_groesse": 20, "farbe": "#ffffff", "max_breite": 480 },
+    { "art": "text", "x": 200, "y": 192, "text": "@{member:name}", "groesse": 18, "farbe": "rgba(255, 255, 255, 0.55)", "max_breite": 480 },
+    { "art": "text", "x": 894, "y": 162, "text": "{text:dabei_seit}", "gross": true, "fett": true, "groesse": 14, "farbe": "rgba(255, 255, 255, 0.55)", "ausrichtung": "rechts" },
+    { "art": "text", "x": 894, "y": 190, "text": "{member:joinedAt}", "schrift": "mono", "groesse": 18, "farbe": "#ffffff", "ausrichtung": "rechts" },
+    { "art": "flaeche", "x": 40, "y": 220, "b": 278, "h": 80, "farbe": "rgba(255, 255, 255, 0.06)", "radius": 14 },
+    { "art": "flaeche", "x": 328, "y": 220, "b": 278, "h": 80, "farbe": "rgba(255, 255, 255, 0.06)", "radius": 14 },
+    { "art": "flaeche", "x": 616, "y": 220, "b": 278, "h": 80, "farbe": "rgba(255, 255, 255, 0.06)", "radius": 14 },
+    { "art": "text", "x": 60, "y": 248, "text": "{titel1}", "gross": true, "fett": true, "groesse": 13, "farbe": "rgba(255, 255, 255, 0.55)", "max_breite": 238 },
+    { "art": "text", "x": 60, "y": 284, "text": "{wert1}", "schrift": "anzeige", "groesse": 28, "farbe": "{farbe:akzent}", "max_breite": 238 },
+    { "art": "text", "x": 348, "y": 248, "text": "{titel2}", "gross": true, "fett": true, "groesse": 13, "farbe": "rgba(255, 255, 255, 0.55)", "max_breite": 238 },
+    { "art": "text", "x": 348, "y": 284, "text": "{wert2}", "schrift": "anzeige", "groesse": 28, "farbe": "#ffffff", "max_breite": 238 },
+    { "art": "text", "x": 636, "y": 248, "text": "{titel3}", "gross": true, "fett": true, "groesse": 13, "farbe": "rgba(255, 255, 255, 0.55)", "max_breite": 238 },
+    { "art": "text", "x": 636, "y": 284, "text": "{wert3}", "schrift": "anzeige", "groesse": 28, "farbe": "#ffffff", "max_breite": 238 },
+    { "art": "bildreihe", "x": 40, "y": 316, "groesse": 32, "abstand": 8, "liste": "abzeichen", "max": 20, "radius": 6 }
+  ]
+}

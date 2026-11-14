@@ -71,7 +71,10 @@
     "BG_OCEAN": "Ozean",
     "TEXT_TITLE": "Begrüßungstext",
     "TEXT_PLACEHOLDER": "Welcome to the server!",
-    "COLOR_TITLE": "Akzentfarbe"
+    "COLOR_TITLE": "Akzentfarbe",
+    "PREVIEW": "Vorschau",
+    "PREVIEW_HINT": "Mit deinem Konto als Beispiel. Gespeichert wird erst mit „Speichern“.",
+    "PREVIEW_ERROR": "Die Vorschau ließ sich nicht zeichnen."
   },
   "BTN_ENABLE": "Aktivieren",
   "BTN_DISABLE": "Deaktivieren",

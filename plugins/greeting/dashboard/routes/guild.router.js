@@ -21,7 +21,8 @@ const router = express.Router();
 const { ServiceManager } = require('dunebot-core');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 const { makeTranslator, renderView, ladeDaten, renderFehler, ANLAESSE, VERIFIZIERUNG } = require('./_shared');
-const { Vorlage } = require('dunebot-sdk');
+const { Vorlage, Bildkarte } = require('dunebot-sdk');
+const Willkommensbild = require('../../shared/willkommensbild');
 
 /** Skripte anmelden, die eine Seite braucht. */
 function skripteAnmelden(handles) {
@@ -70,6 +71,35 @@ router.get('/verifizierung',  requirePermission('GREETING.VIEW'), seite('greetin
 router.get('/boost',          requirePermission('GREETING.VIEW'), seite('greeting-boost',         'Die Boost-Nachricht konnte nicht geladen werden'));
 router.get('/einladungen',    requirePermission('GREETING.VIEW'), seite('greeting-invites',       'Die Einladungen konnten nicht geladen werden'));
 router.get('/settings',       requirePermission('GREETING.VIEW'), seite('greeting-settings',      'Die Greeting-Einstellungen konnten nicht geladen werden'));
+
+/**
+ * GET /guild/:guildId/plugins/greeting/willkommensbild?bg=&text=&color=
+ * Das Willkommensbild als PNG mit den Werten aus dem Formular (noch nicht
+ * gespeichert), gezeichnet vom Kern-Renderer wie im Bot (G-10). Mitglied ist
+ * der angemeldete Nutzer.
+ */
+router.get('/willkommensbild', requirePermission('GREETING.VIEW'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    try {
+        const zeilen = await ServiceManager.get('dbService').query('SELECT guild_name FROM guilds WHERE _id = ?', [guildId]);
+        const q = req.query || {};
+        const karte = await Bildkarte.beispiel(Willkommensbild.ANLASS, {
+            guildId,
+            guildName: zeilen?.[0]?.guild_name || '',
+            nutzer: req.session.user.info,
+            werte: Willkommensbild.werte({
+                welcome_image_bg: String(q.bg || ''),
+                welcome_image_text: String(q.text || '').slice(0, 200),
+                welcome_image_color: String(q.color || ''),
+            }),
+        });
+        res.set('Cache-Control', 'no-store');
+        res.type(karte.typ === 'png' ? 'png' : 'jpeg').send(karte.puffer);
+    } catch (err) {
+        ServiceManager.get('Logger').error(`[Greeting] Vorschau Willkommensbild in ${guildId}:`, err);
+        res.status(500).type('text').send(err.message);
+    }
+});
 
 /**
  * PUT /guild/:guildId/plugins/greeting/settings

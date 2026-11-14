@@ -71,7 +71,10 @@
     "BG_OCEAN": "Ocean",
     "TEXT_TITLE": "Welcome Text",
     "TEXT_PLACEHOLDER": "Welcome to the server!",
-    "COLOR_TITLE": "Accent Color"
+    "COLOR_TITLE": "Accent Color",
+    "PREVIEW": "Preview",
+    "PREVIEW_HINT": "Uses your account as the example. Nothing is saved until you click Save.",
+    "PREVIEW_ERROR": "The preview could not be drawn."
   },
   "BTN_ENABLE": "Enable",
   "BTN_DISABLE": "Disable",

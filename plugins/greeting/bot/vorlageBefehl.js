@@ -2,6 +2,7 @@ const { MiscUtils } = require("dunebot-sdk/utils");
 const { ServiceManager } = require("dunebot-core");
 const { Vorlage } = require("dunebot-sdk");
 const { baueNachricht, ANLAESSE } = require("./utils");
+const Willkommensbild = require("../shared/willkommensbild");
 
 /**
  * Greeting - was `/welcome` und `/farewell` gemeinsam tun (G-08, 2026-11-14).
@@ -38,7 +39,14 @@ async function vorschau(name, member, guild) {
     if (!settings[a.an]) return guild.getT(`greeting:${a.schluessel}.${a.schluessel}_DISABLED`);
     const ziel = guild.channels.cache.get(settings[a.kanal]);
     if (!ziel) return guild.getT(`greeting:${a.schluessel}.CHANNEL_NOT_CONFIG`);
-    await ziel.send(await baueNachricht(member, a.anlass));
+    // Die Vorschau zeigt, was ein Beitritt sendet, samt Willkommensbild (bis
+    // G-10 fehlte es hier, die Probe ging nur mit einem echten Beitritt).
+    const anhaenge = [];
+    if (name === "welcome" && settings.welcome_image_enabled) {
+        const bild = await Willkommensbild.anhang(member, settings, ServiceManager.get("Logger"));
+        if (bild) anhaenge.push(bild);
+    }
+    await ziel.send(await baueNachricht(member, a.anlass, { anhaenge }));
     return guild.getT(`greeting:${a.schluessel}.PREVIEW_SENT`, { channel: ziel.toString() });
 }
 

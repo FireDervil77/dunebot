@@ -1,8 +1,7 @@
 const { baueNachricht, ANLAESSE } = require("../utils");
-const { generateWelcomeImage } = require("../welcomeImage");
+const Willkommensbild = require("../../shared/willkommensbild");
 const { detectUsedInvite } = require("../inviteTracker");
 const { ServiceManager } = require('dunebot-core');
-const { AttachmentBuilder } = require('discord.js');
 
 /**
  * @param {import('discord.js').GuildMember} member
@@ -74,20 +73,12 @@ module.exports = async (member) => {
             if (channel) {
                 const inviterData = member.inviterData || {};
 
-                // Das Willkommensbild hängt als Datei an. In Components V2
-                // steht es in der Galerie (`attachment://welcome.png`).
+                // Das Willkommensbild hängt als Datei an (Kern-Renderer, G-10).
+                // In Components V2 steht es in der Galerie (`attachment://…`).
                 const anhaenge = [];
                 if (settings.welcome_image_enabled) {
-                    try {
-                        const imgBuffer = await generateWelcomeImage(member, {
-                            bg: settings.welcome_image_bg || 'default',
-                            text: settings.welcome_image_text,
-                            color: settings.welcome_image_color || '#5865f2'
-                        });
-                        anhaenge.push(new AttachmentBuilder(imgBuffer, { name: 'welcome.png' }));
-                    } catch (err) {
-                        logger.error(`[Greeting] Failed to generate welcome image for ${member.user.tag}:`, err);
-                    }
+                    const bild = await Willkommensbild.anhang(member, settings, logger);
+                    if (bild) anhaenge.push(bild);
                 }
 
                 // Eine Einladung mit eigenem Text ersetzt nur den Nachrichtentext
@@ -95,7 +86,7 @@ module.exports = async (member) => {
                 const response = await baueNachricht(member, ANLAESSE.welcome, {
                     inviterData,
                     textStatt: inviteMapping?.welcome_content || null,
-                    anhaenge: anhaenge.map((a) => ({ name: a.name, attachment: a.attachment }))
+                    anhaenge
                 });
 
                 await channel.send(response);
