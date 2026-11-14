@@ -3,7 +3,59 @@ const { EmbedBuilder } = require("discord.js");
 /**
  * Shared Placeholder-Parser für alle Plugins
  * Ersetzt Platzhalter wie {member:name}, {guild:name}, etc.
+ *
+ * # Register (G-08, 2026-11-14)
+ *
+ * `PLATZHALTER` nennt jeden Platzhalter, den `parsePlaceholders` selbst
+ * ersetzt, mit Gruppe und Bedeutung (Schlüssel in den Kern-Texten). Das ist
+ * ein **Vertrag** mit der Ersetzung darunter: Steht ein Name nur in der Liste,
+ * erscheint er wörtlich in Discord; steht er nur in der Ersetzung, kennt ihn
+ * kein Editor. `scripts/check-vorlagen.js` prüft beide Richtungen.
+ *
+ * Platzhalter eines Plugins (`{inviter:name}` bei greeting) erklärt das Plugin
+ * in seiner package.json unter `vorlagen.platzhalter` und reicht die Werte als
+ * `extra` herein. Bis 2026-11-14 hatte greeting dafür eine Kopie dieser Datei
+ * in `bot/utils.js`.
  */
+
+/**
+ * Die Platzhalter des Kerns. `gruppe` ist `member` oder `guild`; `alias` nennt
+ * den gleichwertigen Hauptnamen. Die Bedeutung steht unter
+ * `core:VORLAGEN.PH.<schluessel>`.
+ */
+const PLATZHALTER = Object.freeze([
+    { name: 'member:name',      gruppe: 'member', schluessel: 'MEMBER_NAME' },
+    { name: 'member:nick',      gruppe: 'member', schluessel: 'MEMBER_NICK' },
+    { name: 'member:mention',   gruppe: 'member', schluessel: 'MEMBER_MENTION' },
+    { name: 'member:tag',       gruppe: 'member', schluessel: 'MEMBER_TAG' },
+    { name: 'member:dis',       gruppe: 'member', schluessel: 'MEMBER_DIS' },
+    { name: 'member:avatar',    gruppe: 'member', schluessel: 'MEMBER_AVATAR' },
+    { name: 'member:id',        gruppe: 'member', schluessel: 'MEMBER_ID' },
+    { name: 'member:joinedAt',  gruppe: 'member', schluessel: 'MEMBER_JOINED' },
+    { name: 'member:createdAt', gruppe: 'member', schluessel: 'MEMBER_CREATED' },
+    { name: 'guild:name',       gruppe: 'guild',  schluessel: 'GUILD_NAME' },
+    { name: 'server',           gruppe: 'guild',  schluessel: 'GUILD_NAME', alias: 'guild:name' },
+    { name: 'guild:memberCount', gruppe: 'guild', schluessel: 'GUILD_COUNT' },
+    { name: 'count',            gruppe: 'guild',  schluessel: 'GUILD_COUNT', alias: 'guild:memberCount' },
+    { name: 'guild:id',         gruppe: 'guild',  schluessel: 'GUILD_ID' },
+    { name: 'guild:icon',       gruppe: 'guild',  schluessel: 'GUILD_ICON' },
+    { name: 'guild:boostCount', gruppe: 'guild',  schluessel: 'GUILD_BOOSTS' },
+    { name: 'guild:boostLevel', gruppe: 'guild',  schluessel: 'GUILD_BOOST_LEVEL' },
+]);
+
+/**
+ * Alle Namen in geschweiften Klammern, die in einem Text stehen, ohne die
+ * Klammern und ohne Doppelte. Der Editor zeigt damit unbekannte Platzhalter
+ * an, bevor jemand speichert.
+ * @param {string} text
+ * @returns {string[]}
+ */
+function platzhalterIn(text) {
+    if (!text || typeof text !== 'string') return [];
+    const aus = new Set();
+    for (const m of text.matchAll(/\{([A-Za-z][A-Za-z0-9_]*(?::[A-Za-z][A-Za-z0-9_]*)?)\}/g)) aus.add(m[1]);
+    return [...aus];
+}
 
 /**
  * Ersetzt Platzhalter in einem String
@@ -142,4 +194,4 @@ function buildEmbed(embedConfig, context = {}) {
     return { embed, hasEmbed };
 }
 
-module.exports = { parsePlaceholders, buildEmbed };
+module.exports = { parsePlaceholders, buildEmbed, PLATZHALTER, platzhalterIn };

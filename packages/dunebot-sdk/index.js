@@ -28,6 +28,7 @@ const Nachbar = require("./lib/nachbar");
 const Ereignisse = require("./ereignisse");
 const Zeitplan = require("./lib/Zeitplan");
 const Gestaltung = require("./lib/Gestaltung");
+const Vorlage = require("./lib/Vorlage");
 
 module.exports = {
     BotPlugin,
@@ -55,6 +56,7 @@ module.exports = {
     Ereignisse,
     Zeitplan,
     Gestaltung,
+    Vorlage,
     // IPM (Inter-Process Messaging) - Event-Bus Architecture
     MessageTypes,
     MessageBuilder,

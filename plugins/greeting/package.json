@@ -36,5 +36,75 @@
       "greeting_settings"
     ]
   },
-  "mitgliedInhalte": {}
+  "mitgliedInhalte": {},
+  "vorlagen": {
+    "recht": "GREETING.SETTINGS.EDIT",
+    "platzhalter": [
+      {
+        "name": "inviter:name",
+        "bedeutung": "greeting:VORLAGEN.PH_INVITER_NAME",
+        "beispiel": "Einladender"
+      },
+      {
+        "name": "inviter:tag",
+        "bedeutung": "greeting:VORLAGEN.PH_INVITER_TAG",
+        "beispiel": "einladender"
+      },
+      {
+        "name": "invites",
+        "bedeutung": "greeting:VORLAGEN.PH_INVITES",
+        "beispiel": "5"
+      }
+    ],
+    "anlaesse": {
+      "willkommen": {
+        "titel": "greeting:TAB_WELCOME",
+        "kern": [
+          "member",
+          "guild",
+          "gestaltung"
+        ],
+        "platzhalter": [
+          "inviter:name",
+          "inviter:tag",
+          "invites"
+        ]
+      },
+      "direktnachricht": {
+        "titel": "greeting:TAB_DM_WELCOME",
+        "kern": [
+          "member",
+          "guild",
+          "gestaltung"
+        ],
+        "platzhalter": [
+          "inviter:name",
+          "inviter:tag",
+          "invites"
+        ]
+      },
+      "abschied": {
+        "titel": "greeting:TAB_FAREWELL",
+        "kern": [
+          "member",
+          "guild",
+          "gestaltung"
+        ],
+        "platzhalter": [
+          "inviter:name",
+          "inviter:tag",
+          "invites"
+        ]
+      },
+      "boost": {
+        "titel": "greeting:TAB_BOOST",
+        "kern": [
+          "member",
+          "guild",
+          "gestaltung"
+        ],
+        "platzhalter": []
+      }
+    }
+  }
 }

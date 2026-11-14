@@ -1,4 +1,4 @@
-const { buildGreeting } = require("../utils");
+const { baueNachricht, ANLAESSE } = require("../utils");
 const { generateWelcomeImage } = require("../welcomeImage");
 const { detectUsedInvite } = require("../inviteTracker");
 const { ServiceManager } = require('dunebot-core');
@@ -74,38 +74,9 @@ module.exports = async (member) => {
             if (channel) {
                 const inviterData = member.inviterData || {};
 
-                // Invite-Mapping überschreibt Standard-Welcome wenn vorhanden
-                let welcomeContent = settings.welcome_content;
-                let embedData = {};
-
-                if (inviteMapping && inviteMapping.welcome_content) {
-                    welcomeContent = inviteMapping.welcome_content;
-                }
-
-                if (inviteMapping && inviteMapping.welcome_embed) {
-                    try {
-                        embedData = typeof inviteMapping.welcome_embed === 'string'
-                            ? JSON.parse(inviteMapping.welcome_embed)
-                            : inviteMapping.welcome_embed;
-                    } catch { /* ignore */ }
-                } else if (settings.welcome_embed) {
-                    try {
-                        embedData = typeof settings.welcome_embed === 'string'
-                            ? JSON.parse(settings.welcome_embed)
-                            : settings.welcome_embed;
-                    } catch { /* ignore */ }
-                }
-
-                const welcomeConfig = {
-                    enabled: settings.welcome_enabled,
-                    channel: settings.welcome_channel,
-                    content: welcomeContent,
-                    embed: embedData
-                };
-
-                const response = await buildGreeting(member, "WELCOME", welcomeConfig, inviterData);
-
-                // Welcome Image als Attachment
+                // Das Willkommensbild hängt als Datei an. In Components V2
+                // steht es in der Galerie (`attachment://welcome.png`).
+                const anhaenge = [];
                 if (settings.welcome_image_enabled) {
                     try {
                         const imgBuffer = await generateWelcomeImage(member, {
@@ -113,12 +84,19 @@ module.exports = async (member) => {
                             text: settings.welcome_image_text,
                             color: settings.welcome_image_color || '#5865f2'
                         });
-                        const attachment = new AttachmentBuilder(imgBuffer, { name: 'welcome.png' });
-                        response.files = [attachment];
+                        anhaenge.push(new AttachmentBuilder(imgBuffer, { name: 'welcome.png' }));
                     } catch (err) {
                         logger.error(`[Greeting] Failed to generate welcome image for ${member.user.tag}:`, err);
                     }
                 }
+
+                // Eine Einladung mit eigenem Text ersetzt nur den Nachrichtentext
+                // der Willkommensvorlage, der Rest bleibt (so war es vor G-08).
+                const response = await baueNachricht(member, ANLAESSE.welcome, {
+                    inviterData,
+                    textStatt: inviteMapping?.welcome_content || null,
+                    anhaenge: anhaenge.map((a) => ({ name: a.name, attachment: a.attachment }))
+                });
 
                 await channel.send(response);
                 logger.info(`[Greeting] Sent welcome message for ${member.user.tag} in ${member.guild.name}`);
@@ -127,23 +105,7 @@ module.exports = async (member) => {
 
         // ===== DM WELCOME =====
         if (settings.dm_welcome_enabled) {
-            const inviterData = member.inviterData || {};
-            let dmEmbedData = {};
-            if (settings.dm_welcome_embed) {
-                try {
-                    dmEmbedData = typeof settings.dm_welcome_embed === 'string'
-                        ? JSON.parse(settings.dm_welcome_embed)
-                        : settings.dm_welcome_embed;
-                } catch { /* ignore */ }
-            }
-
-            const dmConfig = {
-                enabled: true,
-                content: settings.dm_welcome_content,
-                embed: dmEmbedData
-            };
-
-            const dmResponse = await buildGreeting(member, "WELCOME", dmConfig, inviterData);
+            const dmResponse = await baueNachricht(member, ANLAESSE.dm_welcome, { inviterData: member.inviterData || {} });
 
             try {
                 await member.send(dmResponse);

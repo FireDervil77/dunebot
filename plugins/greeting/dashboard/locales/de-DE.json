@@ -26,24 +26,20 @@
   "TAB_INVITE_TRACKING": "Invite-Tracking",
   "WELCOME": {
     "TITLE": "Willkommensnachrichten",
-    "DESC": "Konfiguriere Willkommensnachrichten für neue Mitglieder",
-    "MESSAGE": "Willkommensnachricht"
+    "DESC": "Konfiguriere Willkommensnachrichten für neue Mitglieder"
   },
   "FAREWELL": {
     "TITLE": "Verabschiedungsnachrichten",
-    "DESC": "Konfiguriere Nachrichten für austretende Mitglieder",
-    "MESSAGE": "Verabschiedungsnachricht"
+    "DESC": "Konfiguriere Nachrichten für austretende Mitglieder"
   },
   "DM_WELCOME": {
     "TITLE": "DM Willkommensnachricht",
     "DESC": "Sende neuen Mitgliedern eine private Willkommensnachricht",
-    "MESSAGE": "DM Nachricht",
     "INFO": "Diese Nachricht wird als Direktnachricht an neue Mitglieder gesendet. Hinweis: Mitglieder mit deaktivierten DMs erhalten diese nicht."
   },
   "BOOST": {
     "TITLE": "Boost-Nachrichten",
     "DESC": "Feiere Mitglieder die deinen Server boosten",
-    "MESSAGE": "Boost-Nachricht",
     "INFO": "Diese Nachricht wird gesendet, wenn ein Mitglied den Server boostet.",
     "SUBTITLE": "Nachricht, wenn jemand den Server boostet"
   },
@@ -77,28 +73,6 @@
     "TEXT_PLACEHOLDER": "Welcome to the server!",
     "COLOR_TITLE": "Akzentfarbe"
   },
-  "EMBED": {
-    "TITLE": "Embed-Builder",
-    "DESC": "Gestalte ein Discord-Embed",
-    "FIELD_TITLE": "Titel",
-    "FIELD_TITLE_PH": "Embed Titel eingeben...",
-    "DESCRIPTION": "Beschreibung",
-    "DESCRIPTION_PH": "Embed Beschreibung eingeben...",
-    "COLOR": "Farbe",
-    "THUMBNAIL": "Thumbnail (Profilbild anzeigen)",
-    "FOOTER": "Footer",
-    "FOOTER_PH": "Footer Text eingeben...",
-    "IMAGE": "Bild-URL",
-    "AUTHOR": "Author-Name",
-    "TIMESTAMP": "Zeitstempel anzeigen",
-    "ENABLE": "Embed aktivieren"
-  },
-  "PREVIEW": {
-    "TITLE": "Vorschau",
-    "PLACEHOLDER_USER": "Neues Mitglied",
-    "BOT_BADGE": "BOT"
-  },
-  "PLACEHOLDERS_HINT": "Nutze Platzhalter wie {member:name}, {member:mention}, {guild:name}",
   "BTN_ENABLE": "Aktivieren",
   "BTN_DISABLE": "Deaktivieren",
   "BTN_SAVE": "Speichern",
@@ -133,8 +107,7 @@
     "INVITE_TRACKING_TITLE": "Invite-Tracking",
     "INVITE_TRACKING_TEXT": "Verschiedene Willkommensnachrichten je nach verwendetem Einladungslink.",
     "IMAGE_TITLE": "Welcome-Image",
-    "IMAGE_TEXT": "Generiertes Begrüßungsbild mit Avatar des neuen Mitglieds.",
-    "PLACEHOLDERS_TITLE": "Verfügbare Platzhalter"
+    "IMAGE_TEXT": "Generiertes Begrüßungsbild mit Avatar des neuen Mitglieds."
   },
   "VERIFICATION": {
     "TITLE": "Verifizierung",
@@ -200,5 +173,10 @@
     "VIEW_DESC": "Berechtigung um Begrüßungs-Einstellungen zu sehen",
     "SETTINGS_EDIT": "Begrüßungs-Einstellungen bearbeiten",
     "SETTINGS_EDIT_DESC": "Berechtigung um Begrüßungsnachrichten zu konfigurieren"
+  },
+  "VORLAGEN": {
+    "PH_INVITER_NAME": "Name dessen, der eingeladen hat",
+    "PH_INVITER_TAG": "Benutzername dessen, der eingeladen hat",
+    "PH_INVITES": "Zahl seiner Einladungen"
   }
 }

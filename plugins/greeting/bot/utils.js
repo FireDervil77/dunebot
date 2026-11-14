@@ -1,156 +1,105 @@
-const { EmbedBuilder } = require("discord.js");
+const { Vorlage } = require("dunebot-sdk");
 
 /**
- * @param {string} content
+ * Greeting - Nachrichten aus den Vorlagen bauen (G-08, 2026-11-14).
+ *
+ * Bis 2026-11-14 stand hier eine Kopie von `dunebot-core/lib/PlaceholderParser`
+ * (Ersetzung der Platzhalter und Aufbau des Embeds). Jetzt füllt der Kern
+ * (`Vorlage.fuelle`), und hier stehen nur noch die Platzhalter, die greeting
+ * selbst erklärt (`vorlagen.platzhalter` in der package.json).
+ *
+ * Die vier Anlässe:
+ *   greeting:willkommen       im Willkommenskanal
+ *   greeting:direktnachricht  als Direktnachricht beim Beitritt
+ *   greeting:abschied         im Abschiedskanal
+ *   greeting:boost            im Boost-Kanal
+ */
+
+const ANLAESSE = Object.freeze({
+    welcome: "greeting:willkommen",
+    dm_welcome: "greeting:direktnachricht",
+    farewell: "greeting:abschied",
+    boost: "greeting:boost",
+});
+
+/** Was gesendet wird, solange eine Vorlage leer ist (wie vor G-08). */
+const VORGABE = Object.freeze({
+    "greeting:willkommen": (m) => `Welcome to the server, ${m.displayName} 🎉`,
+    "greeting:direktnachricht": (m) => `Welcome to the server, ${m.displayName} 🎉`,
+    "greeting:abschied": (m) => `${m.user.username} has left the server 👋`,
+    "greeting:boost": (m) => `${m.displayName} just boosted the server! 🚀`,
+});
+
+/**
+ * Werte der greeting-eigenen Platzhalter: `{inviter:name}`, `{inviter:tag}`,
+ * `{invites}`. Nur wenn einer davon vorkommt, wird der Einladende geholt.
+ *
+ * `member.inviterData` setzt heute niemand (Fund bei G-13, behoben mit G-16).
+ * Bis dahin stehen die Werte auf „NA“ bzw. 0, wie vor G-08.
+ *
  * @param {import('discord.js').GuildMember} member
+ * @param {Object} vorlage
  * @param {Object} inviterData
  */
-const parse = async (content, member, inviterData = {}) => {
-    if (!content) return "";
-    const inviteData = {};
-
-    const getEffectiveInvites = (inviteData = {}) =>
-        inviteData.tracked + inviteData.added - inviteData.fake - inviteData.left || 0;
-
-    if (content.includes("{inviter:")) {
+async function eigeneWerte(member, vorlage, inviterData = {}) {
+    const text = Object.keys(Vorlage.FELDER).map((f) => vorlage?.[f] || "").join(" ");
+    const extra = {};
+    if (text.includes("{inviter:")) {
         const inviterId = inviterData.member_id || "NA";
+        let name = inviterId;
+        let tag = inviterId;
         if (inviterId !== "VANITY" && inviterId !== "NA") {
             try {
                 const inviter = await member.client.users.fetch(inviterId);
-                inviteData.name = inviter.username;
-                inviteData.tag = inviter.tag;
+                name = inviter.username;
+                tag = inviter.tag;
             } catch (ex) {
                 member.client.logger.error(`Parsing inviterId: ${inviterId}`, ex);
-                inviteData.name = "NA";
-                inviteData.tag = "NA";
+                name = "NA";
+                tag = "NA";
             }
         } else if (member.user.bot) {
-            inviteData.name = "OAuth";
-            inviteData.tag = "OAuth";
-        } else {
-            inviteData.name = inviterId;
-            inviteData.tag = inviterId;
+            name = "OAuth";
+            tag = "OAuth";
         }
+        extra["inviter:name"] = name;
+        extra["inviter:tag"] = tag;
     }
-    return content
-        .replaceAll(/\\n/g, "\n")
-        // Server/Guild Placeholders
-        .replaceAll(/{server}/g, member.guild.name)
-        .replaceAll(/{guild:name}/g, member.guild.name)
-        .replaceAll(/{count}/g, member.guild.memberCount)
-        .replaceAll(/{guild:memberCount}/g, member.guild.memberCount)
-        .replaceAll(/{guild:id}/g, member.guild.id)
-        .replaceAll(/{guild:icon}/g, member.guild.iconURL() || '')
-        .replaceAll(/{guild:boostCount}/g, member.guild.premiumSubscriptionCount || 0)
-        .replaceAll(/{guild:boostLevel}/g, member.guild.premiumTier || 0)
-        // Member Placeholders
-        .replaceAll(/{member:nick}/g, member.displayName)
-        .replaceAll(/{member:name}/g, member.user.username)
-        .replaceAll(/{member:dis}/g, member.user.discriminator)
-        .replaceAll(/{member:tag}/g, member.user.tag)
-        .replaceAll(/{member:mention}/g, member.toString())
-        .replaceAll(/{member:avatar}/g, member.displayAvatarURL())
-        .replaceAll(/{member:id}/g, member.user.id)
-        .replaceAll(/{member:joinedAt}/g, member.joinedAt ? member.joinedAt.toLocaleDateString('de-DE') : '')
-        .replaceAll(/{member:createdAt}/g, member.user.createdAt ? member.user.createdAt.toLocaleDateString('de-DE') : '')
-        // Inviter Placeholders
-        .replaceAll(/{inviter:name}/g, inviteData.name)
-        .replaceAll(/{inviter:tag}/g, inviteData.tag)
-        .replaceAll(/{invites}/g, getEffectiveInvites(inviterData.invite_data));
-};
+    if (text.includes("{invites}")) {
+        const d = inviterData.invite_data || {};
+        extra.invites = d.tracked + d.added - d.fake - d.left || 0;
+    }
+    return extra;
+}
 
 /**
+ * Nachricht eines Anlasses für dieses Mitglied.
+ *
  * @param {import('discord.js').GuildMember} member
- * @param {"WELCOME"|"FAREWELL"} type
- * @param {Object} config
- * @param {Object} inviterData
+ * @param {string} anlass einer aus ANLAESSE
+ * @param {Object} [optionen]
+ * @param {Object} [optionen.inviterData]
+ * @param {string} [optionen.textStatt] anderer Nachrichtentext (Einladung mit eigenem Text)
+ * @param {{name: string, attachment: *}[]} [optionen.anhaenge] z. B. das Willkommensbild
+ * @returns {Promise<Object>} Nachricht für `send()`
  */
-const buildGreeting = async (member, type, config, inviterData) => {
-    if (!config) return;
-    let content;
+async function baueNachricht(member, anlass, optionen = {}) {
+    let vorlage = (await Vorlage.lade(member.guild.id, anlass)) || Vorlage.leer();
+    if (optionen.textStatt) vorlage = { ...vorlage, text: optionen.textStatt };
+    const extra = await eigeneWerte(member, vorlage, optionen.inviterData);
+    const kontext = { member, guild: member.guild, extra };
+    const mit = { guildId: member.guild.id, erwaehnen: [member.id], anhaenge: optionen.anhaenge };
 
-    // build content
-    if (config.content) content = await parse(config.content, member, inviterData);
-
-    const embed = new EmbedBuilder();
-    let hasEmbed = false;
-    const embedData = config.embed || {};
-
-    if (embedData.title) {
-        const parsed = await parse(embedData.title, member, inviterData);
-        embed.setTitle(parsed);
-        hasEmbed = true;
+    let { nachricht } = await Vorlage.fuelle(vorlage, kontext, mit);
+    if (!nachricht) {
+        // Leer: der feste Satz wie vor G-08, in der Form der Vorlage (bei V2
+        // als Textblock, damit ein Willkommensbild in der Galerie stehen kann).
+        ({ nachricht } = await Vorlage.fuelle({ ...vorlage, text: VORGABE[anlass](member) }, kontext, mit));
     }
-    if (embedData.description) {
-        const parsed = await parse(embedData.description, member, inviterData);
-        embed.setDescription(parsed);
-        hasEmbed = true;
-    }
-    if (embedData.color) {
-        embed.setColor(embedData.color);
-    }
-    if (embedData.thumbnail) {
-        embed.setThumbnail(member.user.displayAvatarURL());
-        hasEmbed = true;
-    }
-    if (embedData.footer?.text) {
-        const parsed = await parse(embedData.footer.text, member, inviterData);
-        if (parsed !== "") {
-            embed.setFooter({ text: parsed, iconURL: embedData.footer.iconURL || null });
-            hasEmbed = true;
-        }
-    }
-    if (embedData.image) {
-        const parsed = await parse(embedData.image, member, inviterData);
-        embed.setImage(parsed);
-        hasEmbed = true;
-    }
-    if (embedData.author?.name) {
-        const parsedName = await parse(embedData.author.name, member, inviterData);
-        embed.setAuthor({
-            name: parsedName,
-            iconURL: embedData.author.iconURL || null,
-        });
-        hasEmbed = true;
-    }
-    if (
-        embedData.fields &&
-        Array.isArray(embedData.fields) &&
-        embedData.fields.length > 0
-    ) {
-        for (const field of embedData.fields) {
-            const parsedName = await parse(field.name, member, inviterData);
-            const parsedValue = await parse(field.value, member, inviterData);
-            embed.addFields({ name: parsedName, value: parsedValue, inline: field.inline });
-        }
-        hasEmbed = true;
-    }
-    if (embedData.timestamp) {
-        embed.setTimestamp();
-        hasEmbed = true;
-    }
-
-    // set default message if no content or embed provided
-    if (!content && !hasEmbed) {
-        if (type === "WELCOME") {
-            content = `Welcome to the server, ${member.displayName} 🎉`;
-        } else if (type === "FAREWELL") {
-            content = `${member.user.username} has left the server 👋`;
-        } else if (type === "BOOST") {
-            content = `${member.displayName} just boosted the server! 🚀`;
-        }
-        return { content };
-    }
-
-    // return appropriate response based on what was configured
-    const response = {};
-    if (content) response.content = content;
-    if (hasEmbed) response.embeds = [embed];
-
-    return response;
-};
+    return nachricht;
+}
 
 module.exports = {
-    parse,
-    buildGreeting,
+    ANLAESSE,
+    baueNachricht,
 };

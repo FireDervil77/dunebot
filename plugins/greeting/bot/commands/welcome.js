@@ -1,24 +1,8 @@
 const { ApplicationCommandOptionType, ChannelType } = require("discord.js");
-const { MiscUtils } = require("dunebot-sdk/utils");
-const { buildGreeting } = require("../utils");
-const { ServiceManager } = require('dunebot-core');
+const Befehl = require("../vorlageBefehl");
 
-/**
- * Parse JSON embed data from database
- * @param {string|object} embedData 
- * @returns {object}
- */
-function parseEmbedData(embedData) {
-    if (!embedData) return {};
-    if (typeof embedData === 'string') {
-        try {
-            return JSON.parse(embedData);
-        } catch (err) {
-            return {};
-        }
-    }
-    return embedData;
-}
+/** Die Vorlage dieses Befehls: `greeting:willkommen` (G-08, siehe ../vorlageBefehl.js). */
+const ART = "welcome";
 
 /**
  * @type {import('dunebot-sdk').CommandType}
@@ -155,273 +139,55 @@ module.exports = {
     },
 
     async messageRun({ message, args }) {
-        const dbService = ServiceManager.get('dbService');
-        const rows = await dbService.query(
-            'SELECT * FROM greeting_settings WHERE guild_id = ?',
-            [message.guild.id]
-        );
-        const settings = rows?.[0] || {};
-        
         const type = args[0].toLowerCase();
+        const { guild } = message;
         let response;
 
-        // preview
         if (type === "preview") {
-            response = await sendPreview(settings, message.member, message.guild);
-        }
-
-        // status
-        else if (type === "status") {
+            response = await Befehl.vorschau(ART, message.member, guild);
+        } else if (type === "status") {
             const status = args[1]?.toUpperCase();
-            if (!status || !["ON", "OFF"].includes(status))
-                return message.replyT("greeting:WELCOME.INVALID_THUMBNAIL");
-            response = await setStatus(settings, status, message.guild);
-        }
-
-        // channel
-        else if (type === "channel") {
-            const channel = message.mentions.channels.first();
-            response = await setChannel(settings, channel, message.guild);
-        }
-
-        // desc
-        else if (type === "desc") {
+            if (!status || !["ON", "OFF"].includes(status)) return message.replyT("greeting:WELCOME.INVALID_THUMBNAIL");
+            response = await Befehl.setzeStatus(ART, status, guild);
+        } else if (type === "channel") {
+            response = await Befehl.setzeKanal(ART, message.mentions.channels.first(), guild);
+        } else if (type === "desc") {
             if (args.length < 2) return message.replyT("greeting:WELCOME.INVALID_CONTENT");
-            const desc = args.slice(1).join(" ");
-            response = await setDescription(settings, desc, message.guild);
-        }
-
-        // thumbnail
-        else if (type === "thumbnail") {
+            response = await Befehl.setzeFelder(ART, { beschreibung: args.slice(1).join(" ") }, guild);
+        } else if (type === "thumbnail") {
             const status = args[1]?.toUpperCase();
-            if (!status || !["ON", "OFF"].includes(status))
-                return message.replyT("greeting:WELCOME.INVALID_THUMBNAIL");
-            response = await setThumbnail(settings, status, message.guild);
-        }
-
-        // color
-        else if (type === "color") {
-            response = await setColor(settings, args[1], message.guild);
-        }
-
-        // footer
-        else if (type === "footer") {
+            if (!status || !["ON", "OFF"].includes(status)) return message.replyT("greeting:WELCOME.INVALID_THUMBNAIL");
+            response = await Befehl.setzeFelder(ART, { vorschaubild: status === "ON" ? "{member:avatar}" : "" }, guild);
+        } else if (type === "color") {
+            response = await Befehl.setzeFelder(ART, { farbe: args[1] || "" }, guild);
+        } else if (type === "footer") {
             if (args.length < 2) return message.replyT("greeting:WELCOME.INVALID_CONTENT");
-            const content = args.slice(1).join(" ");
-            response = await setFooter(settings, content, message.guild);
+            response = await Befehl.setzeFelder(ART, { fusszeile: args.slice(1).join(" ") }, guild);
+        } else if (type === "image") {
+            if (!args[1]) return message.replyT("greeting:WELCOME.INVALID_IMAGE");
+            response = await Befehl.setzeFelder(ART, { bild: args[1] }, guild);
+        } else {
+            response = guild.getT("INVALID_SUBCOMMAND", { sub: type });
         }
-
-        // image
-        else if (type === "image") {
-            const url = args[1];
-            if (!url) return message.replyT("greeting:WELCOME.INVALID_IMAGE");
-            response = await setImage(settings, url, message.guild);
-        }
-
-        //
-        else response = message.guild.getT("INVALID_SUBCOMMAND", { sub: type });
         return message.reply(response);
     },
 
     async interactionRun({ interaction }) {
-        const dbService = ServiceManager.get('dbService');
-        const rows = await dbService.query(
-            'SELECT * FROM greeting_settings WHERE guild_id = ?',
-            [interaction.guild.id]
-        );
-        const settings = rows?.[0] || {};
-        
         const sub = interaction.options.getSubcommand();
-
         let response;
         switch (sub) {
             case "preview":
-                response = await sendPreview(settings, interaction.member, interaction.guild);
+                response = await Befehl.vorschau(ART, interaction.member, interaction.guild);
                 break;
-
             case "status":
-                response = await setStatus(
-                    settings,
-                    interaction.options.getString("status"),
-                    interaction.guild,
-                );
+                response = await Befehl.setzeStatus(ART, interaction.options.getString("status"), interaction.guild);
                 break;
-
             case "message":
-                response = await setMessage(settings, interaction);
+                response = await Befehl.setzeNachricht(ART, interaction);
                 break;
-
             default:
                 response = interaction.guild.getT("INVALID_SUBCOMMAND", { sub });
         }
-
         return interaction.followUp(response);
     },
 };
-
-async function sendPreview(settings, member, guild) {
-    const Logger = ServiceManager.get('Logger');
-    
-    if (!settings || !settings.welcome_enabled) {
-        return guild.getT("greeting:WELCOME.WELCOME_DISABLED");
-    }
-
-    const targetChannel = member.guild.channels.cache.get(settings.welcome_channel);
-    if (!targetChannel) return guild.getT("greeting:WELCOME.CHANNEL_NOT_CONFIG");
-
-    const welcomeConfig = {
-        enabled: settings.welcome_enabled,
-        channel: settings.welcome_channel,
-        content: settings.welcome_content,
-        embed: parseEmbedData(settings.welcome_embed)
-    };
-
-    const response = await buildGreeting(member, "WELCOME", welcomeConfig);
-    await targetChannel.send(response);
-
-    return guild.getT("greeting:WELCOME.PREVIEW_SENT", {
-        channel: targetChannel.toString(),
-    });
-}
-
-async function setStatus(settings, status, guild) {
-    const dbService = ServiceManager.get('dbService');
-    const enabled = status.toUpperCase() === "ON";
-    
-    await dbService.query(
-        'INSERT INTO greeting_settings (guild_id, welcome_enabled) VALUES (?, ?) ON DUPLICATE KEY UPDATE welcome_enabled = ?',
-        [guild.id, enabled, enabled]
-    );
-    
-    return enabled
-        ? guild.getT("greeting:WELCOME.ENABLED")
-        : guild.getT("greeting:WELCOME.DISABLED");
-}
-
-async function setChannel(settings, channel, guild) {
-    if (!guild.members.me.permissionsIn(channel).has(['SendMessages', 'EmbedLinks'])) {
-        return guild.getT("greeting:WELCOME.CHANNEL_NO_PERMS", {
-            channel: channel.toString(),
-        });
-    }
-    
-    const dbService = ServiceManager.get('dbService');
-    await dbService.query(
-        'INSERT INTO greeting_settings (guild_id, welcome_channel) VALUES (?, ?) ON DUPLICATE KEY UPDATE welcome_channel = ?',
-        [guild.id, channel.id, channel.id]
-    );
-    
-    return guild.getT("greeting:WELCOME.CHANNEL_SET", {
-        channel: channel.toString(),
-    });
-}
-
-async function setDescription(settings, desc, guild) {
-    const dbService = ServiceManager.get('dbService');
-    const embedData = parseEmbedData(settings.welcome_embed);
-    embedData.description = desc;
-    
-    await dbService.query(
-        'INSERT INTO greeting_settings (guild_id, welcome_embed) VALUES (?, ?) ON DUPLICATE KEY UPDATE welcome_embed = ?',
-        [guild.id, JSON.stringify(embedData), JSON.stringify(embedData)]
-    );
-    
-    return guild.getT("greeting:WELCOME.CONFIG_UPDATED");
-}
-
-async function setThumbnail(settings, status, guild) {
-    const dbService = ServiceManager.get('dbService');
-    const embedData = parseEmbedData(settings.welcome_embed);
-    embedData.thumbnail = status.toUpperCase() === "ON";
-    
-    await dbService.query(
-        'INSERT INTO greeting_settings (guild_id, welcome_embed) VALUES (?, ?) ON DUPLICATE KEY UPDATE welcome_embed = ?',
-        [guild.id, JSON.stringify(embedData), JSON.stringify(embedData)]
-    );
-    
-    return guild.getT("greeting:WELCOME.CONFIG_UPDATED");
-}
-
-async function setColor(settings, color, guild) {
-    if (!color || !MiscUtils.isHex(color)) return guild.getT("greeting:WELCOME.INVALID_COLOR");
-    
-    const dbService = ServiceManager.get('dbService');
-    const embedData = parseEmbedData(settings.welcome_embed);
-    embedData.color = color;
-    
-    await dbService.query(
-        'INSERT INTO greeting_settings (guild_id, welcome_embed) VALUES (?, ?) ON DUPLICATE KEY UPDATE welcome_embed = ?',
-        [guild.id, JSON.stringify(embedData), JSON.stringify(embedData)]
-    );
-    
-    return guild.getT("greeting:WELCOME.CONFIG_UPDATED");
-}
-
-async function setFooter(settings, content, guild) {
-    const dbService = ServiceManager.get('dbService');
-    const embedData = parseEmbedData(settings.welcome_embed);
-    embedData.footer = { text: content };
-    
-    await dbService.query(
-        'INSERT INTO greeting_settings (guild_id, welcome_embed) VALUES (?, ?) ON DUPLICATE KEY UPDATE welcome_embed = ?',
-        [guild.id, JSON.stringify(embedData), JSON.stringify(embedData)]
-    );
-    
-    return guild.getT("greeting:WELCOME.CONFIG_UPDATED");
-}
-
-async function setImage(settings, url, guild) {
-    const dbService = ServiceManager.get('dbService');
-    const embedData = parseEmbedData(settings.welcome_embed);
-    embedData.image = url;
-    
-    await dbService.query(
-        'INSERT INTO greeting_settings (guild_id, welcome_embed) VALUES (?, ?) ON DUPLICATE KEY UPDATE welcome_embed = ?',
-        [guild.id, JSON.stringify(embedData), JSON.stringify(embedData)]
-    );
-    
-    return guild.getT("greeting:WELCOME.CONFIG_UPDATED");
-}
-
-async function setMessage(settings, interaction) {
-    const channel = interaction.guild.channels.cache.get(
-        interaction.options.getChannel("channel").id,
-    );
-    const status = interaction.options.getString("status") === "ON";
-    const color = interaction.options.getString("hex-code");
-    const footer = interaction.options.getString("footer");
-    const url = interaction.options.getString("url");
-    const desc = interaction.options.getString("description");
-
-    const { guild } = interaction;
-
-    if (!guild.members.me.permissionsIn(channel).has(['SendMessages', 'EmbedLinks'])) {
-        return guild.getT("greeting:WELCOME.CHANNEL_NO_PERMS", {
-            channel: channel.toString(),
-        });
-    }
-
-    if (color && !MiscUtils.isHex(color)) return guild.getT("greeting:WELCOME.INVALID_COLOR");
-
-    const dbService = ServiceManager.get('dbService');
-    const embedData = parseEmbedData(settings.welcome_embed);
-    embedData.description = desc;
-    embedData.thumbnail = status;
-    if (color) embedData.color = color;
-    if (footer) embedData.footer = { text: footer };
-    if (url) embedData.image = url;
-
-    await dbService.query(
-        `INSERT INTO greeting_settings (guild_id, welcome_enabled, welcome_channel, welcome_embed) 
-         VALUES (?, TRUE, ?, ?) 
-         ON DUPLICATE KEY UPDATE 
-            welcome_enabled = TRUE,
-            welcome_channel = ?,
-            welcome_embed = ?`,
-        [guild.id, channel.id, JSON.stringify(embedData), channel.id, JSON.stringify(embedData)]
-    );
-
-    return guild.getT("greeting:WELCOME.CONFIG_SAVED", {
-        channel: channel.toString(),
-    });
-}

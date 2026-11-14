@@ -1,0 +1,339 @@
+<%
+/**
+ * Nachricht — Kern-Teil Vorlagen-Baukasten (G-08, K382, 2026-11-14).
+ *
+ * Eine Vorlage, drei Formen (Nur Text, Embed, Components V2), dieselben
+ * Felder. Darunter die Platzhalter dieses Anlasses (Kern und Plugin, aus dem
+ * Register) und die Vorschau. Die Vorschau rechnet der Server mit derselben
+ * Funktion wie der Bot (POST /guild/ID/vorlagen/vorschau).
+ *
+ * Aufruf INNERHALB des Formulars des Plugins (gespeichert wird mit dessen
+ * Knopf):
+ *
+ *     include('shared/vorlage', { guildId, tr, teil: vorlagen.willkommen })
+ *
+ * `teil` kommt aus `Vorlage.editor(guildId, 'plugin:anlass')`. Das Skript des
+ * Plugins liest die Vorlage beim Speichern mit
+ *
+ *     window.FBVorlage.lies('plugin:anlass')
+ *
+ * und schickt sie mit. Die Route des Plugins speichert mit
+ * `Vorlage.speichere`.
+ */
+const _a = teil.anlass;
+const _v = teil.vorlage;
+const _t = (k, o) => tr('core:VORLAGEN.' + k, o);
+const _id = 'vorlage-' + _a.anlass.replace(/[^a-z0-9]+/gi, '-');
+const _gruppen = [];
+for (const p of _a.platzhalter) {
+  let g = _gruppen.find(x => x.name === p.gruppe);
+  if (!g) { g = { name: p.gruppe, liste: [] }; _gruppen.push(g); }
+  g.liste.push(p);
+}
+const _gruppenTitel = (n) => n === 'member' ? _t('GRUPPE_MEMBER') : n === 'guild' ? _t('GRUPPE_GUILD') : n === 'gestaltung' ? _t('GRUPPE_GESTALTUNG') : _t('GRUPPE_PLUGIN');
+const _hatLogo = _a.platzhalter.some(p => p.name === 'gestaltung:logo');
+const _hatAvatar = _a.platzhalter.some(p => p.name === 'member:avatar');
+%>
+<div class="fb-vorlage border rounded p-3 mb-3" id="<%= _id %>"
+     data-vorlage="<%= _a.anlass %>"
+     data-vorschau="/guild/<%= guildId %>/vorlagen/vorschau"
+     data-text-wird-gesendet="<%= _t('VORSCHAU_WIRD_GESENDET') %>"
+     data-text-leer="<%= _t('VORSCHAU_LEER') %>"
+     data-text-fehler="<%= _t('VORSCHAU_FEHLER', { grund: '{{grund}}' }) %>"
+     data-text-anhang="<%= _t('VORSCHAU_ANHANG', { name: '{{name}}' }) %>"
+     data-text-unbekannt="<%= _t('UNBEKANNT', { namen: '{{namen}}' }) %>"
+     data-text-form-text="<%= _t('FORM_TEXT') %>"
+     data-text-form-embed="<%= _t('FORM_EMBED') %>"
+     data-text-form-v2="<%= _t('FORM_V2') %>">
+
+  <div class="mb-3">
+    <label class="form-label"><i class="fa-solid fa-shapes me-1"></i><%= _t('FORM') %></label>
+    <div class="btn-group w-100" role="group">
+      <% [['text', 'fa-align-left', 'FORM_TEXT'], ['embed', 'fa-code', 'FORM_EMBED'], ['v2', 'fa-table-cells-large', 'FORM_V2']].forEach(function (f) { %>
+        <input type="radio" class="btn-check" name="<%= _id %>-form" id="<%= _id %>-form-<%= f[0] %>" value="<%= f[0] %>" data-vorlage-form <%= _v.form === f[0] ? 'checked' : '' %>>
+        <label class="btn btn-outline-primary btn-sm" for="<%= _id %>-form-<%= f[0] %>"><i class="fa-solid <%= f[1] %> me-1"></i><%= _t(f[2]) %></label>
+      <% }); %>
+    </div>
+    <div class="form-hint"><%= _t('FORM_HILFE') %></div>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label" for="<%= _id %>-text"><%= _t('TEXT') %></label>
+    <textarea class="form-control" id="<%= _id %>-text" rows="3" maxlength="2000" data-vorlage-feld="text"><%= _v.text %></textarea>
+    <div class="form-hint"><%= _t('TEXT_HILFE') %></div>
+  </div>
+
+  <div data-vorlage-aufbau class="<%= _v.form === 'text' ? 'd-none' : '' %>">
+    <div class="row">
+      <div class="col-md-8 mb-3">
+        <label class="form-label" for="<%= _id %>-titel"><%= _t('FELD_TITEL') %></label>
+        <input type="text" class="form-control" id="<%= _id %>-titel" maxlength="256" data-vorlage-feld="titel" value="<%= _v.titel %>">
+      </div>
+      <div class="col-md-4 mb-3">
+        <label class="form-label" for="<%= _id %>-farbe"><%= _t('FELD_FARBE') %></label>
+        <div class="input-group">
+          <input type="color" class="form-control form-control-color" id="<%= _id %>-farbe" data-vorlage-farbwahl value="<%= _v.farbe || '#3498db' %>" <%= _v.farbe ? '' : 'disabled' %>>
+        </div>
+        <label class="form-check form-switch mt-1 mb-0">
+          <input class="form-check-input" type="checkbox" data-vorlage-farbe-server <%= _v.farbe ? '' : 'checked' %>>
+          <span class="form-check-label small"><%= _t('FARBE_SERVER') %></span>
+        </label>
+      </div>
+    </div>
+    <div class="mb-3">
+      <label class="form-label" for="<%= _id %>-beschreibung"><%= _t('FELD_BESCHREIBUNG') %></label>
+      <textarea class="form-control" id="<%= _id %>-beschreibung" rows="4" maxlength="4096" data-vorlage-feld="beschreibung"><%= _v.beschreibung %></textarea>
+    </div>
+    <div class="row">
+      <div class="col-md-6 mb-3">
+        <label class="form-label" for="<%= _id %>-vorschaubild"><%= _t('FELD_VORSCHAUBILD') %></label>
+        <div class="input-group">
+          <input type="text" class="form-control" id="<%= _id %>-vorschaubild" maxlength="1000" data-vorlage-feld="vorschaubild" value="<%= _v.vorschaubild %>" placeholder="https://…">
+          <% if (_hatAvatar) { %><button type="button" class="btn btn-outline-secondary" data-vorlage-setze="vorschaubild" data-wert="{member:avatar}"><%= _t('VORSCHAUBILD_AVATAR') %></button><% } %>
+          <% if (_hatLogo) { %><button type="button" class="btn btn-outline-secondary" data-vorlage-setze="vorschaubild" data-wert="{gestaltung:logo}"><%= _t('VORSCHAUBILD_LOGO') %></button><% } %>
+        </div>
+        <div class="form-hint"><%= _t('VORSCHAUBILD_HILFE') %></div>
+      </div>
+      <div class="col-md-6 mb-3">
+        <label class="form-label" for="<%= _id %>-bild"><%= _t('FELD_BILD') %></label>
+        <input type="text" class="form-control" id="<%= _id %>-bild" maxlength="1000" data-vorlage-feld="bild" value="<%= _v.bild %>" placeholder="https://…">
+        <div class="form-hint"><%= _t('BILD_HILFE') %></div>
+      </div>
+    </div>
+    <div class="row align-items-end">
+      <div class="col-md-8 mb-3">
+        <label class="form-label" for="<%= _id %>-fusszeile"><%= _t('FELD_FUSSZEILE') %></label>
+        <input type="text" class="form-control" id="<%= _id %>-fusszeile" maxlength="2048" data-vorlage-feld="fusszeile" value="<%= _v.fusszeile %>">
+      </div>
+      <div class="col-md-4 mb-3">
+        <label class="form-check form-switch mb-2">
+          <input class="form-check-input" type="checkbox" data-vorlage-zeitstempel <%= _v.zeitstempel ? 'checked' : '' %>>
+          <span class="form-check-label"><%= _t('FELD_ZEITSTEMPEL') %></span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <details class="mb-3">
+    <summary class="text-secondary"><i class="fa-solid fa-code me-1"></i><%= _t('PLATZHALTER') %> <span class="small">· <%= _t('PLATZHALTER_HILFE') %></span></summary>
+    <% _gruppen.forEach(function (g) { %>
+      <div class="small text-secondary mt-2 mb-1"><strong><%= _gruppenTitel(g.name) %></strong></div>
+      <div class="d-flex flex-wrap" style="gap:4px">
+        <% g.liste.forEach(function (p) { %>
+          <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1 font-monospace" data-vorlage-platzhalter="{<%= p.name %>}"
+                  title="<%= p.bedeutung ? tr(p.bedeutung) : '' %>">{<%= p.name %>}</button>
+        <% }); %>
+      </div>
+    <% }); %>
+  </details>
+
+  <div>
+    <div class="d-flex align-items-center mb-1">
+      <strong class="me-2"><i class="fa-solid fa-eye me-1"></i><%= _t('VORSCHAU') %></strong>
+      <div class="btn-group btn-group-sm ms-auto" role="group" data-vorlage-vorschau-wahl></div>
+    </div>
+    <div class="form-hint mb-1"><%= _t('VORSCHAU_HILFE') %></div>
+    <div data-vorlage-vorschau style="background:#313338;color:#dbdee1;padding:12px 16px;border-radius:6px;min-height:60px;font-size:.92rem;line-height:1.35;overflow-wrap:anywhere"></div>
+    <div data-vorlage-hinweise class="small mt-1"></div>
+  </div>
+</div>
+<script>
+(function () {
+  // Über das Attribut suchen, nicht über `document.currentScript`: Das Layout
+  // zieht alle Skripte ans Seitenende (`extractScripts`). Der Teil kann mehrfach
+  // auf einer Seite stehen; jeder wird einmal eingerichtet.
+  var HEX = /^#[0-9a-fA-F]{6}$/;
+
+  function lies(el) {
+    var v = { form: 'text', farbe: '', zeitstempel: false };
+    var f = el.querySelector('[data-vorlage-form]:checked');
+    if (f) v.form = f.value;
+    el.querySelectorAll('[data-vorlage-feld]').forEach(function (i) { v[i.dataset.vorlageFeld] = i.value; });
+    var server = el.querySelector('[data-vorlage-farbe-server]');
+    var wahl = el.querySelector('[data-vorlage-farbwahl]');
+    v.farbe = server && !server.checked && wahl && HEX.test(wahl.value) ? wahl.value : '';
+    var z = el.querySelector('[data-vorlage-zeitstempel]');
+    v.zeitstempel = !!(z && z.checked);
+    return v;
+  }
+
+  window.FBVorlage = window.FBVorlage || {
+    lies: function (anlass) {
+      var el = document.querySelector('[data-vorlage="' + String(anlass).replace(/"/g, '') + '"]');
+      return el ? lies(el) : null;
+    }
+  };
+
+  function esc(t) {
+    return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function bildOk(u) { return /^https?:\/\//.test(String(u || '')); }
+
+  // Discord-Markdown, so weit es die Vorschau braucht. Erst escapen, dann setzen.
+  function md(text, namen) {
+    return String(text || '').split('\n').map(function (zeile) {
+      var art = '';
+      if (/^## /.test(zeile)) { art = 'h'; zeile = zeile.slice(3); }
+      else if (/^# /.test(zeile)) { art = 'h1'; zeile = zeile.slice(2); }
+      else if (/^-# /.test(zeile)) { art = 'klein'; zeile = zeile.slice(3); }
+      var h = esc(zeile)
+        .replace(/&lt;@!?(\d+)&gt;/g, function (_, id) { return '<span style="background:rgba(88,101,242,.3);color:#c9cdfb;border-radius:3px;padding:0 2px">@' + esc((namen || {})[id] || id) + '</span>'; })
+        .replace(/&lt;t:(\d+)(?::[a-zA-Z])?&gt;/g, function (_, s) { return esc(new Date(Number(s) * 1000).toLocaleString()); })
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/__(.+?)__/g, '<u>$1</u>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<span style="color:#00a8fc">$1</span>');
+      if (art === 'h') return '<div style="font-size:1.15rem;font-weight:700;color:#f2f3f5;margin:2px 0">' + h + '</div>';
+      if (art === 'h1') return '<div style="font-size:1.4rem;font-weight:700;color:#f2f3f5;margin:2px 0">' + h + '</div>';
+      if (art === 'klein') return '<div style="font-size:.78rem;color:#949ba4">' + h + '</div>';
+      return '<div>' + (h || '&nbsp;') + '</div>';
+    }).join('');
+  }
+  function farbe(n) { return typeof n === 'number' ? '#' + n.toString(16).padStart(6, '0') : '#1e1f22'; }
+  function bild(url, el, stil) {
+    if (/^attachment:\/\//.test(url)) return '<div style="' + stil + ';background:#2b2d31;border:1px dashed #4e5058;display:flex;align-items:center;justify-content:center;font-size:.8rem;color:#949ba4">' + esc(el.dataset.textAnhang.replace('{{name}}', url.slice(13))) + '</div>';
+    if (!bildOk(url)) return '';
+    return '<img src="' + esc(url) + '" alt="" style="' + stil + ';object-fit:cover" onerror="this.style.opacity=.2">';
+  }
+
+  function zeichneEmbed(n, namen, el) {
+    var h = '';
+    if (n.content) h += md(n.content, namen);
+    (n.embeds || []).forEach(function (e) {
+      h += '<div style="display:flex;max-width:520px;margin-top:4px;background:#2b2d31;border-radius:4px;border-left:4px solid ' + farbe(e.color) + ';padding:8px 12px 10px">';
+      h += '<div style="flex:1;min-width:0">';
+      if (e.title) h += '<div style="font-weight:600;color:#f2f3f5;margin-bottom:4px">' + md(e.title, namen) + '</div>';
+      if (e.description) h += '<div>' + md(e.description, namen) + '</div>';
+      if (e.image) h += '<div style="margin-top:8px">' + bild(e.image.url, el, 'max-width:100%;max-height:260px;border-radius:4px') + '</div>';
+      if (e.footer || e.timestamp) h += '<div style="font-size:.75rem;color:#949ba4;margin-top:8px">' + esc((e.footer && e.footer.text) || '') + (e.footer && e.timestamp ? ' • ' : '') + (e.timestamp ? esc(new Date(e.timestamp).toLocaleString()) : '') + '</div>';
+      h += '</div>';
+      if (e.thumbnail) h += '<div style="margin-left:12px">' + bild(e.thumbnail.url, el, 'width:80px;height:80px;border-radius:4px') + '</div>';
+      h += '</div>';
+    });
+    (n.dateien || []).forEach(function (d) { h += '<div class="mt-2">' + bild('attachment://' + d, el, 'width:240px;height:90px;border-radius:4px') + '</div>'; });
+    return h;
+  }
+
+  function zeichneTeil(c, namen, el) {
+    if (c.type === 10) return md(c.content, namen);
+    if (c.type === 14) return '<hr style="border-color:#4e5058;margin:8px 0;opacity:1">';
+    if (c.type === 12) return '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">' + c.items.map(function (i) { return bild(i.media.url, el, 'max-width:100%;height:160px;flex:1 1 45%;border-radius:4px'); }).join('') + '</div>';
+    if (c.type === 9) return '<div style="display:flex;gap:12px"><div style="flex:1;min-width:0">' + c.components.map(function (t) { return zeichneTeil(t, namen, el); }).join('') + '</div><div>' + bild(c.accessory.media.url, el, 'width:80px;height:80px;border-radius:6px') + '</div></div>';
+    if (c.type === 17) return '<div style="max-width:520px;margin-top:4px;background:#2b2d31;border-radius:8px;border-left:4px solid ' + farbe(c.accent_color) + ';padding:12px 14px">' + c.components.map(function (t) { return zeichneTeil(t, namen, el); }).join('') + '</div>';
+    return '';
+  }
+
+  function einrichten(el) {
+    var box = el.querySelector('[data-vorlage-vorschau]');
+    var wahlLeiste = el.querySelector('[data-vorlage-vorschau-wahl]');
+    var hinweise = el.querySelector('[data-vorlage-hinweise]');
+    var aufbau = el.querySelector('[data-vorlage-aufbau]');
+    var serverFarbe = el.querySelector('[data-vorlage-farbe-server]');
+    var farbwahl = el.querySelector('[data-vorlage-farbwahl]');
+    var zuletzt = el.querySelector('[data-vorlage-feld="text"]');
+    var stand = null, ansicht = null, uhr = null, nr = 0;
+
+    function zeige() {
+      if (!stand) return;
+      var form = ansicht || stand.form;
+      wahlLeiste.innerHTML = '';
+      ['text', 'embed', 'v2'].forEach(function (f) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'btn ' + (f === form ? 'btn-secondary' : 'btn-outline-secondary');
+        b.textContent = el.dataset['textForm' + (f === 'v2' ? 'V2' : f.charAt(0).toUpperCase() + f.slice(1))] + (f === stand.form ? ' · ' + el.dataset.textWirdGesendet : '');
+        b.addEventListener('click', function () { ansicht = f; zeige(); });
+        wahlLeiste.appendChild(b);
+      });
+      var n = stand.formen[form];
+      if (!n) { box.innerHTML = '<span style="color:#949ba4">' + esc(el.dataset.textLeer) + '</span>'; }
+      else if (form === 'v2') { box.innerHTML = n.components.map(function (c) { return zeichneTeil(c, stand.namen, el); }).join(''); }
+      else { box.innerHTML = zeichneEmbed(n, stand.namen, el); }
+      hinweise.innerHTML = '';
+      var zeilen = stand.hinweise.slice();
+      if (stand.unbekannt.length) zeilen.push(el.dataset.textUnbekannt.replace('{{namen}}', stand.unbekannt.map(function (u) { return '{' + u + '}'; }).join(', ')));
+      zeilen.forEach(function (t) {
+        var d = document.createElement('div');
+        d.className = 'text-warning';
+        d.textContent = t;
+        hinweise.appendChild(d);
+      });
+    }
+
+    async function rechne() {
+      var meins = ++nr;
+      try {
+        var r = await fetch(el.dataset.vorschau, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json', 'Accept': 'application/json',
+            'X-CSRF-Token': (document.querySelector('meta[name="csrf-token"]') || {}).content || ''
+          },
+          body: JSON.stringify({ anlass: el.dataset.vorlage, vorlage: lies(el) })
+        });
+        var a = await r.json().catch(function () { return { success: false, message: 'HTTP ' + r.status }; });
+        if (meins !== nr) return;
+        if (!a.success) throw new Error(a.message || 'HTTP ' + r.status);
+        stand = a.data;
+        zeige();
+      } catch (e) {
+        if (meins !== nr) return;
+        stand = null;
+        box.innerHTML = '';
+        hinweise.innerHTML = '';
+        var d = document.createElement('div');
+        d.className = 'text-danger';
+        d.textContent = el.dataset.textFehler.replace('{{grund}}', e.message);
+        hinweise.appendChild(d);
+      }
+    }
+    function spaeter() { clearTimeout(uhr); uhr = setTimeout(rechne, 300); }
+
+    el.querySelectorAll('[data-vorlage-feld]').forEach(function (i) {
+      i.addEventListener('focus', function () { zuletzt = i; });
+      i.addEventListener('input', spaeter);
+    });
+    el.querySelectorAll('[data-vorlage-form]').forEach(function (r) {
+      r.addEventListener('change', function () {
+        aufbau.classList.toggle('d-none', r.value === 'text' && r.checked);
+        ansicht = null;
+        spaeter();
+      });
+    });
+    serverFarbe.addEventListener('change', function () { farbwahl.disabled = serverFarbe.checked; spaeter(); });
+    farbwahl.addEventListener('input', spaeter);
+    el.querySelector('[data-vorlage-zeitstempel]').addEventListener('change', spaeter);
+    el.querySelectorAll('[data-vorlage-setze]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var i = el.querySelector('[data-vorlage-feld="' + b.dataset.vorlageSetze + '"]');
+        i.value = b.dataset.wert;
+        spaeter();
+      });
+    });
+    el.querySelectorAll('[data-vorlage-platzhalter]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var i = zuletzt;
+        var p = b.dataset.vorlagePlatzhalter;
+        var a = typeof i.selectionStart === 'number' ? i.selectionStart : i.value.length;
+        var e = typeof i.selectionEnd === 'number' ? i.selectionEnd : a;
+        i.value = i.value.slice(0, a) + p + i.value.slice(e);
+        i.focus();
+        i.selectionStart = i.selectionEnd = a + p.length;
+        spaeter();
+      });
+    });
+    rechne();
+  }
+
+  function alle() {
+    document.querySelectorAll('[data-vorlage]').forEach(function (el) {
+      if (el.dataset.eingerichtet) return;
+      el.dataset.eingerichtet = '1';
+      einrichten(el);
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', alle);
+  else alle();
+})();
+</script>

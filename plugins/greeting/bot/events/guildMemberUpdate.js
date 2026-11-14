@@ -1,4 +1,4 @@
-const { buildGreeting } = require("../utils");
+const { baueNachricht, ANLAESSE } = require("../utils");
 const { ServiceManager } = require('dunebot-core');
 
 /**
@@ -36,22 +36,7 @@ module.exports = async (oldMember, newMember) => {
         const channel = newMember.guild.channels.cache.get(settings.boost_channel);
         if (!channel) return;
 
-        let embedData = {};
-        if (settings.boost_embed) {
-            try {
-                embedData = typeof settings.boost_embed === 'string'
-                    ? JSON.parse(settings.boost_embed)
-                    : settings.boost_embed;
-            } catch { /* ignore */ }
-        }
-
-        const boostConfig = {
-            enabled: true,
-            content: settings.boost_content,
-            embed: embedData
-        };
-
-        const response = await buildGreeting(newMember, "BOOST", boostConfig, {});
+        const response = await baueNachricht(newMember, ANLAESSE.boost);
         await channel.send(response);
 
         logger.info(`[Greeting] Sent boost message for ${newMember.user.tag} in ${newMember.guild.name}`);

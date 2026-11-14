@@ -9,28 +9,27 @@
  */
 
 const { ServiceManager } = require('dunebot-core');
+const { Vorlage } = require('dunebot-sdk');
 
-/** Ein leeres Embed - Grundform fuer alle vier Nachrichtenarten. */
-const LEERES_EMBED = () => ({
-    title: null,
-    description: null,
-    color: null,
-    thumbnail: null,
-    image: null,
-    fields: [],
-    author: { name: null, iconURL: null },
-    footer: { text: null, iconURL: null },
-    timestamp: false
+/**
+ * Die vier Nachrichten und ihre Vorlage im Kern (G-08, 2026-11-14). Der
+ * Schlüssel ist der Bereich auf den Seiten und im Formular (`type`).
+ */
+const ANLAESSE = Object.freeze({
+    welcome: 'greeting:willkommen',
+    dm_welcome: 'greeting:direktnachricht',
+    farewell: 'greeting:abschied',
+    boost: 'greeting:boost'
 });
 
 /** Standardwerte, solange eine Guild noch nichts gespeichert hat. */
 const STANDARD = {
-    welcome_enabled: false, welcome_channel: null, welcome_content: null, welcome_embed: null,
-    farewell_enabled: false, farewell_channel: null, farewell_content: null, farewell_embed: null,
+    welcome_enabled: false, welcome_channel: null,
+    farewell_enabled: false, farewell_channel: null,
     autorole_id: null, autorole_ids: null,
-    dm_welcome_enabled: false, dm_welcome_content: null, dm_welcome_embed: null,
+    dm_welcome_enabled: false,
     welcome_image_enabled: false, welcome_image_bg: 'default', welcome_image_text: null, welcome_image_color: '#5865f2',
-    boost_enabled: false, boost_channel: null, boost_content: null, boost_embed: null
+    boost_enabled: false, boost_channel: null
 };
 
 /**
@@ -61,26 +60,10 @@ async function renderView(res, viewPath, data) {
 }
 
 /**
- * Ein Embed-Feld lesen, das als JSON-Text oder als Objekt vorliegen kann.
- *
- * @param {*} roh Wert aus der Datenbank
- * @returns {Object} Embed
- */
-function leseEmbed(roh) {
-    if (!roh) return LEERES_EMBED();
-    if (typeof roh === 'object') return roh;
-    try {
-        return JSON.parse(roh) || LEERES_EMBED();
-    } catch {
-        return LEERES_EMBED();
-    }
-}
-
-/**
  * Alles laden, was die Greeting-Seiten brauchen.
  *
  * @param {string} guildId Discord-Guild-ID
- * @returns {Promise<Object>} { settings, channels, roles, inviteMappings }
+ * @returns {Promise<Object>} { settings, channels, roles, inviteMappings, vorlagen }
  */
 async function ladeDaten(guildId) {
     const dbService = ServiceManager.get('dbService');
@@ -122,20 +105,14 @@ async function ladeDaten(guildId) {
     const settings = {
         welcome: {
             enabled: Boolean(roh.welcome_enabled),
-            channel: roh.welcome_channel || '',
-            content: roh.welcome_content || '',
-            embed: leseEmbed(roh.welcome_embed)
+            channel: roh.welcome_channel || ''
         },
         farewell: {
             enabled: Boolean(roh.farewell_enabled),
-            channel: roh.farewell_channel || '',
-            content: roh.farewell_content || '',
-            embed: leseEmbed(roh.farewell_embed)
+            channel: roh.farewell_channel || ''
         },
         dm_welcome: {
-            enabled: Boolean(roh.dm_welcome_enabled),
-            content: roh.dm_welcome_content || '',
-            embed: leseEmbed(roh.dm_welcome_embed)
+            enabled: Boolean(roh.dm_welcome_enabled)
         },
         autorole_id: roh.autorole_id || '',
         autorole_ids: autoroleIds,
@@ -147,9 +124,7 @@ async function ladeDaten(guildId) {
         },
         boost: {
             enabled: Boolean(roh.boost_enabled),
-            channel: roh.boost_channel || '',
-            content: roh.boost_content || '',
-            embed: leseEmbed(roh.boost_embed)
+            channel: roh.boost_channel || ''
         },
         verification: {
             enabled: Boolean(roh.verification_enabled),
@@ -172,7 +147,13 @@ async function ladeDaten(guildId) {
         );
     } catch { /* Tabelle noch nicht angelegt */ }
 
-    return { settings, channels, roles, inviteMappings };
+    // Je Nachricht die Vorlage für den Kern-Teil `shared/vorlage`.
+    const vorlagen = {};
+    for (const [art, anlass] of Object.entries(ANLAESSE)) {
+        vorlagen[art] = await Vorlage.editor(guildId, anlass);
+    }
+
+    return { settings, channels, roles, inviteMappings, vorlagen };
 }
 
 /** Fehlerseite statt eines nackten 500ers. */
@@ -188,4 +169,4 @@ function renderFehler(res, error, kontext) {
     });
 }
 
-module.exports = { makeTranslator, renderView, ladeDaten, renderFehler, LEERES_EMBED };
+module.exports = { makeTranslator, renderView, ladeDaten, renderFehler, ANLAESSE };

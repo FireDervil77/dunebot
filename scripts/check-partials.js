@@ -93,11 +93,15 @@ function aufbau(partials) {
     ServiceManager.register('dbService', {
         query: async (sql, werte) => {
             abfragen.push(sql);
-            return [{
-                guild_id: '1',
-                boost_enabled: 1, boost_channel: '77', boost_content: 'Boost {member:name}', boost_embed: null,
-                farewell_enabled: 1, farewell_channel: '77', farewell_content: 'Tschuess {member:name}', farewell_embed: null,
-            }];
+            if (/FROM greeting_settings/.test(sql)) {
+                return [{ guild_id: '1', boost_enabled: 1, boost_channel: '77', farewell_enabled: 1, farewell_channel: '77' }];
+            }
+            // Seit G-08 (2026-11-14) stehen die Nachrichten als Vorlage im Kern.
+            if (/FROM guild_vorlagen/.test(sql)) {
+                const text = { 'greeting:boost': 'Boost {member:name}', 'greeting:abschied': 'Tschuess {member:name}' }[werte[1]];
+                return text ? [{ inhalt: JSON.stringify({ form: 'text', text }) }] : [];
+            }
+            throw new Error(`Attrappe kennt die Abfrage nicht: ${sql.slice(0, 80)}`);
         },
     });
     ServiceManager.register('Logger', {
@@ -201,7 +205,7 @@ const updateDaten = (premium) => ({
                 await handler(...args);
                 assert.deepStrictEqual(fehlerLog, []);
                 assert.strictEqual(gesendet.length, 1, `gesendet: ${gesendet.length}`);
-                assert.match(JSON.stringify(gesendet[0]), /nutzer/);
+                assert.match(JSON.stringify(gesendet[0]), /Tschuess nutzer/, "nicht aus der Vorlage (G-08)");
             });
         }
     }

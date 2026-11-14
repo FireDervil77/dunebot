@@ -26,24 +26,20 @@
   "TAB_INVITE_TRACKING": "Invite Tracking",
   "WELCOME": {
     "TITLE": "Welcome Messages",
-    "DESC": "Configure welcome messages for new members",
-    "MESSAGE": "Welcome Message"
+    "DESC": "Configure welcome messages for new members"
   },
   "FAREWELL": {
     "TITLE": "Farewell Messages",
-    "DESC": "Configure messages for leaving members",
-    "MESSAGE": "Farewell Message"
+    "DESC": "Configure messages for leaving members"
   },
   "DM_WELCOME": {
     "TITLE": "DM Welcome Message",
     "DESC": "Send new members a private welcome message",
-    "MESSAGE": "DM Message",
     "INFO": "This message will be sent as a direct message to new members. Note: Members with DMs disabled will not receive this."
   },
   "BOOST": {
     "TITLE": "Boost Messages",
     "DESC": "Celebrate members who boost your server",
-    "MESSAGE": "Boost Message",
     "INFO": "This message is sent when a member boosts the server.",
     "SUBTITLE": "Message when someone boosts the server"
   },
@@ -77,28 +73,6 @@
     "TEXT_PLACEHOLDER": "Welcome to the server!",
     "COLOR_TITLE": "Accent Color"
   },
-  "EMBED": {
-    "TITLE": "Embed Builder",
-    "DESC": "Design a Discord embed",
-    "FIELD_TITLE": "Title",
-    "FIELD_TITLE_PH": "Enter embed title...",
-    "DESCRIPTION": "Description",
-    "DESCRIPTION_PH": "Enter embed description...",
-    "COLOR": "Colour",
-    "THUMBNAIL": "Thumbnail (show profile picture)",
-    "FOOTER": "Footer",
-    "FOOTER_PH": "Enter footer text...",
-    "IMAGE": "Image URL",
-    "AUTHOR": "Author Name",
-    "TIMESTAMP": "Show timestamp",
-    "ENABLE": "Enable Embed"
-  },
-  "PREVIEW": {
-    "TITLE": "Preview",
-    "PLACEHOLDER_USER": "New Member",
-    "BOT_BADGE": "BOT"
-  },
-  "PLACEHOLDERS_HINT": "Use placeholders like {member:name}, {member:mention}, {guild:name}",
   "BTN_ENABLE": "Enable",
   "BTN_DISABLE": "Disable",
   "BTN_SAVE": "Save",
@@ -133,8 +107,7 @@
     "INVITE_TRACKING_TITLE": "Invite Tracking",
     "INVITE_TRACKING_TEXT": "Different welcome messages depending on the invite link used.",
     "IMAGE_TITLE": "Welcome Image",
-    "IMAGE_TEXT": "Generated welcome banner with the new member's avatar.",
-    "PLACEHOLDERS_TITLE": "Available Placeholders"
+    "IMAGE_TEXT": "Generated welcome banner with the new member's avatar."
   },
   "VERIFICATION": {
     "TITLE": "Verification",
@@ -200,5 +173,10 @@
     "VIEW_DESC": "Allows seeing the greeting settings",
     "SETTINGS_EDIT": "Edit greeting settings",
     "SETTINGS_EDIT_DESC": "Allows configuring greeting messages"
+  },
+  "VORLAGEN": {
+    "PH_INVITER_NAME": "Name of the person who invited",
+    "PH_INVITER_TAG": "Username of the person who invited",
+    "PH_INVITES": "Number of their invites"
   }
 }

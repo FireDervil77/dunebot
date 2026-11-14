@@ -1,122 +1,34 @@
-<%# Greeting Plugin v2 Scripts – all 5 types, embed builder, live preview, tab persistence %>
+<%# Greeting – Speichern, Schalter, Autorollen, Verifizierung, Einladungen. Nachricht und Vorschau: Kern-Teil shared/vorlage (G-08). %>
 <script>
 (function() {
   const guildId = window.location.pathname.split('/')[2];
 
-  // ──── Embed data collector ────
-  function collectEmbed(prefix) {
-    const t  = document.querySelector(`[name="${prefix}_embed_title"]`);
-    const d  = document.querySelector(`[name="${prefix}_embed_description"]`);
-    const c  = document.querySelector(`[name="${prefix}_embed_color"]`);
-    const im = document.querySelector(`[name="${prefix}_embed_image"]`);
-    const f  = document.querySelector(`[name="${prefix}_embed_footer"]`);
-    const th = document.querySelector(`#${prefix}_embed_thumbnail`);
-    const ts = document.querySelector(`#${prefix}_embed_timestamp`);
-    if (!t && !d) return null;
-
-    const title = t ? t.value.trim() : '';
-    const desc  = d ? d.value.trim() : '';
-    if (!title && !desc) return null;
-
-    const embed = {};
-    if (title)              embed.title       = title;
-    if (desc)               embed.description = desc;
-    if (c && c.value)       embed.color       = c.value;
-    if (im && im.value.trim()) embed.image    = im.value.trim();
-    if (f && f.value.trim())   embed.footer   = { text: f.value.trim() };
-    if (th && th.checked)      embed.thumbnail = true;
-    if (ts && ts.checked)      embed.timestamp = true;
-    return embed;
-  }
-
-  // ──── Message Mode Helper ────
-  function getMessageMode(type) {
-    const radio = document.querySelector(`input[name="${type}_message_mode"]:checked`);
-    return radio ? radio.value : 'text';
-  }
-
-  // ──── Message Mode Toggle ────
-  function initMessageModes() {
-    const types = ['welcome', 'farewell', 'dm_welcome', 'boost'];
-    types.forEach(function(type) {
-      const labels = document.querySelectorAll(`input[name="${type}_message_mode"]`);
-      labels.forEach(function(radio) {
-        radio.closest('label').addEventListener('click', function() {
-          const value = radio.value;
-          const textSection = document.getElementById(`${type}_text_section`);
-          const embedSection = document.getElementById(`${type}_embed_section`);
-          if (!textSection || !embedSection) return;
-
-          if (value === 'text') {
-            textSection.style.display = '';
-            embedSection.style.display = 'none';
-          } else {
-            textSection.style.display = 'none';
-            embedSection.style.display = '';
-            const klappe = document.getElementById(`${type}_embed_collapse`);
-            if (klappe && window.bootstrap) bootstrap.Collapse.getOrCreateInstance(klappe).show();
-          }
-          setTimeout(renderLivePreview, 50);
-        });
-      });
-    });
-  }
-
   // ──── Save handler ────
+  // Die Nachricht selbst liest der Kern-Teil „Nachricht“ (shared/vorlage,
+  // G-08). Bis 2026-11-14 sammelte das Skript hier Text und Embed getrennt.
+  const ANLAESSE = {
+    welcome: 'greeting:willkommen',
+    dm_welcome: 'greeting:direktnachricht',
+    farewell: 'greeting:abschied',
+    boost: 'greeting:boost'
+  };
+
   async function updateGreeting(type, action) {
     const data = { type, action };
 
+    if (ANLAESSE[type]) {
+      const kanal = document.querySelector(`[name="${type}_channel"]`);
+      if (kanal) data[`${type}_channel`] = kanal.value || '';
+      data.vorlage = window.FBVorlage ? window.FBVorlage.lies(ANLAESSE[type]) : null;
+    }
     if (type === 'welcome') {
-      data.welcome_channel = document.querySelector('[name="welcome_channel"]')?.value || '';
-      const mode = getMessageMode('welcome');
-      if (mode === 'text') {
-        data.welcome_content = document.querySelector('[name="welcome_content"]')?.value || '';
-        data.welcome_embed = null;
-      } else {
-        data.welcome_content = '';
-        data.welcome_embed = collectEmbed('welcome') || null;
-      }
-      // welcome image fields
       data.welcome_image_enabled = document.querySelector('[name="welcome_image_enabled"]')?.checked || false;
       data.welcome_image_bg      = document.querySelector('[name="welcome_image_bg"]')?.value || 'default';
       data.welcome_image_text    = document.querySelector('[name="welcome_image_text"]')?.value || '';
       data.welcome_image_color   = document.querySelector('[name="welcome_image_color"]')?.value || '#5865f2';
-
-    } else if (type === 'farewell') {
-      data.farewell_channel = document.querySelector('[name="farewell_channel"]')?.value || '';
-      const mode = getMessageMode('farewell');
-      if (mode === 'text') {
-        data.farewell_content = document.querySelector('[name="farewell_content"]')?.value || '';
-        data.farewell_embed = null;
-      } else {
-        data.farewell_content = '';
-        data.farewell_embed = collectEmbed('farewell') || null;
-      }
-
-    } else if (type === 'dm_welcome') {
-      const mode = getMessageMode('dm_welcome');
-      if (mode === 'text') {
-        data.dm_welcome_content = document.querySelector('[name="dm_welcome_content"]')?.value || '';
-        data.dm_welcome_embed = null;
-      } else {
-        data.dm_welcome_content = '';
-        data.dm_welcome_embed = collectEmbed('dm_welcome') || null;
-      }
-
     } else if (type === 'autorole') {
       const sel = document.querySelector('[name="autorole_ids"]');
       data.autorole_ids = sel ? Array.from(sel.selectedOptions).map(o => o.value) : [];
-
-    } else if (type === 'boost') {
-      data.boost_channel = document.querySelector('[name="boost_channel"]')?.value || '';
-      const mode = getMessageMode('boost');
-      if (mode === 'text') {
-        data.boost_content = document.querySelector('[name="boost_content"]')?.value || '';
-        data.boost_embed = null;
-      } else {
-        data.boost_content = '';
-        data.boost_embed = collectEmbed('boost') || null;
-      }
     }
 
     try {
@@ -181,154 +93,10 @@
     }
   }
 
-  // ──── Placeholder copy ────
-  function copyPH(el) {
-    const text = el.getAttribute('data-ph') || el.innerText;
-    navigator.clipboard.writeText(text).then(() => {
-      const orig = el.innerHTML;
-      el.innerHTML = '<i class="fa-solid fa-check"></i> Kopiert!';
-      setTimeout(() => el.innerHTML = orig, 1200);
-    });
-  }
-
-  // ──── Tab persistence via localStorage ────
-  const TAB_KEY = 'greeting_active_tab_' + guildId;
-  document.addEventListener('DOMContentLoaded', function() {
-    const savedTab = localStorage.getItem(TAB_KEY);
-    if (savedTab) {
-      const tabLink = document.querySelector(`a[href="${savedTab}"]`);
-      if (tabLink && window.bootstrap) {
-        bootstrap.Tab.getOrCreateInstance(tabLink).show();
-      }
-    }
-    document.querySelectorAll('#greetingTabs a[data-bs-toggle="tab"]').forEach(tab => {
-      tab.addEventListener('shown.bs.tab', function(e) {
-        localStorage.setItem(TAB_KEY, e.target.getAttribute('href'));
-        renderLivePreview();
-      });
-    });
-  });
-
-  // ──── Tab → Type mapping ────
-  const TAB_TYPE_MAP = {
-    '#welcome-pane': 'welcome',
-    '#farewell-pane': 'farewell',
-    '#dm-pane': 'dm_welcome',
-    '#autorole-pane': 'autorole',
-    '#boost-pane': 'boost',
-    '#verification-pane': 'verification',
-    '#reaction-roles-pane': 'reaction_roles',
-    '#invite-tracking-pane': 'invite_tracking'
-  };
-
-  // ──── Placeholder Preview Helper ────
-  function previewPlaceholders(text) {
-    if (!text) return '';
-    return text
-      // Member
-      .replace(/\{member:name\}/g, '<span class="text-info">ExampleUser</span>')
-      .replace(/\{member:nick\}/g, '<span class="text-info">ExampleUser</span>')
-      .replace(/\{member:mention\}/g, '<span class="text-info">@ExampleUser</span>')
-      .replace(/\{member:tag\}/g, '<span class="text-info">ExampleUser#0001</span>')
-      .replace(/\{member:avatar\}/g, '<span class="text-secondary">[Avatar-URL]</span>')
-      .replace(/\{member:dis\}/g, '<span class="text-info">0001</span>')
-      .replace(/\{member:id\}/g, '<span class="text-info">123456789</span>')
-      .replace(/\{member:joinedAt\}/g, '<span class="text-info">11.04.2026</span>')
-      .replace(/\{member:createdAt\}/g, '<span class="text-info">15.03.2021</span>')
-      // Guild
-      .replace(/\{server\}/g, '<strong>My Server</strong>')
-      .replace(/\{guild:name\}/g, '<strong>My Server</strong>')
-      .replace(/\{count\}/g, '42')
-      .replace(/\{guild:memberCount\}/g, '42')
-      .replace(/\{guild:id\}/g, '<span class="text-info">123456789</span>')
-      .replace(/\{guild:icon\}/g, '<span class="text-secondary">[Icon-URL]</span>')
-      .replace(/\{guild:boostCount\}/g, '3')
-      .replace(/\{guild:boostLevel\}/g, '2')
-      // Inviter
-      .replace(/\{inviter:name\}/g, '<span class="text-warning">InviterName</span>')
-      .replace(/\{inviter:tag\}/g, '<span class="text-warning">InviterName#0001</span>')
-      .replace(/\{invites\}/g, '5');
-  }
-
-  // ──── Live Preview ────
-  function renderLivePreview() {
-    const previewContent = document.getElementById('previewContent');
-    const previewEmbed   = document.getElementById('previewEmbed');
-    if (!previewContent || !previewEmbed) return;
-
-    // Find active tab type
-    const activeTab = document.querySelector('#greetingTabs .nav-link.active');
-    if (!activeTab) return;
-    const type = TAB_TYPE_MAP[activeTab.getAttribute('href')];
-    if (!type) return;
-
-    // Get message text – Verification hat eigene Textarea (id statt name)
-    let content = '';
-    if (type === 'verification') {
-      const vmsg = document.getElementById('verificationMessage');
-      content = vmsg ? vmsg.value.trim() : '';
-    } else {
-      const textarea = document.querySelector(`[name="${type}_content"]`);
-      content = textarea ? textarea.value.trim() : '';
-    }
-
-    // Replace placeholders for preview
-    const preview = previewPlaceholders(content);
-
-    previewContent.innerHTML = preview || '<span class="text-secondary">Kein Text</span>';
-
-    // Verification-Tab hat kein Embed-Builder-Formular → Embed-Bereich leeren
-    if (type === 'verification') {
-      previewEmbed.innerHTML = '';
-      return;
-    }
-
-    // Embed preview
-    const embed = collectEmbed(type);
-    if (embed && (embed.title || embed.description)) {
-      const color = embed.color || '#5865f2';
-      let html = `<div style="border-left: 4px solid ${escapeAttr(color)}; padding: 8px 12px; margin-top: 6px; background: #2f3136; border-radius: 0 4px 4px 0;">`;
-      if (embed.title) html += `<div style="font-weight:600; color: #fff; margin-bottom:4px;">${previewPlaceholders(escapeHTML(embed.title))}</div>`;
-      if (embed.description) html += `<div style="color: #dcddde; font-size: 0.9em;">${previewPlaceholders(escapeHTML(embed.description))}</div>`;
-      if (embed.image) html += `<div style="margin-top:6px;"><img src="${escapeAttr(embed.image)}" style="max-width:100%; border-radius:4px;" onerror="this.style.display='none'"></div>`;
-      if (embed.footer && embed.footer.text) html += `<div style="color:#72767d; font-size:0.75em; margin-top:6px;">${previewPlaceholders(escapeHTML(embed.footer.text))}</div>`;
-      if (embed.timestamp) html += `<div style="color:#72767d; font-size:0.75em;">Heute um ${new Date().toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'})}</div>`;
-      html += '</div>';
-      previewEmbed.innerHTML = html;
-    } else {
-      previewEmbed.innerHTML = '';
-    }
-  }
-
-  function escapeHTML(str) {
-    const d = document.createElement('div');
-    d.textContent = str;
-    return d.innerHTML;
-  }
-  function escapeAttr(str) {
-    return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  }
-
-  // Bind live preview to text inputs
-  document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.msg-input, .embed-input').forEach(el => {
-      el.addEventListener('input', renderLivePreview);
-      el.addEventListener('change', renderLivePreview);
-    });
-    // Verification-Textarea auch an Live-Preview binden
-    const vmsg = document.getElementById('verificationMessage');
-    if (vmsg) {
-      vmsg.addEventListener('input', renderLivePreview);
-    }
-    initMessageModes();
-    renderLivePreview();
-  });
-
   // Global exports
   window.updateGreeting = updateGreeting;
   window.toggleGreeting = toggleGreeting;
   window.removeAutorole = removeAutorole;
-  window.copyPH = copyPH;
 
   // ==================== VERIFICATION ====================
   const verificationBasePath = '/guild/<%= guildId %>/plugins/greeting';
