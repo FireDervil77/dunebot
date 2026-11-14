@@ -42,7 +42,9 @@ class CoreDashboardPlugin extends DashboardPlugin {
   
     // `onUpdate` ist am 2026-11-09 entfallen (K028): Niemand rief den Haken auf.
     // Was er tat (Standardgruppen, Navigation), erledigen der Wiederbeitritt
-    // (GuildManager) und onGuildEnable bei jedem Start.
+    // (GuildManager) und, für die Navigation, `app.js`
+    // `enableGuildSpecificPlugins` bei jedem Start (seit 2026-11-14; vorher
+    // stand hier „onGuildEnable bei jedem Start“, aber app.js überspringt core).
 
     /**
      * Registriert guild-spezifische Navigation

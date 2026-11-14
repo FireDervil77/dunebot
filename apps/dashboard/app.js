@@ -5,6 +5,7 @@ require("dotenv").config();
 
 // ServiceManager aus SDK holen
 const PluginManager = require("./helpers/PluginManager");
+const { registerKernNavigation } = require("./helpers/KernNavigation");
 const { SessionManager, BotHealthMonitor } = require("dunebot-sdk");
 const { ServiceManager, I18nManager, SiteConfig } = require("dunebot-core");
 const { parseJsonArray } = require("dunebot-sdk/utils");
@@ -489,6 +490,19 @@ module.exports = class App {
             // Für jede Guild die aktivierten Plugins aus guild_plugins holen (NEU!)
             for (const guild of allGuilds) {
                 const guildId = guild._id;
+
+                // Kern-Navigation bei jedem Start, wie jedes Plugin sie in
+                // `onGuildEnable` registriert (2026-11-14, G-09). core wird
+                // unten übersprungen; bis hierhin entstand sein Menü nur beim
+                // Beitritt einer Guild, und jeder neue Kern-Punkt (zuletzt
+                // „Gestaltung“) brauchte eine Nachtrag-Migration.
+                // `registerNavigation` legt Fehlendes an, zieht Erklärtes
+                // nach und löscht nie.
+                try {
+                    await registerKernNavigation(guildId);
+                } catch (err) {
+                    Logger.error(`[Kern] Navigation für Guild ${guildId} nicht registriert:`, err);
+                }
                 
                 // NEU: guild_plugins Tabelle nutzen statt configs
                 const enabledPlugins = await dbService.getEnabledPlugins(guildId);
