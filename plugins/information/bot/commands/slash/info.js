@@ -92,7 +92,7 @@ module.exports = {
         if (sub === "user") {
             let targetUser = interaction.options.getUser("name") || interaction.user;
             let target = await interaction.guild.members.fetch(targetUser);
-            response = user(target);
+            response = await user(target);
         }
 
         // channel

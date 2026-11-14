@@ -165,5 +165,13 @@
     "EMBED_REQUIREMENTS": "Requirements",
     "EMBED_REQ_ROLE": "Role: <@&{value}>",
     "EMBED_REQ_ACCOUNT_AGE": "Account Age: {value} days",
-    "EMBED_REQ_SERVER_AGE": "Server Membership: {value} days"
+    "EMBED_REQ_SERVER_AGE": "Server Membership: {value} days",
+
+    "PROFIL": {
+        "TITEL": "Giveaways",
+        "TEILNAHMEN": "Entries",
+        "GEWONNEN": "Won",
+        "ZULETZT": "Last won",
+        "KACHEL": "Giveaways won"
+    }
 }

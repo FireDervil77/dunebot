@@ -156,5 +156,22 @@
         "SEITE_TITEL": "Alles auf einer Seite",
         "SEITE_LINK": "Zur Willkommensseite",
         "FUSS": "Diese Nachricht kommt einmalig, beim Beitritt."
+    },
+
+    "PROFIL": {
+        "DISCORD_TITEL": "Discord",
+        "BEIGETRETEN": "Auf dem Server seit",
+        "KONTO_ERSTELLT": "Konto erstellt",
+        "ROLLEN": "Rollen [{{n}}]",
+        "KACHEL_ROLLEN": "Rollen",
+        "KONTEN_TITEL": "Verbundene Konten",
+        "KONTEN": "Konten [{{n}}]",
+        "MEHR": "und {{n}} weitere",
+        "DESCRIPTION": "Zeigt dein Profil auf diesem Server",
+        "NUR_DU": "Nur du siehst diese Antwort. Andere Mitglieder können dein Profil nicht abrufen.",
+        "TITEL": "Profil von {{name}}",
+        "LEER": "Über dich gibt es auf diesem Server noch nichts zu zeigen.",
+        "FEHLER": "Nicht lesbar: {{titel}} ({{grund}})",
+        "KARTE_FEHLT": "Die Profilkarte ließ sich nicht zeichnen: {{grund}}"
     }
 }

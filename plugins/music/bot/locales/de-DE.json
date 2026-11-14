@@ -116,5 +116,13 @@
     "UNSAVE": {
         "DESCRIPTION": "Löscht eine gespeicherte Wiedergabeliste",
         "NAME_DESC": "Name der Liste"
+    },
+
+    "PROFIL": {
+        "TITEL": "Musik",
+        "WUENSCHE": "Gewünschte Titel",
+        "ZULETZT_AM": "Zuletzt gewünscht",
+        "ZULETZT": "Letzte Wünsche",
+        "KACHEL": "Musikwünsche"
     }
 }

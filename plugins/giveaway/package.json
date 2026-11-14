@@ -69,5 +69,13 @@
             "akzent": "#f59e0b",
             "gefahr": "#ff4444"
         }
+    },
+    "profil": {
+        "giveaway": {
+            "titel": "PROFIL.TITEL",
+            "sicht": "team",
+            "recht": "GIVEAWAY.VIEW",
+            "reihe": 300
+        }
     }
 }

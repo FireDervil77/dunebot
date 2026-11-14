@@ -157,6 +157,18 @@ async function registerKernNavigation(guildId) {
                 guildId,
                 parent: null
             },
+            // ── Mitglieder (G-12): Mitglieder der Guild und ihre Profilabschnitte ──
+            {
+                title: 'NAV.MITGLIEDER',
+                url: `/guild/${guildId}/mitglieder`,
+                icon: 'fa-solid fa-address-card',
+                order: 2960,
+                type: navigationManager.menuTypes.MAIN,
+                capability: 'CORE.MITGLIEDER.VIEW',
+                visible: true,
+                guildId,
+                parent: null
+            },
             {
                 title: 'NAV.THEMES_OVERVIEW',
                 url: `/guild/${guildId}/themes`,

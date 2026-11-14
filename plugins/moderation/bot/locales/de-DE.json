@@ -271,5 +271,31 @@
         "ADD_FAILED": "Fehler beim Erstellen der Notiz",
         "DELETE_SUCCESS": "Notiz #{{id}} wurde gelöscht",
         "DELETE_FAILED": "Notiz #{{id}} konnte nicht gelöscht werden (nicht gefunden oder keine Berechtigung)"
+    },
+
+    "PROFIL": {
+        "FAELLE_TITEL": "Moderationsfälle",
+        "FAELLE": "Fälle",
+        "JE_ART": "Je Art",
+        "LETZTER_FALL": "Letzter Fall (#{{nr}}, {{art}})",
+        "NOTIZEN_TITEL": "Moderationsnotizen",
+        "NOTIZEN": "Notizen",
+        "LETZTE_NOTIZ": "Letzte Notiz",
+        "ART": {
+            "WARN": "Verwarnung",
+            "TIMEOUT": "Timeout",
+            "UNTIMEOUT": "Timeout aufgehoben",
+            "KICK": "Kick",
+            "SOFTBAN": "Softban",
+            "BAN": "Bann",
+            "UNBAN": "Entbannt",
+            "VMUTE": "Sprachkanal stumm",
+            "VUNMUTE": "Sprachkanal laut",
+            "DEAFEN": "Taub geschaltet",
+            "UNDEAFEN": "Taub aufgehoben",
+            "DISCONNECT": "Getrennt",
+            "MOVE": "Verschoben",
+            "PURGE": "Nachrichten gelöscht"
+        }
     }
 }

@@ -50,5 +50,13 @@
             "warnung": "#f59f00",
             "gefahr": "#d63939"
         }
+    },
+    "profil": {
+        "music": {
+            "titel": "PROFIL.TITEL",
+            "sicht": "team",
+            "recht": "MUSIC.HISTORY.VIEW",
+            "reihe": 400
+        }
     }
 }

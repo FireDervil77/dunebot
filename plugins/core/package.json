@@ -207,5 +207,23 @@
       "guild": false,
       "titel": "core:AUFBEWAHRUNG.SPENDEN"
     }
-  ]
+  ],
+  "profil": {
+    "discord": {
+      "titel": "PROFIL.DISCORD_TITEL",
+      "sicht": "alle",
+      "reihe": 100
+    },
+    "konten": {
+      "titel": "PROFIL.KONTEN_TITEL",
+      "sicht": "selbst",
+      "reihe": 900
+    }
+  },
+  "bildkarten": {
+    "kern:profil": {
+      "wo": "core:BILDKARTEN.WO_PROFIL",
+      "stand": "shared/profil.js"
+    }
+  }
 }

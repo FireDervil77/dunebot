@@ -156,5 +156,22 @@
         "SEITE_TITEL": "Everything on one page",
         "SEITE_LINK": "Open the welcome page",
         "FUSS": "You get this message once, when I join."
+    },
+
+    "PROFIL": {
+        "DISCORD_TITEL": "Discord",
+        "BEIGETRETEN": "On this server since",
+        "KONTO_ERSTELLT": "Account created",
+        "ROLLEN": "Roles [{{n}}]",
+        "KACHEL_ROLLEN": "Roles",
+        "KONTEN_TITEL": "Connected accounts",
+        "KONTEN": "Accounts [{{n}}]",
+        "MEHR": "and {{n}} more",
+        "DESCRIPTION": "Shows your profile on this server",
+        "NUR_DU": "Only you can see this reply. Other members cannot look up your profile.",
+        "TITEL": "Profile of {{name}}",
+        "LEER": "There is nothing to show about you on this server yet.",
+        "FEHLER": "Could not be read: {{titel}} ({{grund}})",
+        "KARTE_FEHLT": "The profile card could not be drawn: {{grund}}"
     }
 }

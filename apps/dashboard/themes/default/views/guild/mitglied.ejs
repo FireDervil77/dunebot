@@ -1,0 +1,77 @@
+<%#
+  Profil eines Mitglieds (G-12, K382, 2026-11-14)
+
+  Oben die Profilkarte (/guild/ID/mitglieder/USER/karte, dieselbe Schablone
+  wie /profile), darunter je Profilabschnitt eine Karte. Welche Abschnitte da
+  sind, hat Profil.abschnitte für den Betrachter entschieden; Abschnitte, die
+  in Discord nie erscheinen (Moderation, Automod), tragen ein Schloss.
+
+  context: guildId, userId, mitglied (oder null), botFehler, selbst,
+           abschnitte [{kennung, titel, sicht, discord, felder: [{titel, text}]}],
+           fehler [{kennung, titel, grund}] (mitglieder.router)
+%>
+<%
+const _t = (k, o) => tr('core:MITGLIEDER.' + k, o);
+const _id = typeof guildId !== 'undefined' ? guildId : '';
+const _m = typeof mitglied !== 'undefined' ? mitglied : null;
+const _uid = typeof userId !== 'undefined' ? userId : '';
+const _abschnitte = typeof abschnitte !== 'undefined' && Array.isArray(abschnitte) ? abschnitte : [];
+const _fehler = typeof fehler !== 'undefined' && Array.isArray(fehler) ? fehler : [];
+%>
+<div class="container-fluid">
+  <div class="mb-3">
+    <a href="/guild/<%= _id %>/mitglieder" class="btn btn-outline-secondary btn-sm"><i class="fa-solid fa-arrow-left me-1"></i><%= _t('ZURUECK') %></a>
+  </div>
+
+  <% if (typeof botFehler !== 'undefined' && botFehler) { %>
+    <div class="alert alert-danger"><i class="fa-solid fa-triangle-exclamation me-2"></i><%= _t('BOT_FEHLT', { grund: botFehler }) %></div>
+  <% } else if (!_m) { %>
+    <div class="alert alert-info"><i class="fa-solid fa-circle-info me-2"></i><%= _t('NICHT_DA', { id: _uid }) %></div>
+  <% } %>
+
+  <% if (_m) { %>
+    <div class="card mb-3">
+      <div class="card-body">
+        <img src="/guild/<%= _id %>/mitglieder/<%= _uid %>/karte" alt="<%= _m.anzeige %>" class="img-fluid rounded border mb-2"
+             width="934" height="360" style="max-width: min(100%, 934px); height: auto;">
+        <div class="text-secondary small"><%= _t('KARTE_HINWEIS') %></div>
+      </div>
+    </div>
+  <% } %>
+
+  <% if (typeof selbst !== 'undefined' && selbst) { %>
+    <div class="alert alert-secondary"><i class="fa-solid fa-user me-2"></i><%= _t('DU_SELBST') %></div>
+  <% } %>
+
+  <% _fehler.forEach(function (f) { %>
+    <div class="alert alert-warning"><i class="fa-solid fa-triangle-exclamation me-2"></i><%= _t('ABSCHNITT_FEHLT', { titel: f.titel, grund: f.grund }) %></div>
+  <% }) %>
+
+  <% if (!_abschnitte.length) { %>
+    <div class="card"><div class="card-body text-secondary"><%= _t('NICHTS') %></div></div>
+  <% } %>
+
+  <div class="row row-cards">
+    <% _abschnitte.forEach(function (a) { %>
+      <div class="col-md-6 col-xl-4" data-abschnitt="<%= a.kennung %>">
+        <div class="card h-100">
+          <div class="card-header">
+            <h3 class="card-title mb-0">
+              <%= a.titel %>
+              <% if (!a.discord) { %><i class="fa-solid fa-lock text-secondary ms-2" title="<%= _t('NUR_DASHBOARD') %>"></i><% } %>
+              <% if (a.sicht === 'selbst') { %><span class="badge bg-secondary-lt ms-2" title="<%= _t('NUR_SELBST_TEXT') %>"><%= _t('NUR_SELBST') %></span><% } %>
+            </h3>
+          </div>
+          <div class="card-body">
+            <dl class="row mb-0">
+              <% a.felder.forEach(function (f) { %>
+                <dt class="col-6 text-secondary fw-normal"><%= f.titel %></dt>
+                <dd class="col-6 text-break"><%= f.text %></dd>
+              <% }) %>
+            </dl>
+          </div>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+</div>

@@ -116,5 +116,13 @@
     "UNSAVE": {
         "DESCRIPTION": "Deletes a saved playlist",
         "NAME_DESC": "Name of the playlist"
+    },
+
+    "PROFIL": {
+        "TITEL": "Music",
+        "WUENSCHE": "Requested tracks",
+        "ZULETZT_AM": "Last request",
+        "ZULETZT": "Latest requests",
+        "KACHEL": "Song requests"
     }
 }

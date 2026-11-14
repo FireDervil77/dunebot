@@ -210,6 +210,15 @@
       "requires": "CORE.BILDKARTEN.VIEW"
     },
     {
+      "key": "CORE.MITGLIEDER.VIEW",
+      "name": "CORE.PERM_MITGLIEDER_VIEW",
+      "description": "CORE.PERM_MITGLIEDER_VIEW_DESC",
+      "category": "core",
+      "is_dangerous": 0,
+      "sort_order": 64,
+      "requires": null
+    },
+    {
       "key": "PERMISSIONS.VIEW",
       "name": "PERMISSIONS.VIEW",
       "description": "PERMISSIONS.VIEW_DESC",

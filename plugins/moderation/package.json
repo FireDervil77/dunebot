@@ -78,5 +78,21 @@
             "akzent": "#607d8b",
             "hinweis": "#78909c"
         }
+    },
+    "profil": {
+        "faelle": {
+            "titel": "PROFIL.FAELLE_TITEL",
+            "sicht": "team",
+            "recht": "MODERATION.LOGS.VIEW",
+            "discord": false,
+            "reihe": 500
+        },
+        "notizen": {
+            "titel": "PROFIL.NOTIZEN_TITEL",
+            "sicht": "team",
+            "recht": "MODERATION.NOTES.VIEW",
+            "discord": false,
+            "reihe": 510
+        }
     }
 }

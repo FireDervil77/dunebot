@@ -1,15 +1,15 @@
 {
-  "titel": "Mitgliederprofil (Schablone für G-12)",
+  "titel": "Mitgliederprofil",
   "breite": 934,
   "hoehe": 360,
   "ecken": 24,
   "werte": [
-    { "name": "titel1", "beispiel": "Community-Level" },
-    { "name": "wert1", "beispiel": "12" },
-    { "name": "titel2", "beispiel": "Clan" },
-    { "name": "wert2", "beispiel": "Sandläufer" },
-    { "name": "titel3", "beispiel": "Abzeichen" },
-    { "name": "wert3", "beispiel": "4" },
+    { "name": "titel1", "beispiel": "Rollen" },
+    { "name": "wert1", "beispiel": "5" },
+    { "name": "titel2", "beispiel": "Giveaways gewonnen" },
+    { "name": "wert2", "beispiel": "2" },
+    { "name": "titel3", "beispiel": "Musikwünsche" },
+    { "name": "wert3", "beispiel": "31" },
     { "name": "abzeichen", "beispiel": [] }
   ],
   "texte": {

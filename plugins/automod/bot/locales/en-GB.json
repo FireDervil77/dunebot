@@ -116,5 +116,12 @@
     "PING_FIELD_EVERYONE": "Mentioned Everyone?",
     "PING_EMBED_FOOTER": "Sent at {{time}}",
     "DM_FIELD_STRIKES": "Total strikes"
+  },
+
+  "PROFIL": {
+    "TITEL": "Automod",
+    "STRIKES": "Strikes",
+    "VERSTOESSE": "Violations",
+    "LETZTER": "Last violation"
   }
 }

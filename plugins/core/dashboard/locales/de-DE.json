@@ -52,6 +52,8 @@
   "PERM_BILDKARTEN_VIEW_DESC": "Erlaubt das Ansehen der Bildkarten dieses Servers (Rangkarte, Willkommensbild …)",
   "PERM_BILDKARTEN_EDIT": "Bildkarten einstellen",
   "PERM_BILDKARTEN_EDIT_DESC": "Erlaubt das Einstellen der Bildkarten dieses Servers",
+  "PERM_MITGLIEDER_VIEW": "Mitglieder ansehen",
+  "PERM_MITGLIEDER_VIEW_DESC": "Erlaubt das Ansehen der Mitglieder dieses Servers und ihrer Profile. Abschnitte von Plugins (Moderation, Automod, Giveaways, Musik) brauchen zusätzlich deren Recht.",
   "CORE": {
     "PERM_SETTINGS_VIEW": "Einstellungen ansehen",
     "PERM_SETTINGS_VIEW_DESC": "Erlaubt das Ansehen der Guild-Einstellungen",
@@ -86,7 +88,9 @@
     "PERM_BILDKARTEN_VIEW": "Bildkarten ansehen",
     "PERM_BILDKARTEN_VIEW_DESC": "Erlaubt das Ansehen der Bildkarten dieses Servers (Rangkarte, Willkommensbild …)",
     "PERM_BILDKARTEN_EDIT": "Bildkarten einstellen",
-    "PERM_BILDKARTEN_EDIT_DESC": "Erlaubt das Einstellen der Bildkarten dieses Servers"
+    "PERM_BILDKARTEN_EDIT_DESC": "Erlaubt das Einstellen der Bildkarten dieses Servers",
+    "PERM_MITGLIEDER_VIEW": "Mitglieder ansehen",
+    "PERM_MITGLIEDER_VIEW_DESC": "Erlaubt das Ansehen der Mitglieder dieses Servers und ihrer Profile. Abschnitte von Plugins (Moderation, Automod, Giveaways, Musik) brauchen zusätzlich deren Recht."
   },
   "PERMISSIONS": {
     "VIEW": "Berechtigungen ansehen",
@@ -541,6 +545,7 @@
     "AUS_TEXT": "Auf diesem Server gerade ausgeschaltet.",
     "EINSTELLEN": "Zu {{plugin}}",
     "STAND_FEHLER": "Ob sie an ist, ließ sich nicht lesen: {{grund}}",
+    "WO_PROFIL": "Bei /profile: dein Profil auf diesem Server, oben die Karte, darunter die Abschnitte der Plugins. Auf der Seite Mitglieder für jedes Mitglied.",
     "BILD_FEHLT": "Die Karte ließ sich nicht zeichnen.",
     "GROESSE": "{{breite}} × {{hoehe}} Pixel",
     "KARTE_RANGKARTE": "Rangkarte",
@@ -563,5 +568,30 @@
     "NUR_LESEN": "Du kannst diese Karte nur ansehen: Dir fehlt das Recht „Bildkarten einstellen“.",
     "GESPERRT": "In der Kontroll-Guild stellt nur ihr Besitzer Bildkarten ein. Du siehst die Einstellung nur.",
     "HINWEISE": "Ein Teil der gespeicherten Einstellung passt nicht mehr, der Bot nimmt dafür die Vorgabe:"
+  },
+
+  "MITGLIEDER": {
+    "EINLEITUNG": "Mitglieder dieses Servers und was die Plugins über sie wissen. Was du in einem Profil siehst, hängt von deinen Rechten ab: Moderation, Automod, Giveaways und Musik brauchen zusätzlich das Recht des Plugins.",
+    "SUCHE": "Name, Anzeigename oder ID",
+    "SUCHEN": "Suchen",
+    "ANZAHL": "{{n}} Mitglieder",
+    "TREFFER": "{{n}} Treffer",
+    "LAUT_DISCORD": "Discord zählt {{n}}",
+    "LEER": "Keine Mitglieder gefunden.",
+    "SEIT": "seit {{datum}}",
+    "SEITE": "Seite {{seite}} von {{seiten}}",
+    "BOT_FEHLT": "Der Bot hat nicht geantwortet: {{grund}}",
+    "UNVOLLSTAENDIG": "Die Liste ist unvollständig: {{grund}}",
+    "NICHT_DA_ID": "Diese ID ist nicht auf dem Server.",
+    "TROTZDEM_ANSEHEN": "Profil trotzdem ansehen (Moderationsfälle bleiben nach dem Verlassen)",
+    "ZURUECK": "Zu allen Mitgliedern",
+    "NICHT_DA": "{{id}} ist nicht (mehr) auf diesem Server. Hier steht, was der Server noch über das Konto hat.",
+    "KARTE_HINWEIS": "So zeichnet der Bot die Profilkarte bei /profile. Aussehen unter Bildkarten.",
+    "DU_SELBST": "Das bist du. Mit /profile siehst du dein Profil auch in Discord, ohne Moderation und Automod.",
+    "ABSCHNITT_FEHLT": "Nicht lesbar: {{titel}} ({{grund}})",
+    "NICHTS": "Über dieses Mitglied gibt es hier nichts, das du sehen darfst.",
+    "NUR_DASHBOARD": "Nur hier im Dashboard, nie in Discord",
+    "NUR_SELBST": "nur du",
+    "NUR_SELBST_TEXT": "Siehst nur du, nicht das Team dieses Servers"
   }
 }

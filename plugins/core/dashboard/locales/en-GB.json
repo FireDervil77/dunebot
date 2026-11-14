@@ -52,6 +52,8 @@
   "PERM_BILDKARTEN_VIEW_DESC": "Allows viewing this server's image cards (rank card, welcome image …)",
   "PERM_BILDKARTEN_EDIT": "Configure image cards",
   "PERM_BILDKARTEN_EDIT_DESC": "Allows configuring this server's image cards",
+  "PERM_MITGLIEDER_VIEW": "View members",
+  "PERM_MITGLIEDER_VIEW_DESC": "Allows viewing this server's members and their profiles. Plugin sections (moderation, automod, giveaways, music) also need that plugin's permission.",
   "CORE": {
     "PERM_SETTINGS_VIEW": "View Settings",
     "PERM_SETTINGS_VIEW_DESC": "Allows viewing guild settings",
@@ -86,7 +88,9 @@
     "PERM_BILDKARTEN_VIEW": "View image cards",
     "PERM_BILDKARTEN_VIEW_DESC": "Allows viewing this server's image cards (rank card, welcome image …)",
     "PERM_BILDKARTEN_EDIT": "Configure image cards",
-    "PERM_BILDKARTEN_EDIT_DESC": "Allows configuring this server's image cards"
+    "PERM_BILDKARTEN_EDIT_DESC": "Allows configuring this server's image cards",
+    "PERM_MITGLIEDER_VIEW": "View members",
+    "PERM_MITGLIEDER_VIEW_DESC": "Allows viewing this server's members and their profiles. Plugin sections (moderation, automod, giveaways, music) also need that plugin's permission."
   },
   "PERMISSIONS": {
     "VIEW": "View Permissions",
@@ -541,6 +545,7 @@
     "AUS_TEXT": "Currently switched off on this server.",
     "EINSTELLEN": "Go to {{plugin}}",
     "STAND_FEHLER": "Could not read whether it is on: {{grund}}",
+    "WO_PROFIL": "With /profile: your profile on this server, the card on top, plugin sections below. On the Members page for every member.",
     "BILD_FEHLT": "The card could not be drawn.",
     "GROESSE": "{{breite}} × {{hoehe}} pixels",
     "KARTE_RANGKARTE": "Rank card",
@@ -563,5 +568,30 @@
     "NUR_LESEN": "You can only view this card: you lack the permission “Configure image cards”.",
     "GESPERRT": "In the control guild only its owner configures image cards. You can only view the settings.",
     "HINWEISE": "Part of the saved settings no longer fits; the bot uses the default instead:"
+  },
+
+  "MITGLIEDER": {
+    "EINLEITUNG": "Members of this server and what the plugins know about them. What you see in a profile depends on your permissions: moderation, automod, giveaways and music also need that plugin's permission.",
+    "SUCHE": "Name, display name or ID",
+    "SUCHEN": "Search",
+    "ANZAHL": "{{n}} members",
+    "TREFFER": "{{n}} matches",
+    "LAUT_DISCORD": "Discord counts {{n}}",
+    "LEER": "No members found.",
+    "SEIT": "since {{datum}}",
+    "SEITE": "Page {{seite}} of {{seiten}}",
+    "BOT_FEHLT": "The bot did not answer: {{grund}}",
+    "UNVOLLSTAENDIG": "The list is incomplete: {{grund}}",
+    "NICHT_DA_ID": "This ID is not on the server.",
+    "TROTZDEM_ANSEHEN": "View the profile anyway (moderation cases remain after leaving)",
+    "ZURUECK": "All members",
+    "NICHT_DA": "{{id}} is not (or no longer) on this server. Shown here is what the server still has about the account.",
+    "KARTE_HINWEIS": "This is how the bot draws the profile card for /profile. Change its look under Image cards.",
+    "DU_SELBST": "This is you. /profile shows your profile in Discord too, without moderation and automod.",
+    "ABSCHNITT_FEHLT": "Could not be read: {{titel}} ({{grund}})",
+    "NICHTS": "There is nothing here about this member that you may see.",
+    "NUR_DASHBOARD": "Only here in the dashboard, never in Discord",
+    "NUR_SELBST": "only you",
+    "NUR_SELBST_TEXT": "Only you see this, not this server's team"
   }
 }

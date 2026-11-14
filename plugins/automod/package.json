@@ -89,5 +89,14 @@
             "recht": "AUTOMOD.SETTINGS.EDIT",
             "titel": "automod:AUFBEWAHRUNG.VERWARNSTAND"
         }
-    ]
+    ],
+    "profil": {
+        "automod": {
+            "titel": "PROFIL.TITEL",
+            "sicht": "team",
+            "recht": "AUTOMOD.LOGS.VIEW",
+            "discord": false,
+            "reihe": 520
+        }
+    }
 }

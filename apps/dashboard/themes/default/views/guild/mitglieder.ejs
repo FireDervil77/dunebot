@@ -1,0 +1,78 @@
+<%#
+  Mitglieder (G-12, K382, 2026-11-14)
+
+  Liste der Mitglieder dieser Guild, vom Bot über IPC (MITGLIEDER_LISTE),
+  Suche nach Name, Anzeigename oder ID, Seiten zu 50. Ein Klick führt zum
+  Profil (/guild/ID/mitglieder/USER). Eine halbe Liste sagt es.
+
+  context: guildId, q, nurId, fehler, vollstaendig, grund, anzahl, treffer,
+           mitglieder, seite, seiten (mitglieder.router)
+%>
+<%
+const _t = (k, o) => tr('core:MITGLIEDER.' + k, o);
+const _id = typeof guildId !== 'undefined' ? guildId : '';
+const _q = typeof q !== 'undefined' ? q : '';
+const _liste = typeof mitglieder !== 'undefined' && Array.isArray(mitglieder) ? mitglieder : [];
+const _seite = typeof seite !== 'undefined' ? seite : 1;
+const _seiten = typeof seiten !== 'undefined' ? seiten : 1;
+const _treffer = typeof treffer !== 'undefined' ? treffer : _liste.length;
+const _link = (s) => '/guild/' + _id + '/mitglieder?' + (_q ? 'q=' + encodeURIComponent(_q) + '&' : '') + 'seite=' + s;
+const _datum = (ms) => ms ? new Date(ms).toLocaleDateString(String(typeof locale !== 'undefined' && locale ? locale : 'de-DE'), { year: 'numeric', month: '2-digit', day: '2-digit' }) : '–';
+%>
+<div class="container-fluid">
+  <div class="card mb-3">
+    <div class="card-body">
+      <p class="text-secondary"><%= _t('EINLEITUNG') %></p>
+      <form method="get" action="/guild/<%= _id %>/mitglieder" class="d-flex gap-2" role="search">
+        <input type="search" name="q" value="<%= _q %>" class="form-control" placeholder="<%= _t('SUCHE') %>" aria-label="<%= _t('SUCHE') %>" maxlength="100">
+        <button class="btn btn-primary" type="submit"><i class="fa-solid fa-magnifying-glass me-1"></i><%= _t('SUCHEN') %></button>
+      </form>
+    </div>
+  </div>
+
+  <% if (typeof fehler !== 'undefined' && fehler) { %>
+    <div class="alert alert-danger"><i class="fa-solid fa-triangle-exclamation me-2"></i><%= _t('BOT_FEHLT', { grund: fehler }) %></div>
+  <% } else if (typeof vollstaendig !== 'undefined' && vollstaendig === false) { %>
+    <div class="alert alert-warning"><i class="fa-solid fa-circle-info me-2"></i><%= _t('UNVOLLSTAENDIG', { grund: (typeof grund !== 'undefined' && grund) || '?' }) %></div>
+  <% } %>
+
+  <% if (typeof nurId !== 'undefined' && nurId) { %>
+    <div class="alert alert-info">
+      <i class="fa-solid fa-circle-info me-2"></i><%= _t('NICHT_DA_ID') %>
+      <a href="/guild/<%= _id %>/mitglieder/<%= nurId %>" class="ms-1"><%= _t('TROTZDEM_ANSEHEN') %></a>
+    </div>
+  <% } %>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title mb-0">
+        <%= _q ? _t('TREFFER', { n: _treffer }) : _t('ANZAHL', { n: _treffer }) %>
+        <% if (typeof anzahl !== 'undefined' && anzahl !== null && !_q) { %><span class="text-secondary fw-normal small ms-2"><%= _t('LAUT_DISCORD', { n: anzahl }) %></span><% } %>
+      </h3>
+    </div>
+    <% if (!_liste.length) { %>
+      <div class="card-body text-secondary"><%= _t('LEER') %></div>
+    <% } else { %>
+      <div class="list-group list-group-flush">
+        <% _liste.forEach(function (m) { %>
+          <a href="/guild/<%= _id %>/mitglieder/<%= m.id %>" class="list-group-item list-group-item-action d-flex align-items-center gap-3">
+            <img src="<%= m.avatar %>" alt="" width="32" height="32" class="rounded-circle" loading="lazy">
+            <div class="flex-grow-1 text-truncate">
+              <strong><%= m.anzeige %></strong>
+              <% if (m.bot) { %><span class="badge bg-blue-lt ms-1">BOT</span><% } %>
+              <div class="small text-secondary text-truncate">@<%= m.name %> · <%= m.id %></div>
+            </div>
+            <div class="small text-secondary text-nowrap d-none d-sm-block"><%= _t('SEIT', { datum: _datum(m.beigetreten) }) %></div>
+          </a>
+        <% }) %>
+      </div>
+    <% } %>
+    <% if (_seiten > 1) { %>
+      <div class="card-footer d-flex justify-content-between align-items-center">
+        <a class="btn btn-sm btn-outline-secondary<%= _seite <= 1 ? ' disabled' : '' %>" href="<%= _link(_seite - 1) %>"><i class="fa-solid fa-chevron-left"></i></a>
+        <span class="text-secondary small"><%= _t('SEITE', { seite: _seite, seiten: _seiten }) %></span>
+        <a class="btn btn-sm btn-outline-secondary<%= _seite >= _seiten ? ' disabled' : '' %>" href="<%= _link(_seite + 1) %>"><i class="fa-solid fa-chevron-right"></i></a>
+      </div>
+    <% } %>
+  </div>
+</div>

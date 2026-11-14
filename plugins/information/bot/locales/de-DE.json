@@ -93,9 +93,7 @@
         "USER_EMBED_TITLE": "Benutzerinformationen für {{user}}",
         "USER_NAME": "Benutzer-Tag",
         "USER_ID": "ID",
-        "USER_JOINED": "Server Beigetreten",
-        "USER_CREATED": "Discord Registriert",
-        "USER_ROLES": "Rollen",
+        "USER_ABSCHNITT_FEHLT": "Nicht lesbar: {{titel}} ({{grund}})",
         "USER_AVATAR": "Avatar-URL"
     },
 

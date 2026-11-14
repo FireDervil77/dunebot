@@ -30,6 +30,7 @@ const themesRouter = require("./guild/themes.router");
 const mediaRouter = require("./guild/media.router");
 const vorlagenRouter = require("./guild/vorlagen.router");
 const bildkartenRouter = require("./guild/bildkarten.router");
+const mitgliederRouter = require("./guild/mitglieder.router");
 
 // NEU: /guild (Index) → immer zuerst Server-Selector anzeigen
 router.get("/", (req, res) => {
@@ -61,6 +62,9 @@ router.use("/:guildId/vorlagen", CheckAuth, CheckGuildAccess, vorlagenRouter);
 
 // Kern-Bereich „Bildkarten“: Karten dieser Guild und wo sie benutzt werden (G-21)
 router.use("/:guildId/bildkarten", CheckAuth, CheckGuildAccess, bildkartenRouter);
+
+// Kern-Seite „Mitglieder“: Mitglieder und ihre Profilabschnitte (G-12)
+router.use("/:guildId/mitglieder", CheckAuth, CheckGuildAccess, mitgliederRouter);
 
 // Kern-Feedback-Routes (Bug Report, Feature Request, Toast History, My Feedback)
 router.use("/:guildId/feedback", CheckAuth, CheckGuildAccess, feedbackRouter);

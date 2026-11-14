@@ -93,9 +93,7 @@
         "USER_EMBED_TITLE": "User information for {{user}}",
         "USER_NAME": "User Tag",
         "USER_ID": "ID",
-        "USER_JOINED": "Guild Joined",
-        "USER_CREATED": "Discord Registered",
-        "USER_ROLES": "Roles",
+        "USER_ABSCHNITT_FEHLT": "Could not be read: {{titel}} ({{grund}})",
         "USER_AVATAR": "Avatar-URL"
     },
 

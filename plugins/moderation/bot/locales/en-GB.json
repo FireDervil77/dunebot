@@ -271,5 +271,31 @@
         "ADD_FAILED": "Failed to create note",
         "DELETE_SUCCESS": "Note #{{id}} has been deleted",
         "DELETE_FAILED": "Note #{{id}} could not be deleted (not found or no permission)"
+    },
+
+    "PROFIL": {
+        "FAELLE_TITEL": "Moderation cases",
+        "FAELLE": "Cases",
+        "JE_ART": "By type",
+        "LETZTER_FALL": "Last case (#{{nr}}, {{art}})",
+        "NOTIZEN_TITEL": "Moderation notes",
+        "NOTIZEN": "Notes",
+        "LETZTE_NOTIZ": "Last note",
+        "ART": {
+            "WARN": "Warning",
+            "TIMEOUT": "Timeout",
+            "UNTIMEOUT": "Timeout removed",
+            "KICK": "Kick",
+            "SOFTBAN": "Softban",
+            "BAN": "Ban",
+            "UNBAN": "Unban",
+            "VMUTE": "Voice muted",
+            "VUNMUTE": "Voice unmuted",
+            "DEAFEN": "Deafened",
+            "UNDEAFEN": "Undeafened",
+            "DISCONNECT": "Disconnected",
+            "MOVE": "Moved",
+            "PURGE": "Messages purged"
+        }
     }
 }
