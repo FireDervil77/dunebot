@@ -241,7 +241,8 @@ function melde(art, text, tun = '') {
 
         for (const z of ziele.filter(x => x.streamer_id === k.streamer_id && x.aktiv)) {
             const vergeben = await q(
-                'SELECT COUNT(*) AS n FROM streaming_role_grants WHERE guild_id = ? AND rolle_id = ?',
+                // Buch des Kerns seit G-07 (vorher streaming_role_grants).
+                "SELECT COUNT(*) AS n FROM rollen_vergaben WHERE guild_id = ? AND rolle_id = ? AND besitzer = 'streaming:abo'",
                 [z.guild_id, z.abo_rolle_id]);
             melde('ok', `Guild ${z.guild_id}: ${vergeben[0].n} Vergabe(n) in unserer Buchfuehrung`);
         }

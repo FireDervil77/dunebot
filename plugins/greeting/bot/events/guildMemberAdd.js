@@ -2,6 +2,14 @@ const { baueNachricht, ANLAESSE } = require("../utils");
 const Willkommensbild = require("../../shared/willkommensbild");
 const { detectUsedInvite } = require("../inviteTracker");
 const { ServiceManager } = require('dunebot-core');
+const { Rollen } = require('dunebot-sdk');
+const { autorollen } = require('../../shared/rollen');
+
+/** Was `Rollen.vergib` nicht setzen konnte, mit Grund ins Log. */
+function meldeRollen(logger, member, was, e) {
+    for (const b of e.blockiert) logger.warn(`[Greeting] ${was} ${b.name || b.rolle} für ${member.user.tag} nicht vergeben (${b.grund}${b.fehler ? `: ${b.fehler}` : ''})`);
+    if (e.vergeben.length) logger.info(`[Greeting] ${was}: ${e.vergeben.length} Rolle(n) an ${member.user.tag}`);
+}
 
 /**
  * @param {import('discord.js').GuildMember} member
@@ -33,38 +41,17 @@ module.exports = async (member) => {
             }
         }
 
-        // ===== VERIFICATION: Assign unverified role if enabled =====
+        // ===== Rollen beim Beitritt: über den Kern (G-07, `Rollen`) =====
+        // Prüfung (Recht, Rangfolge, verwaltete Rolle) und Buch macht `Rollen`;
+        // was nicht ging, steht mit Grund im Log statt still zu fehlen.
         if (settings.verification_enabled && settings.verification_remove_role_id) {
-            const unverifiedRole = member.guild.roles.cache.get(settings.verification_remove_role_id);
-            if (unverifiedRole && member.guild.members.me.roles.highest.position > unverifiedRole.position && !unverifiedRole.managed) {
-                await member.roles.add(unverifiedRole).catch((err) => {
-                    logger.error(`[Greeting] Failed to assign unverified role to ${member.user.tag}:`, err);
-                });
-                logger.info(`[Greeting] Assigned unverified role to ${member.user.tag}`);
-            }
+            meldeRollen(logger, member, 'unverifiziert',
+                await Rollen.vergib({ mitglied: member, rollen: settings.verification_remove_role_id, besitzer: 'greeting:unverifiziert', grund: 'Beitritt, noch nicht verifiziert' }));
         }
-
-        // ===== MULTI-AUTOROLE =====
-        let autoroleIds = [];
-        if (settings.autorole_ids) {
-            try {
-                autoroleIds = typeof settings.autorole_ids === 'string'
-                    ? JSON.parse(settings.autorole_ids)
-                    : settings.autorole_ids;
-            } catch { /* ignore */ }
-        }
-        // Fallback: altes autorole_id Feld
-        if (autoroleIds.length === 0 && settings.autorole_id) {
-            autoroleIds = [settings.autorole_id];
-        }
-
-        for (const roleId of autoroleIds) {
-            const role = member.guild.roles.cache.get(roleId);
-            if (role && member.guild.members.me.roles.highest.position > role.position && !role.managed) {
-                await member.roles.add(role).catch((err) => {
-                    logger.error(`[Greeting] Failed to assign autorole ${role.name} to ${member.user.tag}:`, err);
-                });
-            }
+        const autoroleIds = autorollen(settings);
+        if (autoroleIds.length) {
+            meldeRollen(logger, member, 'Autorolle',
+                await Rollen.vergib({ mitglied: member, rollen: autoroleIds, besitzer: 'greeting:autorolle', grund: 'Autorolle beim Beitritt' }));
         }
 
         // ===== WELCOME MESSAGE (Channel) =====

@@ -70,8 +70,9 @@ ServiceManager.register('dbService', {
         if (s.startsWith('SELECT konto_id FROM streaming_subscribers')) {
             return daten.abonnenten.filter(a => a.streamer_id === w[0]);
         }
-        if (s.startsWith('SELECT mitglied_id FROM streaming_role_grants')) {
-            return daten.vergaben.filter(v => v.guild_id === w[0] && v.rolle_id === w[1]);
+        // Das Buch fuehrt seit G-07 der Kern (`Rollen.vergebene`, Besitzer streaming:abo).
+        if (s.startsWith('SELECT guild_id, mitglied_id, rolle_id, besitzer, bezug, seit FROM rollen_vergaben WHERE guild_id = ? AND rolle_id = ? AND besitzer IN (?)')) {
+            return daten.vergaben.filter(v => v.guild_id === w[0] && v.rolle_id === w[1] && (v.besitzer || 'streaming:abo') === w[2]);
         }
         if (s.startsWith('SELECT ist_live FROM streaming_state')) {
             return daten.zustand;
@@ -84,20 +85,9 @@ ServiceManager.register('dbService', {
             daten.abonnenten.push({ streamer_id: w[0], konto_id: String(w[1]) });
             return [];
         }
-        // Das Buch der vergebenen Rollen (drossel.js). Bis zum 2026-11-09 lief das
-        // still durch — geprueft war nur, DASS der Bot gefragt wurde, nicht, dass
-        // das Plugin es sich merkt. Ohne den Eintrag nimmt der Abgleich die Rolle
-        // spaeter nie zurueck (K108).
-        if (s.startsWith('INSERT INTO streaming_role_grants (guild_id, mitglied_id, rolle_id)')) {
-            if (!daten.vergaben.some(v => v.guild_id === w[0] && v.mitglied_id === w[1] && v.rolle_id === w[2])) {
-                daten.vergaben.push({ guild_id: w[0], mitglied_id: w[1], rolle_id: w[2] });
-            }
-            return [];
-        }
-        if (s.startsWith('DELETE FROM streaming_role_grants WHERE guild_id = ? AND mitglied_id = ? AND rolle_id = ?')) {
-            daten.vergaben = daten.vergaben.filter(v => !(v.guild_id === w[0] && v.mitglied_id === w[1] && v.rolle_id === w[2]));
-            return [];
-        }
+        // Geschrieben wird das Buch seit G-07 im Bot (dunebot-sdk/lib/Rollen.js,
+        // check-rollenvergabe.js). Schreibt das Dashboard es doch, faellt das
+        // unten als unbekannte Abfrage auf.
         if (s.startsWith('DELETE FROM streaming_subscribers')) {
             daten.abonnenten = daten.abonnenten.filter(a => !(a.streamer_id === w[0] && String(a.konto_id) === String(w[1])));
             return [];
@@ -266,8 +256,16 @@ const drossel    = require('../plugins/streaming/dashboard/ausgabe/drossel');
     // eine Abo-Rolle nicht.
     daten.zustand = [{ ist_live: 0 }];
     let anDenBotGegangen = false;
+    let anDenBot = null;
+    // Der Kern-Handler dashboard:ROLLEN im Bot (apps/bot/ipc/ROLLEN.js) bucht.
     ServiceManager.register('ipcServer', {
-        async broadcastOne() { anDenBotGegangen = true; return { success: true, data: {} }; }
+        async broadcast(ereignis, nutzlast) {
+            anDenBotGegangen = true;
+            anDenBot = { ereignis, ...nutzlast };
+            return [{ success: true, data: { success: true, ergebnis: {
+                vergeben: nutzlast.rollen, entzogen: [], gebucht: [], blockiert: [], gehalten: [], unveraendert: [],
+                kein_mitglied: false, fehler: null, code: null } } }];
+        }
     });
 
     anDenBotGegangen = false;
@@ -282,13 +280,18 @@ const drossel    = require('../plugins/streaming/dashboard/ausgabe/drossel');
     daten.vergaben = [];
     await drossel.ausfuehren({
         id: 2, aktion: 'rolle_geben', guild_id: 'G1', target_id: 1, versuche: 0,
-        nutzlast: JSON.stringify({ grund: 'abo', streamer_id: 7, mitglied_id: 'D111', rolle_id: 'R1' })
+        // Eine Rollen-ID in Discord-Form: `Rollen` nimmt nur Ziffern an.
+        nutzlast: JSON.stringify({ grund: 'abo', streamer_id: 7, mitglied_id: 'D111', rolle_id: '100000000000000001' })
     });
     pruefe(anDenBotGegangen, 'eine ABO-Rolle wird trotzdem vergeben',
         'ein Abonnement gilt auch nachts um vier');
-    pruefe(daten.vergaben.some(v => v.guild_id === 'G1' && v.mitglied_id === 'D111' && v.rolle_id === 'R1'),
-        'und das Plugin merkt sich die Vergabe — sonst nimmt der Abgleich sie nie zurueck',
-        JSON.stringify(daten.vergaben));
+    // Gemerkt wird sie im Bot (Buch des Kerns, seit G-07), unter dem Besitzer,
+    // den dieser Auftrag nennt. Ohne den richtigen Besitzer naehme der
+    // Abo-Abgleich sie nie zurueck (K108), und die Live-Rolle haette sie.
+    pruefe(anDenBot?.ereignis === 'dashboard:ROLLEN' && anDenBot.art === 'vergib' && anDenBot.besitzer === 'streaming:abo'
+        && anDenBot.guildId === 'G1' && anDenBot.userId === 'D111' && anDenBot.rollen.join() === '100000000000000001',
+        'und der Kern bucht sie als Abo-Rolle — sonst nimmt der Abgleich sie nie zurueck',
+        JSON.stringify(anDenBot));
 
     // ---------------------------------------------------------------
     console.log('\nEnde des Abonnements');

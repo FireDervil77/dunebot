@@ -1249,17 +1249,18 @@ async function altRolleAbraeumen(guildId, rolleId) {
     // die einem Ziel zugeordnet sind" — und das nahm die Rolle auch denen weg,
     // die sie aus einem ganz anderen Grund tragen. Ist die eingetragene Rolle
     // zugleich ein Zugangsrecht, ist das ein Zugangsverlust (2026-08-25).
-    const vergeben = await db.query(
-        'SELECT mitglied_id FROM streaming_role_grants WHERE guild_id = ? AND rolle_id = ?',
-        [guildId, rolleId]);
+    // Buch des Kerns seit G-07: nur die Eintraege als Live-Rolle. Hat
+    // jemand dieselbe Rolle als Abo-Rolle, bleibt sie ihm (Regel 1).
+    const vergeben = await require('dunebot-sdk/lib/Rollen').vergebene(
+        guildId, { rolleId, besitzer: 'streaming:live' });
 
     let anzahl = 0;
 
-    for (const v of vergeben) {
+    for (const mitgliedId of vergeben) {
         await db.query(`
             INSERT INTO streaming_outbox (guild_id, aktion, nutzlast)
             VALUES (?, 'rolle_nehmen', ?)
-        `, [guildId, JSON.stringify({ mitglied_id: v.mitglied_id, rolle_id: rolleId })]);
+        `, [guildId, JSON.stringify({ mitglied_id: mitgliedId, rolle_id: rolleId })]);
         anzahl++;
     }
 

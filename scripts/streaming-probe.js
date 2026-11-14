@@ -391,15 +391,17 @@ async function ketteFahren(c, s) {
                 ? `vermerkt — Stufe ${abonnent[0].stufe || '—'}${abonnent[0].geschenkt ? ', geschenkt' : ''}`
                 : 'steht NICHT in streaming_subscribers'));
 
-            const [gaben] = await c.query(`
-                SELECT g.guild_id, g.rolle_id, g.mitglied_id
-                  FROM streaming_role_grants g
-                 WHERE g.mitglied_id = (SELECT user_id FROM user_connections
-                                         WHERE plattform = ? AND konto_id = ? LIMIT 1)`,
-                [s.plattform, kontoId]);
+            // Buch des Kerns seit G-07 (vorher streaming_role_grants). Zwei
+            // Abfragen statt einer Unterabfrage: Die Tabellen haben
+            // verschiedene Kollationen.
+            const [konto] = await c.query(
+                'SELECT user_id FROM user_connections WHERE plattform = ? AND konto_id = ? LIMIT 1', [s.plattform, kontoId]);
+            const [gaben] = konto.length ? await c.query(
+                "SELECT guild_id, rolle_id, mitglied_id, besitzer FROM rollen_vergaben WHERE mitglied_id = ? AND besitzer LIKE 'streaming:%'",
+                [String(konto[0].user_id)]) : [[]];
             console.log('  Buchfuehrung: ' + (gaben.length
-                ? gaben.map(g => `Rolle ${g.rolle_id} an ${g.mitglied_id}`).join(', ')
-                : 'kein Eintrag in streaming_role_grants'));
+                ? gaben.map(g => `Rolle ${g.rolle_id} an ${g.mitglied_id} (${g.besitzer})`).join(', ')
+                : 'kein Eintrag in rollen_vergaben (streaming:*)'));
 
             console.log('\n  Der Beweis steht in Discord, nicht hier: Traegt das Mitglied die Rolle?');
             if (art === 'abo') {

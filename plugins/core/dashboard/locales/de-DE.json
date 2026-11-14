@@ -54,6 +54,8 @@
   "PERM_BILDKARTEN_EDIT_DESC": "Erlaubt das Einstellen der Bildkarten dieses Servers",
   "PERM_MITGLIEDER_VIEW": "Mitglieder ansehen",
   "PERM_MITGLIEDER_VIEW_DESC": "Erlaubt das Ansehen der Mitglieder dieses Servers und ihrer Profile. Abschnitte von Plugins (Moderation, Automod, Giveaways, Musik) brauchen zusätzlich deren Recht.",
+  "PERM_ROLLEN_VIEW": "Rollenvergabe ansehen",
+  "PERM_ROLLEN_VIEW_DESC": "Erlaubt das Ansehen, welche Rollen der Bot auf diesem Server für wen verwaltet, mit Rangfolge-Problemen. Ändern lässt sich dort nichts.",
   "CORE": {
     "PERM_SETTINGS_VIEW": "Einstellungen ansehen",
     "PERM_SETTINGS_VIEW_DESC": "Erlaubt das Ansehen der Guild-Einstellungen",
@@ -90,7 +92,9 @@
     "PERM_BILDKARTEN_EDIT": "Bildkarten einstellen",
     "PERM_BILDKARTEN_EDIT_DESC": "Erlaubt das Einstellen der Bildkarten dieses Servers",
     "PERM_MITGLIEDER_VIEW": "Mitglieder ansehen",
-    "PERM_MITGLIEDER_VIEW_DESC": "Erlaubt das Ansehen der Mitglieder dieses Servers und ihrer Profile. Abschnitte von Plugins (Moderation, Automod, Giveaways, Musik) brauchen zusätzlich deren Recht."
+    "PERM_MITGLIEDER_VIEW_DESC": "Erlaubt das Ansehen der Mitglieder dieses Servers und ihrer Profile. Abschnitte von Plugins (Moderation, Automod, Giveaways, Musik) brauchen zusätzlich deren Recht.",
+    "PERM_ROLLEN_VIEW": "Rollenvergabe ansehen",
+    "PERM_ROLLEN_VIEW_DESC": "Erlaubt das Ansehen, welche Rollen der Bot auf diesem Server für wen verwaltet, mit Rangfolge-Problemen. Ändern lässt sich dort nichts."
   },
   "PERMISSIONS": {
     "VIEW": "Berechtigungen ansehen",
@@ -593,5 +597,38 @@
     "NUR_DASHBOARD": "Nur hier im Dashboard, nie in Discord",
     "NUR_SELBST": "nur du",
     "NUR_SELBST_TEXT": "Siehst nur du, nicht das Team dieses Servers"
+  },
+  "ROLLENVERGABE": {
+    "TITEL": "Rollenvergabe",
+    "EINLEITUNG": "Diese Rollen vergibt der Bot hier selbst. Je Rolle steht, welches System sie vergibt, wie viele Mitglieder sie von ihm haben und ob der Bot sie überhaupt vergeben darf. Eingestellt wird jede Rolle beim Plugin, das sie vergibt (Link in der Tabelle).",
+    "REGEL_1": "Ein System nimmt nur zurück, was es selbst gegeben hat. Halten zwei Systeme dieselbe Rolle, bleibt sie, bis beide sie zurücknehmen.",
+    "REGEL_2": "Trägt ein Mitglied eine Rolle schon von Hand (oder von einem anderen Bot), gehört sie nicht dem Bot: Sie wird nicht gebucht und nie weggenommen.",
+    "REGEL_3": "Nimmt jemand eine Rolle in Discord von Hand weg, vergisst der Bot den Eintrag. Ob er sie wieder gibt, entscheidet das System beim nächsten Anlass.",
+    "LEER": "Hier verwaltet der Bot noch keine Rolle.",
+    "UNBEKANNT": "unbekannte Rolle",
+    "TRAEGER": "{{n}} tragen sie",
+    "VON_HAND": "{{n}} ohne den Bot",
+    "MEHRERE": "Mehrere Systeme verwalten diese Rolle. Sie bleibt, solange eines sie hält.",
+    "SPALTE_BESITZER": "Vergeben von",
+    "SPALTE_GEBUCHT": "Mitglieder",
+    "SPALTE_STAND": "Stand",
+    "EINGESTELLT": "eingestellt",
+    "NICHT_EINGESTELLT": "nicht mehr eingestellt (Einträge bleiben, bis das System sie zurücknimmt)",
+    "VERALTET": "{{n}} tragen sie nicht mehr (der tägliche Abgleich räumt auf)",
+    "BOT_FEHLT": "Der Bot hat nicht geantwortet, Namen und Träger fehlen: {{grund}}",
+    "UNVOLLSTAENDIG": "Die Mitgliederliste ist unvollständig, Träger werden nicht gezählt: {{grund}}",
+    "ERKLAERUNG_FEHLER": "Eine Einstellung ließ sich nicht lesen: {{fehler}}",
+    "PROBLEM_ZU_HOCH": "Die Rolle steht in der Rangliste über der Rolle des Bots ({{bot}}). Der Bot kann sie nicht vergeben: Verschiebe sie unter seine Rolle.",
+    "PROBLEM_VERWALTET": "Diese Rolle wird von einer Integration verwaltet (Bot-, Booster- oder Abo-Rolle) und lässt sich nicht vergeben.",
+    "PROBLEM_KEIN_RECHT": "Dem Bot fehlt das Recht „Rollen verwalten“.",
+    "PROBLEM_WEG": "Diese Rolle gibt es in Discord nicht mehr.",
+    "HINWEIS_AUCH": "{{rolle}} wird auch verwaltet von: {{wer}}. Sie bleibt, solange eines davon sie hält.",
+    "HINWEIS_ZU_HOCH": "{{rolle}} steht über der Bot-Rolle ({{bot}}), der Bot kann sie nicht vergeben. Verschiebe sie darunter.",
+    "HINWEIS_VERWALTET": "{{rolle}} wird von einer Integration verwaltet und lässt sich nicht vergeben.",
+    "HINWEIS_KEIN_RECHT": "Dem Bot fehlt das Recht „Rollen verwalten“.",
+    "HINWEIS_WEG": "{{rolle}} gibt es in Discord nicht mehr.",
+    "HINWEIS_BOT_FEHLT": "Rangfolge nicht geprüft, der Bot antwortete nicht: {{grund}}",
+    "HINWEIS_ZUR_SEITE": "Alle verwalteten Rollen",
+    "BESITZER_UNTERSTUETZER": "Unterstützer-Abzeichen"
   }
 }

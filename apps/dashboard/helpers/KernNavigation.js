@@ -169,6 +169,18 @@ async function registerKernNavigation(guildId) {
                 guildId,
                 parent: null
             },
+            // ── Rollenvergabe (G-07): welche Rollen der Bot für wen verwaltet ──
+            {
+                title: 'NAV.ROLLENVERGABE',
+                url: `/guild/${guildId}/rollenvergabe`,
+                icon: 'fa-solid fa-user-tag',
+                order: 2970,
+                type: navigationManager.menuTypes.MAIN,
+                capability: 'CORE.ROLLEN.VIEW',
+                visible: true,
+                guildId,
+                parent: null
+            },
             {
                 title: 'NAV.THEMES_OVERVIEW',
                 url: `/guild/${guildId}/themes`,

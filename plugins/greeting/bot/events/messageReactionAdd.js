@@ -2,6 +2,7 @@
 
 const { ServiceManager } = require('dunebot-core');
 const { baueVerifiziert } = require('../utils');
+const { verifiziere } = require('../verifizierung');
 
 /**
  * Verifizierung per Reaktion.
@@ -62,26 +63,13 @@ module.exports = async (reaction, user) => {
         if (!member) return;
 
         const verifiziertId = settings.verification_role_id;
-        const unverifiziertId = settings.verification_remove_role_id;
 
         // Schon verifiziert? Dann nichts tun — sonst käme die
         // Bestätigungsnachricht bei jedem erneuten Reagieren.
         if (verifiziertId && member.roles.cache.has(verifiziertId)) return;
 
-        if (verifiziertId) {
-            const rolle = guild.roles.cache.get(verifiziertId);
-            if (rolle && guild.members.me.roles.highest.comparePositionTo(rolle) > 0) {
-                await member.roles.add(rolle);
-                Logger.info(`[Greeting] ${user.tag} per Reaktion verifiziert — Rolle ${rolle.name} vergeben`);
-            }
-        }
-
-        if (unverifiziertId) {
-            const rolle = guild.roles.cache.get(unverifiziertId);
-            if (rolle && guild.members.me.roles.highest.comparePositionTo(rolle) > 0) {
-                await member.roles.remove(rolle);
-            }
-        }
+        // Rollen über den Kern (G-07), derselbe Weg wie Knopf und Captcha.
+        await verifiziere(member, settings, Logger);
 
         await sendeBestaetigung(member, user, Logger);
 

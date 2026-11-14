@@ -8,6 +8,7 @@
 
 const { ServiceManager } = require('dunebot-core');
 const { PermissionFlagsBits } = require('discord.js');
+const { Rollen } = require('dunebot-sdk');
 
 /**
  * Badge-Level → kosmetische Discord-Rolle (nur Farbe, keine Permissions)
@@ -79,6 +80,12 @@ module.exports = async function(payload, discordClient) {
 /**
  * Kosmetische Supporter-Role in einer Guild zuweisen/entfernen
  * Rollen haben NUR Farbe + Hoist, keine Permissions
+ *
+ * Seit G-07 (2026-11-14) über den Kern (`Rollen`, Besitzer
+ * `kern:unterstuetzer`): Genommen wird nur, was der Kern selbst gegeben hat
+ * (Regel 1). Eine gleichnamige Rolle, die jemand von Hand vergeben hat, bleibt.
+ * Gemessen 2026-11-14: `supporter_badges` hat 0 Zeilen, es gibt keinen Bestand
+ * aus der Zeit davor.
  */
 async function assignRoleInGuild(guild, userId, badgeLevel) {
     const Logger = ServiceManager.get('Logger');
@@ -94,21 +101,15 @@ async function assignRoleInGuild(guild, userId, badgeLevel) {
         return;
     }
     
-    // Alle Supporter-Roles in der Guild finden
+    const roleName = badgeLevel ? BADGE_ROLE_NAMES[badgeLevel] : null;
+    const roleColor = badgeLevel ? BADGE_COLORS[badgeLevel] : null;
+
+    // Alte Supporter-Roles entfernen (alle außer der neuen Stufe)
     const allBadgeNames = Object.values(BADGE_ROLE_NAMES);
-    const supporterRoles = guild.roles.cache.filter(role => allBadgeNames.includes(role.name));
-    
-    // Alte Supporter-Roles entfernen
-    for (const [roleId, role] of supporterRoles) {
-        if (member.roles.cache.has(roleId)) {
-            await member.roles.remove(role, 'Supporter badge updated');
-        }
-    }
-    
-    if (!badgeLevel) return;
-    
-    const roleName = BADGE_ROLE_NAMES[badgeLevel];
-    const roleColor = BADGE_COLORS[badgeLevel];
+    const alte = guild.roles.cache.filter(role => allBadgeNames.includes(role.name) && role.name !== roleName);
+    const weg = await Rollen.nimm({ mitglied: member, rollen: [...alte.keys()], besitzer: 'kern:unterstuetzer', grund: 'Supporter badge updated' });
+    for (const b of weg.blockiert) Logger.warn(`[SetSupporterRole] ${b.name || b.rolle} in ${guild.name} nicht entfernt (${b.grund})`);
+
     if (!roleName) return;
     
     // Role finden oder erstellen (kosmetisch: nur Farbe, kein Permission)
@@ -126,7 +127,8 @@ async function assignRoleInGuild(guild, userId, badgeLevel) {
         Logger.info(`[SetSupporterRole] Created cosmetic role ${roleName} in guild ${guild.name}`);
     }
     
-    if (!member.roles.cache.has(supporterRole.id)) {
-        await member.roles.add(supporterRole, `Supporter badge: ${badgeLevel}`);
+    const dazu = await Rollen.vergib({ mitglied: member, rollen: supporterRole.id, besitzer: 'kern:unterstuetzer', grund: `Supporter badge: ${badgeLevel}` });
+    if (dazu.blockiert.length) {
+        throw new Error(`Rolle ${roleName} nicht vergeben (${dazu.blockiert.map(b => b.grund).join(', ')})`);
     }
 }

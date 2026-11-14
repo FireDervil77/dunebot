@@ -171,5 +171,10 @@
   "BILDKARTEN": {
     "TITEL_WILLKOMMEN": "Willkommensbild",
     "WO_WILLKOMMEN": "Hängt an der Willkommensnachricht, wenn ein Mitglied beitritt, und an /welcome preview."
+  },
+  "ROLLEN": {
+    "AUTOROLLE": "Autorolle beim Beitritt",
+    "VERIFIZIERT": "Rolle nach der Verifizierung",
+    "UNVERIFIZIERT": "Rolle bis zur Verifizierung"
   }
 }

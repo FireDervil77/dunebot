@@ -20,7 +20,6 @@
             "streaming_music_queue",
             "streaming_music_state",
             "streaming_outbox",
-            "streaming_role_grants",
             "streaming_serverstopp_streamer",
             "streaming_serverstopp",
             "streaming_targets",
@@ -51,14 +50,15 @@
             "angelegt_von": "anonymisieren",
             "mitglied_id": "anonymisieren"
         },
-        "streaming_role_grants": {
-            "mitglied_id": "loeschen"
-        },
         "streaming_music_queue": {
             "gewuenscht_von": {
                 "weg": "ausgenommen",
                 "grund": "Name eines Zuschauers auf der Streaming-Plattform, keine Discord-ID"
             }
         }
-    }
+    },
+    "rollen": [
+        { "besitzer": "streaming:live", "titel": "streaming:ROLLEN.LIVE", "seite": "/plugins/streaming/rollen" },
+        { "besitzer": "streaming:abo", "titel": "streaming:ROLLEN.ABO", "seite": "/plugins/streaming/rollen" }
+    ]
 }

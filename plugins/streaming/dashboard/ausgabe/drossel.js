@@ -25,6 +25,7 @@
  */
 
 const { ServiceManager } = require('dunebot-core');
+const Rollen = require('dunebot-sdk/lib/Rollen');
 const nachricht = require('./nachricht');
 const chatansage = require('./chatansage');
 const twitch = require('../plattformen/twitch');
@@ -226,38 +227,60 @@ async function rolleSetzen(auftrag) {
         }
     }
 
-    const antwort = await anDenBot('streaming:role', {
-        guildId: auftrag.guild_id, userId: mitgliedId, roleId: rolleId, aktion: richtung
-    });
-
-    if (!antwort.ok) return { ok: false, fehler: antwort.fehler, endgueltig: istEndgueltig(antwort) };
-
-    // **Buch fuehren, sonst nimmt der Abgleich spaeter Fremdes weg.**
-    // Ohne diese beiden Zeilen weiss das Plugin nicht, welche Rolle es selbst
-    // vergeben hat — und der taegliche Lauf raeumt dann bei jedem ab, der sie
-    // aus einem anderen Grund traegt. Genau das ist am 2026-08-25 passiert.
-    try {
-        if (richtung === 'geben') {
-            await db().query(`
-                INSERT INTO streaming_role_grants (guild_id, mitglied_id, rolle_id)
-                VALUES (?, ?, ?)
-                ON DUPLICATE KEY UPDATE vergeben_am = vergeben_am
-            `, [auftrag.guild_id, mitgliedId, rolleId]);
-        } else {
-            await db().query(
-                'DELETE FROM streaming_role_grants WHERE guild_id = ? AND mitglied_id = ? AND rolle_id = ?',
-                [auftrag.guild_id, mitgliedId, rolleId]);
-        }
-    } catch (err) {
-        // Die Rolle ist gesetzt - das Buch ist zweitrangig. Aber es gehoert
-        // gemeldet, denn ohne Eintrag holt der Abgleich sie nie zurueck.
-        log().warn(`[Streaming] Rollenvergabe nicht notiert (${richtung}): ${err.message}`);
-    }
-
-    return {
-        ok: true, fehler: null, endgueltig: false,
-        hinweis: antwort.daten?.hinweis || (antwort.daten?.geaendert ? undefined : 'unveraendert')
+    // **Seit G-07 (2026-11-14) fuehrt der Kern das Buch** (`rollen_vergaben`,
+    // ein Eintrag je Besitzer). Vorher stand es hier in `streaming_role_grants`,
+    // und jedes `ok` buchte die Rolle als unsere, auch wenn das Mitglied sie
+    // schon trug: Wer sie von Hand hatte und live ging, verlor sie nach dem
+    // Stream (K391). Jetzt gilt Regel 2 des Kerns: getragen und von keinem
+    // System gehalten = nicht unsere, es wird nichts gebucht.
+    const besitzer = istLiveRolle ? 'streaming:live' : 'streaming:abo';
+    const auftragKern = {
+        guildId: auftrag.guild_id, userId: mitgliedId, rollen: [rolleId], besitzer,
+        frist_ms: BOT_FRIST_MS,
+        bezug: nutzlast.streamer_id ? `streamer:${nutzlast.streamer_id}` : null,
+        grund: richtung === 'geben'
+            ? (istLiveRolle ? 'ist live' : 'Abonnent')
+            : (istLiveRolle ? 'Stream beendet' : 'kein Abonnent mehr')
     };
+    const e = richtung === 'geben' ? await Rollen.vergib(auftragKern) : await Rollen.nimm(auftragKern);
+    return rollenErgebnis(e);
+}
+
+/**
+ * Ergebnis des Kerns in die Sprache des Ausgangs.
+ *
+ * Endgueltig ist, was sich ohne Eingriff nicht aendert: Rolle steht ueber der
+ * Bot-Rolle, Recht fehlt, Rolle wird von einer Integration verwaltet, Rolle
+ * weg, Guild weg. Alles andere (Netz, Frist) darf wiederholt werden.
+ *
+ * @param {Object} e Ergebnis von `Rollen.vergib`/`nimm`
+ * @returns {{ok: boolean, fehler: string|null, endgueltig: boolean, hinweis?: string}} Ergebnis
+ */
+function rollenErgebnis(e) {
+    if (e.fehler) return { ok: false, fehler: e.fehler, endgueltig: e.code === 10004 };
+    const b = e.blockiert[0];
+    if (b) {
+        const text = {
+            ZU_HOCH: `Die Rolle "${b.name || b.rolle}" steht in der Rangliste ueber der Bot-Rolle — verschiebe sie darunter`,
+            KEIN_RECHT: 'Dem Bot fehlt das Recht "Rollen verwalten"',
+            VERWALTET: `Die Rolle "${b.name || b.rolle}" wird von einer Integration verwaltet`,
+            WEG: 'Rolle gibt es nicht mehr'
+        }[b.grund] || b.fehler || 'Rolle nicht gesetzt';
+        // Rolle weg ist kein Fehler: Es gibt nichts mehr zu tun.
+        if (b.grund === 'WEG') return { ok: true, fehler: null, endgueltig: true, hinweis: text };
+        return { ok: false, fehler: text, endgueltig: b.grund !== 'FEHLER' || b.code === 50013 || b.code === 50001 };
+    }
+    if (e.kein_mitglied) return { ok: true, fehler: null, endgueltig: false, hinweis: 'Mitglied ist nicht mehr auf dem Server' };
+    if (e.vergeben.length || e.entzogen.length) return { ok: true, fehler: null, endgueltig: false };
+    const hinweis = e.gehalten.length
+        ? `bleibt, haelt noch ${e.gehalten[0].von.join(', ')}`
+        : ({
+            HAT_SCHON: 'hatte die Rolle schon (nicht von uns, nichts gebucht)',
+            SCHON_GEBUCHT: 'hatte die Rolle schon',
+            HAT_NICHT: 'hatte die Rolle nicht',
+            KEIN_EINTRAG: 'nicht von uns vergeben, bleibt'
+        }[e.unveraendert[0]?.hinweis] || (e.gebucht.length ? 'hatte die Rolle schon (von einem anderen System, mitgebucht)' : 'unveraendert'));
+    return { ok: true, fehler: null, endgueltig: false, hinweis };
 }
 
 /**

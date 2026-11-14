@@ -78,7 +78,8 @@ module.exports = async (interaction) => {
         const ergebnis = await wendeAn(
             interaction.member,
             aenderung,
-            `Rollenmenü „${menu.title}" (#${menu.id})`
+            `Rollenmenü „${menu.title}" (#${menu.id})`,
+            menu.id
         );
 
         return interaction.editReply({ content: baueText(ergebnis, aenderung.hinweis) });

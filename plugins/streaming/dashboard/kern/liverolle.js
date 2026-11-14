@@ -72,17 +72,16 @@ function vergleichen(traeger, sollen, vergeben) {
 }
 
 /**
- * Wem hat das Plugin diese Rolle gegeben?
+ * Wem hat das Plugin diese Rolle als Live-Rolle gegeben?
  *
  * @param {string} guildId Discord-Guild-ID
  * @param {string} rolleId Rolle
  * @returns {Promise<Array<string>>} Mitglieder-IDs
  */
 async function vergebene(guildId, rolleId) {
-    const zeilen = await db().query(
-        'SELECT mitglied_id FROM streaming_role_grants WHERE guild_id = ? AND rolle_id = ?',
-        [guildId, rolleId]);
-    return zeilen.map(z => String(z.mitglied_id));
+    // Das Buch fuehrt seit G-07 der Kern (`rollen_vergaben`, Besitzer
+    // `streaming:live`). Nur lesen: Geschrieben wird es beim Geben und Nehmen.
+    return require('dunebot-sdk/lib/Rollen').vergebene(guildId, { rolleId, besitzer: 'streaming:live' });
 }
 
 /**

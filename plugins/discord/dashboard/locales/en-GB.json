@@ -156,5 +156,8 @@
     "ROLEMENUS_VIEW_DESC": "Allows viewing the server's role menus",
     "ROLEMENUS_MANAGE": "Manage role menus",
     "ROLEMENUS_MANAGE_DESC": "Allows creating, changing and sending role menus to a channel. Whoever may do this indirectly decides which roles members can give themselves"
+  },
+  "ROLLEN": {
+    "ROLLENMENUE": "Role menus"
   }
 }

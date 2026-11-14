@@ -1,6 +1,7 @@
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const { ServiceManager } = require('dunebot-core');
 const { baueVerifiziert, bauePanel } = require('../utils');
+const { verifiziere } = require('../verifizierung');
 
 // Simple math captcha cache: Map<`${guildId}-${userId}`, { answer: number, expires: number }>
 const captchaCache = new Map();
@@ -28,7 +29,6 @@ module.exports = async (interaction) => {
         }
 
         const verifiedRoleId = settings.verification_role_id;
-        const unverifiedRoleId = settings.verification_remove_role_id;
 
         // ===== STATUS CHECK BUTTON =====
         if (interaction.customId === 'greeting:VERIFY_STATUS') {
@@ -59,7 +59,7 @@ module.exports = async (interaction) => {
 
         // ===== BUTTON Verification =====
         if (settings.verification_type === 'button') {
-            await assignVerification(member, verifiedRoleId, unverifiedRoleId, Logger);
+            await verifiziere(member, settings, Logger);
             return interaction.reply(await baueVerifiziert(member, { fluechtig: true }));
         }
 
@@ -111,7 +111,7 @@ module.exports = async (interaction) => {
 
                 if (selectedAnswer === captcha.answer) {
                     captchaCache.delete(cacheKey);
-                    await assignVerification(member, verifiedRoleId, unverifiedRoleId, Logger);
+                    await verifiziere(member, settings, Logger);
                     // Die Bestätigung kommt als neue Antwort, die Captcha-Nachricht
                     // geht weg: Eine Vorlage in Components V2 lässt sich nicht in
                     // eine Nachricht mit Embed hineinbearbeiten (K389).
@@ -153,25 +153,8 @@ module.exports = async (interaction) => {
 // ../utils.js aus der Vorlage `greeting:verifiziert`. Bis dahin stand hier
 // `buildSuccessEmbed` mit eigener Platzhalter-Tabelle ({user:name} usw.).
 
-/**
- * Assigns verified role and removes unverified role
- */
-async function assignVerification(member, verifiedRoleId, unverifiedRoleId, Logger) {
-    if (verifiedRoleId) {
-        const role = member.guild.roles.cache.get(verifiedRoleId);
-        if (role && member.guild.members.me.roles.highest.position > role.position) {
-            await member.roles.add(role);
-            Logger.info(`[Greeting] Verified ${member.user.tag} — added role ${role.name}`);
-        }
-    }
-    if (unverifiedRoleId) {
-        const removeRole = member.guild.roles.cache.get(unverifiedRoleId);
-        if (removeRole && member.guild.members.me.roles.highest.position > removeRole.position) {
-            await member.roles.remove(removeRole);
-            Logger.info(`[Greeting] Verified ${member.user.tag} — removed unverified role ${removeRole.name}`);
-        }
-    }
-}
+// Rollen setzt seit G-07 (2026-11-14) `verifiziere` in ../verifizierung.js
+// über den Kern (`Rollen`). Bis dahin stand hier `assignVerification`.
 
 /**
  * Generates 4 buttons: 1 correct + 3 wrong answers, shuffled

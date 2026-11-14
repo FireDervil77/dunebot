@@ -47,6 +47,7 @@
           <option value="<%= r.id %>" <%= String(r.id) === String(liveRolleId) ? 'selected' : '' %>>@<%= r.name %></option>
         <% }); %>
       </select>
+      <%- include('shared/rollen-hinweis', { guildId, tr, besitzer: 'streaming:live', feld: '#live_rolle_id' }) %>
       <div class="zeile__hilfe">
         Steht sie in der Rangliste über der Rolle des Bots, darf er sie nicht
         vergeben — und es passiert nichts.

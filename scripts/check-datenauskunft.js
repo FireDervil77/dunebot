@@ -36,7 +36,7 @@ const { ohneKommentare } = require('./lib/quelltext');
 
 /** Wer einen Haken braucht, und warum (baustellen.md G-04a „Für G-04b mitnehmen“). */
 const HAKEN = {
-    streaming: { vor: 'streaming_role_grants ist das Buch der vergebenen Rollen: erst Rolle zurücknehmen, dann Zeile löschen' },
+    streaming: { vor: 'Live- und Abo-Rolle stehen im Buch des Kerns (rollen_vergaben, G-07); ohne Eintrag nimmt sie niemand mehr: erst Rolle zurücknehmen, dann löschen' },
     core: { vor: 'Stimmen merken', nach: 'user_feedback.upvotes nachzählen' },
     gameserver: { vor: 'Bewertungen merken', nach: 'addon_marketplace.rating_avg/rating_count nachrechnen' },
 };

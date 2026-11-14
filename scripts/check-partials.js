@@ -75,6 +75,19 @@ const HANDLER = {
         ereignis: 'guildMemberRemove',
         partialAlt: 'Abschied geht raus, ohne Fehler, Name steht drin',
     },
+    // Kern (G-07): Das Buch der Rollenvergabe folgt Discord. Diese Handler
+    // senden nichts, sie loeschen Eintraege in `rollen_vergaben`.
+    'apps/bot/events/guildMemberUpdate.js': {
+        ereignis: 'guildMemberUpdate',
+        buch: true,
+        partialAlt: 'keine Abfrage (welche Rollen es vorher trug, ist unbekannt; der taegliche Abgleich holt es nach)',
+        gegenprobe: 'Rolle 880…88 weggenommen: Eintraege zu genau dieser Rolle dieses Mitglieds gehen',
+    },
+    'apps/bot/events/guildMemberRemove.js': {
+        ereignis: 'guildMemberRemove',
+        buch: true,
+        partialAlt: 'alle Eintraege des Mitglieds in dieser Guild gehen, ohne Fehler',
+    },
 };
 
 /** Ein Client, eine Gilde mit Ziel-Kanal, Attrappen fuer DB und Logger. */
@@ -83,12 +96,14 @@ function aufbau(partials) {
     client.user = { id: '999' };
     const guild = client.guilds._add({
         id: '1', name: 'Probe', member_count: 10, channels: [], members: [],
-        roles: [{ id: '1', name: '@everyone', permissions: '0', position: 0 }],
+        roles: [{ id: '1', name: '@everyone', permissions: '0', position: 0 },
+                { id: '880000000000000088', name: 'Booster', permissions: '0', position: 1, managed: true }],
     });
     const gesendet = [];
     guild.channels.cache.set('77', { id: '77', send: async (inhalt) => { gesendet.push(inhalt); } });
 
     const abfragen = [];
+    const geloescht = [];
     const fehlerLog = [];
     ServiceManager.register('dbService', {
         query: async (sql, werte) => {
@@ -101,6 +116,11 @@ function aufbau(partials) {
                 const text = { 'greeting:boost': 'Boost {member:name}', 'greeting:abschied': 'Tschuess {member:name}' }[werte[1]];
                 return text ? [{ inhalt: JSON.stringify({ form: 'text', text }) }] : [];
             }
+            // Kern (G-07): das Buch der Rollenvergabe.
+            if (/^DELETE FROM rollen_vergaben WHERE /.test(sql)) {
+                geloescht.push({ sql, werte });
+                return { affectedRows: 1 };
+            }
             throw new Error(`Attrappe kennt die Abfrage nicht: ${sql.slice(0, 80)}`);
         },
     });
@@ -108,7 +128,7 @@ function aufbau(partials) {
         info() {}, warn() {}, debug() {},
         error: (...a) => fehlerLog.push(a.map((x) => (x && x.message) || String(x)).join(' ')),
     });
-    return { client, guild, gesendet, abfragen, fehlerLog };
+    return { client, guild, gesendet, abfragen, geloescht, fehlerLog };
 }
 
 /** Laesst discord.js selbst ein Ereignis erzeugen und gibt dessen Argumente zurueck. */
@@ -120,11 +140,11 @@ function erzeuge(client, ereignis, ausloesen) {
 }
 
 const NUTZER = { id: '4', username: 'nutzer', discriminator: '0', global_name: null, avatar: null };
-// Ein Boost bringt die verwaltete Booster-Rolle mit ('88'). Das ist noetig:
+// Ein Boost bringt die verwaltete Booster-Rolle mit ('880000000000000088'). Das ist noetig:
 // `GuildMember#equals` vergleicht `premiumSince` nicht — aendert sich nur
 // das, sendet discord.js gar kein guildMemberUpdate (gemessen 14.22.1).
 const updateDaten = (premium) => ({
-    guild_id: '1', user: NUTZER, roles: premium ? ['1', '88'] : ['1'], nick: 'neu', joined_at: '2025-01-01T00:00:00Z',
+    guild_id: '1', user: NUTZER, roles: premium ? ['1', '880000000000000088'] : ['1'], nick: 'neu', joined_at: '2025-01-01T00:00:00Z',
     premium_since: premium ? '2026-01-01T00:00:00Z' : null,
 });
 
@@ -171,9 +191,51 @@ const updateDaten = (premium) => ({
     });
 
     for (const datei of gefunden.filter((f) => HANDLER[f])) {
-        const { ereignis, partialAlt, gegenprobe } = HANDLER[datei];
+        const { ereignis, partialAlt, gegenprobe, buch } = HANDLER[datei];
         const handler = require(path.join(WURZEL, datei));
         const kurz = datei.replace(/^plugins\//, '').replace('/bot/events/', ': ');
+
+        if (buch && ereignis === 'guildMemberUpdate') {
+            await pruefe(`${kurz} — ungecacht: ${partialAlt}`, async () => {
+                const { client, gesendet, abfragen, fehlerLog } = aufbau(partials);
+                const args = erzeuge(client, ereignis, () =>
+                    client.actions.GuildMemberUpdate.handle(updateDaten(false), { status: Status.Ready }));
+                assert.strictEqual(args[0].partial, true);
+                await handler(...args);
+                assert.deepStrictEqual(abfragen, [], 'hat die Datenbank gefragt');
+                assert.deepStrictEqual(gesendet, []);
+                assert.deepStrictEqual(fehlerLog, []);
+            });
+            await pruefe(`${kurz} — Gegenprobe: ${gegenprobe}`, async () => {
+                const { client, guild, geloescht, fehlerLog } = aufbau(partials);
+                guild.members._add(updateDaten(true));
+                const args = erzeuge(client, ereignis, () =>
+                    client.actions.GuildMemberUpdate.handle(updateDaten(false), { status: Status.Ready }));
+                assert.strictEqual(args[0].partial, false);
+                assert.ok(args[0].roles.cache.has('880000000000000088') && !args[1].roles.cache.has('880000000000000088'), 'Aufbau: Rolle vorher da, nachher weg');
+                await handler(...args);
+                assert.deepStrictEqual(fehlerLog, []);
+                assert.strictEqual(geloescht.length, 1, `geloescht: ${geloescht.length}`);
+                assert.deepStrictEqual(geloescht[0].werte, ['1', '4', '880000000000000088']);
+                assert.match(geloescht[0].sql, /guild_id = \? AND mitglied_id = \? AND rolle_id IN \(\?\)/);
+            });
+            continue;
+        }
+        if (buch) {
+            await pruefe(`${kurz} — ungecacht: ${partialAlt}`, async () => {
+                const { client, gesendet, geloescht, fehlerLog } = aufbau(partials);
+                const args = erzeuge(client, ereignis, () =>
+                    client.actions.GuildMemberRemove.handle({ guild_id: '1', user: NUTZER }, { status: Status.Ready }));
+                assert.strictEqual(args[0].partial, true);
+                await handler(...args);
+                assert.deepStrictEqual(fehlerLog, []);
+                assert.deepStrictEqual(gesendet, []);
+                assert.strictEqual(geloescht.length, 1, `geloescht: ${geloescht.length}`);
+                assert.deepStrictEqual(geloescht[0].werte, ['1', '4']);
+                assert.match(geloescht[0].sql, /guild_id = \? AND mitglied_id = \?$/);
+            });
+            continue;
+        }
 
         if (ereignis === 'guildMemberUpdate') {
             await pruefe(`${kurz} — ungecacht: ${partialAlt}`, async () => {

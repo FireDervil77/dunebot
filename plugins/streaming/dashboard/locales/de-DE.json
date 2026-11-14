@@ -571,5 +571,9 @@
     "TEST_DESC": "Berechtigung um eine Probe-Ankündigung zu senden. Sie erscheint sichtbar im Kanal.",
     "CHAT_MANAGE": "Chatbot dieses Kanals einstellen",
     "CHAT_MANAGE_DESC": "Chatbot dieses Kanals einstellen. Wirkt nur in der Heim-Guild, sonst nirgends."
+  },
+  "ROLLEN": {
+    "LIVE": "Live-Rolle",
+    "ABO": "Abo-Rolle"
   }
 }

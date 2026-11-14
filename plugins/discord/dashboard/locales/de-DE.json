@@ -156,5 +156,8 @@
     "ROLEMENUS_VIEW_DESC": "Berechtigung, die Rollenmenüs des Servers einzusehen",
     "ROLEMENUS_MANAGE": "Rollenmenüs verwalten",
     "ROLEMENUS_MANAGE_DESC": "Berechtigung, Rollenmenüs anzulegen, zu ändern und in einen Kanal zu senden. Wer das darf, bestimmt mittelbar, welche Rollen sich Mitglieder selbst geben können"
+  },
+  "ROLLEN": {
+    "ROLLENMENUE": "Rollenmenüs"
   }
 }

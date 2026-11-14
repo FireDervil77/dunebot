@@ -1,0 +1,105 @@
+<%
+/**
+ * Hinweis am Rollenfeld — Kern-Teil (G-07, F-G12 Punkt 4, 2026-11-14).
+ *
+ * Unter ein Rollenfeld eines Plugins gesetzt, sagt er zu jeder gewählten
+ * Rolle, was der Bot weiß:
+ *   - „auch verwaltet von …“ (ein anderes System hat dieselbe Rolle eingestellt)
+ *   - „steht über der Bot-Rolle“, „von einer Integration verwaltet“,
+ *     „dem Bot fehlt das Recht“, „gibt es nicht mehr“
+ * Daten: GET /guild/ID/rollenvergabe/hinweis (rollenvergabe.router). Er folgt
+ * dem Feld: Ändert sich die Auswahl, fragt er neu.
+ *
+ * Aufruf, direkt unter dem Feld:
+ *
+ *     include('shared/rollen-hinweis', { guildId, tr, besitzer: 'streaming:live', feld: '#live_rolle_id' })
+ *
+ * `feld` ist ein CSS-Wähler auf ein <select> (einfach oder mehrfach) oder ein
+ * <input>; mehrere Felder mit Komma. Ohne Auswahl bleibt er leer.
+ */
+const _t = (k, o) => tr('core:ROLLENVERGABE.' + k, o);
+const _besitzer = typeof besitzer !== 'undefined' ? besitzer : '';
+const _feld = typeof feld !== 'undefined' ? feld : '';
+%>
+<div class="form-hint" data-rollen-hinweis="<%= _besitzer %>" data-feld="<%= _feld %>"
+     data-adresse="/guild/<%= guildId %>/rollenvergabe/hinweis"
+     data-seite="/guild/<%= guildId %>/rollenvergabe"
+     data-text-auch="<%= _t('HINWEIS_AUCH') %>"
+     data-text-zu-hoch="<%= _t('HINWEIS_ZU_HOCH') %>"
+     data-text-verwaltet="<%= _t('HINWEIS_VERWALTET') %>"
+     data-text-kein-recht="<%= _t('HINWEIS_KEIN_RECHT') %>"
+     data-text-weg="<%= _t('HINWEIS_WEG') %>"
+     data-text-bot-fehlt="<%= _t('HINWEIS_BOT_FEHLT') %>"
+     data-text-zur-seite="<%= _t('HINWEIS_ZUR_SEITE') %>"></div>
+<script>
+(function () {
+  // Über das Attribut suchen, nicht über `document.currentScript`: Das Layout
+  // zieht alle Skripte ans Seitenende (extractScripts in ThemeRenderer.js).
+  function alle() {
+    document.querySelectorAll('[data-rollen-hinweis]').forEach(function (h) {
+      if (h.dataset.eingerichtet) return;
+      h.dataset.eingerichtet = '1';
+      einrichten(h);
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', alle);
+  else alle();
+
+  function einrichten(h) {
+    var felder = h.dataset.feld ? Array.prototype.slice.call(document.querySelectorAll(h.dataset.feld)) : [];
+    var lauf = 0;
+    function text(name, werte) {
+      var t = h.dataset['text' + name] || '';
+      Object.keys(werte || {}).forEach(function (k) { t = t.split('{{' + k + '}}').join(String(werte[k])); });
+      return t;
+    }
+    function gewaehlt() {
+      var ids = [];
+      felder.forEach(function (f) {
+        if (f.tagName === 'SELECT') Array.prototype.forEach.call(f.selectedOptions, function (o) { if (o.value) ids.push(o.value); });
+        else if (f.value) ids.push(f.value);
+      });
+      return ids.filter(function (id, i) { return /^\d{5,32}$/.test(id) && ids.indexOf(id) === i; });
+    }
+    function zeile(t, art) {
+      var d = document.createElement('div');
+      d.className = art === 'gefahr' ? 'text-danger' : 'text-secondary';
+      var i = document.createElement('i');
+      i.className = 'fa-solid ' + (art === 'gefahr' ? 'fa-triangle-exclamation' : 'fa-circle-info') + ' me-1';
+      d.append(i, document.createTextNode(t));
+      return d;
+    }
+    async function frage() {
+      var ids = gewaehlt();
+      var meins = ++lauf;
+      h.innerHTML = '';
+      if (!ids.length) return;
+      try {
+        var r = await fetch(h.dataset.adresse + '?besitzer=' + encodeURIComponent(h.dataset.rollenHinweis) + '&rollen=' + ids.join(','), { headers: { Accept: 'application/json' } });
+        var d = await r.json();
+        if (meins !== lauf) return;
+        if (!d.success) throw new Error(d.error || r.status);
+        var zeilen = [];
+        if (d.botFehler) zeilen.push(zeile(text('BotFehlt', { grund: d.botFehler }), 'info'));
+        var bot = (d.bot && d.bot.rolle) || '?';
+        d.rollen.forEach(function (x) {
+          var name = '@' + (x.name || x.id);
+          var p = { ZU_HOCH: 'ZuHoch', VERWALTET: 'Verwaltet', KEIN_RECHT: 'KeinRecht', WEG: 'Weg' }[x.problem];
+          if (p) zeilen.push(zeile(text(p, { rolle: name, bot: bot }), 'gefahr'));
+          if (x.auch && x.auch.length) zeilen.push(zeile(text('Auch', { rolle: name, wer: x.auch.join(', ') }), 'info'));
+        });
+        if (zeilen.length) {
+          var a = document.createElement('a');
+          a.href = h.dataset.seite; a.className = 'small'; a.textContent = text('ZurSeite');
+          zeilen.push(a);
+        }
+        zeilen.forEach(function (z) { h.appendChild(z); });
+      } catch (e) {
+        if (meins === lauf) h.appendChild(zeile(text('BotFehlt', { grund: e.message }), 'info'));
+      }
+    }
+    felder.forEach(function (f) { f.addEventListener('change', frage); });
+    frage();
+  }
+})();
+</script>

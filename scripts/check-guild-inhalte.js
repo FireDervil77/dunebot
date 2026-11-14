@@ -129,6 +129,9 @@ function abschalter(plugin) {
         const sichten = new Set(tabellen.filter(r => r.art === 'VIEW').map(r => r.t));
         const guildSpalte = await db.guildSpalten([...vorhanden].filter(t => !sichten.has(t)));
         const offen = await ausOffenenMigrationen(db, plugins);
+        // Gegenstück: Was eine offene Migration löscht, braucht keine Liste mehr (G-07).
+        const geht = require('./lib/migrationen').gehtMitOffenerMigration(WURZEL,
+            new Set((await db.query('SELECT source, filename FROM migrations WHERE success = 1')).map(r => `${r.source}:${r.filename}`)), plugins);
         const kommt = [];
         const mitGuild = new Set(Object.keys(guildSpalte).filter(t => guildSpalte[t]));
         const besitz = Object.fromEntries(plugins.map(p => [p, angelegt(p)]));
@@ -150,7 +153,8 @@ function abschalter(plugin) {
                 for (const t of besitz[p]) {
                     if (!mitGuild.has(t)) continue;
                     const n = (loeschen.includes(t) ? 1 : 0) + (t in bleiben ? 1 : 0);
-                    if (n === 0) meldungen.push(`${p}: ${t} fehlt in guildInhalte`);
+                    if (n === 0 && geht.has(t)) console.log(`      geht mit offener Migration: ${p}: ${t} (${geht.get(t)})`);
+                    else if (n === 0) meldungen.push(`${p}: ${t} fehlt in guildInhalte`);
                     if (n === 2) meldungen.push(`${p}: ${t} steht in loeschen UND bleiben`);
                 }
                 for (const t of [...loeschen, ...Object.keys(bleiben)]) {

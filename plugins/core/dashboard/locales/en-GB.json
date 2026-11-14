@@ -54,6 +54,8 @@
   "PERM_BILDKARTEN_EDIT_DESC": "Allows configuring this server's image cards",
   "PERM_MITGLIEDER_VIEW": "View members",
   "PERM_MITGLIEDER_VIEW_DESC": "Allows viewing this server's members and their profiles. Plugin sections (moderation, automod, giveaways, music) also need that plugin's permission.",
+  "PERM_ROLLEN_VIEW": "View role assignment",
+  "PERM_ROLLEN_VIEW_DESC": "Allows viewing which roles the bot manages on this server for whom, including role order problems. Nothing can be changed there.",
   "CORE": {
     "PERM_SETTINGS_VIEW": "View Settings",
     "PERM_SETTINGS_VIEW_DESC": "Allows viewing guild settings",
@@ -90,7 +92,9 @@
     "PERM_BILDKARTEN_EDIT": "Configure image cards",
     "PERM_BILDKARTEN_EDIT_DESC": "Allows configuring this server's image cards",
     "PERM_MITGLIEDER_VIEW": "View members",
-    "PERM_MITGLIEDER_VIEW_DESC": "Allows viewing this server's members and their profiles. Plugin sections (moderation, automod, giveaways, music) also need that plugin's permission."
+    "PERM_MITGLIEDER_VIEW_DESC": "Allows viewing this server's members and their profiles. Plugin sections (moderation, automod, giveaways, music) also need that plugin's permission.",
+    "PERM_ROLLEN_VIEW": "View role assignment",
+    "PERM_ROLLEN_VIEW_DESC": "Allows viewing which roles the bot manages on this server for whom, including role order problems. Nothing can be changed there."
   },
   "PERMISSIONS": {
     "VIEW": "View Permissions",
@@ -593,5 +597,38 @@
     "NUR_DASHBOARD": "Only here in the dashboard, never in Discord",
     "NUR_SELBST": "only you",
     "NUR_SELBST_TEXT": "Only you see this, not this server's team"
+  },
+  "ROLLENVERGABE": {
+    "TITEL": "Role assignment",
+    "EINLEITUNG": "The bot assigns these roles here itself. For each role you see which system assigns it, how many members have it from that system, and whether the bot may assign it at all. Each role is set up in the plugin that assigns it (link in the table).",
+    "REGEL_1": "A system only takes back what it gave. If two systems hold the same role, it stays until both take it back.",
+    "REGEL_2": "If a member already has a role by hand (or from another bot), it does not belong to the bot: it is not recorded and never taken away.",
+    "REGEL_3": "If someone removes a role by hand in Discord, the bot forgets the entry. Whether it gives the role again is up to the system at its next occasion.",
+    "LEER": "The bot does not manage any role here yet.",
+    "UNBEKANNT": "unknown role",
+    "TRAEGER": "{{n}} have it",
+    "VON_HAND": "{{n}} without the bot",
+    "MEHRERE": "Several systems manage this role. It stays as long as one of them holds it.",
+    "SPALTE_BESITZER": "Assigned by",
+    "SPALTE_GEBUCHT": "Members",
+    "SPALTE_STAND": "State",
+    "EINGESTELLT": "set up",
+    "NICHT_EINGESTELLT": "no longer set up (entries stay until the system takes them back)",
+    "VERALTET": "{{n}} no longer have it (the daily sync cleans up)",
+    "BOT_FEHLT": "The bot did not answer, names and holders are missing: {{grund}}",
+    "UNVOLLSTAENDIG": "The member list is incomplete, holders are not counted: {{grund}}",
+    "ERKLAERUNG_FEHLER": "A setting could not be read: {{fehler}}",
+    "PROBLEM_ZU_HOCH": "This role is above the bot's role ({{bot}}). The bot cannot assign it: move it below the bot's role.",
+    "PROBLEM_VERWALTET": "This role is managed by an integration (bot, booster or subscription role) and cannot be assigned.",
+    "PROBLEM_KEIN_RECHT": "The bot lacks the “Manage Roles” permission.",
+    "PROBLEM_WEG": "This role no longer exists in Discord.",
+    "HINWEIS_AUCH": "{{rolle}} is also managed by: {{wer}}. It stays as long as one of them holds it.",
+    "HINWEIS_ZU_HOCH": "{{rolle}} is above the bot's role ({{bot}}), the bot cannot assign it. Move it below.",
+    "HINWEIS_VERWALTET": "{{rolle}} is managed by an integration and cannot be assigned.",
+    "HINWEIS_KEIN_RECHT": "The bot lacks the “Manage Roles” permission.",
+    "HINWEIS_WEG": "{{rolle}} no longer exists in Discord.",
+    "HINWEIS_BOT_FEHLT": "Role order not checked, the bot did not answer: {{grund}}",
+    "HINWEIS_ZUR_SEITE": "All managed roles",
+    "BESITZER_UNTERSTUETZER": "Supporter badge"
   }
 }

@@ -17,5 +17,8 @@
             "discord_role_menus"
         ]
     },
-    "mitgliedInhalte": {}
+    "mitgliedInhalte": {},
+    "rollen": [
+        { "besitzer": "discord:rollenmenue", "titel": "discord:ROLLEN.ROLLENMENUE", "seite": "/plugins/discord/rollenmenues" }
+    ]
 }

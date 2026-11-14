@@ -100,7 +100,7 @@ async function behandleReaktion(reaction, user, aktion) {
         const hatRollen = new Set(member.roles.cache.map(r => r.id));
 
         const aenderung = fuerEinenEintrag(menu, eintrag, alleRollen, hatRollen, aktion);
-        const ergebnis = await wendeAn(member, aenderung, `Rollenmenü „${menu.title}" (#${menu.id})`);
+        const ergebnis = await wendeAn(member, aenderung, `Rollenmenü „${menu.title}" (#${menu.id})`, menu.id);
 
         if (ergebnis.blockiert.length > 0) {
             // Nur ins Protokoll: Der Nutzer sieht davon nichts, und das ist der

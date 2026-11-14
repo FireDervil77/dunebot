@@ -312,12 +312,19 @@ function pruefeWerte(meta, schema, mitIds) {
                 nurImCode.push(`${t}.${s}`);
             }
         }
+        // Was eine offene Migration löscht, braucht keine Erklärung mehr (G-07).
+        const geht = require('./lib/migrationen').gehtMitOffenerMigration(WURZEL, gelaufen, plugins);
+        for (const [t, mig] of geht) {
+            if (!spalten[t]) continue;
+            delete spalten[t];
+            console.log(`      geht mit offener Migration: ${t} (${mig})`);
+        }
         const schema = { spalten, besitz: code.besitz, sichten };
 
         // Werte: jede ID-fähige Spalte einer echten Tabelle, die Discord-IDs trägt.
         const mitIds = [];
         for (const { t, s, typ } of spaltenDb) {
-            if (sichten.has(t) || !ID_TYP.test(String(typ).toLowerCase())) continue;
+            if (sichten.has(t) || geht.has(t) || !ID_TYP.test(String(typ).toLowerCase())) continue;
             const [{ n }] = await db.query(`SELECT COUNT(*) AS n FROM \`${t}\` WHERE CAST(\`${s}\` AS CHAR) REGEXP ?`, [SCHNEEFLOCKE]);
             if (Number(n)) mitIds.push({ t, s, n: Number(n) });
         }

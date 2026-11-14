@@ -91,17 +91,10 @@ ServiceManager.register('dbService', {
             return [];
         }
 
-        // **Die Buchfuehrung der Rollen.** Sie wird hier mitgeschrieben und
-        // nicht geprueft — dafuer gibt es `check-streaming-liverolle.js` und
-        // `check-streaming-abonnenten.js`. Sie muss trotzdem stehen, sonst
-        // faellt sie unten als "unbekannte Abfrage" auf, und die Warnung
-        // verloere ihren Wert: Ein Waechter, der immer etwas meldet, wird
-        // weggeklickt.
-        if (s.startsWith('INSERT INTO streaming_role_grants')
-            || s.startsWith('DELETE FROM streaming_role_grants')) {
-            daten.geschrieben.push({ sql: s, werte });
-            return [];
-        }
+        // **Die Buchfuehrung der Rollen** fuehrt seit G-07 der Kern, und zwar
+        // im Bot (`dunebot-sdk/lib/Rollen.js`, geprueft in
+        // check-rollenvergabe.js). Das Dashboard schreibt sie nicht mehr: Eine
+        // solche Abfrage hier faellt unten als unbekannt auf.
 
         // Eine Abfrage, die hier vorbeilaeuft, ist ein Befund. Genau so ist
         // dieser Waechter am 2026-08-27 blind geworden.
@@ -159,10 +152,15 @@ const drossel = require('../plugins/streaming/dashboard/ausgabe/drossel');
     // -----------------------------------------------------------------------
 
     const IPCServer = require('../apps/dashboard/helpers/IPCServer');
+    // Antwort des Kern-Handlers `dashboard:ROLLEN` (apps/bot/ipc/ROLLEN.js) in
+    // der Huelle des IPC-Clients: Rolle vergeben.
+    const ROLLE_GESETZT = { success: true, data: { success: true, ergebnis: {
+        vergeben: ['8'], entzogen: [], gebucht: [], blockiert: [], gehalten: [], unveraendert: [],
+        kein_mitglied: false, fehler: null, code: null } } };
     const ipc = new IPCServer();
     let mitgegeben = null;
     ipc.getSockets = () => [['Bot #0', {
-        send: async (_daten, optionen) => { mitgegeben = optionen; return { success: true, data: {} }; }
+        send: async (_daten, optionen) => { mitgegeben = optionen; return ROLLE_GESETZT; }
     }]];
     ServiceManager.register('ipcServer', ipc);
 
@@ -212,8 +210,8 @@ const drossel = require('../plugins/streaming/dashboard/ausgabe/drossel');
     const beginn = Date.now();
     ipc.getSockets = () => [['Bot #0', {
         send: async (nutzlast) => {
-            if (nutzlast.payload?.userId === '9') { await kurz(3000); return { success: true, data: {} }; }
-            return { success: true, data: {} };
+            if (nutzlast.payload?.userId === '9') { await kurz(3000); return ROLLE_GESETZT; }
+            return ROLLE_GESETZT;
         }
     }]];
 
@@ -256,7 +254,10 @@ const drossel = require('../plugins/streaming/dashboard/ausgabe/drossel');
 
     pruefe(zwanzig.versuche === 1, 'der Versuch wird gezaehlt', `versuche = ${zwanzig.versuche}`);
     pruefe(zwanzig.zustand === 'offen', 'und der Auftrag bleibt offen fuer den naechsten Anlauf');
-    pruefe(String(zwanzig.fehlertext).includes('Timed out'),
+    // Seit G-07 laeuft der Rollenauftrag ueber `Rollen` und `broadcast`, das
+    // Sockets ohne Antwort weglaesst; der Grund heisst dann „keine Antwort in
+    // N s“ (die Frist steht mit drin), nicht mehr veza's „Timed out.“.
+    pruefe(/Timed out|keine Antwort in \d/.test(String(zwanzig.fehlertext)),
         'der Grund steht in der Zeile',
         'vorher stand dort nichts und der Auftrag galt als sauber erledigt');
     pruefe(protokoll.some(z => z.includes('#20') || z.includes('Auftrag 20')),

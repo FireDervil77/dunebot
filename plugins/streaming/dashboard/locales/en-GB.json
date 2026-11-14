@@ -571,5 +571,9 @@
     "TEST_DESC": "Allows sending a test announcement. It appears visibly in the channel.",
     "CHAT_MANAGE": "Configure this channel's chatbot",
     "CHAT_MANAGE_DESC": "Configure this channel's chatbot. Only takes effect in the home guild, nowhere else."
+  },
+  "ROLLEN": {
+    "LIVE": "Live role",
+    "ABO": "Subscriber role"
   }
 }

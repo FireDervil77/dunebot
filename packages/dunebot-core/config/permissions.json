@@ -219,6 +219,15 @@
       "requires": null
     },
     {
+      "key": "CORE.ROLLEN.VIEW",
+      "name": "CORE.PERM_ROLLEN_VIEW",
+      "description": "CORE.PERM_ROLLEN_VIEW_DESC",
+      "category": "core",
+      "is_dangerous": 0,
+      "sort_order": 65,
+      "requires": null
+    },
+    {
       "key": "PERMISSIONS.VIEW",
       "name": "PERMISSIONS.VIEW",
       "description": "PERMISSIONS.VIEW_DESC",

@@ -1156,6 +1156,13 @@ class PluginManager extends BasePluginManager {
                         "DELETE FROM configs WHERE plugin_name = ? AND guild_id = ?",
                         [pluginName, guildId]
                     );
+                    // Sein Teil im Buch der Rollenvergabe (G-07): Ein Plugin, das aus
+                    // ist, hält keine Rolle mehr. Die Rollen in Discord bleiben, wie
+                    // beim Löschen der Daten eines Mitglieds (F-G12).
+                    await dbService.query(
+                        "DELETE FROM rollen_vergaben WHERE guild_id = ? AND LEFT(besitzer, CHAR_LENGTH(?) + 1) = CONCAT(?, ':')",
+                        [guildId, pluginName, pluginName]
+                    );
                 } catch (tabellenFehler) {
                     await brichAb('Löschen der Inhalte', tabellenFehler);
                 }

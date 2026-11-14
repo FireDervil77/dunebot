@@ -644,10 +644,9 @@ async function zeitzoneSetzen(guildId, zone) {
  */
 async function vergebeneRolle(guildId, rolleId) {
     if (!rolleId) return [];
-    const zeilen = await db().query(
-        'SELECT mitglied_id FROM streaming_role_grants WHERE guild_id = ? AND rolle_id = ?',
-        [guildId, rolleId]);
-    return zeilen.map(z => String(z.mitglied_id));
+    // Beide Besitzer des Plugins: Ist die Live-Rolle zugleich eine Abo-Rolle,
+    // kommt sie auch dann von uns (Buch des Kerns seit G-07).
+    return require('dunebot-sdk/lib/Rollen').vergebene(guildId, { rolleId, besitzer: ['streaming:live', 'streaming:abo'] });
 }
 
 // =====================================================

@@ -23,7 +23,18 @@ const GRUND_TEXT = {
     [GRUND.KEIN_RECHT]: 'mir fehlt das Recht, Rollen zu verwalten',
     [GRUND.ZU_HOCH]: 'die Rolle steht über meiner eigenen — die Serverleitung muss meine Rolle höher schieben',
     [GRUND.VERWALTET]: 'diese Rolle verwaltet Discord selbst und lässt sich nicht vergeben',
-    [GRUND.WEG]: 'diese Rolle gibt es nicht mehr'
+    [GRUND.WEG]: 'diese Rolle gibt es nicht mehr',
+    [GRUND.FEHLER]: 'Discord hat die Änderung abgelehnt, bitte später noch einmal'
+};
+
+/** Kurznamen der Besitzer für „diese Rolle hält noch …“ (G-07). */
+const BESITZER_TEXT = {
+    'streaming:live': 'die Live-Rolle (Streaming)',
+    'streaming:abo': 'die Abo-Rolle (Streaming)',
+    'greeting:autorolle': 'die Autorolle beim Beitritt',
+    'greeting:verifiziert': 'die Verifizierung',
+    'greeting:unverifiziert': 'die Verifizierung',
+    'kern:unterstuetzer': 'das Unterstützer-Abzeichen'
 };
 
 /** Wenn nichts geschehen ist, aber aus einem guten Grund. */
@@ -48,7 +59,7 @@ function alsListe(rollen) {
 }
 
 /**
- * @param {{vergeben: string[], entzogen: string[], blockiert: Array}} ergebnis
+ * @param {{vergeben: string[], entzogen: string[], blockiert: Array, gehalten?: Array}} ergebnis
  * @param {string|null} [hinweis] Schlüssel aus `HINWEIS_TEXT`
  * @returns {string}
  */
@@ -77,6 +88,12 @@ function baueText(ergebnis, hinweis = null) {
         }
     }
 
+    // Abgewählt, aber ein anderes System hält die Rolle (G-07, F-G12 Punkt 2).
+    for (const { rolle, von } of ergebnis.gehalten || []) {
+        const wer = [...new Set(von.map(b => BESITZER_TEXT[b] || b))].join(', ');
+        teile.push(`ℹ️ ${alsListe([rolle])} bleibt: Sie kommt auch über ${wer}.`);
+    }
+
     if (teile.length === 0) {
         return HINWEIS_TEXT[hinweis] || 'Es hat sich nichts geändert.';
     }
@@ -84,4 +101,4 @@ function baueText(ergebnis, hinweis = null) {
     return teile.join('\n');
 }
 
-module.exports = { baueText, GRUND_TEXT, HINWEIS_TEXT };
+module.exports = { baueText, GRUND_TEXT, HINWEIS_TEXT, BESITZER_TEXT };

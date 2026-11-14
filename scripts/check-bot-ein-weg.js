@@ -59,7 +59,12 @@ function absenderQuellen() {
 
 (async () => {
     const quellen = absenderQuellen().map(p => ohneKommentare(lies(p))).join('\n');
-    const hatAbsender = (name) => new RegExp(`['"\`]dashboard:${name}['"\`]`).test(quellen);
+    // Auch über einen Helfer `frageBot('NAME', …)`, der `dashboard:${event}`
+    // baut (Mitglieder G-12, Rollenvergabe G-07). Ohne das blieb die Prüfung
+    // seit G-12 rot, obwohl beide Handler einen Absender haben.
+    const helfer = /['"`]dashboard:\$\{event\}['"`]/.test(quellen);
+    const hatAbsender = (name) => new RegExp(`['"\`]dashboard:${name}['"\`]`).test(quellen)
+        || (helfer && new RegExp(`frageBot\\(\\s*['"]${name}['"]`).test(quellen));
     const client = ohneKommentare(lies('apps/bot/helpers/IPCClient.js'));
     const schalter = client.slice(client.indexOf('switch (eventName)'), client.indexOf('default: {', client.indexOf('switch (eventName)')));
     const faelle = [...schalter.matchAll(/case "([A-Z_]+)":/g)].map(m => m[1]);

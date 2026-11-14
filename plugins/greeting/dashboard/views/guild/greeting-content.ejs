@@ -159,6 +159,7 @@
             </option>
           <% }); %>
         </select>
+        <%- include('shared/rollen-hinweis', { guildId, tr, besitzer: 'greeting:autorolle', feld: '#autoroleForm [name="autorole_ids"]' }) %>
       </div>
 
       <div class="alert alert-info">

@@ -440,11 +440,13 @@ class StreamingDashboardPlugin extends DashboardPlugin {
      * Datenauskunft (G-04b): Vor dem Loeschen eines Mitglieds die Rollen
      * zuruecknehmen, die dieses Plugin ihm gegeben hat.
      *
-     * `streaming_role_grants` ist das Buch, nach dem der Abgleich spaeter
-     * nimmt (siehe `drossel.rolleSetzen`). Geht die Zeile, ohne dass die Rolle
-     * geht, nimmt sie niemand mehr: Das Mitglied traegt „ist live“ fuer
-     * immer. Deshalb zuerst der Bot, direkt und nicht ueber die Outbox — die
-     * Rueckmeldung an das Mitglied soll sagen, ob es geklappt hat.
+     * Das Buch fuehrt seit G-07 der Kern (`rollen_vergaben`). Seine Zeilen
+     * gehen mit dem Loeschen (core `mitgliedInhalte`), die Rolle in Discord
+     * bliebe dabei stehen (F-G12). Fuer Live- und Abo-Rolle waere das falsch:
+     * Ohne Eintrag nimmt sie niemand mehr, das Mitglied traegt „ist live“
+     * fuer immer. Deshalb nimmt das Plugin seine beiden Besitzer vorher selbst
+     * zurueck, direkt und nicht ueber die Outbox — die Rueckmeldung an das
+     * Mitglied soll sagen, ob es geklappt hat.
      *
      * Wirft, wenn eine Rolle nicht zurueckging: Dann bleiben alle Zeilen
      * dieses Plugins, die Rueckmeldung nennt den Grund. Ist der Bot nicht mehr
@@ -454,16 +456,17 @@ class StreamingDashboardPlugin extends DashboardPlugin {
      * @param {{userId: string, guildId: string|null}} ctx
      */
     async vorMitgliedLoeschen(ctx) {
-        const drossel = require('./ausgabe/drossel');
-        const zeilen = await ServiceManager.get('dbService').query(
-            `SELECT guild_id, rolle_id FROM streaming_role_grants WHERE mitglied_id = ?${ctx.guildId ? ' AND guild_id = ?' : ''}`,
-            ctx.guildId ? [ctx.userId, ctx.guildId] : [ctx.userId]);
+        const Rollen = require('dunebot-sdk/lib/Rollen');
+        const zeilen = await Rollen.eintraege(ctx.guildId || null,
+            { mitgliedId: ctx.userId, besitzer: ['streaming:live', 'streaming:abo'] });
         const offen = [];
         for (const z of zeilen) {
-            const antwort = await drossel.anDenBot('streaming:role', {
-                guildId: z.guild_id, userId: ctx.userId, roleId: z.rolle_id, aktion: 'nehmen'
+            const e = await Rollen.nimm({
+                guildId: z.guild_id, userId: ctx.userId, rollen: [z.rolle_id], besitzer: z.besitzer,
+                grund: 'Daten des Mitglieds geloescht'
             });
-            if (!antwort.ok && antwort.code !== 10004) offen.push(`Rolle ${z.rolle_id} in Guild ${z.guild_id}: ${antwort.fehler}`);
+            if (e.fehler && e.code !== 10004) offen.push(`Rolle ${z.rolle_id} in Guild ${z.guild_id}: ${e.fehler}`);
+            for (const b of e.blockiert) offen.push(`Rolle ${b.name || b.rolle} in Guild ${z.guild_id}: ${b.grund}${b.fehler ? ` (${b.fehler})` : ''}`);
         }
         if (offen.length) throw new Error(`Rolle nicht zurueckgenommen (${offen.join('; ')})`);
     }

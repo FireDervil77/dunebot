@@ -45,8 +45,16 @@ const merk = (stufe) => (...a) => protokoll.push(`${stufe} ${a.map(x => x instan
 ServiceManager.register('Logger', { debug: merk('debug'), info: merk('info'), warn: merk('warn'), error: merk('error'), success: merk('info') });
 
 const TABELLEN = ['user_connections', 'user_connection_grants', 'streaming_streamers', 'streaming_subscribers',
-    'streaming_targets', 'streaming_role_grants', 'streaming_outbox', 'streaming_subscriptions',
+    'streaming_targets', 'streaming_outbox', 'streaming_subscriptions',
     'streaming_commands', 'streaming_variables', 'streaming_announcements', 'streaming_lose', 'streaming_music_queue'];
+
+/** CREATE TABLE einer Kern-Migration als TEMPORARY (DDL nur an TEMPORARY). */
+async function kernDDL(datei) {
+    let sql = null;
+    await require(path.join(WURZEL, 'migrations/kern', datei)).up({ query: async (s) => { sql = s; return []; } });
+    if (!/CREATE TABLE IF NOT EXISTS/.test(sql || '')) throw new Error(`${datei}: kein CREATE TABLE`);
+    return sql.replace('CREATE TABLE IF NOT EXISTS', 'CREATE TEMPORARY TABLE');
+}
 
 let fehler = 0;
 async function pruefe(was, tun) {
@@ -64,6 +72,9 @@ async function pruefe(was, tun) {
             await c.query(`CREATE TEMPORARY TABLE fb_probe_${t} LIKE ${t}`);
             await c.query(`CREATE TEMPORARY TABLE ${t} LIKE fb_probe_${t}`);
         }
+        // Das Buch der Rollen führt seit G-07 der Kern (`rollen_vergaben`). Die
+        // Tabelle entsteht erst mit der Migration, also hier aus deren DDL.
+        await c.query(await kernDDL('20261114_230000_rollen_vergaben.js'));
         const q = async (sql, p) => (await c.query(sql, p))[0];
         ServiceManager.register('dbService', { query: q, getConfig: async () => null });
 
@@ -90,7 +101,8 @@ async function pruefe(was, tun) {
             (21, 'G3', 2, 'C3', 'R3', NULL, 1), (31, 'G9', 3, 'C9', 'R9', NULL, 1), (41, 'G8', 4, 'C8', NULL, NULL, 1)`);
         await q(`INSERT INTO streaming_subscribers (streamer_id, konto_id, konto_name, stufe, geschenkt) VALUES
             (1, 'V2', 'Zuschauer', '1000', 0), (1, 'X', 'Fremd', '1000', 0), (2, 'V2', 'Zuschauer', '1000', 0)`);
-        await q(`INSERT INTO streaming_role_grants (guild_id, mitglied_id, rolle_id) VALUES ('G1', 'U2', 'R1'), ('G3', 'U2', 'R3')`);
+        await q(`INSERT INTO rollen_vergaben (guild_id, mitglied_id, rolle_id, besitzer) VALUES
+            ('G1', 'U2', 'R1', 'streaming:abo'), ('G3', 'U2', 'R3', 'streaming:abo')`);
         await q(`INSERT INTO streaming_subscriptions (streamer_id, ereignis, anbieter_abo_id, geheimnis, zustand) VALUES
             (1, 'stream.online', 'a-on', 'g', 'bestaetigt'), (1, 'channel.subscribe', 'a-sub', 'g', 'bestaetigt'),
             (1, 'channel.subscription.end', 'a-end', 'g', 'bestaetigt'), (1, 'channel.cheer', 'a-bits', 'g', 'bestaetigt'),

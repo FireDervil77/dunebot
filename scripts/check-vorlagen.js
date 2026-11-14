@@ -290,6 +290,8 @@ async function main() {
     });
     await pruefe('3. Anlässe im Code: eigenes Plugin, erklärt', () => {
         const mitVorlagen = Object.keys(meta).filter((p) => meta[p].vorlagen);
+        // Kein Anlass: Besitzer der Rollenvergabe (G-07), erklärt unter `rollen`.
+        const rollenBesitzer = new Set(Object.values(meta).flatMap((m) => (m.rollen || []).map((r) => r.besitzer)));
         const f = [];
         for (const plugin of Object.keys(meta)) {
             for (const d of dateien(path.join(WURZEL, 'plugins', plugin), ['.js', '.ejs'])) {
@@ -301,6 +303,7 @@ async function main() {
                     // Platzhalter des Plugins (`{ticket:id}`).
                     if (/(customId\s*(===|!==|:)|setCustomId\(|customId\.startsWith\()\s*$/.test(t.slice(Math.max(0, m.index - 40), m.index))) continue;
                     if ((meta[m[1]].vorlagen.platzhalter || []).some((p) => p.name === `${m[1]}:${m[2]}`)) continue;
+                    if (rollenBesitzer.has(`${m[1]}:${m[2]}`)) continue;
                     if (m[1] !== plugin) f.push(`${path.relative(WURZEL, d)}: Anlass ${m[1]}:${m[2]} eines anderen Plugins`);
                     else if (!meta[plugin].vorlagen.anlaesse?.[m[2]]) f.push(`${path.relative(WURZEL, d)}: Anlass ${m[0]} nicht erklärt`);
                 }

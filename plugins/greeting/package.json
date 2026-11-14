@@ -124,5 +124,10 @@
       "seite": "nachrichten",
       "stand": "shared/willkommensbild.js"
     }
-  }
+  },
+  "rollen": [
+    { "besitzer": "greeting:autorolle", "titel": "greeting:ROLLEN.AUTOROLLE", "seite": "/plugins/greeting/rollen" },
+    { "besitzer": "greeting:verifiziert", "titel": "greeting:ROLLEN.VERIFIZIERT", "seite": "/plugins/greeting/verifizierung" },
+    { "besitzer": "greeting:unverifiziert", "titel": "greeting:ROLLEN.UNVERIFIZIERT", "seite": "/plugins/greeting/verifizierung" }
+  ]
 }

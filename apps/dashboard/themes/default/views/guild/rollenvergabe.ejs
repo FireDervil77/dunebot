@@ -1,0 +1,91 @@
+<%#
+  Rollenvergabe (G-07, F-G12 Punkt 4, K382, 2026-11-14)
+
+  Jede Rolle, die ein System des Bots in dieser Guild verwaltet: wer sie
+  vergibt (Besitzer), wie viele sie von wem haben, wie viele sie ohne
+  Besitzer tragen (von Hand, anderer Bot), und ob der Bot sie überhaupt
+  vergeben darf. Eingestellt wird jede Rolle beim Plugin (Link je Besitzer).
+
+  context: guildId, rollen, botFehler, bot, vollstaendig, grund, fehler
+           (rollenvergabe.router)
+%>
+<%
+const _t = (k, o) => tr('core:ROLLENVERGABE.' + k, o);
+const _id = typeof guildId !== 'undefined' ? guildId : '';
+const _rollen = typeof rollen !== 'undefined' && Array.isArray(rollen) ? rollen : [];
+const _fehler = typeof fehler !== 'undefined' && Array.isArray(fehler) ? fehler : [];
+const _bot = typeof bot !== 'undefined' && bot ? bot : null;
+const _zahl = (n) => (n === null || n === undefined ? '–' : String(n));
+%>
+<div class="container-fluid">
+  <div class="card mb-3">
+    <div class="card-body">
+      <p class="text-secondary mb-2"><%= _t('EINLEITUNG') %></p>
+      <ul class="text-secondary small mb-0">
+        <li><%= _t('REGEL_1') %></li>
+        <li><%= _t('REGEL_2') %></li>
+        <li><%= _t('REGEL_3') %></li>
+      </ul>
+    </div>
+  </div>
+
+  <% if (typeof botFehler !== 'undefined' && botFehler) { %>
+    <div class="alert alert-danger"><i class="fa-solid fa-triangle-exclamation me-2"></i><%= _t('BOT_FEHLT', { grund: botFehler }) %></div>
+  <% } else if (typeof vollstaendig !== 'undefined' && vollstaendig === false) { %>
+    <div class="alert alert-warning"><i class="fa-solid fa-circle-info me-2"></i><%= _t('UNVOLLSTAENDIG', { grund: (typeof grund !== 'undefined' && grund) || '?' }) %></div>
+  <% } %>
+  <% _fehler.forEach(function (f) { %>
+    <div class="alert alert-warning"><i class="fa-solid fa-circle-info me-2"></i><%= _t('ERKLAERUNG_FEHLER', { fehler: f }) %></div>
+  <% }) %>
+
+  <% if (!_rollen.length) { %>
+    <div class="card"><div class="card-body text-secondary"><%= _t('LEER') %></div></div>
+  <% } %>
+
+  <% _rollen.forEach(function (r) { %>
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+        <span class="rounded-circle d-inline-block" style="width:12px;height:12px;background:<%= r.farbe || 'var(--tblr-secondary)' %>"></span>
+        <h3 class="card-title mb-0">@<%= r.name || _t('UNBEKANNT') %></h3>
+        <span class="text-secondary small"><%= r.id %></span>
+        <span class="ms-auto text-secondary small">
+          <%= _t('TRAEGER', { n: _zahl(r.traeger) }) %><% if (r.vonHand) { %> · <%= _t('VON_HAND', { n: r.vonHand }) %><% } %>
+        </span>
+      </div>
+      <div class="card-body">
+        <% if (r.problem) { %>
+          <div class="alert alert-<%= r.problem === 'WEG' ? 'secondary' : 'danger' %> py-2 mb-3">
+            <i class="fa-solid fa-triangle-exclamation me-2"></i><%= _t('PROBLEM_' + r.problem, { bot: (_bot && _bot.rolle) || '?' }) %>
+          </div>
+        <% } %>
+        <% if (r.besitzer.length > 1) { %>
+          <p class="small text-secondary mb-2"><i class="fa-solid fa-people-arrows me-1"></i><%= _t('MEHRERE') %></p>
+        <% } %>
+        <div class="table-responsive">
+          <table class="table table-sm table-vcenter mb-0">
+            <thead>
+              <tr><th><%= _t('SPALTE_BESITZER') %></th><th class="text-end"><%= _t('SPALTE_GEBUCHT') %></th><th><%= _t('SPALTE_STAND') %></th></tr>
+            </thead>
+            <tbody>
+              <% r.besitzer.forEach(function (b) { %>
+                <tr>
+                  <td>
+                    <% if (b.seite) { %><a href="<%= b.seite %>"><% } %>
+                    <%= b.pluginName ? b.pluginName + ': ' : '' %><%= b.titel %>
+                    <% if (b.seite) { %></a><% } %>
+                    <div class="small text-secondary"><code><%= b.besitzer %></code></div>
+                  </td>
+                  <td class="text-end"><%= b.gebucht %></td>
+                  <td class="small">
+                    <% if (b.eingestellt) { %><span class="text-success"><%= _t('EINGESTELLT') %></span><% } else { %><span class="text-secondary"><%= _t('NICHT_EINGESTELLT') %></span><% } %>
+                    <% if (b.veraltet) { %><div class="text-secondary"><%= _t('VERALTET', { n: b.veraltet }) %></div><% } %>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  <% }) %>
+</div>

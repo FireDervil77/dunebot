@@ -273,6 +273,14 @@ module.exports = class App {
                 Logger.error('[INIT] Abgleich der Guilds mit Discord konnte nicht starten:', error);
             }
 
+            // Rollenbuch (G-07): täglich mit Discord abgleichen, für die Zeit,
+            // in der der Bot aus war. Gelöscht wird im Bot.
+            try {
+                require('./helpers/RollenAbgleich').starten();
+            } catch (error) {
+                Logger.error('[INIT] Abgleich des Rollenbuchs konnte nicht starten:', error);
+            }
+
             // Aufbewahrung (G-05): nachts alte Zeilen nach den Fristen der
             // Plugins löschen. Wirft, wenn eine Erklärung fehlerhaft ist.
             try {

@@ -24,6 +24,7 @@ const mDa = (mitglieder || []).some(m => String(m.id) === String(z.mitglied_id))
         <option value="<%= r.id %>" <%= String(r.id) === String(z.abo_rolle_id) ? 'selected' : '' %>>@<%= r.name %></option>
       <% }); %>
     </select>
+    <%- include('shared/rollen-hinweis', { guildId, tr, besitzer: 'streaming:abo', feld: '#abo_rolle_' + z.id }) %>
     <% if (z.aboZusage === true) { %>
       <div class="form-hint text-success">
         <%= z.aboInhaber %> hat den Kanal verknüpft und das Lesen der Abonnenten erlaubt.

@@ -28,7 +28,9 @@
  *
  * ## Nur zurueck, was wir gaben
  *
- * Der Abgleich vergibt und nimmt ausschliesslich ueber `streaming_role_grants`.
+ * Der Abgleich vergibt und nimmt ausschliesslich ueber das Buch des Kerns
+ * (`rollen_vergaben`, Besitzer `streaming:abo`, seit G-07; vorher
+ * `streaming_role_grants`).
  * Am 2026-08-25 hat ein Abgleich vier Mitgliedern eine Rolle weggenommen, die
  * sie aus einem anderen Grund trugen. Diese Buchfuehrung ist die Lehre daraus,
  * und sie gilt hier genauso.
@@ -309,11 +311,10 @@ async function abgleichen(streamer) {
     let nehmen = 0;
 
     for (const ziel of ziele) {
-        const vergeben = await db().query(
-            'SELECT mitglied_id FROM streaming_role_grants WHERE guild_id = ? AND rolle_id = ?',
-            [ziel.guild_id, ziel.abo_rolle_id]);
+        const vergeben = await require('dunebot-sdk/lib/Rollen').vergebene(
+            ziel.guild_id, { rolleId: ziel.abo_rolle_id, besitzer: 'streaming:abo' });
 
-        const urteil = vergleichen(sollen, vergeben.map(v => v.mitglied_id));
+        const urteil = vergleichen(sollen, vergeben);
 
         for (const richtung of ['geben', 'nehmen']) {
             for (const mitglied of urteil[richtung]) {

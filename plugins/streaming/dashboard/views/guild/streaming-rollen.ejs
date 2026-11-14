@@ -106,6 +106,7 @@ const marke = (an) => an
                     <option value="<%= r.id %>" <%= String(r.id) === String(aboRolleId) ? 'selected' : '' %>>@<%= r.name %></option>
                   <% }); %>
                 </select>
+                <%- include('shared/rollen-hinweis', { guildId, tr, besitzer: 'streaming:abo', feld: '#abo_rolle_id' }) %>
                 <div class="zeile__hilfe">
                   Sie wird bei jedem Abgleich neu gesetzt und eingesammelt — wer
                   sein Abo beendet, verliert sie beim nächsten Lauf.
