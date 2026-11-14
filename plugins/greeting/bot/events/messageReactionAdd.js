@@ -1,7 +1,7 @@
 'use strict';
 
-const { EmbedBuilder } = require('discord.js');
 const { ServiceManager } = require('dunebot-core');
+const { baueVerifiziert } = require('../utils');
 
 /**
  * Verifizierung per Reaktion.
@@ -83,7 +83,7 @@ module.exports = async (reaction, user) => {
             }
         }
 
-        await sendeBestaetigung(settings, guild, user);
+        await sendeBestaetigung(member, user, Logger);
 
     } catch (error) {
         Logger.error(`[Greeting] messageReactionAdd fehlgeschlagen für ${user.tag}`, error);
@@ -105,40 +105,20 @@ module.exports = async (reaction, user) => {
  * Eigene Funktion, damit der Fehlerfall die Verifizierung nicht mit sich reisst
  * — gesperrte DMs sind der Normalfall, nicht die Ausnahme.
  *
- * @param {Object} settings
- * @param {import('discord.js').Guild} guild
+ * Seit K389 (2026-11-14) dieselbe Vorlage `greeting:verifiziert` wie nach
+ * Knopf und Captcha. Bis dahin stand hier eine zweite Kopie der eigenen
+ * Platzhalter-Tabelle ({user:name}, {user:tag}, {user:mention}).
+ *
+ * @param {import('discord.js').GuildMember} member
  * @param {import('discord.js').User} user
+ * @param {Object} Logger
  */
-async function sendeBestaetigung(settings, guild, user) {
-    let text = `Du wurdest auf **${guild.name}** verifiziert und hast jetzt vollen Zugang!`;
-
-    if (settings.verification_success_message) {
-        const platzhalter = {
-            '{guild:name}': guild.name,
-            '{server}': guild.name,
-            '{user:name}': user.username,
-            '{user:tag}': user.tag,
-            '{user:mention}': `<@${user.id}>`,
-            '{member:name}': user.username,
-            '{member:mention}': `<@${user.id}>`,
-            '{guild:memberCount}': String(guild.memberCount),
-            '{count}': String(guild.memberCount)
-        };
-
-        text = settings.verification_success_message;
-        for (const [schluessel, wert] of Object.entries(platzhalter)) {
-            text = text.replaceAll(schluessel, wert);
-        }
-    }
-
-    const embed = new EmbedBuilder()
-        .setColor(0x57F287)
-        .setTitle('✅ Erfolgreich verifiziert!')
-        .setDescription(text)
-        .setThumbnail(guild.iconURL({ size: 128 }))
-        .setTimestamp();
-
-    // DMs können gesperrt sein. Das ist kein Fehler, sondern eine Einstellung
-    // des Nutzers — die Verifizierung selbst ist längst durch.
-    await user.send({ embeds: [embed] }).catch(() => {});
+async function sendeBestaetigung(member, user, Logger) {
+    const nachricht = await baueVerifiziert(member);
+    // DMs können gesperrt sein (Discord 50007). Das ist eine Einstellung des
+    // Nutzers, kein Fehler — die Verifizierung selbst ist längst durch.
+    await user.send(nachricht).catch((err) => {
+        if (err?.code === 50007) return;
+        Logger.warn(`[Greeting] Bestätigung an ${user.tag} nicht gesendet: ${err.message}`);
+    });
 }

@@ -22,6 +22,16 @@ const ANLAESSE = Object.freeze({
     boost: 'greeting:boost'
 });
 
+/**
+ * Die zwei Nachrichten der Verifizierung (K389, 2026-11-14). Bis dahin
+ * standen sie als Text in `verification_message` und
+ * `verification_success_message`. Der Schlüssel ist der im Formular.
+ */
+const VERIFIZIERUNG = Object.freeze({
+    verifiziert: 'greeting:verifiziert',
+    verifizierung_panel: 'greeting:verifizierung_panel'
+});
+
 /** Standardwerte, solange eine Guild noch nichts gespeichert hat. */
 const STANDARD = {
     welcome_enabled: false, welcome_channel: null,
@@ -131,10 +141,8 @@ async function ladeDaten(guildId) {
             channel: roh.verification_channel || '',
             role_id: roh.verification_role_id || '',
             type: roh.verification_type || 'button',
-            message: roh.verification_message || '',
             remove_role_id: roh.verification_remove_role_id || '',
-            emoji: roh.verification_emoji || '✅',
-            success_message: roh.verification_success_message || ''
+            emoji: roh.verification_emoji || '✅'
         }
     };
 
@@ -149,7 +157,7 @@ async function ladeDaten(guildId) {
 
     // Je Nachricht die Vorlage für den Kern-Teil `shared/vorlage`.
     const vorlagen = {};
-    for (const [art, anlass] of Object.entries(ANLAESSE)) {
+    for (const [art, anlass] of Object.entries({ ...ANLAESSE, ...VERIFIZIERUNG })) {
         vorlagen[art] = await Vorlage.editor(guildId, anlass);
     }
 
@@ -169,4 +177,4 @@ function renderFehler(res, error, kontext) {
     });
 }
 
-module.exports = { makeTranslator, renderView, ladeDaten, renderFehler, ANLAESSE };
+module.exports = { makeTranslator, renderView, ladeDaten, renderFehler, ANLAESSE, VERIFIZIERUNG };

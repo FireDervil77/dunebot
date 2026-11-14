@@ -121,8 +121,9 @@
     "BUTTON_LABEL": "Button label",
     "BUTTON_EMOJI": "Emoji",
     "MAX_OPEN": "Open per member",
-    "OPEN_TITLE": "Opening message title",
-    "OPEN_DESC": "Opening message text"
+    "OPEN_MSG": "Opening message",
+    "OPEN_MSG_BTN": "Edit opening message",
+    "OPEN_MSG_HINT": "The opening message has its own page, reachable from the button in the list once the category is saved."
   },
   "TAGS": {
     "SUBTITLE": "Prepared replies the team calls up with /tag",
@@ -164,5 +165,20 @@
     "CATEGORIES_MANAGE_DESC": "Allows creating, editing and deleting ticket categories",
     "TICKETS_VIEW": "View tickets",
     "TICKETS_VIEW_DESC": "Allows viewing all tickets and transcripts"
+  },
+  "VORLAGEN": {
+    "EROEFFNUNG": "Opening message",
+    "JE_KATEGORIE": "per category",
+    "PH_CATEGORY": "Name of the category",
+    "PH_NUMBER": "Number of the ticket",
+    "PH_ID": "ID of the ticket",
+    "OHNE_KATEGORIE": "Tickets without a category",
+    "SEITE_BESCHREIBUNG": "The bot writes this message first into a new ticket channel of the category “{{kategorie}}”.",
+    "SEITE_BESCHREIBUNG_OHNE": "The bot writes this message first into a new ticket channel as long as the guild has no active category.",
+    "FESTE_TEILE": "Below it the bot always adds: the answers from the category's form and the buttons “Close” and “Claim”, for tickets without a category also category and ticket ID.",
+    "LEER": "Saved empty, the bot sends the default.",
+    "ZURUECK": "Back to the categories",
+    "GESPEICHERT": "Opening message saved",
+    "NICHT_GEFUNDEN": "This category does not exist."
   }
 }

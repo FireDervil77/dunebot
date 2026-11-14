@@ -124,14 +124,12 @@
     "UNVERIFIED_ROLE": "Unverified Role (optional)",
     "UNVERIFIED_ROLE_DESC": "This role is assigned on join and removed after verification",
     "MESSAGE": "Verification Message",
-    "MESSAGE_PH": "Click the button to verify yourself!",
     "EMOJI": "Verification Emoji",
     "EMOJI_DESC": "The emoji used for reaction verification",
     "SEND_PANEL": "Send Verification Panel",
     "SEND_PANEL_DESC": "Sends the verification button to the selected channel",
     "SUCCESS_MESSAGE": "Message after verification",
-    "SUCCESS_MESSAGE_PH": "Welcome to {guild:name}! You now have full access to the server.",
-    "SUCCESS_MESSAGE_DESC": "This message is shown to the member after successful verification. Placeholders: {guild:name}, {user:name}, {user:tag}, {member:mention}, {guild:memberCount}",
+    "SUCCESS_MESSAGE_DESC": "The member gets this message after a successful verification: after button or captcha visible only to them, after a reaction as a direct message. Left empty, the bot sends the default (embed “Successfully verified”).",
     "INFO": "Verification ensures that new members are not bots. With 'Button' a simple click suffices, with 'Captcha' a math problem must be solved, with 'Reaction' members react with an emoji."
   },
   "INVITE_TRACKING": {

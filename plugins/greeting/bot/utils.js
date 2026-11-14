@@ -13,6 +13,13 @@ const { Vorlage } = require("dunebot-sdk");
  *   greeting:direktnachricht  als Direktnachricht beim Beitritt
  *   greeting:abschied         im Abschiedskanal
  *   greeting:boost            im Boost-Kanal
+ *
+ * Dazu die Verifizierung (K389, 2026-11-14), bis dahin mit eigener
+ * Platzhalter-Tabelle, zweimal, und einem eigenen Embed-Format im Panel-Text:
+ *   greeting:verifiziert          Bestätigung nach der Verifizierung
+ *                                 (Knopf und Captcha nur für ihn, Reaktion als DM)
+ *   greeting:verifizierung_panel  die Nachricht im Verifizierungskanal, an der
+ *                                 die Knöpfe oder die Reaktion hängen
  */
 
 const ANLAESSE = Object.freeze({
@@ -21,6 +28,14 @@ const ANLAESSE = Object.freeze({
     farewell: "greeting:abschied",
     boost: "greeting:boost",
 });
+
+const VERIFIZIERUNG = Object.freeze({
+    erfolg: "greeting:verifiziert",
+    panel: "greeting:verifizierung_panel",
+});
+
+/** `MessageFlags.Ephemeral` */
+const FLUECHTIG = 1 << 6;
 
 /** Was gesendet wird, solange eine Vorlage leer ist (wie vor G-08). */
 const VORGABE = Object.freeze({
@@ -99,7 +114,61 @@ async function baueNachricht(member, anlass, optionen = {}) {
     return nachricht;
 }
 
+/**
+ * Was die Verifizierung sendet, solange keine Vorlage gespeichert ist: so wie
+ * bis 2026-11-14 der feste Aufbau aussah, Texte in der Sprache der Guild.
+ * @param {import('discord.js').Guild} guild
+ */
+function vorgabeVerifizierung(guild) {
+    return {
+        erfolg: {
+            form: "embed",
+            titel: guild.getT("greeting:VERIFICATION.ERFOLG_TITEL"),
+            beschreibung: guild.getT("greeting:VERIFICATION.ERFOLG_TEXT"),
+            farbe: "#57f287",
+            vorschaubild: "{member:avatar}",
+            fusszeile: "{guild:name}",
+            zeitstempel: true,
+        },
+        panel: { form: "text", text: guild.getT("greeting:VERIFICATION.PANEL_TEXT") },
+    };
+}
+
+/**
+ * Bestätigung nach der Verifizierung (`greeting:verifiziert`).
+ * @param {import('discord.js').GuildMember} member
+ * @param {Object} [optionen]
+ * @param {boolean} [optionen.fluechtig] nur für ihn sichtbar (Antwort auf Knopf)
+ * @returns {Promise<Object>} Nachricht für `reply()` oder `send()`
+ */
+async function baueVerifiziert(member, optionen = {}) {
+    const guild = member.guild;
+    const vorlage = (await Vorlage.lade(guild.id, VERIFIZIERUNG.erfolg)) || vorgabeVerifizierung(guild).erfolg;
+    let { nachricht } = await Vorlage.fuelle(vorlage, { member, guild }, { guildId: guild.id, erwaehnen: [member.id] });
+    if (!nachricht) ({ nachricht } = await Vorlage.fuelle(vorgabeVerifizierung(guild).erfolg, { member, guild }, { guildId: guild.id, erwaehnen: [member.id] }));
+    if (optionen.fluechtig) nachricht.flags = (nachricht.flags || 0) | FLUECHTIG;
+    return nachricht;
+}
+
+/**
+ * Die Nachricht im Verifizierungskanal (`greeting:verifizierung_panel`), mit
+ * den Knöpfen des Aufrufers. Ohne Mitglied: nur Platzhalter der Guild.
+ * @param {import('discord.js').Guild} guild
+ * @param {Object[]} [komponenten] Zeilen mit Knöpfen
+ * @returns {Promise<Object>} Nachricht für `send()`
+ */
+async function bauePanel(guild, komponenten = []) {
+    const vorlage = (await Vorlage.lade(guild.id, VERIFIZIERUNG.panel)) || vorgabeVerifizierung(guild).panel;
+    const mit = { guildId: guild.id, komponenten };
+    let { nachricht } = await Vorlage.fuelle(vorlage, { guild }, mit);
+    if (!nachricht) ({ nachricht } = await Vorlage.fuelle(vorgabeVerifizierung(guild).panel, { guild }, mit));
+    return nachricht;
+}
+
 module.exports = {
     ANLAESSE,
+    VERIFIZIERUNG,
     baueNachricht,
+    baueVerifiziert,
+    bauePanel,
 };

@@ -15,8 +15,8 @@
  *      Richtungen), Bedeutungen in beiden Sprachen.
  *   3. Jeder Anlass im Code eines Plugins (`'plugin:anlass'`) gehört dem Plugin
  *      selbst und ist erklärt.
- *   4. Keine Kopie der Ersetzung außerhalb von PlaceholderParser; die drei
- *      eigenen Platzhalter-Tabellen von 2026-11-14 als Liste (K389).
+ *   4. Keine Kopie der Ersetzung außerhalb von PlaceholderParser und keine
+ *      eigene Platzhalter-Tabelle (die drei bis K389 sind umgestellt).
  *   5. Wer `vorlagen` erklärt, bindet `shared/vorlage` ein und speichert über
  *      `Vorlage.speichere`; wer einbindet, erklärt. Kern-Teil ohne
  *      `document.currentScript`; Texte des Teils in beiden Sprachen.
@@ -25,7 +25,7 @@
  *      Recht aus der Erklärung und Prüfung „Plugin an“. Kein anderer Ort
  *      schreibt `guild_vorlagen`.
  *   7. `guild_vorlagen` geht mit der Guild.
- *   8. greeting liest keine der alten Spalten mehr.
+ *   8. greeting und ticket lesen keine der alten Spalten mehr (G-08, K389).
  * Läufe:
  *   9. pruefe: weist falsche Form, Farbe, Länge, Adresse ab.
  *  10. fuelle: V2 ohne content/embeds, mit Markierung, höchstens 4000 Zeichen,
@@ -39,8 +39,20 @@
  *      Grenzfällen; danach sendet greeting Feld für Feld dasselbe wie der
  *      alte `buildGreeting` (aus Commit 2043e388). Verlust bricht ab.
  *  14. Vorschau: drei Formen, unbekannte Platzhalter erkannt.
+ *  16. Verifizierung (K389): greeting-Migration mit den gemessenen Zeilen;
+ *      Bestätigung und Panel danach wie der alte Code aus 237afea1 (bis auf
+ *      das Guild-Symbol der Fußzeile); Vorgabe ohne Vorlage gleich.
+ *  17. Ticket (K389): Migration je Kategorie (Stelle), leere Felder aus der
+ *      Sprachdatei, {member:name} → {member:nick}; Eröffnung danach wie der
+ *      alte Code (Titel jetzt Überschrift statt Autorzeile, Farbe = Akzent);
+ *      Kategorie löschen nimmt ihre Vorlage mit.
  * Datenbank (nach dem Neustart):
- *  15. Spalten weg, jede Zeile in `guild_vorlagen` gültig und erklärt.
+ *  15. Spalten weg, jede Zeile in `guild_vorlagen` gültig und erklärt, Stelle
+ *      nur an Anlässen mit `je`.
+ *
+ * Stellen (K389): `guild_vorlagen` hat seit der Kern-Migration
+ * `20261114_170000_vorlagen_stelle` die Spalte `stelle` im Schlüssel. Läufe
+ * 12, 16, 17 legen beide Kern-Migrationen als TEMPORARY an.
  *
  *   node scripts/check-vorlagen.js
  */
@@ -59,7 +71,11 @@ const { ohneKommentare, ohneKommentareEjs } = require('./lib/quelltext');
 const SDK_DATEI = path.join(WURZEL, 'packages/dunebot-sdk/lib/Vorlage.js');
 const PARSER_DATEI = path.join(WURZEL, 'packages/dunebot-core/lib/PlaceholderParser.js');
 const ALT_COMMIT = '2043e388';
+/** Stand vor K389: eigene Tabellen in Verifizierung und Ticket. */
+const ALT_K389 = '237afea1';
 const ALTE_SPALTEN = ['welcome_content', 'welcome_embed', 'dm_welcome_content', 'dm_welcome_embed', 'farewell_content', 'farewell_embed', 'boost_content', 'boost_embed'];
+const VERIFIZIERUNG_SPALTEN = ['verification_message', 'verification_success_message'];
+const TICKET_SPALTEN = ['open_msg_title', 'open_msg_description', 'open_msg_footer'];
 
 let rot = 0;
 async function pruefe(was, tun) {
@@ -123,6 +139,23 @@ function ladeSdk(text, name = 'Vorlage.js') {
     return m.exports;
 }
 
+/** Eine Datei aus einem alten Commit laden, an ihrem Ort (für require). */
+function ladeAlt(commit, datei, anhang = '') {
+    const quelle = execFileSync('git', ['-C', WURZEL, 'show', `${commit}:${datei}`], { encoding: 'utf8' });
+    const ort = path.join(WURZEL, path.dirname(datei), `.alt-${path.basename(datei)}`);
+    const m = new Module(ort, module);
+    m.filename = ort;
+    m.paths = Module._nodeModulePaths(path.dirname(ort));
+    m._compile(quelle + anhang, ort);
+    return m.exports;
+}
+
+/** Übersetzer aus einer Sprachdatei eines Plugins (`ns:A.B`), wie guild.getT. */
+function getTaus(plugin, sprache = 'de-DE') {
+    const j = JSON.parse(lies(`plugins/${plugin}/bot/locales/${sprache}.json`));
+    return (k) => String(k).split(':')[1].split('.').reduce((o, t) => (o ? o[t] : undefined), j) ?? k;
+}
+
 /** Ein Mitglied, das alter und neuer Code lesen können. */
 function mitglied(V, guildId) {
     const { member } = V.beispielKontext({ id: '123456789012345678', username: 'anna', global_name: 'Anna' }, { id: guildId, name: 'Testserver' });
@@ -182,6 +215,21 @@ async function laeufeFuellen(V) {
 
     const text = await V.fuelle({ form: 'text', text: 'hi', titel: 'unsichtbar' }, k, {});
     gleich(Object.keys(text.nachricht).sort(), ['allowedMentions', 'content'], 'Text: nur content');
+
+    // Feste Teile (K389): Felder ohne Ersetzung, Knöpfe in jeder Form.
+    const zeile = { type: 1, components: [{ type: 2, style: 1, custom_id: 'x:A', label: 'A' }] };
+    const felder = [{ name: 'Frage', wert: '{member:name}', inline: true }, { name: 'Leer', wert: '' }];
+    const fv2 = (await V.fuelle({ form: 'v2', titel: 'T' }, k, { felder, komponenten: [{ toJSON: () => zeile }] })).nachricht;
+    gleich(fv2.components[fv2.components.length - 1], zeile, 'V2: Knöpfe als letzte Zeile');
+    const fcont = fv2.components.find((c) => c.type === 17);
+    assert(JSON.stringify(fcont).includes('**Frage**\\n{member:name}'), 'V2: Feld fehlt im Container oder wurde gefüllt');
+    const fem = (await V.fuelle({ form: 'embed', titel: 'T' }, k, { felder, komponenten: [zeile] })).nachricht;
+    gleich(fem.embeds[0].fields, [{ name: 'Frage', value: '{member:name}', inline: true }, { name: 'Leer', value: '-', inline: false }], 'Embed: Felder');
+    gleich(fem.components, [zeile], 'Embed: Knöpfe');
+    const nurFelder = (await V.fuelle({ form: 'embed' }, k, { felder })).nachricht;
+    assert(nurFelder?.embeds?.[0]?.fields?.length === 2, 'Embed nur aus festen Feldern fehlt');
+    const ftext = (await V.fuelle({ form: 'text', text: 'hi' }, k, { felder, komponenten: [zeile] })).nachricht;
+    gleich([ftext.content, ftext.components], ['hi\n\n**Frage**\n{member:name}\n**Leer**\n-', [zeile]], 'Text: Felder als Zeilen, Knöpfe');
 }
 
 async function main() {
@@ -213,12 +261,15 @@ async function main() {
             for (const [name, a] of anlaesse) {
                 if (!/^[a-z0-9_-]{1,40}$/.test(name)) f.push(`${plugin}:${name} ungültiger Name`);
                 if (!a.titel || !textDa(a.titel, cache)) f.push(`${plugin}:${name} Titel fehlt (${a.titel})`);
+                if (a.je !== undefined && (!a.je || !textDa(a.je, cache))) f.push(`${plugin}:${name} Bedeutung der Stelle (je) fehlt (${a.je})`);
                 for (const g of a.kern || []) if (!V.KERN_GRUPPEN.includes(g)) f.push(`${plugin}:${name} unbekannte Kern-Gruppe ${g}`);
                 for (const n of a.platzhalter || []) if (!eigene.has(n)) f.push(`${plugin}:${name} nennt nicht erklärten Platzhalter ${n}`);
             }
         }
         assert(!f.length, f.join('\n'));
         assert(meta.greeting?.vorlagen, 'greeting erklärt keine Vorlagen');
+        assert(meta.greeting.vorlagen.anlaesse.verifiziert && meta.greeting.vorlagen.anlaesse.verifizierung_panel, 'greeting: Anlässe der Verifizierung fehlen (K389)');
+        assert(meta.ticket?.vorlagen?.anlaesse?.eroeffnung?.je, 'ticket: eroeffnung mit je fehlt (K389)');
     });
     await pruefe('2. Register des Kerns = Ersetzung in PlaceholderParser', () => {
         const quelle = code(path.relative(WURZEL, PARSER_DATEI));
@@ -246,6 +297,10 @@ async function main() {
                 const t = ohneKommentare(fs.readFileSync(d, 'utf8'));
                 for (const m of t.matchAll(/['"`]([a-z0-9_-]+):([a-z0-9_-]+)['"`]/g)) {
                     if (!mitVorlagen.includes(m[1])) continue;
+                    // Kein Anlass: Kennungen von Discord-Komponenten und die
+                    // Platzhalter des Plugins (`{ticket:id}`).
+                    if (/(customId\s*(===|!==|:)|setCustomId\(|customId\.startsWith\()\s*$/.test(t.slice(Math.max(0, m.index - 40), m.index))) continue;
+                    if ((meta[m[1]].vorlagen.platzhalter || []).some((p) => p.name === `${m[1]}:${m[2]}`)) continue;
                     if (m[1] !== plugin) f.push(`${path.relative(WURZEL, d)}: Anlass ${m[1]}:${m[2]} eines anderen Plugins`);
                     else if (!meta[plugin].vorlagen.anlaesse?.[m[2]]) f.push(`${path.relative(WURZEL, d)}: Anlass ${m[0]} nicht erklärt`);
                 }
@@ -253,16 +308,9 @@ async function main() {
         }
         assert(!f.length, f.join('\n'));
     });
-    await pruefe('4. Keine Kopie der Ersetzung (bekannt: K389)', () => {
-        // Eigene Tabellen mit Platzhaltern des Kerns, gemessen 2026-11-14.
-        // Sie gehören auf G-08 umgestellt (K389); bis dahin genau diese, als
-        // Liste von Namen: Eine neue Stelle wird rot, eine erledigte auch
-        // (dann die Zeile hier löschen).
-        const BEKANNT_K389 = [
-            'plugins/greeting/bot/events/interactionCreate.js',
-            'plugins/greeting/bot/events/messageReactionAdd.js',
-            'plugins/ticket/bot/events/interactionCreate.js',
-        ];
+    await pruefe('4. Keine Kopie der Ersetzung, keine eigene Platzhalter-Tabelle', () => {
+        // Bis K389 (2026-11-14) standen hier drei bekannte Tabellen als Liste
+        // (Verifizierung zweimal, Ticket). Sie sind umgestellt; jede neue ist rot.
         const f = [];
         const tabellen = [];
         for (const w of ['apps', 'plugins', 'packages']) {
@@ -271,11 +319,13 @@ async function main() {
                 const t = ohneKommentare(fs.readFileSync(d, 'utf8'));
                 if (/\.replace(All)?\(\s*\/\\?\{(member|guild):/.test(t)) f.push(path.relative(WURZEL, d));
                 // Schlüssel einer Objekt-Tabelle am Zeilenanfang (nicht `? '{member:avatar}' : ''`).
-                if (d !== SDK_DATEI && /^\s*['"]\{?(member|guild):[A-Za-z]+\}?['"]\s*:/m.test(t)) tabellen.push(path.relative(WURZEL, d));
+                if (d !== SDK_DATEI && /^\s*['"]\{?(member|guild|user):[A-Za-z]+\}?['"]\s*:/m.test(t)) tabellen.push(path.relative(WURZEL, d));
+                // Eine Ersetzung über eine selbst gebaute Tabelle (wie `parse` im Ticket bis K389).
+                if (d !== SDK_DATEI && /new RegExp\(\s*`\{\$\{key\}\}`/.test(t)) f.push(path.relative(WURZEL, d));
             }
         }
         assert(!f.length, `ersetzen selbst: ${f.join(', ')}`);
-        gleich(tabellen.sort(), BEKANNT_K389, 'eigene Platzhalter-Tabellen');
+        gleich(tabellen.sort(), [], 'eigene Platzhalter-Tabellen');
     });
     await pruefe('5. Kern-Teil eingebunden, wo erklärt; gespeichert über Vorlage.speichere', () => {
         const f = [];
@@ -323,9 +373,19 @@ async function main() {
     await pruefe('7. Geht mit der Guild', () => {
         assert(meta.core.guildInhalte.loeschen.includes('guild_vorlagen'), 'guild_vorlagen fehlt in core guildInhalte.loeschen');
         assert(fs.existsSync(path.join(WURZEL, 'migrations/kern/20261114_150000_vorlagen.js')), 'Kern-Migration fehlt');
+        assert(fs.existsSync(path.join(WURZEL, 'migrations/kern/20261114_170000_vorlagen_stelle.js')), 'Kern-Migration stelle fehlt (K389)');
+        // Eine Kategorie nimmt ihre Eröffnungsnachricht mit.
+        assert(/Vorlage\.loesche\(guildId, 'ticket:eroeffnung', String\(id\)\)/.test(code('plugins/ticket/shared/models/TicketCategories.js')), 'TicketCategories.delete löscht die Vorlage nicht');
     });
-    await pruefe('8. greeting liest keine alte Spalte', () => {
+    await pruefe('8. greeting und ticket lesen keine alte Spalte', () => {
         const f = [];
+        for (const [plugin, liste] of [['greeting', VERIFIZIERUNG_SPALTEN], ['ticket', TICKET_SPALTEN]]) {
+            for (const d of dateien(path.join(WURZEL, 'plugins', plugin), ['.js', '.ejs'])) {
+                if (d.includes(`${path.sep}migrations${path.sep}`)) continue;
+                const t = d.endsWith('.ejs') ? ohneKommentareEjs(fs.readFileSync(d, 'utf8')) : ohneKommentare(fs.readFileSync(d, 'utf8'));
+                for (const s of liste) if (new RegExp(`\\b${s}\\b`).test(t)) f.push(`${path.relative(WURZEL, d)}: ${s} (K389)`);
+            }
+        }
         for (const d of dateien(path.join(WURZEL, 'plugins/greeting'), ['.js', '.ejs'])) {
             if (d.includes(`${path.sep}migrations${path.sep}`)) continue;
             const t = d.endsWith('.ejs') ? ohneKommentareEjs(fs.readFileSync(d, 'utf8')) : ohneKommentare(fs.readFileSync(d, 'utf8'));
@@ -360,6 +420,8 @@ async function main() {
             'leerer Container': [/if \(innen\.length\) aussen\.push\(/, 'aussen.push('],
             'Erwähnungen offen': [/\{ parse: \[\], users:/, "{ parse: ['users', 'roles', 'everyone'], users:"],
             'Adresse ungeprüft': [/if \(w\[f\] && !ADRESSE\.test\(w\[f\]\)\)/, 'if (false)'],
+            'Knöpfe fehlen in V2': [/aussen\.push\(\.\.\.komponenten\);/, ''],
+            'Felder gefüllt': [/const wert = String\(f\.wert \?\? ''\)\.trim\(\) \|\| '-';/, "const wert = String(f.wert ?? '').replace('{member:name}', 'anna').trim() || '-';"],
             'V2 mit content': [/const nachricht = \{ flags: FLAG_V2, components: aussen, allowedMentions \};/, "const nachricht = { flags: FLAG_V2, components: aussen, allowedMentions, content: '' };"],
         };
         const gruen = [];
@@ -389,6 +451,11 @@ async function main() {
         // Dieselbe Kern-Migration, als TEMPORARY: verdeckt in dieser Verbindung die echte Tabelle.
         const kern = require(path.join(WURZEL, 'migrations/kern/20261114_150000_vorlagen.js'));
         await kern.up({ query: (sql) => c.query(sql.replace(/CREATE TABLE IF NOT EXISTS/g, 'CREATE TEMPORARY TABLE')) });
+        // Und die Spalte `stelle` (K389) an derselben TEMPORARY-Tabelle.
+        const stelleMig = require(path.join(WURZEL, 'migrations/kern/20261114_170000_vorlagen_stelle.js'));
+        await stelleMig.up({ query: async (sql, p) => (await c.query(sql, p))[0] });
+        const [tempSpalten] = await c.query('SHOW COLUMNS FROM guild_vorlagen');
+        assert(tempSpalten.some((r) => r.Field === 'stelle'), 'Kern-Migration stelle legt die Spalte nicht an');
         ServiceManager.register('Logger', { info() {}, warn() {}, error() {}, debug() {} });
         ServiceManager.register('dbService', { async query(sql, params = []) { const [r] = await c.query(sql, params); return r; } });
         const A = '900000000000000011';
@@ -403,6 +470,20 @@ async function main() {
             gleich((await V.lade(A, 'greeting:boost')).form, 'embed', 'Feld des Aufbaus macht aus Text ein Embed');
             await V.aendere(A, 'greeting:boost', { form: 'v2' });
             gleich((await V.lade(A, 'greeting:boost')).form, 'v2', 'Form umgeschaltet');
+            // Stellen (K389)
+            await assert.rejects(() => V.speichere(A, 'greeting:boost', { text: 'x' }, '5'), (e) => e.schluessel === 'STELLE', 'Stelle an Anlass ohne je');
+            await assert.rejects(() => V.lade(A, 'ticket:eroeffnung', 'a b'), (e) => e.schluessel === 'STELLE', 'ungültige Stelle');
+            await V.speichere(A, 'ticket:eroeffnung', { text: 'eins' }, '5');
+            await V.speichere(A, 'ticket:eroeffnung', { text: 'ohne' });
+            gleich([(await V.lade(A, 'ticket:eroeffnung', '5')).text, (await V.lade(A, 'ticket:eroeffnung')).text, await V.lade(A, 'ticket:eroeffnung', '6')], ['eins', 'ohne', null], 'je Stelle eine Vorlage');
+            await V.loesche(A, 'ticket:eroeffnung', '5');
+            gleich([await V.lade(A, 'ticket:eroeffnung', '5'), (await V.lade(A, 'ticket:eroeffnung', '')).text], [null, 'ohne'], 'Löschen trifft nur die Stelle');
+            await V.aendere(A, 'ticket:eroeffnung', { titel: 'T' }, '7', { form: 'embed', text: '{member:mention}', beschreibung: 'B' });
+            const geaendert = await V.lade(A, 'ticket:eroeffnung', '7');
+            gleich([geaendert.form, geaendert.text, geaendert.titel, geaendert.beschreibung], ['embed', '{member:mention}', 'T', 'B'], 'aendere startet bei der Vorgabe');
+            await V.loesche(A, 'ticket:eroeffnung', '7');
+            await V.loesche(A, 'ticket:eroeffnung');
+
             await V.speichere(A, 'greeting:boost', { form: 'v2' });
             gleich((await c.query('SELECT COUNT(*) n FROM guild_vorlagen WHERE guild_id = ?', [A]))[0][0].n, 0, 'leer: Zeile weg');
         });
@@ -502,8 +583,151 @@ async function main() {
             gleich(v.namen, { 42: 'anna' }, 'Namen für Erwähnungen');
             await assert.rejects(() => V.vorschau('greeting:willkommen', { farbe: 'x' }, {}), (e) => e.schluessel === 'FARBE', 'Vorschau prüft');
         });
+        await pruefe('16. Verifizierung: Migration, danach dieselben Nachrichten (K389)', async () => {
+            await c.query('DROP TEMPORARY TABLE IF EXISTS greeting_settings');
+            await c.query(`CREATE TEMPORARY TABLE greeting_settings (guild_id VARCHAR(255) PRIMARY KEY, verification_enabled TINYINT(1) DEFAULT 1,
+                verification_type VARCHAR(20) DEFAULT 'button', verification_channel VARCHAR(255) DEFAULT 'k1', verification_message TEXT DEFAULT NULL,
+                verification_success_message TEXT DEFAULT NULL, verification_emoji VARCHAR(50) DEFAULT '✅', verification_message_id VARCHAR(255) DEFAULT NULL)`);
+            // Zeile 31 gemessen am 2026-11-14 (Kontroll-Guild, ID ersetzt), 32 und 33 Grenzfälle.
+            const ZEILEN = [
+                ['900000000000000031', 'Wenn Du dir diese Rolle nimmst, dann bist Du in FireNetworks verifiziert.', 'Willkommen {user:name} auf {guild:name}.\nDu bist nun verifiziert. Und das {guild:memberCount} Zündhols, auf {guild:name}.\nViel Spaß.'],
+                ['900000000000000032', '{"title":"Hallo {guild:name}","description":"Klick unten","color":"#FF0000"}', '{user:mention} ist da\\n{user:tag}'],
+                ['900000000000000033', null, null],
+            ];
+            for (const z of ZEILEN) await c.query('INSERT INTO greeting_settings (guild_id, verification_message, verification_success_message) VALUES (?, ?, ?)', z);
+            const einstellungen = async (g) => (await c.query('SELECT * FROM greeting_settings WHERE guild_id = ?', [g]))[0][0];
+            const gilde = (g) => {
+                const m = mitglied(V, g);
+                const gesendet = [];
+                m.guild.getT = getTaus('greeting');
+                m.guild.channels = { cache: { get: () => ({ name: 'verifizierung', send: async (p) => { gesendet.push(p); return { id: '1', react: async () => {} }; } }) } };
+                return { m, gesendet };
+            };
+            const json = (x) => (x && typeof x.toJSON === 'function' ? x.toJSON() : x);
+            const panelJson = (p) => ({ content: p.content, embeds: (p.embeds || []).map(json), components: (p.components || []).map(json) });
+
+            const alt = ladeAlt(ALT_K389, 'plugins/greeting/bot/events/interactionCreate.js', '\nmodule.exports.__erfolg = buildSuccessEmbed;\n');
+            const vorher = {};
+            for (const [g] of ZEILEN) {
+                const st = await einstellungen(g);
+                const { m, gesendet } = gilde(g);
+                const erfolg = alt.__erfolg(m.guild, m, st).toJSON();
+                await alt.sendVerificationPanel(m.guild, st);
+                vorher[g] = { erfolg, panel: panelJson(gesendet[0]) };
+            }
+
+            const migration = require(path.join(WURZEL, 'plugins/greeting/migrations/20261114_180000_verifizierung_vorlagen.js'));
+            const db = { query: async (sql, p) => (await c.query(sql, p))[0] };
+            await migration.up(db);
+            const [rest] = await c.query('SHOW COLUMNS FROM greeting_settings');
+            gleich(rest.map((r) => r.Field).filter((f) => VERIFIZIERUNG_SPALTEN.includes(f)), [], 'Spalten der Verifizierung');
+            const [zeilen] = await c.query("SELECT guild_id, anlass, stelle, inhalt FROM guild_vorlagen WHERE guild_id LIKE '90000000000000003%' ORDER BY guild_id, anlass");
+            gleich(zeilen.map((z) => `${z.guild_id.slice(-2)} ${z.anlass} ${z.stelle}`), ['31 greeting:verifiziert ', '31 greeting:verifizierung_panel ', '32 greeting:verifiziert ', '32 greeting:verifizierung_panel '], 'umgezogene Vorlagen');
+            for (const z of zeilen) V.pruefe(JSON.parse(z.inhalt));
+            const v32 = JSON.parse(zeilen.find((z) => z.guild_id.endsWith('32') && z.anlass === 'greeting:verifiziert').inhalt);
+            gleich(v32.beschreibung, '{member:mention} ist da\n{member:tag}', '{user:*} umbenannt, \\n als Umbruch');
+            gleich(JSON.parse(zeilen.find((z) => z.guild_id.endsWith('32') && z.anlass === 'greeting:verifizierung_panel').inhalt).form, 'embed', 'Panel-JSON wird Embed');
+
+            const U = require(path.join(WURZEL, 'plugins/greeting/bot/utils.js'));
+            const neuI = require(path.join(WURZEL, 'plugins/greeting/bot/events/interactionCreate.js'));
+            const abw = [];
+            for (const [g] of ZEILEN) {
+                const { m, gesendet } = gilde(g);
+                const erfolg = await U.baueVerifiziert(m, { fluechtig: true });
+                if (erfolg.flags !== 64 || erfolg.content) abw.push(`${g.slice(-2)}: Bestätigung nicht flüchtig oder mit Text`);
+                const a = { ...vorher[g].erfolg, footer: { text: vorher[g].erfolg.footer.text }, timestamp: 'jetzt' };
+                // Gewollt anders: das Guild-Symbol neben der Fußzeile (die Vorlage hat
+                // keins); in 32 wird „\n“ jetzt zum Umbruch.
+                if (g.endsWith('32')) a.description = a.description.replace(/\\n/g, '\n');
+                const n = { ...erfolg.embeds[0], timestamp: 'jetzt' };
+                if (JSON.stringify(kanonisch(n)) !== JSON.stringify(kanonisch(a))) abw.push(`${g.slice(-2)} Bestätigung\n        alt ${JSON.stringify(kanonisch(a))}\n        neu ${JSON.stringify(kanonisch(n))}`);
+                await neuI.sendVerificationPanel(m.guild, await einstellungen(g));
+                const p = panelJson(gesendet[0]);
+                if (JSON.stringify(kanonisch(p)) !== JSON.stringify(kanonisch(vorher[g].panel))) abw.push(`${g.slice(-2)} Panel\n        alt ${JSON.stringify(kanonisch(vorher[g].panel))}\n        neu ${JSON.stringify(kanonisch(p))}`);
+            }
+            assert(!abw.length, abw.join('\n      '));
+            await migration.up(db);
+            gleich((await c.query("SELECT COUNT(*) n FROM guild_vorlagen WHERE guild_id LIKE '90000000000000003%'"))[0][0].n, 4, 'zweiter Lauf');
+        });
+
+        await pruefe('17. Ticket: Migration je Kategorie, danach dieselbe Eröffnung (K389)', async () => {
+            await c.query(`CREATE TEMPORARY TABLE ticket_categories (id INT PRIMARY KEY, guild_id VARCHAR(20), name VARCHAR(100), description TEXT NULL,
+                staff_roles TEXT NULL, member_roles TEXT NULL, form_fields TEXT NULL, is_active TINYINT(1) DEFAULT 1, created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                open_msg_title VARCHAR(256) NULL, open_msg_description TEXT NULL, open_msg_footer VARCHAR(256) NULL)`);
+            await c.query("CREATE TEMPORARY TABLE configs (plugin_name VARCHAR(255), config_key VARCHAR(255), config_value TEXT, context VARCHAR(255) DEFAULT 'shared', guild_id VARCHAR(255))");
+            await c.query("INSERT INTO configs (plugin_name, config_key, config_value, guild_id) VALUES ('core', 'LOCALE', 'en-GB', '900000000000000043')");
+            // Zeile 41 gemessen am 2026-11-14 (Kontroll-Guild, ID ersetzt), 42 und 43 Grenzfälle.
+            const ZEILEN = [
+                [41, '900000000000000041', 'Dashboard', 'Dein Ticket wurde erstellt.', 'Du kannst dein Ticket nur für dich alleine sehen. \nSobald der Support deine Anfrage mitbekommen hat wird sich jamand darum kümmern.', null],
+                [42, '900000000000000042', 'Leer', null, null, null],
+                [43, '900000000000000043', 'Support', null, 'Hallo {member:name} ({member:tag}) in {ticket:category}', 'Fuß {server}'],
+            ];
+            for (const z of ZEILEN) await c.query('INSERT INTO ticket_categories (id, guild_id, name, open_msg_title, open_msg_description, open_msg_footer) VALUES (?, ?, ?, ?, ?, ?)', z);
+            const SPRACHE = { 41: 'de-DE', 42: 'de-DE', 43: 'en-GB' };
+            const antworten = [{ label: 'Worum geht es?', value: 'Login {member:name}' }];
+
+            // So baute der Code bis K389 die Eröffnung (interactionCreate.js, createTicketChannel).
+            const { parse } = ladeAlt(ALT_K389, 'plugins/ticket/bot/utils.js');
+            const vorher = {};
+            for (const [id, g, name, titel, text, fuss] of ZEILEN) {
+                const t = getTaus('ticket', SPRACHE[id]);
+                const m = mitglied(V, g);
+                const daten = { server: m.guild.name, count: m.guild.memberCount, 'member:name': m.displayName, 'member:tag': m.user.username, 'member:mention': m.toString(), 'ticket:category': name, 'ticket:number': '7', 'ticket:id': 'abc12345' };
+                vorher[id] = {
+                    content: m.toString(),
+                    titel: parse(titel || t('ticket:HANDLER.OPEN_EMBED_TITLE'), daten),
+                    beschreibung: parse(text || t('ticket:HANDLER.OPEN_EMBED_DESC'), daten),
+                    fuss: parse(fuss || t('ticket:HANDLER.OPEN_EMBED_FOOTER'), daten),
+                    felder: [{ name: '​', value: '**' + t('ticket:HANDLER.FORM_RESPONSES_TITLE') + '**', inline: false }, ...antworten.map((a) => ({ name: a.label, value: a.value, inline: false }))],
+                };
+            }
+
+            const migration = require(path.join(WURZEL, 'plugins/ticket/migrations/20261114_180000_eroeffnung_vorlagen.js'));
+            const db = { query: async (sql, p) => (await c.query(sql, p))[0] };
+            await migration.up(db);
+            const [rest] = await c.query('SHOW COLUMNS FROM ticket_categories');
+            gleich(rest.map((r) => r.Field).filter((f) => TICKET_SPALTEN.includes(f)), [], 'Spalten der Eröffnung');
+            const [zeilen] = await c.query("SELECT guild_id, anlass, stelle, inhalt FROM guild_vorlagen WHERE anlass = 'ticket:eroeffnung' ORDER BY stelle");
+            gleich(zeilen.map((z) => `${z.guild_id.slice(-2)} ${z.stelle}`), ['41 41', '43 43'], 'je Kategorie mit eigenem Text eine Vorlage');
+            for (const z of zeilen) { V.pruefe(JSON.parse(z.inhalt)); V.stelleVon(z.anlass, z.stelle); }
+            const v41 = JSON.parse(zeilen[0].inhalt);
+            const v43 = JSON.parse(zeilen[1].inhalt);
+            gleich(v41.fusszeile, getTaus('ticket')('ticket:HANDLER.OPEN_EMBED_FOOTER'), 'leere Fußzeile aus der Sprachdatei');
+            gleich(v43.titel, getTaus('ticket', 'en-GB')('ticket:HANDLER.OPEN_EMBED_TITLE'), 'Sprache der Guild');
+            assert(v43.beschreibung.includes('{member:nick}') && !v43.beschreibung.includes('{member:name}'), '{member:name} → {member:nick}');
+
+            // Die Schlüssel der Vorgabe stehen in beiden Sprachdateien des Bots.
+            const Eroeffnung = require(path.join(WURZEL, 'plugins/ticket/shared/eroeffnung.js'));
+            for (const sprache of ['de-DE', 'en-GB']) {
+                const t = Eroeffnung.texteAus(sprache);
+                for (const k of Object.values(Eroeffnung.SCHLUESSEL)) assert(t(k) !== k, `${sprache}: ${k} fehlt in plugins/ticket/bot/locales`);
+            }
+
+            const U = require(path.join(WURZEL, 'plugins/ticket/bot/utils.js'));
+            const zeile = { type: 1, components: [{ type: 2, style: 1, custom_id: 'ticket:CLOSE', label: 'x' }] };
+            const abw = [];
+            for (const [id, g, name] of ZEILEN) {
+                const m = mitglied(V, g);
+                m.guild.getT = getTaus('ticket', SPRACHE[id]);
+                const t = m.guild.getT;
+                const felder = [{ name: '​', wert: '**' + t('ticket:HANDLER.FORM_RESPONSES_TITLE') + '**' }, ...antworten.map((a) => ({ name: a.label, wert: a.value }))];
+                const n = await U.baueEroeffnung({ member: m, category: { id, name }, ticketNumber: '7', ticketId: 'abc12345', felder, komponenten: [zeile] });
+                const e = n.embeds[0];
+                const a = vorher[id];
+                // Gewollt anders: Titel als Überschrift statt Autorzeile, Farbe = Akzent.
+                const ist = { content: n.content, titel: e.title, beschreibung: e.description, fuss: e.footer?.text, felder: e.fields };
+                if (JSON.stringify(ist) !== JSON.stringify(a)) abw.push(`${id}\n        alt ${JSON.stringify(a)}\n        neu ${JSON.stringify(ist)}`);
+                if (e.color !== 0x3498db) abw.push(`${id}: Farbe nicht der Akzent`);
+                gleich([n.allowedMentions.users, n.components], [[m.id], [zeile]], `${id}: Erwähnung und Knöpfe`);
+            }
+            assert(!abw.length, abw.join('\n      '));
+
+            const { TicketCategories } = require(path.join(WURZEL, 'plugins/ticket/shared/models'));
+            await TicketCategories.delete(41, '900000000000000041');
+            gleich((await c.query("SELECT COUNT(*) n FROM guild_vorlagen WHERE anlass = 'ticket:eroeffnung' AND stelle = '41'"))[0][0].n, 0, 'Kategorie löschen nimmt die Vorlage mit');
+        });
     } finally {
-        await c.query('DROP TEMPORARY TABLE IF EXISTS guild_vorlagen, greeting_settings, greeting_invite_mappings').catch(() => {});
+        await c.query('DROP TEMPORARY TABLE IF EXISTS guild_vorlagen, greeting_settings, greeting_invite_mappings, ticket_categories, configs');
     }
 
     console.log('Datenbank');
@@ -515,12 +739,20 @@ async function main() {
             return;
         }
         const [alteDa] = await c.query(`SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'greeting_settings' AND COLUMN_NAME IN (?)`, [ALTE_SPALTEN]);
-        const [z] = await c.query('SELECT guild_id, anlass, inhalt FROM guild_vorlagen');
+        const [[{ mitStelle }]] = await c.query("SELECT COUNT(*) mitStelle FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'guild_vorlagen' AND COLUMN_NAME = 'stelle'");
+        const [z] = await c.query(`SELECT guild_id, anlass, ${mitStelle ? 'stelle' : "'' AS stelle"}, inhalt FROM guild_vorlagen`);
         gleich(z.length, vorherZeilen, 'Zeilen vorher/nachher (der Wächter schreibt nicht)');
         if (alteDa.length) console.log(`      (greeting-Migration offen: ${alteDa.length} alte Spalten, läuft beim Neustart)`);
+        if (!mitStelle) console.log('      (Spalte stelle fehlt noch: Kern-Migration K389 läuft beim Neustart)');
+        const [k389] = await c.query(`SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE()
+            AND ((TABLE_NAME = 'greeting_settings' AND COLUMN_NAME IN (?)) OR (TABLE_NAME = 'ticket_categories' AND COLUMN_NAME IN (?)))`, [VERIFIZIERUNG_SPALTEN, TICKET_SPALTEN]);
+        if (k389.length) console.log(`      (Migrationen K389 offen: ${k389.map((r) => `${r.TABLE_NAME}.${r.COLUMN_NAME}`).join(', ')}, laufen beim Neustart)`);
+        if (k389.length && mitStelle === 0 && k389.length !== VERIFIZIERUNG_SPALTEN.length + TICKET_SPALTEN.length) {
+            assert.fail(`Spalten K389 zum Teil weg ohne Spalte stelle: ${k389.length}`);
+        }
         const f = [];
         for (const r of z) {
-            try { V.anlass(r.anlass); V.pruefe(JSON.parse(r.inhalt)); } catch (e) { f.push(`${r.guild_id} ${r.anlass}: ${e.message}`); }
+            try { V.anlass(r.anlass); V.stelleVon(r.anlass, r.stelle); V.pruefe(JSON.parse(r.inhalt)); } catch (e) { f.push(`${r.guild_id} ${r.anlass} ${r.stelle}: ${e.message}`); }
         }
         assert(!f.length, f.join('\n'));
     });

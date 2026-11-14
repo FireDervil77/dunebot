@@ -8,21 +8,59 @@ const {
 const ShortUniqueId = require("short-unique-id");
 const uid = new ShortUniqueId({ length: 8 });
 const { ServiceManager } = require("dunebot-core");
+const { Vorlage } = require("dunebot-sdk");
+const Eroeffnung = require("../shared/eroeffnung");
+const EROEFFNUNG = Eroeffnung.EROEFFNUNG;
 const { TicketSettings, TicketCategories, Tickets } = require("../shared/models");
 const CLOSE_PERMS = ["ManageChannels", "ReadMessageHistory"];
 
 const genTicketId = () => uid.rnd();
 
 /**
- * @param {string} content
- * @param {Object} data
+ * Vorgabe der Eröffnungsnachricht in der Sprache der Guild (K389). Der Aufbau
+ * steht in ../shared/eroeffnung.js, damit Dashboard und Migration dieselbe
+ * zeigen.
+ * @param {import('discord.js').Guild} guild
  */
-const parse = (content, data) => {
-    for (const key in data) {
-        content = content.replace(new RegExp(`{${key}}`, "g"), data[key]);
-    }
-    return content;
-};
+function vorgabeEroeffnung(guild) {
+    return Eroeffnung.vorgabe((k) => guild.getT(k));
+}
+
+/**
+ * Die Eröffnungsnachricht eines neuen Tickets.
+ *
+ * Bis 2026-11-14 ersetzte hier `parse` eine eigene Platzhalter-Tabelle, in der
+ * `{member:name}` den Anzeigenamen meinte (im Kern: Benutzername; Anzeigename
+ * ist `{member:nick}`). Jetzt füllt der Kern (`Vorlage.fuelle`); Ticket
+ * erklärt nur `{ticket:category}`, `{ticket:number}`, `{ticket:id}`.
+ *
+ * @param {Object} a
+ * @param {import('discord.js').GuildMember} a.member
+ * @param {Object} a.category Kategorie (ohne `id`: Tickets ohne Kategorie)
+ * @param {string} a.ticketNumber
+ * @param {string} a.ticketId
+ * @param {{name: string, wert: string, inline?: boolean}[]} a.felder feste Felder
+ * @param {Object[]} a.komponenten Zeilen mit Knöpfen
+ * @returns {Promise<Object>} Nachricht für `send()`
+ */
+async function baueEroeffnung({ member, category, ticketNumber, ticketId, felder, komponenten }) {
+    const guild = member.guild;
+    const stelle = category?.id ? String(category.id) : "";
+    const vorlage = (await Vorlage.lade(guild.id, EROEFFNUNG, stelle)) || vorgabeEroeffnung(guild);
+    const kontext = {
+        member,
+        guild,
+        extra: {
+            "ticket:category": category?.name || "",
+            "ticket:number": ticketNumber,
+            "ticket:id": ticketId,
+        },
+    };
+    const mit = { guildId: guild.id, erwaehnen: [member.id], felder, komponenten };
+    let { nachricht } = await Vorlage.fuelle(vorlage, kontext, mit);
+    if (!nachricht) ({ nachricht } = await Vorlage.fuelle(vorgabeEroeffnung(guild), kontext, mit));
+    return nachricht;
+}
 
 /**
  * @param {import('discord.js').Channel} channel
@@ -369,7 +407,9 @@ async function reopenTicket(guild, reopenedBy, ticketId) {
 
 module.exports = {
     genTicketId,
-    parse,
+    EROEFFNUNG,
+    vorgabeEroeffnung,
+    baueEroeffnung,
     getTicketChannels,
     getExistingTicketChannel,
     isTicketChannel,

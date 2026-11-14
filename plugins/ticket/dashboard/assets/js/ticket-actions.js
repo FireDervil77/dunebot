@@ -123,8 +123,6 @@
             document.getElementById('catButtonLabel').value = kategorie.button_label || 'Ticket erstellen';
             document.getElementById('catButtonEmoji').value = kategorie.button_emoji || '🎫';
             document.getElementById('catMaxOpen').value = kategorie.max_open_per_user || 1;
-            document.getElementById('catOpenTitle').value = kategorie.open_msg_title || '';
-            document.getElementById('catOpenDescription').value = kategorie.open_msg_description || '';
             document.getElementById('catActive').checked = Boolean(kategorie.is_active);
             setzeAuswahl('catStaffRoles', kategorie.staff_roles);
             setzeAuswahl('catMemberRoles', kategorie.member_roles);
@@ -176,8 +174,6 @@
                 button_label: document.getElementById('catButtonLabel').value.trim() || 'Ticket erstellen',
                 button_emoji: document.getElementById('catButtonEmoji').value.trim() || '🎫',
                 max_open_per_user: document.getElementById('catMaxOpen').value,
-                open_msg_title: document.getElementById('catOpenTitle').value.trim() || null,
-                open_msg_description: document.getElementById('catOpenDescription').value.trim() || null,
                 is_active: document.getElementById('catActive').checked
             };
 

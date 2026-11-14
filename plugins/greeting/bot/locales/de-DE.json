@@ -97,5 +97,11 @@
 
         "CONFIG_UPDATED": "Konfiguration gespeichert! Verabschiedungsnachricht aktualisiert",
         "CONFIG_SAVED": "Konfiguration gespeichert! Verabschiedungsnachricht ist für {{channel}} konfiguriert"
+    },
+
+    "VERIFICATION": {
+        "ERFOLG_TITEL": "✅ Erfolgreich verifiziert!",
+        "ERFOLG_TEXT": "Willkommen auf **{guild:name}**!\nDu hast jetzt vollen Zugang zum Server.",
+        "PANEL_TEXT": "✅ Klicke den Button um dich zu verifizieren!"
     }
 }

@@ -44,5 +44,21 @@
         "ticket_tags": {
             "created_by": "anonymisieren"
         }
+    },
+    "vorlagen": {
+        "recht": "TICKET.CATEGORIES.MANAGE",
+        "platzhalter": [
+            { "name": "ticket:category", "bedeutung": "ticket:VORLAGEN.PH_CATEGORY", "beispiel": "Support" },
+            { "name": "ticket:number", "bedeutung": "ticket:VORLAGEN.PH_NUMBER", "beispiel": "7" },
+            { "name": "ticket:id", "bedeutung": "ticket:VORLAGEN.PH_ID", "beispiel": "a1B2c3D4" }
+        ],
+        "anlaesse": {
+            "eroeffnung": {
+                "titel": "ticket:VORLAGEN.EROEFFNUNG",
+                "je": "ticket:VORLAGEN.JE_KATEGORIE",
+                "kern": ["member", "guild", "gestaltung"],
+                "platzhalter": ["ticket:category", "ticket:number", "ticket:id"]
+            }
+        }
     }
 }

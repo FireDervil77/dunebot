@@ -470,6 +470,7 @@
     "FELD_BILD": "Bild",
     "BILD_HILFE": "Adresse eines Bildes, auch breit. Platzhalter wie {gestaltung:banner} gehen.",
     "FELD_FUSSZEILE": "Fußzeile",
+    "FELD_FELDER": "Feste Felder",
     "FELD_ZEITSTEMPEL": "Zeitpunkt anzeigen",
     "PLATZHALTER": "Platzhalter",
     "PLATZHALTER_HILFE": "Klick fügt an der Schreibmarke ein.",
@@ -496,7 +497,8 @@
       "V2_ZU_LANG": "Components V2 nimmt {{max}} Zeichen Text zusammen, hier sind es {{laenge}}.",
       "EMBED_ZU_LANG": "Ein Embed nimmt {{max}} Zeichen zusammen, hier sind es {{laenge}}.",
       "ADRESSE": "{{feld}}: bitte eine Adresse mit https:// oder einen Platzhalter.",
-      "ANLASS": "Unbekannte Vorlage „{{anlass}}“."
+      "ANLASS": "Unbekannte Vorlage „{{anlass}}“.",
+      "STELLE": "Ungültige Stelle „{{stelle}}“ für diese Vorlage."
     },
     "PH": {
       "MEMBER_NAME": "Benutzername",

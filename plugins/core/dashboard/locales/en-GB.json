@@ -470,6 +470,7 @@
     "FELD_BILD": "Image",
     "BILD_HILFE": "Address of an image, wide is fine. Placeholders like {gestaltung:banner} work.",
     "FELD_FUSSZEILE": "Footer",
+    "FELD_FELDER": "Fixed fields",
     "FELD_ZEITSTEMPEL": "Show time",
     "PLATZHALTER": "Placeholders",
     "PLATZHALTER_HILFE": "Click to insert at the cursor.",
@@ -496,7 +497,8 @@
       "V2_ZU_LANG": "Components V2 takes {{max}} characters of text in total, this has {{laenge}}.",
       "EMBED_ZU_LANG": "An embed takes {{max}} characters in total, this has {{laenge}}.",
       "ADRESSE": "{{feld}}: please an address with https:// or a placeholder.",
-      "ANLASS": "Unknown template \"{{anlass}}\"."
+      "ANLASS": "Unknown template \"{{anlass}}\".",
+      "STELLE": "Invalid position \"{{stelle}}\" for this template."
     },
     "PH": {
       "MEMBER_NAME": "Username",

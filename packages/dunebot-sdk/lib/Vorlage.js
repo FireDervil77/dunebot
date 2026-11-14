@@ -43,9 +43,9 @@
  *
  * # Ablage und Register
  *
- * Kern-Tabelle `guild_vorlagen (guild_id, anlass, inhalt)` (F-G10 Punkt 2 A).
- * Der Anlass beginnt mit dem Plugin: `greeting:willkommen`. Jedes Plugin
- * erklärt seine Anlässe und Platzhalter in der package.json:
+ * Kern-Tabelle `guild_vorlagen (guild_id, anlass, stelle, inhalt)` (F-G10
+ * Punkt 2 A). Der Anlass beginnt mit dem Plugin: `greeting:willkommen`. Jedes
+ * Plugin erklärt seine Anlässe und Platzhalter in der package.json:
  *
  *     "vorlagen": {
  *       "recht": "GREETING.SETTINGS.EDIT",
@@ -54,6 +54,22 @@
  *         "willkommen": { "titel": "greeting:…", "kern": ["member", "guild", "gestaltung"], "platzhalter": ["invites"] }
  *       }
  *     }
+ *
+ * # Stellen (K389, 2026-11-14)
+ *
+ * Hat ein Anlass mehrere Vorlagen je Guild (Ticket: eine Eröffnungsnachricht
+ * je Kategorie), erklärt er `"je": "<Bedeutung>"` und jeder Aufruf der Ablage
+ * nennt die Stelle als letztes Argument: `lade(guildId, 'ticket:eroeffnung',
+ * String(kategorie.id))`. Die leere Stelle ist die Vorlage ohne Stelle. Ein
+ * Anlass ohne `je` nimmt nur die leere Stelle; eine andere wirft.
+ *
+ * # Feste Teile (K389)
+ *
+ * Was eine Guild nicht gestaltet, aber in die Nachricht gehört, reicht der
+ * Aufrufer an `fuelle`: `felder` (Name und Wert, z. B. die Antworten aus dem
+ * Ticket-Formular; ohne Platzhalter-Ersetzung) und `komponenten` (Zeilen mit
+ * Knöpfen). Sie stehen in jeder Form an ihrem Platz: im Embed als Felder, in
+ * V2 als Textblock im Container, im Text als Zeilen.
  *
  * Die Platzhalter des Kerns stehen in `dunebot-core/lib/PlaceholderParser`
  * (`PLATZHALTER`) neben ihrer Ersetzung, dazu hier `{gestaltung:logo}` und
@@ -96,6 +112,9 @@ const ADRESSE = /^https?:\/\/[^\s<>"]+$/;
 const ANLASS = /^([a-z0-9_-]{1,32}):([a-z0-9_-]{1,40})$/;
 const PLUGIN_NAME = /^[a-z0-9_-]{1,32}$/;
 const PLATZHALTER_NAME = /^[A-Za-z][A-Za-z0-9_]*(?::[A-Za-z][A-Za-z0-9_]*)?$/;
+const STELLE = /^[A-Za-z0-9_-]{0,40}$/;
+/** Grenzen von Discord für Embed-Felder. */
+const FELD_MAX = Object.freeze({ anzahl: 25, name: 256, wert: 1024 });
 const PLUGINS = path.join(__dirname, '..', '..', '..', 'plugins');
 
 /** Gruppen des Kerns, die ein Anlass unter `kern` nennen kann. */
@@ -248,7 +267,7 @@ function erklaerung(plugin) {
  * erklärt: Ein Aufruf mit einem Tippfehler soll laut scheitern, nicht still
  * nichts senden.
  * @param {string} anlass z. B. `greeting:willkommen`
- * @returns {{anlass: string, plugin: string, name: string, recht: string|null, titel: string|null, platzhalter: Object[]}}
+ * @returns {{anlass: string, plugin: string, name: string, recht: string|null, titel: string|null, je: string|null, platzhalter: Object[]}}
  */
 function anlass(anlassName) {
     const m = ANLASS.exec(String(anlassName || ''));
@@ -269,7 +288,20 @@ function anlass(anlassName) {
         const p = eigene.get(n);
         if (p) liste.push({ name: p.name, gruppe: plugin, bedeutung: p.bedeutung || null, alias: null, beispiel: p.beispiel ?? '' });
     }
-    return { anlass: anlassName, plugin, name, recht: e.recht, titel: a.titel || null, platzhalter: liste };
+    return { anlass: anlassName, plugin, name, recht: e.recht, titel: a.titel || null, je: a.je || null, platzhalter: liste };
+}
+
+/**
+ * Anlass und Stelle zusammen prüfen. Wirft bei falscher Form oder bei einer
+ * Stelle an einem Anlass ohne `je`.
+ * @returns {string} die Stelle als Zeichenkette ('' = ohne)
+ */
+function stelleVon(anlassName, stelle) {
+    const a = anlass(anlassName);
+    const s = stelle === undefined || stelle === null ? '' : String(stelle);
+    if (!STELLE.test(s)) throw new Eingabefehler('STELLE', { stelle: s });
+    if (s && !a.je) throw new Eingabefehler('STELLE', { stelle: s });
+    return s;
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -280,10 +312,11 @@ function anlass(anlassName) {
  * Gespeicherte Vorlage, normalisiert, oder null.
  * @param {string} guildId
  * @param {string} anlassName
+ * @param {string} [stelle] nur bei Anlässen mit `je`
  */
-async function lade(guildId, anlassName) {
-    anlass(anlassName);
-    const rows = await db().query('SELECT inhalt FROM guild_vorlagen WHERE guild_id = ? AND anlass = ?', [String(guildId), anlassName]);
+async function lade(guildId, anlassName, stelle) {
+    const s = stelleVon(anlassName, stelle);
+    const rows = await db().query('SELECT inhalt FROM guild_vorlagen WHERE guild_id = ? AND anlass = ? AND stelle = ?', [String(guildId), anlassName, s]);
     const roh = rows?.[0]?.inhalt;
     if (roh === undefined || roh === null) return null;
     let gelesen = roh;
@@ -297,17 +330,17 @@ async function lade(guildId, anlassName) {
  * Prüfen und speichern. Eine leere Vorlage löscht die Zeile.
  * @returns {Promise<Object|null>} die gespeicherte Vorlage oder null
  */
-async function speichere(guildId, anlassName, roh) {
-    anlass(anlassName);
+async function speichere(guildId, anlassName, roh, stelle) {
+    const s = stelleVon(anlassName, stelle);
     const v = pruefe(roh);
     if (istLeer(v)) {
-        await loesche(guildId, anlassName);
+        await loesche(guildId, anlassName, s);
         return null;
     }
     await db().query(
-        `INSERT INTO guild_vorlagen (guild_id, anlass, inhalt) VALUES (?, ?, ?)
+        `INSERT INTO guild_vorlagen (guild_id, anlass, stelle, inhalt) VALUES (?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE inhalt = VALUES(inhalt)`,
-        [String(guildId), anlassName, JSON.stringify(v)]
+        [String(guildId), anlassName, s, JSON.stringify(v)]
     );
     return v;
 }
@@ -317,16 +350,16 @@ async function speichere(guildId, anlassName, roh) {
  * während die Vorlage nur Text ist, wird sie zum Embed: sonst sähe er seine
  * Änderung nie.
  */
-async function aendere(guildId, anlassName, teil) {
-    const alt = (await lade(guildId, anlassName)) || leer();
+async function aendere(guildId, anlassName, teil, stelle, vorgabe) {
+    const alt = (await lade(guildId, anlassName, stelle)) || normalisiere(vorgabe);
     const neu = { ...alt, ...teil };
     if (alt.form === 'text' && teil.form === undefined && AUFBAU.some((f) => teil[f])) neu.form = 'embed';
-    return speichere(guildId, anlassName, neu);
+    return speichere(guildId, anlassName, neu, stelle);
 }
 
-async function loesche(guildId, anlassName) {
-    anlass(anlassName);
-    await db().query('DELETE FROM guild_vorlagen WHERE guild_id = ? AND anlass = ?', [String(guildId), anlassName]);
+async function loesche(guildId, anlassName, stelle) {
+    const s = stelleVon(anlassName, stelle);
+    await db().query('DELETE FROM guild_vorlagen WHERE guild_id = ? AND anlass = ? AND stelle = ?', [String(guildId), anlassName, s]);
 }
 
 /**
@@ -336,10 +369,11 @@ async function loesche(guildId, anlassName) {
  * @param {string} guildId
  * @param {string} anlassName
  * @param {Object} [vorgabe] Vorlage, solange nichts gespeichert ist
+ * @param {string} [stelle] nur bei Anlässen mit `je`
  */
-async function editor(guildId, anlassName, vorgabe) {
+async function editor(guildId, anlassName, vorgabe, stelle) {
     const a = anlass(anlassName);
-    const v = (await lade(guildId, anlassName)) || normalisiere(vorgabe);
+    const v = (await lade(guildId, anlassName, stelle)) || normalisiere(vorgabe);
     return { anlass: a, vorlage: v };
 }
 
@@ -354,6 +388,36 @@ function kuerze(text, max, hinweise, feld) {
 }
 
 /**
+ * Feste Felder des Aufrufers in eine Form bringen: höchstens 25, Name und
+ * Wert gekürzt wie im Embed, leerer Wert als „-“. Ohne Platzhalter-Ersetzung,
+ * denn die Werte sind Daten (z. B. Antworten eines Mitglieds).
+ * @returns {{name: string, wert: string, inline: boolean}[]}
+ */
+function festeFelder(roh) {
+    if (!Array.isArray(roh)) return [];
+    const aus = [];
+    for (const f of roh.slice(0, FELD_MAX.anzahl)) {
+        if (!f || typeof f !== 'object') continue;
+        const name = String(f.name ?? '').trim() || '\u200b';
+        const wert = String(f.wert ?? '').trim() || '-';
+        const kurz = (t, max) => (t.length > max ? t.slice(0, max - 1) + '…' : t);
+        aus.push({ name: kurz(name, FELD_MAX.name), wert: kurz(wert, FELD_MAX.wert), inline: f.inline === true });
+    }
+    return aus;
+}
+
+/** Zeilen mit Knöpfen als JSON (Builder oder fertige Objekte). */
+function festeKomponenten(roh) {
+    if (!Array.isArray(roh)) return [];
+    return roh.filter(Boolean).map((k) => (typeof k.toJSON === 'function' ? k.toJSON() : k));
+}
+
+/** Felder als Markdown-Zeilen für Text und V2. */
+function felderAlsText(felder) {
+    return felder.map((f) => (f.name === '\u200b' ? f.wert : `**${f.name}**\n${f.wert}`)).join('\n');
+}
+
+/**
  * Vorlage mit Werten füllen und als Nachricht für discord.js bauen.
  *
  * @param {Object|null} vorlage gespeicherte oder geprüfte Vorlage
@@ -362,6 +426,8 @@ function kuerze(text, max, hinweise, feld) {
  * @param {string} [optionen.guildId] für Akzentfarbe und Logo/Banner
  * @param {string[]} [optionen.erwaehnen] Discord-IDs, die gepingt werden dürfen
  * @param {{name: string, attachment: *}[]} [optionen.anhaenge] Dateien (z. B. Willkommensbild)
+ * @param {{name: string, wert: string, inline?: boolean}[]} [optionen.felder] feste Felder, nicht gestaltbar
+ * @param {Object[]} [optionen.komponenten] Zeilen mit Knöpfen (ActionRow, Builder oder JSON)
  * @param {string} [optionen.form] andere Form erzwingen (Vorschau)
  * @param {Date} [optionen.jetzt]
  * @returns {Promise<{nachricht: Object|null, hinweise: Object[], leer: boolean}>}
@@ -372,6 +438,8 @@ async function fuelle(vorlage, kontext = {}, optionen = {}) {
     const hinweise = [];
     const guildId = String(optionen.guildId || kontext.guild?.id || kontext.member?.guild?.id || '');
     const anhaenge = Array.isArray(optionen.anhaenge) ? optionen.anhaenge.filter((a) => a && a.name) : [];
+    const felder = festeFelder(optionen.felder);
+    const komponenten = festeKomponenten(optionen.komponenten);
 
     const extra = { ...(kontext.extra || {}) };
     const alles = Object.keys(FELDER).map((f) => v[f]).join(' ');
@@ -400,21 +468,26 @@ async function fuelle(vorlage, kontext = {}, optionen = {}) {
     const files = anhaenge.map((a) => ({ attachment: a.attachment, name: a.name }));
     const jetzt = optionen.jetzt instanceof Date ? optionen.jetzt : new Date();
 
+    const mitKnoepfen = (n) => (komponenten.length ? { ...n, components: [...(n.components || []), ...komponenten] } : n);
+
     if (form === 'text') {
-        const content = kuerze(w.text, FELDER.text, hinweise, 'text');
+        const teile = [w.text, felder.length ? felderAlsText(felder) : ''].filter(Boolean);
+        const content = kuerze(teile.join('\n\n'), FELDER.text, hinweise, 'text');
         if (!content) return { nachricht: null, hinweise, leer: true };
-        return { nachricht: { content, allowedMentions, ...(files.length ? { files } : {}) }, hinweise, leer: false };
+        return { nachricht: mitKnoepfen({ content, allowedMentions, ...(files.length ? { files } : {}) }), hinweise, leer: false };
     }
 
     if (form === 'embed') {
         const nachricht = { allowedMentions };
         if (w.text) nachricht.content = kuerze(w.text, FELDER.text, hinweise, 'text');
-        const hatEmbed = AUFBAU.some((f) => w[f]) || v.zeitstempel;
+        const hatEmbed = AUFBAU.some((f) => w[f]) || v.zeitstempel || felder.length > 0;
         if (hatEmbed) {
             const embed = { color: await farbe() };
             if (w.titel) embed.title = kuerze(w.titel, FELDER.titel, hinweise, 'titel');
-            const platz = EMBED_GESAMT_MAX - (embed.title || '').length - Math.min(w.fusszeile.length, FELDER.fusszeile);
-            if (w.beschreibung) embed.description = kuerze(w.beschreibung, Math.min(FELDER.beschreibung, platz), hinweise, 'beschreibung');
+            const festePlatz = felder.reduce((n, f) => n + f.name.length + f.wert.length, 0);
+            const platz = EMBED_GESAMT_MAX - (embed.title || '').length - Math.min(w.fusszeile.length, FELDER.fusszeile) - festePlatz;
+            if (w.beschreibung) embed.description = kuerze(w.beschreibung, Math.max(0, Math.min(FELDER.beschreibung, platz)), hinweise, 'beschreibung');
+            if (felder.length) embed.fields = felder.map((f) => ({ name: f.name, value: f.wert, inline: f.inline }));
             if (w.vorschaubild) embed.thumbnail = { url: w.vorschaubild };
             if (w.bild) embed.image = { url: w.bild };
             if (w.fusszeile) embed.footer = { text: kuerze(w.fusszeile, FELDER.fusszeile, hinweise, 'fusszeile') };
@@ -423,7 +496,7 @@ async function fuelle(vorlage, kontext = {}, optionen = {}) {
         }
         if (!nachricht.content && !nachricht.embeds) return { nachricht: null, hinweise, leer: true };
         if (files.length) nachricht.files = files;
-        return { nachricht, hinweise, leer: false };
+        return { nachricht: mitKnoepfen(nachricht), hinweise, leer: false };
     }
 
     // Components V2
@@ -433,9 +506,10 @@ async function fuelle(vorlage, kontext = {}, optionen = {}) {
     fuss = fuss ? `-# ${fuss}` : '';
 
     // Gesamtlänge vorher abfangen: zuerst die Beschreibung kürzen, dann den Text.
-    const texte = { text: w.text, titel, beschreibung: w.beschreibung, fuss };
+    // Die festen Felder zählen mit, werden aber zuletzt gekürzt.
+    const texte = { text: w.text, titel, beschreibung: w.beschreibung, fuss, felder: felder.length ? felderAlsText(felder) : '' };
     const summe = () => Object.values(texte).reduce((n, t) => n + t.length, 0);
-    for (const f of ['beschreibung', 'text', 'fuss', 'titel']) {
+    for (const f of ['beschreibung', 'text', 'fuss', 'titel', 'felder']) {
         const ueber = summe() - V2_TEXT_MAX;
         if (ueber > 0 && texte[f]) texte[f] = kuerze(texte[f], Math.max(0, texte[f].length - ueber), hinweise, f === 'fuss' ? 'fusszeile' : f);
     }
@@ -455,12 +529,14 @@ async function fuelle(vorlage, kontext = {}, optionen = {}) {
     if (w.bild) galerie.push(w.bild);
     for (const a of anhaenge) galerie.push(`attachment://${a.name}`);
     if (galerie.length) innen.push({ type: TYP.GALERIE, items: galerie.slice(0, GALERIE_MAX).map((url) => ({ media: { url } })) });
+    if (texte.felder) innen.push({ type: TYP.TEXT, content: texte.felder });
     if (texte.fuss) {
         if (innen.length) innen.push({ type: TYP.TRENNER, divider: true, spacing: 1 });
         innen.push({ type: TYP.TEXT, content: texte.fuss });
     }
     if (innen.length) aussen.push({ type: TYP.CONTAINER, accent_color: await farbe(), components: innen });
     if (!aussen.length) return { nachricht: null, hinweise, leer: true };
+    aussen.push(...komponenten);
 
     const nachricht = { flags: FLAG_V2, components: aussen, allowedMentions };
     if (files.length) nachricht.files = files;
@@ -529,6 +605,7 @@ async function vorschau(anlassName, roh, { guildId, guildName, nutzer } = {}) {
 module.exports = {
     FORMEN,
     FELDER,
+    FELD_MAX,
     FLAG_V2,
     V2_TEXT_MAX,
     KERN_GRUPPEN,
@@ -541,6 +618,7 @@ module.exports = {
     pruefe,
     erklaerung,
     anlass,
+    stelleVon,
     lade,
     speichere,
     aendere,

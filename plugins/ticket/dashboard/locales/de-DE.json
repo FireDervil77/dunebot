@@ -121,8 +121,9 @@
     "BUTTON_LABEL": "Beschriftung der Schaltfläche",
     "BUTTON_EMOJI": "Symbol",
     "MAX_OPEN": "Offen je Mitglied",
-    "OPEN_TITLE": "Titel der Eröffnungsnachricht",
-    "OPEN_DESC": "Text der Eröffnungsnachricht"
+    "OPEN_MSG": "Eröffnungsnachricht",
+    "OPEN_MSG_BTN": "Eröffnungsnachricht bearbeiten",
+    "OPEN_MSG_HINT": "Die Eröffnungsnachricht hat eine eigene Seite. Erreichbar über den Knopf in der Liste, sobald die Kategorie gespeichert ist."
   },
   "TAGS": {
     "SUBTITLE": "Vorformulierte Antworten, die das Team per /tag abruft",
@@ -164,5 +165,20 @@
     "CATEGORIES_MANAGE_DESC": "Berechtigung um Ticket-Kategorien zu erstellen, bearbeiten und löschen",
     "TICKETS_VIEW": "Tickets anzeigen",
     "TICKETS_VIEW_DESC": "Berechtigung um alle Tickets und Transkripte einzusehen"
+  },
+  "VORLAGEN": {
+    "EROEFFNUNG": "Eröffnungsnachricht",
+    "JE_KATEGORIE": "je Kategorie",
+    "PH_CATEGORY": "Name der Kategorie",
+    "PH_NUMBER": "Nummer des Tickets",
+    "PH_ID": "Kennung des Tickets",
+    "OHNE_KATEGORIE": "Tickets ohne Kategorie",
+    "SEITE_BESCHREIBUNG": "Diese Nachricht schreibt der Bot als Erstes in einen neuen Ticket-Kanal der Kategorie „{{kategorie}}“.",
+    "SEITE_BESCHREIBUNG_OHNE": "Diese Nachricht schreibt der Bot als Erstes in einen neuen Ticket-Kanal, solange die Guild keine aktive Kategorie hat.",
+    "FESTE_TEILE": "Darunter hängt der Bot immer an: die Antworten aus dem Formular der Kategorie und die Knöpfe „Schließen“ und „Übernehmen“, bei Tickets ohne Kategorie auch Kategorie und Ticket-ID.",
+    "LEER": "Leer gespeichert sendet der Bot die Vorgabe.",
+    "ZURUECK": "Zurück zu den Kategorien",
+    "GESPEICHERT": "Eröffnungsnachricht gespeichert",
+    "NICHT_GEFUNDEN": "Diese Kategorie gibt es nicht."
   }
 }

@@ -104,6 +104,16 @@
           "gestaltung"
         ],
         "platzhalter": []
+      },
+      "verifiziert": {
+        "titel": "greeting:VERIFICATION.SUCCESS_MESSAGE",
+        "kern": ["member", "guild", "gestaltung"],
+        "platzhalter": []
+      },
+      "verifizierung_panel": {
+        "titel": "greeting:VERIFICATION.MESSAGE",
+        "kern": ["guild", "gestaltung"],
+        "platzhalter": []
       }
     }
   }

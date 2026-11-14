@@ -8,6 +8,8 @@
  *   /dashboard     Uebersicht
  *   /tickets       Offene und geschlossene Tickets
  *   /kategorien    Ticket-Arten samt Formular und Schaltflaeche
+ *   /kategorien/:id/nachricht  Eröffnungsnachricht einer Kategorie (K389),
+ *                  `standard` = Tickets ohne Kategorie
  *   /bausteine     Textbausteine (Tags) - neu
  *   /settings      Grundeinstellungen (unter Kern-Einstellungen)
  *
@@ -20,6 +22,8 @@ const { ServiceManager } = require('dunebot-core');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 const { TicketSettings, TicketCategories, Tickets, TicketTags } = require('../../shared/models');
 const { makeTranslator, renderView, getGuildChannels, getGuildRoles, renderFehler } = require('./_shared');
+const { Vorlage } = require('dunebot-sdk');
+const Eroeffnung = require('../../shared/eroeffnung');
 
 /** Skripte anmelden, die eine Seite braucht. */
 function skripteAnmelden(handles) {
@@ -116,6 +120,37 @@ router.get('/kategorien', requirePermission('TICKET.VIEW'), async (req, res) => 
         await renderView(res, 'guild/ticket-categories', { tr, guildId, kategorien, channels, roles });
     } catch (error) {
         return renderFehler(res, error, 'Die Kategorien konnten nicht geladen werden');
+    }
+});
+
+// =====================================================
+// Eröffnungsnachricht einer Kategorie (K389, 2026-11-14)
+//
+// Eigene Seite statt Feldern im Dialog der Kategorie: Der Kern-Teil
+// „Nachricht“ (shared/vorlage) braucht Platz für Form, Felder und Vorschau.
+// `standard` ist die Nachricht für Tickets ohne Kategorie (Stelle leer).
+// Die Vorgabe ist die, die der Bot in der Sprache der Guild sendet.
+// =====================================================
+router.get('/kategorien/:id/nachricht', requirePermission('TICKET.VIEW'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const tr = makeTranslator(req, res);
+
+    try {
+        const stelle = req.params.id === 'standard' ? '' : String(parseInt(req.params.id, 10) || '');
+        const kategorie = stelle ? await TicketCategories.getById(Number(stelle), guildId) : null;
+        if (req.params.id !== 'standard' && !kategorie) {
+            return renderFehler(res, new Error(tr('ticket:VORLAGEN.NICHT_GEFUNDEN')), tr('ticket:VORLAGEN.NICHT_GEFUNDEN'));
+        }
+        const konfig = await ServiceManager.get('dbService').getConfigs(guildId);
+        const teil = await Vorlage.editor(guildId, Eroeffnung.EROEFFNUNG, Eroeffnung.vorgabe(Eroeffnung.texteAus(konfig?.LOCALE)), stelle);
+
+        // Die Adresse trägt eine ID, ist also kein Menüpunkt: Kategorien leuchtet.
+        await renderView(res, 'guild/ticket-eroeffnung', {
+            tr, guildId, kategorie, stelle, teil,
+            activeMenu: `/guild/${guildId}/plugins/ticket/kategorien`
+        });
+    } catch (error) {
+        return renderFehler(res, error, 'Die Eröffnungsnachricht konnte nicht geladen werden');
     }
 });
 

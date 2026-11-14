@@ -11,13 +11,15 @@ const express = require('express');
 const router = express.Router();
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 const { TicketCategories } = require('../../shared/models');
-const { fehler } = require('./_shared');
+const { fehler, makeTranslator } = require('./_shared');
+const { csrfProtection } = require('../../../../apps/dashboard/middlewares/security/csrf-protection.middleware');
+const { Vorlage } = require('dunebot-sdk');
+const { EROEFFNUNG } = require('../../shared/eroeffnung');
 
 /** Felder, die von aussen gesetzt werden duerfen. */
 const FELDER = [
     'name', 'description', 'parent_id', 'channel_style',
-    'staff_roles', 'member_roles', 'open_msg_title', 'open_msg_description',
-    'open_msg_footer', 'button_label', 'button_emoji', 'button_color',
+    'staff_roles', 'member_roles', 'button_label', 'button_emoji', 'button_color',
     'max_open_per_user', 'is_active', 'form_fields'
 ];
 
@@ -68,9 +70,6 @@ router.post('/', requirePermission('TICKET.CATEGORIES.MANAGE'), async (req, res)
             channel_style: req.body.channel_style || 'NUMBER',
             staff_roles: aufbereiten('staff_roles', req.body.staff_roles),
             member_roles: aufbereiten('member_roles', req.body.member_roles),
-            open_msg_title: req.body.open_msg_title || null,
-            open_msg_description: req.body.open_msg_description || null,
-            open_msg_footer: req.body.open_msg_footer || null,
             button_label: req.body.button_label || 'Ticket erstellen',
             button_emoji: req.body.button_emoji || '🎫',
             button_color: req.body.button_color || 'PRIMARY',
@@ -116,6 +115,33 @@ router.delete('/:id', requirePermission('TICKET.CATEGORIES.MANAGE'), async (req,
         res.json({ success: true });
     } catch (error) {
         fehler(res, error, 'Die Kategorie konnte nicht geloescht werden');
+    }
+});
+
+/**
+ * Eröffnungsnachricht einer Kategorie speichern (K389, 2026-11-14). Die
+ * Vorlage geht in die Kern-Tabelle `guild_vorlagen`, Stelle = ID der
+ * Kategorie; `standard` ist die für Tickets ohne Kategorie. Leer gespeichert
+ * gilt wieder die Vorgabe.
+ */
+router.put('/:id/nachricht', csrfProtection, requirePermission('TICKET.CATEGORIES.MANAGE'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const tr = makeTranslator(req, res);
+    const id = req.params.id === 'standard' ? null : parseInt(req.params.id, 10);
+    if (Number.isNaN(id)) return res.status(400).json({ success: false, error: 'Ungueltige ID' });
+
+    try {
+        if (id !== null && !(await TicketCategories.getById(id, guildId))) {
+            return res.status(404).json({ success: false, error: tr('ticket:VORLAGEN.NICHT_GEFUNDEN') });
+        }
+        const stelle = id === null ? '' : String(id);
+        await Vorlage.speichere(guildId, EROEFFNUNG, req.body?.vorlage, stelle);
+        res.json({ success: true, message: tr('ticket:VORLAGEN.GESPEICHERT') });
+    } catch (error) {
+        if (error instanceof Vorlage.Eingabefehler) {
+            return res.status(400).json({ success: false, error: Vorlage.alsText(tr, 'FEHLER', error) });
+        }
+        fehler(res, error, 'Die Eröffnungsnachricht konnte nicht gespeichert werden');
     }
 });
 

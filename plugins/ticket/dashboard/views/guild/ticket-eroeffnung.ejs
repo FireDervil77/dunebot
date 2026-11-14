@@ -1,0 +1,64 @@
+<%#
+  Eröffnungsnachricht einer Ticket-Kategorie (K389, 2026-11-14).
+  Erwartet: tr, guildId, kategorie (null = Tickets ohne Kategorie), stelle, teil
+  (teil aus Vorlage.editor für ticket:eroeffnung, Stelle = ID der Kategorie).
+  Gespeichert wird über PUT …/categories/<id|standard>/nachricht.
+%>
+<% const basis = `/guild/${guildId}/plugins/ticket`; %>
+<% const ziel = kategorie ? String(kategorie.id) : 'standard'; %>
+
+<%- include('partials/ticket-kopf', {
+  guildId, tr,
+  icon: 'fa-solid fa-message',
+  titel: tr('ticket:VORLAGEN.EROEFFNUNG') + ' · ' + (kategorie ? kategorie.name : tr('ticket:VORLAGEN.OHNE_KATEGORIE')),
+  beschreibung: kategorie
+    ? tr('ticket:VORLAGEN.SEITE_BESCHREIBUNG', { kategorie: kategorie.name })
+    : tr('ticket:VORLAGEN.SEITE_BESCHREIBUNG_OHNE'),
+  aktion: `<a class="btn btn-outline-secondary" href="${basis}/kategorien">
+             <i class="fa-solid fa-arrow-left me-2"></i>${tr('ticket:VORLAGEN.ZURUECK')}
+           </a>`
+}) %>
+
+<div class="card">
+  <div class="card-body">
+    <div class="alert alert-info small">
+      <i class="fa-solid fa-circle-info me-1"></i><%= tr('ticket:VORLAGEN.FESTE_TEILE') %>
+      <%= tr('ticket:VORLAGEN.LEER') %>
+    </div>
+
+    <%- include('shared/vorlage', { guildId, tr, teil }) %>
+  </div>
+  <div class="card-footer d-flex">
+    <button type="button" class="btn btn-primary ms-auto" id="eroeffnungSpeichern"
+            data-ziel="<%= basis %>/categories/<%= ziel %>/nachricht">
+      <i class="fa-solid fa-floppy-disk me-2"></i><%= tr('ticket:SAVE_BTN') %>
+    </button>
+  </div>
+</div>
+
+<script>
+(function () {
+  var knopf = document.getElementById('eroeffnungSpeichern');
+  if (!knopf) return;
+  knopf.addEventListener('click', async function () {
+    knopf.disabled = true;
+    try {
+      var r = await fetch(knopf.dataset.ziel, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json', 'Accept': 'application/json',
+          'X-CSRF-Token': (document.querySelector('meta[name="csrf-token"]') || {}).content || ''
+        },
+        body: JSON.stringify({ vorlage: window.FBVorlage ? window.FBVorlage.lies('ticket:eroeffnung') : null })
+      });
+      var a = await r.json().catch(function () { return { success: false, error: 'HTTP ' + r.status }; });
+      if (!a.success) throw new Error(a.error || a.message || 'HTTP ' + r.status);
+      if (window.showToast) window.showToast('success', a.message);
+    } catch (e) {
+      if (window.showToast) window.showToast('error', e.message);
+    } finally {
+      knopf.disabled = false;
+    }
+  });
+})();
+</script>

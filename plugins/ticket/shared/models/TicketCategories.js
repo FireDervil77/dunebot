@@ -1,4 +1,5 @@
 const { ServiceManager } = require('dunebot-core');
+const { Vorlage } = require('dunebot-sdk');
 
 class TicketCategories {
     static _parseJsonFields(row) {
@@ -78,8 +79,8 @@ class TicketCategories {
             const result = await dbService.query(
                 `INSERT INTO ticket_categories 
                  (guild_id, name, description, parent_id, channel_style, staff_roles, member_roles,
-                  open_msg_title, open_msg_description, open_msg_footer, button_label, button_emoji, button_color, max_open_per_user, form_fields) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                  button_label, button_emoji, button_color, max_open_per_user, form_fields) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     guildId,
                     data.name,
@@ -88,9 +89,6 @@ class TicketCategories {
                     data.channel_style || 'NUMBER',
                     JSON.stringify(data.staff_roles || []),
                     JSON.stringify(data.member_roles || []),
-                    data.open_msg_title || null,
-                    data.open_msg_description || null,
-                    data.open_msg_footer || null,
                     data.button_label || 'Ticket erstellen',
                     data.button_emoji || '🎫',
                     data.button_color || 'PRIMARY',
@@ -135,6 +133,11 @@ class TicketCategories {
                 'DELETE FROM ticket_categories WHERE id = ? AND guild_id = ?',
                 [id, guildId]
             );
+            // Die Eröffnungsnachricht der Kategorie geht mit (K389). Sie liegt
+            // in der Kern-Tabelle guild_vorlagen, Stelle = ID der Kategorie.
+            if (result.affectedRows > 0) {
+                await Vorlage.loesche(guildId, 'ticket:eroeffnung', String(id));
+            }
             return result.affectedRows > 0;
         } catch (error) {
             const Logger = ServiceManager.get('Logger');

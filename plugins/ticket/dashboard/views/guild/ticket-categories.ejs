@@ -62,6 +62,11 @@
               </td>
               <td class="text-end">
                 <div class="btn-list flex-nowrap justify-content-end">
+                  <a class="btn btn-sm btn-outline-secondary"
+                     href="/guild/<%= guildId %>/plugins/ticket/kategorien/<%= kat.id %>/nachricht"
+                     title="<%= tr('ticket:CATEGORIES.OPEN_MSG_BTN') %>">
+                    <i class="fa-solid fa-message"></i>
+                  </a>
                   <button type="button" class="btn btn-sm btn-outline-primary"
                           onclick="editCategory(<%= kat.id %>)"
                           title="<%= tr('ticket:ACTION_UPDATE_BTN') %>">
@@ -93,6 +98,12 @@
       </div>
     </div>
   <% } %>
+  <div class="card-footer d-flex align-items-center">
+    <span class="text-secondary small"><%= tr('ticket:VORLAGEN.OHNE_KATEGORIE') %></span>
+    <a class="btn btn-sm btn-outline-secondary ms-auto" href="/guild/<%= guildId %>/plugins/ticket/kategorien/standard/nachricht">
+      <i class="fa-solid fa-message me-1"></i><%= tr('ticket:CATEGORIES.OPEN_MSG_BTN') %>
+    </a>
+  </div>
 </div>
 
 <!-- Die vorhandenen Kategorien als JSON, damit das Bearbeiten ohne zweite
@@ -162,13 +173,9 @@
             </div>
           </div>
 
-          <div class="mb-3">
-            <label for="catOpenTitle" class="form-label"><%= tr('ticket:CATEGORIES.OPEN_TITLE') %></label>
-            <input type="text" id="catOpenTitle" class="form-control" maxlength="255">
-          </div>
           <div class="mb-0">
-            <label for="catOpenDescription" class="form-label"><%= tr('ticket:CATEGORIES.OPEN_DESC') %></label>
-            <textarea id="catOpenDescription" class="form-control" rows="3"></textarea>
+            <label class="form-label"><%= tr('ticket:CATEGORIES.OPEN_MSG') %></label>
+            <div class="text-secondary small"><i class="fa-solid fa-circle-info me-1"></i><%= tr('ticket:CATEGORIES.OPEN_MSG_HINT') %></div>
           </div>
 
           <label class="form-check form-switch mt-3 mb-0">

@@ -106,7 +106,8 @@
         "CONFIG_ROLE_NOT_EXIST": "A role with ID {{role}} does not exist.",
         "CONFIG_MEM_ROLE_SUCCESS": "Successfully updated member roles configuration.",
         "CONFIG_STAFF_ROLE_SUCCESS": "Successfully updated staff roles configuration.",
-        "CONFIG_MSG_SUCCESS": "Successfully updated opening message configuration."
+        "CONFIG_MSG_SUCCESS": "Successfully updated opening message configuration.",
+        "CONFIG_MSG_INVALID": "That does not fit into a Discord message: title at most 256 characters, footer 2048, all together 6000."
     },
 
     "TICKET": {

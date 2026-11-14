@@ -1,6 +1,7 @@
 <%#
   Herausgeloest aus greeting-settings.ejs beim Umbau am 2026-08-07.
-  Erwartet: tr, guildId, settings, channels, roles, inviteMappings
+  Erwartet: tr, guildId, settings, channels, roles, inviteMappings, vorlagen
+  (vorlagen.verifizierung_panel und vorlagen.verifiziert, K389)
 %>
 <h4><i class="fa-solid fa-shield-check text-success me-2"></i><%= tr('greeting:VERIFICATION.TITLE') %></h4>
 <p class="text-secondary mb-4"><%= tr('greeting:VERIFICATION.DESC') %></p>
@@ -70,20 +71,16 @@
       <small class="text-secondary"><%= tr('greeting:VERIFICATION.UNVERIFIED_ROLE_DESC') %></small>
     </div>
 
-    <!-- Verification Message -->
+    <!-- Panel-Nachricht und Bestätigung: Kern-Teil „Nachricht“ (G-08, K389) -->
     <div class="mb-3">
-      <label><%= tr('greeting:VERIFICATION.MESSAGE') %></label>
-      <textarea id="verificationMessage" class="form-control" rows="3" placeholder="<%= tr('greeting:VERIFICATION.MESSAGE_PH') %>"><%= settings.verification.message %></textarea>
-      <small class="text-secondary">
-        Platzhalter: <code>{guild:name}</code> <code>{server}</code> <code>{guild:memberCount}</code> <code>{count}</code>
-      </small>
+      <label class="form-label fw-semibold"><%= tr('greeting:VERIFICATION.MESSAGE') %></label>
+      <%- include('shared/vorlage', { guildId, tr, teil: vorlagen.verifizierung_panel }) %>
     </div>
 
-    <!-- Verification Success Message -->
     <div class="mb-3">
-      <label><%= tr('greeting:VERIFICATION.SUCCESS_MESSAGE') %></label>
-      <textarea id="verificationSuccessMessage" class="form-control" rows="3" placeholder="<%= tr('greeting:VERIFICATION.SUCCESS_MESSAGE_PH') %>"><%= settings.verification.success_message %></textarea>
-      <small class="text-secondary"><%= tr('greeting:VERIFICATION.SUCCESS_MESSAGE_DESC') %></small>
+      <label class="form-label fw-semibold"><%= tr('greeting:VERIFICATION.SUCCESS_MESSAGE') %></label>
+      <small class="d-block text-secondary mb-1"><%= tr('greeting:VERIFICATION.SUCCESS_MESSAGE_DESC') %></small>
+      <%- include('shared/vorlage', { guildId, tr, teil: vorlagen.verifiziert }) %>
     </div>
 
     <!-- Info -->

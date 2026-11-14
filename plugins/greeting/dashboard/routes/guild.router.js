@@ -20,7 +20,7 @@ const express = require('express');
 const router = express.Router();
 const { ServiceManager } = require('dunebot-core');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
-const { makeTranslator, renderView, ladeDaten, renderFehler, ANLAESSE } = require('./_shared');
+const { makeTranslator, renderView, ladeDaten, renderFehler, ANLAESSE, VERIFIZIERUNG } = require('./_shared');
 const { Vorlage } = require('dunebot-sdk');
 
 /** Skripte anmelden, die eine Seite braucht. */
@@ -101,8 +101,8 @@ router.put('/settings', requirePermission('GREETING.SETTINGS.EDIT'), async (req,
             farewell_enabled: false, farewell_channel: null,
             boost_enabled: false, boost_channel: null,
             verification_enabled: false, verification_channel: null, verification_role_id: null,
-            verification_type: 'button', verification_message: null, verification_remove_role_id: null,
-            verification_emoji: '✅', verification_success_message: null,
+            verification_type: 'button', verification_remove_role_id: null,
+            verification_emoji: '✅',
             ...(vorhanden || {})
         };
         if (typeof settings.autorole_ids === 'string') {
@@ -166,10 +166,16 @@ router.put('/settings', requirePermission('GREETING.SETTINGS.EDIT'), async (req,
                 if (body.verification_channel !== undefined) settings.verification_channel = body.verification_channel || null;
                 if (body.verification_role_id !== undefined) settings.verification_role_id = body.verification_role_id || null;
                 if (body.verification_type !== undefined) settings.verification_type = body.verification_type || 'button';
-                if (body.verification_message !== undefined) settings.verification_message = body.verification_message || null;
                 if (body.verification_remove_role_id !== undefined) settings.verification_remove_role_id = body.verification_remove_role_id || null;
                 if (body.verification_emoji !== undefined) settings.verification_emoji = body.verification_emoji || '✅';
-                if (body.verification_success_message !== undefined) settings.verification_success_message = body.verification_success_message || null;
+                // Panel-Nachricht und Bestätigung sind Vorlagen (K389). Erst
+                // beide prüfen, dann speichern: ein Fehler in der zweiten soll
+                // die erste nicht schon geschrieben haben.
+                const vorlagen = [];
+                for (const [feld, anlass] of [['vorlage_panel', VERIFIZIERUNG.verifizierung_panel], ['vorlage_verifiziert', VERIFIZIERUNG.verifiziert]]) {
+                    if (body[feld] !== undefined && body[feld] !== null) vorlagen.push([anlass, Vorlage.pruefe(body[feld])]);
+                }
+                for (const [anlass, v] of vorlagen) await Vorlage.speichere(guildId, anlass, v);
             }
             if (body.action === 'enable') settings.verification_enabled = 1;
             if (body.action === 'disable') settings.verification_enabled = 0;
@@ -184,8 +190,8 @@ router.put('/settings', requirePermission('GREETING.SETTINGS.EDIT'), async (req,
                 welcome_image_enabled, welcome_image_bg, welcome_image_text, welcome_image_color,
                 farewell_enabled, farewell_channel,
                 boost_enabled, boost_channel,
-                verification_enabled, verification_channel, verification_role_id, verification_type, verification_message, verification_remove_role_id, verification_emoji, verification_success_message
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                verification_enabled, verification_channel, verification_role_id, verification_type, verification_remove_role_id, verification_emoji
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
                 autorole_id = VALUES(autorole_id),
                 autorole_ids = VALUES(autorole_ids),
@@ -204,10 +210,8 @@ router.put('/settings', requirePermission('GREETING.SETTINGS.EDIT'), async (req,
                 verification_channel = VALUES(verification_channel),
                 verification_role_id = VALUES(verification_role_id),
                 verification_type = VALUES(verification_type),
-                verification_message = VALUES(verification_message),
                 verification_remove_role_id = VALUES(verification_remove_role_id),
                 verification_emoji = VALUES(verification_emoji),
-                verification_success_message = VALUES(verification_success_message),
                 updated_at = CURRENT_TIMESTAMP
         `, [
             guildId,
@@ -228,10 +232,8 @@ router.put('/settings', requirePermission('GREETING.SETTINGS.EDIT'), async (req,
             settings.verification_channel,
             settings.verification_role_id,
             settings.verification_type,
-            settings.verification_message,
             settings.verification_remove_role_id,
-            settings.verification_emoji || '✅',
-            settings.verification_success_message
+            settings.verification_emoji || '✅'
         ]);
 
         Logger.info(`[Greeting] Settings für Guild ${guildId} gespeichert (${body.type}/${body.action})`);

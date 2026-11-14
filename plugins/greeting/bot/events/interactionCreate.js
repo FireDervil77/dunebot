@@ -1,5 +1,6 @@
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
-const { ServiceManager, parsePlaceholders } = require('dunebot-core');
+const { ServiceManager } = require('dunebot-core');
+const { baueVerifiziert, bauePanel } = require('../utils');
 
 // Simple math captcha cache: Map<`${guildId}-${userId}`, { answer: number, expires: number }>
 const captchaCache = new Map();
@@ -59,8 +60,7 @@ module.exports = async (interaction) => {
         // ===== BUTTON Verification =====
         if (settings.verification_type === 'button') {
             await assignVerification(member, verifiedRoleId, unverifiedRoleId, Logger);
-            const successEmbed = buildSuccessEmbed(guild, member, settings);
-            return interaction.reply({ embeds: [successEmbed], ephemeral: true });
+            return interaction.reply(await baueVerifiziert(member, { fluechtig: true }));
         }
 
         // ===== CAPTCHA Verification =====
@@ -112,8 +112,15 @@ module.exports = async (interaction) => {
                 if (selectedAnswer === captcha.answer) {
                     captchaCache.delete(cacheKey);
                     await assignVerification(member, verifiedRoleId, unverifiedRoleId, Logger);
-                    const successEmbed = buildSuccessEmbed(guild, member, settings);
-                    return interaction.update({ embeds: [successEmbed], components: [] });
+                    // Die Bestätigung kommt als neue Antwort, die Captcha-Nachricht
+                    // geht weg: Eine Vorlage in Components V2 lässt sich nicht in
+                    // eine Nachricht mit Embed hineinbearbeiten (K389).
+                    await interaction.deferUpdate();
+                    await interaction.followUp(await baueVerifiziert(member, { fluechtig: true }));
+                    await interaction.deleteReply().catch((err) => {
+                        Logger.warn(`[Greeting] Captcha-Nachricht von ${member.user.tag} nicht gelöscht: ${err.message}`);
+                    });
+                    return;
                 } else {
                     captchaCache.delete(cacheKey);
                     const wrongEmbed = new EmbedBuilder()
@@ -142,43 +149,9 @@ module.exports = async (interaction) => {
     }
 };
 
-/**
- * Builds a success embed after verification
- */
-function buildSuccessEmbed(guild, member, settings) {
-    const defaultTitle = '✅ Erfolgreich verifiziert!';
-    const defaultDesc = `Willkommen auf **${guild.name}**!\nDu hast jetzt vollen Zugang zum Server.`;
-
-    let title = defaultTitle;
-    let description = defaultDesc;
-
-    if (settings.verification_success_message) {
-        const raw = settings.verification_success_message;
-        const placeholders = {
-            '{guild:name}': guild.name,
-            '{server}': guild.name,
-            '{user:name}': member.user.username,
-            '{user:tag}': member.user.tag,
-            '{user:mention}': `<@${member.user.id}>`,
-            '{member:name}': member.user.username,
-            '{member:mention}': `<@${member.user.id}>`,
-            '{guild:memberCount}': String(guild.memberCount),
-            '{count}': String(guild.memberCount)
-        };
-        description = raw;
-        for (const [key, val] of Object.entries(placeholders)) {
-            description = description.replaceAll(key, val);
-        }
-    }
-
-    return new EmbedBuilder()
-        .setColor(0x57F287)
-        .setTitle(title)
-        .setDescription(description)
-        .setThumbnail(member.user.displayAvatarURL({ size: 128 }))
-        .setFooter({ text: guild.name, iconURL: guild.iconURL({ size: 64 }) })
-        .setTimestamp();
-}
+// Die Bestätigung baut seit K389 (2026-11-14) `baueVerifiziert` in
+// ../utils.js aus der Vorlage `greeting:verifiziert`. Bis dahin stand hier
+// `buildSuccessEmbed` mit eigener Platzhalter-Tabelle ({user:name} usw.).
 
 /**
  * Assigns verified role and removes unverified role
@@ -231,30 +204,14 @@ module.exports.sendVerificationPanel = async (guild, settings) => {
     const channel = guild.channels.cache.get(channelId);
     if (!channel) return;
 
-    const rawMessage = settings.verification_message || '✅ Klicke den Button um dich zu verifizieren!';
-    const ctx = { guild, extra: {} };
-    let messageText = parsePlaceholders(rawMessage, ctx);
-    let embed = null;
-
-    try {
-        const parsed = JSON.parse(messageText);
-        if (parsed && parsed.title) {
-            embed = new EmbedBuilder()
-                .setTitle(parsePlaceholders(parsed.title, ctx))
-                .setDescription(parsed.description ? parsePlaceholders(parsed.description, ctx) : null)
-                .setColor(parsed.color ? parseInt(parsed.color.replace('#', ''), 16) : 0x5865f2);
-            messageText = null;
-        }
-    } catch { /* plain text */ }
-
-    const payload = {};
-    if (messageText) payload.content = messageText;
-    if (embed) payload.embeds = [embed];
+    // Text aus der Vorlage `greeting:verifizierung_panel` (K389). Bis
+    // 2026-11-14 aus `verification_message`, das JSON mit title/description/
+    // color als Embed las.
 
     // For reaction type: no buttons, add reaction emoji instead
     if (settings.verification_type === 'reaction') {
         const emoji = settings.verification_emoji || '✅';
-        const reactionMsg = await channel.send(payload);
+        const reactionMsg = await channel.send(await bauePanel(guild));
         await reactionMsg.react(emoji);
 
         // Store message ID for reaction tracking
@@ -280,8 +237,7 @@ module.exports.sendVerificationPanel = async (guild, settings) => {
                 .setStyle(ButtonStyle.Secondary)
         );
 
-        payload.components = [row];
-        await channel.send(payload);
+        await channel.send(await bauePanel(guild, [row]));
         Logger.info(`[Greeting] Verification panel sent to #${channel.name} in ${guild.name}`);
     }
 };

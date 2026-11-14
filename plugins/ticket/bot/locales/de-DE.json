@@ -106,7 +106,8 @@
         "CONFIG_ROLE_NOT_EXIST": "Eine Rolle mit der ID {{role}} existiert nicht.",
         "CONFIG_MEM_ROLE_SUCCESS": "Mitglieder-Rollen-Konfiguration erfolgreich aktualisiert.",
         "CONFIG_STAFF_ROLE_SUCCESS": "Staff-Rollen-Konfiguration erfolgreich aktualisiert.",
-        "CONFIG_MSG_SUCCESS": "Eröffnungsnachricht-Konfiguration erfolgreich aktualisiert."
+        "CONFIG_MSG_SUCCESS": "Eröffnungsnachricht-Konfiguration erfolgreich aktualisiert.",
+        "CONFIG_MSG_INVALID": "Das passt nicht in eine Discord-Nachricht: Überschrift höchstens 256 Zeichen, Fußzeile 2048, alles zusammen 6000."
     },
 
     "TICKET": {

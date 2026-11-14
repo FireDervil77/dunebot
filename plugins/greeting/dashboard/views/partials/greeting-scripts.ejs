@@ -110,8 +110,8 @@
       verification_channel: document.getElementById('verificationChannel').value,
       verification_role_id: document.getElementById('verificationRoleId').value,
       verification_remove_role_id: document.getElementById('verificationRemoveRoleId').value,
-      verification_message: document.getElementById('verificationMessage').value,
-      verification_success_message: document.getElementById('verificationSuccessMessage').value,
+      vorlage_panel: window.FBVorlage ? window.FBVorlage.lies('greeting:verifizierung_panel') : null,
+      vorlage_verifiziert: window.FBVorlage ? window.FBVorlage.lies('greeting:verifiziert') : null,
       verification_emoji: document.getElementById('verificationEmoji')?.value || '✅'
     };
 

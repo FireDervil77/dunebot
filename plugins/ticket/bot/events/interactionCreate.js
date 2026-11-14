@@ -2,7 +2,7 @@ const {
     getExistingTicketChannel,
     getTicketChannels,
     closeTicket,
-    parse,
+    baueEroeffnung,
     genTicketId,
     reopenTicket,
 } = require("../utils");
@@ -46,12 +46,6 @@ module.exports = async (interaction) => {
         if (existing >= (settings.ticket_limit || 50))
             return interaction.reply({ content: guild.getT("ticket:HANDLER.TOO_MANY"), ephemeral: true });
 
-        let defaultMsg = {
-            title: guild.getT("ticket:HANDLER.OPEN_EMBED_TITLE"),
-            description: guild.getT("ticket:HANDLER.OPEN_EMBED_DESC"),
-            footer: guild.getT("ticket:HANDLER.OPEN_EMBED_FOOTER"),
-        };
-
         let useDefault = true;
         let category = {
             name: "Default",
@@ -60,9 +54,6 @@ module.exports = async (interaction) => {
             channel_style: "NUMBER",
             staff_roles: [],
             member_roles: [],
-            open_msg_title: null,
-            open_msg_description: null,
-            open_msg_footer: null,
             form_fields: [],
         };
 
@@ -155,7 +146,7 @@ module.exports = async (interaction) => {
                     components: [],
                 });
 
-                return createTicketChannel(interaction, guild, user, member, settings, category, useDefault, defaultMsg, formResponses);
+                return createTicketChannel(interaction, guild, user, member, settings, category, useDefault, formResponses);
             }
 
             await interaction.editReply({
@@ -163,12 +154,12 @@ module.exports = async (interaction) => {
                 components: [],
             });
 
-            return createTicketChannel(interaction, guild, user, member, settings, category, useDefault, defaultMsg, null);
+            return createTicketChannel(interaction, guild, user, member, settings, category, useDefault, null);
         }
 
         // No categories: check for form_fields on default or just create
         await interaction.deferReply({ ephemeral: true });
-        return createTicketChannel(interaction, guild, user, member, settings, category, useDefault, defaultMsg, null);
+        return createTicketChannel(interaction, guild, user, member, settings, category, useDefault, null);
     }
 
     //  Ticket Close Button
@@ -337,15 +328,9 @@ module.exports = async (interaction) => {
 /**
  * Creates the actual ticket channel after all pre-checks (category selection, forms) are done.
  */
-async function createTicketChannel(interaction, guild, user, member, settings, category, useDefault, defaultMsg, formResponses) {
+async function createTicketChannel(interaction, guild, user, member, settings, category, useDefault, formResponses) {
     const Logger = ServiceManager.get("Logger");
     const existing = getTicketChannels(guild).size;
-
-    const openMsg = {
-        title: category.open_msg_title || defaultMsg.title,
-        description: category.open_msg_description || defaultMsg.description,
-        footer: category.open_msg_footer || defaultMsg.footer,
-    };
 
     try {
         const ticketNumber = (existing + 1).toString();
@@ -442,57 +427,18 @@ async function createTicketChannel(interaction, guild, user, member, settings, c
             permissionOverwrites,
         });
 
-        const openEmbed = new EmbedBuilder();
-
-        const parseData = {
-            "server": guild.name,
-            "count": guild.memberCount,
-            "member:name": member.displayName,
-            "member:tag": member.user.username,
-            "member:mention": member.toString(),
-            "ticket:category": category.name,
-            "ticket:number": ticketNumber,
-            "ticket:id": ticketId,
-        };
-
-        if (openMsg.title) {
-            openEmbed.setAuthor({ name: parse(openMsg.title, parseData) });
-        }
-
-        if (openMsg.description) {
-            openEmbed.setDescription(parse(openMsg.description, parseData));
-        }
-
-        if (openMsg.footer) {
-            openEmbed.setFooter({ text: parse(openMsg.footer, parseData) });
-        }
-
-        // Default style
+        // Feste Teile unter der gestaltbaren Nachricht (K389): ohne
+        // Kategorie Kategorie und Ticket-ID, dazu die Antworten des Formulars.
+        const felder = [];
         if (useDefault) {
-            openEmbed.addFields(
-                {
-                    name: guild.getT("ticket:HANDLER.CATEGORY_LABEL"),
-                    value: category.name,
-                    inline: true,
-                },
-                {
-                    name: guild.getT("ticket:HANDLER.TICKET_ID"),
-                    value: ticketId,
-                    inline: true,
-                },
+            felder.push(
+                { name: guild.getT("ticket:HANDLER.CATEGORY_LABEL"), wert: category.name, inline: true },
+                { name: guild.getT("ticket:HANDLER.TICKET_ID"), wert: ticketId, inline: true },
             );
         }
-
-        // Add form responses to embed if present
         if (formResponses && formResponses.length > 0) {
-            openEmbed.addFields({ name: "\u200b", value: "**" + guild.getT("ticket:HANDLER.FORM_RESPONSES_TITLE") + "**" });
-            for (const resp of formResponses) {
-                openEmbed.addFields({
-                    name: resp.label,
-                    value: resp.value || "-",
-                    inline: false,
-                });
-            }
+            felder.push({ name: "\u200b", wert: "**" + guild.getT("ticket:HANDLER.FORM_RESPONSES_TITLE") + "**" });
+            for (const resp of formResponses) felder.push({ name: resp.label, wert: resp.value || "-" });
         }
 
         // Buttons: Close + Claim
@@ -509,11 +455,7 @@ async function createTicketChannel(interaction, guild, user, member, settings, c
                 .setStyle(ButtonStyle.Success),
         );
 
-        await tktChannel.send({
-            content: user.toString(),
-            embeds: [openEmbed],
-            components: [btnRow],
-        });
+        await tktChannel.send(await baueEroeffnung({ member, category, ticketNumber, ticketId, felder, komponenten: [btnRow] }));
 
         const commonFields = [
             {

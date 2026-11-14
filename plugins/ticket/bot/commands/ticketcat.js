@@ -12,6 +12,8 @@ const {
 } = require("discord.js");
 const { ServiceManager } = require("dunebot-core");
 const { TicketCategories } = require("../../shared/models");
+const { Vorlage } = require("dunebot-sdk");
+const { EROEFFNUNG, vorgabeEroeffnung } = require("../utils");
 
 /**
  * @type {import('dunebot-sdk').CommandType}
@@ -430,11 +432,18 @@ async function configCategory(arg0, guildId, name) {
             const description = modal.fields.getTextInputValue("description");
             const footer = modal.fields.getTextInputValue("footer");
 
-            await TicketCategories.update(cat.id, guildId, {
-                open_msg_title: title || null,
-                open_msg_description: description || null,
-                open_msg_footer: footer || null,
-            });
+            // Felder der Vorlage der Kategorie (K389). Leer lässt das Feld,
+            // wie es ist; ganz neu startet die Vorlage bei der Vorgabe.
+            const teil = {};
+            if (title) teil.titel = title;
+            if (description) teil.beschreibung = description;
+            if (footer) teil.fusszeile = footer;
+            try {
+                await Vorlage.aendere(guildId, EROEFFNUNG, teil, String(cat.id), vorgabeEroeffnung(guild));
+            } catch (err) {
+                if (!(err instanceof Vorlage.Eingabefehler)) throw err;
+                return modal.followUp(guild.getT("ticket:CATEGORY.CONFIG_MSG_INVALID"));
+            }
             await modal.followUp(guild.getT("ticket:CATEGORY.CONFIG_MSG_SUCCESS"));
         }
     });
