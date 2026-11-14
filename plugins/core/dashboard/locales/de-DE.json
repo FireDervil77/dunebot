@@ -426,7 +426,8 @@
     "TOAST": "Protokoll der Hinweise im Dashboard",
     "EREIGNISBUCH": "Fachereignisse, fertig zugestellt",
     "EREIGNISBUCH_SPAETESTENS": "Fachereignisse, spätestens (auch liegen gebliebene)",
-    "SPENDEN": "Spenden (Zahlungsbelege)"
+    "SPENDEN": "Spenden (Zahlungsbelege)",
+    "FORTSCHRITT_BUCHUNGEN": "Buchungen der Fortschritte (Leveling, Clan): ältere werden zu Monatssummen je Mitglied verdichtet, der Stand bleibt"
   },
   "GESTALTUNG": {
     "TITEL": "Gestaltung",
@@ -573,7 +574,6 @@
     "GESPERRT": "In der Kontroll-Guild stellt nur ihr Besitzer Bildkarten ein. Du siehst die Einstellung nur.",
     "HINWEISE": "Ein Teil der gespeicherten Einstellung passt nicht mehr, der Bot nimmt dafür die Vorgabe:"
   },
-
   "MITGLIEDER": {
     "EINLEITUNG": "Mitglieder dieses Servers und was die Plugins über sie wissen. Was du in einem Profil siehst, hängt von deinen Rechten ab: Moderation, Automod, Giveaways und Musik brauchen zusätzlich das Recht des Plugins.",
     "SUCHE": "Name, Anzeigename oder ID",
@@ -630,5 +630,52 @@
     "HINWEIS_BOT_FEHLT": "Rangfolge nicht geprüft, der Bot antwortete nicht: {{grund}}",
     "HINWEIS_ZUR_SEITE": "Alle verwalteten Rollen",
     "BESITZER_UNTERSTUETZER": "Unterstützer-Abzeichen"
+  },
+  "FORTSCHRITT": {
+    "TITEL": "Stufen",
+    "TEXT": "Hier legst du fest, ab wie vielen XP jede Stufe erreicht ist. Unter der ersten Stufe steht ein Mitglied auf Level 0, die höchste Stufe ist das Höchstlevel. Speicherst du, rechnet der Bot die Level aller Mitglieder neu; die XP bleiben, wie sie sind.",
+    "PRESTIGE": "Prestige",
+    "PRESTIGE_TEXT": "Wer die höchste Stufe erreicht, beginnt wieder unten und bekommt einen Prestige-Punkt. XP über der Schwelle der höchsten Stufe nimmt er mit. Gilt ab der nächsten Vergabe.",
+    "PRESTIGE_AN": "Prestige ist an.",
+    "PRESTIGE_AUS": "Prestige ist aus.",
+    "STUFE": "Stufe",
+    "NAME": "Name",
+    "NAME_PLATZHALTER": "optional",
+    "AB_XP": "Ab XP",
+    "SCHRITT": "Schritt",
+    "ENTFERNEN": "Stufe entfernen",
+    "HINZUFUEGEN": "Stufe hinzufügen",
+    "SPEICHERN": "Speichern",
+    "GESPEICHERT": "Gespeichert: {{n}} Stufen.",
+    "NEU_GERECHNET": "Neu gerechnet: {{aufgestiegen}} aufgestiegen, {{abgestiegen}} abgestiegen, {{gleich}} unverändert.",
+    "UNGESPEICHERT": "nicht gespeichert",
+    "KEIN_RECHT": "Ändern darf nur, wer das Recht {{recht}} hat.",
+    "LADEFEHLER": "Die Stufen ließen sich nicht laden: {{grund}}",
+    "SCHABLONE_AKTIV": "Schablone „{{name}}“",
+    "SCHABLONE_EIGEN": "eigene Tabelle",
+    "NICHT_EINGESPIELT": "Vorgabe „{{name}}“, noch nicht benutzt",
+    "VORSCHLAG_DA": "Vorschlag mit {{n}} Stufen eingetragen. Er gilt erst, wenn du speicherst.",
+    "LEER": "Keine Stufe angelegt. Alle stehen auf Level 0.",
+    "STUFEN_ZAHL": "{{n}} Stufen",
+    "SCHABLONE_TITEL": "Schablone laden",
+    "SCHABLONE_TEXT": "Ein mitgelieferter Levelsatz ersetzt die ganze Tabelle, auch Namen.",
+    "SCHABLONE_LADEN": "Laden …",
+    "SCHABLONE_FLACH": "Flach",
+    "SCHABLONE_ANSTEIGEND": "Ansteigend",
+    "SCHABLONE_STEIL": "Steil",
+    "RECHNER_TITEL": "Rechner",
+    "RECHNER_TEXT": "Schlägt eine Tabelle vor: XP von Stufe L zu L+1 nach der Formel, L ab 0. Übernommen wird sie erst mit „Speichern“.",
+    "FORMEL": "Formel",
+    "FORMEL_QUADRATISCH": "quadratisch",
+    "FORMEL_EXPONENTIELL": "exponentiell",
+    "BASIS": "Basis",
+    "FAKTOR": "Faktor",
+    "ANZAHL": "Stufen",
+    "VORSCHLAGEN": "Vorschlagen",
+    "BESTAETIGEN_TITEL": "Stufentabelle ersetzen",
+    "BESTAETIGEN_TEXT": "„{{name}}“ ersetzt die ganze Tabelle durch {{n}} Stufen. Die Level aller Mitglieder werden neu gerechnet, die XP bleiben. Tippe zur Bestätigung den Namen der Schablone ein:",
+    "BESTAETIGUNG_FALSCH": "Der Name stimmt nicht. Nichts wurde geändert.",
+    "ABBRECHEN": "Abbrechen",
+    "PROBE": "Probe der Fortschritts-Bibliothek"
   }
 }

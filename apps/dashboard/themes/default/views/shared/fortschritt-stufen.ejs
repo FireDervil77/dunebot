@@ -1,0 +1,344 @@
+<%
+/**
+ * Stufentabelle eines Fortschritts — Kern-Teil (G-20, F-CL8, 2026-11-14).
+ *
+ * Zeigt die Stufen einer Kennung (`leveling:community`, `clan:<id>`,
+ * `clan:<id>:gesamt`) und lässt sie frei ändern: jede Stufe einzeln, eine
+ * Schablone laden (rotes Fenster, ersetzt die Tabelle) oder mit dem Rechner
+ * einen Vorschlag holen, der erst mit „Speichern“ gilt. Beim Speichern rechnet
+ * der Kern alle Stände neu. Schnittstellen: /guild/ID/settings/fortschritt/KENNUNG
+ * (ansehen mit Zugang zur Guild, ändern mit dem Recht der Erklärung).
+ *
+ * Aufruf, AUSSERHALB eines anderen Formulars (eigener Speichern-Knopf):
+ *
+ *     include('shared/fortschritt-stufen', { guildId, tr, kennung: 'leveling:community' })
+ *
+ * Die Karte wird per Skript gefüllt (Skripte stehen am Seitenende, deshalb
+ * über `data-fortschritt-stufen` gesucht, nie über das laufende Skript).
+ */
+const _kennung = typeof kennung !== 'undefined' ? String(kennung) : '';
+const _t = (k, o) => tr('core:FORTSCHRITT.' + k, o);
+const _id = 'fs-' + _kennung.replace(/[^a-z0-9]/gi, '-');
+const _texte = ['STUFE', 'NAME', 'AB_XP', 'SCHRITT', 'ENTFERNEN', 'HINZUFUEGEN', 'SPEICHERN', 'GESPEICHERT', 'NEU_GERECHNET',
+  'UNGESPEICHERT', 'KEIN_RECHT', 'LADEFEHLER', 'SCHABLONE_AKTIV', 'SCHABLONE_EIGEN', 'NICHT_EINGESPIELT', 'VORSCHLAG_DA',
+  'PRESTIGE_AN', 'PRESTIGE_AUS', 'LEER', 'STUFEN_ZAHL', 'BESTAETIGEN_TEXT', 'NAME_PLATZHALTER'];
+%>
+<div class="card mt-3" data-fortschritt-stufen="<%= _kennung %>"
+     data-adresse="/guild/<%= guildId %>/settings/fortschritt/<%= encodeURIComponent(_kennung) %>"
+     <% _texte.forEach(function (k) { %> data-text-<%= k.toLowerCase().replace(/_/g, '-') %>="<%= _t(k) %>"<% }) %>>
+  <div class="card-header">
+    <h3 class="card-title"><i class="fa-solid fa-stairs me-2"></i><%= _t('TITEL') %> <span class="text-secondary ms-1" data-fs-titel></span></h3>
+    <div class="card-actions"><span class="badge bg-secondary-lt" data-fs-schablone></span></div>
+  </div>
+  <div class="card-body">
+    <p class="text-secondary"><%= _t('TEXT') %></p>
+    <div data-fs-hinweis></div>
+
+    <div class="mb-3" data-fs-prestige-zeile hidden>
+      <label class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" data-fs-prestige>
+        <span class="form-check-label"><%= _t('PRESTIGE') %></span>
+      </label>
+      <div class="form-hint"><%= _t('PRESTIGE_TEXT') %></div>
+    </div>
+
+    <div class="table-responsive border rounded" style="max-height: 420px; overflow-y: auto;">
+      <table class="table table-sm table-vcenter mb-0">
+        <thead class="sticky-top bg-body">
+          <tr><th style="width: 5rem;"><%= _t('STUFE') %></th><th><%= _t('NAME') %></th><th style="width: 11rem;"><%= _t('AB_XP') %></th><th class="text-end" style="width: 8rem;"><%= _t('SCHRITT') %></th><th style="width: 3rem;"></th></tr>
+        </thead>
+        <tbody data-fs-zeilen><tr><td colspan="5" class="text-secondary"><i class="fa-solid fa-spinner fa-spin me-2"></i></td></tr></tbody>
+      </table>
+    </div>
+    <div class="d-flex flex-wrap gap-2 mt-2 align-items-center">
+      <button type="button" class="btn btn-outline-secondary btn-sm" data-fs-hinzu><i class="fa-solid fa-plus me-1"></i><%= _t('HINZUFUEGEN') %></button>
+      <span class="text-secondary small" data-fs-zahl></span>
+      <span class="badge bg-warning-lt" data-fs-ungespeichert hidden><%= _t('UNGESPEICHERT') %></span>
+      <button type="button" class="btn btn-primary ms-auto" data-fs-speichern><i class="fa-solid fa-floppy-disk me-1"></i><%= _t('SPEICHERN') %></button>
+    </div>
+
+    <hr>
+    <div class="row g-3">
+      <div class="col-lg-5">
+        <h4><%= _t('SCHABLONE_TITEL') %></h4>
+        <p class="text-secondary small"><%= _t('SCHABLONE_TEXT') %></p>
+        <div class="input-group">
+          <select class="form-select" data-fs-schablone-wahl></select>
+          <button type="button" class="btn btn-outline-danger" data-fs-schablone-laden><i class="fa-solid fa-file-import me-1"></i><%= _t('SCHABLONE_LADEN') %></button>
+        </div>
+      </div>
+      <div class="col-lg-7">
+        <h4><%= _t('RECHNER_TITEL') %></h4>
+        <p class="text-secondary small"><%= _t('RECHNER_TEXT') %></p>
+        <div class="row g-2 align-items-end">
+          <div class="col-sm-4">
+            <label class="form-label" for="<%= _id %>-formel"><%= _t('FORMEL') %></label>
+            <select class="form-select" id="<%= _id %>-formel" data-fs-formel>
+              <option value="quadratisch"><%= _t('FORMEL_QUADRATISCH') %></option>
+              <option value="exponentiell"><%= _t('FORMEL_EXPONENTIELL') %></option>
+            </select>
+          </div>
+          <div class="col-4 col-sm-2" data-fs-quadratisch><label class="form-label" for="<%= _id %>-a">a</label><input class="form-control" id="<%= _id %>-a" type="number" step="any" value="5" data-fs-p="a"></div>
+          <div class="col-4 col-sm-2" data-fs-quadratisch><label class="form-label" for="<%= _id %>-b">b</label><input class="form-control" id="<%= _id %>-b" type="number" step="any" value="50" data-fs-p="b"></div>
+          <div class="col-4 col-sm-2" data-fs-quadratisch><label class="form-label" for="<%= _id %>-c">c</label><input class="form-control" id="<%= _id %>-c" type="number" step="any" value="100" data-fs-p="c"></div>
+          <div class="col-6 col-sm-3" data-fs-exponentiell hidden><label class="form-label" for="<%= _id %>-basis"><%= _t('BASIS') %></label><input class="form-control" id="<%= _id %>-basis" type="number" step="any" value="100" data-fs-p="basis"></div>
+          <div class="col-6 col-sm-3" data-fs-exponentiell hidden><label class="form-label" for="<%= _id %>-faktor"><%= _t('FAKTOR') %></label><input class="form-control" id="<%= _id %>-faktor" type="number" step="any" value="1.1" data-fs-p="faktor"></div>
+          <div class="col-6 col-sm-2"><label class="form-label" for="<%= _id %>-anzahl"><%= _t('ANZAHL') %></label><input class="form-control" id="<%= _id %>-anzahl" type="number" min="1" step="1" value="100" data-fs-p="anzahl"></div>
+          <div class="col-6 col-sm-auto"><button type="button" class="btn btn-outline-primary w-100" data-fs-rechnen><i class="fa-solid fa-calculator me-1"></i><%= _t('VORSCHLAGEN') %></button></div>
+        </div>
+        <div class="form-hint mt-1" data-fs-formel-text></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal modal-blur fade" tabindex="-1" aria-hidden="true" data-fs-fenster>
+    <div class="modal-dialog modal-dialog-centered" role="document">
+      <div class="modal-content border border-danger border-2">
+        <div class="modal-status bg-danger"></div>
+        <div class="modal-header bg-danger-lt">
+          <h5 class="modal-title text-danger fw-bold"><i class="fa-solid fa-triangle-exclamation me-2"></i><%= _t('BESTAETIGEN_TITEL') %></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="<%= _t('ABBRECHEN') %>"></button>
+        </div>
+        <div class="modal-body">
+          <p data-fs-fenster-text></p>
+          <label class="form-label" for="<%= _id %>-bestaetigung" data-fs-fenster-frage></label>
+          <input class="form-control" id="<%= _id %>-bestaetigung" type="text" autocomplete="off" data-fs-bestaetigung>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal"><%= _t('ABBRECHEN') %></button>
+          <button type="button" class="btn btn-danger" disabled data-fs-fenster-ok><i class="fa-solid fa-file-import me-1"></i><%= _t('SCHABLONE_LADEN') %></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  function alle() {
+    document.querySelectorAll('[data-fortschritt-stufen]').forEach(function (karte) {
+      if (karte.dataset.eingerichtet) return;
+      karte.dataset.eingerichtet = '1';
+      einrichten(karte);
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', alle);
+  else alle();
+
+  function einrichten(karte) {
+    var adresse = karte.dataset.adresse;
+    var $ = function (s) { return karte.querySelector(s); };
+    var zeilenEl = $('[data-fs-zeilen]');
+    var stand = null;
+    var stufen = [];
+    var ungespeichert = false;
+
+    function text(name, werte) {
+      var t = karte.dataset['text' + name.split('-').map(function (w) { return w.charAt(0).toUpperCase() + w.slice(1); }).join('')] || '';
+      Object.keys(werte || {}).forEach(function (k) { t = t.split('{{' + k + '}}').join(String(werte[k])); });
+      return t;
+    }
+    function melde(art, t) {
+      if (typeof showToast === 'function') showToast(art, t);
+      else if (window.GuildAjaxHandler && GuildAjaxHandler.showToast) GuildAjaxHandler.showToast(art, t);
+    }
+    async function anfrage(weg, methode, daten) {
+      var r = await fetch(adresse + weg, {
+        method: methode,
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json',
+          'X-CSRF-Token': (document.querySelector('meta[name="csrf-token"]') || {}).content || '' },
+        body: daten === undefined ? undefined : JSON.stringify(daten)
+      });
+      var a = await r.json().catch(function () { return { success: false, message: 'HTTP ' + r.status }; });
+      if (!a.success) throw new Error(a.message || 'HTTP ' + r.status);
+      return a.data;
+    }
+    var zahl = function (n) { return Number(n).toLocaleString(document.documentElement.lang || 'de-DE'); };
+
+    function markiere(an) {
+      ungespeichert = an;
+      $('[data-fs-ungespeichert]').hidden = !an;
+    }
+    function lies() {
+      stufen = Array.prototype.map.call(zeilenEl.querySelectorAll('tr[data-zeile]'), function (tr) {
+        return { name: tr.querySelector('[data-name]').value, schwelle: tr.querySelector('[data-schwelle]').value };
+      });
+    }
+    function zeichne() {
+      zeilenEl.textContent = '';
+      var darf = stand && stand.darf;
+      if (!stufen.length) {
+        var leer = document.createElement('tr');
+        var td = document.createElement('td');
+        td.colSpan = 5; td.className = 'text-secondary'; td.textContent = text('leer');
+        leer.appendChild(td); zeilenEl.appendChild(leer);
+      }
+      var sortiert = stufen.slice().sort(function (x, y) { return Number(x.schwelle) - Number(y.schwelle); });
+      sortiert.forEach(function (s, i) {
+        var tr = document.createElement('tr');
+        tr.dataset.zeile = '1';
+        var nr = document.createElement('td'); nr.className = 'text-secondary'; nr.textContent = String(i + 1);
+        var tdName = document.createElement('td');
+        var name = document.createElement('input');
+        name.type = 'text'; name.maxLength = 100; name.className = 'form-control form-control-sm'; name.value = s.name || '';
+        name.placeholder = text('name-platzhalter'); name.dataset.name = '1'; name.disabled = !darf;
+        name.setAttribute('aria-label', text('name') + ' ' + (i + 1));
+        tdName.appendChild(name);
+        var tdS = document.createElement('td');
+        var schwelle = document.createElement('input');
+        schwelle.type = 'number'; schwelle.min = '0'; schwelle.step = '1'; schwelle.className = 'form-control form-control-sm';
+        schwelle.value = String(s.schwelle); schwelle.dataset.schwelle = '1'; schwelle.disabled = !darf;
+        schwelle.setAttribute('aria-label', text('ab-xp') + ' ' + (i + 1));
+        tdS.appendChild(schwelle);
+        var tdSchritt = document.createElement('td'); tdSchritt.className = 'text-end text-secondary';
+        tdSchritt.textContent = i === 0 ? zahl(s.schwelle) : zahl(Number(s.schwelle) - Number(sortiert[i - 1].schwelle));
+        var tdX = document.createElement('td');
+        if (darf) {
+          var x = document.createElement('button');
+          x.type = 'button'; x.className = 'btn btn-sm btn-ghost-danger'; x.title = text('entfernen'); x.setAttribute('aria-label', text('entfernen'));
+          x.innerHTML = '<i class="fa-solid fa-trash"></i>';
+          x.addEventListener('click', function () { tr.remove(); lies(); markiere(true); zeichne(); });
+          tdX.appendChild(x);
+        }
+        [name, schwelle].forEach(function (f) { f.addEventListener('input', function () { markiere(true); }); });
+        schwelle.addEventListener('change', function () { lies(); zeichne(); });
+        tr.append(nr, tdName, tdS, tdSchritt, tdX);
+        zeilenEl.appendChild(tr);
+      });
+      stufen = sortiert;
+      $('[data-fs-zahl]').textContent = text('stufen-zahl', { n: stufen.length });
+    }
+    function kopf() {
+      $('[data-fs-titel]').textContent = stand.titel;
+      var b = $('[data-fs-schablone]');
+      if (!stand.eingespielt) b.textContent = text('nicht-eingespielt', { name: titelVon(stand.schablone) });
+      else b.textContent = stand.schablone ? text('schablone-aktiv', { name: titelVon(stand.schablone) }) : text('schablone-eigen');
+      var hinweis = $('[data-fs-hinweis]');
+      hinweis.textContent = '';
+      if (!stand.darf) {
+        var h = document.createElement('div');
+        h.className = 'alert alert-info'; h.textContent = text('kein-recht', { recht: stand.recht });
+        hinweis.appendChild(h);
+      }
+      var pz = $('[data-fs-prestige-zeile]');
+      pz.hidden = !!stand.gesamt;
+      var p = $('[data-fs-prestige]');
+      p.checked = !!stand.prestige; p.disabled = !stand.darf;
+      ['[data-fs-hinzu]', '[data-fs-speichern]', '[data-fs-schablone-laden]', '[data-fs-rechnen]'].forEach(function (s) { $(s).disabled = !stand.darf; });
+      var wahl = $('[data-fs-schablone-wahl]');
+      if (!wahl.options.length) {
+        stand.schablonen.forEach(function (s) {
+          var o = document.createElement('option'); o.value = s.name; o.textContent = s.titel; wahl.appendChild(o);
+        });
+      }
+      wahl.disabled = !stand.darf;
+    }
+    function titelVon(name) {
+      var s = (stand.schablonen || []).find(function (x) { return x.name === name; });
+      return s ? s.titel : (name || '');
+    }
+    function annehmen(d) {
+      stand = d;
+      stufen = d.stufen.map(function (s) { return { name: s.name, schwelle: s.schwelle }; });
+      markiere(false);
+      kopf();
+      zeichne();
+    }
+
+    $('[data-fs-hinzu]').addEventListener('click', function () {
+      lies();
+      var letzte = stufen.length ? Number(stufen[stufen.length - 1].schwelle) : -100;
+      var schritt = stufen.length > 1 ? Number(stufen[stufen.length - 1].schwelle) - Number(stufen[stufen.length - 2].schwelle) : 100;
+      stufen.push({ name: '', schwelle: letzte + Math.max(schritt, 1) });
+      markiere(true);
+      zeichne();
+      zeilenEl.parentElement.parentElement.scrollTop = zeilenEl.parentElement.parentElement.scrollHeight;
+    });
+
+    $('[data-fs-speichern]').addEventListener('click', async function () {
+      var knopf = this;
+      lies();
+      knopf.disabled = true;
+      try {
+        var d = await anfrage('/stufen', 'PUT', { stufen: stufen });
+        annehmen(d);
+        melde('success', text('gespeichert', { n: d.stufen.length }) + ' ' + text('neu-gerechnet', d.neuberechnet));
+      } catch (e) { melde('error', e.message); }
+      knopf.disabled = !stand.darf;
+    });
+
+    $('[data-fs-prestige]').addEventListener('change', async function () {
+      var feld = this;
+      try {
+        var d = await anfrage('/einstellungen', 'PUT', { prestige: feld.checked });
+        stand.prestige = d.prestige;
+        melde('success', text(d.prestige ? 'prestige-an' : 'prestige-aus'));
+      } catch (e) { feld.checked = !feld.checked; melde('error', e.message); }
+    });
+
+    // Rechner: Vorschlag in die Tabelle, gilt erst mit „Speichern“.
+    var formel = $('[data-fs-formel]');
+    function formelZeigen() {
+      var q = formel.value === 'quadratisch';
+      karte.querySelectorAll('[data-fs-quadratisch]').forEach(function (e) { e.hidden = !q; });
+      karte.querySelectorAll('[data-fs-exponentiell]').forEach(function (e) { e.hidden = q; });
+      $('[data-fs-formel-text]').textContent = q ? 'a·L² + b·L + c' : 'Basis · Faktor^L';
+    }
+    formel.addEventListener('change', formelZeigen);
+    formelZeigen();
+    $('[data-fs-rechnen]').addEventListener('click', async function () {
+      var p = { formel: formel.value };
+      karte.querySelectorAll('[data-fs-p]').forEach(function (f) { p[f.dataset.fsP] = Number(f.value); });
+      try {
+        var d = await anfrage('/vorschlag', 'POST', p);
+        stufen = d.stufen.map(function (s) { return { name: '', schwelle: s.schwelle }; });
+        markiere(true);
+        zeichne();
+        melde('info', text('vorschlag-da', { n: stufen.length }));
+      } catch (e) { melde('error', e.message); }
+    });
+
+    // Schablone laden: rotes Fenster, Name eintippen.
+    // Das Fenster zieht beim ersten Öffnen an den body (sonst liegt es unter
+    // dem Kartenrahmen); danach findet es karte.querySelector nicht mehr.
+    var fensterEl = $('[data-fs-fenster]');
+    var eingabe = $('[data-fs-bestaetigung]');
+    var ok = $('[data-fs-fenster-ok]');
+    var gewaehlt = null;
+    var fenster = null;
+    function gleich() { return gewaehlt && eingabe.value.trim().toLowerCase() === gewaehlt.titel.trim().toLowerCase(); }
+    eingabe.addEventListener('input', function () { ok.disabled = !gleich(); });
+    fensterEl.addEventListener('shown.bs.modal', function () { eingabe.focus(); });
+    $('[data-fs-schablone-laden]').addEventListener('click', function () {
+      var name = $('[data-fs-schablone-wahl]').value;
+      gewaehlt = (stand.schablonen || []).find(function (s) { return s.name === name; });
+      if (!gewaehlt) return;
+      fensterEl.querySelector('[data-fs-fenster-text]').textContent = text('bestaetigen-text', { name: gewaehlt.titel, n: gewaehlt.anzahl });
+      fensterEl.querySelector('[data-fs-fenster-frage]').textContent = '„' + gewaehlt.titel + '“';
+      eingabe.value = ''; ok.disabled = true;
+      if (!fensterEl.parentElement || fensterEl.parentElement !== document.body) document.body.appendChild(fensterEl);
+      fenster = fenster || (window.bootstrap ? bootstrap.Modal.getOrCreateInstance(fensterEl) : null);
+      if (fenster) fenster.show();
+    });
+    ok.addEventListener('click', async function () {
+      if (!gleich()) return;
+      ok.disabled = true;
+      try {
+        var d = await anfrage('/stufen', 'PUT', { schablone: gewaehlt.name, bestaetigung: eingabe.value });
+        if (fenster) fenster.hide();
+        annehmen(d);
+        melde('success', text('gespeichert', { n: d.stufen.length }) + ' ' + text('neu-gerechnet', d.neuberechnet));
+      } catch (e) { melde('error', e.message); ok.disabled = !gleich(); }
+    });
+
+    window.addEventListener('beforeunload', function (ev) { if (ungespeichert) { ev.preventDefault(); ev.returnValue = ''; } });
+
+    anfrage('', 'GET').then(annehmen).catch(function (e) {
+      zeilenEl.textContent = '';
+      var tr = document.createElement('tr');
+      var td = document.createElement('td');
+      td.colSpan = 5; td.className = 'text-danger'; td.textContent = text('ladefehler', { grund: e.message });
+      tr.appendChild(td); zeilenEl.appendChild(tr);
+    });
+  }
+})();
+</script>

@@ -1,0 +1,122 @@
+<%# Fortschritt (G-20, 2026-11-14): Erklärungen aus den package.json der Plugins,
+    Zahlen je Kennung, Probe auf kern:probe in der Kontroll-Guild und dort der
+    Kern-Teil „Stufen“ zum Ausprobieren. Technik in dunebot-sdk/lib/Fortschritt.js. %>
+<%
+  const ue = typeof ueberblick !== 'undefined' ? ueberblick : { erklaerungen: [], je: [], fehlt: null };
+  const kg = typeof kontrollGuild !== 'undefined' ? kontrollGuild : '';
+  const pk = typeof probeKennung !== 'undefined' ? probeKennung : 'kern:probe';
+  const zeit = (w) => w ? new Date(w).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' }) : '–';
+  const zahl = (n) => Number(n || 0).toLocaleString('de-DE');
+%>
+<div class="container-fluid">
+  <% if (ue.fehlt) { %>
+    <div class="alert alert-warning"><i class="fa-solid fa-triangle-exclamation me-2"></i><%= ue.fehlt %></div>
+  <% } %>
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title mb-0"><i class="fa-solid fa-stairs me-2"></i>Erklärte Fortschritte</h3>
+    </div>
+    <div class="card-body">
+      <p class="text-secondary">Jedes Plugin erklärt seine Fortschritte in der <code>package.json</code> unter <code>fortschritt</code>. Gebucht wird nur auf erklärte Kennungen, und jedes Plugin nur auf seine eigenen (Wächter <code>check-fortschritt</code>). Buchungen älter als die Frist <a href="/admin/aufbewahrung"><code>core:fortschritt-buchungen</code></a> werden nachts zu Monatssummen verdichtet. Saisons beendet die Aufgabe <a href="/admin/zeitplan"><code>core:fortschritt-saisons</code></a>.</p>
+      <div class="table-responsive">
+        <table class="table table-sm table-vcenter mb-0">
+          <thead><tr><th>Kennung</th><th>Plugin</th><th>Recht</th><th>Schablone</th><th>Gesamtstand</th></tr></thead>
+          <tbody>
+            <% ue.erklaerungen.forEach(function (e) { %>
+              <tr>
+                <td><code><%= e.kennung %></code></td>
+                <td><%= e.plugin %></td>
+                <td><code class="small"><%= e.recht %></code></td>
+                <td><%= e.schablone %></td>
+                <td><%= e.gesamt ? ('ja, ' + e.gesamt.schablone) : '–' %></td>
+              </tr>
+            <% }) %>
+            <% if (!ue.erklaerungen.length) { %><tr><td colspan="5" class="text-secondary">Kein Plugin erklärt einen Fortschritt.</td></tr><% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-header"><h3 class="card-title mb-0"><i class="fa-solid fa-table me-2"></i>Bestand je Kennung</h3></div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-sm table-vcenter mb-0">
+          <thead><tr><th>Kennung</th><th class="text-end">Guilds</th><th class="text-end">Mitglieder</th><th class="text-end">XP gesamt</th><th class="text-end">Buchungen</th><th class="text-end">storniert</th><th class="text-end">verdichtet</th><th>Letzte Buchung</th><th class="text-end">Saisons (offen)</th></tr></thead>
+          <tbody>
+            <% ue.je.forEach(function (z) { %>
+              <tr>
+                <td><code><%= z.kennung %></code><% if (!z.erklaert) { %> <span class="badge bg-danger-lt" title="Keine package.json erklärt diese Kennung mehr">nicht erklärt</span><% } %></td>
+                <td class="text-end"><%= zahl(z.guilds) %></td>
+                <td class="text-end"><%= zahl(z.mitglieder) %></td>
+                <td class="text-end"><%= zahl(z.xp) %></td>
+                <td class="text-end"><%= zahl(z.buchungen) %></td>
+                <td class="text-end"><%= zahl(z.storniert) %></td>
+                <td class="text-end"><%= zahl(z.verdichtet) %></td>
+                <td class="small"><%= zeit(z.zuletzt) %></td>
+                <td class="text-end"><%= zahl(z.saisons) %> (<%= zahl(z.offen) %>)</td>
+              </tr>
+            <% }) %>
+            <% if (!ue.je.length && !ue.fehlt) { %><tr><td colspan="9" class="text-secondary">Noch nichts gebucht.</td></tr><% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-header">
+      <h3 class="card-title mb-0"><i class="fa-solid fa-vial me-2"></i>Probe</h3>
+      <div class="card-actions">
+        <button type="button" class="btn btn-sm btn-outline-primary" data-fortschritt-probe <%= kg ? '' : 'disabled' %>><i class="fa-solid fa-play me-1"></i>Probe starten</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <p class="text-secondary">Bucht auf <code><%= pk %></code> in der Kontroll-Guild (<code><%= kg || 'CONTROL_GUILD_ID fehlt' %></code>) mit dir als Mitglied: +150, derselbe Schlüssel noch einmal, −1000 (wird gekürzt), beide stornieren, +300 und dann Woche, Monat und Gesamt lesen, Gesamtstand, Nachrechnen. Vorher und nachher wird deine Probe gelöscht; die Stufentabelle unten bleibt.</p>
+      <div data-fortschritt-probe-ergebnis></div>
+    </div>
+  </div>
+
+  <% if (kg && typeof tr === 'function') { %>
+    <%- include('../shared/fortschritt-stufen', { guildId: kg, tr, kennung: pk }) %>
+    <%- include('../shared/fortschritt-stufen', { guildId: kg, tr, kennung: pk + ':gesamt' }) %>
+  <% } %>
+</div>
+
+<script>
+(function () {
+  function melde(art, text) {
+    if (window.GuildAjaxHandler && GuildAjaxHandler.showToast) GuildAjaxHandler.showToast(art, text);
+    else if (typeof showToast === 'function') showToast(art, text);
+  }
+  var knopf = document.querySelector('[data-fortschritt-probe]');
+  var aus = document.querySelector('[data-fortschritt-probe-ergebnis]');
+  knopf.addEventListener('click', async function () {
+    knopf.disabled = true;
+    aus.textContent = '';
+    try {
+      var r = await fetch('/admin/fortschritt/probe', { method: 'POST', headers: { 'Content-Type': 'application/json',
+        'X-CSRF-Token': (document.querySelector('meta[name="csrf-token"]') || {}).content || '' }, body: '{}' });
+      var d = await r.json().catch(function () { return {}; });
+      if (!r.ok || !d.success) throw new Error(d.message || 'Fehlgeschlagen.');
+      var liste = document.createElement('ul');
+      liste.className = 'list-unstyled mb-0';
+      d.ergebnis.schritte.forEach(function (s) {
+        var li = document.createElement('li');
+        var i = document.createElement('i');
+        i.className = 'fa-solid me-2 ' + (s.ok ? 'fa-circle-check text-success' : 'fa-circle-xmark text-danger');
+        var b = document.createElement('strong');
+        b.textContent = s.name + ': ';
+        li.append(i, b, document.createTextNode(s.text));
+        liste.appendChild(li);
+      });
+      aus.appendChild(liste);
+      melde(d.ergebnis.ok ? 'success' : 'error', d.message);
+    } catch (e) {
+      melde('error', e.message);
+    }
+    knopf.disabled = false;
+  });
+})();
+</script>

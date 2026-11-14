@@ -489,6 +489,126 @@ router.put('/gestaltung/plugin/:plugin', csrfProtection, async (req, res) => {
 });
 
 // =============================================
+// FORTSCHRITT (G-20)
+// Kern-Teil `shared/fortschritt-stufen` auf den Seiten der Plugins, die einen
+// Fortschritt führen (Leveling, Clan). Sehen darf es jeder mit Zugang zur
+// Guild, ändern nur, wer das Recht der Erklärung hat (`recht` unter
+// `fortschritt` in der package.json), in der Kontroll-Guild nur der Besitzer.
+// Was eine Stufe ist und wie neu gerechnet wird: `dunebot-sdk/lib/Fortschritt.js`.
+// =============================================
+
+/** Erklärung zur Kennung aus der Adresse, nur wenn ihr Plugin in der Guild an ist. */
+async function fortschrittErklaerung(req, res) {
+    const { Fortschritt } = require('dunebot-sdk');
+    const kennung = String(req.params.kennung || '');
+    const e = Fortschritt.erklaerungFuer(kennung);
+    if (!e) { res.status(404).json({ success: false, message: `Kein Fortschritt "${kennung}"` }); return null; }
+    if (e.plugin !== 'core' && !(await ServiceManager.get('dbService').isPluginEnabledForGuild(res.locals.guildId, e.plugin))) {
+        res.status(404).json({ success: false, message: `${e.plugin} ist in dieser Guild aus` });
+        return null;
+    }
+    return { ...e, kennung };
+}
+
+function schablonenListe(req) {
+    const { Fortschritt } = require('dunebot-sdk');
+    return Object.entries(Fortschritt.SCHABLONEN).map(([name, p]) => ({ name, titel: req.translate(`core:FORTSCHRITT.SCHABLONE_${name.toUpperCase()}`), ...p }));
+}
+
+function fortschrittFehler(res, err, was) {
+    const { Fortschritt } = require('dunebot-sdk');
+    if (err instanceof Fortschritt.Eingabefehler) return res.status(400).json({ success: false, message: err.message });
+    ServiceManager.get('Logger').error(`[Fortschritt] ${was}:`, err);
+    return res.status(500).json({ success: false, message: err.message });
+}
+
+// GET /settings/fortschritt/:kennung → Stufen, Einstellungen, Schablonen, darf
+router.get('/fortschritt/:kennung', async (req, res) => {
+    const guildId = res.locals.guildId;
+    const e = await fortschrittErklaerung(req, res);
+    if (!e) return;
+    try {
+        const { Fortschritt } = require('dunebot-sdk');
+        const userId = req.session.user?.info?.id;
+        const pm = ServiceManager.get('permissionManager');
+        const darf = Boolean(userId && await pm.hasPermission(userId, guildId, e.recht)) && !(await istKontrollGuildGesperrt(guildId, userId));
+        const st = await Fortschritt.stufen({ guildId, kennung: e.kennung });
+        res.json({
+            success: true,
+            data: {
+                kennung: e.kennung, titel: req.translate(e.titel), gesamt: e.gesamt_gefragt, recht: e.recht, darf,
+                ...st, schablonen: schablonenListe(req), stufenMax: Fortschritt.STUFEN_MAX,
+            },
+        });
+    } catch (err) {
+        fortschrittFehler(res, err, `Stufen von ${e.kennung} in ${guildId} nicht lesbar`);
+    }
+});
+
+// POST /settings/fortschritt/:kennung/vorschlag { schablone } | { formel, a, b, c, basis, faktor, anzahl }
+// → eine Tabelle, nichts gespeichert (der Rechner)
+router.post('/fortschritt/:kennung/vorschlag', csrfProtection, async (req, res) => {
+    const e = await fortschrittErklaerung(req, res);
+    if (!e) return;
+    try {
+        const { Fortschritt } = require('dunebot-sdk');
+        const b = req.body || {};
+        const stufen = b.schablone ? Fortschritt.schablone(String(b.schablone)) : Fortschritt.rechne(b);
+        res.json({ success: true, data: { stufen } });
+    } catch (err) {
+        fortschrittFehler(res, err, `Vorschlag für ${e.kennung} gescheitert`);
+    }
+});
+
+// PUT /settings/fortschritt/:kennung/stufen { stufen: [{schwelle, name}] }
+//   oder { schablone, bestaetigung }: Schablone laden, ersetzt die Tabelle;
+//   `bestaetigung` ist der eingetippte Name der Schablone (rotes Fenster)
+router.put('/fortschritt/:kennung/stufen', csrfProtection, async (req, res) => {
+    const guildId = res.locals.guildId;
+    const e = await fortschrittErklaerung(req, res);
+    if (!e) return;
+    return requirePermission(e.recht)(req, res, () => requireBesitzerInKontrollGuild()(req, res, async () => {
+        try {
+            const { Fortschritt } = require('dunebot-sdk');
+            const b = req.body || {};
+            let stufen = b.stufen;
+            let schablone = null;
+            if (b.schablone != null) {
+                schablone = String(b.schablone);
+                const titel = schablonenListe(req).find((x) => x.name === schablone)?.titel;
+                if (!titel) return res.status(400).json({ success: false, message: `Schablone "${schablone}" unbekannt` });
+                if (String(b.bestaetigung || '').trim().toLowerCase() !== titel.trim().toLowerCase()) {
+                    return res.status(400).json({ success: false, message: req.translate('core:FORTSCHRITT.BESTAETIGUNG_FALSCH') });
+                }
+                stufen = Fortschritt.schablone(schablone);
+            }
+            const r = await Fortschritt.setzeStufen({ guildId, kennung: e.kennung, stufen, schablone });
+            ServiceManager.get('Logger').info(`[Fortschritt] Stufen von ${e.kennung} in ${guildId}: ${r.stufen} Stufe(n)${schablone ? ` aus Schablone ${schablone}` : ''}, neu gerechnet ${r.neuberechnet.aufgestiegen} auf, ${r.neuberechnet.abgestiegen} ab (von ${req.session.user.info.id})`);
+            res.json({ success: true, data: { ...r, ...(await Fortschritt.stufen({ guildId, kennung: e.kennung })) } });
+        } catch (err) {
+            fortschrittFehler(res, err, `Stufen von ${e.kennung} in ${guildId} nicht gespeichert`);
+        }
+    }));
+});
+
+// PUT /settings/fortschritt/:kennung/einstellungen { prestige }
+router.put('/fortschritt/:kennung/einstellungen', csrfProtection, async (req, res) => {
+    const guildId = res.locals.guildId;
+    const e = await fortschrittErklaerung(req, res);
+    if (!e) return;
+    if (e.gesamt_gefragt) return res.status(400).json({ success: false, message: 'Der Gesamtstand hat kein Prestige' });
+    return requirePermission(e.recht)(req, res, () => requireBesitzerInKontrollGuild()(req, res, async () => {
+        try {
+            const r = await require('dunebot-sdk').Fortschritt.setzeEinstellungen({ guildId, kennung: e.kennung, prestige: req.body?.prestige === true });
+            ServiceManager.get('Logger').info(`[Fortschritt] Prestige von ${e.kennung} in ${guildId}: ${r.prestige ? 'an' : 'aus'} (von ${req.session.user.info.id})`);
+            res.json({ success: true, data: r });
+        } catch (err) {
+            fortschrittFehler(res, err, `Einstellungen von ${e.kennung} in ${guildId} nicht gespeichert`);
+        }
+    }));
+});
+
+// =============================================
 // CHANNEL-VERWALTUNG (Discord Channels Mirror)
 // =============================================
 

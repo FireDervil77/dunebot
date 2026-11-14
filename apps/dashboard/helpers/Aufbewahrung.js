@@ -27,6 +27,11 @@
  *   wo              optional `{ spalte: [werte] }`: nur diese Zeilen
  *   ohne            optional `{ tabelle, spalte, wo }`: nur Zeilen, auf die
  *                   keine solche Kind-Zeile zeigt (`spalte` = Verweis auf `id`)
+ *   verdichten      optional `true`: nicht löschen, sondern die Funktion gleichen
+ *                   Namens in `plugins/<plugin>/shared/aufbewahrung.js` rufen,
+ *                   mit `{ bedingung, trocken, stueck, hoechstens }`; sie
+ *                   liefert `{ zeilen, rest }` wie das Löschen. Erste Nutzerin:
+ *                   `core:fortschritt-buchungen` (G-20, Monatssummen)
  *
  * Jede Tabelle, die in `mitgliedInhalte` den Weg `frist` trägt, braucht hier
  * eine Frist ohne `wo` und `ohne`, sonst bliebe sie für immer (Wächter).
@@ -109,6 +114,7 @@ function pruefeForm(meta) {
             if (e?.ohne !== undefined && (!BEZEICHNER.test(String(e.ohne?.tabelle ?? '')) || !BEZEICHNER.test(String(e.ohne?.spalte ?? '')))) {
                 fehler.push(`${wer}: ohne braucht tabelle und spalte`);
             }
+            if (e?.verdichten !== undefined && e.verdichten !== true) fehler.push(`${wer}: verdichten ist nur als true erlaubt`);
         }
     }
     return fehler;
@@ -216,6 +222,7 @@ function bedingung(e, tage, nur = {}) {
  *   `HOECHSTENS_STUECKE` abgebrochen, die nächste Nacht macht weiter
  */
 async function loesche(e, wo, trocken) {
+    if (e.verdichten) return verdichter(e)({ bedingung: wo, trocken, stueck: STUECK, hoechstens: HOECHSTENS_STUECKE });
     if (trocken) {
         const [{ n }] = await db().query(`SELECT COUNT(*) AS n FROM ${q(e.tabelle)} WHERE ${wo.sql}`, wo.werte);
         return { zeilen: Number(n), rest: false };
@@ -228,6 +235,19 @@ async function loesche(e, wo, trocken) {
         if (n < STUECK) return { zeilen, rest: false };
     }
     return { zeilen, rest: true };
+}
+
+/**
+ * Der Verdichter einer Frist mit `verdichten: true`. Fehlt er, wirft es: Die
+ * Frist ist dann rot, gelöscht wird nichts.
+ *
+ * @returns {(a: {bedingung, trocken, stueck, hoechstens}) => Promise<{zeilen, rest}>}
+ */
+function verdichter(e) {
+    const datei = path.join(PLUGINS, e.plugin, 'shared', 'aufbewahrung.js');
+    const f = fs.existsSync(datei) ? require(datei)[e.name] : null;
+    if (typeof f !== 'function') throw new Error(`${schluessel(e)}: verdichten ohne Funktion "${e.name}" in plugins/${e.plugin}/shared/aufbewahrung.js`);
+    return f;
 }
 
 /**
@@ -277,7 +297,7 @@ async function laufen({ trocken = false, nurPlugin = null, meta } = {}) {
             ON DUPLICATE KEY UPDATE letzter_lauf = NOW(3), zuletzt_geloescht = VALUES(zuletzt_geloescht),
                 geloescht_gesamt = geloescht_gesamt + VALUES(zuletzt_geloescht), letzter_fehler = VALUES(letzter_fehler)
         `, [e.plugin, e.name, r.zeilen, r.zeilen, r.fehler ? r.fehler.slice(0, 500) : null]);
-        if (r.zeilen) log().info(`[Aufbewahrung] ${r.frist}: ${r.zeilen} Zeile(n) aus ${e.tabelle} gelöscht${r.rest ? ', Rest folgt in der nächsten Nacht' : ''}`);
+        if (r.zeilen) log().info(`[Aufbewahrung] ${r.frist}: ${r.zeilen} Zeile(n) aus ${e.tabelle} ${e.verdichten ? 'verdichtet' : 'gelöscht'}${r.rest ? ', Rest folgt in der nächsten Nacht' : ''}`);
     }
     return { je, zeilen: je.reduce((a, r) => a + r.zeilen, 0), fehler: je.filter(r => r.fehler).length };
 }
@@ -426,5 +446,5 @@ function starten() {
 
 module.exports = {
     starten, laufen, nachts, fuerGuild, setzeGuild, setzeGrenze, stand, tageJeTabelle,
-    erklaerungen, pruefeForm, bedingung, wirksam, TAKT, STUECK, TAGE_MAX,
+    erklaerungen, pruefeForm, bedingung, wirksam, verdichter, TAKT, STUECK, TAGE_MAX,
 };

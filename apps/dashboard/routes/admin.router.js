@@ -492,6 +492,45 @@ router.get('/bildkarten', async (req, res) => {
 });
 
 // ================================================================
+// FORTSCHRITT (G-20)
+// Erklärungen und Zahlen je Kennung, Probe auf `kern:probe` in der
+// Kontroll-Guild, dort auch der Kern-Teil „Stufen“ zum Ausprobieren.
+// ================================================================
+
+router.get('/fortschritt', async (req, res) => {
+    const themeManager = ServiceManager.get('themeManager');
+    const Logger = ServiceManager.get('Logger');
+    try {
+        const FortschrittProbe = require('../helpers/FortschrittProbe');
+        await themeManager.renderView(res, 'admin/fortschritt', {
+            title: 'Fortschritt',
+            activeMenu: '/admin/fortschritt',
+            ueberblick: await FortschrittProbe.ueberblick(),
+            kontrollGuild: process.env.CONTROL_GUILD_ID || '',
+            probeKennung: FortschrittProbe.KENNUNG,
+        });
+    } catch (error) {
+        Logger.error('[Admin] Fortschritt nicht lesbar:', error);
+        res.status(500).send(`Der Stand der Fortschritte ließ sich nicht lesen: ${error.message}`);
+    }
+});
+
+router.post('/fortschritt/probe', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const guildId = process.env.CONTROL_GUILD_ID;
+    const userId = req.session?.user?.info?.id;
+    if (!guildId) return res.status(500).json({ success: false, message: 'CONTROL_GUILD_ID fehlt.' });
+    if (!userId) return res.status(401).json({ success: false, message: 'Nicht angemeldet.' });
+    try {
+        const r = await require('../helpers/FortschrittProbe').laufen(guildId, String(userId));
+        res.json({ success: true, ergebnis: r, message: r.ok ? 'Probe grün.' : `Probe rot: ${r.schritte.filter(s => !s.ok).map(s => s.name).join(', ')}` });
+    } catch (error) {
+        Logger.error('[Admin] Probe der Fortschritte gescheitert:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// ================================================================
 // AUFBEWAHRUNG (G-05)
 // Fristen aller Plugins, Obergrenze des Betreibers, Probelauf.
 // ================================================================

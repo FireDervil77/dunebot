@@ -36,6 +36,12 @@
       "guild_vorlagen",
       "guild_bildkarten",
       "rollen_vergaben",
+      "fortschritt_saison_stand",
+      "fortschritt_saisons",
+      "fortschritt_buchungen",
+      "fortschritt_stand",
+      "fortschritt_stufen",
+      "fortschritt_einstellungen",
       "guilds"
     ],
     "bleiben": {
@@ -157,6 +163,17 @@
         "weg": "frist",
         "grund": "Zustellbuch der Fachereignisse zwischen den Plugins; was ein Plugin daraus speichert, erklärt das Plugin"
       }
+    },
+    "fortschritt_buchungen": {
+      "mitglied_id": "loeschen",
+      "akteur": "anonymisieren",
+      "storniert_von": "anonymisieren"
+    },
+    "fortschritt_stand": {
+      "mitglied_id": "loeschen"
+    },
+    "fortschritt_saison_stand": {
+      "mitglied_id": "loeschen"
     }
   },
   "aufbewahrung": [
@@ -210,6 +227,16 @@
       "hoechstens_tage": 3653,
       "guild": false,
       "titel": "core:AUFBEWAHRUNG.SPENDEN"
+    },
+    {
+      "name": "fortschritt-buchungen",
+      "tabelle": "fortschritt_buchungen",
+      "zeitspalte": "zeit",
+      "vorgabe_tage": 180,
+      "hoechstens_tage": 3653,
+      "guild": false,
+      "titel": "core:AUFBEWAHRUNG.FORTSCHRITT_BUCHUNGEN",
+      "verdichten": true
     }
   ],
   "profil": {
@@ -232,5 +259,16 @@
   },
   "rollen": [
     { "besitzer": "kern:unterstuetzer", "titel": "core:ROLLENVERGABE.BESITZER_UNTERSTUETZER" }
+  ],
+  "fortschritt": [
+    {
+      "kennung": "kern:probe",
+      "titel": "core:FORTSCHRITT.PROBE",
+      "recht": "CORE.SETTINGS.EDIT",
+      "schablone": "ansteigend",
+      "gesamt": {
+        "schablone": "flach"
+      }
+    }
   ]
 }

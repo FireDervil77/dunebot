@@ -281,6 +281,14 @@ module.exports = class App {
                 Logger.error('[INIT] Abgleich des Rollenbuchs konnte nicht starten:', error);
             }
 
+            // Saisons der Fortschritts-Bibliothek (G-20): abgelaufene beenden
+            // und ihre Regel anwenden (archivieren oder Saisonstand löschen).
+            try {
+                require('./helpers/FortschrittSaisons').starten();
+            } catch (error) {
+                Logger.error('[INIT] Saisonende der Fortschritte konnte nicht starten:', error);
+            }
+
             // Aufbewahrung (G-05): nachts alte Zeilen nach den Fristen der
             // Plugins löschen. Wirft, wenn eine Erklärung fehlerhaft ist.
             try {

@@ -32,6 +32,7 @@ const Vorlage = require("./lib/Vorlage");
 const Bildkarte = require("./lib/Bildkarte");
 const Profil = require("./lib/Profil");
 const Rollen = require("./lib/Rollen");
+const Fortschritt = require("./lib/Fortschritt");
 
 module.exports = {
     BotPlugin,
@@ -63,6 +64,7 @@ module.exports = {
     Bildkarte,
     Profil,
     Rollen,
+    Fortschritt,
     // IPM (Inter-Process Messaging) - Event-Bus Architecture
     MessageTypes,
     MessageBuilder,

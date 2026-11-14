@@ -426,7 +426,8 @@
     "TOAST": "Log of dashboard notices",
     "EREIGNISBUCH": "Domain events, fully delivered",
     "EREIGNISBUCH_SPAETESTENS": "Domain events, at the latest (including stuck ones)",
-    "SPENDEN": "Donations (payment records)"
+    "SPENDEN": "Donations (payment records)",
+    "FORTSCHRITT_BUCHUNGEN": "Progress bookings (levelling, clan): older ones are compacted into monthly totals per member, the total stays"
   },
   "GESTALTUNG": {
     "TITEL": "Design",
@@ -573,7 +574,6 @@
     "GESPERRT": "In the control guild only its owner configures image cards. You can only view the settings.",
     "HINWEISE": "Part of the saved settings no longer fits; the bot uses the default instead:"
   },
-
   "MITGLIEDER": {
     "EINLEITUNG": "Members of this server and what the plugins know about them. What you see in a profile depends on your permissions: moderation, automod, giveaways and music also need that plugin's permission.",
     "SUCHE": "Name, display name or ID",
@@ -630,5 +630,52 @@
     "HINWEIS_BOT_FEHLT": "Role order not checked, the bot did not answer: {{grund}}",
     "HINWEIS_ZUR_SEITE": "All managed roles",
     "BESITZER_UNTERSTUETZER": "Supporter badge"
+  },
+  "FORTSCHRITT": {
+    "TITEL": "Levels",
+    "TEXT": "Set how many XP each level needs. Below the first level a member is at level 0, the highest level is the maximum. When you save, the bot recalculates every member's level; XP stay as they are.",
+    "PRESTIGE": "Prestige",
+    "PRESTIGE_TEXT": "Whoever reaches the highest level starts again at the bottom and gets a prestige point. XP above the threshold of the highest level carry over. Applies from the next award.",
+    "PRESTIGE_AN": "Prestige is on.",
+    "PRESTIGE_AUS": "Prestige is off.",
+    "STUFE": "Level",
+    "NAME": "Name",
+    "NAME_PLATZHALTER": "optional",
+    "AB_XP": "From XP",
+    "SCHRITT": "Step",
+    "ENTFERNEN": "Remove level",
+    "HINZUFUEGEN": "Add level",
+    "SPEICHERN": "Save",
+    "GESPEICHERT": "Saved: {{n}} levels.",
+    "NEU_GERECHNET": "Recalculated: {{aufgestiegen}} up, {{abgestiegen}} down, {{gleich}} unchanged.",
+    "UNGESPEICHERT": "not saved",
+    "KEIN_RECHT": "Only members with the permission {{recht}} can change this.",
+    "LADEFEHLER": "Could not load the levels: {{grund}}",
+    "SCHABLONE_AKTIV": "Template “{{name}}”",
+    "SCHABLONE_EIGEN": "custom table",
+    "NICHT_EINGESPIELT": "Default “{{name}}”, not used yet",
+    "VORSCHLAG_DA": "Suggestion with {{n}} levels filled in. It applies once you save.",
+    "LEER": "No level defined. Everyone is at level 0.",
+    "STUFEN_ZAHL": "{{n}} levels",
+    "SCHABLONE_TITEL": "Load template",
+    "SCHABLONE_TEXT": "A bundled level set replaces the whole table, names included.",
+    "SCHABLONE_LADEN": "Load …",
+    "SCHABLONE_FLACH": "Flat",
+    "SCHABLONE_ANSTEIGEND": "Rising",
+    "SCHABLONE_STEIL": "Steep",
+    "RECHNER_TITEL": "Calculator",
+    "RECHNER_TEXT": "Suggests a table: XP from level L to L+1 by the formula, L from 0. It only applies once you save.",
+    "FORMEL": "Formula",
+    "FORMEL_QUADRATISCH": "quadratic",
+    "FORMEL_EXPONENTIELL": "exponential",
+    "BASIS": "Base",
+    "FAKTOR": "Factor",
+    "ANZAHL": "Levels",
+    "VORSCHLAGEN": "Suggest",
+    "BESTAETIGEN_TITEL": "Replace level table",
+    "BESTAETIGEN_TEXT": "“{{name}}” replaces the whole table with {{n}} levels. Every member's level is recalculated, XP stay. Type the template's name to confirm:",
+    "BESTAETIGUNG_FALSCH": "The name does not match. Nothing was changed.",
+    "ABBRECHEN": "Cancel",
+    "PROBE": "Progress library probe"
   }
 }
