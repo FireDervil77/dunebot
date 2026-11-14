@@ -45,38 +45,12 @@
             <label class="form-check-label" for="welcomeImageToggle"><%= tr('greeting:IMAGE.ENABLE') %></label>
           </div>
         </div>
-        <div class="col-md-3 mb-3">
-          <label class="form-label"><%= tr('greeting:IMAGE.BG_TITLE') %></label>
-          <select class="form-control" name="welcome_image_bg">
-            <option value="default" <%= settings.welcome_image.bg === 'default' ? 'selected' : '' %>><%= tr('greeting:IMAGE.BG_DEFAULT') %></option>
-            <option value="dark" <%= settings.welcome_image.bg === 'dark' ? 'selected' : '' %>><%= tr('greeting:IMAGE.BG_DARK') %></option>
-            <option value="blue" <%= settings.welcome_image.bg === 'blue' ? 'selected' : '' %>><%= tr('greeting:IMAGE.BG_BLUE') %></option>
-            <option value="purple" <%= settings.welcome_image.bg === 'purple' ? 'selected' : '' %>><%= tr('greeting:IMAGE.BG_PURPLE') %></option>
-            <option value="green" <%= settings.welcome_image.bg === 'green' ? 'selected' : '' %>><%= tr('greeting:IMAGE.BG_GREEN') %></option>
-            <option value="sunset" <%= settings.welcome_image.bg === 'sunset' ? 'selected' : '' %>><%= tr('greeting:IMAGE.BG_SUNSET') %></option>
-            <option value="ocean" <%= settings.welcome_image.bg === 'ocean' ? 'selected' : '' %>><%= tr('greeting:IMAGE.BG_OCEAN') %></option>
-          </select>
-        </div>
-        <div class="col-md-3 mb-3">
-          <label class="form-label"><%= tr('greeting:IMAGE.TEXT_TITLE') %></label>
-          <input type="text" class="form-control" name="welcome_image_text"
-                 value="<%= settings.welcome_image.text || '' %>"
-                 placeholder="<%= tr('greeting:IMAGE.TEXT_PLACEHOLDER') %>">
-        </div>
-        <div class="col-md-3 mb-3">
-          <label class="form-label"><%= tr('greeting:IMAGE.COLOR_TITLE') %></label>
-          <input type="color" class="form-control form-control-color" name="welcome_image_color"
-                 value="<%= settings.welcome_image.color || '#5865f2' %>" style="height: 38px;">
-        </div>
-      </div>
-      <%# Vorschau vom Server gezeichnet wie im Bot (G-10). Das Bild steht immer im HTML, das Skript schaltet nur die Sichtbarkeit. %>
-      <div class="mb-3">
-        <button type="button" class="btn btn-outline-secondary btn-sm" data-greeting-bildvorschau>
-          <i class="fa-solid fa-eye me-1"></i> <%= tr('greeting:IMAGE.PREVIEW') %>
-        </button>
-        <span class="text-secondary small ms-2"><%= tr('greeting:IMAGE.PREVIEW_HINT') %></span>
-        <div class="mt-2 d-none" data-greeting-bildvorschau-rahmen>
-          <img alt="<%= tr('greeting:IMAGE.TITLE') %>" class="img-fluid rounded border" style="max-width: 640px;" data-greeting-bildvorschau-bild data-fehler="<%= tr('greeting:IMAGE.PREVIEW_ERROR') %>">
+        <div class="col-md-9 mb-3">
+          <%# Aussehen (Verlauf, Hintergrundbild, Farbe, Text) nur im Kern-Bereich Bildkarten (G-22, F-G11 Punkt 2). %>
+          <p class="text-secondary small mb-2"><%= tr('greeting:IMAGE.AUSSEHEN_TEXT') %></p>
+          <a class="btn btn-outline-primary btn-sm" href="/guild/<%= guildId %>/bildkarten/einstellen/greeting/<%= encodeURIComponent('greeting:willkommen') %>">
+            <i class="fa-solid fa-id-card me-1"></i> <%= tr('greeting:IMAGE.AUSSEHEN') %>
+          </a>
         </div>
       </div>
 

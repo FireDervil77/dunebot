@@ -43,7 +43,7 @@ async function vorschau(name, member, guild) {
     // G-10 fehlte es hier, die Probe ging nur mit einem echten Beitritt).
     const anhaenge = [];
     if (name === "welcome" && settings.welcome_image_enabled) {
-        const bild = await Willkommensbild.anhang(member, settings, ServiceManager.get("Logger"));
+        const bild = await Willkommensbild.anhang(member, ServiceManager.get("Logger"));
         if (bild) anhaenge.push(bild);
     }
     await ziel.send(await baueNachricht(member, a.anlass, { anhaenge }));

@@ -38,7 +38,7 @@ const STANDARD = {
     farewell_enabled: false, farewell_channel: null,
     autorole_id: null, autorole_ids: null,
     dm_welcome_enabled: false,
-    welcome_image_enabled: false, welcome_image_bg: 'default', welcome_image_text: null, welcome_image_color: '#5865f2',
+    welcome_image_enabled: false,
     boost_enabled: false, boost_channel: null
 };
 
@@ -127,10 +127,7 @@ async function ladeDaten(guildId) {
         autorole_id: roh.autorole_id || '',
         autorole_ids: autoroleIds,
         welcome_image: {
-            enabled: Boolean(roh.welcome_image_enabled),
-            bg: roh.welcome_image_bg || 'default',
-            text: roh.welcome_image_text || '',
-            color: roh.welcome_image_color || '#5865f2'
+            enabled: Boolean(roh.welcome_image_enabled)
         },
         boost: {
             enabled: Boolean(roh.boost_enabled),

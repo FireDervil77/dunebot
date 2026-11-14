@@ -52,6 +52,14 @@
  * Bricolage ist variabel und zeichnet hier immer mit Gewicht 800: Die Rolle
  * `anzeige` ist deshalb immer fett.
  *
+ * # Einstellen je Guild (G-22, F-G11)
+ *
+ * Ein Wert mit `einstellbar` (`farbe`, `text`, `bild`) und `titel` stellt die
+ * Guild im Bereich „Bildkarten“ ein; sein Beispiel ist die Vorgabe.
+ * `vorschlaege` sind fertige Sätze solcher Werte. Bot und Seiten zeichnen
+ * eine Nutzung über `zeichneNutzung` (Einstellung aus `guild_bildkarten`
+ * plus Laufzeitwerte des Plugins), nie mit eigenen Werten für Einstellbares.
+ *
  * Bot und Dashboard nutzen dieselbe Datei. Wächter `scripts/check-bildkarten.js`.
  *
  * @module dunebot-sdk/lib/Bildkarte
@@ -120,7 +128,42 @@ const PFLICHT = Object.freeze({
     balken: ['x', 'y', 'b', 'h', 'wert', 'max'], bildreihe: ['x', 'y', 'groesse', 'liste'],
 });
 
+/**
+ * Was eine Guild an einer Karte einstellen darf (G-22). Ein Wert der Vorlage
+ * mit `einstellbar` erscheint im Bereich „Bildkarten“ als Feld:
+ *   - `farbe`  #rrggbb
+ *   - `text`   bis 255 Zeichen, Platzhalter von Mitglied und Guild
+ *   - `bild`   ein Bild aus der Medienablage der Guild (gespeichert als `guild_media.id`)
+ * Das Beispiel ist zugleich die Vorgabe: So zeichnet der Bot, solange die
+ * Guild nichts eingestellt hat. Werte ohne `einstellbar` gibt das Plugin.
+ */
+const EINSTELLBAR = Object.freeze(['farbe', 'text', 'bild']);
+const WERT_FELDER = new Set(['name', 'beispiel', 'einstellbar', 'titel']);
+const HEX6 = /^#[0-9a-f]{6}$/i;
+const TEXT_EINSTELLBAR_MAX = 255;
+
+/**
+ * Passt ein Wert zu seiner Art? `vorgabe`: Beispiel in der Vorlage (Bild
+ * leer), sonst gespeicherter Wert (Bild als Medien-ID).
+ * @returns {string|null} was falsch ist, oder null
+ */
+function wertFalsch(art, wert, { vorgabe = false } = {}) {
+    if (art === 'farbe') return typeof wert === 'string' && HEX6.test(wert) ? null : 'muss eine Farbe wie #3498db sein';
+    if (art === 'text') {
+        if (typeof wert !== 'string') return 'muss Text sein';
+        return wert.length > TEXT_EINSTELLBAR_MAX ? `ist länger als ${TEXT_EINSTELLBAR_MAX} Zeichen` : null;
+    }
+    if (art === 'bild') {
+        if (vorgabe) return wert === '' ? null : 'muss leer sein (das Bild wählt die Guild)';
+        return Number.isInteger(wert) && wert > 0 ? null : 'ist keine Medien-ID';
+    }
+    return `hat die unbekannte Art ${art}`;
+}
+
 class Kartenfehler extends Error {}
+
+/** Eingabe aus dem Bereich „Bildkarten“ passt nicht (Meldung für die Guild). */
+class Eingabefehler extends Error {}
 
 let canvasModul = null;
 function canvas() {
@@ -201,7 +244,7 @@ function istZahl(w) {
 function pruefe(roh, wo = 'Vorlage') {
     const f = (t) => { throw new Kartenfehler(`${wo}: ${t}`); };
     if (!roh || typeof roh !== 'object' || Array.isArray(roh)) f('kein Objekt');
-    const erlaubt = new Set(['titel', 'breite', 'hoehe', 'ecken', 'werte', 'texte', 'ebenen']);
+    const erlaubt = new Set(['titel', 'breite', 'hoehe', 'ecken', 'werte', 'texte', 'vorschlaege', 'ebenen']);
     for (const k of Object.keys(roh)) if (!erlaubt.has(k)) f(`unbekanntes Feld „${k}“`);
     for (const k of ['breite', 'hoehe']) {
         if (!Number.isInteger(roh[k]) || roh[k] < GRENZEN.seiteMin || roh[k] > GRENZEN.seiteMax) f(`${k} muss eine ganze Zahl von ${GRENZEN.seiteMin} bis ${GRENZEN.seiteMax} sein`);
@@ -211,12 +254,42 @@ function pruefe(roh, wo = 'Vorlage') {
     const werte = roh.werte || [];
     if (!Array.isArray(werte)) f('werte muss eine Liste sein');
     const wertNamen = new Set();
+    const einstellbare = new Map();
     for (const w of werte) {
         if (!w || typeof w.name !== 'string' || !/^[a-z][a-z0-9_]{0,31}$/.test(w.name)) f(`Wert ohne gültigen Namen: ${JSON.stringify(w)}`);
         if (w.name.includes(':')) f(`Wert ${w.name}: kein Doppelpunkt`);
         if (!('beispiel' in w)) f(`Wert ${w.name} ohne Beispiel`);
+        if (wertNamen.has(w.name)) f(`Wert ${w.name} doppelt`);
+        for (const k of Object.keys(w)) if (!WERT_FELDER.has(k)) f(`Wert ${w.name}: unbekanntes Feld „${k}“`);
+        if (w.einstellbar !== undefined) {
+            if (!EINSTELLBAR.includes(w.einstellbar)) f(`Wert ${w.name}: einstellbar muss eines von ${EINSTELLBAR.join(', ')} sein`);
+            if (!w.titel || typeof w.titel.de !== 'string' || typeof w.titel.en !== 'string' || !w.titel.de || !w.titel.en) f(`Wert ${w.name}: einstellbar braucht titel mit de und en`);
+            const falsch = wertFalsch(w.einstellbar, w.beispiel, { vorgabe: true });
+            if (falsch) f(`Wert ${w.name}: Beispiel ${falsch}`);
+            einstellbare.set(w.name, w.einstellbar);
+        } else if (w.titel !== undefined) {
+            f(`Wert ${w.name}: titel nur bei einstellbaren Werten`);
+        }
         wertNamen.add(w.name);
     }
+
+    // Vorschläge: fertige Sätze einstellbarer Werte (die Hintergründe des
+    // Willkommensbilds). Bilder nicht: Ihre Medien-ID gilt nur in einer Guild.
+    const vorschlaege = roh.vorschlaege || [];
+    if (!Array.isArray(vorschlaege) || vorschlaege.length > 24) f('vorschlaege ist eine Liste mit höchstens 24 Einträgen');
+    vorschlaege.forEach((s, i) => {
+        const ort = `Vorschlag ${i + 1}`;
+        if (!s || typeof s !== 'object' || Object.keys(s).some((k) => !['titel', 'werte'].includes(k))) f(`${ort}: nur titel und werte`);
+        if (!s.titel || typeof s.titel.de !== 'string' || typeof s.titel.en !== 'string') f(`${ort}: titel braucht de und en`);
+        if (!s.werte || typeof s.werte !== 'object' || !Object.keys(s.werte).length) f(`${ort}: werte fehlt`);
+        for (const [n, x] of Object.entries(s.werte)) {
+            const art = einstellbare.get(n);
+            if (!art) f(`${ort}: ${n} ist kein einstellbarer Wert dieser Vorlage`);
+            if (art === 'bild') f(`${ort}: ${n} ist ein Bild, das geht nicht als Vorschlag`);
+            const falsch = wertFalsch(art, x, { vorgabe: true });
+            if (falsch) f(`${ort}: ${n} ${falsch}`);
+        }
+    });
 
     const texte = roh.texte || {};
     if (typeof texte !== 'object' || Array.isArray(texte)) f('texte muss ein Objekt sein');
@@ -643,9 +716,52 @@ async function beispiel(name, { guildId, guildName, nutzer, werte, sprache, plug
 // Wer welche Karte nutzt (G-21, F-G11)
 // ─────────────────────────────────────────────────────────────────────────
 
-const NUTZUNG_FELDER = new Set(['titel', 'wo', 'seite', 'stand']);
+const NUTZUNG_FELDER = new Set(['titel', 'wo', 'seite', 'stand', 'schablonen']);
 const SEITE = /^[a-z0-9_-]{1,32}(\/[a-z0-9_-]{1,32}){0,3}$/;
 const STAND = /^[a-z0-9_-]{1,32}(\/[a-z0-9_-]{1,32}){0,3}\.js$/;
+
+/** Werte, die das Plugin zur Laufzeit gibt (alle ohne `einstellbar`). */
+function laufzeitWerte(v) {
+    return new Set((v.werte || []).filter((w) => !w.einstellbar).map((w) => w.name));
+}
+
+/**
+ * `schablonen` einer Erklärung (G-22): weitere Vorlagen, aus denen die Guild
+ * für diese Nutzung wählen darf. Die erklärte Karte ist immer die erste und
+ * die Vorgabe. Jede weitere ist eine eigene (`<p>:…`) oder eine des Kerns
+ * und braucht keinen Laufzeitwert, den die erklärte nicht kennt: Sonst
+ * zeichnete sie ihr Beispiel („Level 12“) statt der Werte des Plugins. Ein
+ * Name in mehreren Vorlagen hat überall dieselbe Art, damit ein gespeicherter
+ * Wert beim Wechsel passt.
+ * `laden` nur für den Wächter (Vorlagen ohne Datei).
+ * @returns {string[]|string} die Liste, oder was falsch ist
+ */
+function schablonenFehler(p, name, roh, vorhanden, laden = vorlage) {
+    if (roh === undefined) return [name];
+    if (!Array.isArray(roh) || !roh.length || roh.length > 8) return 'schablonen ist eine Liste mit 1 bis 8 Vorlagen';
+    const liste = [name];
+    let basis;
+    try { basis = laden(name); } catch (err) { return err.message; }
+    const kennt = laufzeitWerte(basis);
+    const arten = new Map((basis.werte || []).map((w) => [w.name, w.einstellbar || null]));
+    for (const s of roh) {
+        const m = NAME.exec(String(s));
+        if (!m || (m[1] !== p && m[1] !== 'kern')) return `schablonen: ${s} ist weder eigene (${p}:…) noch des Kerns`;
+        if (s === name || liste.includes(s)) return `schablonen: ${s} doppelt (die erklärte Karte steht schon vorn)`;
+        if (!vorhanden.has(s)) return `schablonen: keine Vorlage ${s}`;
+        let v;
+        try { v = laden(s); } catch (err) { return err.message; }
+        const fremd = [...laufzeitWerte(v)].filter((w) => !kennt.has(w));
+        if (fremd.length) return `schablonen: ${s} braucht ${fremd.join(', ')}, das ${name} nicht kennt`;
+        for (const w of v.werte || []) {
+            const art = w.einstellbar || null;
+            if (arten.has(w.name) && arten.get(w.name) !== art) return `schablonen: ${w.name} ist in ${s} ${art || 'ein Laufzeitwert'}, anderswo ${arten.get(w.name) || 'ein Laufzeitwert'}`;
+            arten.set(w.name, art);
+        }
+        liste.push(s);
+    }
+    return liste;
+}
 
 let nutzungenGelesen = null;
 
@@ -657,9 +773,13 @@ let nutzungenGelesen = null;
  *         "titel": "greeting:BILDKARTEN.TITEL_WILLKOMMEN",  // Pflicht bei eigenen Karten
  *         "wo":    "greeting:BILDKARTEN.WO_WILLKOMMEN",     // wo der Bot sie zeigt
  *         "seite": "nachrichten",                           // /guild/<id>/plugins/<p>/<seite>
- *         "stand": "shared/willkommensbild.js"              // exportiert stand(guildId) → {an, werte}
+ *         "stand": "shared/willkommensbild.js",             // exportiert stand(guildId) → {an, werte}
+ *         "schablonen": ["greeting:willkommen-schlicht"]     // optional: weitere zur Wahl (G-22)
  *       }
  *     }
+ *
+ * `werte` aus `stand` sind die Laufzeitwerte des Plugins; Einstellbares
+ * kommt aus der Einstellung der Guild (G-22).
  *
  * Ein Plugin erklärt nur eigene Karten (`<p>:…`) oder Schablonen des Kerns
  * (`kern:…`). Jede Karte eines Plugins muss erklärt sein, sonst sähe die Guild
@@ -698,8 +818,10 @@ function nutzungen() {
                 fehler.push(`${ort}: stand nennt keine Datei im Plugin (${e.stand})`);
                 continue;
             }
+            const schablonen = schablonenFehler(p, name, e.schablonen, vorhanden);
+            if (typeof schablonen === 'string') { fehler.push(`${ort}: ${schablonen}`); continue; }
             if (!karten.has(name)) karten.set(name, []);
-            karten.get(name).push({ plugin: p, titel: e.titel || null, wo: e.wo, seite: e.seite || null, stand: e.stand || null });
+            karten.get(name).push({ plugin: p, karte: name, titel: e.titel || null, wo: e.wo, seite: e.seite || null, stand: e.stand || null, schablonen });
         }
     }
     for (const name of vorhanden) {
@@ -731,10 +853,243 @@ async function nutzungStand(nutzung, guildId) {
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Einstellungen je Guild (G-22, F-G11)
+// ─────────────────────────────────────────────────────────────────────────
+//
+// Kern-Tabelle `guild_bildkarten`, eine Zeile je Guild, Plugin und Karte
+// (die erklärte, `greeting:willkommen`). `vorlage` ist die gewählte Schablone
+// (NULL = die erklärte), `werte` nur, was von der Vorgabe abweicht. Bilder
+// stehen als `guild_media.id` darin; gelesen wird nur ein Bild derselben
+// Guild. Keine Mitgliederdaten, geht mit der Guild (core `guildInhalte`).
+//
+// Eingestellt wird nur im Bereich „Bildkarten“ (F-G11 Punkt 2). Der Bot
+// zeichnet über `zeichneNutzung`, die Seiten über `beispielNutzung`: dieselbe
+// Rechnung, keine Kopie im Plugin.
+
+function db() {
+    return require('dunebot-core').ServiceManager.get('dbService');
+}
+
+/** Die Nutzung eines Plugins, oder Eingabefehler. */
+function nutzungVon(plugin, karte) {
+    const n = (nutzungen().karten.get(String(karte)) || []).find((x) => x.plugin === String(plugin));
+    if (!n) throw new Eingabefehler(`${plugin} erklärt keine Bildkarte ${karte}.`);
+    return n;
+}
+
+/** Die einstellbaren Werte einer Vorlage, in ihrer Reihenfolge. */
+function einstellbar(v) {
+    return (v.werte || []).filter((w) => w.einstellbar);
+}
+
+function alsJson(roh) {
+    if (!roh) return {};
+    if (typeof roh === 'object') return roh;
+    try { const p = JSON.parse(roh); return p && typeof p === 'object' && !Array.isArray(p) ? p : {}; } catch { return {}; }
+}
+
+/**
+ * Gespeichertes gegen die Vorlage prüfen und zum Zeichnen auflösen. Was nicht
+ * (mehr) passt, fällt auf die Vorgabe und steht in `hinweise`: eine Schablone,
+ * die das Plugin nicht mehr anbietet, ein Wert falscher Art, ein gelöschtes Bild.
+ *
+ * @param {Object} nutzung aus `nutzungen()`
+ * @param {string} guildId
+ * @param {{vorlage?: string|null, werte?: Object}} gespeichert Bilder als Medien-ID
+ * @returns {Promise<{vorlage: string, werte: Object<string,string>, gespeichert: {vorlage: string|null, werte: Object}, hinweise: string[]}>}
+ */
+async function einstellungAufloesen(nutzung, guildId, gespeichert = {}) {
+    const hinweise = [];
+    let name = nutzung.karte;
+    if (gespeichert.vorlage && gespeichert.vorlage !== nutzung.karte) {
+        if (nutzung.schablonen.includes(gespeichert.vorlage)) name = gespeichert.vorlage;
+        else hinweise.push(`Schablone ${gespeichert.vorlage} bietet ${nutzung.plugin} nicht mehr an, nehme ${nutzung.karte}`);
+    }
+    const v = vorlage(name);
+    const roh = alsJson(gespeichert.werte);
+    const werte = {};
+    const behalten = {};
+    const bilder = new Map();
+    for (const w of einstellbar(v)) {
+        werte[w.name] = w.beispiel;
+        if (!(w.name in roh)) continue;
+        const falsch = wertFalsch(w.einstellbar, roh[w.name]);
+        if (falsch) { hinweise.push(`${w.name} ${falsch}, nehme die Vorgabe`); continue; }
+        behalten[w.name] = roh[w.name];
+        if (w.einstellbar === 'bild') bilder.set(w.name, roh[w.name]);
+        else werte[w.name] = roh[w.name];
+    }
+    if (bilder.size) {
+        const ids = [...new Set(bilder.values())];
+        const zeilen = await db().query(
+            `SELECT id, stored_name FROM guild_media WHERE guild_id = ? AND mime_type LIKE 'image/%' AND id IN (${ids.map(() => '?').join(', ')})`,
+            [String(guildId), ...ids]
+        );
+        const datei = new Map((zeilen || []).map((z) => [Number(z.id), z.stored_name]));
+        for (const [n, id] of bilder) {
+            if (datei.has(id)) werte[n] = `/uploads/media/${encodeURIComponent(String(guildId))}/${encodeURIComponent(datei.get(id))}`;
+            else hinweise.push(`${n}: Das Bild liegt nicht mehr in der Medienablage, nehme keins`);
+        }
+    }
+    return { vorlage: name, werte, gespeichert: { vorlage: name === nutzung.karte ? null : name, werte: behalten }, hinweise };
+}
+
+/**
+ * Was eine Guild für eine Nutzung eingestellt hat, aufgelöst zum Zeichnen.
+ * Ohne Zeile: die erklärte Karte mit ihren Vorgaben.
+ */
+async function einstellung(plugin, karte, guildId) {
+    const n = nutzungVon(plugin, karte);
+    const zeilen = await db().query(
+        'SELECT vorlage, werte FROM guild_bildkarten WHERE guild_id = ? AND plugin = ? AND karte = ?',
+        [String(guildId), n.plugin, n.karte]
+    );
+    const z = zeilen?.[0];
+    return einstellungAufloesen(n, guildId, z ? { vorlage: z.vorlage, werte: z.werte } : {});
+}
+
+/** Adresse aus der Medienwahl → `guild_media.id` dieser Guild (wie Logo und Banner, G-09). */
+async function medienId(guildId, adresse, titel) {
+    const a = String(adresse || '').trim();
+    if (!a) return null;
+    const basis = String(process.env.DASHBOARD_BASE_URL || '').replace(/\/+$/, '');
+    const pfad = basis && a.startsWith(basis) ? a.slice(basis.length) : a;
+    const praefix = `/uploads/media/${guildId}/`;
+    let datei = '';
+    try { datei = pfad.startsWith(praefix) ? decodeURIComponent(pfad.slice(praefix.length)) : ''; } catch { datei = ''; }
+    if (!datei || datei.includes('/')) throw new Eingabefehler(`${titel}: Bitte ein Bild aus der Medienablage dieses Servers wählen.`);
+    const zeilen = await db().query(
+        "SELECT id FROM guild_media WHERE guild_id = ? AND stored_name = ? AND mime_type LIKE 'image/%'",
+        [String(guildId), datei]
+    );
+    if (!zeilen?.[0]) throw new Eingabefehler(`${titel}: Das Bild liegt nicht in der Medienablage dieses Servers.`);
+    return Number(zeilen[0].id);
+}
+
+/** Platzhalter in einem Text der Guild, die der Renderer nicht kennt. */
+function fremdePlatzhalter(text) {
+    const kern = new Set(require('dunebot-core/lib/PlaceholderParser').PLATZHALTER.map((p) => p.name));
+    return platzhalterIn(text).filter((n) => !kern.has(n));
+}
+
+/**
+ * Eingabe aus dem Bereich prüfen, in die Form der Tabelle. Nur, was von der
+ * Vorgabe abweicht, bleibt; leerer Text heißt Vorgabe, leeres Bild keins.
+ * Werte anderer Schablonen werden übergangen (Wechsel der Schablone).
+ *
+ * @param {Object} nutzung
+ * @param {string} guildId
+ * @param {{vorlage?: string, werte?: Object<string,string>}} eingabe Bilder als Adresse aus der Medienwahl
+ * @param {'de'|'en'} [sprache] für die Titel in Meldungen
+ * @returns {Promise<{vorlage: string|null, werte: Object}>}
+ */
+async function eingabePruefen(nutzung, guildId, eingabe = {}, sprache = 'de') {
+    const gewaehlt = String(eingabe.vorlage || '') || nutzung.karte;
+    if (!nutzung.schablonen.includes(gewaehlt)) throw new Eingabefehler(`Die Schablone ${gewaehlt} gibt es für diese Karte nicht.`);
+    const v = vorlage(gewaehlt);
+    const roh = eingabe.werte && typeof eingabe.werte === 'object' ? eingabe.werte : {};
+    const werte = {};
+    for (const w of einstellbar(v)) {
+        if (!(w.name in roh)) continue;
+        const titel = w.titel[sprache] || w.titel.de;
+        const x = roh[w.name];
+        if (x !== null && typeof x !== 'string') throw new Eingabefehler(`${titel}: kein Text.`);
+        const s = String(x ?? '').trim();
+        if (w.einstellbar === 'farbe') {
+            if (!s) continue;
+            if (!HEX6.test(s)) throw new Eingabefehler(`${titel}: „${s.slice(0, 20)}“ ist kein Farbwert wie #3498db.`);
+            if (s.toLowerCase() !== w.beispiel.toLowerCase()) werte[w.name] = s.toLowerCase();
+        } else if (w.einstellbar === 'text') {
+            if (!s || s === w.beispiel) continue;
+            if (s.length > TEXT_EINSTELLBAR_MAX) throw new Eingabefehler(`${titel}: höchstens ${TEXT_EINSTELLBAR_MAX} Zeichen.`);
+            const fremd = fremdePlatzhalter(s);
+            if (fremd.length) throw new Eingabefehler(`${titel}: Platzhalter ${fremd.map((n) => `{${n}}`).join(', ')} gibt es hier nicht.`);
+            werte[w.name] = s;
+        } else if (w.einstellbar === 'bild') {
+            const id = await medienId(guildId, s, titel);
+            if (id !== null) werte[w.name] = id;
+        }
+    }
+    return { vorlage: gewaehlt === nutzung.karte ? null : gewaehlt, werte };
+}
+
+/**
+ * Einstellung speichern. Bleibt nichts Abweichendes, verschwindet die Zeile
+ * (die Karte zeichnet dann wieder die Vorgabe). Das Recht prüft die Route.
+ * @returns {Promise<Object>} die neue Einstellung wie `einstellung()`
+ */
+async function speichereEinstellung(plugin, karte, guildId, eingabe, sprache) {
+    const n = nutzungVon(plugin, karte);
+    const g = await eingabePruefen(n, guildId, eingabe, sprache);
+    if (!g.vorlage && !Object.keys(g.werte).length) {
+        await db().query('DELETE FROM guild_bildkarten WHERE guild_id = ? AND plugin = ? AND karte = ?', [String(guildId), n.plugin, n.karte]);
+    } else {
+        await db().query(
+            `INSERT INTO guild_bildkarten (guild_id, plugin, karte, vorlage, werte) VALUES (?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE vorlage = VALUES(vorlage), werte = VALUES(werte)`,
+            [String(guildId), n.plugin, n.karte, g.vorlage, JSON.stringify(g.werte)]
+        );
+    }
+    return einstellung(plugin, karte, guildId);
+}
+
+/** Werte zum Zeichnen: Einstellung der Guild, dazu die Laufzeitwerte des Plugins. */
+function werteZusammen(e, laufzeit) {
+    const v = vorlage(e.vorlage);
+    const eigen = new Set(einstellbar(v).map((w) => w.name));
+    const werte = { ...e.werte };
+    for (const [k, x] of Object.entries(laufzeit || {})) if (!eigen.has(k)) werte[k] = x;
+    return werte;
+}
+
+/**
+ * Eine Nutzung zeichnen, wie die Guild sie eingestellt hat: gewählte
+ * Schablone, ihre Werte, dazu die Laufzeitwerte des Plugins unter
+ * `kontext.werte` (einstellbare Namen darin zählen nicht). Ist die
+ * Einstellung nicht lesbar, zeichnet die Karte die Vorgabe und sagt es in
+ * `hinweise`.
+ *
+ *     const karte = await Bildkarte.zeichneNutzung('greeting', 'greeting:willkommen', { member }, { guildId });
+ *
+ * @param {string} plugin
+ * @param {string} karte die erklärte Karte
+ * @param {Object} kontext wie `zeichne` (member, guild, werte)
+ * @param {{guildId: string, sprache?: string, einstellung?: Object}} optionen `einstellung` nur für Vorschauen
+ */
+async function zeichneNutzung(plugin, karte, kontext = {}, optionen = {}) {
+    const n = nutzungVon(plugin, karte);
+    const guildId = String(optionen.guildId || kontext.guild?.id || kontext.member?.guild?.id || '');
+    let e = optionen.einstellung;
+    if (!e) {
+        try {
+            e = await einstellung(plugin, karte, guildId);
+        } catch (err) {
+            e = await einstellungAufloesen(n, guildId, {});
+            e.hinweise.push(`Einstellung nicht lesbar, nehme die Vorgabe: ${err.message}`);
+        }
+    }
+    const bild = await zeichne(e.vorlage, { ...kontext, werte: werteZusammen(e, kontext.werte) }, { guildId, plugin: n.plugin, sprache: optionen.sprache });
+    bild.hinweise.unshift(...e.hinweise);
+    return bild;
+}
+
+/** Wie `beispiel`, aber für eine Nutzung samt Einstellung (Seiten im Bereich). */
+async function beispielNutzung(plugin, karte, { guildId, guildName, nutzer, werte, sprache, einstellung: e } = {}) {
+    const { beispielKontext } = require('./Vorlage');
+    const { member, guild } = beispielKontext(nutzer, { id: guildId, name: guildName });
+    return zeichneNutzung(plugin, karte, { member, guild, werte }, { guildId, sprache, einstellung: e });
+}
+
 /** Gelesene Vorlagen und Erklärungen vergessen (Wächter, nach dem Bearbeiten einer Datei). */
 function vergiss() {
     vorlagen.clear();
     nutzungenGelesen = null;
 }
 
-module.exports = { ARTEN, PFLICHT, GRENZEN, PNG_MAX_BYTES, SYSTEM, Kartenfehler, pruefe, vorlage, liste, zeichne, beispiel, schriftStand, nutzungen, nutzungStand, vergiss };
+module.exports = {
+    ARTEN, PFLICHT, GRENZEN, PNG_MAX_BYTES, SYSTEM, EINSTELLBAR, TEXT_EINSTELLBAR_MAX, Kartenfehler, Eingabefehler,
+    pruefe, vorlage, liste, zeichne, beispiel, schriftStand, nutzungen, nutzungStand, vergiss,
+    einstellbar, einstellung, einstellungAufloesen, eingabePruefen, speichereEinstellung, zeichneNutzung, beispielNutzung,
+    schablonenFehler, wertFalsch,
+};

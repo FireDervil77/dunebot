@@ -4,7 +4,9 @@
   Jede Karte dieser Guild: Schablonen des Kerns und Karten eingeschalteter
   Plugins, dazu wo der Bot sie zeigt (Erklärung `bildkarten` in der
   package.json des Plugins). Das Bild lädt einzeln über
-  /guild/ID/bildkarten/bild/NAME. Nur Lesen; Einstellen folgt (G-22).
+  /guild/ID/bildkarten/bild/NAME. Eingestellt wird je Nutzung auf
+  /guild/ID/bildkarten/einstellen/PLUGIN/KARTE (G-22); eine Nutzung steht
+  unter der Schablone, die die Guild für sie gewählt hat.
 
   context: guildId, karten (bildkarten.router kartenDerGuild + Stand)
 %>
@@ -60,9 +62,14 @@ const _titel = (k) => {
                 <div class="text-secondary"><%= tr(n.wo) %></div>
                 <% if (n.an === false) { %><div class="small text-secondary"><%= _t('AUS_TEXT') %></div><% } %>
                 <% if (n.fehler) { %><div class="small text-orange"><i class="fa-solid fa-circle-info me-1"></i><%= _t('STAND_FEHLER', { grund: n.fehler }) %></div><% } %>
-                <% if (n.seite) { %>
-                  <a class="btn btn-sm btn-outline-primary mt-1" href="/guild/<%= _id %>/plugins/<%= n.plugin %>/<%= n.seite %>"><i class="fa-solid fa-sliders me-1"></i><%= _t('EINSTELLEN', { plugin: n.pluginName }) %></a>
-                <% } %>
+                <div class="btn-list mt-1">
+                  <% if (n.einstellbar) { %>
+                    <a class="btn btn-sm btn-primary" href="/guild/<%= _id %>/bildkarten/einstellen/<%= encodeURIComponent(n.plugin) %>/<%= encodeURIComponent(n.karte) %>"><i class="fa-solid fa-palette me-1"></i><%= _t('AUSSEHEN') %></a>
+                  <% } %>
+                  <% if (n.seite) { %>
+                    <a class="btn btn-sm btn-outline-secondary" href="/guild/<%= _id %>/plugins/<%= n.plugin %>/<%= n.seite %>"><i class="fa-solid fa-sliders me-1"></i><%= _t('EINSTELLEN', { plugin: n.pluginName }) %></a>
+                  <% } %>
+                </div>
               </li>
             <% }) %>
           </ul>

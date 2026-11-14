@@ -73,11 +73,12 @@ module.exports = async (member) => {
             if (channel) {
                 const inviterData = member.inviterData || {};
 
-                // Das Willkommensbild hängt als Datei an (Kern-Renderer, G-10).
+                // Das Willkommensbild hängt als Datei an (Kern-Renderer, G-10; Aussehen
+                // stellt die Guild unter Bildkarten ein, G-22).
                 // In Components V2 steht es in der Galerie (`attachment://…`).
                 const anhaenge = [];
                 if (settings.welcome_image_enabled) {
-                    const bild = await Willkommensbild.anhang(member, settings, logger);
+                    const bild = await Willkommensbild.anhang(member, logger);
                     if (bild) anhaenge.push(bild);
                 }
 

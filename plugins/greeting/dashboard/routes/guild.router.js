@@ -21,8 +21,7 @@ const router = express.Router();
 const { ServiceManager } = require('dunebot-core');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 const { makeTranslator, renderView, ladeDaten, renderFehler, ANLAESSE, VERIFIZIERUNG } = require('./_shared');
-const { Vorlage, Bildkarte } = require('dunebot-sdk');
-const Willkommensbild = require('../../shared/willkommensbild');
+const { Vorlage } = require('dunebot-sdk');
 
 /** Skripte anmelden, die eine Seite braucht. */
 function skripteAnmelden(handles) {
@@ -73,35 +72,6 @@ router.get('/einladungen',    requirePermission('GREETING.VIEW'), seite('greetin
 router.get('/settings',       requirePermission('GREETING.VIEW'), seite('greeting-settings',      'Die Greeting-Einstellungen konnten nicht geladen werden'));
 
 /**
- * GET /guild/:guildId/plugins/greeting/willkommensbild?bg=&text=&color=
- * Das Willkommensbild als PNG mit den Werten aus dem Formular (noch nicht
- * gespeichert), gezeichnet vom Kern-Renderer wie im Bot (G-10). Mitglied ist
- * der angemeldete Nutzer.
- */
-router.get('/willkommensbild', requirePermission('GREETING.VIEW'), async (req, res) => {
-    const guildId = res.locals.guildId;
-    try {
-        const zeilen = await ServiceManager.get('dbService').query('SELECT guild_name FROM guilds WHERE _id = ?', [guildId]);
-        const q = req.query || {};
-        const karte = await Bildkarte.beispiel(Willkommensbild.ANLASS, {
-            guildId,
-            guildName: zeilen?.[0]?.guild_name || '',
-            nutzer: req.session.user.info,
-            werte: Willkommensbild.werte({
-                welcome_image_bg: String(q.bg || ''),
-                welcome_image_text: String(q.text || '').slice(0, 200),
-                welcome_image_color: String(q.color || ''),
-            }),
-        });
-        res.set('Cache-Control', 'no-store');
-        res.type(karte.typ === 'png' ? 'png' : 'jpeg').send(karte.puffer);
-    } catch (err) {
-        ServiceManager.get('Logger').error(`[Greeting] Vorschau Willkommensbild in ${guildId}:`, err);
-        res.status(500).type('text').send(err.message);
-    }
-});
-
-/**
  * PUT /guild/:guildId/plugins/greeting/settings
  * Speichert Guild-spezifische Greeting-Einstellungen.
  *
@@ -127,7 +97,7 @@ router.put('/settings', requirePermission('GREETING.SETTINGS.EDIT'), async (req,
             autorole_id: null, autorole_ids: [],
             welcome_enabled: false, welcome_channel: null,
             dm_welcome_enabled: false,
-            welcome_image_enabled: false, welcome_image_bg: 'default', welcome_image_text: null, welcome_image_color: '#5865f2',
+            welcome_image_enabled: false,
             farewell_enabled: false, farewell_channel: null,
             boost_enabled: false, boost_channel: null,
             verification_enabled: false, verification_channel: null, verification_role_id: null,
@@ -155,9 +125,7 @@ router.put('/settings', requirePermission('GREETING.SETTINGS.EDIT'), async (req,
                     if (body.welcome_image_enabled !== undefined) {
                         settings.welcome_image_enabled = body.welcome_image_enabled === true || body.welcome_image_enabled === 'true';
                     }
-                    if (body.welcome_image_bg !== undefined) settings.welcome_image_bg = body.welcome_image_bg || 'default';
-                    if (body.welcome_image_text !== undefined) settings.welcome_image_text = body.welcome_image_text || null;
-                    if (body.welcome_image_color !== undefined) settings.welcome_image_color = body.welcome_image_color || '#5865f2';
+                    // Aussehen des Bildes: nur unter Bildkarten (G-22).
                 }
             }
             if (body.action === 'enable') settings[schalter] = true;
@@ -184,9 +152,6 @@ router.put('/settings', requirePermission('GREETING.SETTINGS.EDIT'), async (req,
         // ── Willkommensbild allein ─────────────────────────────────────────
         if (body.type === 'welcome_image' && body.action === 'save') {
             settings.welcome_image_enabled = body.welcome_image_enabled === true || body.welcome_image_enabled === 'true';
-            if (body.welcome_image_bg !== undefined) settings.welcome_image_bg = body.welcome_image_bg || 'default';
-            if (body.welcome_image_text !== undefined) settings.welcome_image_text = body.welcome_image_text || null;
-            if (body.welcome_image_color !== undefined) settings.welcome_image_color = body.welcome_image_color || '#5865f2';
         }
 
         // ── Verifizierung ──────────────────────────────────────────────────
@@ -217,11 +182,11 @@ router.put('/settings', requirePermission('GREETING.SETTINGS.EDIT'), async (req,
                 autorole_id, autorole_ids,
                 welcome_enabled, welcome_channel,
                 dm_welcome_enabled,
-                welcome_image_enabled, welcome_image_bg, welcome_image_text, welcome_image_color,
+                welcome_image_enabled,
                 farewell_enabled, farewell_channel,
                 boost_enabled, boost_channel,
                 verification_enabled, verification_channel, verification_role_id, verification_type, verification_remove_role_id, verification_emoji
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
                 autorole_id = VALUES(autorole_id),
                 autorole_ids = VALUES(autorole_ids),
@@ -229,9 +194,6 @@ router.put('/settings', requirePermission('GREETING.SETTINGS.EDIT'), async (req,
                 welcome_channel = VALUES(welcome_channel),
                 dm_welcome_enabled = VALUES(dm_welcome_enabled),
                 welcome_image_enabled = VALUES(welcome_image_enabled),
-                welcome_image_bg = VALUES(welcome_image_bg),
-                welcome_image_text = VALUES(welcome_image_text),
-                welcome_image_color = VALUES(welcome_image_color),
                 farewell_enabled = VALUES(farewell_enabled),
                 farewell_channel = VALUES(farewell_channel),
                 boost_enabled = VALUES(boost_enabled),
@@ -251,9 +213,6 @@ router.put('/settings', requirePermission('GREETING.SETTINGS.EDIT'), async (req,
             settings.welcome_channel,
             settings.dm_welcome_enabled ? 1 : 0,
             settings.welcome_image_enabled ? 1 : 0,
-            settings.welcome_image_bg,
-            settings.welcome_image_text,
-            settings.welcome_image_color,
             settings.farewell_enabled ? 1 : 0,
             settings.farewell_channel,
             settings.boost_enabled ? 1 : 0,

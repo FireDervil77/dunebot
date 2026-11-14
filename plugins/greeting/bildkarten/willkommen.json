@@ -3,14 +3,25 @@
   "breite": 1024,
   "hoehe": 450,
   "werte": [
-    { "name": "hintergrund1", "beispiel": "#1a1a2e" },
-    { "name": "hintergrund2", "beispiel": "#16213e" },
-    { "name": "hintergrund3", "beispiel": "#0f3460" },
-    { "name": "akzent", "beispiel": "#5865f2" },
-    { "name": "text", "beispiel": "Willkommen {member:nick}!" }
+    { "name": "hintergrund1", "beispiel": "#1a1a2e", "einstellbar": "farbe", "titel": { "de": "Verlauf oben links", "en": "Gradient top left" } },
+    { "name": "hintergrund2", "beispiel": "#16213e", "einstellbar": "farbe", "titel": { "de": "Verlauf Mitte", "en": "Gradient middle" } },
+    { "name": "hintergrund3", "beispiel": "#0f3460", "einstellbar": "farbe", "titel": { "de": "Verlauf unten rechts", "en": "Gradient bottom right" } },
+    { "name": "hintergrundbild", "beispiel": "", "einstellbar": "bild", "titel": { "de": "Hintergrundbild", "en": "Background image" } },
+    { "name": "akzent", "beispiel": "#5865f2", "einstellbar": "farbe", "titel": { "de": "Akzentfarbe", "en": "Accent colour" } },
+    { "name": "text", "beispiel": "Welcome to the server!", "einstellbar": "text", "titel": { "de": "Begrüßungstext", "en": "Welcome text" } }
+  ],
+  "vorschlaege": [
+    { "titel": { "de": "Standard", "en": "Default" }, "werte": { "hintergrund1": "#1a1a2e", "hintergrund2": "#16213e", "hintergrund3": "#0f3460" } },
+    { "titel": { "de": "Dunkel", "en": "Dark" }, "werte": { "hintergrund1": "#0d0d0d", "hintergrund2": "#1a1a1a", "hintergrund3": "#2d2d2d" } },
+    { "titel": { "de": "Blau", "en": "Blue" }, "werte": { "hintergrund1": "#0f0c29", "hintergrund2": "#302b63", "hintergrund3": "#24243e" } },
+    { "titel": { "de": "Lila", "en": "Purple" }, "werte": { "hintergrund1": "#12011e", "hintergrund2": "#3c1053", "hintergrund3": "#6a0572" } },
+    { "titel": { "de": "Grün", "en": "Green" }, "werte": { "hintergrund1": "#0a1a0a", "hintergrund2": "#1b4332", "hintergrund3": "#2d6a4f" } },
+    { "titel": { "de": "Sonnenuntergang", "en": "Sunset" }, "werte": { "hintergrund1": "#2d1b69", "hintergrund2": "#6b2fa0", "hintergrund3": "#e94560" } },
+    { "titel": { "de": "Ozean", "en": "Ocean" }, "werte": { "hintergrund1": "#0a192f", "hintergrund2": "#172a45", "hintergrund3": "#1c4a6e" } }
   ],
   "ebenen": [
     { "art": "flaeche", "x": 0, "y": 0, "b": 1024, "h": 450, "verlauf": ["{hintergrund1}", "{hintergrund2}", "{hintergrund3}"], "richtung": "diagonal" },
+    { "art": "bild", "x": 0, "y": 0, "b": 1024, "h": 450, "quelle": "{hintergrundbild}", "passung": "fuellen", "abdunkeln": 0.45 },
     { "art": "gitter", "abstand": 40, "farbe": "rgba(255, 255, 255, 0.03)", "breite": 1 },
     { "art": "flaeche", "x": 0, "y": 444, "b": 1024, "h": 6, "farbe": "{akzent}" },
     { "art": "leuchten", "mx": 512, "my": 140, "r_innen": 50, "r_aussen": 150, "farbe": "{akzent}40" },

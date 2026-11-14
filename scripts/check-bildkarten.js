@@ -26,8 +26,9 @@
  *   8.  Über 1 MB geht die Karte als JPEG, mit passendem Dateinamen.
  *   9.  Ein Renderer: Canvas lädt außer Bildkarte.js niemand (Ausnahmen mit Grund).
  *   10. greeting: welcomeImage.js ist weg, Beitritt und `/welcome preview`
- *       nehmen dieselbe Stelle, die Hintergründe im Formular sind die im Code,
- *       die Vorschau-Route zeichnet über Bildkarte.
+ *       nehmen dieselbe Stelle (`zeichneNutzung`), Aussehen nur unter
+ *       Bildkarten (G-22): kein Feld, keine Spalte, keine Vorschau-Route mehr
+ *       in greeting, die Vorschläge der Vorlage sind die alten Hintergründe.
  *   11. /admin/bildkarten: Route, Seitenleiste, die Ansicht rendert (leer und voll).
  *   12. Bereich „Bildkarten“ je Guild (G-21, F-G11):
  *       a. Erklärungen `bildkarten` in den package.json ohne Fehler, jede Karte
@@ -37,8 +38,22 @@
  *       c. Router: beide Routen mit Recht, eingehängt unter /:guildId/bildkarten.
  *       d. Welche Karten eine Guild sieht: Kern immer, Plugin nur eingeschaltet,
  *          Nutzung nur von eingeschalteten Plugins.
- *       e. greeting `stand()`: an nur mit Nachricht und Bild, Werte wie der Bot.
+ *       e. greeting `stand()`: an nur mit Nachricht und Bild, keine Laufzeitwerte.
  *       f. Die Seite rendert leer und voll, Texte in beiden Sprachen.
+ *   13. Eigene Karten je Guild (G-22):
+ *       a. `pruefe`: einstellbare Werte und Vorschläge, mit Ablehnungen.
+ *       b. `schablonen` in der Erklärung: nur eigene oder Kern, keine fremden
+ *          Laufzeitwerte, gleiche Art je Name.
+ *       c. Gespeichertes lesen: Unpassendes fällt auf die Vorgabe mit Hinweis,
+ *          Bild nur aus der Medienablage derselben Guild.
+ *       d. Eingabe prüfen: nur Abweichendes bleibt, Fehler mit Titel.
+ *       e. Speichern: nichts Abweichendes löscht die Zeile.
+ *       f. Zeichnen: Einstellbares gibt die Guild, nicht das Plugin; ohne
+ *          lesbare Einstellung die Vorgabe mit Hinweis.
+ *       g. Router: Rechte, CSRF, Kontroll-Guild nur Besitzer, Nutzung unter
+ *          der gewählten Schablone.
+ *       h. Einstellseite und Übersicht rendern, beide Sprachen, escaped.
+ *       i. Tabelle, Löschort, greeting-Migration (Abbildung und Lauf).
  *
  * Kein Netz, keine Datenbank: Die Palette kommt aus einer Attrappe ohne Zeilen
  * (also die Vorgabe des Kerns). Liest eine Datei aus der Medienablage der
@@ -287,26 +302,41 @@ function stubMember(nick = 'Anna') {
         assert(!weg.length, `Ausnahme ohne Fund, Zeile löschen: ${weg.join(', ')}`);
     });
 
-    await pruefe('10. greeting: eine Stelle, Formular = Code, Vorschau über Bildkarte', () => {
+    await pruefe('10. greeting: eine Stelle, Aussehen nur unter Bildkarten', () => {
         assert(!fs.existsSync(path.join(WURZEL, 'plugins/greeting/bot/welcomeImage.js')), 'welcomeImage.js ist zurück');
         const beitritt = ohneKommentare(lies('plugins/greeting/bot/events/guildMemberAdd.js'));
         const befehl = ohneKommentare(lies('plugins/greeting/bot/vorlageBefehl.js'));
-        assert(/Willkommensbild\.anhang\(member, settings/.test(beitritt), 'Beitritt nimmt nicht Willkommensbild.anhang');
-        assert(/Willkommensbild\.anhang\(member, settings/.test(befehl), '/welcome preview nimmt nicht Willkommensbild.anhang');
+        assert(/Willkommensbild\.anhang\(member, logger\)/.test(beitritt), 'Beitritt nimmt nicht Willkommensbild.anhang');
+        assert(/Willkommensbild\.anhang\(member, ServiceManager/.test(befehl), '/welcome preview nimmt nicht Willkommensbild.anhang');
         assert(/baueNachricht\(member, a\.anlass, \{ anhaenge \}\)/.test(befehl), '/welcome preview hängt das Bild nicht an');
         const W = require(path.join(WURZEL, 'plugins/greeting/shared/willkommensbild.js'));
+        assert(typeof W.anhang === 'function' && typeof W.stand === 'function' && !W.werte && !W.HINTERGRUENDE, 'willkommensbild.js rechnet wieder selbst');
+        assert(/Bildkarte\.zeichneNutzung\('greeting', ANLASS/.test(ohneKommentare(lies('plugins/greeting/shared/willkommensbild.js'))), 'anhang zeichnet nicht über zeichneNutzung');
+        // Kein Feld, keine Spalte mehr in greeting (außer den Migrationen).
+        const reste = [];
+        const geh = (ordner) => {
+            for (const d of fs.readdirSync(path.join(WURZEL, ordner), { withFileTypes: true })) {
+                const rel = path.join(ordner, d.name);
+                if (d.isDirectory()) { if (d.name !== 'migrations' && d.name !== 'node_modules') geh(rel); continue; }
+                if (!/\.(js|ejs)$/.test(d.name)) continue;
+                const q = d.name.endsWith('.ejs') ? ohneKommentareEjs(lies(rel)) : ohneKommentare(lies(rel));
+                if (/welcome_image_(bg|text|color)|willkommensbild\?|data-greeting-bildvorschau/.test(q)) reste.push(rel);
+            }
+        };
+        geh('plugins/greeting');
+        assert(!reste.length, `Aussehen des Bildes noch in greeting: ${reste.join(', ')}`);
+        assert(!/router\.get\('\/willkommensbild'/.test(ohneKommentare(lies('plugins/greeting/dashboard/routes/guild.router.js'))), 'Vorschau-Route in greeting ist zurück');
         const ejs = ohneKommentareEjs(lies('plugins/greeting/dashboard/views/guild/greeting-content.ejs'));
-        const auswahl = ejs.slice(ejs.indexOf('name="welcome_image_bg"'), ejs.indexOf('</select>', ejs.indexOf('name="welcome_image_bg"')));
-        const optionen = [...auswahl.matchAll(/<option value="([a-z]+)"/g)].map((m) => m[1]).sort();
-        assert.deepStrictEqual(optionen, Object.keys(W.HINTERGRUENDE).sort(), 'Hintergründe im Formular ≠ im Code');
-        assert.deepStrictEqual(W.werte({ welcome_image_bg: 'gibtsnicht', welcome_image_color: 'rot' }).hintergrund1, W.HINTERGRUENDE.default[0]);
-        assert.strictEqual(W.werte({ welcome_image_color: 'rot' }).akzent, W.VORGABE_FARBE);
-        const router = ohneKommentare(lies('plugins/greeting/dashboard/routes/guild.router.js'));
-        const route = router.slice(router.indexOf("router.get('/willkommensbild'"));
-        assert(route.length > 30, 'Vorschau-Route fehlt');
-        assert(/requirePermission\('GREETING\.VIEW'\)/.test(route.slice(0, 120)), 'Vorschau-Route ohne Recht');
-        assert(/Bildkarte\.beispiel\(Willkommensbild\.ANLASS/.test(route.slice(0, 900)), 'Vorschau zeichnet nicht über Bildkarte');
-        assert(/data-greeting-bildvorschau-bild/.test(ejs) && !/<% if[^%]*%>\s*<div class="mt-2 d-none" data-greeting-bildvorschau-rahmen/.test(ejs), 'Vorschaubild fehlt im HTML');
+        assert(/\/bildkarten\/einstellen\/greeting\/<%= encodeURIComponent\('greeting:willkommen'\) %>/.test(ejs), 'greeting verweist nicht auf die Einstellseite');
+        assert(/name="welcome_image_enabled"/.test(ejs), 'Schalter „Bild anhängen“ fehlt');
+        // Die Vorschläge der Vorlage sind die Hintergründe, die die Migration kennt.
+        const M = require(path.join(WURZEL, 'plugins/greeting/migrations/20261114_210000_willkommensbild_bildkarten.js'));
+        const v = Bildkarte.vorlage('greeting:willkommen');
+        const ausVorlage = v.vorschlaege.map((x) => [x.werte.hintergrund1, x.werte.hintergrund2, x.werte.hintergrund3].join()).sort();
+        assert.deepStrictEqual(ausVorlage, Object.values(M.HINTERGRUENDE).map((x) => x.join()).sort(), 'Vorschläge ≠ alte Hintergründe');
+        const vorgabe = Object.fromEntries(v.werte.map((w) => [w.name, w.beispiel]));
+        assert.deepStrictEqual([vorgabe.hintergrund1, vorgabe.hintergrund2, vorgabe.hintergrund3], M.HINTERGRUENDE.default, 'Vorgabe ≠ alter Standard');
+        assert(vorgabe.akzent === '#5865f2' && vorgabe.text === 'Welcome to the server!' && vorgabe.hintergrundbild === '', 'Vorgabe anders als bis G-22');
     });
 
     await pruefe('11. /admin/bildkarten: Route, Seitenleiste, Ansicht rendert', async () => {
@@ -401,7 +431,7 @@ function stubMember(nick = 'Anna') {
         assert(mit.filter((k) => k.besitzer === 'kern').every((k) => k.nutzungen.every((n) => n.plugin !== 'greeting')), 'fremde Nutzung');
         const echt = Bildkarte.nutzungen;
         const karten = new Map(echt().karten);
-        karten.set('kern:rangkarte', [{ plugin: 'leveling', titel: null, wo: 'leveling:X', seite: null, stand: null }]);
+        karten.set('kern:rangkarte', [{ plugin: 'leveling', karte: 'kern:rangkarte', titel: null, wo: 'leveling:X', seite: null, stand: null, schablonen: ['kern:rangkarte'] }]);
         Bildkarte.nutzungen = () => ({ karten, fehler: [] });
         try {
             mitPlugins(['core', 'greeting']);
@@ -412,21 +442,19 @@ function stubMember(nick = 'Anna') {
             Bildkarte.nutzungen = echt;
         }
     });
-    await pruefe('12e. greeting stand(): an nur mit Nachricht und Bild, Werte wie der Bot', async () => {
+    await pruefe('12e. greeting stand(): an nur mit Nachricht und Bild, keine Laufzeitwerte', async () => {
         const nutz = Bildkarte.nutzungen().karten.get('greeting:willkommen')[0];
-        const Willkommensbild = require(path.join(WURZEL, 'plugins/greeting/shared/willkommensbild.js'));
-        const zeile = { welcome_enabled: 1, welcome_image_enabled: 1, welcome_image_bg: 'ocean', welcome_image_text: 'Hallo {member:nick}', welcome_image_color: '#ff0000' };
+        const zeile = { welcome_enabled: 1, welcome_image_enabled: 1 };
         mitPlugins(['greeting'], zeile);
         const s = await Bildkarte.nutzungStand(nutz, '1');
         assert.strictEqual(s.an, true, 'an');
-        assert.deepStrictEqual(s.werte, Willkommensbild.werte(zeile), 'Werte anders als im Bot');
+        assert.deepStrictEqual(s.werte, {}, 'greeting gibt Werte, die die Guild einstellt');
         mitPlugins(['greeting'], { ...zeile, welcome_image_enabled: 0 });
         assert.strictEqual((await Bildkarte.nutzungStand(nutz, '1')).an, false, 'Bild aus, trotzdem an');
         mitPlugins(['greeting'], { ...zeile, welcome_enabled: 0 });
         assert.strictEqual((await Bildkarte.nutzungStand(nutz, '1')).an, false, 'Nachricht aus, trotzdem an');
         mitPlugins(['greeting'], null);
-        const leer = await Bildkarte.nutzungStand(nutz, '1');
-        assert(leer.an === false && leer.werte.text === Willkommensbild.VORGABE_TEXT, 'ohne Zeile');
+        assert.strictEqual((await Bildkarte.nutzungStand(nutz, '1')).an, false, 'ohne Zeile');
         ServiceManager.register('dbService', { async query() { throw new Error('weg'); } });
         const kaputt = await Bildkarte.nutzungStand(nutz, '1');
         assert(kaputt.an === null && /weg/.test(kaputt.fehler), 'Fehler verschluckt');
@@ -449,16 +477,279 @@ function stubMember(nick = 'Anna') {
                 karten: [
                     { name: 'kern:rangkarte', besitzer: 'kern', besitzerName: null, titel: null, breite: 934, hoehe: 282, nutzungen: [] },
                     { name: 'greeting:willkommen', besitzer: 'greeting', besitzerName: 'Greeting', titel: 'greeting:BILDKARTEN.TITEL_WILLKOMMEN', breite: 1024, hoehe: 450,
-                        nutzungen: [{ plugin: 'greeting', pluginName: 'Greeting', wo: 'greeting:BILDKARTEN.WO_WILLKOMMEN', seite: 'nachrichten', an: false, fehler: '<x>' }] },
+                        nutzungen: [{ plugin: 'greeting', karte: 'greeting:willkommen', pluginName: 'Greeting', wo: 'greeting:BILDKARTEN.WO_WILLKOMMEN', seite: 'nachrichten', an: false, fehler: '<x>', einstellbar: true }] },
                     { name: 'kern:profil', besitzer: 'kern', titel: null, fehler: 'kaputt', nutzungen: [] },
                 ],
             });
             assert.deepStrictEqual(fehlt, [], `${loc}: ${fehlt.join(', ')}`);
             assert(voll.includes('/guild/1/bildkarten/bild/kern%3Arangkarte'), 'Bildadresse');
             assert(voll.includes('/guild/1/plugins/greeting/nachrichten'), 'Weg zum Plugin');
+            assert(voll.includes('/guild/1/bildkarten/einstellen/greeting/greeting%3Awillkommen') && voll.includes(tr('core:BILDKARTEN.AUSSEHEN')), 'Knopf „Aussehen einstellen“ fehlt');
             assert(voll.includes(tr('core:BILDKARTEN.KEINE_NUTZUNG')) && voll.includes(tr('core:BILDKARTEN.AUS')) && voll.includes('kaputt'), 'Schablone, aus oder Fehler fehlt');
             assert(voll.includes('&lt;x&gt;') && !voll.includes('<x>'), 'nicht escaped');
         }
+    });
+
+    console.log('Eigene Karten je Guild (G-22)');
+    const W_NUTZ = () => Bildkarte.nutzungen().karten.get('greeting:willkommen').find((n) => n.plugin === 'greeting');
+    /** Datenbank-Attrappe: Medien nur in Guild 11111, gespeicherte Zeile wählbar, Abfragen mitgeschrieben. */
+    const MEDIEN_GUILD = '11111';
+    const dbMit = ({ zeile = null, kaputt = false } = {}) => {
+        const sql = [];
+        ServiceManager.register('dbService', {
+            async query(q, p = []) {
+                sql.push([q.replace(/\s+/g, ' ').trim(), p]);
+                if (kaputt) throw new Error('Datenbank weg');
+                if (/FROM guild_media WHERE guild_id = \? AND stored_name/.test(q)) return p[0] === MEDIEN_GUILD && p[1] === 'a.png' ? [{ id: 7 }] : [];
+                if (/FROM guild_media/.test(q)) return p[0] === MEDIEN_GUILD ? p.slice(1).filter((id) => id === 7).map((id) => ({ id, stored_name: 'a.png' })) : [];
+                if (/FROM guild_bildkarten WHERE guild_id = \? AND plugin/.test(q)) return zeile ? [zeile] : [];
+                return [];
+            },
+        });
+        return sql;
+    };
+    const WILLKOMMEN = JSON.parse(lies('plugins/greeting/bildkarten/willkommen.json'));
+    const abgelehnt = (fn, muster) => {
+        try { fn(); } catch (err) { if (muster.test(err.message)) return; throw new Error(`falscher Grund: ${err.message}`); }
+        throw new Error(`nicht abgelehnt (${muster})`);
+    };
+    const abgelehntAsync = async (fn, muster) => {
+        try { await fn(); } catch (err) {
+            if (!(err instanceof Bildkarte.Eingabefehler)) throw new Error(`kein Eingabefehler: ${err.message}`);
+            if (muster.test(err.message)) return;
+            throw new Error(`falscher Grund: ${err.message}`);
+        }
+        throw new Error(`nicht abgelehnt (${muster})`);
+    };
+
+    await pruefe('13a. pruefe: einstellbare Werte und Vorschläge', () => {
+        Bildkarte.pruefe(JSON.parse(JSON.stringify(WILLKOMMEN)));
+        const mit = (fn) => { const v = JSON.parse(JSON.stringify(WILLKOMMEN)); fn(v); return () => Bildkarte.pruefe(v); };
+        abgelehnt(mit((v) => { v.werte[0].einstellbar = 'zahl'; }), /einstellbar muss eines von/);
+        abgelehnt(mit((v) => { delete v.werte[0].titel; }), /braucht titel mit de und en/);
+        abgelehnt(mit((v) => { v.werte[0].titel = { de: 'x' }; }), /braucht titel mit de und en/);
+        abgelehnt(mit((v) => { v.werte[0].beispiel = 'rot'; }), /Beispiel muss eine Farbe/);
+        abgelehnt(mit((v) => { v.werte[3].beispiel = '/uploads/media/1/a.png'; }), /Beispiel muss leer sein/);
+        abgelehnt(mit((v) => { v.werte[5].beispiel = 'x'.repeat(256); }), /länger als 255/);
+        abgelehnt(mit((v) => { v.werte.push({ name: 'n', beispiel: '1', titel: { de: 'a', en: 'b' } }); }), /titel nur bei einstellbaren/);
+        abgelehnt(mit((v) => { v.werte.push({ name: 'akzent', beispiel: '#000000' }); }), /doppelt/);
+        abgelehnt(mit((v) => { v.werte[0].bedeutung = 'x'; }), /unbekanntes Feld „bedeutung“/);
+        abgelehnt(mit((v) => { v.vorschlaege[0].werte.member = '#000000'; }), /kein einstellbarer Wert/);
+        abgelehnt(mit((v) => { v.vorschlaege[0].werte.hintergrundbild = ''; }), /Bild, das geht nicht/);
+        abgelehnt(mit((v) => { v.vorschlaege[0].werte.akzent = 'blau'; }), /muss eine Farbe/);
+        abgelehnt(mit((v) => { v.vorschlaege[0].extra = 1; }), /nur titel und werte/);
+        abgelehnt(mit((v) => { v.vorschlaege[0].werte = {}; }), /werte fehlt/);
+    });
+
+    await pruefe('13b. schablonen: eigene oder Kern, keine fremden Laufzeitwerte, gleiche Art', () => {
+        const t = (werte) => Bildkarte.pruefe({ breite: 100, hoehe: 100, werte, ebenen: [{ art: 'flaeche', x: 0, y: 0, b: 1, h: 1 }] });
+        const farbe = { name: 'akzent', beispiel: '#000000', einstellbar: 'farbe', titel: { de: 'A', en: 'A' } };
+        const lager = {
+            'p:a': t([{ name: 'level', beispiel: 1 }, farbe]),
+            'p:b': t([{ name: 'level', beispiel: 1 }]),
+            'kern:k': t([farbe]),
+            'p:mehr': t([{ name: 'level', beispiel: 1 }, { name: 'xp', beispiel: 2 }]),
+            'p:anders': t([{ name: 'akzent', beispiel: 'x', einstellbar: 'text', titel: { de: 'A', en: 'A' } }]),
+            'p:laufzeit': t([{ name: 'akzent', beispiel: 'x' }]),
+            'q:fremd': t([]),
+        };
+        const laden = (n) => { if (!lager[n]) throw new Error(`keine ${n}`); return lager[n]; };
+        const vorhanden = new Set(Object.keys(lager));
+        const f = (roh) => Bildkarte.schablonenFehler('p', 'p:a', roh, vorhanden, laden);
+        assert.deepStrictEqual(f(undefined), ['p:a']);
+        assert.deepStrictEqual(f(['p:b', 'kern:k']), ['p:a', 'p:b', 'kern:k']);
+        for (const [roh, muster] of [
+            [['q:fremd'], /weder eigene/], [['p:fehlt'], /keine Vorlage/], [['p:mehr'], /braucht xp/],
+            [['p:anders'], /akzent ist in p:anders text, anderswo farbe/], [['p:laufzeit'], /p:laufzeit braucht akzent, das p:a nicht kennt/], [['p:a'], /doppelt/],
+            [['p:b', 'p:b'], /doppelt/], [[], /1 bis 8/], ['p:b', /1 bis 8/],
+        ]) {
+            const r = f(roh);
+            assert(typeof r === 'string' && muster.test(r), `${JSON.stringify(roh)}: ${JSON.stringify(r)}`);
+        }
+        assert.deepStrictEqual(W_NUTZ().schablonen, ['greeting:willkommen'], 'greeting bietet ungefragt Schablonen an');
+    });
+
+    await pruefe('13c. Gespeichertes lesen: Unpassendes → Vorgabe mit Hinweis, Bild nur aus derselben Guild', async () => {
+        const n = W_NUTZ();
+        const sql = dbMit({ zeile: { vorlage: 'kern:rangkarte', werte: JSON.stringify({ akzent: '#ff0000', hintergrund1: 'rot', text: 42, hintergrundbild: 7, fremd: 'x' }) } });
+        const e = await Bildkarte.einstellung('greeting', 'greeting:willkommen', MEDIEN_GUILD);
+        assert.strictEqual(e.vorlage, 'greeting:willkommen', 'nicht angebotene Schablone genommen');
+        assert(e.hinweise.some((h) => /kern:rangkarte bietet greeting nicht mehr an/.test(h)), 'kein Hinweis zur Schablone');
+        assert.strictEqual(e.werte.akzent, '#ff0000');
+        assert.strictEqual(e.werte.hintergrund1, '#1a1a2e', 'falsche Farbe nicht auf Vorgabe');
+        assert.strictEqual(e.werte.text, 'Welcome to the server!', 'Zahl als Text genommen');
+        assert.strictEqual(e.werte.hintergrundbild, `/uploads/media/${MEDIEN_GUILD}/a.png`, 'Bild nicht aufgelöst');
+        assert(!('fremd' in e.werte) && !('fremd' in e.gespeichert.werte), 'fremder Wert durchgereicht');
+        const medien = sql.find(([q]) => /FROM guild_media/.test(q));
+        assert(medien && /guild_id = \?/.test(medien[0]) && medien[1][0] === MEDIEN_GUILD, 'Bild ohne Guild-Bezug gelesen');
+        dbMit({ zeile: { vorlage: null, werte: { hintergrundbild: 7 } } });
+        const anders = await Bildkarte.einstellung('greeting', 'greeting:willkommen', '22222');
+        assert.strictEqual(anders.werte.hintergrundbild, '', 'Bild einer fremden Guild genommen');
+        assert(anders.hinweise.some((h) => /nicht mehr in der Medienablage/.test(h)), 'kein Hinweis zum fehlenden Bild');
+        dbMit();
+        const leer = await Bildkarte.einstellung('greeting', 'greeting:willkommen', MEDIEN_GUILD);
+        assert(leer.vorlage === 'greeting:willkommen' && !leer.hinweise.length && leer.werte.akzent === '#5865f2', 'ohne Zeile nicht die Vorgabe');
+        await abgelehntAsync(() => Bildkarte.einstellung('greeting', 'kern:rangkarte', MEDIEN_GUILD), /erklärt keine Bildkarte/);
+    });
+
+    await pruefe('13d. Eingabe prüfen: nur Abweichendes, Fehler mit Titel', async () => {
+        const n = W_NUTZ();
+        dbMit();
+        const g = await Bildkarte.eingabePruefen(n, MEDIEN_GUILD, { werte: {
+            akzent: '#5865F2', text: 'Welcome to the server!', hintergrund1: '#ABCDEF', hintergrund2: '', hintergrundbild: `/uploads/media/${MEDIEN_GUILD}/a.png`, member: 'x',
+        } });
+        assert.deepStrictEqual(g, { vorlage: null, werte: { hintergrund1: '#abcdef', hintergrundbild: 7 } });
+        assert.deepStrictEqual(await Bildkarte.eingabePruefen(n, MEDIEN_GUILD, { vorlage: 'greeting:willkommen', werte: { text: '  ' } }), { vorlage: null, werte: {} });
+        assert.deepStrictEqual((await Bildkarte.eingabePruefen(n, MEDIEN_GUILD, { werte: { text: 'Hi {member:nick} auf {guild:name}' } })).werte, { text: 'Hi {member:nick} auf {guild:name}' });
+        await abgelehntAsync(() => Bildkarte.eingabePruefen(n, MEDIEN_GUILD, { werte: { akzent: 'rot' } }), /^Akzentfarbe: „rot“ ist kein Farbwert/);
+        await abgelehntAsync(() => Bildkarte.eingabePruefen(n, MEDIEN_GUILD, { werte: { akzent: 'rot' } }, 'en'), /^Accent colour:/);
+        await abgelehntAsync(() => Bildkarte.eingabePruefen(n, MEDIEN_GUILD, { werte: { text: 'Level {level}' } }), /Platzhalter \{level\} gibt es hier nicht/);
+        await abgelehntAsync(() => Bildkarte.eingabePruefen(n, MEDIEN_GUILD, { werte: { text: 'x'.repeat(256) } }), /höchstens 255/);
+        await abgelehntAsync(() => Bildkarte.eingabePruefen(n, MEDIEN_GUILD, { werte: { text: ['a'] } }), /kein Text/);
+        await abgelehntAsync(() => Bildkarte.eingabePruefen(n, MEDIEN_GUILD, { werte: { hintergrundbild: '/uploads/media/22222/a.png' } }), /aus der Medienablage dieses Servers wählen/);
+        await abgelehntAsync(() => Bildkarte.eingabePruefen(n, MEDIEN_GUILD, { werte: { hintergrundbild: `/uploads/media/${MEDIEN_GUILD}/b.png` } }), /liegt nicht in der Medienablage/);
+        await abgelehntAsync(() => Bildkarte.eingabePruefen(n, MEDIEN_GUILD, { werte: { hintergrundbild: `/uploads/media/${MEDIEN_GUILD}/../x/a.png` } }), /wählen/);
+        await abgelehntAsync(() => Bildkarte.eingabePruefen(n, MEDIEN_GUILD, { werte: { hintergrundbild: 'https://cdn.discordapp.com/x.png' } }), /wählen/);
+        await abgelehntAsync(() => Bildkarte.eingabePruefen(n, MEDIEN_GUILD, { vorlage: 'kern:rangkarte' }), /gibt es für diese Karte nicht/);
+    });
+
+    await pruefe('13e. Speichern: nichts Abweichendes löscht die Zeile', async () => {
+        let sql = dbMit();
+        await Bildkarte.speichereEinstellung('greeting', 'greeting:willkommen', MEDIEN_GUILD, { werte: { akzent: '#5865f2' } });
+        assert(sql.some(([q, p]) => /^DELETE FROM guild_bildkarten WHERE guild_id = \? AND plugin = \? AND karte = \?$/.test(q) && p.join() === `${MEDIEN_GUILD},greeting,greeting:willkommen`), 'Vorgabe nicht gelöscht');
+        assert(!sql.some(([q]) => /INSERT INTO guild_bildkarten/.test(q)), 'Vorgabe gespeichert');
+        sql = dbMit();
+        await Bildkarte.speichereEinstellung('greeting', 'greeting:willkommen', MEDIEN_GUILD, { werte: { akzent: '#123456' } });
+        const ein = sql.find(([q]) => /INSERT INTO guild_bildkarten/.test(q));
+        assert(ein && ein[1][0] === MEDIEN_GUILD && ein[1][1] === 'greeting' && ein[1][3] === null && ein[1][4] === '{"akzent":"#123456"}', `gespeichert: ${JSON.stringify(ein)}`);
+        sql = dbMit();
+        await abgelehntAsync(() => Bildkarte.speichereEinstellung('greeting', 'greeting:willkommen', MEDIEN_GUILD, { werte: { akzent: 'x' } }), /Farbwert/);
+        assert(!sql.some(([q]) => /INSERT|DELETE/.test(q)), 'trotz Fehler geschrieben');
+    });
+
+    await pruefe('13f. Zeichnen: Einstellbares gibt die Guild, nicht das Plugin', async () => {
+        const n = W_NUTZ();
+        dbMit();
+        const e = (werte) => Bildkarte.einstellungAufloesen(n, MEDIEN_GUILD, { werte });
+        const rot = await e({ akzent: '#ff0000', text: 'A' });
+        const a = await Bildkarte.zeichneNutzung('greeting', 'greeting:willkommen', { member: stubMember(), werte: { akzent: '#00ff00', text: 'B' } }, { guildId: MEDIEN_GUILD, einstellung: rot });
+        const b = await Bildkarte.zeichneNutzung('greeting', 'greeting:willkommen', { member: stubMember() }, { guildId: MEDIEN_GUILD, einstellung: rot });
+        const c = await Bildkarte.zeichneNutzung('greeting', 'greeting:willkommen', { member: stubMember() }, { guildId: MEDIEN_GUILD, einstellung: await e({ akzent: '#00ff00', text: 'A' }) });
+        assert(a.puffer.equals(b.puffer), 'Plugin-Werte überschreiben die Einstellung');
+        assert(!b.puffer.equals(c.puffer), 'Einstellung wirkt nicht');
+        dbMit({ kaputt: true });
+        const d = await Bildkarte.zeichneNutzung('greeting', 'greeting:willkommen', { member: stubMember() }, { guildId: MEDIEN_GUILD });
+        assert(d.hinweise.some((h) => /Einstellung nicht lesbar, nehme die Vorgabe: Datenbank weg/.test(h)), 'Fehler verschluckt');
+        dbMit();
+        const vorgabe = await Bildkarte.zeichneNutzung('greeting', 'greeting:willkommen', { member: stubMember() }, { guildId: MEDIEN_GUILD });
+        assert(vorgabe.puffer.equals(d.puffer), 'ohne lesbare Einstellung nicht die Vorgabe');
+    });
+
+    await pruefe('13g. Router: Rechte, CSRF, Kontroll-Guild, Nutzung unter der gewählten Schablone', async () => {
+        const r = ohneKommentare(lies('apps/dashboard/routes/guild/bildkarten.router.js'));
+        assert(/router\.get\('\/einstellen\/:plugin\/:karte', requirePermission\('CORE\.BILDKARTEN\.VIEW'\)/.test(r), 'Einstellseite ohne Recht');
+        assert(/router\.get\('\/einstellen\/:plugin\/:karte\/vorschau', requirePermission\('CORE\.BILDKARTEN\.VIEW'\)/.test(r), 'Vorschau ohne Recht');
+        assert(/router\.put\('\/einstellen\/:plugin\/:karte', csrfProtection, requirePermission\('CORE\.BILDKARTEN\.EDIT'\), requireBesitzerInKontrollGuild\(\)/.test(r), 'Speichern ohne CSRF, Recht oder Kontroll-Guild-Schutz');
+        assert(/istKontrollGuildGesperrt\(/.test(r) && /'CORE\.BILDKARTEN\.EDIT'\);/.test(r), 'Seite weiß nicht, ob nur lesen');
+        assert(/Bildkarte\.speichereEinstellung\(/.test(r) && /Bildkarte\.eingabePruefen\(/.test(r) && /Bildkarte\.beispielNutzung\(/.test(r), 'Router rechnet selbst');
+        assert(!/INSERT|UPDATE guild_bildkarten|DELETE/.test(r), 'Router schreibt selbst in die Tabelle');
+        const nutzAn = /if \(!\(await eingeschaltet\(guildId\)\)\.has\(plugin\)\) return null;/.test(r);
+        assert(nutzAn, 'Einstellen auch bei ausgeschaltetem Plugin');
+        // Wahl einer Schablone: Nutzung wandert unter sie.
+        const echt = Bildkarte.nutzungen;
+        const karten = new Map(echt().karten);
+        karten.set('kern:rangkarte', [{ plugin: 'leveling', karte: 'kern:rangkarte', titel: null, wo: 'leveling:X', seite: null, stand: null, schablonen: ['kern:rangkarte', 'kern:profil'] }]);
+        Bildkarte.nutzungen = () => ({ karten, fehler: [] });
+        try {
+            ServiceManager.register('dbService', { async query(q) {
+                if (/FROM guild_plugins/.test(q)) return [{ plugin_name: 'leveling' }];
+                if (/FROM guild_bildkarten/.test(q)) return [{ plugin: 'leveling', karte: 'kern:rangkarte', vorlage: 'kern:profil' }];
+                return [];
+            } });
+            const k = await kartenDerGuild('1');
+            assert.strictEqual(k.find((x) => x.name === 'kern:rangkarte').nutzungen.length, 0, 'Nutzung bleibt unter der erklärten');
+            const p = k.find((x) => x.name === 'kern:profil').nutzungen;
+            assert(p.length === 1 && p[0].karte === 'kern:rangkarte' && p[0].einstellbar === true, 'Nutzung nicht unter der gewählten');
+        } finally {
+            Bildkarte.nutzungen = echt;
+            ServiceManager.register('dbService', { async query() { return []; } });
+        }
+    });
+
+    await pruefe('13h. Einstellseite und Übersicht rendern, beide Sprachen, escaped', () => {
+        const ejs = require('ejs');
+        const vorlage = lies('apps/dashboard/themes/default/views/guild/bildkarte-einstellen.ejs');
+        const { seitenFelder } = require(path.join(WURZEL, 'apps/dashboard/routes/guild/bildkarten.router.js'));
+        const n = W_NUTZ();
+        for (const loc of ['de-DE', 'en-GB']) {
+            const fehlt = [];
+            const tr = (k, o = {}) => {
+                const t = textVon(k, loc);
+                if (typeof t !== 'string') { fehlt.push(k); return k; }
+                return t.replace(/\{\{(\w+)\}\}/g, (_, x) => String(o[x] ?? ''));
+            };
+            const e = { vorlage: 'greeting:willkommen', werte: { hintergrund1: '#1a1a2e', hintergrund2: '#16213e', hintergrund3: '#0f3460', hintergrundbild: '/uploads/media/1/b%20c.png', akzent: '#ff0080', text: '<b>Hi</b>' }, gespeichert: { vorlage: null, werte: {} } };
+            const felder = seitenFelder(n, e, loc.startsWith('de') ? 'de' : 'en');
+            assert.deepStrictEqual(felder.felder.map((f) => f.art), ['farbe', 'farbe', 'farbe', 'bild', 'farbe', 'text'], 'Felder');
+            assert.strictEqual(felder.vorschlaege.length, 7, 'Vorschläge');
+            const html = (darf, gesperrt) => ejs.render(vorlage, {
+                tr, guildId: '1', nutzung: { ...n, pluginName: 'Greeting', an: true }, gewaehlt: e.vorlage, hinweise: ['<i>h</i>'],
+                ...felder, darf, gesperrt, locals: {},
+            }, { views: [path.join(WURZEL, 'apps/dashboard/themes/default/views')], filename: path.join(WURZEL, 'apps/dashboard/themes/default/views/guild/bildkarte-einstellen.ejs') });
+            const voll = html(true, false);
+            assert.deepStrictEqual([...new Set(fehlt)], [], `${loc}: ${fehlt.join(', ')}`);
+            assert(voll.includes('data-adresse="/guild/1/bildkarten/einstellen/greeting/greeting%3Awillkommen"'), 'Adresse');
+            assert(voll.includes('id="medienwahlFenster"'), 'Medienwahl fehlt trotz Bildfeld');
+            assert(voll.includes('&lt;b&gt;Hi&lt;/b&gt;') && !voll.includes('<b>Hi</b>') && voll.includes('&lt;i&gt;h&lt;/i&gt;'), 'nicht escaped');
+            assert(voll.includes('b c.png'), 'Bildname');
+            assert(!/<(input|select|button)[^>]*data-bk-speichern[^>]*disabled/.test(voll), 'mit Recht gesperrt');
+            const lesend = html(false, false);
+            assert(lesend.includes(tr('core:BILDKARTEN.NUR_LESEN')) && /data-bk-speichern disabled/.test(lesend), 'ohne Recht nicht gesperrt');
+            const kontroll = html(false, true);
+            assert(kontroll.includes(tr('core:BILDKARTEN.GESPERRT')), 'Kontroll-Guild ohne Hinweis');
+        }
+        const js = ohneKommentareEjs(vorlage);
+        assert(!/document\.currentScript/.test(js), 'document.currentScript (Skripte stehen am Seitenende)');
+        assert(/'X-CSRF-Token'/.test(js) && /method: 'PUT'/.test(js), 'Speichern ohne CSRF');
+        assert(!/confirm\(/.test(js), 'confirm()');
+    });
+
+    await pruefe('13i. Tabelle, Löschort, greeting-Migration', async () => {
+        const mig = ohneKommentare(lies('migrations/kern/20261114_210000_bildkarten_einstellungen.js'));
+        assert(/CREATE TABLE IF NOT EXISTS guild_bildkarten/.test(mig) && /PRIMARY KEY \(guild_id, plugin, karte\)/.test(mig) && /json_valid\(werte\)/.test(mig), 'Tabelle');
+        assert(!/user_id|member_id|frist/.test(mig), 'Mitgliederdaten oder Frist in der Tabelle');
+        assert(JSON.parse(lies('plugins/core/package.json')).guildInhalte.loeschen.includes('guild_bildkarten'), 'guild_bildkarten geht nicht mit der Guild');
+        const M = require(path.join(WURZEL, 'plugins/greeting/migrations/20261114_210000_willkommensbild_bildkarten.js'));
+        assert.deepStrictEqual(M.alsWerte({ welcome_image_bg: 'default', welcome_image_text: null, welcome_image_color: '#5865f2' }), {});
+        assert.deepStrictEqual(M.alsWerte({ welcome_image_bg: 'ocean', welcome_image_text: ' Willkommen auf dem Server ', welcome_image_color: '#FF0080' }),
+            { hintergrund1: '#0a192f', hintergrund2: '#172a45', hintergrund3: '#1c4a6e', akzent: '#ff0080', text: 'Willkommen auf dem Server' });
+        assert.deepStrictEqual(M.alsWerte({ welcome_image_bg: 'gibtsnicht', welcome_image_color: 'rot', welcome_image_text: '' }), {});
+        // Was die Migration schreibt, liest der Kern ohne Hinweis zurück.
+        dbMit({ zeile: { vorlage: null, werte: JSON.stringify(M.alsWerte({ welcome_image_bg: 'sunset', welcome_image_text: 'Willkommen {member:nick}!', welcome_image_color: '#d90de7' })) } });
+        const zurueck = await Bildkarte.einstellung('greeting', 'greeting:willkommen', MEDIEN_GUILD);
+        assert(!zurueck.hinweise.length && zurueck.werte.hintergrund3 === '#e94560' && zurueck.werte.text === 'Willkommen {member:nick}!', 'Migration und Kern verstehen sich nicht');
+        // Lauf an einer Attrappe.
+        const lauf = async (zeilen, spalten) => {
+            const sql = [];
+            await M.up({ async query(q, p) {
+                sql.push([q.replace(/\s+/g, ' ').trim(), p]);
+                if (/^SHOW COLUMNS/.test(q)) return spalten.map((Field) => ({ Field }));
+                if (/^SELECT guild_id/.test(q)) return zeilen;
+                return [];
+            } });
+            return sql;
+        };
+        const alle = ['guild_id', 'welcome_image_enabled', 'welcome_image_bg', 'welcome_image_text', 'welcome_image_color'];
+        const sql = await lauf([
+            { guild_id: '1', welcome_image_bg: 'default', welcome_image_text: null, welcome_image_color: '#5865f2' },
+            { guild_id: '2', welcome_image_bg: 'ocean', welcome_image_text: 'Hallo', welcome_image_color: '#ff0080' },
+        ], alle);
+        const ein = sql.filter(([q]) => /^INSERT INTO guild_bildkarten/.test(q));
+        assert(ein.length === 1 && ein[0][1][0] === '2' && /ON DUPLICATE KEY UPDATE karte = karte/.test(ein[0][0]), `Einträge: ${JSON.stringify(ein)}`);
+        assert.deepStrictEqual(sql.filter(([q]) => /DROP COLUMN/.test(q)).map(([q]) => q.split(' ').pop()), ['welcome_image_bg', 'welcome_image_text', 'welcome_image_color']);
+        assert.strictEqual((await lauf([], ['guild_id', 'welcome_image_enabled'])).length, 1, 'zweiter Lauf tut etwas');
+        await assert.rejects(lauf([{ guild_id: '3', welcome_image_text: 'x'.repeat(256) }], alle), /länger als 255/);
+        ServiceManager.register('dbService', { async query() { return []; } });
     });
 
     console.log(`\n${gruen} grün, ${rot} rot`);

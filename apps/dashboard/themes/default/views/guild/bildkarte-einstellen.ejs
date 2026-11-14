@@ -1,0 +1,277 @@
+<%#
+  Bildkarte einstellen (G-22, F-G11, K382, 2026-11-14)
+
+  Eine Nutzung einer Karte (Plugin und erklärte Karte): Schablone wählen,
+  einstellbare Werte der Vorlage (Farbe, Text, Bild aus der Medienablage),
+  Vorschläge aus der Vorlage. Die Vorschau zeichnet der Server mit denselben
+  Werten wie der Bot (GET …/vorschau?e=JSON), gespeichert wird mit PUT.
+  Leere Felder heißen Vorgabe; gespeichert wird nur, was abweicht.
+
+  context: guildId, nutzung, gewaehlt, hinweise, felder, schablonen,
+           vorschlaege, darf, gesperrt (bildkarten.router)
+%>
+<%
+const _t = (k, o) => tr('core:BILDKARTEN.' + k, o);
+const _id = typeof guildId !== 'undefined' ? guildId : '';
+const _n = typeof nutzung !== 'undefined' && nutzung ? nutzung : { plugin: '', karte: '', schablonen: [] };
+const _felder = typeof felder !== 'undefined' && Array.isArray(felder) ? felder : [];
+const _schablonen = typeof schablonen !== 'undefined' && Array.isArray(schablonen) ? schablonen : [];
+const _vorschlaege = typeof vorschlaege !== 'undefined' && Array.isArray(vorschlaege) ? vorschlaege : [];
+const _hinweise = typeof hinweise !== 'undefined' && Array.isArray(hinweise) ? hinweise : [];
+const _gewaehlt = typeof gewaehlt !== 'undefined' && gewaehlt ? gewaehlt : _n.karte;
+const _darf = typeof darf !== 'undefined' && darf === true;
+const _gesperrt = typeof gesperrt !== 'undefined' && gesperrt === true;
+const _aus = _darf ? '' : 'disabled';
+const _kernTitel = (name) => _t('KARTE_' + String(name.split(':')[1] || '').toUpperCase());
+const _titel = String(_n.karte).startsWith('kern:') ? _kernTitel(_n.karte) : (_n.titel ? tr(_n.titel) : _n.karte);
+const _basis = '/guild/' + _id + '/bildkarten/einstellen/' + encodeURIComponent(_n.plugin) + '/' + encodeURIComponent(_n.karte);
+const _bildDatei = (adresse) => { try { return decodeURIComponent(String(adresse || '').split('/').pop() || ''); } catch (e) { return ''; } };
+const _hatBild = _felder.some((f) => f.art === 'bild');
+%>
+<div class="container-fluid" id="bildkarteEinstellen"
+     data-adresse="<%= _basis %>" data-darf="<%= _darf ? '1' : '' %>"
+     data-gespeichert="<%= _t('GESPEICHERT') %>" data-fehler="<%= _t('VORSCHAU_FEHLER') %>">
+  <div class="mb-3">
+    <a href="/guild/<%= _id %>/bildkarten" class="btn btn-ghost-secondary btn-sm"><i class="fa-solid fa-arrow-left me-1"></i><%= _t('ZURUECK') %></a>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header">
+      <h3 class="card-title mb-0">
+        <i class="fa-solid fa-id-card me-2"></i><%= _titel %>
+        <span class="text-secondary fw-normal small ms-2"><%= _t('VON_PLUGIN', { plugin: _n.pluginName || _n.plugin }) %></span>
+        <% if (_n.an === true) { %><span class="badge bg-green-lt ms-1"><%= _t('AN') %></span><% } %>
+        <% if (_n.an === false) { %><span class="badge bg-secondary-lt ms-1"><%= _t('AUS') %></span><% } %>
+      </h3>
+    </div>
+    <div class="card-body">
+      <p class="text-secondary mb-0"><%= _n.wo ? tr(_n.wo) : '' %></p>
+      <% if (_n.an === false) { %><p class="small text-secondary mb-0 mt-1"><%= _t('AUS_TEXT') %></p><% } %>
+    </div>
+  </div>
+
+  <% if (_gesperrt) { %>
+    <div class="alert alert-info"><i class="fa-solid fa-lock me-2"></i><%= _t('GESPERRT') %></div>
+  <% } else if (!_darf) { %>
+    <div class="alert alert-info"><i class="fa-solid fa-eye me-2"></i><%= _t('NUR_LESEN') %></div>
+  <% } %>
+  <% if (_hinweise.length) { %>
+    <div class="alert alert-warning">
+      <div class="mb-1"><i class="fa-solid fa-triangle-exclamation me-2"></i><%= _t('HINWEISE') %></div>
+      <ul class="mb-0"><% _hinweise.forEach(function (h) { %><li><%= h %></li><% }) %></ul>
+    </div>
+  <% } %>
+
+  <div class="row g-3">
+    <div class="col-lg-5">
+      <div class="card">
+        <div class="card-body">
+          <% if (_schablonen.length > 1) { %>
+            <div class="mb-3">
+              <label class="form-label" for="bkSchablone"><%= _t('SCHABLONE_WAEHLEN') %></label>
+              <select class="form-select" id="bkSchablone" data-bk-schablone <%= _aus %>>
+                <% _schablonen.forEach(function (s) { %>
+                  <option value="<%= s.name %>" <%= s.name === _gewaehlt ? 'selected' : '' %>><%= s.name.startsWith('kern:') ? _kernTitel(s.name) : s.titel %></option>
+                <% }) %>
+              </select>
+            </div>
+          <% } %>
+
+          <% if (_vorschlaege.length) { %>
+            <div class="mb-3">
+              <div class="form-label"><%= _t('VORSCHLAEGE') %></div>
+              <div class="btn-list">
+                <% _vorschlaege.forEach(function (s) { %>
+                  <button type="button" class="btn btn-sm" data-bk-vorschlag="<%= JSON.stringify(s.werte) %>" data-bk-vorlage="<%= s.vorlage %>" <%= _aus %>>
+                    <% Object.keys(s.werte).filter(function (k) { return /^#[0-9a-f]{6}$/i.test(String(s.werte[k])); }).slice(0, 3).forEach(function (k) { %>
+                      <span class="d-inline-block rounded-circle border me-1" style="width: 0.8rem; height: 0.8rem; background: <%= s.werte[k] %>;"></span>
+                    <% }) %><%= s.titel %>
+                  </button>
+                <% }) %>
+              </div>
+            </div>
+          <% } %>
+
+          <% if (!_felder.length) { %>
+            <p class="text-secondary"><%= _t('KEIN_FELD') %></p>
+          <% } %>
+          <% _felder.forEach(function (f) { %>
+            <div class="mb-3" data-bk-feld="<%= f.name %>" data-bk-art="<%= f.art %>" data-bk-vorlagen="<%= f.vorlagen.join(' ') %>" data-bk-vorgabe="<%= f.vorgabe %>">
+              <label class="form-label" for="bk-<%= f.name %>"><%= f.titel %></label>
+              <% if (f.art === 'farbe') { %>
+                <div class="d-flex align-items-center gap-2">
+                  <input type="color" class="form-control form-control-color" id="bk-<%= f.name %>" value="<%= f.wert %>" <%= _aus %>>
+                  <code class="small" data-bk-hex="<%= f.name %>"><%= f.wert %></code>
+                </div>
+              <% } else if (f.art === 'text') { %>
+                <input type="text" class="form-control" id="bk-<%= f.name %>" maxlength="255" value="<%= f.wert === f.vorgabe ? '' : f.wert %>" placeholder="<%= f.vorgabe %>" <%= _aus %>>
+                <div class="form-hint"><%= _t('TEXT_HINWEIS', { vorgabe: f.vorgabe }) %></div>
+              <% } else if (f.art === 'bild') { %>
+                <div class="d-flex align-items-center gap-3">
+                  <div class="border rounded d-flex align-items-center justify-content-center overflow-hidden" style="width: 160px; height: 64px;"
+                       data-medienwahl-vorschau="bk-<%= f.name %>" data-medienwahl-leer="fa-panorama"></div>
+                  <div class="flex-fill">
+                    <input type="hidden" id="bk-<%= f.name %>" value="<%= f.wert %>">
+                    <div class="small text-secondary mb-2" data-bk-bildname="bk-<%= f.name %>" data-leer="<%= _t('BILD_KEINS') %>"><%= f.wert ? _bildDatei(f.wert) : _t('BILD_KEINS') %></div>
+                    <div class="btn-list">
+                      <button type="button" class="btn btn-sm" data-medienwahl="bk-<%= f.name %>" <%= _aus %>><i class="fa-solid fa-image me-1"></i><%= _t('BILD_WAEHLEN') %></button>
+                      <button type="button" class="btn btn-sm btn-ghost-danger" data-bk-bild-weg="bk-<%= f.name %>" <%= _aus %>><i class="fa-solid fa-xmark me-1"></i><%= _t('BILD_ENTFERNEN') %></button>
+                    </div>
+                  </div>
+                </div>
+              <% } %>
+            </div>
+          <% }) %>
+
+          <div class="d-flex flex-wrap gap-2 justify-content-end">
+            <button type="button" class="btn" data-bk-vorgabe-knopf <%= _aus %>><i class="fa-solid fa-rotate-left me-1"></i><%= _t('VORGABE_KNOPF') %></button>
+            <button type="button" class="btn btn-primary" data-bk-speichern <%= _aus %>><i class="fa-solid fa-save me-1"></i><%= _t('SPEICHERN') %></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-7">
+      <div class="card">
+        <div class="card-header"><h3 class="card-title mb-0"><i class="fa-solid fa-eye me-2"></i><%= _t('VORSCHAU') %></h3></div>
+        <div class="card-body">
+          <img alt="<%= _titel %>" class="img-fluid rounded border" data-bk-vorschau style="max-width: 100%; height: auto;">
+          <div class="text-red small mt-2 d-none" data-bk-vorschau-fehler></div>
+          <div class="small text-secondary mt-2"><%= _t('VORSCHAU_TEXT') %></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<% if (_hatBild) { %>
+<%- include('shared/medienwahl', { guildId: _id, ordner: 'general' }) %>
+<% } %>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var wurzel = document.getElementById('bildkarteEinstellen');
+  if (!wurzel) return;
+  var adresse = wurzel.dataset.adresse;
+  var schablone = wurzel.querySelector('[data-bk-schablone]');
+  var bild = wurzel.querySelector('[data-bk-vorschau]');
+  var fehler = wurzel.querySelector('[data-bk-vorschau-fehler]');
+  var felder = Array.prototype.slice.call(wurzel.querySelectorAll('[data-bk-feld]'));
+  var altesBild = null;
+  var warte = null;
+  var lauf = 0;
+
+  function gewaehlt() { return schablone ? schablone.value : null; }
+  function gilt(el) {
+    var g = gewaehlt();
+    return !g || el.dataset.bkVorlagen.split(' ').indexOf(g) !== -1;
+  }
+  function eingabe(f) { return document.getElementById('bk-' + f.dataset.bkFeld); }
+
+  function zeigeFelder() {
+    felder.forEach(function (f) { f.classList.toggle('d-none', !gilt(f)); });
+    wurzel.querySelectorAll('[data-bk-vorschlag]').forEach(function (k) {
+      k.classList.toggle('d-none', !!gewaehlt() && k.dataset.bkVorlage !== gewaehlt());
+    });
+  }
+
+  function lies() {
+    var werte = {};
+    felder.filter(gilt).forEach(function (f) { werte[f.dataset.bkFeld] = eingabe(f).value; });
+    var aus = { werte: werte };
+    if (gewaehlt()) aus.vorlage = gewaehlt();
+    return aus;
+  }
+
+  async function vorschau() {
+    var nummer = ++lauf;
+    try {
+      var antwort = await fetch(adresse + '/vorschau?' + new URLSearchParams({ e: JSON.stringify(lies()) }));
+      if (nummer !== lauf) return;
+      if (!antwort.ok) throw new Error(await antwort.text());
+      var url = URL.createObjectURL(await antwort.blob());
+      bild.src = url;
+      if (altesBild) URL.revokeObjectURL(altesBild);
+      altesBild = url;
+      fehler.classList.add('d-none');
+    } catch (err) {
+      if (nummer !== lauf) return;
+      fehler.textContent = wurzel.dataset.fehler + ' ' + err.message;
+      fehler.classList.remove('d-none');
+    }
+  }
+  function spaeter() { clearTimeout(warte); warte = setTimeout(vorschau, 350); }
+
+  function bildname(id) {
+    var el = wurzel.querySelector('[data-bk-bildname="' + id + '"]');
+    var feld = document.getElementById(id);
+    if (!el || !feld) return;
+    var teile = feld.value.split('/');
+    var name = '';
+    try { name = decodeURIComponent(teile[teile.length - 1] || ''); } catch (e) { name = ''; }
+    el.textContent = name || el.dataset.leer || '';
+  }
+
+  wurzel.addEventListener('input', function (ev) {
+    var t = ev.target;
+    if (t && t.type === 'color') {
+      var hex = wurzel.querySelector('[data-bk-hex="' + t.id.slice(3) + '"]');
+      if (hex) hex.textContent = t.value;
+    }
+    if (t && t.id && t.id.indexOf('bk-') === 0) bildname(t.id);
+    spaeter();
+  });
+  if (schablone) schablone.addEventListener('change', function () { zeigeFelder(); spaeter(); });
+
+  function setze(f, wert) {
+    var el = eingabe(f);
+    if (!el) return;
+    el.value = wert;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  wurzel.querySelectorAll('[data-bk-bild-weg]').forEach(function (k) {
+    k.addEventListener('click', function () {
+      var f = felder.find(function (x) { return 'bk-' + x.dataset.bkFeld === k.dataset.bkBildWeg; });
+      if (f) setze(f, '');
+    });
+  });
+  wurzel.querySelectorAll('[data-bk-vorschlag]').forEach(function (k) {
+    k.addEventListener('click', function () {
+      var werte = JSON.parse(k.dataset.bkVorschlag);
+      felder.forEach(function (f) { if (f.dataset.bkFeld in werte) setze(f, werte[f.dataset.bkFeld]); });
+    });
+  });
+  var vorgabeKnopf = wurzel.querySelector('[data-bk-vorgabe-knopf]');
+  if (vorgabeKnopf) vorgabeKnopf.addEventListener('click', function () {
+    felder.filter(gilt).forEach(function (f) { setze(f, f.dataset.bkArt === 'text' ? '' : f.dataset.bkVorgabe); });
+  });
+
+  var speichern = wurzel.querySelector('[data-bk-speichern]');
+  if (speichern) speichern.addEventListener('click', async function () {
+    if (!wurzel.dataset.darf) return;
+    speichern.disabled = true;
+    try {
+      var antwort = await fetch(adresse, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': (document.querySelector('meta[name="csrf-token"]') || {}).content || ''
+        },
+        body: JSON.stringify(lies())
+      });
+      var d = await antwort.json().catch(function () { return {}; });
+      if (!antwort.ok || !d.success) throw new Error(d.message || ('HTTP ' + antwort.status));
+      window.showToast && window.showToast('success', wurzel.dataset.gespeichert);
+      vorschau();
+    } catch (err) {
+      window.showToast && window.showToast('error', err.message);
+    } finally {
+      speichern.disabled = false;
+    }
+  });
+
+  zeigeFelder();
+  vorschau();
+});
+</script>
