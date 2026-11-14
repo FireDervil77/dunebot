@@ -29,6 +29,16 @@
  *       nehmen dieselbe Stelle, die Hintergründe im Formular sind die im Code,
  *       die Vorschau-Route zeichnet über Bildkarte.
  *   11. /admin/bildkarten: Route, Seitenleiste, die Ansicht rendert (leer und voll).
+ *   12. Bereich „Bildkarten“ je Guild (G-21, F-G11):
+ *       a. Erklärungen `bildkarten` in den package.json ohne Fehler, jede Karte
+ *          eines Plugins erklärt, Titel und Ort in beiden Sprachen übersetzt.
+ *       b. Navigation neben Medien mit CORE.BILDKARTEN.VIEW, beide Rechte im
+ *          Katalog, Migration gibt sie der Administrator-Gruppe und vermerkt sie.
+ *       c. Router: beide Routen mit Recht, eingehängt unter /:guildId/bildkarten.
+ *       d. Welche Karten eine Guild sieht: Kern immer, Plugin nur eingeschaltet,
+ *          Nutzung nur von eingeschalteten Plugins.
+ *       e. greeting `stand()`: an nur mit Nachricht und Bild, Werte wie der Bot.
+ *       f. Die Seite rendert leer und voll, Texte in beiden Sprachen.
  *
  * Kein Netz, keine Datenbank: Die Palette kommt aus einer Attrappe ohne Zeilen
  * (also die Vorgabe des Kerns). Liest eine Datei aus der Medienablage der
@@ -314,6 +324,141 @@ function stubMember(nick = 'Anna') {
         });
         assert(/kern:rangkarte/.test(voll) && /kaputt/.test(voll) && /h1/.test(voll), 'Karte, Fehler oder Hinweis fehlt');
         assert(!/<b>/.test(voll.replace(/<b>(?=[^<]*<\/b>)/g, '')) || /&lt;b&gt;/.test(voll), 'Testname nicht escaped');
+    });
+
+    console.log('Bereich je Guild (G-21)');
+    const deKern = JSON.parse(lies('plugins/core/dashboard/locales/de-DE.json'));
+    const enKern = JSON.parse(lies('plugins/core/dashboard/locales/en-GB.json'));
+    const sprachen = {};
+    const textVon = (schluessel, loc) => {
+        const [ns, rest] = schluessel.includes(':') ? schluessel.split(':') : ['core', schluessel];
+        const datei = ns === 'core' ? `plugins/core/dashboard/locales/${loc}.json` : `plugins/${ns}/dashboard/locales/${loc}.json`;
+        sprachen[datei] = sprachen[datei] || JSON.parse(lies(datei));
+        return rest.split('.').reduce((o, k) => (o && typeof o === 'object' ? o[k] : undefined), sprachen[datei]);
+    };
+    await pruefe('12a. Erklärungen „bildkarten“ ohne Fehler, übersetzt', () => {
+        Bildkarte.vergiss();
+        const { karten, fehler } = Bildkarte.nutzungen();
+        assert.deepStrictEqual(fehler, [], fehler.join('\n'));
+        const w = (karten.get('greeting:willkommen') || []).find((n) => n.plugin === 'greeting');
+        assert(w && w.stand && w.seite, 'greeting:willkommen ohne Stand oder Seite');
+        for (const nutz of karten.values()) {
+            for (const n of nutz) {
+                for (const k of [n.wo, n.titel].filter(Boolean)) {
+                    for (const loc of ['de-DE', 'en-GB']) assert(typeof textVon(k, loc) === 'string', `${k} fehlt in ${loc}`);
+                }
+            }
+        }
+        for (const name of Bildkarte.liste().filter((n) => n.startsWith('kern:'))) {
+            const k = `KARTE_${name.split(':')[1].toUpperCase()}`;
+            assert(typeof deKern.BILDKARTEN?.[k] === 'string' && typeof enKern.BILDKARTEN?.[k] === 'string', `core:BILDKARTEN.${k} fehlt`);
+        }
+        assert.deepStrictEqual(Object.keys(deKern.BILDKARTEN).sort(), Object.keys(enKern.BILDKARTEN).sort(), 'core:BILDKARTEN de/en verschieden');
+    });
+    await pruefe('12b. Navigation, Rechte im Katalog, Migration verteilt an Administratoren', () => {
+        const nav = ohneKommentare(lies('apps/dashboard/helpers/KernNavigation.js'));
+        const eintrag = nav.slice(nav.indexOf("title: 'NAV.BILDKARTEN'"), nav.indexOf('},', nav.indexOf("title: 'NAV.BILDKARTEN'")));
+        assert(eintrag.length > 20, 'Navigationseintrag fehlt');
+        assert(/capability: 'CORE\.BILDKARTEN\.VIEW'/.test(eintrag) && /parent: null/.test(eintrag) && /\/bildkarten`/.test(eintrag), 'Eintrag: Recht, Hauptmenü oder Adresse');
+        for (const loc of ['de-DE', 'en-GB']) assert(JSON.parse(lies(`apps/dashboard/locales/${loc}.json`)).NAV?.BILDKARTEN, `NAV.BILDKARTEN fehlt in ${loc}`);
+        const katalog = JSON.parse(lies('packages/dunebot-core/config/permissions.json')).permissions;
+        const ansehen = katalog.find((p) => p.key === 'CORE.BILDKARTEN.VIEW');
+        const einstellen = katalog.find((p) => p.key === 'CORE.BILDKARTEN.EDIT');
+        assert(ansehen && einstellen && einstellen.requires === 'CORE.BILDKARTEN.VIEW', 'Rechte im Kern-Katalog');
+        for (const p of [ansehen, einstellen]) {
+            for (const loc of ['de-DE', 'en-GB']) assert(typeof textVon(p.name, loc) === 'string' && typeof textVon(p.description, loc) === 'string', `${p.name} fehlt in ${loc}`);
+        }
+        const mig = fs.readdirSync(path.join(WURZEL, 'migrations/kern')).filter((d) => /bildkarten_rechte/.test(d));
+        assert(mig.length === 1, 'Migration für die Rechte fehlt');
+        const m = ohneKommentare(lies(`migrations/kern/${mig[0]}`));
+        assert(/slug\) = 'administrator'/.test(m) && /INSERT IGNORE INTO guild_permission_seeds/.test(m) && /CORE\.BILDKARTEN\.VIEW/.test(m) && /CORE\.BILDKARTEN\.EDIT/.test(m), 'Migration: Administrator, Merkposten, beide Rechte');
+    });
+    await pruefe('12c. Router mit Recht, eingehängt', () => {
+        const r = ohneKommentare(lies('apps/dashboard/routes/guild/bildkarten.router.js'));
+        assert(/router\.get\('\/', requirePermission\('CORE\.BILDKARTEN\.VIEW'\)/.test(r), 'Übersicht ohne Recht');
+        assert(/router\.get\('\/bild\/:name', requirePermission\('CORE\.BILDKARTEN\.VIEW'\)/.test(r), 'Bild ohne Recht');
+        assert(/Bildkarte\.beispiel\(/.test(r) && !/createCanvas|@napi-rs/.test(r), 'Bild nicht über Bildkarte');
+        const g = ohneKommentare(lies('apps/dashboard/routes/guild.router.js'));
+        assert(/router\.use\("\/:guildId\/bildkarten", CheckAuth, CheckGuildAccess, bildkartenRouter\)/.test(g), 'nicht eingehängt');
+    });
+    const { kartenDerGuild } = require(path.join(WURZEL, 'apps/dashboard/routes/guild/bildkarten.router.js'));
+    const mitPlugins = (plugins, greetingZeile) => ServiceManager.register('dbService', {
+        async query(sql) {
+            if (/FROM guild_plugins/.test(sql)) return plugins.map((p) => ({ plugin_name: p }));
+            if (/FROM greeting_settings/.test(sql)) return greetingZeile ? [greetingZeile] : [];
+            return [];
+        },
+    });
+    await pruefe('12d. Kern immer, Plugin nur eingeschaltet', async () => {
+        mitPlugins(['core']);
+        const ohne = (await kartenDerGuild('1')).map((k) => k.name);
+        assert(ohne.includes('kern:rangkarte') && ohne.includes('kern:profil'), `Kern fehlt: ${ohne}`);
+        assert(!ohne.includes('greeting:willkommen'), 'greeting ist aus und trotzdem da');
+        mitPlugins(['core', 'greeting']);
+        const mit = await kartenDerGuild('1');
+        const w = mit.find((k) => k.name === 'greeting:willkommen');
+        assert(w && w.nutzungen.length === 1 && w.besitzerName === 'Greeting', 'greeting eingeschaltet, Karte oder Nutzung fehlt');
+        assert(mit.filter((k) => k.besitzer === 'kern').every((k) => k.nutzungen.every((n) => n.plugin !== 'greeting')), 'fremde Nutzung');
+        const echt = Bildkarte.nutzungen;
+        const karten = new Map(echt().karten);
+        karten.set('kern:rangkarte', [{ plugin: 'leveling', titel: null, wo: 'leveling:X', seite: null, stand: null }]);
+        Bildkarte.nutzungen = () => ({ karten, fehler: [] });
+        try {
+            mitPlugins(['core', 'greeting']);
+            assert.strictEqual((await kartenDerGuild('1')).find((k) => k.name === 'kern:rangkarte').nutzungen.length, 0, 'Nutzung eines ausgeschalteten Plugins sichtbar');
+            mitPlugins(['core', 'leveling']);
+            assert.strictEqual((await kartenDerGuild('1')).find((k) => k.name === 'kern:rangkarte').nutzungen.length, 1, 'Nutzung eines eingeschalteten Plugins fehlt');
+        } finally {
+            Bildkarte.nutzungen = echt;
+        }
+    });
+    await pruefe('12e. greeting stand(): an nur mit Nachricht und Bild, Werte wie der Bot', async () => {
+        const nutz = Bildkarte.nutzungen().karten.get('greeting:willkommen')[0];
+        const Willkommensbild = require(path.join(WURZEL, 'plugins/greeting/shared/willkommensbild.js'));
+        const zeile = { welcome_enabled: 1, welcome_image_enabled: 1, welcome_image_bg: 'ocean', welcome_image_text: 'Hallo {member:nick}', welcome_image_color: '#ff0000' };
+        mitPlugins(['greeting'], zeile);
+        const s = await Bildkarte.nutzungStand(nutz, '1');
+        assert.strictEqual(s.an, true, 'an');
+        assert.deepStrictEqual(s.werte, Willkommensbild.werte(zeile), 'Werte anders als im Bot');
+        mitPlugins(['greeting'], { ...zeile, welcome_image_enabled: 0 });
+        assert.strictEqual((await Bildkarte.nutzungStand(nutz, '1')).an, false, 'Bild aus, trotzdem an');
+        mitPlugins(['greeting'], { ...zeile, welcome_enabled: 0 });
+        assert.strictEqual((await Bildkarte.nutzungStand(nutz, '1')).an, false, 'Nachricht aus, trotzdem an');
+        mitPlugins(['greeting'], null);
+        const leer = await Bildkarte.nutzungStand(nutz, '1');
+        assert(leer.an === false && leer.werte.text === Willkommensbild.VORGABE_TEXT, 'ohne Zeile');
+        ServiceManager.register('dbService', { async query() { throw new Error('weg'); } });
+        const kaputt = await Bildkarte.nutzungStand(nutz, '1');
+        assert(kaputt.an === null && /weg/.test(kaputt.fehler), 'Fehler verschluckt');
+        ServiceManager.register('dbService', { async query() { return []; } });
+    });
+    await pruefe('12f. Seite rendert leer und voll, beide Sprachen', () => {
+        const ejs = require('ejs');
+        const vorlage = lies('apps/dashboard/themes/default/views/guild/bildkarten.ejs');
+        for (const loc of ['de-DE', 'en-GB']) {
+            const fehlt = [];
+            const tr = (k, o = {}) => {
+                const t = textVon(k, loc);
+                if (typeof t !== 'string') { fehlt.push(k); return k; }
+                return t.replace(/\{\{(\w+)\}\}/g, (_, n) => String(o[n] ?? ''));
+            };
+            const leer = ejs.render(vorlage, { tr, guildId: '1', karten: [] });
+            assert(leer.includes(tr('core:BILDKARTEN.LEER')), 'leer');
+            const voll = ejs.render(vorlage, {
+                tr, guildId: '1',
+                karten: [
+                    { name: 'kern:rangkarte', besitzer: 'kern', besitzerName: null, titel: null, breite: 934, hoehe: 282, nutzungen: [] },
+                    { name: 'greeting:willkommen', besitzer: 'greeting', besitzerName: 'Greeting', titel: 'greeting:BILDKARTEN.TITEL_WILLKOMMEN', breite: 1024, hoehe: 450,
+                        nutzungen: [{ plugin: 'greeting', pluginName: 'Greeting', wo: 'greeting:BILDKARTEN.WO_WILLKOMMEN', seite: 'nachrichten', an: false, fehler: '<x>' }] },
+                    { name: 'kern:profil', besitzer: 'kern', titel: null, fehler: 'kaputt', nutzungen: [] },
+                ],
+            });
+            assert.deepStrictEqual(fehlt, [], `${loc}: ${fehlt.join(', ')}`);
+            assert(voll.includes('/guild/1/bildkarten/bild/kern%3Arangkarte'), 'Bildadresse');
+            assert(voll.includes('/guild/1/plugins/greeting/nachrichten'), 'Weg zum Plugin');
+            assert(voll.includes(tr('core:BILDKARTEN.KEINE_NUTZUNG')) && voll.includes(tr('core:BILDKARTEN.AUS')) && voll.includes('kaputt'), 'Schablone, aus oder Fehler fehlt');
+            assert(voll.includes('&lt;x&gt;') && !voll.includes('<x>'), 'nicht escaped');
+        }
     });
 
     console.log(`\n${gruen} grün, ${rot} rot`);

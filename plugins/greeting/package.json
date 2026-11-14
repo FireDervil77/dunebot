@@ -116,5 +116,13 @@
         "platzhalter": []
       }
     }
+  },
+  "bildkarten": {
+    "greeting:willkommen": {
+      "titel": "greeting:BILDKARTEN.TITEL_WILLKOMMEN",
+      "wo": "greeting:BILDKARTEN.WO_WILLKOMMEN",
+      "seite": "nachrichten",
+      "stand": "shared/willkommensbild.js"
+    }
   }
 }

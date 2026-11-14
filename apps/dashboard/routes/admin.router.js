@@ -447,6 +447,9 @@ router.post('/zeitplan/vergessen', async (req, res) => {
 // Jede Vorlage mit Beispielwerten gezeichnet, in der Palette der
 // Kontroll-Guild, mit Zeit und Größe. Ein Name zum Testen von Emoji und
 // Schriften ersetzt den Anzeigenamen des Beispiel-Mitglieds.
+// Betreiberseite (G-21): Guilds sehen ihre Karten unter /guild/ID/bildkarten.
+// Hier alle Karten im Vergleich, wer sie nutzt (package.json `bildkarten`)
+// und was an diesen Erklärungen nicht stimmt.
 // ================================================================
 
 router.get('/bildkarten', async (req, res) => {
@@ -463,12 +466,14 @@ router.get('/bildkarten', async (req, res) => {
         const zeilen = await ServiceManager.get('dbService').query('SELECT guild_name FROM guilds WHERE _id = ?', [guildId]);
         guildName = zeilen?.[0]?.guild_name || '';
     } catch { /* ohne Namen */ }
+    const erklaert = Bildkarte.nutzungen();
     for (const name of Bildkarte.liste()) {
         try {
             const v = Bildkarte.vorlage(name);
             const k = await Bildkarte.beispiel(name, { guildId, guildName, nutzer, sprache });
             karten.push({
                 name, titel: v.titel || name, breite: v.breite, hoehe: v.hoehe, ebenen: v.ebenen.length,
+                genutzt: (erklaert.karten.get(name) || []).map((n) => n.plugin),
                 werte: (v.werte || []).map((w) => w.name),
                 ms: k.ms, bytes: k.bytes, typ: k.typ, hinweise: k.hinweise,
                 bild: `data:image/${k.typ};base64,${k.puffer.toString('base64')}`,
@@ -481,6 +486,7 @@ router.get('/bildkarten', async (req, res) => {
         title: 'Bildkarten',
         activeMenu: '/admin/bildkarten',
         karten, schriften: Bildkarte.schriftStand(), testname, sprache, guildName,
+        erklaerFehler: erklaert.fehler,
         grenzeBytes: Bildkarte.PNG_MAX_BYTES,
     });
 });

@@ -7,8 +7,16 @@
   const spr = typeof sprache !== 'undefined' ? sprache : 'de-DE';
   const grenze = typeof grenzeBytes !== 'undefined' ? grenzeBytes : 1048576;
   const kb = (b) => `${(b / 1024).toFixed(1)} KB`;
+  const erklFehler = typeof erklaerFehler !== 'undefined' && Array.isArray(erklaerFehler) ? erklaerFehler : [];
 %>
 <div class="container-fluid">
+  <div class="alert alert-info"><i class="fa-solid fa-circle-info me-2"></i>Betreiberseite. Jede Guild sieht ihre eigenen Karten unter „Bildkarten“ in ihrer Navigation, in ihren Farben und mit den Werten ihrer Plugins.</div>
+  <% if (erklFehler.length) { %>
+    <div class="alert alert-danger">
+      <div class="fw-bold mb-1"><i class="fa-solid fa-triangle-exclamation me-1"></i>Erklärungen unter „bildkarten“ in den package.json stimmen nicht</div>
+      <% erklFehler.forEach(function (f) { %><div class="small font-monospace"><%= f %></div><% }) %>
+    </div>
+  <% } %>
   <div class="card mb-3">
     <div class="card-header"><h3 class="card-title mb-0"><i class="fa-solid fa-font me-2"></i>Schriften</h3></div>
     <div class="card-body">
@@ -71,6 +79,7 @@
             <span class="badge <%= k.bytes < grenze ? 'bg-green-lt' : 'bg-red-lt' %>"><%= kb(k.bytes) %> <%= k.typ.toUpperCase() %></span>
             <span class="text-secondary ms-2"><%= k.breite %> × <%= k.hoehe %>, <%= k.ebenen %> Ebenen, Werte: <span class="font-monospace"><%= k.werte.join(', ') || '–' %></span></span>
           </div>
+          <div class="small mt-1">Genutzt von: <% if ((k.genutzt || []).length) { %><span class="font-monospace"><%= k.genutzt.join(', ') %></span><% } else { %><span class="text-secondary">noch keinem Plugin</span><% } %></div>
           <% k.hinweise.forEach(function (h) { %><div class="small text-orange mt-1"><i class="fa-solid fa-circle-info me-1"></i><%= h %></div><% }) %>
         <% } %>
       </div>

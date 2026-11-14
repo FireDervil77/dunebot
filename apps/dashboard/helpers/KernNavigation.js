@@ -145,6 +145,18 @@ async function registerKernNavigation(guildId) {
                 guildId,
                 parent: null
             },
+            // ── Bildkarten (G-21, F-G11): Karten dieser Guild ansehen, später einstellen ──
+            {
+                title: 'NAV.BILDKARTEN',
+                url: `/guild/${guildId}/bildkarten`,
+                icon: 'fa-solid fa-id-card',
+                order: 2950,
+                type: navigationManager.menuTypes.MAIN,
+                capability: 'CORE.BILDKARTEN.VIEW',
+                visible: true,
+                guildId,
+                parent: null
+            },
             {
                 title: 'NAV.THEMES_OVERVIEW',
                 url: `/guild/${guildId}/themes`,

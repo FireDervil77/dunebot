@@ -179,5 +179,9 @@
     "PH_INVITER_NAME": "Name dessen, der eingeladen hat",
     "PH_INVITER_TAG": "Benutzername dessen, der eingeladen hat",
     "PH_INVITES": "Zahl seiner Einladungen"
+  },
+  "BILDKARTEN": {
+    "TITEL_WILLKOMMEN": "Willkommensbild",
+    "WO_WILLKOMMEN": "Hängt an der Willkommensnachricht, wenn ein Mitglied beitritt, und an /welcome preview."
   }
 }

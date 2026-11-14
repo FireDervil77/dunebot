@@ -65,4 +65,22 @@ async function anhang(member, settings, logger) {
     }
 }
 
-module.exports = { ANLASS, HINTERGRUENDE, VORGABE_TEXT, VORGABE_FARBE, werte, anhang };
+/**
+ * Für den Kern-Bereich „Bildkarten“ (G-21, erklärt in package.json unter
+ * `bildkarten`): Ist das Bild in dieser Guild an, und mit welchen Werten
+ * zeichnet der Bot es? An heißt: Willkommensnachricht und Bild eingeschaltet.
+ * Ohne Zeile in `greeting_settings` ist es aus, gezeichnet mit der Vorgabe.
+ * @param {string} guildId
+ * @returns {Promise<{an: boolean, werte: Object}>}
+ */
+async function stand(guildId) {
+    const { ServiceManager } = require('dunebot-core');
+    const zeilen = await ServiceManager.get('dbService').query(
+        'SELECT welcome_enabled, welcome_image_enabled, welcome_image_bg, welcome_image_text, welcome_image_color FROM greeting_settings WHERE guild_id = ?',
+        [guildId]
+    );
+    const s = zeilen?.[0] || {};
+    return { an: Boolean(Number(s.welcome_enabled)) && Boolean(Number(s.welcome_image_enabled)), werte: werte(s) };
+}
+
+module.exports = { ANLASS, HINTERGRUENDE, VORGABE_TEXT, VORGABE_FARBE, werte, anhang, stand };

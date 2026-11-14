@@ -1,0 +1,73 @@
+<%#
+  Bildkarten (G-21, F-G11, K382, 2026-11-14)
+
+  Jede Karte dieser Guild: Schablonen des Kerns und Karten eingeschalteter
+  Plugins, dazu wo der Bot sie zeigt (Erklärung `bildkarten` in der
+  package.json des Plugins). Das Bild lädt einzeln über
+  /guild/ID/bildkarten/bild/NAME. Nur Lesen; Einstellen folgt (G-22).
+
+  context: guildId, karten (bildkarten.router kartenDerGuild + Stand)
+%>
+<%
+const _t = (k, o) => tr('core:BILDKARTEN.' + k, o);
+const _karten = typeof karten !== 'undefined' && Array.isArray(karten) ? karten : [];
+const _id = typeof guildId !== 'undefined' ? guildId : '';
+const _titel = (k) => {
+  if (k.besitzer === 'kern') return _t('KARTE_' + String(k.name.split(':')[1] || '').toUpperCase());
+  return k.titel ? tr(k.titel) : k.name;
+};
+%>
+<div class="container-fluid">
+  <div class="card mb-3">
+    <div class="card-body d-flex flex-wrap align-items-center gap-2">
+      <p class="text-secondary mb-0 flex-grow-1"><%= _t('EINLEITUNG') %></p>
+      <a class="btn btn-outline-secondary" href="/guild/<%= _id %>/settings/gestaltung"><i class="fa-solid fa-palette me-1"></i><%= _t('GESTALTUNG') %></a>
+    </div>
+  </div>
+
+  <% if (!_karten.length) { %>
+    <div class="alert alert-info"><i class="fa-solid fa-circle-info me-2"></i><%= _t('LEER') %></div>
+  <% } %>
+
+  <% _karten.forEach(function (k) { %>
+    <div class="card mb-3" data-bildkarte="<%= k.name %>">
+      <div class="card-header">
+        <h3 class="card-title mb-0">
+          <i class="fa-solid fa-id-card me-2"></i><%= _titel(k) %>
+          <span class="text-secondary fw-normal small ms-2"><%= k.besitzer === 'kern' ? _t('SCHABLONE') : _t('VON_PLUGIN', { plugin: k.besitzerName }) %></span>
+        </h3>
+      </div>
+      <div class="card-body">
+        <% if (k.fehler) { %>
+          <div class="text-red"><i class="fa-solid fa-triangle-exclamation me-1"></i><%= _t('BILD_FEHLT') %> <span class="small text-secondary"><%= k.fehler %></span></div>
+        <% } else { %>
+          <img src="/guild/<%= _id %>/bildkarten/bild/<%= encodeURIComponent(k.name) %>" alt="<%= _titel(k) %>" loading="lazy"
+               class="img-fluid rounded border mb-1" width="<%= k.breite %>" height="<%= k.hoehe %>"
+               style="max-width: min(100%, <%= Math.min(k.breite, 934) %>px); height: auto;">
+          <div class="small text-secondary mb-3"><%= _t('GROESSE', { breite: k.breite, hoehe: k.hoehe }) %></div>
+        <% } %>
+
+        <h4 class="mb-2"><%= _t('BENUTZT') %></h4>
+        <% if (!k.nutzungen.length) { %>
+          <p class="text-secondary mb-0"><%= _t('KEINE_NUTZUNG') %></p>
+        <% } else { %>
+          <ul class="list-unstyled mb-0">
+            <% k.nutzungen.forEach(function (n) { %>
+              <li class="mb-2">
+                <strong><%= n.pluginName %></strong>
+                <% if (n.an === true) { %><span class="badge bg-green-lt ms-1"><%= _t('AN') %></span><% } %>
+                <% if (n.an === false) { %><span class="badge bg-secondary-lt ms-1" title="<%= _t('AUS_TEXT') %>"><%= _t('AUS') %></span><% } %>
+                <div class="text-secondary"><%= tr(n.wo) %></div>
+                <% if (n.an === false) { %><div class="small text-secondary"><%= _t('AUS_TEXT') %></div><% } %>
+                <% if (n.fehler) { %><div class="small text-orange"><i class="fa-solid fa-circle-info me-1"></i><%= _t('STAND_FEHLER', { grund: n.fehler }) %></div><% } %>
+                <% if (n.seite) { %>
+                  <a class="btn btn-sm btn-outline-primary mt-1" href="/guild/<%= _id %>/plugins/<%= n.plugin %>/<%= n.seite %>"><i class="fa-solid fa-sliders me-1"></i><%= _t('EINSTELLEN', { plugin: n.pluginName }) %></a>
+                <% } %>
+              </li>
+            <% }) %>
+          </ul>
+        <% } %>
+      </div>
+    </div>
+  <% }) %>
+</div>

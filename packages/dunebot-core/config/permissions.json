@@ -192,6 +192,24 @@
       "requires": "CORE.MEDIA.VIEW"
     },
     {
+      "key": "CORE.BILDKARTEN.VIEW",
+      "name": "CORE.PERM_BILDKARTEN_VIEW",
+      "description": "CORE.PERM_BILDKARTEN_VIEW_DESC",
+      "category": "core",
+      "is_dangerous": 0,
+      "sort_order": 62,
+      "requires": null
+    },
+    {
+      "key": "CORE.BILDKARTEN.EDIT",
+      "name": "CORE.PERM_BILDKARTEN_EDIT",
+      "description": "CORE.PERM_BILDKARTEN_EDIT_DESC",
+      "category": "core",
+      "is_dangerous": 0,
+      "sort_order": 63,
+      "requires": "CORE.BILDKARTEN.VIEW"
+    },
+    {
       "key": "PERMISSIONS.VIEW",
       "name": "PERMISSIONS.VIEW",
       "description": "PERMISSIONS.VIEW_DESC",

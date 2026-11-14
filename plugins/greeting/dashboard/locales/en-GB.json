@@ -179,5 +179,9 @@
     "PH_INVITER_NAME": "Name of the person who invited",
     "PH_INVITER_TAG": "Username of the person who invited",
     "PH_INVITES": "Number of their invites"
+  },
+  "BILDKARTEN": {
+    "TITEL_WILLKOMMEN": "Welcome image",
+    "WO_WILLKOMMEN": "Attached to the welcome message when a member joins, and to /welcome preview."
   }
 }

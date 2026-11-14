@@ -639,9 +639,102 @@ async function beispiel(name, { guildId, guildName, nutzer, werte, sprache, plug
     return zeichne(name, { member, guild, werte }, { guildId, sprache, plugin: plugin || (besitzer === 'kern' ? undefined : besitzer) });
 }
 
-/** Gelesene Vorlagen vergessen (Wächter, nach dem Bearbeiten einer Datei). */
-function vergiss() {
-    vorlagen.clear();
+// ─────────────────────────────────────────────────────────────────────────
+// Wer welche Karte nutzt (G-21, F-G11)
+// ─────────────────────────────────────────────────────────────────────────
+
+const NUTZUNG_FELDER = new Set(['titel', 'wo', 'seite', 'stand']);
+const SEITE = /^[a-z0-9_-]{1,32}(\/[a-z0-9_-]{1,32}){0,3}$/;
+const STAND = /^[a-z0-9_-]{1,32}(\/[a-z0-9_-]{1,32}){0,3}\.js$/;
+
+let nutzungenGelesen = null;
+
+/**
+ * Wer welche Karte nutzt, aus `bildkarten` in jeder `plugins/<p>/package.json`:
+ *
+ *     "bildkarten": {
+ *       "greeting:willkommen": {
+ *         "titel": "greeting:BILDKARTEN.TITEL_WILLKOMMEN",  // Pflicht bei eigenen Karten
+ *         "wo":    "greeting:BILDKARTEN.WO_WILLKOMMEN",     // wo der Bot sie zeigt
+ *         "seite": "nachrichten",                           // /guild/<id>/plugins/<p>/<seite>
+ *         "stand": "shared/willkommensbild.js"              // exportiert stand(guildId) → {an, werte}
+ *       }
+ *     }
+ *
+ * Ein Plugin erklärt nur eigene Karten (`<p>:…`) oder Schablonen des Kerns
+ * (`kern:…`). Jede Karte eines Plugins muss erklärt sein, sonst sähe die Guild
+ * sie ohne Ort. Einmal je Prozess gelesen; Fehler stehen in `fehler` (Wächter),
+ * die Seite zeigt den Rest.
+ *
+ * @returns {{karten: Map<string, Array<{plugin: string, titel: string|null, wo: string, seite: string|null, stand: string|null}>>, fehler: string[]}}
+ */
+function nutzungen() {
+    if (nutzungenGelesen) return nutzungenGelesen;
+    const karten = new Map();
+    const fehler = [];
+    const vorhanden = new Set(liste());
+    let plugins = [];
+    try { plugins = fs.readdirSync(PLUGINS).sort(); } catch { /* ohne Plugins */ }
+    for (const p of plugins) {
+        let pkg;
+        try { pkg = JSON.parse(fs.readFileSync(path.join(PLUGINS, p, 'package.json'), 'utf8')); } catch { continue; }
+        const erkl = pkg.bildkarten;
+        if (erkl === undefined) continue;
+        if (!erkl || typeof erkl !== 'object' || Array.isArray(erkl)) { fehler.push(`${p}: bildkarten muss ein Objekt sein`); continue; }
+        for (const [name, e] of Object.entries(erkl)) {
+            const ort = `${p} → ${name}`;
+            const m = NAME.exec(name);
+            if (!m) { fehler.push(`${ort}: kein Name der Form plugin:karte`); continue; }
+            if (m[1] !== p && m[1] !== 'kern') { fehler.push(`${ort}: nur eigene Karten (${p}:…) oder Schablonen des Kerns (kern:…)`); continue; }
+            if (!vorhanden.has(name)) { fehler.push(`${ort}: keine Vorlage ${path.relative(WURZEL, dateiVon(name))}`); continue; }
+            if (!e || typeof e !== 'object' || Array.isArray(e)) { fehler.push(`${ort}: kein Objekt`); continue; }
+            const fremd = Object.keys(e).filter((k) => !NUTZUNG_FELDER.has(k));
+            if (fremd.length) { fehler.push(`${ort}: unbekannte Felder ${fremd.join(', ')}`); continue; }
+            if (typeof e.wo !== 'string' || !e.wo.startsWith(`${p}:`)) { fehler.push(`${ort}: wo braucht einen Übersetzungsschlüssel ${p}:…`); continue; }
+            if (m[1] === p && (typeof e.titel !== 'string' || !e.titel.startsWith(`${p}:`))) { fehler.push(`${ort}: titel braucht einen Übersetzungsschlüssel ${p}:…`); continue; }
+            if (m[1] === 'kern' && e.titel !== undefined) { fehler.push(`${ort}: Schablonen des Kerns haben ihren Titel im Kern`); continue; }
+            if (e.seite !== undefined && (typeof e.seite !== 'string' || !SEITE.test(e.seite))) { fehler.push(`${ort}: seite ist ein Pfad unter /plugins/${p}/`); continue; }
+            if (e.stand !== undefined && (typeof e.stand !== 'string' || !STAND.test(e.stand) || !fs.existsSync(path.join(PLUGINS, p, e.stand)))) {
+                fehler.push(`${ort}: stand nennt keine Datei im Plugin (${e.stand})`);
+                continue;
+            }
+            if (!karten.has(name)) karten.set(name, []);
+            karten.get(name).push({ plugin: p, titel: e.titel || null, wo: e.wo, seite: e.seite || null, stand: e.stand || null });
+        }
+    }
+    for (const name of vorhanden) {
+        const besitzer = name.split(':')[0];
+        if (besitzer !== 'kern' && !(karten.get(name) || []).some((n) => n.plugin === besitzer)) {
+            fehler.push(`${name}: steht nicht unter bildkarten in plugins/${besitzer}/package.json`);
+        }
+    }
+    nutzungenGelesen = { karten, fehler };
+    return nutzungenGelesen;
 }
 
-module.exports = { ARTEN, PFLICHT, GRENZEN, PNG_MAX_BYTES, SYSTEM, Kartenfehler, pruefe, vorlage, liste, zeichne, beispiel, schriftStand, vergiss };
+/**
+ * Stand einer Nutzung in einer Guild: an oder aus, und die Werte, mit denen
+ * der Bot die Karte dort zeichnet. Ohne `stand` in der Erklärung: unbekannt.
+ * Scheitert das Plugin, steht der Grund in `fehler`, die Seite zeigt dann
+ * die Beispielwerte.
+ * @returns {Promise<{an: boolean|null, werte: Object|null, fehler: string|null}>}
+ */
+async function nutzungStand(nutzung, guildId) {
+    if (!nutzung?.stand) return { an: null, werte: null, fehler: null };
+    try {
+        const modul = require(path.join(PLUGINS, nutzung.plugin, nutzung.stand));
+        if (typeof modul.stand !== 'function') throw new Error(`${nutzung.stand} exportiert kein stand()`);
+        const s = await modul.stand(String(guildId));
+        return { an: typeof s?.an === 'boolean' ? s.an : null, werte: s?.werte && typeof s.werte === 'object' ? s.werte : null, fehler: null };
+    } catch (err) {
+        return { an: null, werte: null, fehler: err.message };
+    }
+}
+
+/** Gelesene Vorlagen und Erklärungen vergessen (Wächter, nach dem Bearbeiten einer Datei). */
+function vergiss() {
+    vorlagen.clear();
+    nutzungenGelesen = null;
+}
+
+module.exports = { ARTEN, PFLICHT, GRENZEN, PNG_MAX_BYTES, SYSTEM, Kartenfehler, pruefe, vorlage, liste, zeichne, beispiel, schriftStand, nutzungen, nutzungStand, vergiss };

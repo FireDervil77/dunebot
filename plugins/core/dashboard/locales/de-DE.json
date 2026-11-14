@@ -48,6 +48,10 @@
   "PERM_MEDIA_UPLOAD_DESC": "Erlaubt das Hochladen von Bildern und Dateien",
   "PERM_MEDIA_DELETE": "Medien löschen",
   "PERM_MEDIA_DELETE_DESC": "Erlaubt das Löschen von Medien aus der Bibliothek (KRITISCH)",
+  "PERM_BILDKARTEN_VIEW": "Bildkarten ansehen",
+  "PERM_BILDKARTEN_VIEW_DESC": "Erlaubt das Ansehen der Bildkarten dieses Servers (Rangkarte, Willkommensbild …)",
+  "PERM_BILDKARTEN_EDIT": "Bildkarten einstellen",
+  "PERM_BILDKARTEN_EDIT_DESC": "Erlaubt das Einstellen der Bildkarten dieses Servers",
   "CORE": {
     "PERM_SETTINGS_VIEW": "Einstellungen ansehen",
     "PERM_SETTINGS_VIEW_DESC": "Erlaubt das Ansehen der Guild-Einstellungen",
@@ -78,7 +82,11 @@
     "PERM_MEDIA_UPLOAD": "Medien hochladen",
     "PERM_MEDIA_UPLOAD_DESC": "Erlaubt das Hochladen von Bildern und Dateien",
     "PERM_MEDIA_DELETE": "Medien löschen",
-    "PERM_MEDIA_DELETE_DESC": "Erlaubt das Löschen von Medien aus der Bibliothek (KRITISCH)"
+    "PERM_MEDIA_DELETE_DESC": "Erlaubt das Löschen von Medien aus der Bibliothek (KRITISCH)",
+    "PERM_BILDKARTEN_VIEW": "Bildkarten ansehen",
+    "PERM_BILDKARTEN_VIEW_DESC": "Erlaubt das Ansehen der Bildkarten dieses Servers (Rangkarte, Willkommensbild …)",
+    "PERM_BILDKARTEN_EDIT": "Bildkarten einstellen",
+    "PERM_BILDKARTEN_EDIT_DESC": "Erlaubt das Einstellen der Bildkarten dieses Servers"
   },
   "PERMISSIONS": {
     "VIEW": "Berechtigungen ansehen",
@@ -519,5 +527,23 @@
       "GESTALTUNG_LOGO": "Logo aus Einstellungen → Gestaltung",
       "GESTALTUNG_BANNER": "Banner aus Einstellungen → Gestaltung"
     }
+  },
+  "BILDKARTEN": {
+    "EINLEITUNG": "Bilder, die der Bot auf diesem Server zeichnet. Hier siehst du jede Karte mit deinem Konto als Mitglied, in den Farben unter Einstellungen → Gestaltung und mit den Werten, die der Bot auf diesem Server nimmt.",
+    "GESTALTUNG": "Farben ändern",
+    "LEER": "Auf diesem Server gibt es keine Bildkarte.",
+    "SCHABLONE": "Schablone des Kerns",
+    "VON_PLUGIN": "Karte von {{plugin}}",
+    "KEINE_NUTZUNG": "Noch nutzt kein eingeschaltetes Plugin diese Schablone.",
+    "BENUTZT": "Wo der Bot sie zeigt",
+    "AN": "an",
+    "AUS": "aus",
+    "AUS_TEXT": "Auf diesem Server gerade ausgeschaltet.",
+    "EINSTELLEN": "Einstellen in {{plugin}}",
+    "STAND_FEHLER": "Ob sie an ist, ließ sich nicht lesen: {{grund}}",
+    "BILD_FEHLT": "Die Karte ließ sich nicht zeichnen.",
+    "GROESSE": "{{breite}} × {{hoehe}} Pixel",
+    "KARTE_RANGKARTE": "Rangkarte",
+    "KARTE_PROFIL": "Profilkarte"
   }
 }

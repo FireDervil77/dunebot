@@ -48,6 +48,10 @@
   "PERM_MEDIA_UPLOAD_DESC": "Allows uploading images and files",
   "PERM_MEDIA_DELETE": "Delete Media",
   "PERM_MEDIA_DELETE_DESC": "Allows deleting media from the library (CRITICAL)",
+  "PERM_BILDKARTEN_VIEW": "View image cards",
+  "PERM_BILDKARTEN_VIEW_DESC": "Allows viewing this server's image cards (rank card, welcome image …)",
+  "PERM_BILDKARTEN_EDIT": "Configure image cards",
+  "PERM_BILDKARTEN_EDIT_DESC": "Allows configuring this server's image cards",
   "CORE": {
     "PERM_SETTINGS_VIEW": "View Settings",
     "PERM_SETTINGS_VIEW_DESC": "Allows viewing guild settings",
@@ -78,7 +82,11 @@
     "PERM_MEDIA_UPLOAD": "Upload Media",
     "PERM_MEDIA_UPLOAD_DESC": "Allows uploading images and files",
     "PERM_MEDIA_DELETE": "Delete Media",
-    "PERM_MEDIA_DELETE_DESC": "Allows deleting media from the library (CRITICAL)"
+    "PERM_MEDIA_DELETE_DESC": "Allows deleting media from the library (CRITICAL)",
+    "PERM_BILDKARTEN_VIEW": "View image cards",
+    "PERM_BILDKARTEN_VIEW_DESC": "Allows viewing this server's image cards (rank card, welcome image …)",
+    "PERM_BILDKARTEN_EDIT": "Configure image cards",
+    "PERM_BILDKARTEN_EDIT_DESC": "Allows configuring this server's image cards"
   },
   "PERMISSIONS": {
     "VIEW": "View Permissions",
@@ -519,5 +527,23 @@
       "GESTALTUNG_LOGO": "Logo from Settings → Appearance",
       "GESTALTUNG_BANNER": "Banner from Settings → Appearance"
     }
+  },
+  "BILDKARTEN": {
+    "EINLEITUNG": "Images the bot draws on this server. Each card is shown with your account as the member, in the colours under Settings → Design and with the values the bot uses on this server.",
+    "GESTALTUNG": "Change colours",
+    "LEER": "There are no image cards on this server.",
+    "SCHABLONE": "Core template",
+    "VON_PLUGIN": "Card from {{plugin}}",
+    "KEINE_NUTZUNG": "No enabled plugin uses this template yet.",
+    "BENUTZT": "Where the bot shows it",
+    "AN": "on",
+    "AUS": "off",
+    "AUS_TEXT": "Currently switched off on this server.",
+    "EINSTELLEN": "Configure in {{plugin}}",
+    "STAND_FEHLER": "Could not read whether it is on: {{grund}}",
+    "BILD_FEHLT": "The card could not be drawn.",
+    "GROESSE": "{{breite}} × {{hoehe}} pixels",
+    "KARTE_RANGKARTE": "Rank card",
+    "KARTE_PROFIL": "Profile card"
   }
 }
