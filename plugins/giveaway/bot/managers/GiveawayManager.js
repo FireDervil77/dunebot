@@ -1,6 +1,6 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { ServiceManager } = require('dunebot-core');
-const { LosquellenRegistry } = require('dunebot-sdk');
+const { LosquellenRegistry, Gestaltung } = require('dunebot-sdk');
 
 class GiveawayManager {
     constructor(client) {
@@ -82,7 +82,8 @@ class GiveawayManager {
             hostedBy,
             description = null,
             title = 'Giveaway',
-            embedColor = '#f59e0b',
+            // Leer = Farbe „Akzent“ von giveaway zur Zeit der Anzeige (G-09).
+            embedColor = null,
             buttonEmoji = '🎁',
             allowedRoles = null,
             scheduledStart = null,
@@ -1018,12 +1019,16 @@ class GiveawayManager {
             const endsTimestamp = Math.floor(new Date(giveaway.ends_at).getTime() / 1000);
             const requirements = await this.getRequirements(giveawayId);
 
+            // Farbe: die der Verlosung, sonst Akzent; Logo in der Fußzeile,
+            // Banner als Bild (G-09, nur wenn die Guild sie gesetzt hat).
+            const bilder = await Gestaltung.bilder(guildId);
             const embed = new EmbedBuilder()
                 .setTitle(`🎁 ${giveaway.prize}`)
                 .setDescription(this._buildActiveDescription(giveaway, host, endsTimestamp, 0, requirements))
-                .setColor(giveaway.embed_color)
-                .setFooter({ text: `ID: ${giveawayId} • ${giveaway.winner_count} Gewinner` })
+                .setColor(giveaway.embed_color || await Gestaltung.farbe(guildId, 'akzent', 'giveaway'))
+                .setFooter({ text: `ID: ${giveawayId} • ${giveaway.winner_count} Gewinner`, iconURL: bilder.logo || undefined })
                 .setTimestamp(new Date(giveaway.ends_at));
+            if (bilder.banner) embed.setImage(bilder.banner);
 
             if (giveaway.description) {
                 embed.addFields({ name: 'Beschreibung', value: giveaway.description });
@@ -1140,8 +1145,8 @@ class GiveawayManager {
             const embed = new EmbedBuilder()
                 .setTitle(`⏸️ ${giveaway.prize} (PAUSIERT)`)
                 .setDescription(`Dieses Giveaway ist **pausiert**.\n\n👥 Teilnehmer: **${entryCount}**`)
-                .setColor('#808080')
-                .setFooter({ text: `ID: ${giveaway.id} • ${giveaway.winner_count} Gewinner` });
+                .setColor('#808080') // fest je Zustand (G-09 Ebene 3)
+                .setFooter({ text: `ID: ${giveaway.id} • ${giveaway.winner_count} Gewinner`, iconURL: (await Gestaltung.bilder(giveaway.guild_id)).logo || undefined });
 
             const button = new ButtonBuilder()
                 .setCustomId(`giveaway_join_${giveaway.id}`)
@@ -1180,8 +1185,8 @@ class GiveawayManager {
                     `🏆 Gewinner: ${winnerMentions}\n` +
                     `👥 Teilnehmer: **${entryCount}**`
                 )
-                .setColor('#2f3136')
-                .setFooter({ text: `ID: ${giveaway.id} • Beendet` })
+                .setColor('#2f3136') // fest je Zustand (G-09 Ebene 3)
+                .setFooter({ text: `ID: ${giveaway.id} • Beendet`, iconURL: (await Gestaltung.bilder(giveaway.guild_id)).logo || undefined })
                 .setTimestamp(new Date());
 
             const button = new ButtonBuilder()
@@ -1221,8 +1226,8 @@ class GiveawayManager {
                     `👥 Teilnehmer: **${entryCount}**\n\n` +
                     `⏳ Gewinner müssen innerhalb von **${claimMinutes} Minuten** auf "Beanspruchen" klicken!`
                 )
-                .setColor('#f59e0b')
-                .setFooter({ text: `ID: ${giveaway.id} • Claim läuft` })
+                .setColor(giveaway.embed_color || await Gestaltung.farbe(giveaway.guild_id, 'akzent', 'giveaway'))
+                .setFooter({ text: `ID: ${giveaway.id} • Claim läuft`, iconURL: (await Gestaltung.bilder(giveaway.guild_id)).logo || undefined })
                 .setTimestamp(new Date());
 
             const claimButton = new ButtonBuilder()
@@ -1293,7 +1298,7 @@ class GiveawayManager {
                 const embed = new EmbedBuilder()
                     .setTitle('🎉 Du hast gewonnen!')
                     .setDescription(desc)
-                    .setColor('#f59e0b')
+                    .setColor(await Gestaltung.farbe(giveaway.guild_id, 'akzent', 'giveaway'))
                     .setTimestamp();
                 await user.send({ embeds: [embed] }).catch(() => {});
             } catch (e) { /* DMs disabled */ }

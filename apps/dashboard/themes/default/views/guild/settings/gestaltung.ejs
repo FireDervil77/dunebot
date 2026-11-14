@@ -1,0 +1,215 @@
+<%#
+  Einstellungen → Gestaltung (G-09, K382, 2026-11-14)
+
+  Palette, Logo und Banner der Bot-Ausgaben dieser Guild. Die Seite kennt
+  keine Plugins außer in der Liste „Diese Plugins weichen ab“ (nur
+  eingeschaltete mit eigenen Farben). Speichern: PUT auf dieselbe Adresse,
+  Recht CORE.SETTINGS.EDIT, in der Kontroll-Guild nur der Besitzer.
+
+  context: guildId, gestaltung (GestaltungSeite.seite), ladefehler, darf, gesperrt
+%>
+<%
+const _t = (k, o) => tr('core:GESTALTUNG.' + k, o);
+const _g = (typeof gestaltung !== 'undefined' && gestaltung) ? gestaltung : null;
+const _darf = typeof darf !== 'undefined' && darf;
+const _gesperrt = typeof gesperrt !== 'undefined' && gesperrt;
+const _aus = _darf ? '' : 'disabled';
+%>
+<% if (typeof ladefehler !== 'undefined' && ladefehler) { %>
+  <div class="alert alert-danger"><i class="fa-solid fa-triangle-exclamation me-2"></i><%= _t('LADEFEHLER', { grund: ladefehler }) %></div>
+<% } else if (_g) { %>
+
+<% if (!_darf) { %>
+  <div class="alert alert-warning">
+    <i class="fa-solid fa-lock me-2"></i>
+    <%= _gesperrt ? _t('NUR_LESEN_KONTROLLE') : _t('NUR_LESEN_RECHT', { recht: 'CORE.SETTINGS.EDIT' }) %>
+  </div>
+<% } %>
+
+<div class="row" id="gestaltung"
+     data-adresse="/guild/<%= guildId %>/settings/gestaltung"
+     data-text-gespeichert="<%= _t('GESPEICHERT') %>"
+     data-text-vorgabe="<%= _t('VORGABE') %>">
+  <div class="col-lg-7">
+    <div class="card mb-4">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fa-solid fa-palette me-2"></i><%= _t('FARBEN') %></h3>
+      </div>
+      <div class="card-body">
+        <p class="text-secondary"><%= _t('TEXT') %></p>
+        <p class="text-secondary small"><%= _t('FARBEN_TEXT') %></p>
+        <% _g.farben.forEach(f => { %>
+          <div class="mb-3" data-farbrolle="<%= f.rolle %>" data-vorgabe="<%= f.vorgabe %>">
+            <label class="form-label" for="farbe-<%= f.rolle %>"><%= _t('ROLLE_' + f.rolle.toUpperCase()) %></label>
+            <div class="input-group">
+              <input type="color" class="form-control form-control-color" aria-label="<%= _t('ROLLE_' + f.rolle.toUpperCase()) %>"
+                     value="<%= f.wert || f.vorgabe %>" data-farbwahl <%= _aus %>>
+              <input type="text" class="form-control font-monospace" id="farbe-<%= f.rolle %>" maxlength="7"
+                     value="<%= f.wert || '' %>" placeholder="<%= _t('VORGABE') %> <%= f.vorgabe %>" data-farbtext <%= _aus %>>
+              <button type="button" class="btn" data-farbe-vorgabe <%= _aus %>>
+                <i class="fa-solid fa-rotate-left me-1"></i><%= _t('VORGABE_KNOPF') %>
+              </button>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+    </div>
+
+    <div class="card mb-4">
+      <div class="card-body">
+        <% [['logo', 'fa-certificate', _g.logo], ['banner', 'fa-panorama', _g.banner]].forEach(([art, symbol, bild]) => { %>
+          <div class="mb-4">
+            <label class="form-label" for="bild-<%= art %>"><%= _t(art.toUpperCase()) %></label>
+            <div class="d-flex align-items-center gap-3">
+              <div class="border rounded d-flex align-items-center justify-content-center overflow-hidden"
+                   style="width: <%= art === 'logo' ? 64 : 160 %>px; height: 64px;"
+                   data-medienwahl-vorschau="bild-<%= art %>" data-medienwahl-leer="<%= symbol %>"></div>
+              <div class="flex-fill">
+                <input type="hidden" id="bild-<%= art %>" value="<%= bild ? bild.adresse : '' %>" data-bild="<%= art %>">
+                <div class="small text-secondary mb-2" data-bild-name="<%= art %>"><%= bild ? bild.datei : '' %></div>
+                <div class="btn-list">
+                  <button type="button" class="btn btn-sm" data-medienwahl="bild-<%= art %>" <%= _aus %>>
+                    <i class="fa-solid fa-image me-1"></i><%= _t('BILD_WAEHLEN') %>
+                  </button>
+                  <button type="button" class="btn btn-sm btn-ghost-danger" data-bild-weg="bild-<%= art %>" <%= _aus %>>
+                    <i class="fa-solid fa-xmark me-1"></i><%= _t('BILD_ENTFERNEN') %>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="form-hint"><%= _t(art.toUpperCase() + '_TEXT') %></div>
+          </div>
+        <% }); %>
+      </div>
+    </div>
+
+    <% if (_darf) { %>
+      <button type="button" class="btn btn-primary mb-4" id="gestaltungSpeichern">
+        <i class="fa-solid fa-floppy-disk me-2"></i><%= _t('SPEICHERN') %>
+      </button>
+    <% } %>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card mb-4">
+      <div class="card-header"><h3 class="card-title"><i class="fa-solid fa-eye me-2"></i><%= _t('VORSCHAU') %></h3></div>
+      <div class="card-body">
+        <%# Nachbildung einer Discord-Nachricht: Farbleiste links, Banner unten, Logo in der Fußzeile. %>
+        <div class="rounded p-3" style="background: #2b2d31; color: #dbdee1; border-left: 4px solid var(--gestaltung-akzent, #3498db);" id="gestaltungVorschau">
+          <div class="fw-bold mb-1" style="color: #f2f3f5;"><%= _t('VORSCHAU_TITEL') %></div>
+          <div class="small mb-2"><%= _t('VORSCHAU_TEXT') %></div>
+          <img alt="" class="rounded w-100 mb-2 d-none" style="max-height: 140px; object-fit: cover;" data-vorschau-banner>
+          <div class="d-flex align-items-center gap-2 small" style="color: #b5bac1;">
+            <img alt="" class="rounded-circle d-none" style="width: 20px; height: 20px; object-fit: cover;" data-vorschau-logo>
+            <span>FireBot</span>
+          </div>
+        </div>
+        <div class="d-flex flex-wrap gap-2 mt-3">
+          <% _g.farben.forEach(f => { %>
+            <span class="badge" style="background: <%= f.wert || f.vorgabe %>; color: #fff;" data-vorschau-rolle="<%= f.rolle %>"><%= _t('ROLLE_' + f.rolle.toUpperCase()) %></span>
+          <% }); %>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-4">
+      <div class="card-header"><h3 class="card-title"><i class="fa-solid fa-puzzle-piece me-2"></i><%= _t('ABWEICHEND') %></h3></div>
+      <div class="card-body">
+        <% if (!_g.abweichend.length) { %>
+          <p class="text-secondary mb-0"><%= _t('ABWEICHEND_LEER') %></p>
+        <% } else { %>
+          <p class="text-secondary small"><%= _t('ABWEICHEND_TEXT') %></p>
+          <div class="list-group list-group-flush">
+            <% _g.abweichend.forEach(p => { %>
+              <a href="<%= p.adresse %>" class="list-group-item list-group-item-action d-flex align-items-center gap-2">
+                <span class="flex-fill"><%= p.name %></span>
+                <% p.farben.forEach(f => { %>
+                  <span class="rounded" style="display:inline-block; width: 16px; height: 16px; background: <%= f.wert || '#888888' %>;" title="<%= _t('ROLLE_' + f.rolle.toUpperCase()) %>"></span>
+                <% }); %>
+                <i class="fa-solid fa-arrow-right text-secondary" title="<%= _t('ZUM_PLUGIN') %>"></i>
+              </a>
+            <% }); %>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('shared/medienwahl', { guildId, ordner: 'general' }) %>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var wurzel = document.getElementById('gestaltung');
+  if (!wurzel) return;
+  var HEX = /^#[0-9a-fA-F]{6}$/;
+
+  function zeichne() {
+    wurzel.querySelectorAll('[data-farbrolle]').forEach(function (z) {
+      var text = z.querySelector('[data-farbtext]');
+      var wahl = z.querySelector('[data-farbwahl]');
+      var wert = text.value.trim();
+      var wirksam = HEX.test(wert) ? wert : z.dataset.vorgabe;
+      if (!wert) wahl.value = z.dataset.vorgabe;
+      var marke = document.querySelector('[data-vorschau-rolle="' + z.dataset.farbrolle + '"]');
+      if (marke) marke.style.background = wirksam;
+      if (z.dataset.farbrolle === 'akzent') document.getElementById('gestaltungVorschau').style.setProperty('--gestaltung-akzent', wirksam);
+    });
+    [['logo', '[data-vorschau-logo]'], ['banner', '[data-vorschau-banner]']].forEach(function (p) {
+      var feld = document.getElementById('bild-' + p[0]);
+      var img = document.querySelector(p[1]);
+      var url = feld.value.trim();
+      img.classList.toggle('d-none', !url);
+      if (url) img.src = url; else img.removeAttribute('src');
+    });
+  }
+
+  wurzel.querySelectorAll('[data-farbrolle]').forEach(function (z) {
+    var text = z.querySelector('[data-farbtext]');
+    var wahl = z.querySelector('[data-farbwahl]');
+    wahl.addEventListener('input', function () { text.value = wahl.value; zeichne(); });
+    text.addEventListener('input', function () { if (HEX.test(text.value.trim())) wahl.value = text.value.trim(); zeichne(); });
+    z.querySelector('[data-farbe-vorgabe]').addEventListener('click', function () { text.value = ''; zeichne(); });
+  });
+  document.querySelectorAll('[data-bild]').forEach(function (feld) {
+    feld.addEventListener('input', function () {
+      var name = document.querySelector('[data-bild-name="' + feld.dataset.bild + '"]');
+      if (name) name.textContent = feld.value ? feld.value.split('/').pop() : '';
+      zeichne();
+    });
+  });
+  document.querySelectorAll('[data-bild-weg]').forEach(function (k) {
+    k.addEventListener('click', function () {
+      var feld = document.getElementById(k.dataset.bildWeg);
+      feld.value = '';
+      feld.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  });
+  zeichne();
+
+  var knopf = document.getElementById('gestaltungSpeichern');
+  if (!knopf) return;
+  knopf.addEventListener('click', async function () {
+    var farben = {};
+    wurzel.querySelectorAll('[data-farbrolle]').forEach(function (z) { farben[z.dataset.farbrolle] = z.querySelector('[data-farbtext]').value.trim(); });
+    knopf.disabled = true;
+    try {
+      var r = await fetch(wurzel.dataset.adresse, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json', 'Accept': 'application/json',
+          'X-CSRF-Token': (document.querySelector('meta[name="csrf-token"]') || {}).content || ''
+        },
+        body: JSON.stringify({ farben: farben, logo: document.getElementById('bild-logo').value, banner: document.getElementById('bild-banner').value })
+      });
+      var a = await r.json().catch(function () { return { success: false, message: 'HTTP ' + r.status }; });
+      if (!a.success) throw new Error(a.message || ('HTTP ' + r.status));
+      showToast('success', wurzel.dataset.textGespeichert);
+    } catch (e) {
+      showToast('error', e.message);
+    }
+    knopf.disabled = false;
+  });
+});
+</script>
+<% } %>

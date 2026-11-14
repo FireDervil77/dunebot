@@ -1,5 +1,6 @@
 const { ApplicationCommandOptionType } = require('discord.js');
 const klangfilter = require('../klangfilter');
+const { farbig, faerbe } = require('../farben');
 const { holen: vorschlaegeHolen } = require('../quellen/vorschlaege');
 
 const play = require('./sub/_play');
@@ -262,7 +263,7 @@ module.exports = {
             textKanalId: message.channelId
         });
 
-        await message.reply(antwort);
+        await message.reply(await faerbe(antwort, message.guildId));
     },
 
     async interactionRun({ interaction }) {
@@ -290,7 +291,7 @@ module.exports = {
             textKanalId: interaction.channelId
         });
 
-        await interaction.followUp(antwort);
+        await interaction.followUp(await faerbe(antwort, interaction.guildId));
     },
 
     /**
@@ -468,7 +469,7 @@ async function ausfuehren(unterbefehl, mitglied, o) {
         default:
             return {
                 embeds: [{
-                    color: 0xF59F00,
+                    ...farbig('warnung'),
                     description: 'Unbekannter Unterbefehl. Nutze `/music` und wähle aus der Liste.'
                 }]
             };

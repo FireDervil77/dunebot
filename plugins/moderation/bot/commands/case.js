@@ -1,5 +1,6 @@
 const { EmbedBuilder, ApplicationCommandOptionType } = require("discord.js");
 const { getCase } = require("../utils");
+const { Gestaltung } = require("dunebot-sdk");
 
 /**
  * @type {import('dunebot-sdk').CommandType}
@@ -51,7 +52,7 @@ async function showCase(guild, caseNumber) {
 
     const embed = new EmbedBuilder()
         .setAuthor({ name: `Case #${caseData.case_number} — ${caseData.type}` })
-        .setColor(getTypeColor(caseData.type))
+        .setColor(getTypeColor(caseData.type) || await Gestaltung.farbe(guild.id, "akzent", "moderation"))
         .addFields(
             { name: "User", value: `<@${caseData.member_id}> (${caseData.member_id})`, inline: true },
             { name: "Moderator", value: `<@${caseData.admin_id}> (${caseData.admin_tag})`, inline: true },
@@ -84,5 +85,6 @@ function getTypeColor(type) {
         DISCONNECT: "#E91E63",
         MOVE: "#9C27B0",
     };
-    return colors[type] || "#607D8B";
+    // Fest je Aktion (G-09 Ebene 3). Alles andere nimmt „Akzent“ von moderation.
+    return colors[type] || null;
 }

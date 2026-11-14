@@ -11,8 +11,10 @@
 
 const GuildPlayer = require('./managers/GuildPlayer');
 
-/** Farbe der Antwort-Embeds. */
-const FARBE = 0x1DB954;
+const { farbig } = require('./farben');
+
+/** Art der Antwort → Farbrolle (G-09). */
+const ROLLE_JE_ART = { ok: 'akzent', warnung: 'warnung', fehler: 'gefahr' };
 
 /**
  * Eine einfache Antwort als Embed.
@@ -22,8 +24,7 @@ const FARBE = 0x1DB954;
  * @returns {Object} Nachricht
  */
 function antwort(text, art = 'ok') {
-    const farben = { ok: FARBE, warnung: 0xF59F00, fehler: 0xD63939 };
-    return { embeds: [{ color: farben[art] ?? FARBE, description: text }] };
+    return { embeds: [{ ...farbig(ROLLE_JE_ART[art] || 'akzent'), description: text }] };
 }
 
 /**
@@ -116,4 +117,4 @@ function hinweisText(hinweis) {
     return HINWEISE[hinweis] || 'Das hat nicht geklappt.';
 }
 
-module.exports = { FARBE, antwort, pruefen, dauerText, titelZeile, spielzeitText, hinweisText };
+module.exports = { farbig, antwort, pruefen, dauerText, titelZeile, spielzeitText, hinweisText };

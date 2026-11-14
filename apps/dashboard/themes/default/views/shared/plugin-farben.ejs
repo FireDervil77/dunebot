@@ -1,0 +1,159 @@
+<%
+/**
+ * Farben dieses Plugins — Kern-Teil (G-09, 2026-11-14).
+ *
+ * Schalter „Farben des Servers nutzen“ (Vorgabe an) oder eigene Werte für die
+ * Rollen, die das Plugin in seiner package.json unter `farben` erklärt.
+ * Schnittstellen: GET/PUT /guild/ID/settings/gestaltung/plugin/PLUGIN
+ * (ansehen mit Zugang zur Guild, ändern mit dem Recht aus `farben.recht`,
+ * in der Kontroll-Guild nur der Besitzer).
+ *
+ * Aufruf, AUSSERHALB eines anderen Formulars (eigener Speichern-Knopf):
+ *
+ *     include('shared/plugin-farben', { guildId, tr, plugin: 'music' })
+ *
+ * Die Karte wird per Skript gefüllt. Schlägt das Laden fehl, steht der Grund
+ * in der Karte.
+ */
+const _plugin = typeof plugin !== 'undefined' ? plugin : '';
+const _t = (k, o) => tr('core:GESTALTUNG.' + k, o);
+%>
+<div class="card mt-3" data-plugin-farben="<%= _plugin %>"
+     data-adresse="/guild/<%= guildId %>/settings/gestaltung/plugin/<%= _plugin %>"
+     data-text-rolle-akzent="<%= _t('ROLLE_AKZENT') %>"
+     data-text-rolle-erfolg="<%= _t('ROLLE_ERFOLG') %>"
+     data-text-rolle-hinweis="<%= _t('ROLLE_HINWEIS') %>"
+     data-text-rolle-warnung="<%= _t('ROLLE_WARNUNG') %>"
+     data-text-rolle-gefahr="<%= _t('ROLLE_GEFAHR') %>"
+     data-text-vom-server="<%= _t('PLUGIN_VOM_SERVER') %>"
+     data-text-vorgabe="<%= _t('PLUGIN_VORGABE') %>"
+     data-text-speichern="<%= _t('SPEICHERN') %>"
+     data-text-gespeichert="<%= _t('GESPEICHERT') %>"
+     data-text-kontrolle="<%= _t('NUR_LESEN_KONTROLLE') %>"
+     data-text-kein-recht="<%= _t('NUR_LESEN_RECHT') %>"
+     data-text-ladefehler="<%= _t('LADEFEHLER') %>">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fa-solid fa-palette me-2"></i><%= _t('PLUGIN_TITEL') %></h3>
+  </div>
+  <div class="card-body">
+    <label class="form-check form-switch mb-2">
+      <input class="form-check-input" type="checkbox" data-plugin-farben-schalter checked disabled>
+      <span class="form-check-label"><%= _t('PLUGIN_SCHALTER') %></span>
+    </label>
+    <p class="text-secondary small"><%= _t('PLUGIN_TEXT') %>
+      <a href="/guild/<%= guildId %>/settings/gestaltung"><%= _t('PLUGIN_ZUR_GESTALTUNG') %></a></p>
+    <div data-plugin-farben-liste><div class="text-secondary"><i class="fa-solid fa-spinner fa-spin me-2"></i></div></div>
+    <div data-plugin-farben-hinweis></div>
+    <button type="button" class="btn btn-primary mt-2 d-none" data-plugin-farben-speichern>
+      <i class="fa-solid fa-floppy-disk me-1"></i><%= _t('SPEICHERN') %>
+    </button>
+  </div>
+</div>
+<script>
+(function () {
+  var karte = document.currentScript.previousElementSibling;
+  if (!karte || !karte.hasAttribute('data-plugin-farben')) return;
+  var liste = karte.querySelector('[data-plugin-farben-liste]');
+  var hinweis = karte.querySelector('[data-plugin-farben-hinweis]');
+  var schalter = karte.querySelector('[data-plugin-farben-schalter]');
+  var knopf = karte.querySelector('[data-plugin-farben-speichern]');
+  var adresse = karte.dataset.adresse;
+  var HEX = /^#[0-9a-fA-F]{6}$/;
+  var stand = null;
+
+  function text(name, werte) {
+    var t = karte.dataset['text' + name] || '';
+    Object.keys(werte || {}).forEach(function (k) { t = t.split('{{' + k + '}}').join(String(werte[k])); });
+    return t;
+  }
+  function rollenText(r) { return text('Rolle' + r.charAt(0).toUpperCase() + r.slice(1)); }
+  function melde(art, t) {
+    if (typeof showToast === 'function') showToast(art, t);
+    else if (window.GuildAjaxHandler && GuildAjaxHandler.showToast) GuildAjaxHandler.showToast(art, t);
+  }
+
+  function zeichne() {
+    liste.innerHTML = '';
+    var eigen = !schalter.checked;
+    stand.rollen.forEach(function (r) {
+      var z = document.createElement('div');
+      z.className = 'mb-3';
+      z.dataset.rolle = r.rolle;
+      var label = document.createElement('label');
+      label.className = 'form-label';
+      label.textContent = rollenText(r.rolle);
+      var gruppe = document.createElement('div');
+      gruppe.className = 'input-group';
+      var wahl = document.createElement('input');
+      wahl.type = 'color'; wahl.className = 'form-control form-control-color';
+      wahl.setAttribute('aria-label', rollenText(r.rolle));
+      var feld = document.createElement('input');
+      feld.type = 'text'; feld.className = 'form-control font-monospace'; feld.maxLength = 7;
+      var wert = eigen ? (r.wert || r.guild) : r.guild;
+      wahl.value = wert; feld.value = wert;
+      wahl.disabled = feld.disabled = !eigen || !stand.darf;
+      wahl.addEventListener('input', function () { feld.value = wahl.value; });
+      feld.addEventListener('input', function () { if (HEX.test(feld.value.trim())) wahl.value = feld.value.trim(); });
+      gruppe.append(wahl, feld);
+      var hint = document.createElement('div');
+      hint.className = 'form-hint';
+      hint.textContent = eigen ? (text('Vorgabe') + ' ' + r.vorgabe) : (r.vonGuild ? text('VomServer') : text('Vorgabe'));
+      z.append(label, gruppe, hint);
+      liste.appendChild(z);
+    });
+  }
+
+  function uebernimm(daten) {
+    stand = daten;
+    schalter.checked = !daten.eigen;
+    schalter.disabled = !daten.darf;
+    knopf.classList.toggle('d-none', !daten.darf);
+    hinweis.innerHTML = '';
+    if (!daten.darf) {
+      var d = document.createElement('div');
+      d.className = 'form-hint';
+      d.textContent = daten.gesperrt ? text('Kontrolle') : text('KeinRecht', { recht: daten.recht });
+      hinweis.appendChild(d);
+    }
+    zeichne();
+  }
+
+  schalter.addEventListener('change', zeichne);
+  knopf.addEventListener('click', async function () {
+    var farben = {};
+    liste.querySelectorAll('[data-rolle]').forEach(function (z) { farben[z.dataset.rolle] = z.querySelector('input[type=text]').value.trim(); });
+    knopf.disabled = true;
+    try {
+      var r = await fetch(adresse, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json', 'Accept': 'application/json',
+          'X-CSRF-Token': (document.querySelector('meta[name="csrf-token"]') || {}).content || ''
+        },
+        body: JSON.stringify({ eigen: !schalter.checked, farben: farben })
+      });
+      var a = await r.json().catch(function () { return { success: false, message: 'HTTP ' + r.status }; });
+      if (!a.success) throw new Error(a.message || 'HTTP ' + r.status);
+      uebernimm(Object.assign({}, a.data, { darf: stand.darf, gesperrt: stand.gesperrt }));
+      melde('success', text('Gespeichert'));
+    } catch (e) {
+      melde('error', e.message);
+    }
+    knopf.disabled = false;
+  });
+
+  fetch(adresse, { headers: { 'Accept': 'application/json' } })
+    .then(function (r) { return r.json().catch(function () { return { success: false, message: 'HTTP ' + r.status }; }); })
+    .then(function (a) {
+      if (!a.success) throw new Error(a.message || '?');
+      uebernimm(a.data);
+    })
+    .catch(function (e) {
+      liste.innerHTML = '';
+      var d = document.createElement('div');
+      d.className = 'text-danger';
+      d.textContent = text('Ladefehler', { grund: e.message });
+      liste.appendChild(d);
+    });
+})();
+</script>

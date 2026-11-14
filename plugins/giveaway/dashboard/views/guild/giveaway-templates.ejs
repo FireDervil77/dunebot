@@ -73,3 +73,6 @@
 <% } %>
 
 <%- include('partials/giveaway-modals', { tr, channels: [], roles: [], vorlagen, streamWeg: false, nur: ['vorlage'] }) %>
+
+<%# Farben (G-09): Kern-Teil. Giveaway hat keine Einstellungsseite; die Farben stehen bei den Vorlagen, weil sie das Aussehen der Verlosungen bestimmen. Pausiert und beendet bleiben fest. %>
+<%- include('shared/plugin-farben', { guildId, tr, plugin: 'giveaway' }) %>

@@ -1,6 +1,7 @@
 const { EmbedBuilder, GuildMember } = require("discord.js");
 const { MiscUtils, Logger } = require("dunebot-sdk/utils");
 const { ServiceManager, parsePlaceholders } = require('dunebot-core');
+const { Gestaltung } = require('dunebot-sdk');
 const path = require('path');
 const fs = require('fs');
 
@@ -397,13 +398,17 @@ const logModeration = async (issuer, target, reason, type, data = {}) => {
                     : `Du wurdest auf **${guild.name}** ${getActionVerb(type)}.`;
 
                 const dmEmbed = new EmbedBuilder()
-                    .setColor(embed.data.color || config["EMBED_COLORS"].DEFAULT)
+                    // Farbe der Aktion, sonst „Akzent“ von moderation (G-09). Bis
+                    // 2026-11-14 stand hier `EMBED_COLORS.DEFAULT`, den es nie gab:
+                    // Eine Verwarnung kam ohne Farbe an.
+                    .setColor(embed.data.color || await Gestaltung.farbe(guild.id, "akzent", "moderation"))
                     .setTitle(`${getActionEmoji(type)} Moderation: ${type}`)
                     .setDescription(dmDescription)
                     .addFields(
                         { name: "Grund", value: reason || "Kein Grund angegeben", inline: false }
                     )
-                    .setFooter({ text: guild.name, iconURL: guild.iconURL() })
+                    // Logo der Gestaltung (G-09), sonst wie bisher das Server-Bild.
+                    .setFooter({ text: guild.name, iconURL: (await Gestaltung.bilder(guild.id)).logo || guild.iconURL() })
                     .setTimestamp();
                 
                 // Bei Timeout: Ablaufzeit hinzufügen

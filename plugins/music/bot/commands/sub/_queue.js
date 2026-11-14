@@ -1,4 +1,4 @@
-const { FARBE, antwort, pruefen, titelZeile, dauerText, spielzeitText } = require('../../utils');
+const { farbig, antwort, pruefen, titelZeile, dauerText, spielzeitText } = require('../../utils');
 
 /** So viele Titel passen auf eine Seite. */
 const PRO_SEITE = 10;
@@ -46,5 +46,5 @@ module.exports = async (mitglied, seite = 1) => {
         zustand.filter !== 'aus' ? `Filter: ${zustand.filter}` : null
     ].filter(Boolean).join(' · ');
 
-    return { embeds: [{ color: FARBE, title: 'Warteschlange', fields: felder, footer: { text: fuss } }] };
+    return { embeds: [{ ...farbig('akzent'), title: 'Warteschlange', fields: felder, footer: { text: fuss } }] };
 };

@@ -41,5 +41,14 @@
         "music_queue": {
             "requested_by": "anonymisieren"
         }
+    },
+    "farben": {
+        "recht": "MUSIC.SETTINGS.EDIT",
+        "seite": "/settings",
+        "rollen": {
+            "akzent": "#1db954",
+            "warnung": "#f59f00",
+            "gefahr": "#d63939"
+        }
     }
 }

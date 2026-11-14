@@ -1,4 +1,5 @@
 const ems = require('enhanced-ms');
+const { Gestaltung } = require('dunebot-sdk');
 
 /**
  * /giveaway template create <name>
@@ -33,7 +34,7 @@ module.exports = async (member, action, name, options = {}) => {
             return { embeds: [{
                 title: guild.getT('giveaways:TEMPLATE_LIST_TITLE'),
                 description: entries,
-                color: 0xf59e0b,
+                color: await Gestaltung.farbe(guild.id, 'akzent', 'giveaway'),
             }] };
         }
 
@@ -51,7 +52,8 @@ module.exports = async (member, action, name, options = {}) => {
                 prize: options.prize,
                 duration: durationMs,
                 winnerCount: parseInt(options.winnerCount) || 1,
-                embedColor: options.embedColor || '#f59e0b',
+                // Leer = Akzent von giveaway beim Start (G-09).
+                embedColor: options.embedColor || null,
                 buttonEmoji: '🎁',
             };
 

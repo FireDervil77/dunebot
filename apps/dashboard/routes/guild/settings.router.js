@@ -10,7 +10,7 @@
 const express = require('express');
 const router = express.Router({ mergeParams: true });
 const { ServiceManager } = require('dunebot-core');
-const { requirePermission, requireGuildOwner } = require('../../middlewares/permissions.middleware');
+const { requirePermission, requireGuildOwner, requireBesitzerInKontrollGuild, istKontrollGuildGesperrt } = require('../../middlewares/permissions.middleware');
 const { csrfProtection } = require('../../middlewares/security/csrf-protection.middleware');
 const Datenauskunft = require('../../helpers/Datenauskunft');
 const { istAn } = require('dunebot-sdk/utils');
@@ -389,6 +389,103 @@ router.put('/aufbewahrung/:plugin', async (req, res) => {
             res.status(500).json({ success: false, message: err.message });
         }
     });
+});
+
+// =============================================
+// GESTALTUNG (G-09)
+// Palette, Logo und Banner der Bot-Ausgaben unter Einstellungen → Gestaltung,
+// dazu der Kern-Teil `shared/plugin-farben` auf den Seiten der Plugins.
+// Schreiben: das Recht, und in der Kontroll-Guild nur der Besitzer
+// (`requireBesitzerInKontrollGuild`). Wie eine Farbe wirkt, steht in
+// `packages/dunebot-sdk/lib/Gestaltung.js`.
+// =============================================
+
+const GestaltungSeite = require('../../helpers/GestaltungSeite');
+
+/** Darf der Nutzer hier schreiben? Recht und Kontroll-Guild, für die Anzeige. */
+async function darfGestalten(req, guildId, recht) {
+    const userId = req.session.user?.info?.id;
+    if (!userId) return { darf: false, gesperrt: false };
+    const gesperrt = await istKontrollGuildGesperrt(guildId, userId);
+    const hat = await ServiceManager.get('permissionManager').hasPermission(userId, guildId, recht);
+    return { darf: Boolean(hat) && !gesperrt, gesperrt };
+}
+
+// GET /settings/gestaltung → Seite
+router.get('/gestaltung', requirePermission('CORE.SETTINGS.VIEW'), async (req, res) => {
+    const themeManager = ServiceManager.get('themeManager');
+    const guildId = res.locals.guildId;
+    let gestaltung = null;
+    let ladefehler = null;
+    try {
+        gestaltung = await GestaltungSeite.seite(guildId);
+    } catch (err) {
+        ServiceManager.get('Logger').error(`[Gestaltung] Seite für ${guildId} nicht lesbar:`, err);
+        ladefehler = err.message;
+    }
+    const zugang = await darfGestalten(req, guildId, 'CORE.SETTINGS.EDIT');
+    await themeManager.renderView(res, 'guild/settings/gestaltung', {
+        title: 'Gestaltung',
+        activeMenu: `/guild/${guildId}/settings/gestaltung`,
+        guildId,
+        gestaltung,
+        ladefehler,
+        darf: zugang.darf,
+        gesperrt: zugang.gesperrt,
+    });
+});
+
+// PUT /settings/gestaltung { farben: {rolle: hex|''}, logo, banner }
+router.put('/gestaltung', csrfProtection, requirePermission('CORE.SETTINGS.EDIT'), requireBesitzerInKontrollGuild(), async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const guildId = res.locals.guildId;
+    try {
+        await GestaltungSeite.speichereGuild(guildId, req.body || {});
+        Logger.info(`[Gestaltung] Palette von ${guildId} gespeichert (von ${req.session.user.info.id})`);
+        res.json({ success: true, data: await GestaltungSeite.seite(guildId) });
+    } catch (err) {
+        if (err instanceof GestaltungSeite.Eingabefehler) return res.status(400).json({ success: false, message: err.message });
+        Logger.error(`[Gestaltung] Palette von ${guildId} nicht gespeichert:`, err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// GET /settings/gestaltung/plugin/:plugin → Kern-Teil „Farben dieses Plugins“
+router.get('/gestaltung/plugin/:plugin', async (req, res) => {
+    const guildId = res.locals.guildId;
+    const plugin = String(req.params.plugin);
+    if (!PLUGIN_NAME.test(plugin)) return res.status(400).json({ success: false, message: 'Unbekanntes Plugin' });
+    try {
+        const teil = await GestaltungSeite.pluginTeil(guildId, plugin);
+        const zugang = await darfGestalten(req, guildId, teil.recht);
+        res.json({ success: true, data: { ...teil, darf: zugang.darf, gesperrt: zugang.gesperrt } });
+    } catch (err) {
+        if (err instanceof GestaltungSeite.Eingabefehler) return res.status(404).json({ success: false, message: err.message });
+        ServiceManager.get('Logger').error(`[Gestaltung] Farben von ${plugin} für ${guildId} nicht lesbar:`, err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// PUT /settings/gestaltung/plugin/:plugin { eigen, farben }
+router.put('/gestaltung/plugin/:plugin', csrfProtection, async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const guildId = res.locals.guildId;
+    const plugin = String(req.params.plugin);
+    if (!PLUGIN_NAME.test(plugin)) return res.status(400).json({ success: false, message: 'Unbekanntes Plugin' });
+    const recht = require('dunebot-sdk').Gestaltung.erklaerung(plugin)?.recht;
+    if (!recht) return res.status(404).json({ success: false, message: `${plugin} erklärt keine Farben` });
+    // Das Recht steht in der Erklärung des Plugins, also erst hier bekannt.
+    return requirePermission(recht)(req, res, () => requireBesitzerInKontrollGuild()(req, res, async () => {
+        try {
+            await GestaltungSeite.speicherePlugin(guildId, plugin, { eigen: req.body?.eigen === true, farben: req.body?.farben });
+            Logger.info(`[Gestaltung] Farben von ${plugin} in ${guildId}: ${req.body?.eigen === true ? 'eigene' : 'der Guild'} (von ${req.session.user.info.id})`);
+            res.json({ success: true, data: await GestaltungSeite.pluginTeil(guildId, plugin) });
+        } catch (err) {
+            if (err instanceof GestaltungSeite.Eingabefehler) return res.status(400).json({ success: false, message: err.message });
+            Logger.error(`[Gestaltung] Farben von ${plugin} in ${guildId} nicht gespeichert:`, err);
+            res.status(500).json({ success: false, message: err.message });
+        }
+    }));
 });
 
 // =============================================

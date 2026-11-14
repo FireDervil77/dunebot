@@ -1,4 +1,5 @@
 const { ServiceManager } = require('dunebot-core');
+const { Gestaltung } = require('dunebot-sdk');
 
 /**
  * /giveaway blacklist add <user> [reason]
@@ -30,7 +31,7 @@ module.exports = async (member, action, targetUserId, reason) => {
             return { embeds: [{
                 title: guild.getT('giveaways:BLACKLIST_TITLE'),
                 description: entries,
-                color: 0xff4444,
+                color: await Gestaltung.farbe(guild.id, 'gefahr', 'giveaway'),
             }] };
         }
 

@@ -1,5 +1,6 @@
 const { EmbedBuilder, ApplicationCommandOptionType } = require("discord.js");
 const { getHistory } = require("../utils");
+const { Gestaltung } = require("dunebot-sdk");
 
 /**
  * @type {import('dunebot-sdk').CommandType}
@@ -78,7 +79,7 @@ async function showHistory(guild, user, limit = 25) {
     const embed = new EmbedBuilder()
         .setAuthor({ name: guild.getT("moderation:HISTORY.TITLE", { target: user.username }) })
         .setThumbnail(user.displayAvatarURL())
-        .setColor("#607D8B")
+        .setColor(await Gestaltung.farbe(guild.id, "akzent", "moderation"))
         .setDescription(description.length > 4000 ? description.substring(0, 4000) + "\n…" : description)
         .setFooter({ text: guild.getT("moderation:HISTORY.FOOTER", { count: logs.length.toString() }) });
 

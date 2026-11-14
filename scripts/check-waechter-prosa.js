@@ -76,6 +76,7 @@ const BEKANNT = new Set([
     'check-wartung.js',              // statisches HTML der Wartungsseite und die gebaute Seite, kein JavaScript (2026-11-07)
     'check-rootserver-loeschen.js',  // schneidet am EJS-Kommentar „Sperre (K375)“ aus und rendert die echte Vorlage; Grund an der Stelle (2026-11-12)
     'check-aufbewahrung.js',         // liest nur JSON roh (permissions.json, Sprachdateien), JSON hat keine Kommentare; Grund an der Stelle (2026-11-14)
+    'check-gestaltung.js',           // JSON roh (permissions.json, config.json); Gegenproben kopieren die ganze SDK-Datei; Gründe an der Stelle (2026-11-14)
     'check-adminlte.js',
     'check-anlagenkonten.js',
     'check-chatabos.js',

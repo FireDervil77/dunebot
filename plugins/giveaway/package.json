@@ -61,5 +61,13 @@
             "recht": "GIVEAWAY.MANAGE",
             "titel": "giveaway:AUFBEWAHRUNG.SPERREN"
         }
-    ]
+    ],
+    "farben": {
+        "recht": "GIVEAWAY.MANAGE",
+        "seite": "/vorlagen",
+        "rollen": {
+            "akzent": "#f59e0b",
+            "gefahr": "#ff4444"
+        }
+    }
 }

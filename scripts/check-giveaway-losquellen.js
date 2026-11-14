@@ -103,6 +103,11 @@ ServiceManager.register('dbService', {
         if (s.startsWith('SELECT COALESCE(SUM(entry_count)')) {
             return [{ total: daten.eintraege.length }];
         }
+        // Gestaltung der Guild (G-09, SDK `Gestaltung`): keine Zeilen, also
+        // gelten die Vorgaben von giveaway. Das Ergebnis prüft check-gestaltung.
+        if (s.includes('FROM guild_gestaltung g')) {
+            return [];
+        }
         if (s.startsWith('UPDATE giveaways') || s.startsWith('SELECT id FROM giveaway_blacklist')) {
             return [];
         }

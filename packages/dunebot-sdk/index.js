@@ -27,6 +27,7 @@ const FormAntwort = require("./lib/FormAntwort");
 const Nachbar = require("./lib/nachbar");
 const Ereignisse = require("./ereignisse");
 const Zeitplan = require("./lib/Zeitplan");
+const Gestaltung = require("./lib/Gestaltung");
 
 module.exports = {
     BotPlugin,
@@ -53,6 +54,7 @@ module.exports = {
     Nachbar,
     Ereignisse,
     Zeitplan,
+    Gestaltung,
     // IPM (Inter-Process Messaging) - Event-Bus Architecture
     MessageTypes,
     MessageBuilder,

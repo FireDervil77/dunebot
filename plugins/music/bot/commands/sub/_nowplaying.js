@@ -1,4 +1,4 @@
-const { FARBE, antwort, pruefen, dauerText } = require('../../utils');
+const { farbig, antwort, pruefen, dauerText } = require('../../utils');
 
 /** Breite des Fortschrittsbalkens in Zeichen. */
 const BALKEN = 20;
@@ -24,7 +24,7 @@ module.exports = async (mitglied) => {
 
     return {
         embeds: [{
-            color: FARBE,
+            ...farbig('akzent'),
             author: { name: zustand.pausiert ? 'Angehalten' : 'Jetzt läuft' },
             title: t.title.substring(0, 256),
             url: t.herkunftUrl || t.url,

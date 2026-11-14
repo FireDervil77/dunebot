@@ -1,5 +1,6 @@
 const { EmbedBuilder, ApplicationCommandOptionType } = require("discord.js");
 const { getNotes, createNote, deleteNote } = require("../utils");
+const { Gestaltung } = require("dunebot-sdk");
 
 /**
  * @type {import('dunebot-sdk').CommandType}
@@ -151,7 +152,7 @@ async function listNotes(guild, targetUser) {
     const embed = new EmbedBuilder()
         .setAuthor({ name: guild.getT("moderation:NOTE.LIST_TITLE", { target: targetUser.username }) })
         .setThumbnail(targetUser.displayAvatarURL())
-        .setColor("#78909C")
+        .setColor(await Gestaltung.farbe(guild.id, "hinweis", "moderation"))
         .setDescription(lines.join("\n"))
         .setFooter({ text: guild.getT("moderation:NOTE.LIST_FOOTER", { count: notes.length.toString() }) });
 

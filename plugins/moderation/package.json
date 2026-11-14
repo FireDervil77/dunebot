@@ -70,5 +70,13 @@
             "recht": "MODERATION.SETTINGS.EDIT",
             "titel": "moderation:AUFBEWAHRUNG.NOTIZEN"
         }
-    ]
+    ],
+    "farben": {
+        "recht": "MODERATION.SETTINGS.EDIT",
+        "seite": "/settings",
+        "rollen": {
+            "akzent": "#607d8b",
+            "hinweis": "#78909c"
+        }
+    }
 }

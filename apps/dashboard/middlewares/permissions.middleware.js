@@ -379,6 +379,41 @@ async function loadUserPermissions(req, res, next) {
 }
 
 /**
+ * Middleware: In der Kontroll-Guild nur deren Besitzer, sonst durch.
+ *
+ * Für Guild-Einstellungen, die in jeder Guild stehen, in der Kontroll-Guild
+ * aber nicht aus Versehen von jemand anderem geändert werden sollen
+ * (Betreiber 2026-11-13 zu G-09). Das Recht prüft davor `requirePermission`;
+ * hier kommt in der Kontroll-Guild nur der Besitzer hinzu.
+ *
+ * Für die Anzeige („nur lesend“) dieselbe Frage: `istKontrollGuildGesperrt`.
+ *
+ * @returns {Function} Express Middleware
+ */
+function requireBesitzerInKontrollGuild() {
+    const besitzer = requireGuildOwner();
+    return (req, res, next) => {
+        const guildId = res.locals.guildId || req.params.guildId;
+        if (!process.env.CONTROL_GUILD_ID || String(guildId) !== String(process.env.CONTROL_GUILD_ID)) return next();
+        return besitzer(req, res, next);
+    };
+}
+
+/**
+ * Ist die Guild die Kontroll-Guild und der Nutzer nicht ihr Besitzer?
+ *
+ * @param {string} guildId
+ * @param {string|undefined} userId
+ * @returns {Promise<boolean>} true = hier nur lesen
+ */
+async function istKontrollGuildGesperrt(guildId, userId) {
+    if (!process.env.CONTROL_GUILD_ID || String(guildId) !== String(process.env.CONTROL_GUILD_ID)) return false;
+    if (!userId) return true;
+    const [g] = await ServiceManager.get('dbService').query('SELECT owner_id FROM guilds WHERE _id = ?', [guildId]);
+    return !g || String(g.owner_id) !== String(userId);
+}
+
+/**
  * Helper: Prüft Permission in Template/Controller (ohne Middleware)
  * 
  * Verwendung in Controller:
@@ -401,6 +436,8 @@ module.exports = {
     requireAnyPermission,
     requireAllPermissions,
     requireGuildOwner,
+    requireBesitzerInKontrollGuild,
+    istKontrollGuildGesperrt,
     loadUserPermissions,
     
     // Helper-Funktion

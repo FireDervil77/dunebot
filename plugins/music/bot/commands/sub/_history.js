@@ -1,4 +1,4 @@
-const { FARBE, antwort, pruefen, titelZeile } = require('../../utils');
+const { farbig, antwort, pruefen, titelZeile } = require('../../utils');
 const { MusicHistory } = require('../../../shared/models');
 
 /** So viele Eintraege zeigt der Verlauf. */
@@ -35,7 +35,7 @@ module.exports = async (mitglied, nummer = null) => {
 
         return {
             embeds: [{
-                color: FARBE,
+                ...farbig('akzent'),
                 title: 'Zuletzt gelaufen',
                 description: zeilen.join('\n').substring(0, 4000),
                 footer: { text: 'Wieder einreihen: /music history <Nummer>' }

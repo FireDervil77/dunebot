@@ -1,4 +1,4 @@
-const { FARBE, antwort, pruefen, titelZeile, spielzeitText } = require('../../utils');
+const { farbig, antwort, pruefen, titelZeile, spielzeitText } = require('../../utils');
 const { MusicPlaylists } = require('../../../shared/models');
 
 /** So viele Titel zeigt die Vorschau einer Liste. */
@@ -35,7 +35,7 @@ module.exports = async (mitglied, name = null) => {
 
         return {
             embeds: [{
-                color: FARBE,
+                ...farbig('akzent'),
                 title: liste.name,
                 description: liste.description || null,
                 fields: zeilen.length > 0
@@ -61,7 +61,7 @@ module.exports = async (mitglied, name = null) => {
 
     return {
         embeds: [{
-            color: FARBE,
+            ...farbig('akzent'),
             title: 'Wiedergabelisten',
             description: zeilen.join('\n').substring(0, 4000),
             footer: { text: 'Inhalt zeigen: /music playlists <Name> · Einreihen: /music load <Name>' }

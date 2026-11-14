@@ -29,6 +29,7 @@ const { aufloesenZumAbspielen, aehnlichenFinden } = require('../quellen');
 const { tonstromVonSeite, tonstromVonAdresse, tonstromVonDatei } = require('../quellen/strom');
 const klangfilter = require('../klangfilter');
 const steuerung = require('../steuerung');
+const { faerbe } = require('../farben');
 const { dauerText } = require('../format');
 
 // prism-media startet ffmpeg selbst. Ohne diesen Hinweis sucht es im
@@ -549,7 +550,7 @@ class GuildPlayer {
     _ansagen() {
         if (!this.textKanalId) return;
 
-        MusicSettings.getSettings(this.guildId).then(einstellungen => {
+        MusicSettings.getSettings(this.guildId).then(async einstellungen => {
             if (!einstellungen.announce_now_playing) return;
 
             const kanalId = einstellungen.announce_channel || this.textKanalId;
@@ -563,7 +564,8 @@ class GuildPlayer {
                 alte.edit({ components: [] }).catch(() => { /* schon geloescht */ });
             }
 
-            kanal.send(steuerung.nachricht(this.zustand()))
+            const ansage = await faerbe(steuerung.nachricht(this.zustand()), this.guildId);
+            kanal.send(ansage)
                 .then(gesendet => { this._ansageNachricht = gesendet; })
                 .catch(() => { /* Kein Schreibrecht - dann eben ohne Ansage */ });
         }).catch(() => { /* Einstellungen nicht lesbar - Ansage entfaellt */ });
@@ -578,8 +580,8 @@ class GuildPlayer {
      */
     ansageAuffrischen() {
         if (!this._ansageNachricht) return;
-        this._ansageNachricht
-            .edit(steuerung.nachricht(this.zustand()))
+        faerbe(steuerung.nachricht(this.zustand()), this.guildId)
+            .then(n => this._ansageNachricht && this._ansageNachricht.edit(n))
             .catch(() => { this._ansageNachricht = null; });
     }
 

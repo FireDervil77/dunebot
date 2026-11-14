@@ -69,10 +69,9 @@ router.put('/', requirePermission('MUSIC.SETTINGS.EDIT'), async (req, res) => {
         if (b.vote_skip_enabled !== undefined) updates.vote_skip_enabled = zuBool(b.vote_skip_enabled) ? 1 : 0;
         if (b.vote_skip_percent !== undefined) updates.vote_skip_percent = zahl(b.vote_skip_percent, 50, 1, 100);
 
-        if (b.embed_color !== undefined) {
-            const farbe = String(b.embed_color || '').trim();
-            updates.embed_color = /^#[0-9A-Fa-f]{6}$/.test(farbe) ? farbe : '#1DB954';
-        }
+        // `embed_color` stand hier bis 2026-11-14 (G-09): kein Formular schickte
+        // es, der Bot las es nie. Die Farben von music stellt jetzt der
+        // Kern-Teil „Farben dieses Plugins“ ein.
 
         // Erlaubte Sprachkanaele; leere Liste heisst "ueberall"
         if (b.allowed_voice !== undefined) {

@@ -196,3 +196,6 @@
 
 <%# Aufbewahrung (G-05): Kern-Teil mit eigenem Speichern, deshalb außerhalb des Formulars. %>
 <%- include('shared/aufbewahrung', { guildId, tr, plugin: 'moderation' }) %>
+
+<%# Farben (G-09): Kern-Teil mit eigenem Speichern. Die zwölf Farben je Aktion bleiben fest. %>
+<%- include('shared/plugin-farben', { guildId, tr, plugin: 'moderation' }) %>

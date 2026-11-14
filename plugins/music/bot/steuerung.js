@@ -17,7 +17,7 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { dauerText, fortschritt } = require('./format');
 
 /** Farbe der Wiedergabe-Nachricht. */
-const FARBE = 0x1DB954;
+const { farbig } = require('./farben');
 
 /** Vorsatz aller Knopf-Kennungen dieses Plugins. */
 const VORSATZ = 'music_';
@@ -85,7 +85,7 @@ function embed(z) {
 
     if (!t) {
         return {
-            color: FARBE,
+            ...farbig('akzent'),
             author: { name: 'Musik' },
             description: 'Gerade läuft nichts. Mit `/music play` geht es los - ' +
                 'ich bleibe so lange hier im Kanal.'
@@ -114,7 +114,7 @@ function embed(z) {
     }
 
     return {
-        color: FARBE,
+        ...farbig('akzent'),
         author: { name: z.pausiert ? 'Angehalten' : 'Jetzt läuft' },
         title: String(t.title || 'Unbekannter Titel').substring(0, 256),
         url: t.herkunftUrl || t.url || undefined,
