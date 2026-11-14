@@ -230,6 +230,20 @@ async function main() {
         assert(f1.some(x => x.includes('in einem Formular')), 'im Formular nicht erkannt');
         assert(f2.some(x => x.includes('bindet shared/plugin-farben nicht ein')), 'fehlend nicht erkannt');
     });
+    await pruefe('2. Kein document.currentScript in Ansichten (Layout zieht Skripte ans Ende)', () => {
+        // `layout extractScripts` (ThemeRenderer.js) verschiebt jedes <script>
+        // ans Seitenende. Ein Skript, das seine Karte über currentScript sucht,
+        // findet sie dort nicht und bleibt still stehen (2026-11-14: Farben und
+        // Aufbewahrung drehten auf den Plugin-Seiten endlos).
+        const f = [];
+        for (const wurzel of ['apps/dashboard/themes', 'plugins']) {
+            for (const d of dateien(path.join(WURZEL, wurzel), '.ejs')) {
+                const text = fs.readFileSync(d, 'utf8').split('\n').filter(z => !/^\s*\/\//.test(z)).join('\n');
+                if (/document\.currentScript/.test(text)) f.push(path.relative(WURZEL, d));
+            }
+        }
+        assert(!f.length, f.join('\n'));
+    });
     await pruefe('3. Aufrufe nennen das eigene Plugin und erklärte Rollen', () => {
         const f = aufrufFehler(meta);
         assert(!f.length, f.join('\n'));

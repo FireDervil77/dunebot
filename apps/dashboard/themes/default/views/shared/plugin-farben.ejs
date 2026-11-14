@@ -51,8 +51,22 @@ const _t = (k, o) => tr('core:GESTALTUNG.' + k, o);
 </div>
 <script>
 (function () {
-  var karte = document.currentScript.previousElementSibling;
-  if (!karte || !karte.hasAttribute('data-plugin-farben')) return;
+  // Die Karte über ihr Attribut suchen, nicht über `document.currentScript`:
+  // Das Layout zieht alle Skripte ans Seitenende (`layout extractScripts` in
+  // ThemeRenderer.js), dort ist das Element davor nicht mehr die Karte.
+  // Bis 2026-11-14 blieb die Karte deshalb beim Laden stehen. Jede Karte
+  // wird einmal eingerichtet, auch wenn der Teil mehrfach auf der Seite steht.
+  function alle() {
+    document.querySelectorAll('[data-plugin-farben]').forEach(function (karte) {
+      if (karte.dataset.eingerichtet) return;
+      karte.dataset.eingerichtet = '1';
+      einrichten(karte);
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', alle);
+  else alle();
+
+  function einrichten(karte) {
   var liste = karte.querySelector('[data-plugin-farben-liste]');
   var hinweis = karte.querySelector('[data-plugin-farben-hinweis]');
   var schalter = karte.querySelector('[data-plugin-farben-schalter]');
@@ -155,5 +169,6 @@ const _t = (k, o) => tr('core:GESTALTUNG.' + k, o);
       d.textContent = text('Ladefehler', { grund: e.message });
       liste.appendChild(d);
     });
+  }
 })();
 </script>

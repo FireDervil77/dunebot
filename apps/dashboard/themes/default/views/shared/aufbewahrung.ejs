@@ -36,8 +36,22 @@ const _t = (k, o) => tr('core:AUFBEWAHRUNG.' + k, o);
 </div>
 <script>
 (function () {
-  var karte = document.currentScript.previousElementSibling;
-  if (!karte || !karte.hasAttribute('data-aufbewahrung')) return;
+  // Die Karte über ihr Attribut suchen, nicht über `document.currentScript`:
+  // Das Layout zieht alle Skripte ans Seitenende (`layout extractScripts` in
+  // ThemeRenderer.js), dort ist das Element davor nicht mehr die Karte.
+  // Bis 2026-11-14 blieb die Karte deshalb beim Laden stehen. Jede Karte
+  // wird einmal eingerichtet, auch wenn der Teil mehrfach auf der Seite steht.
+  function alle() {
+    document.querySelectorAll('[data-aufbewahrung]').forEach(function (karte) {
+      if (karte.dataset.eingerichtet) return;
+      karte.dataset.eingerichtet = '1';
+      einrichten(karte);
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', alle);
+  else alle();
+
+  function einrichten(karte) {
   var liste = karte.querySelector('[data-aufbewahrung-liste]');
   var adresse = karte.dataset.adresse;
   function text(name, werte) {
@@ -123,5 +137,6 @@ const _t = (k, o) => tr('core:AUFBEWAHRUNG.' + k, o);
       d.textContent = text('Ladefehler', { grund: e.message });
       liste.appendChild(d);
     });
+  }
 })();
 </script>
