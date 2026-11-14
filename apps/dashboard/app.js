@@ -265,6 +265,14 @@ module.exports = class App {
                 Logger.error('[INIT] Aufräumer für verlassene Guilds konnte nicht starten:', error);
             }
 
+            // Abgleich mit Discord (K383): Guilds, aus denen der Bot flog,
+            // während er aus war. Markiert nur, gelöscht wird oben.
+            try {
+                require('./helpers/GuildAbgleich').starten();
+            } catch (error) {
+                Logger.error('[INIT] Abgleich der Guilds mit Discord konnte nicht starten:', error);
+            }
+
             // Aufbewahrung (G-05): nachts alte Zeilen nach den Fristen der
             // Plugins löschen. Wirft, wenn eine Erklärung fehlerhaft ist.
             try {

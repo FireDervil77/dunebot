@@ -91,8 +91,11 @@ class GuildManager {
             guild.locale = konfiguration?.LOCALE || guild.client?.defaultLanguage || "de-DE";
         }
 
-        // 4. IPC-Event an Dashboard senden
-        this._notifyDashboardJoined(guild);
+        // Bis 2026-11-14 folgte hier `_notifyDashboardJoined` mit
+        // `dashboard:GUILD_JOINED`. Es las `guild.client.ipcClient`, das
+        // niemand setzte, ging also nie hinaus, und im Dashboard hörte auch
+        // niemand darauf (K384). Das Dashboard braucht beim Beitritt nichts:
+        // Es liest die Zeile in `guilds` (`Einladung.warteAufGuild`).
     }
 
     /**
@@ -385,25 +388,6 @@ class GuildManager {
             Logger.info(`Standard-Gruppen für Guild ${guildId}: ${created} erstellt`);
         } else {
             Logger.debug(`Standard-Gruppen für Guild ${guildId}: alle bereits vorhanden`);
-        }
-    }
-
-    /**
-     * Sendet ein IPC-Event an das Dashboard, wenn eine Guild beitritt
-     * @param {import('discord.js').Guild} guild
-     */
-    _notifyDashboardJoined(guild) {
-        try {
-            const ipcClient = guild.client?.ipcClient;
-            if (ipcClient) {
-                ipcClient.send("dashboard:GUILD_JOINED", {
-                    guildId: guild.id,
-                    guildName: guild.name,
-                });
-            }
-        } catch (err) {
-            const Logger = ServiceManager.get("Logger");
-            Logger.warn(`IPC GUILD_JOINED fehlgeschlagen: ${err.message}`);
         }
     }
 
