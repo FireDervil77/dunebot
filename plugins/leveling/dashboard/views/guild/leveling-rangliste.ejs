@@ -1,0 +1,111 @@
+<%- include('shared/seitenkopf', {
+      plugin:       'leveling',
+      vortitel:     tr('leveling:TITEL'),
+      titel:        tr('leveling:NAV.RANGLISTE'),
+      beschreibung: tr('leveling:RANGLISTE.BESCHREIBUNG'),
+      icon:         'fa-solid fa-list-ol',
+      guildId:      guildId
+}) %>
+
+<%# Rangliste (LV-1i Teil 2): rechnet der Kern (G-20, Fortschritt.rangliste). Woche und Monat zählen Buchungen im Zeitraum, das Level ist das von jetzt. %>
+<%
+  const basis = '/guild/' + guildId + '/plugins/leveling/rangliste';
+  const link = (z, s) => basis + '?zeitraum=' + encodeURIComponent(z) + (s > 1 ? '&seite=' + s : '');
+  const zahl = (n) => Number(n).toLocaleString('de-DE');
+%>
+
+<ul class="nav nav-tabs mb-3" role="tablist">
+  <% zeitraeume.forEach((z) => { %>
+    <li class="nav-item" role="presentation">
+      <a class="nav-link <%= z === zeitraum ? 'active' : '' %>" href="<%= link(z, 1) %>" <%- z === zeitraum ? 'aria-current="page"' : '' %>>
+        <%= tr('leveling:RANGLISTE.ZEITRAUM_' + z.toUpperCase()) %>
+      </a>
+    </li>
+  <% }); %>
+</ul>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fa-solid fa-ranking-star me-2"></i><%= tr('leveling:RANGLISTE.ZEITRAUM_' + zeitraum.toUpperCase()) %></h3>
+        <div class="card-actions text-secondary small"><%= tr('leveling:RANGLISTE.MITGLIEDER', { anzahl: zahl(rangliste.gesamt) }) %></div>
+      </div>
+      <% if (!rangliste.eintraege.length) { %>
+        <div class="card-body">
+          <%- include('shared/leerzustand', {
+                icon:  'fa-solid fa-ranking-star',
+                titel: tr(rangliste.gesamt ? 'leveling:RANGLISTE.SEITE_LEER' : 'leveling:RANGLISTE.LEER'),
+                text:  tr(rangliste.gesamt ? 'leveling:RANGLISTE.SEITE_LEER_TEXT' : 'leveling:RANGLISTE.LEER_TEXT')
+          }) %>
+        </div>
+      <% } else { %>
+        <div class="table-responsive">
+          <table class="table card-table table-vcenter">
+            <thead>
+              <tr>
+                <th style="width: 4rem;">#</th>
+                <th><%= tr('leveling:UEBERSICHT.MITGLIED') %></th>
+                <th class="text-end"><%= tr('leveling:UEBERSICHT.LEVEL') %></th>
+                <th class="text-end"><%= tr(zeitraum === 'gesamt' ? 'leveling:UEBERSICHT.XP' : 'leveling:RANGLISTE.XP_IM_ZEITRAUM') %></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% rangliste.eintraege.forEach((z) => { const id = String(z.mitglied_id); %>
+                <tr class="<%= id === ich ? 'table-active' : '' %>">
+                  <td class="fw-bold"><%= z.platz %></td>
+                  <td>
+                    <%= namen[id] || id %>
+                    <% if (namen[id]) { %><div class="text-secondary small font-monospace"><%= id %></div><% } %>
+                  </td>
+                  <td class="text-end"><%= z.prestige > 0 ? z.level + ' (P' + z.prestige + ')' : z.level %></td>
+                  <td class="text-end"><%= zahl(z.xp) %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+      <% if (rangliste.seiten > 1) { %>
+        <div class="card-footer d-flex align-items-center">
+          <span class="text-secondary small"><%= tr('leveling:RANGLISTE.SEITE_VON', { seite: rangliste.seite, seiten: rangliste.seiten }) %></span>
+          <div class="ms-auto btn-group">
+            <a class="btn btn-sm btn-outline-secondary <%= rangliste.seite <= 1 ? 'disabled' : '' %>" href="<%= link(zeitraum, rangliste.seite - 1) %>">
+              <i class="fa-solid fa-chevron-left me-1"></i><%= tr('leveling:RANGLISTE.ZURUECK') %>
+            </a>
+            <a class="btn btn-sm btn-outline-secondary <%= rangliste.seite >= rangliste.seiten ? 'disabled' : '' %>" href="<%= link(zeitraum, rangliste.seite + 1) %>">
+              <%= tr('leveling:RANGLISTE.WEITER') %><i class="fa-solid fa-chevron-right ms-1"></i>
+            </a>
+          </div>
+        </div>
+      <% } %>
+      <% if (namenFehlen) { %>
+        <div class="card-footer text-secondary small"><%= tr('leveling:UEBERSICHT.NAMEN_FEHLEN') %></div>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fa-solid fa-user me-2"></i><%= tr('leveling:RANGLISTE.DEIN_PLATZ') %></h3>
+      </div>
+      <div class="card-body">
+        <% if (platz && platz.platz) { %>
+          <div class="h1 mb-1">#<%= platz.platz %></div>
+          <div class="text-secondary"><%= tr('leveling:RANGLISTE.PLATZ_TEXT', { von: zahl(platz.von), xp: zahl(platz.xp) }) %></div>
+          <% if (Math.ceil(platz.platz / jeSeite) !== rangliste.seite) { %>
+            <a class="btn btn-sm btn-outline-primary mt-3" href="<%= link(zeitraum, Math.ceil(platz.platz / jeSeite)) %>"><%= tr('leveling:RANGLISTE.ZU_MIR') %></a>
+          <% } %>
+        <% } else { %>
+          <div class="text-secondary"><%= tr('leveling:RANGLISTE.KEIN_PLATZ') %></div>
+        <% } %>
+      </div>
+    </div>
+    <div class="card mt-3">
+      <div class="card-body text-secondary small">
+        <i class="fa-solid fa-circle-info me-1"></i><%= tr('leveling:RANGLISTE.HINWEIS_' + zeitraum.toUpperCase()) %>
+      </div>
+    </div>
+  </div>
+</div>

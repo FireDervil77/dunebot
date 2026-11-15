@@ -3,11 +3,11 @@
 /**
  * Leveling - Dashboard-Plugin (LV-1a, LV-1c, K382, 2026-11-15).
  *
- * Stufe 1 bisher: eigene Navigation mit Übersicht, XP-Regeln, Stufen,
- * Belohnungen, Ausschlüssen (LV-1i) und Nachrichten (LV-1f), Startwerte beim
- * Einschalten, Storno nach `automod.verstoss`, Hinweis „kein Level-Kanal
- * gewählt“ oben im Guild-Bereich (F-LV1). Rangliste und Datenverwaltung
- * kommen mit LV-1i Teil 2.
+ * Stufe 1: eigene Navigation mit Übersicht, Rangliste, XP-Regeln, Stufen,
+ * Belohnungen, Ausschlüssen, Nachrichten (LV-1f) und Datenverwaltung (LV-1i),
+ * Startwerte beim Einschalten, Storno nach `automod.verstoss`, Hinweis „kein
+ * Level-Kanal gewählt“ oben im Guild-Bereich (F-LV1), nachts XP von
+ * Mitgliedern löschen, die vor der Frist gegangen sind (`leveling:verlassen`).
  *
  * Gelöscht wird beim Abschalten vom Kern: Tabellen nach `guildInhalte`, die
  * Fortschritte `leveling:*` über `Fortschritt.loeschePlugin`
@@ -16,7 +16,7 @@
  * @author FireBot Team
  */
 
-const { DashboardPlugin, VersionHelper, Ereignisse } = require('dunebot-sdk');
+const { DashboardPlugin, VersionHelper, Ereignisse, Zeitplan } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
 const { spieleStartwerteEin } = require('../shared/vorgaben');
 const Ausgabe = require('../shared/ausgabe');
@@ -45,6 +45,10 @@ class LevelingDashboardPlugin extends DashboardPlugin {
         // automod hat die Nachricht beanstandet → ihre XP zurück (LV-1c).
         Ereignisse.hoere('automod.verstoss', 'leveling', require('./hoerer').automodVerstoss);
         this._registerMeldungen();
+
+        // Frist beim Verlassen (LV-1i Teil 2): nachts, nach der Aufbewahrung (03:30).
+        const Verlassen = require('./verlassen');
+        Zeitplan.eintragen('leveling:verlassen', Verlassen.TAKT, Verlassen.nachts);
 
         Logger.success('[Leveling] Dashboard-Plugin aktiviert');
         return true;
@@ -154,6 +158,17 @@ class LevelingDashboardPlugin extends DashboardPlugin {
                 parent: basis
             },
             {
+                title: 'leveling:NAV.RANGLISTE',
+                url: `${basis}/rangliste`,
+                icon: 'fa-solid fa-list-ol',
+                order: 15,
+                type: haupt,
+                capability: 'LEVELING.VIEW',
+                visible: true,
+                guildId,
+                parent: basis
+            },
+            {
                 title: 'leveling:NAV.XP_REGELN',
                 url: `${basis}/xp-regeln`,
                 icon: 'fa-solid fa-sliders',
@@ -204,6 +219,17 @@ class LevelingDashboardPlugin extends DashboardPlugin {
                 order: 60,
                 type: haupt,
                 capability: 'LEVELING.CONFIGURE',
+                visible: true,
+                guildId,
+                parent: basis
+            },
+            {
+                title: 'leveling:NAV.DATEN',
+                url: `${basis}/daten`,
+                icon: 'fa-solid fa-database',
+                order: 70,
+                type: haupt,
+                capability: 'LEVELING.DATA.EXPORT',
                 visible: true,
                 guildId,
                 parent: basis

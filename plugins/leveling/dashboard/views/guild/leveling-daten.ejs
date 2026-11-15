@@ -1,0 +1,465 @@
+<%- include('shared/seitenkopf', {
+      plugin:       'leveling',
+      vortitel:     tr('leveling:TITEL'),
+      titel:        tr('leveling:NAV.DATEN'),
+      beschreibung: tr('leveling:DATEN.BESCHREIBUNG'),
+      icon:         'fa-solid fa-database',
+      guildId:      guildId
+}) %>
+
+<%# Datenverwaltung (LV-1i Teil 2, F-LV7): Export, Nachrechnen, Import, Fristen, Zurücksetzen. Geprüft wird in shared/daten.js, gebucht über den Kern (G-20). Ändern nur mit LEVELING.DATA.RESET, in der Kontroll-Guild nur der Besitzer. %>
+<% if (!eingerichtet) { %>
+  <%- include('shared/leerzustand', {
+        icon:  'fa-solid fa-ranking-star',
+        titel: tr('leveling:UEBERSICHT.NICHT_EINGERICHTET'),
+        text:  tr('leveling:UEBERSICHT.NICHT_EINGERICHTET_TEXT')
+  }) %>
+<% } else { %>
+  <%
+    const zahl = (n) => Number(n).toLocaleString('de-DE');
+    const basis = '/guild/' + guildId + '/plugins/leveling/daten';
+    const e = einstellungen || {};
+    const verlassenTage = typeof e.verlassen_tage !== 'undefined' && e.verlassen_tage !== null ? Number(e.verlassen_tage) : 30;
+    const texte = {
+      probeLaeuft: tr('leveling:DATEN.IMPORT_PRUEFT'),
+      probeErgebnis: tr('leveling:DATEN.IMPORT_ERGEBNIS'),
+      probeSchon: tr('leveling:DATEN.IMPORT_SCHON'),
+      nichtsZuTun: tr('leveling:DATEN.IMPORT_NICHTS'),
+      laeuft: tr('leveling:DATEN.IMPORT_LAEUFT'),
+      fertig: tr('leveling:DATEN.IMPORT_FERTIG'),
+      abgebrochen: tr('leveling:DATEN.IMPORT_ABGEBROCHEN'),
+      zuGross: tr('leveling:DATEN.IMPORT_ZU_GROSS', { mb: grenzen.bytes / 1024 / 1024 }),
+      keineDatei: tr('leveling:DATEN.IMPORT_KEINE_DATEI'),
+      weitereFehler: tr('leveling:DATEN.IMPORT_WEITERE_FEHLER'),
+      nachrechnenOk: tr('leveling:DATEN.NACHRECHNEN_OK'),
+      nachrechnenAbweichung: tr('leveling:DATEN.NACHRECHNEN_ABWEICHUNG'),
+      zurueckProbe: tr('leveling:DATEN.ZURUECK_PROBE'),
+      zurueckZahlen: tr('leveling:DATEN.ZURUECK_ZAHLEN'),
+      zurueckProbeFehler: tr('leveling:DATEN.ZURUECK_PROBE_FEHLER'),
+      zurueckLaeuft: tr('leveling:DATEN.ZURUECK_LAEUFT'),
+    };
+  %>
+
+  <% if (gesperrt) { %>
+    <div class="alert alert-info"><i class="fa-solid fa-lock me-2"></i><%= tr('leveling:DATEN.GESPERRT') %></div>
+  <% } %>
+
+  <div class="row g-3" id="levelingDaten" data-basis="<%= basis %>" data-name="<%= guildName %>" data-max-bytes="<%= grenzen.bytes %>"
+       data-texte="<%= JSON.stringify(texte) %>">
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title"><i class="fa-solid fa-chart-simple me-2"></i><%= tr('leveling:DATEN.BESTAND') %></h3>
+        </div>
+        <div class="card-body">
+          <dl class="row mb-0">
+            <dt class="col-8"><%= tr('leveling:DATEN.BESTAND_MITGLIEDER') %></dt><dd class="col-4 text-end"><%= zahl(zahlen.mitglieder) %></dd>
+            <dt class="col-8"><%= tr('leveling:DATEN.BESTAND_BUCHUNGEN') %></dt><dd class="col-4 text-end"><%= zahl(zahlen.buchungen) %></dd>
+            <dt class="col-8"><%= tr('leveling:DATEN.BESTAND_ZAEHLER') %></dt><dd class="col-4 text-end"><%= zahl(zahlen.zaehler) %></dd>
+            <dt class="col-8"><%= tr('leveling:DATEN.BESTAND_VERMERKE') %></dt><dd class="col-4 text-end"><%= zahl(zahlen.vermerke) %></dd>
+          </dl>
+        </div>
+      </div>
+
+      <div class="card mt-3">
+        <div class="card-header">
+          <h3 class="card-title"><i class="fa-solid fa-file-arrow-down me-2"></i><%= tr('leveling:DATEN.EXPORT_TITEL') %></h3>
+        </div>
+        <div class="card-body">
+          <p class="text-secondary"><%= tr('leveling:DATEN.EXPORT_TEXT') %></p>
+          <div class="d-flex flex-wrap gap-2">
+            <a class="btn btn-primary" href="<%= basis %>/export/staende.csv" download>
+              <i class="fa-solid fa-users me-1"></i><%= tr('leveling:DATEN.EXPORT_STAENDE') %>
+            </a>
+            <a class="btn btn-outline-primary" href="<%= basis %>/export/buchungen.csv" download>
+              <i class="fa-solid fa-list me-1"></i><%= tr('leveling:DATEN.EXPORT_BUCHUNGEN') %>
+            </a>
+          </div>
+          <div class="form-text mt-2"><%= tr('leveling:DATEN.EXPORT_SPALTEN') %></div>
+        </div>
+      </div>
+
+      <div class="card mt-3">
+        <div class="card-header">
+          <h3 class="card-title"><i class="fa-solid fa-calculator me-2"></i><%= tr('leveling:DATEN.NACHRECHNEN_TITEL') %></h3>
+        </div>
+        <div class="card-body">
+          <p class="text-secondary"><%= tr('leveling:DATEN.NACHRECHNEN_TEXT') %></p>
+          <button type="button" class="btn btn-outline-secondary" id="levelingNachrechnen">
+            <i class="fa-solid fa-play me-1"></i><%= tr('leveling:DATEN.NACHRECHNEN_KNOPF') %>
+          </button>
+          <div class="mt-2" id="levelingNachrechnenErgebnis" aria-live="polite"></div>
+        </div>
+      </div>
+
+      <div class="card mt-3">
+        <div class="card-header">
+          <h3 class="card-title"><i class="fa-solid fa-hourglass-half me-2"></i><%= tr('leveling:DATEN.FRISTEN_TITEL') %></h3>
+        </div>
+        <div class="card-body">
+          <h4><%= tr('leveling:DATEN.VERLASSEN_TITEL') %></h4>
+          <p class="text-secondary small"><%= tr('leveling:DATEN.VERLASSEN_TEXT') %></p>
+          <% if (darfZuruecksetzen) { %>
+            <form id="levelingVerlassenForm" onsubmit="return false;">
+              <div class="row g-2 align-items-end">
+                <div class="col-sm-6">
+                  <label class="form-label" for="levelingVerlassen"><%= tr('leveling:DATEN.VERLASSEN_WAHL') %></label>
+                  <select class="form-select" id="levelingVerlassen" name="verlassen">
+                    <option value="behalten" <%= e.verlassen !== 'loeschen' ? 'selected' : '' %>><%= tr('leveling:DATEN.VERLASSEN_BEHALTEN') %></option>
+                    <option value="loeschen" <%= e.verlassen === 'loeschen' ? 'selected' : '' %>><%= tr('leveling:DATEN.VERLASSEN_LOESCHEN') %></option>
+                  </select>
+                </div>
+                <div class="col-sm-3">
+                  <label class="form-label" for="levelingVerlassenTage"><%= tr('leveling:DATEN.VERLASSEN_TAGE') %></label>
+                  <input type="number" class="form-control" id="levelingVerlassenTage" name="verlassen_tage" min="<%= grenzen.verlassen_tage[0] %>" max="<%= grenzen.verlassen_tage[1] %>" step="1" value="<%= verlassenTage %>">
+                </div>
+                <div class="col-sm-3">
+                  <button type="button" class="btn btn-primary w-100" id="levelingVerlassenSpeichern"><%= tr('leveling:DATEN.SPEICHERN') %></button>
+                </div>
+              </div>
+            </form>
+          <% } else { %>
+            <div class="fw-bold"><%= e.verlassen === 'loeschen' ? tr('leveling:DATEN.VERLASSEN_STAND_LOESCHEN', { tage: verlassenTage }) : tr('leveling:DATEN.VERLASSEN_BEHALTEN') %></div>
+          <% } %>
+          <div class="form-text"><%= tr('leveling:DATEN.VERLASSEN_GRENZE') %></div>
+
+          <h4 class="mt-4"><%= tr('leveling:DATEN.VERDICHTUNG_TITEL') %></h4>
+          <p class="text-secondary small mb-0">
+            <%= verdichtungTage ? tr('leveling:DATEN.VERDICHTUNG_TEXT', { tage: zahl(verdichtungTage) }) : tr('leveling:DATEN.VERDICHTUNG_UNBEKANNT') %>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <% if (darfZuruecksetzen) { %>
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title"><i class="fa-solid fa-file-arrow-up me-2"></i><%= tr('leveling:DATEN.IMPORT_TITEL') %></h3>
+          </div>
+          <div class="card-body">
+            <p class="text-secondary"><%= tr('leveling:DATEN.IMPORT_TEXT') %></p>
+            <div class="form-text mb-3"><%= tr('leveling:DATEN.IMPORT_SPALTEN', { id: idSpalten.join(', '), xp: xpSpalten.join(', ') }) %></div>
+            <div class="mb-3">
+              <label class="form-label" for="levelingImportDatei"><%= tr('leveling:DATEN.IMPORT_DATEI') %></label>
+              <input type="file" class="form-control" id="levelingImportDatei" accept=".csv,.tsv,.txt,text/csv,text/plain">
+            </div>
+            <div class="mb-3">
+              <div class="form-label"><%= tr('leveling:DATEN.IMPORT_MODUS') %></div>
+              <label class="form-check">
+                <input class="form-check-input" type="radio" name="levelingImportModus" value="setzen" checked>
+                <span class="form-check-label"><%= tr('leveling:DATEN.MODUS_SETZEN') %></span>
+                <span class="form-check-description"><%= tr('leveling:DATEN.MODUS_SETZEN_TEXT') %></span>
+              </label>
+              <label class="form-check">
+                <input class="form-check-input" type="radio" name="levelingImportModus" value="addieren">
+                <span class="form-check-label"><%= tr('leveling:DATEN.MODUS_ADDIEREN') %></span>
+                <span class="form-check-description"><%= tr('leveling:DATEN.MODUS_ADDIEREN_TEXT') %></span>
+              </label>
+            </div>
+            <button type="button" class="btn btn-outline-primary" id="levelingImportPruefen">
+              <i class="fa-solid fa-magnifying-glass me-1"></i><%= tr('leveling:DATEN.IMPORT_PRUEFEN') %>
+            </button>
+
+            <div class="mt-3" id="levelingImportErgebnis" hidden>
+              <div class="mb-2" id="levelingImportZusammenfassung"></div>
+              <ul class="small text-danger mb-2" id="levelingImportFehler"></ul>
+              <div class="table-responsive" id="levelingImportBeispiele" hidden>
+                <table class="table table-sm table-vcenter mb-2">
+                  <thead>
+                    <tr>
+                      <th><%= tr('leveling:UEBERSICHT.MITGLIED') %></th>
+                      <th class="text-end"><%= tr('leveling:DATEN.VORHER') %></th>
+                      <th class="text-end"><%= tr('leveling:DATEN.NACHHER') %></th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+                <div class="form-text mb-2"><%= tr('leveling:DATEN.IMPORT_BEISPIELE') %></div>
+              </div>
+              <div class="progress mb-2" id="levelingImportBalken" hidden>
+                <div class="progress-bar" role="progressbar" style="width: 0%" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+              </div>
+              <button type="button" class="btn btn-primary" id="levelingImportStart" hidden>
+                <i class="fa-solid fa-file-import me-1"></i><%= tr('leveling:DATEN.IMPORT_START') %>
+              </button>
+            </div>
+          </div>
+          <div class="card-footer text-secondary small">
+            <i class="fa-solid fa-circle-info me-1"></i><%= tr('leveling:DATEN.IMPORT_NACHHER') %>
+          </div>
+        </div>
+
+        <div class="card border-danger mt-3">
+          <div class="card-header bg-danger-lt">
+            <h3 class="card-title text-danger"><i class="fa-solid fa-triangle-exclamation me-2"></i><%= tr('leveling:DATEN.ZURUECK_TITEL') %></h3>
+          </div>
+          <div class="card-body">
+            <p class="mb-2"><%= tr('leveling:DATEN.ZURUECK_TEXT') %></p>
+            <ul class="small text-secondary mb-3">
+              <li><%= tr('leveling:DATEN.ZURUECK_PUNKT_WEG') %></li>
+              <li><%= tr('leveling:DATEN.ZURUECK_PUNKT_BLEIBT') %></li>
+              <li><%= tr('leveling:DATEN.ZURUECK_PUNKT_ROLLEN') %></li>
+              <li><%= tr('leveling:DATEN.ZURUECK_PUNKT_EXPORT') %></li>
+            </ul>
+            <button type="button" class="btn btn-outline-danger" id="levelingZurueckOeffnen">
+              <i class="fa-solid fa-rotate-left me-1"></i><%= tr('leveling:DATEN.ZURUECK_KNOPF') %>
+            </button>
+          </div>
+        </div>
+
+        <div class="modal modal-blur fade" id="levelingZurueckModal" tabindex="-1" aria-labelledby="levelingZurueckTitel" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content border border-danger border-2">
+              <div class="modal-status bg-danger"></div>
+              <div class="modal-header bg-danger-lt">
+                <h5 class="modal-title text-danger fw-bold" id="levelingZurueckTitel">
+                  <i class="fa-solid fa-triangle-exclamation me-2"></i><%= tr('leveling:DATEN.ZURUECK_MODAL_TITEL') %>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="<%= tr('leveling:DATEN.ABBRECHEN') %>"></button>
+              </div>
+              <div class="modal-body">
+                <p class="text-danger fw-bold fs-3 mb-2"><%= tr('leveling:DATEN.ZURUECK_MODAL_NAME', { name: guildName }) %></p>
+                <p class="text-danger fw-bold mb-3"><%= tr('leveling:DATEN.ZURUECK_ENDGUELTIG') %></p>
+                <ul class="mb-3" id="levelingZurueckListe"></ul>
+                <label class="form-label fw-bold" for="levelingZurueckEingabe">
+                  <%= tr('leveling:DATEN.ZURUECK_EINTIPPEN') %> <span class="font-monospace text-danger"><%= guildName %></span>
+                </label>
+                <input type="text" class="form-control font-monospace" id="levelingZurueckEingabe" autocomplete="off" spellcheck="false">
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal"><%= tr('leveling:DATEN.ABBRECHEN') %></button>
+                <button type="button" class="btn btn-danger fw-bold" id="levelingZurueckKnopf" disabled>
+                  <i class="fa-solid fa-rotate-left me-1"></i><%= tr('leveling:DATEN.ZURUECK_MODAL_KNOPF') %>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      <% } else { %>
+        <div class="card">
+          <div class="card-body text-secondary">
+            <i class="fa-solid fa-lock me-2"></i><%= tr(gesperrt ? 'leveling:DATEN.GESPERRT' : 'leveling:DATEN.NUR_LESEN') %>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    const wurzel = document.getElementById('levelingDaten');
+    if (!wurzel) return;
+    const basis = wurzel.dataset.basis;
+    const T = JSON.parse(wurzel.dataset.texte || '{}');
+    const text = (k, werte = {}) => String(T[k] || k).replace(/\{\{(\w+)\}\}/g, (_, n) => (werte[n] ?? ''));
+    const zahl = (n) => Number(n).toLocaleString('de-DE');
+    const meldung = (art, t, o) => (window.showToast ? window.showToast(art, t, o) : console[art === 'error' ? 'error' : 'log']('[Leveling]', t));
+    const punkt = (t, klasse) => { const li = document.createElement('li'); li.textContent = t; if (klasse) li.className = klasse; return li; };
+    async function anfrage(weg, optionen = {}) {
+      const antwort = await fetch(basis + weg, { ...optionen, headers: { 'Accept': 'application/json', ...(optionen.headers || {}) } });
+      const a = await antwort.json().catch(() => ({ success: false, message: 'HTTP ' + antwort.status }));
+      if (!antwort.ok || !a.success) { const f = new Error(a.message || ('HTTP ' + antwort.status)); f.antwort = a; throw f; }
+      return a;
+    }
+
+    // Nachrechnen: nur lesen.
+    const nachrechnen = document.getElementById('levelingNachrechnen');
+    nachrechnen?.addEventListener('click', async () => {
+      const ziel = document.getElementById('levelingNachrechnenErgebnis');
+      nachrechnen.disabled = true;
+      try {
+        const a = await anfrage('/nachrechnen');
+        ziel.className = 'mt-2 ' + (a.anzahl ? 'text-danger' : 'text-success');
+        ziel.textContent = a.anzahl ? text('nachrechnenAbweichung', { n: a.anzahl, geprueft: zahl(a.geprueft) }) : text('nachrechnenOk', { geprueft: zahl(a.geprueft) });
+        if (a.anzahl) {
+          const ul = document.createElement('ul');
+          ul.className = 'small mb-0';
+          a.abweichungen.forEach((x) => ul.appendChild(punkt(x.mitglied_id + ': ' + zahl(x.stand) + ' ≠ ' + zahl(x.summe))));
+          ziel.appendChild(ul);
+        }
+      } catch (err) {
+        meldung('error', err.message);
+      }
+      nachrechnen.disabled = false;
+    });
+
+    // Frist beim Verlassen.
+    const verlassenKnopf = document.getElementById('levelingVerlassenSpeichern');
+    verlassenKnopf?.addEventListener('click', async () => {
+      verlassenKnopf.disabled = true;
+      try {
+        const a = await anfrage('/verlassen', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+          verlassen: document.getElementById('levelingVerlassen').value,
+          verlassen_tage: document.getElementById('levelingVerlassenTage').value,
+        }) });
+        meldung('success', a.message);
+      } catch (err) {
+        meldung('error', err.message);
+      }
+      verlassenKnopf.disabled = false;
+    });
+
+    // Import: erst prüfen (nichts wird geschrieben), dann in Stücken einlesen.
+    const datei = document.getElementById('levelingImportDatei');
+    const pruefen = document.getElementById('levelingImportPruefen');
+    const start = document.getElementById('levelingImportStart');
+    const ergebnis = document.getElementById('levelingImportErgebnis');
+    const zusammenfassung = document.getElementById('levelingImportZusammenfassung');
+    const fehlerListe = document.getElementById('levelingImportFehler');
+    const beispiele = document.getElementById('levelingImportBeispiele');
+    const balken = document.getElementById('levelingImportBalken');
+    let geprueft = null;
+    const modus = () => document.querySelector('input[name="levelingImportModus"]:checked')?.value || 'setzen';
+    const zuruecksetzenAnzeige = () => {
+      geprueft = null;
+      if (!ergebnis) return;
+      ergebnis.hidden = true;
+      start.hidden = true;
+      balken.hidden = true;
+      fehlerListe.replaceChildren();
+    };
+    datei?.addEventListener('change', zuruecksetzenAnzeige);
+    document.querySelectorAll('input[name="levelingImportModus"]').forEach((r) => r.addEventListener('change', zuruecksetzenAnzeige));
+
+    async function inhalt() {
+      const f = datei.files?.[0];
+      if (!f) throw new Error(text('keineDatei'));
+      if (f.size > Number(wurzel.dataset.maxBytes)) throw new Error(text('zuGross'));
+      return f.text();
+    }
+
+    pruefen?.addEventListener('click', async () => {
+      zuruecksetzenAnzeige();
+      pruefen.disabled = true;
+      ergebnis.hidden = false;
+      zusammenfassung.className = 'mb-2 text-secondary';
+      zusammenfassung.textContent = text('probeLaeuft');
+      try {
+        const csv = await inhalt();
+        const a = await anfrage('/import?probe=1&modus=' + encodeURIComponent(modus()), { method: 'POST', headers: { 'Content-Type': 'text/csv' }, body: csv });
+        zusammenfassung.className = 'mb-2';
+        zusammenfassung.textContent = text('probeErgebnis', {
+          zeilen: zahl(a.zeilen), aendern: zahl(a.aendern), neu: zahl(a.neu), gleich: zahl(a.gleich),
+          vorher: zahl(a.summeVorher), nachher: zahl(a.summeNachher),
+        });
+        if (a.schon) zusammenfassung.appendChild(Object.assign(document.createElement('div'), { className: 'text-warning mt-1', textContent: text('probeSchon', { n: zahl(a.schon) }) }));
+        const tbody = beispiele.querySelector('tbody');
+        tbody.replaceChildren(...a.beispiele.map((b) => {
+          const tr = document.createElement('tr');
+          [b.name ? b.name + ' (' + b.mitglied + ')' : b.mitglied, zahl(b.vorher), zahl(b.nachher)].forEach((w, i) => {
+            const td = document.createElement('td');
+            td.textContent = w;
+            if (i) td.className = 'text-end';
+            tr.appendChild(td);
+          });
+          return tr;
+        }));
+        beispiele.hidden = !a.beispiele.length;
+        if (a.aendern) {
+          geprueft = { csv, lauf: a.lauf, modus: a.modus };
+          start.hidden = false;
+        } else {
+          zusammenfassung.appendChild(Object.assign(document.createElement('div'), { className: 'text-secondary mt-1', textContent: text('nichtsZuTun') }));
+        }
+      } catch (err) {
+        zusammenfassung.className = 'mb-2 text-danger fw-bold';
+        zusammenfassung.textContent = err.message;
+        const f = err.antwort?.fehler || [];
+        fehlerListe.replaceChildren(...f.map((t) => punkt(t)));
+        if ((err.antwort?.fehlerGesamt || 0) > f.length) fehlerListe.appendChild(punkt(text('weitereFehler', { n: err.antwort.fehlerGesamt - f.length })));
+      }
+      pruefen.disabled = false;
+    });
+
+    start?.addEventListener('click', async () => {
+      if (!geprueft) return;
+      start.disabled = true;
+      pruefen.disabled = true;
+      datei.disabled = true;
+      balken.hidden = false;
+      const leiste = balken.querySelector('.progress-bar');
+      let ab = 0;
+      let gebucht = 0;
+      let doppelt = 0;
+      zusammenfassung.className = 'mb-2 text-secondary';
+      zusammenfassung.textContent = text('laeuft');
+      try {
+        for (;;) {
+          const a = await anfrage('/import?modus=' + encodeURIComponent(geprueft.modus) + '&lauf=' + encodeURIComponent(geprueft.lauf) + '&ab=' + ab,
+            { method: 'POST', headers: { 'Content-Type': 'text/csv' }, body: geprueft.csv });
+          gebucht += a.gebucht;
+          doppelt += a.doppelt;
+          ab = a.ab;
+          const p = a.gesamt ? Math.round((ab / a.gesamt) * 100) : 100;
+          leiste.style.width = p + '%';
+          leiste.setAttribute('aria-valuenow', String(p));
+          if (a.fertig) break;
+        }
+        zusammenfassung.className = 'mb-2 text-success fw-bold';
+        zusammenfassung.textContent = text('fertig', { gebucht: zahl(gebucht), doppelt: zahl(doppelt) });
+        meldung('success', zusammenfassung.textContent, { timeOut: 0 });
+        start.hidden = true;
+        geprueft = null;
+      } catch (err) {
+        // Was gebucht ist, bleibt; nochmal „Einlesen“ macht dort weiter (Schlüssel je Lauf).
+        zusammenfassung.className = 'mb-2 text-danger fw-bold';
+        zusammenfassung.textContent = text('abgebrochen', { gebucht: zahl(gebucht), grund: err.message });
+        start.disabled = false;
+      }
+      pruefen.disabled = false;
+      datei.disabled = false;
+    });
+
+    // Ganze Guild zurücksetzen: rote Rückfrage mit Zählung und eingetipptem Namen.
+    const oeffnen = document.getElementById('levelingZurueckOeffnen');
+    if (oeffnen) {
+      const name = wurzel.dataset.name;
+      const dialog = new bootstrap.Modal(document.getElementById('levelingZurueckModal'));
+      const liste = document.getElementById('levelingZurueckListe');
+      const eingabe = document.getElementById('levelingZurueckEingabe');
+      const knopf = document.getElementById('levelingZurueckKnopf');
+      const knopfInhalt = knopf.innerHTML;
+      let probeOk = false;
+      const gleich = () => eingabe.value.trim().toLowerCase() === name.trim().toLowerCase();
+      const pruefe = () => { knopf.disabled = !(probeOk && gleich()); };
+      oeffnen.addEventListener('click', async () => {
+        eingabe.value = '';
+        knopf.innerHTML = knopfInhalt;
+        probeOk = false;
+        pruefe();
+        liste.replaceChildren(punkt(text('zurueckProbe')));
+        dialog.show();
+        try {
+          const a = await anfrage('/zuruecksetzen-probe');
+          liste.replaceChildren(punkt(text('zurueckZahlen', { mitglieder: zahl(a.mitglieder), buchungen: zahl(a.buchungen), zaehler: zahl(a.zaehler) })));
+          probeOk = true;
+        } catch (err) {
+          // Ohne Zählung kein Zurücksetzen: Wer nicht sieht, was geht, bestätigt blind.
+          liste.replaceChildren(punkt(text('zurueckProbeFehler') + ' ' + err.message, 'text-danger'));
+        }
+        pruefe();
+      });
+      document.getElementById('levelingZurueckModal').addEventListener('shown.bs.modal', () => eingabe.focus());
+      eingabe.addEventListener('input', pruefe);
+      knopf.addEventListener('click', async () => {
+        if (!probeOk || !gleich()) return;
+        knopf.disabled = true;
+        eingabe.disabled = true;
+        knopf.textContent = text('zurueckLaeuft');
+        try {
+          const a = await anfrage('/zuruecksetzen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bestaetigung: eingabe.value }) });
+          dialog.hide();
+          meldung('success', a.message, { timeOut: 0 });
+          setTimeout(() => location.reload(), 1500);
+        } catch (err) {
+          knopf.innerHTML = knopfInhalt;
+          meldung('error', err.message, { timeOut: 0 });
+          pruefe();
+        }
+        eingabe.disabled = false;
+      });
+    }
+  })();
+  </script>
+<% } %>

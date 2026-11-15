@@ -329,6 +329,19 @@ async function fuerGuild(guildId, plugin, { meta } = {}) {
     });
 }
 
+/**
+ * Wirksame Tage einer Frist, die nur der Betreiber einstellt (`guild: false`),
+ * zum Anzeigen auf einer Plugin-Seite (Leveling: Verdichtung der Buchungen).
+ * Unbekannte Frist → null.
+ *
+ * @returns {Promise<number|null>}
+ */
+async function tageFuer(plugin, name, { meta } = {}) {
+    const e = erklaerungen(meta).find(x => x.plugin === plugin && x.name === name && !x.guild);
+    if (!e) return null;
+    return wirksam(e, obergrenze(e, await grenzen()), null);
+}
+
 /** Ganze Zahl aus einer Eingabe, sonst null (leer = Vorgabe). */
 function tageAus(wert) {
     if (wert === null || wert === undefined || String(wert).trim() === '') return null;
@@ -445,6 +458,6 @@ function starten() {
 }
 
 module.exports = {
-    starten, laufen, nachts, fuerGuild, setzeGuild, setzeGrenze, stand, tageJeTabelle,
+    starten, laufen, nachts, fuerGuild, tageFuer, setzeGuild, setzeGrenze, stand, tageJeTabelle,
     erklaerungen, pruefeForm, bedingung, wirksam, verdichter, TAKT, STUECK, TAGE_MAX,
 };

@@ -12,10 +12,14 @@
  *   /stufen       Kern-Teil Stufentabelle (G-20) mit Kontrolltabelle (LV-1i)
  *   /belohnungen  Rolle je Stufe geben/abnehmen, vorherige entfernen (LV-1i)
  *   /ausschluesse Kanal- und Rollenregeln: ausschließen, nur diese, Faktor (LV-1i)
+ *   /rangliste    Gesamt, Woche, Monat, je Seite 25, dein Platz (LV-1i Teil 2)
+ *   /daten        Datenverwaltung (LV-1i Teil 2, F-LV7): CSV-Export der Stände
+ *                 und Buchungen, CSV-Import (Probelauf, dann in Stücken),
+ *                 Nachrechnen, Frist beim Verlassen, ganze Guild zurücksetzen
  *
- * Geprüft wird in `shared/einstellen.js`, hier nur gelesen und geschrieben.
- * Der Bot liest Regeln 30 s zwischengespeichert, Belohnungen frisch.
- * Rangliste und Datenverwaltung kommen mit LV-1i Teil 2.
+ * Geprüft wird in `shared/einstellen.js` und `shared/daten.js`, hier nur
+ * gelesen und geschrieben. Der Bot liest Regeln 30 s zwischengespeichert,
+ * Belohnungen frisch.
  *
  * @module leveling/routes/guild
  */
@@ -24,12 +28,13 @@ const express = require('express');
 const router = express.Router();
 const { ServiceManager } = require('dunebot-core');
 const { Fortschritt, Vorlage } = require('dunebot-sdk');
-const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
+const { requirePermission, requireBesitzerInKontrollGuild, istKontrollGuildGesperrt } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 const { csrfProtection } = require('../../../../apps/dashboard/middlewares/security/csrf-protection.middleware');
 const Regeln = require('../../shared/regeln');
 const Belohnungen = require('../../shared/belohnungen');
 const Ausgabe = require('../../shared/ausgabe');
 const Einstellen = require('../../shared/einstellen');
+const Daten = require('../../shared/daten');
 const { KanalTypen } = require('dunebot-core');
 
 function makeTranslator(req, res) {
@@ -484,6 +489,308 @@ router.delete('/ausschluesse/:id', csrfProtection, requirePermission('LEVELING.C
         return res.json({ success: true, message: tr('leveling:AUSSCHLUESSE.ENTFERNT') });
     } catch (error) {
         return antwortFehler(res, tr, error, 'Regel entfernen');
+    }
+});
+
+// ---------------------------------------------------------------------------
+// LV-1i Teil 2: Rangliste, Datenverwaltung
+// ---------------------------------------------------------------------------
+
+const ZEITRAEUME = Object.freeze(['gesamt', 'woche', 'monat']);
+const RANG_JE_SEITE = 25;
+/** Länger rechnet ein Import-Stück nicht; der Browser schickt das nächste. */
+const STUECK_MS = 15_000;
+
+const wer = (req) => String(req.session?.user?.info?.id || '');
+
+/** Rangliste mit Zeitraum und Seiten, dazu dein Platz. Daten aus dem Kern (G-20). */
+router.get('/rangliste', requirePermission('LEVELING.VIEW'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const tr = makeTranslator(req, res);
+    try {
+        const zeitraum = ZEITRAEUME.includes(String(req.query.zeitraum)) ? String(req.query.zeitraum) : 'gesamt';
+        const seite = Math.min(Math.max(Number.parseInt(req.query.seite, 10) || 1, 1), 100_000);
+        const ich = wer(req);
+        const [rangliste, platz] = await Promise.all([
+            Fortschritt.rangliste({ guildId, kennung: 'leveling:community', zeitraum, seite, proSeite: RANG_JE_SEITE }),
+            /^\d{5,32}$/.test(ich) ? Fortschritt.position({ guildId, kennung: 'leveling:community', mitglied: ich, zeitraum }) : null,
+        ]);
+        const { namen, fehlen } = await namenVon(guildId, rangliste.eintraege.map((e) => String(e.mitglied_id)));
+        await ServiceManager.get('themeManager').renderView(res, 'guild/leveling-rangliste', {
+            tr, guildId, zeitraum, zeitraeume: ZEITRAEUME, rangliste, namen, namenFehlen: fehlen, ich, platz, jeSeite: RANG_JE_SEITE,
+        });
+    } catch (error) {
+        return fehlerSeite(req, res, tr, 'RANGLISTE', error);
+    }
+});
+
+/** Zahlen für Datenverwaltung und Rückfrage beim Zurücksetzen. */
+async function bestand(guildId) {
+    const db = ServiceManager.get('dbService');
+    const zahl = async (sql) => Number((await db.query(sql, [guildId]))?.[0]?.n || 0);
+    return {
+        mitglieder: await zahl("SELECT COUNT(*) AS n FROM fortschritt_stand WHERE guild_id = ? AND kennung = 'leveling:community'"),
+        buchungen: await zahl("SELECT COUNT(*) AS n FROM fortschritt_buchungen WHERE guild_id = ? AND kennung = 'leveling:community'"),
+        zaehler: await zahl('SELECT COUNT(*) AS n FROM level_zaehler WHERE guild_id = ?'),
+        vermerke: await zahl('SELECT COUNT(*) AS n FROM level_verlassen WHERE guild_id = ?'),
+    };
+}
+
+/** Name der Guild, wie er beim Zurücksetzen eingetippt werden muss. */
+async function guildName(guildId) {
+    const [g] = await ServiceManager.get('dbService').query('SELECT guild_name FROM guilds WHERE _id = ?', [guildId]);
+    return String(g?.guild_name || guildId);
+}
+
+router.get('/daten', requirePermission('LEVELING.DATA.EXPORT'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const tr = makeTranslator(req, res);
+    try {
+        const ich = wer(req);
+        const Aufbewahrung = require('../../../../apps/dashboard/helpers/Aufbewahrung');
+        const [regeln, zahlen, name, darfZuruecksetzen, gesperrt, verdichtungTage] = await Promise.all([
+            Regeln.lade(guildId, { frisch: true }),
+            bestand(guildId),
+            guildName(guildId),
+            ServiceManager.get('permissionManager').hasPermission(ich, guildId, 'LEVELING.DATA.RESET'),
+            istKontrollGuildGesperrt(guildId, ich),
+            Aufbewahrung.tageFuer('core', 'fortschritt-buchungen'),
+        ]);
+        await ServiceManager.get('themeManager').renderView(res, 'guild/leveling-daten', {
+            tr, guildId, eingerichtet: Boolean(regeln), einstellungen: regeln?.einstellungen || null, zahlen, guildName: name,
+            darfZuruecksetzen: Boolean(darfZuruecksetzen) && !gesperrt, gesperrt, verdichtungTage,
+            grenzen: Daten.GRENZEN, idSpalten: Daten.ID_SPALTEN, xpSpalten: Daten.XP_SPALTEN,
+        });
+    } catch (error) {
+        return fehlerSeite(req, res, tr, 'DATEN', error);
+    }
+});
+
+/** Dateiname mit Guild und Tag, nur Ziffern und Bindestriche. */
+function dateiname(was, guildId) {
+    return `leveling-${was}-${String(guildId).replace(/\D/g, '')}-${new Date().toISOString().slice(0, 10)}.csv`;
+}
+
+/**
+ * Stände als CSV: dieselben Spalten liest der Import wieder (`mitglied_id`,
+ * `xp`), also ist der Export auch eine Sicherung. Zähler aus `level_zaehler`.
+ */
+router.get('/daten/export/staende.csv', requirePermission('LEVELING.DATA.EXPORT'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const tr = makeTranslator(req, res);
+    try {
+        const db = ServiceManager.get('dbService');
+        const [staende, zaehler] = await Promise.all([
+            db.query(`SELECT mitglied_id, xp, level, prestige FROM fortschritt_stand WHERE guild_id = ? AND kennung = 'leveling:community'
+                      ORDER BY prestige DESC, xp DESC, mitglied_id`, [guildId]),
+            db.query('SELECT mitglied_id, nachrichten, sprachminuten FROM level_zaehler WHERE guild_id = ?', [guildId]),
+        ]);
+        const z = new Map((zaehler || []).map((x) => [String(x.mitglied_id), x]));
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${dateiname('staende', guildId)}"`);
+        res.setHeader('Cache-Control', 'no-store');
+        let text = Daten.zeile(['mitglied_id', 'xp', 'level', 'prestige', 'nachrichten', 'sprachminuten']);
+        for (const s of staende || []) {
+            const x = z.get(String(s.mitglied_id));
+            text += Daten.zeile([String(s.mitglied_id), Number(s.xp), Number(s.level), Number(s.prestige), x ? Number(x.nachrichten) : 0, x ? Number(x.sprachminuten) : 0]);
+        }
+        return res.send(text);
+    } catch (error) {
+        ServiceManager.get('Logger').error('[Leveling] Export der Stände gescheitert:', error);
+        return res.status(500).type('text/plain').send(tr('leveling:DATEN.EXPORT_FEHLER'));
+    }
+});
+
+/**
+ * Alle Buchungen als CSV, in Stücken gelesen und gestreamt. Älter als die
+ * Verdichtungsfrist sind es Monatssummen (`kern:verdichtet`).
+ */
+router.get('/daten/export/buchungen.csv', requirePermission('LEVELING.DATA.EXPORT'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const tr = makeTranslator(req, res);
+    const db = ServiceManager.get('dbService');
+    let begonnen = false;
+    try {
+        let ab = 0;
+        for (;;) {
+            const zeilen = await db.query(
+                `SELECT id, zeit, mitglied_id, menge, verlangt, quelle, schluessel, akteur, grund, storniert_am, storniert_von, storno_grund
+                 FROM fortschritt_buchungen WHERE guild_id = ? AND kennung = 'leveling:community' AND id > ? ORDER BY id LIMIT 5000`, [guildId, ab]);
+            if (!begonnen) {
+                res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+                res.setHeader('Content-Disposition', `attachment; filename="${dateiname('buchungen', guildId)}"`);
+                res.setHeader('Cache-Control', 'no-store');
+                res.write(Daten.zeile(['zeit', 'mitglied_id', 'menge', 'verlangt', 'quelle', 'schluessel', 'akteur', 'grund', 'storniert_am', 'storniert_von', 'storno_grund']));
+                begonnen = true;
+            }
+            if (!zeilen?.length) break;
+            res.write(zeilen.map((b) => Daten.zeile([
+                b.zeit, String(b.mitglied_id), Number(b.menge), b.verlangt == null ? null : Number(b.verlangt), b.quelle, b.schluessel,
+                b.akteur == null ? null : String(b.akteur), b.grund, b.storniert_am, b.storniert_von == null ? null : String(b.storniert_von), b.storno_grund,
+            ])).join(''));
+            ab = Number(zeilen[zeilen.length - 1].id);
+            if (zeilen.length < 5000) break;
+        }
+        return res.end();
+    } catch (error) {
+        ServiceManager.get('Logger').error('[Leveling] Export der Buchungen gescheitert:', error);
+        // Schon begonnen: abbrechen, damit die Datei nicht vollständig aussieht.
+        if (begonnen) return res.destroy(error);
+        return res.status(500).type('text/plain').send(tr('leveling:DATEN.EXPORT_FEHLER'));
+    }
+});
+
+/** XP je Mitglied jetzt, in Stücken gefragt. */
+async function staendeVon(guildId, ids) {
+    const db = ServiceManager.get('dbService');
+    const aus = new Map();
+    for (let i = 0; i < ids.length; i += 1000) {
+        const teil = ids.slice(i, i + 1000);
+        const zeilen = await db.query(
+            "SELECT mitglied_id, xp FROM fortschritt_stand WHERE guild_id = ? AND kennung = 'leveling:community' AND mitglied_id IN (?)", [guildId, teil]);
+        for (const z of zeilen || []) aus.set(String(z.mitglied_id), Number(z.xp));
+    }
+    return aus;
+}
+
+/** Zeilenfehler des CSV in Text. */
+function zeilenFehler(tr, gelesen) {
+    return gelesen.fehler.map((f) => tr(`leveling:DATEN.ZEILE_${f.grund}`, { zeile: f.zeile, ...(f.werte || {}) }));
+}
+
+/**
+ * CSV-Import (F-LV7). Der Browser schickt die Datei als `text/csv`.
+ *
+ *   ?probe=1&modus=…            liest, rechnet, schreibt nichts; nennt `lauf`
+ *   ?modus=…&lauf=…&ab=N        bucht ab Zeile N, höchstens STUECK_MS lang,
+ *                               und nennt das nächste `ab` (oder `fertig`)
+ *
+ * Jede Änderung ist eine Buchung im Kern mit Quelle `import`, Akteur und
+ * Schlüssel `import:<lauf>:<mitglied>`: Wiederholte Stücke zählen nicht
+ * doppelt, dieselbe Datei beim Addieren auch nicht. Hat die Datei einen
+ * Fehler, wird nichts gebucht. Level-up-Nachrichten gehen keine hinaus,
+ * Belohnungsrollen kommen mit `/levels sync`.
+ */
+router.post('/daten/import', csrfProtection, requirePermission('LEVELING.DATA.RESET'), requireBesitzerInKontrollGuild(),
+    express.text({ type: 'text/csv', limit: Daten.GRENZEN.bytes + 64 * 1024 }), async (req, res) => {
+        const guildId = res.locals.guildId;
+        const tr = makeTranslator(req, res);
+        try {
+            if (!await Regeln.lade(guildId, { frisch: true })) throw new Einstellen.Eingabefehler('NICHT_EINGERICHTET');
+            const modus = String(req.query.modus || '');
+            if (!Daten.MODI.includes(modus)) throw new Einstellen.Eingabefehler('FALSCHER_MODUS');
+            const gelesen = Daten.leseCsv(typeof req.body === 'string' ? req.body : '');
+            if (gelesen.fehlerGesamt) {
+                return res.status(400).json({
+                    success: false, message: tr('leveling:DATEN.IMPORT_ZEILENFEHLER', { n: gelesen.fehlerGesamt }),
+                    fehler: zeilenFehler(tr, gelesen), fehlerGesamt: gelesen.fehlerGesamt,
+                });
+            }
+            const plan = Daten.plane(gelesen.zeilen, await staendeVon(guildId, gelesen.zeilen.map((z) => z.mitglied)), modus);
+
+            if (String(req.query.probe) === '1') {
+                const lauf = Daten.laufVon(modus, gelesen.zeilen);
+                const [{ n: schon }] = await ServiceManager.get('dbService').query(
+                    "SELECT COUNT(*) AS n FROM fortschritt_buchungen WHERE guild_id = ? AND kennung = 'leveling:community' AND schluessel LIKE ?",
+                    [guildId, `import:${lauf}:%`]);
+                const beispiele = plan.eintraege.filter((e) => e.menge !== 0).slice(0, 10);
+                const { namen } = await namenVon(guildId, beispiele.map((e) => e.mitglied));
+                return res.json({
+                    success: true, probe: true, lauf, modus, zeilen: gelesen.zeilen.length, kopf: gelesen.kopf,
+                    aendern: plan.aendern, neu: plan.neu, gleich: plan.gleich, summeVorher: plan.summeVorher, summeNachher: plan.summeNachher,
+                    schon: Number(schon), beispiele: beispiele.map((e) => ({ ...e, name: namen[e.mitglied] || null })),
+                });
+            }
+
+            const lauf = String(req.query.lauf || '');
+            if (!Daten.LAUF.test(lauf)) throw new Einstellen.Eingabefehler('IMPORT_OHNE_PROBE');
+            const ab = Math.max(Number.parseInt(req.query.ab, 10) || 0, 0);
+            const akteur = wer(req);
+            const ende = Date.now() + STUECK_MS;
+            let i = ab;
+            let gebucht = 0;
+            let doppelt = 0;
+            for (; i < plan.eintraege.length && Date.now() < ende; i++) {
+                const e = plan.eintraege[i];
+                if (e.menge === 0) continue;
+                const r = await Fortschritt.buche({
+                    guildId, kennung: 'leveling:community', mitglied: e.mitglied, menge: e.menge, quelle: 'import',
+                    schluessel: `import:${lauf}:${e.mitglied}`, akteur: /^\d{5,32}$/.test(akteur) ? akteur : null, grund: `Import (${modus})`,
+                });
+                if (r.doppelt) doppelt++; else gebucht++;
+            }
+            const fertig = i >= plan.eintraege.length;
+            if (fertig) ServiceManager.get('Logger').info(`[Leveling] Import ${lauf} (${modus}) in ${guildId} fertig, von ${akteur || '?'}`);
+            return res.json({ success: true, fertig, ab: i, gesamt: plan.eintraege.length, gebucht, doppelt });
+        } catch (error) {
+            return antwortFehler(res, tr, error, 'Import');
+        }
+    });
+
+/** Nachrechnen: Stimmt jeder Stand mit der Summe seiner Buchungen? Nur lesen. */
+router.get('/daten/nachrechnen', requirePermission('LEVELING.DATA.EXPORT'), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const tr = makeTranslator(req, res);
+    try {
+        const r = await Fortschritt.pruefe({ guildId, kennung: 'leveling:community' });
+        return res.json({ success: true, geprueft: r.geprueft, abweichungen: r.abweichungen.slice(0, 20), anzahl: r.abweichungen.length });
+    } catch (error) {
+        ServiceManager.get('Logger').error('[Leveling] Nachrechnen gescheitert:', error);
+        return res.status(500).json({ success: false, message: tr('leveling:DATEN.NACHRECHNEN_FEHLER') });
+    }
+});
+
+/** Frist beim Verlassen. „behalten“ streicht die Vermerke gleich. */
+router.put('/daten/verlassen', csrfProtection, requirePermission('LEVELING.DATA.RESET'), requireBesitzerInKontrollGuild(), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const tr = makeTranslator(req, res);
+    try {
+        const v = Daten.pruefeVerlassen(req.body);
+        const db = ServiceManager.get('dbService');
+        const r = await db.query('UPDATE level_einstellungen SET verlassen = ?, verlassen_tage = ? WHERE guild_id = ?', [v.verlassen, v.verlassen_tage, guildId]);
+        if (!Number(r?.affectedRows)) throw new Einstellen.Eingabefehler('NICHT_EINGERICHTET');
+        if (v.verlassen === 'behalten') await db.query('DELETE FROM level_verlassen WHERE guild_id = ?', [guildId]);
+        Regeln.vergiss(guildId);
+        return res.json({ success: true, message: tr(v.verlassen === 'loeschen' ? 'leveling:DATEN.VERLASSEN_LOESCHEN_GESPEICHERT' : 'leveling:DATEN.VERLASSEN_BEHALTEN_GESPEICHERT', { tage: v.verlassen_tage }) });
+    } catch (error) {
+        return antwortFehler(res, tr, error, 'Frist beim Verlassen');
+    }
+});
+
+/** Was „ganze Guild zurücksetzen“ löschen würde, gezählt, nicht geschätzt. */
+router.get('/daten/zuruecksetzen-probe', requirePermission('LEVELING.DATA.RESET'), requireBesitzerInKontrollGuild(), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const tr = makeTranslator(req, res);
+    try {
+        return res.json({ success: true, name: await guildName(guildId), ...(await bestand(guildId)) });
+    } catch (error) {
+        ServiceManager.get('Logger').error('[Leveling] Probe „Zurücksetzen“ gescheitert:', error);
+        return res.status(500).json({ success: false, message: tr('leveling:DATEN.ZURUECK_FEHLER') });
+    }
+});
+
+/**
+ * Ganze Guild zurücksetzen: Stände, Buchungen, Saisonstände (Kern), Zähler und
+ * Vermerke (Leveling). Stufen, Regeln, Belohnungen und Nachrichten bleiben.
+ * Erst nach eingetipptem Guildnamen; was eingetippt werden muss, steht hier.
+ */
+router.post('/daten/zuruecksetzen', csrfProtection, requirePermission('LEVELING.DATA.RESET'), requireBesitzerInKontrollGuild(), async (req, res) => {
+    const guildId = res.locals.guildId;
+    const tr = makeTranslator(req, res);
+    try {
+        const name = await guildName(guildId);
+        if (String(req.body?.bestaetigung ?? '').trim().toLowerCase() !== name.trim().toLowerCase()) {
+            return res.status(400).json({ success: false, message: tr('leveling:DATEN.ZURUECK_NAME_FALSCH', { name }) });
+        }
+        const db = ServiceManager.get('dbService');
+        const kern = await Fortschritt.setzeZurueck({ guildId, kennung: 'leveling:community' });
+        const zaehler = Number((await db.query('DELETE FROM level_zaehler WHERE guild_id = ?', [guildId]))?.affectedRows || 0);
+        await db.query('DELETE FROM level_verlassen WHERE guild_id = ?', [guildId]);
+        ServiceManager.get('Logger').info(`[Leveling] ${guildId} zurückgesetzt von ${wer(req) || '?'}: ${kern.fortschritt_stand} Stände, ${kern.fortschritt_buchungen} Buchungen, ${zaehler} Zähler`);
+        return res.json({ success: true, message: tr('leveling:DATEN.ZURUECK_FERTIG', { mitglieder: kern.fortschritt_stand, buchungen: kern.fortschritt_buchungen }) });
+    } catch (error) {
+        ServiceManager.get('Logger').error('[Leveling] Zurücksetzen gescheitert:', error);
+        return res.status(500).json({ success: false, message: tr('leveling:DATEN.ZURUECK_FEHLER') });
     }
 });
 

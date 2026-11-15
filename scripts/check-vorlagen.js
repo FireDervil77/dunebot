@@ -302,6 +302,9 @@ async function main() {
                     // Kein Anlass: Kennungen von Discord-Komponenten und die
                     // Platzhalter des Plugins (`{ticket:id}`).
                     if (/(customId\s*(===|!==|:)|setCustomId\(|customId\.startsWith\()\s*$/.test(t.slice(Math.max(0, m.index - 40), m.index))) continue;
+                    // Kein Anlass: Name einer Aufgabe im Zeitplan (G-06, `plugin:aufgabe`),
+                    // erstes Plugin mit beidem: leveling (LV-1i Teil 2, 2026-11-15).
+                    if (/Zeitplan\.eintragen\(\s*$/.test(t.slice(Math.max(0, m.index - 40), m.index))) continue;
                     if ((meta[m[1]].vorlagen.platzhalter || []).some((p) => p.name === `${m[1]}:${m[2]}`)) continue;
                     if (rollenBesitzer.has(`${m[1]}:${m[2]}`)) continue;
                     if (m[1] !== plugin) f.push(`${path.relative(WURZEL, d)}: Anlass ${m[1]}:${m[2]} eines anderen Plugins`);

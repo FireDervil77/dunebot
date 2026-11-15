@@ -22,7 +22,14 @@
  *                   LV-1i: jede Einstellseite mit Recht, jedes Schreiben mit
  *                   CSRF und Recht, Navigation mit demselben Recht wie die
  *                   Seite, Prüfung über `shared/einstellen.js`, Stufen über
- *                   den Kern-Teil mit Ereignis für die Kontrolltabelle
+ *                   den Kern-Teil mit Ereignis für die Kontrolltabelle;
+ *                   LV-1i Teil 2: Rangliste und Datenverwaltung mit Recht,
+ *                   Import/Frist/Zurücksetzen nur mit LEVELING.DATA.RESET und
+ *                   in der Kontroll-Guild nur für den Besitzer, Import über
+ *                   `shared/daten.js` ohne Buchung bei Zeilenfehlern und mit
+ *                   Schlüssel je Lauf, Zurücksetzen nur mit Namen und über
+ *                   `Fortschritt.setzeZurueck`, Bot vermerkt Verlassen und
+ *                   Rückkehr, Nachtlauf `leveling:verlassen`
  *   2  Regeln       Ausschluss, „nur diese“, Faktoren (Kanal genauester,
  *                   Rolle höchster), Kette Thread → Kanal → Kategorie,
  *                   Menge, Taktung und gleicher Text; Sprache (AFK, allein,
@@ -30,7 +37,9 @@
  *                   vorherige entfernen); Level-up: Meilensteine, wann,
  *                   wohin, Platzhalter, Vorgabe in beiden Sprachen;
  *                   Rangkarte: Werte passen zur Schablone; Eingaben der
- *                   Einstellseiten, Raten, Zählung je Kanal wie im Bot
+ *                   Einstellseiten, Raten, Zählung je Kanal wie im Bot;
+ *                   CSV lesen (Trenner, Kopf, Umbruch in Anführungszeichen,
+ *                   Fehler je Zeile), Importplan, Lauf, Formelschutz, Frist
  *   3  Läufe        an TEMPORARY-Kopien von `level_*`, `fortschritt_*` und
  *                   `ereignisbuch` mit echtem SQL: nicht eingerichtet →
  *                   nichts, Startwerte, Buchung `msg:<id>`, Taktung, gleicher
@@ -46,7 +55,12 @@
  *                   Vorlage, Meilenstein, Direktnachricht, aus), `/xp` mit
  *                   Recht/Akteur/Grund/Ereignis/Kürzen/Bestätigung,
  *                   `/leaderboard` mit Seiten, `/rank` mit Karte; Seiten
- *                   XP-Regeln, Belohnungen, Ausschlüsse speichern und lesen
+ *                   XP-Regeln, Belohnungen, Ausschlüsse speichern und lesen;
+ *                   Import (Probe schreibt nichts, setzen, addieren, dieselbe
+ *                   Datei zweimal, Wiederholung), Export lässt sich wieder
+ *                   einlesen, Nachrechnen findet eine Abweichung, Rangliste,
+ *                   Verlassen/Rückkehr/Nachtlauf mit Frist, Zurücksetzen
+ *                   (falscher Name, Stufen bleiben, andere Guild bleibt)
  *   4  Gegenproben  jede Prüfung aus 1 wird an eingebauten Fehlern rot
  *
  * Geschrieben wird nur in TEMPORARY-Tabellen dieser Verbindung.
@@ -99,6 +113,9 @@ const DATEIEN = {
     kern: 'apps/dashboard/helpers/PluginManager.js',
     stufenSeite: 'plugins/leveling/dashboard/views/guild/leveling-stufen.ejs',
     kernStufen: 'apps/dashboard/themes/default/views/shared/fortschritt-stufen.ejs',
+    verlassenWeg: 'plugins/leveling/bot/events/guildMemberRemove.js',
+    beitritt: 'plugins/leveling/bot/events/guildMemberAdd.js',
+    verlassenNacht: 'plugins/leveling/dashboard/verlassen.js',
 };
 
 /** LV-1i: Methode, Weg, Recht, schreibt (dann mit CSRF). */
@@ -113,7 +130,19 @@ const SEITEN = [
     ['get', '/ausschluesse', 'LEVELING.CONFIGURE', false],
     ['post', '/ausschluesse', 'LEVELING.CONFIGURE', true],
     ['delete', '/ausschluesse/:id', 'LEVELING.CONFIGURE', true],
+    // LV-1i Teil 2
+    ['get', '/rangliste', 'LEVELING.VIEW', false],
+    ['get', '/daten', 'LEVELING.DATA.EXPORT', false],
+    ['get', '/daten/export/staende.csv', 'LEVELING.DATA.EXPORT', false, true],
+    ['get', '/daten/export/buchungen.csv', 'LEVELING.DATA.EXPORT', false, true],
+    ['get', '/daten/nachrechnen', 'LEVELING.DATA.EXPORT', false, true],
+    ['post', '/daten/import', 'LEVELING.DATA.RESET', true],
+    ['put', '/daten/verlassen', 'LEVELING.DATA.RESET', true],
+    ['get', '/daten/zuruecksetzen-probe', 'LEVELING.DATA.RESET', false, true],
+    ['post', '/daten/zuruecksetzen', 'LEVELING.DATA.RESET', true],
 ];
+/** Ändern in der Kontroll-Guild nur ihr Besitzer (G-09): Import, Frist, Zurücksetzen. */
+const BESITZER = ['/daten/import', '/daten/verlassen', '/daten/zuruecksetzen-probe', '/daten/zuruecksetzen'];
 const esc = (x) => x.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 
 function pruefeVerdrahtung(t) {
@@ -163,9 +192,21 @@ function pruefeVerdrahtung(t) {
     }
     const nav = {};
     for (const x of t.dashboard.matchAll(/url: `\$\{basis\}\/([\w-]+)`,[^}]*?capability: '([\w.]+)'/g)) nav[`/${x[1]}`] = x[2];
-    for (const [m, weg, recht] of SEITEN) {
-        if (m === 'get' && nav[weg] !== recht) aus.push(`Navigation ${weg}: ${nav[weg] || 'fehlt'} statt ${recht}`);
+    for (const [m, weg, recht, , ohneNav] of SEITEN) {
+        if (m === 'get' && !ohneNav && nav[weg] !== recht) aus.push(`Navigation ${weg}: ${nav[weg] || 'fehlt'} statt ${recht}`);
     }
+    // LV-1i Teil 2: Datenverwaltung
+    for (const weg of BESITZER) {
+        if (!new RegExp(`router\\.\\w+\\('${esc(weg)}',[^\\n]*requireBesitzerInKontrollGuild\\(\\)`).test(t.router)) aus.push(`${weg} ohne Besitzer-Schutz in der Kontroll-Guild`);
+    }
+    const imp = /router\.post\('\/daten\/import'([\s\S]*?)\n {4}\}\);/.exec(t.router);
+    if (!imp || !/Daten\.leseCsv\(/.test(imp[1]) || !/if \(gelesen\.fehlerGesamt\)/.test(imp[1]) || !/Daten\.plane\(/.test(imp[1])) aus.push('Import liest nicht über shared/daten.js oder bucht trotz Zeilenfehlern');
+    if (!imp || !/quelle: 'import'/.test(imp[1]) || !/schluessel: `import:\$\{lauf\}:\$\{e\.mitglied\}`/.test(imp[1]) || !/Daten\.LAUF\.test\(lauf\)/.test(imp[1])) aus.push('Import bucht ohne Quelle import oder ohne Schlüssel je Lauf');
+    const zur = /router\.post\('\/daten\/zuruecksetzen'([\s\S]*?)\n\}\);/.exec(t.router);
+    if (!zur || !/req\.body\?\.bestaetigung[\s\S]*?!== name\.trim\(\)\.toLowerCase\(\)\) \{\s*return res\.status\(400\)/.test(zur[1]) || !/Fortschritt\.setzeZurueck\(\{ guildId, kennung: 'leveling:community' \}\)/.test(zur[1])) aus.push('Zurücksetzen ohne eingetippten Namen oder nicht über Fortschritt.setzeZurueck');
+    if (!/beimVerlassen\(member\)/.test(t.verlassenWeg) || !/beimBeitritt\(member\)/.test(t.beitritt)) aus.push('Bot vermerkt Verlassen oder Rückkehr nicht');
+    if (!/Zeitplan\.eintragen\('leveling:verlassen', Verlassen\.TAKT, Verlassen\.nachts\)/.test(t.dashboard)) aus.push('Nachtlauf leveling:verlassen nicht eingetragen');
+    if (!/Fortschritt\.entferneMitglied\(\{ guildId, kennung: 'leveling:community', mitglied \}\)/.test(t.verlassenNacht) || !/DELETE FROM level_zaehler/.test(t.verlassenNacht)) aus.push('Nachtlauf löscht Fortschritt oder Zähler nicht');
     if (!/Einstellen\.pruefeXp\(req\.body\)/.test(t.router) || !/Einstellen\.pruefeBelohnung\(req\.body/.test(t.router) || !/Einstellen\.pruefeRegel\(req\.body/.test(t.router)) aus.push('Seiten speichern ohne Prüfung aus shared/einstellen.js');
     if (!/Einstellen\.istDoppelt\(regel, vorhanden\)/.test(t.router)) aus.push('Ausschlüsse ohne Doppelprüfung (NULL im Schlüssel)');
     for (const weg of ['/xp-regeln', '/ausschluesse', '/ausschluesse/:id']) {
@@ -191,8 +232,9 @@ function pruefeVerdrahtung(t) {
         const p = require(L('package.json'));
         assert.deepStrictEqual(p.fortschritt?.map((e) => e.kennung), ['leveling:community']);
         assert.ok(p.nurKontrollGuild === true, 'nurKontrollGuild fehlt, Stufe 1 ist nicht fertig');
-        const ddl = lies('plugins/leveling/migrations/20261115_130000_baseline.js');
+        const ddl = fs.readdirSync(L('migrations')).filter((f) => f.endsWith('.js')).map((f) => lies(`plugins/leveling/migrations/${f}`)).join('\n');
         const tabellen = [...ddl.matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)].map((x) => x[1]);
+        assert.deepStrictEqual(p.mitgliedInhalte.level_verlassen, { mitglied_id: 'loeschen' }, 'level_verlassen nennt Mitglieder, ohne Erklärung');
         assert.deepStrictEqual([...p.guildInhalte.loeschen].sort(), [...tabellen].sort(), 'guildInhalte ≠ Tabellen der Migration');
         assert.ok(p.ereignisse.sendet.includes('leveling.level.erreicht') && p.ereignisse.sendet.includes('leveling.belohnung.vergeben') && p.ereignisse.hoert.includes('automod.verstoss'));
         assert.deepStrictEqual(p.rollen?.map((r) => r.besitzer), ['leveling:community'], 'Belohnungsrollen ohne Besitzer-Erklärung');
@@ -412,6 +454,42 @@ function pruefeVerdrahtung(t) {
         }
     });
 
+    const Daten = require(L('shared/daten'));
+    await pruefe('2l. CSV: Trenner, Kopfzeile, Spalten, Fehler je Zeile, Plan, Lauf, Formelschutz, Frist', () => {
+        const ID1 = '123456789012345678';
+        const ID2 = '223456789012345678';
+        let r = Daten.leseCsv(`﻿user_id;username;XP\r\n${ID1};"a;b";1.234\r\n;;\r\n${ID2};x;"12"\r\n`);
+        assert.deepStrictEqual([r.trenner, r.zeilen.map((z) => [z.zeile, z.mitglied, z.xp]), r.fehlerGesamt], [';', [[2, ID1, 1234], [4, ID2, 12]], 0]);
+        r = Daten.leseCsv(`${ID1},50\n${ID1},60\nabc,1\n${ID2},1.5\n${ID2}\n`);
+        assert.deepStrictEqual(r.fehler.map((f) => [f.zeile, f.grund]), [[2, 'DOPPELT'], [3, 'ID_FALSCH'], [4, 'XP_KEINE_ZAHL'], [5, 'SPALTEN_FEHLEN']]);
+        assert.strictEqual(r.fehler[0].werte.erste, 1);
+        assert.deepStrictEqual(Daten.leseCsv(`id\txp\n"${ID1}"\t"7"`).zeilen.map((z) => z.xp), [7]);
+        r = Daten.leseCsv(`name,id,xp\n"Anna\nB",${ID1},5\nx,${ID2},3`);
+        assert.deepStrictEqual(r.zeilen.map((z) => [z.zeile, z.mitglied, z.xp]), [[2, ID1, 5], [4, ID2, 3]], 'Umbruch im Anführungszeichen verschiebt die Zeilen');
+        const fehler = (text) => { try { Daten.leseCsv(text); return null; } catch (e) { return e.schluessel; } };
+        assert.strictEqual(fehler('name,points\nx,1'), 'CSV_SPALTEN');
+        assert.strictEqual(fehler(' \n\n'), 'CSV_LEER');
+        assert.strictEqual(fehler(`${ID1},"5`), 'CSV_ANFUEHRUNG');
+        assert.strictEqual(fehler('x'.repeat(Daten.GRENZEN.bytes + 1)), 'CSV_ZU_GROSS');
+        assert.strictEqual(Daten.leseCsv(`${ID1},1000000000001`).fehler[0].grund, 'XP_ZU_GROSS');
+        const st = new Map([[ID1, 100]]);
+        const zeilen = [{ mitglied: ID1, xp: 40 }, { mitglied: ID2, xp: 0 }];
+        const setzen = Daten.plane(zeilen, st, 'setzen');
+        assert.deepStrictEqual(setzen.eintraege.map((e) => [e.vorher, e.nachher, e.menge, e.neu]), [[100, 40, -60, false], [0, 0, 0, true]]);
+        assert.deepStrictEqual([setzen.aendern, setzen.neu, setzen.gleich, setzen.summeVorher, setzen.summeNachher], [1, 0, 1, 100, 40]);
+        assert.deepStrictEqual(Daten.plane(zeilen, st, 'addieren').eintraege.map((e) => e.menge), [40, 0]);
+        assert.throws(() => Daten.plane(zeilen, st, 'ersetzen'), (e) => e.schluessel === 'FALSCHER_MODUS');
+        assert.strictEqual(Daten.laufVon('addieren', zeilen), Daten.laufVon('addieren', zeilen), 'dieselbe Datei addiert zweimal');
+        assert.notStrictEqual(Daten.laufVon('addieren', zeilen), Daten.laufVon('addieren', [{ mitglied: ID1, xp: 41 }]));
+        assert.notStrictEqual(Daten.laufVon('setzen', zeilen), Daten.laufVon('setzen', zeilen), 'setzen braucht je Probe einen neuen Lauf');
+        assert.ok(Daten.LAUF.test(Daten.laufVon('setzen', zeilen)) && Daten.LAUF.test(Daten.laufVon('addieren', zeilen)));
+        assert.strictEqual(Daten.zeile(['=HYPERLINK("x")', '-1', -1, '@a', 'a,b', null]), `"'=HYPERLINK(""x"")",'-1,-1,'@a,"a,b",\r\n`);
+        assert.deepStrictEqual(Daten.pruefeVerlassen({ verlassen: 'loeschen', verlassen_tage: '0' }), { verlassen: 'loeschen', verlassen_tage: 0 });
+        assert.throws(() => Daten.pruefeVerlassen({ verlassen: 'loeschen', verlassen_tage: '-1' }), (e) => e.schluessel === 'KEINE_ZAHL');
+        assert.throws(() => Daten.pruefeVerlassen({ verlassen: 'loeschen', verlassen_tage: '3654' }), (e) => e.schluessel === 'AUSSERHALB');
+        assert.throws(() => Daten.pruefeVerlassen({ verlassen: 'weg', verlassen_tage: '3' }), (e) => e.schluessel === 'FALSCHE_ART');
+    });
+
     // ── 3: Läufe an TEMPORARY-Kopien ─────────────────────────────────────────
     const mysql = require('mysql2/promise');
     const c = await mysql.createConnection({ host: process.env.MYSQL_HOST, port: process.env.MYSQL_PORT,
@@ -441,6 +519,13 @@ function pruefeVerdrahtung(t) {
     await require(path.join(WURZEL, 'migrations/kern/20261114_235000_fortschritt.js')).up(fange);
     await require(path.join(WURZEL, 'migrations/kern/20261113_200000_ereignisbuch.js')).up(fange);
     await require(L('migrations/20261115_130000_baseline.js')).up(fange);
+    // LV-1i Teil 2: Die neue Spalte kommt per ALTER; hier gleich in die Kopie, nie ALTER auf einen Namen der echten Datenbank.
+    await require(L('migrations/20261115_200000_verlassen.js')).up(fange);
+    const spalte = /ALTER TABLE level_einstellungen ADD COLUMN (verlassen_tage [^"]*?) AFTER verlassen/.exec(ddl.join('\n'));
+    if (!spalte) throw new Error('Migration verlassen: ALTER für verlassen_tage nicht gefunden');
+    for (let i = 0; i < ddl.length; i++) {
+        if (/CREATE TABLE IF NOT EXISTS level_einstellungen/.test(ddl[i])) ddl[i] = ddl[i].replace(/(verlassen\s+ENUM\('behalten','loeschen'\) NOT NULL DEFAULT 'behalten',)/, `$1 ${spalte[1]},`);
+    }
     await require(path.join(WURZEL, 'migrations/kern/20261114_230000_rollen_vergaben.js')).up(fange);
     for (const s of ddl.filter((x) => /CREATE TABLE IF NOT EXISTS (fortschritt_|level_|ereignisbuch\b|rollen_vergaben\b)/.test(x))) {
         await c.query(s.replace('CREATE TABLE IF NOT EXISTS', 'CREATE TEMPORARY TABLE').replace(/,\s*CONSTRAINT[\s\S]*?ON DELETE CASCADE/, ''));
@@ -957,6 +1042,135 @@ function pruefeVerdrahtung(t) {
         assert.strictEqual(r.statusCode, 400);
     });
 
+    await pruefe('3u. Rangliste, Export, Import, Nachrechnen, Frist beim Verlassen, Zurücksetzen (LV-1i Teil 2)', async () => {
+        const G7 = '100000000000000007';
+        const [M0, M1, M2] = ['300000000000000071', '300000000000000072', '300000000000000073'];
+        const ICH = '300000000000000079';
+        const gerendert = [];
+        ServiceManager.register('themeManager', { renderView: async (res, view, daten) => { gerendert.push({ view, daten }); }, getLayout: () => null });
+        ServiceManager.register('ipcServer', { broadcast: async () => [] });
+        ServiceManager.register('permissionManager', { hasPermission: async () => true });
+        const router = require(L('dashboard/routes/guild.router'));
+        const ruf = async (methode, weg, { body = {}, query = {} } = {}) => {
+            const schicht = router.stack.find((x) => x.route?.path === weg && x.route.methods[methode]);
+            assert.ok(schicht, `${methode} ${weg} fehlt`);
+            const res = { locals: { guildId: G7 }, statusCode: 200, body: null, text: '', kopf: {},
+                status(c) { this.statusCode = c; return this; }, json(b) { this.body = b; return this; }, render() { this.statusCode = 500; return this; },
+                setHeader(k, v) { this.kopf[k.toLowerCase()] = v; }, type() { return this; }, send(t) { this.text += t; return this; },
+                write(t) { this.text += t; }, end() { return this; }, destroy(e) { this.zerstoert = e; return this; } };
+            await schicht.route.stack.at(-1).handle({ body, params: {}, query, session: { user: { info: { id: ICH } } }, translate: (k) => k }, res);
+            return res;
+        };
+        const xp7 = async (m) => Number((await q('SELECT xp FROM fortschritt_stand WHERE guild_id = ? AND kennung = ? AND mitglied_id = ?', [G7, K, m]))[0]?.xp ?? -1);
+        const imports = async () => q("SELECT mitglied_id, menge, akteur, schluessel FROM fortschritt_buchungen WHERE guild_id = ? AND quelle = 'import' ORDER BY id", [G7]);
+        const csv = `mitglied_id,xp\n${M0},40\n${M1},250\n${M2},0\n`;
+
+        let r = await ruf('post', '/daten/import', { body: csv, query: { modus: 'setzen', probe: '1' } });
+        assert.ok(r.statusCode === 400 && r.body.message === 'leveling:EINSTELLEN.NICHT_EINGERICHTET', 'Import ohne Einrichtung');
+        await spieleStartwerteEin(ServiceManager.get('dbService'), G7);
+        await Fortschritt.buche({ guildId: G7, kennung: K, mitglied: M0, menge: 100, quelle: 'nachricht', schluessel: 'msg:7001' });
+
+        r = await ruf('post', '/daten/import', { body: csv, query: { modus: 'setzen', probe: '1' } });
+        assert.ok(r.body?.success && r.body.probe, JSON.stringify(r.body));
+        assert.deepStrictEqual([r.body.zeilen, r.body.aendern, r.body.neu, r.body.gleich, r.body.summeVorher, r.body.summeNachher], [3, 2, 1, 1, 100, 290]);
+        assert.ok(/^[0-9a-f]{16}$/.test(r.body.lauf));
+        assert.deepStrictEqual([await xp7(M0), (await imports()).length], [100, 0], 'Probelauf hat geschrieben');
+        const lauf = r.body.lauf;
+        r = await ruf('post', '/daten/import', { body: `${csv}${M2}x,5\n`, query: { modus: 'setzen', lauf } });
+        assert.ok(r.statusCode === 400 && r.body.fehlerGesamt === 1 && r.body.fehler.length === 1, JSON.stringify(r.body));
+        assert.strictEqual(await xp7(M0), 100, 'mit Zeilenfehler gebucht');
+        r = await ruf('post', '/daten/import', { body: csv, query: { modus: 'setzen' } });
+        assert.ok(r.statusCode === 400 && r.body.message === 'leveling:EINSTELLEN.IMPORT_OHNE_PROBE', 'ohne Lauf gebucht');
+        r = await ruf('post', '/daten/import', { body: csv, query: { modus: 'setzen', lauf, ab: '0' } });
+        assert.ok(r.body?.success && r.body.fertig && r.body.gebucht === 2 && r.body.ab === 3, JSON.stringify(r.body));
+        assert.deepStrictEqual([await xp7(M0), await xp7(M1), await xp7(M2)], [40, 250, -1], 'setzen');
+        const b = await imports();
+        assert.deepStrictEqual(b.map((x) => [String(x.mitglied_id), Number(x.menge), String(x.akteur), x.schluessel]),
+            [[M0, -60, ICH, `import:${lauf}:${M0}`], [M1, 250, ICH, `import:${lauf}:${M1}`]]);
+        r = await ruf('post', '/daten/import', { body: csv, query: { modus: 'setzen', lauf, ab: '0' } });
+        assert.ok(r.body.fertig && r.body.gebucht === 0, 'Wiederholung bucht noch einmal');
+
+        r = await ruf('post', '/daten/import', { body: csv, query: { modus: 'addieren', probe: '1' } });
+        const plus = r.body.lauf;
+        assert.strictEqual((await ruf('post', '/daten/import', { body: csv, query: { modus: 'addieren', probe: '1' } })).body.lauf, plus);
+        r = await ruf('post', '/daten/import', { body: csv, query: { modus: 'addieren', lauf: plus } });
+        assert.ok(r.body.fertig && r.body.gebucht === 2, JSON.stringify(r.body));
+        r = await ruf('post', '/daten/import', { body: csv, query: { modus: 'addieren', lauf: plus } });
+        assert.ok(r.body.fertig && r.body.gebucht === 0 && r.body.doppelt === 2, `dieselbe Datei zweimal addiert: ${JSON.stringify(r.body)}`);
+        assert.deepStrictEqual([await xp7(M0), await xp7(M1)], [80, 500]);
+        assert.strictEqual((await ruf('post', '/daten/import', { body: csv, query: { modus: 'addieren', probe: '1' } })).body.schon, 2);
+
+        r = await ruf('get', '/daten/export/staende.csv');
+        assert.ok(/^text\/csv/.test(r.kopf['content-type']) && /^attachment; filename="leveling-staende-100000000000000007-/.test(r.kopf['content-disposition']));
+        const zurueck = Daten.leseCsv(r.text);
+        assert.deepStrictEqual(zurueck.zeilen.map((z) => [z.mitglied, z.xp]), [[M1, 500], [M0, 80]], 'Export lässt sich nicht wieder einlesen');
+        r = await ruf('get', '/daten/export/buchungen.csv');
+        const zeilenB = r.text.trim().split('\r\n');
+        const [{ n: anzahlB }] = await q('SELECT COUNT(*) AS n FROM fortschritt_buchungen WHERE guild_id = ? AND kennung = ?', [G7, K]);
+        assert.ok(zeilenB[0].startsWith('zeit,mitglied_id,menge') && zeilenB.length === Number(anzahlB) + 1, `Buchungen: ${zeilenB.length} Zeilen für ${anzahlB}`);
+        assert.ok(!r.zerstoert);
+
+        r = await ruf('get', '/daten/nachrechnen');
+        assert.deepStrictEqual([r.body.success, r.body.geprueft, r.body.anzahl], [true, 2, 0], JSON.stringify(r.body));
+        await q('UPDATE fortschritt_stand SET xp = xp + 1 WHERE guild_id = ? AND kennung = ? AND mitglied_id = ?', [G7, K, M0]);
+        r = await ruf('get', '/daten/nachrechnen');
+        assert.deepStrictEqual([r.body.anzahl, r.body.abweichungen[0].mitglied_id], [1, M0], 'Abweichung nicht gefunden');
+        await q('UPDATE fortschritt_stand SET xp = xp - 1 WHERE guild_id = ? AND kennung = ? AND mitglied_id = ?', [G7, K, M0]);
+
+        await ruf('get', '/rangliste', { query: { zeitraum: 'woche' } });
+        let seite = gerendert.at(-1);
+        assert.deepStrictEqual([seite.view, seite.daten.zeitraum, seite.daten.rangliste.eintraege.map((e) => e.mitglied_id)], ['guild/leveling-rangliste', 'woche', [M1, M0]]);
+        await ruf('get', '/rangliste', { query: { zeitraum: 'x; DROP', seite: '-4' } });
+        seite = gerendert.at(-1);
+        assert.deepStrictEqual([seite.daten.zeitraum, seite.daten.rangliste.seite], ['gesamt', 1]);
+        await ruf('get', '/daten');
+        seite = gerendert.at(-1).daten;
+        assert.deepStrictEqual([seite.zahlen.mitglieder, seite.zahlen.vermerke, seite.darfZuruecksetzen, seite.guildName], [2, 0, true, G7]);
+        assert.ok(Number.isInteger(seite.verdichtungTage) && seite.verdichtungTage > 0, `Verdichtung: ${seite.verdichtungTage}`);
+
+        const { beimVerlassen, beimBeitritt } = require(L('bot/verlassen'));
+        const { raeumeAuf } = require(L('dashboard/verlassen'));
+        const mitglied = (id) => ({ id, guild: { id: G7 }, user: { bot: false } });
+        const vermerke = async () => (await q('SELECT mitglied_id FROM level_verlassen WHERE guild_id = ? ORDER BY mitglied_id', [G7])).map((z) => String(z.mitglied_id));
+        await beimVerlassen(mitglied(M1));
+        assert.deepStrictEqual(await vermerke(), [], 'vermerkt, obwohl „behalten“');
+        r = await ruf('put', '/daten/verlassen', { body: { verlassen: 'loeschen', verlassen_tage: '0' } });
+        assert.ok(r.body.success, JSON.stringify(r.body));
+        await q('INSERT INTO level_zaehler (guild_id, mitglied_id, nachrichten) VALUES (?, ?, 5), (?, ?, 3)', [G7, M1, G7, M0]);
+        await beimVerlassen(mitglied(M1));
+        await beimVerlassen(mitglied(M0));
+        await beimBeitritt(mitglied(M0));
+        assert.deepStrictEqual(await vermerke(), [M1], 'Rückkehr nicht gestrichen');
+        let n = await raeumeAuf();
+        assert.deepStrictEqual([n.geloescht, n.fehler], [1, 0], JSON.stringify(n));
+        assert.deepStrictEqual([await xp7(M1), await xp7(M0), await vermerke()], [-1, 80, []], 'Frist 0: nicht in der Nacht gelöscht oder zu viel');
+        assert.deepStrictEqual((await q('SELECT mitglied_id FROM level_zaehler WHERE guild_id = ?', [G7])).map((z) => String(z.mitglied_id)), [M0], 'Zähler bleiben');
+        assert.strictEqual(Number((await q('SELECT COUNT(*) AS n FROM fortschritt_buchungen WHERE guild_id = ? AND mitglied_id = ?', [G7, M1]))[0].n), 0, 'Verlauf bleibt');
+        r = await ruf('put', '/daten/verlassen', { body: { verlassen: 'loeschen', verlassen_tage: '30' } });
+        await beimVerlassen(mitglied(M0));
+        n = await raeumeAuf();
+        assert.deepStrictEqual([n.geloescht, await xp7(M0), await vermerke()], [0, 80, [M0]], 'vor der Frist gelöscht');
+        r = await ruf('put', '/daten/verlassen', { body: { verlassen: 'behalten', verlassen_tage: '30' } });
+        assert.deepStrictEqual(await vermerke(), [], '„behalten“ lässt Vermerke liegen');
+        r = await ruf('put', '/daten/verlassen', { body: { verlassen: 'loeschen', verlassen_tage: 'x' } });
+        assert.ok(r.statusCode === 400 && r.body.message === 'leveling:EINSTELLEN.KEINE_ZAHL', JSON.stringify(r.body));
+
+        r = await ruf('get', '/daten/zuruecksetzen-probe');
+        assert.deepStrictEqual([r.body.success, r.body.name, r.body.mitglieder], [true, G7, 1], JSON.stringify(r.body));
+        r = await ruf('post', '/daten/zuruecksetzen', { body: { bestaetigung: 'falsch' } });
+        assert.ok(r.statusCode === 400 && await xp7(M0) === 80, 'falscher Name setzt zurück');
+        const stufenVorher = (await q('SELECT COUNT(*) AS n FROM fortschritt_stufen WHERE guild_id = ? AND kennung = ?', [G7, K]))[0].n;
+        await Fortschritt.buche({ guildId: ANDERE, kennung: K, mitglied: M0, menge: 7, quelle: 'nachricht', schluessel: 'msg:7002' });
+        r = await ruf('post', '/daten/zuruecksetzen', { body: { bestaetigung: ` ${G7} ` } });
+        assert.ok(r.body?.success, JSON.stringify(r.body));
+        const rest = async (t) => Number((await q(`SELECT COUNT(*) AS n FROM ${t} WHERE guild_id = ?`, [G7]))[0].n);
+        assert.deepStrictEqual([await rest('fortschritt_stand'), await rest('fortschritt_buchungen'), await rest('level_zaehler')], [0, 0, 0], 'nicht alles zurückgesetzt');
+        assert.ok(Number(stufenVorher) > 0 && await rest('fortschritt_stufen') === Number(stufenVorher) && await rest('level_einstellungen') === 1, 'Stufen oder Einstellungen mitgelöscht');
+        assert.ok((await q('SELECT xp FROM fortschritt_stand WHERE guild_id = ? AND mitglied_id = ?', [ANDERE, M0]))[0]?.xp >= 7, 'andere Guild mit zurückgesetzt');
+        r = await ruf('post', '/daten/import', { body: csv, query: { modus: 'setzen', probe: '1' } });
+        assert.ok(r.body.success && r.body.aendern === 2, 'nach dem Zurücksetzen nicht wieder benutzbar');
+    });
+
     await c.end();
     assert.deepStrictEqual(gesehen, [], `Fehler im Log: ${gesehen.join(' | ')}`);
 
@@ -1000,6 +1214,16 @@ function pruefeVerdrahtung(t) {
     await rot('XP-Regeln ohne Prüfung', mit('router', 'Einstellen.pruefeXp(req.body)', 'req.body'));
     await rot('Ausschlüsse ohne Doppelprüfung', mit('router', 'Einstellen.istDoppelt(regel, vorhanden)', 'false'));
     await rot('Kern-Teil meldet kein Zeichnen', mit('kernStufen', "new CustomEvent('fortschritt-stufen:gezeichnet'", "new CustomEvent('anders'"));
+
+    await rot('Import mit anderem Recht', mit('router', "router.post('/daten/import', csrfProtection, requirePermission('LEVELING.DATA.RESET')", "router.post('/daten/import', csrfProtection, requirePermission('LEVELING.VIEW')"));
+    await rot('Zurücksetzen ohne CSRF', mit('router', "router.post('/daten/zuruecksetzen', csrfProtection, ", "router.post('/daten/zuruecksetzen', "));
+    await rot('Zurücksetzen ohne Besitzer-Schutz', mit('router', "router.post('/daten/zuruecksetzen', csrfProtection, requirePermission('LEVELING.DATA.RESET'), requireBesitzerInKontrollGuild(), ", "router.post('/daten/zuruecksetzen', csrfProtection, requirePermission('LEVELING.DATA.RESET'), "));
+    await rot('Import trotz Zeilenfehlern', mit('router', 'if (gelesen.fehlerGesamt)', 'if (false)'));
+    await rot('Import ohne Lauf im Schlüssel', mit('router', 'schluessel: `import:${lauf}:${e.mitglied}`', 'schluessel: null'));
+    await rot('Zurücksetzen ohne Namen', mit('router', "!== name.trim().toLowerCase()) {", "!== name.trim().toLowerCase() && false) {"));
+    await rot('Navigation Datenverwaltung mit anderem Recht', mit('dashboard', "capability: 'LEVELING.DATA.EXPORT'", "capability: 'LEVELING.VIEW'"));
+    await rot('Rückkehr nicht gestrichen', mit('beitritt', 'beimBeitritt(member)', 'null'));
+    await rot('Nachtlauf nicht eingetragen', mit('dashboard', "Zeitplan.eintragen('leveling:verlassen'", "Zeitplan.eintragen('leveling:anders'"));
 
     console.log(fehler ? `\n✗ ${fehler} Prüfung(en) rot` : '\n✓ alles grün');
     process.exit(fehler ? 1 : 0);

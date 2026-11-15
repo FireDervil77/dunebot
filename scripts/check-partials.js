@@ -88,6 +88,13 @@ const HANDLER = {
         buch: true,
         partialAlt: 'alle Eintraege des Mitglieds in dieser Guild gehen, ohne Fehler',
     },
+    // Leveling (LV-1i Teil 2): vermerkt, wer geht; geloescht wird nach der
+    // Frist nachts im Dashboard. Braucht nur id und guild.id.
+    'plugins/leveling/bot/events/guildMemberRemove.js': {
+        ereignis: 'guildMemberRemove',
+        vermerk: true,
+        partialAlt: 'Verlassen vermerkt (Mitglied 4 in Guild 1), ohne Fehler, nichts gesendet',
+    },
 };
 
 /** Ein Client, eine Gilde mit Ziel-Kanal, Attrappen fuer DB und Logger. */
@@ -104,6 +111,7 @@ function aufbau(partials) {
 
     const abfragen = [];
     const geloescht = [];
+    const vermerkt = [];
     const fehlerLog = [];
     ServiceManager.register('dbService', {
         query: async (sql, werte) => {
@@ -115,6 +123,11 @@ function aufbau(partials) {
             if (/FROM guild_vorlagen/.test(sql)) {
                 const text = { 'greeting:boost': 'Boost {member:name}', 'greeting:abschied': 'Tschuess {member:name}' }[werte[1]];
                 return text ? [{ inhalt: JSON.stringify({ form: 'text', text }) }] : [];
+            }
+            // Leveling (LV-1i Teil 2): Vermerk beim Verlassen.
+            if (/^\s*INSERT INTO level_verlassen /.test(sql)) {
+                vermerkt.push({ sql, werte });
+                return { affectedRows: 1 };
             }
             // Kern (G-07): das Buch der Rollenvergabe.
             if (/^DELETE FROM rollen_vergaben WHERE /.test(sql)) {
@@ -128,7 +141,7 @@ function aufbau(partials) {
         info() {}, warn() {}, debug() {},
         error: (...a) => fehlerLog.push(a.map((x) => (x && x.message) || String(x)).join(' ')),
     });
-    return { client, guild, gesendet, abfragen, geloescht, fehlerLog };
+    return { client, guild, gesendet, abfragen, geloescht, vermerkt, fehlerLog };
 }
 
 /** Laesst discord.js selbst ein Ereignis erzeugen und gibt dessen Argumente zurueck. */
@@ -191,9 +204,24 @@ const updateDaten = (premium) => ({
     });
 
     for (const datei of gefunden.filter((f) => HANDLER[f])) {
-        const { ereignis, partialAlt, gegenprobe, buch } = HANDLER[datei];
+        const { ereignis, partialAlt, gegenprobe, buch, vermerk } = HANDLER[datei];
         const handler = require(path.join(WURZEL, datei));
         const kurz = datei.replace(/^plugins\//, '').replace('/bot/events/', ': ');
+
+        if (vermerk) {
+            await pruefe(`${kurz} — ungecacht: ${partialAlt}`, async () => {
+                const { client, gesendet, vermerkt, fehlerLog } = aufbau(partials);
+                const args = erzeuge(client, ereignis, () =>
+                    client.actions.GuildMemberRemove.handle({ guild_id: '1', user: NUTZER }, { status: Status.Ready }));
+                assert.strictEqual(args[0].partial, true);
+                await handler(...args);
+                assert.deepStrictEqual(fehlerLog, []);
+                assert.deepStrictEqual(gesendet, []);
+                assert.strictEqual(vermerkt.length, 1, `vermerkt: ${vermerkt.length}`);
+                assert.deepStrictEqual(vermerkt[0].werte, ['4', '1']);
+            });
+            continue;
+        }
 
         if (buch && ereignis === 'guildMemberUpdate') {
             await pruefe(`${kurz} — ungecacht: ${partialAlt}`, async () => {

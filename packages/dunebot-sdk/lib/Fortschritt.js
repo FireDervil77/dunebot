@@ -800,6 +800,28 @@ async function loescheKennung({ guildId, kennung }) {
 }
 
 /**
+ * Alle Stände einer Kennung auf null: Buchungen, Stand und Saisonstand gehen,
+ * Stufentabelle, Einstellungen (Prestige) und die Saisons selbst bleiben
+ * (Leveling „ganze Guild zurücksetzen“, LV-1i). Anders als `loescheKennung`
+ * ist der Fortschritt danach sofort wieder benutzbar.
+ *
+ * @returns {Promise<{fortschritt_saison_stand, fortschritt_buchungen, fortschritt_stand}>} gelöschte Zeilen
+ */
+async function setzeZurueck({ guildId, kennung }) {
+    const g = pruefeGuild(guildId);
+    brauche(kennung);
+    return transaktion(async (q) => {
+        const n = async (sql, w) => Number((await q(sql, w))?.affectedRows || 0);
+        return {
+            fortschritt_saison_stand: await n(`DELETE ss FROM fortschritt_saison_stand ss JOIN fortschritt_saisons s ON s.id = ss.saison_id
+                                               WHERE s.guild_id = ? AND s.kennung = ?`, [g, kennung]),
+            fortschritt_buchungen: await n('DELETE FROM fortschritt_buchungen WHERE guild_id = ? AND kennung = ?', [g, kennung]),
+            fortschritt_stand: await n('DELETE FROM fortschritt_stand WHERE guild_id = ? AND kennung = ?', [g, kennung]),
+        };
+    });
+}
+
+/**
  * Alle Fortschritte eines Plugins in einer Guild löschen, auch die zur
  * Laufzeit entstandenen (`clan:<id>`) samt Gesamt-Tabellen. Ruft der Kern beim
  * Abschalten des Plugins in dieser Guild (`PluginManager.disableInGuild`,
@@ -908,7 +930,7 @@ module.exports = {
     // Saisons
     legeSaisonAn, saisons, beendeSaison, beendeFaellige, loescheSaison,
     // Aufräumen
-    entferneMitglied, loescheKennung, loeschePlugin, verdichte, pruefe,
+    entferneMitglied, setzeZurueck, loescheKennung, loeschePlugin, verdichte, pruefe,
     // Erklärungen
     erklaerungen, erklaerungFuer, pruefeForm,
     Eingabefehler, SCHABLONEN, QUELLEN, STUFEN_MAX, KENNUNG, MUSTER,
