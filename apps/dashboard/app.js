@@ -673,7 +673,11 @@ module.exports = class App {
                         "'self'", 
                         "data:" // Font-Data-URLs
                     ],
-                    imgSrc: ["'self'", "data:", "https:", "http:"],
+                    // blob: für Bilder, die eine Seite selbst abholt und als
+                    // Objekt-URL zeigt (Vorschau der Bildkarten, G-22, und
+                    // „Meine Karten“ im Profil). Ohne blob: blockt der Browser
+                    // das Bild still, die Vorschau bleibt leer.
+                    imgSrc: ["'self'", "data:", "blob:", "https:", "http:"],
                     connectSrc: [
                         "'self'", 
                         "ws:", 

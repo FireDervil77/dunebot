@@ -836,6 +836,28 @@ function stubMember(nick = 'Anna') {
         ServiceManager.register('dbService', { async query() { return []; } });
     });
 
+    await pruefe('13k. Vorschau als Objekt-URL: CSP erlaubt blob: für Bilder', async () => {
+        // Die Seiten holen die Vorschau mit fetch und setzen sie als blob:-URL
+        // ins <img>. Fehlt blob: in img-src, blockt der Browser still
+        // (gemeldet 2026-11-15, seit G-22 leer).
+        const ansichten = [];
+        const suche = (ordner) => {
+            for (const e of fs.readdirSync(path.join(WURZEL, ordner), { withFileTypes: true })) {
+                const rel = path.join(ordner, e.name);
+                if (e.isDirectory()) { if (!/node_modules|vendor/.test(e.name)) suche(rel); continue; }
+                if (!e.name.endsWith('.ejs')) continue;
+                const t = ohneKommentareEjs(lies(rel));
+                if (/createObjectURL\(await \w+\.blob\(\)\)/.test(t) && /\.src = /.test(t)) ansichten.push(rel);
+            }
+        };
+        suche('apps/dashboard/themes');
+        assert(ansichten.length >= 2, `zu wenige Vorschau-Ansichten gefunden: ${ansichten.join(', ')}`);
+        const app = ohneKommentare(lies('apps/dashboard/app.js'));
+        const img = app.match(/imgSrc:\s*\[([^\]]*)\]/);
+        assert(img, 'imgSrc nicht gefunden');
+        assert(/"blob:"|'blob:'/.test(img[1]), `imgSrc ohne blob:, Vorschau bleibt leer in ${ansichten.join(', ')}`);
+    });
+
     console.log(`\n${gruen} grün, ${rot} rot`);
     process.exitCode = rot ? 1 : 0;
 })().catch((err) => {
