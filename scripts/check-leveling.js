@@ -985,6 +985,28 @@ function pruefeVerdrahtung(t) {
         assert.strictEqual(fertig[3].flags, V2, 'leere Rangliste nicht als Liste');
     });
 
+    await pruefe('3r2. Bildkarten-Marke der Rangliste: „an“ nur bei „Als Bild“', async () => {
+        // Betreiber 2026-11-15: Der Bereich Bildkarten zeigte „an“, obwohl
+        // /leaderboard als Liste kam und die Karte gar nicht benutzt wurde.
+        const echt = ServiceManager.get('dbService');
+        let pluginAn = true;
+        ServiceManager.register('dbService', { ...echt, query: async (s, w) => (/FROM guild_plugins/.test(String(s)) ? (pluginAn ? [{ x: 1 }] : []) : echt.query(s, w)) });
+        try {
+            const { stand } = require(L('shared/rangliste'));
+            const G5 = '100000000000000099';
+            await q("INSERT INTO level_einstellungen (guild_id, rangliste_form) VALUES (?, 'bild')", [G5]);
+            assert.strictEqual((await stand(G5)).an, true, 'Als Bild, aber nicht an');
+            await q("UPDATE level_einstellungen SET rangliste_form = 'liste' WHERE guild_id = ?", [G5]);
+            assert.strictEqual((await stand(G5)).an, false, 'Als Liste, aber an');
+            await q("UPDATE level_einstellungen SET rangliste_form = 'bild' WHERE guild_id = ?", [G5]);
+            pluginAn = false;
+            assert.strictEqual((await stand(G5)).an, false, 'Leveling aus, aber an');
+            await q('DELETE FROM level_einstellungen WHERE guild_id = ?', [G5]);
+        } finally {
+            ServiceManager.register('dbService', echt);
+        }
+    });
+
     const rank = require(L('bot/commands/rank'));
     await pruefe('3s. /rank zeichnet die Rangkarte über den Kern, Bots nicht', async () => {
         const fertig = [];

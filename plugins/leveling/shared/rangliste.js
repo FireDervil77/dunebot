@@ -41,14 +41,22 @@ function werte({ titel, untertitel, seite, unten, eintraege = [] }) {
 }
 
 /**
- * Für den Kern-Bereich „Bildkarten“ (G-21): an, wo Leveling an ist.
- * Keine Laufzeitwerte, die Seite zeigt die Beispielwerte der Vorlage.
+ * Für den Kern-Bereich „Bildkarten“ (G-21): an nur, wo Leveling an ist UND
+ * `/leaderboard` als Bild kommt (`rangliste_form = 'bild'`). Bei „Als Liste“
+ * benutzt der Bot die Karte nicht, die Marke darf dann nicht „an“ sagen
+ * (Betreiber 2026-11-15). Keine Laufzeitwerte, die Seite zeigt die
+ * Beispielwerte der Vorlage.
  *
  * @param {string} guildId
  * @returns {Promise<{an: boolean, werte: null}>}
  */
 async function stand(guildId) {
-    return require('./rangkarte').stand(guildId);
+    const s = await require('./rangkarte').stand(guildId);
+    if (!s.an) return s;
+    const { ServiceManager } = require('dunebot-core');
+    const zeilen = await ServiceManager.get('dbService').query(
+        'SELECT rangliste_form FROM level_einstellungen WHERE guild_id = ?', [String(guildId)]);
+    return { an: zeilen?.[0]?.rangliste_form === 'bild', werte: null };
 }
 
 module.exports = { KARTE, ZEILEN, werte, stand };
