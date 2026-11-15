@@ -1,9 +1,9 @@
 'use strict';
 
 const { ApplicationCommandOptionType } = require('discord.js');
-const { ServiceManager } = require('dunebot-core');
 const { EmbedUtils } = require('dunebot-sdk/utils');
 const { sync } = require('../sync');
+const { darf } = require('../recht');
 
 /**
  * `/levels sync` — Belohnungsrollen aller Mitglieder an ihre Stufe angleichen
@@ -45,18 +45,9 @@ module.exports = {
 };
 
 const RECHT = 'LEVELING.REWARDS.MANAGE';
-const FRIST_MS = 15_000;
 /** Danach ist die Antwort nicht mehr änderbar (Discord: 15 min). */
 const ANTWORT_MS = 14 * 60 * 1000;
 const HOECHSTENS_ZEILEN = 15;
-
-async function darf(guild, user) {
-    const ipc = ServiceManager.get('ipcClient');
-    if (!ipc) return { darf: false, fehler: 'keine Verbindung zum Dashboard' };
-    const a = await ipc.sendToDashboard('core:RECHT_PRUEFEN', { guild_id: guild.id, actor_user_id: user.id, recht: RECHT }, FRIST_MS);
-    if (!a?.success) return { darf: false, fehler: a?.error || 'keine Antwort' };
-    return { darf: a.data?.darf === true, fehler: null };
-}
 
 /**
  * @param {import('discord.js').ChatInputCommandInteraction} interaction bereits verschoben (ephemeral)
@@ -65,7 +56,7 @@ async function levelsSync(interaction) {
     const { guild, user } = interaction;
     const t = (k, w) => guild.getT(`leveling:LEVELS.${k}`, w);
 
-    const recht = await darf(guild, user);
+    const recht = await darf(guild, user, RECHT);
     if (recht.fehler) return interaction.editReply({ content: t('KEIN_DASHBOARD', { grund: recht.fehler }) });
     if (!recht.darf) return interaction.editReply({ content: t('KEIN_RECHT', { recht: RECHT }) });
 

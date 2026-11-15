@@ -95,6 +95,38 @@
     </div>
 
     <div class="col-lg-7">
+      <%
+        // Neu mit LV-1f: bis zum Dashboard-Neustart gibt die alte Route sie nicht mit.
+        const kFehlt = typeof ausgabeKanalFehlt !== 'undefined' && ausgabeKanalFehlt;
+        const kName = typeof ausgabeKanalName !== 'undefined' ? ausgabeKanalName : null;
+        const modus = e.ausgabe_modus || 'level_kanal';
+      %>
+      <div class="card mb-3">
+        <div class="card-header">
+          <h3 class="card-title"><i class="fa-solid fa-bullhorn me-2"></i><%= tr('leveling:UEBERSICHT.AUSGABE_TITEL') %></h3>
+        </div>
+        <div class="card-body">
+          <% if (kFehlt) { %>
+            <div class="alert alert-warning mb-3" role="alert">
+              <i class="fa-solid fa-triangle-exclamation me-2"></i><%= tr('leveling:NACHRICHTEN.KANAL_FEHLT') %>
+            </div>
+          <% } %>
+          <dl class="row mb-0">
+            <dt class="col-5"><%= tr('leveling:NACHRICHTEN.MODUS') %></dt>
+            <dd class="col-7"><%= tr('leveling:NACHRICHTEN.MODUS_' + String(modus).toUpperCase()) %></dd>
+            <dt class="col-5"><%= tr('leveling:NACHRICHTEN.KANAL') %></dt>
+            <dd class="col-7"><%= e.ausgabe_kanal ? (kName ? '#' + kName : e.ausgabe_kanal) : tr('leveling:NACHRICHTEN.KANAL_KEINER') %></dd>
+            <dt class="col-5"><%= tr('leveling:NACHRICHTEN.NUR_MEILENSTEINE') %></dt>
+            <dd class="col-7"><%= Number(e.nur_meilensteine) ? tr('leveling:UEBERSICHT.AN') : tr('leveling:UEBERSICHT.AUS') %></dd>
+            <dt class="col-5"><%= tr('leveling:NACHRICHTEN.RANGKARTE') %></dt>
+            <dd class="col-7"><%= Number(e.rangkarte_anhaengen) ? tr('leveling:UEBERSICHT.AN') : tr('leveling:UEBERSICHT.AUS') %></dd>
+          </dl>
+          <a class="btn btn-outline-primary btn-sm mt-3" href="/guild/<%= guildId %>/plugins/leveling/nachrichten">
+            <i class="fa-solid fa-pen me-1"></i> <%= tr('leveling:UEBERSICHT.AUSGABE_EINSTELLEN') %>
+          </a>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-header">
           <h3 class="card-title"><i class="fa-solid fa-ranking-star me-2"></i><%= tr('leveling:UEBERSICHT.RANGLISTE') %></h3>

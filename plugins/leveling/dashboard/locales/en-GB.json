@@ -2,7 +2,8 @@
     "TITEL": "Leveling",
     "NAV": {
         "LEVELING": "Leveling",
-        "UEBERSICHT": "Overview"
+        "UEBERSICHT": "Overview",
+        "NACHRICHTEN": "Messages"
     },
     "FORTSCHRITT": {
         "COMMUNITY": "Community level"
@@ -60,13 +61,58 @@
         "GEBEN": "gets",
         "NEHMEN": "loses",
         "VORHERIGE": "Remove previous level roles",
-        "ROLLENNAMEN_FEHLEN": "The bot did not answer, so role IDs are shown instead of names."
+        "ROLLENNAMEN_FEHLEN": "The bot did not answer, so role IDs are shown instead of names.",
+        "AUSGABE_TITEL": "Level-up message",
+        "AUSGABE_EINSTELLEN": "Configure"
     },
     "FEHLER": {
         "SEITE": "Page could not be loaded",
-        "UEBERSICHT": "The leveling overview could not be loaded."
+        "UEBERSICHT": "The leveling overview could not be loaded.",
+        "NACHRICHTEN": "The Leveling messages page could not be loaded."
     },
     "ROLLEN": {
         "BELOHNUNG": "Leveling: reward per level"
+    },
+    "NACHRICHTEN": {
+        "BESCHREIBUNG": "Where and when the bot announces a level-up, and with which message",
+        "MODUS": "Where",
+        "MODUS_AUS": "No message",
+        "MODUS_KANAL_DER_NACHRICHT": "In the channel where the XP was earned",
+        "MODUS_LEVEL_KANAL": "In the level channel",
+        "MODUS_DIREKTNACHRICHT": "As a direct message",
+        "MODUS_HINWEIS": "“Channel where the XP was earned” means the voice channel's chat for voice XP and the command's channel for /xp.",
+        "KANAL": "Level channel",
+        "KANAL_KEINER": "No channel selected",
+        "KANAL_UNBEKANNT": "Unknown channel ({{id}})",
+        "KANAL_HINWEIS": "With “channel where the XP was earned” it is the fallback when the XP have no channel.",
+        "KANAELE_FEHLEN": "The bot did not answer, so the channel list is missing.",
+        "KANAL_FEHLT": "No level channel is selected. Until then there is no level-up message.",
+        "NUR_MEILENSTEINE": "Only at milestones",
+        "MEILENSTEINE_HINWEIS": "Levels separated by commas, for example 5, 10, 25. Jumping past a milestone counts too.",
+        "RANGKARTE": "Attach the rank card as an image",
+        "RANGKARTE_HINWEIS": "The same card as /rank. Set its look under Image cards.",
+        "RANGKARTE_AUSSEHEN": "Rank card look",
+        "SPEICHERN": "Save",
+        "GESPEICHERT": "Saved. The bot picks it up within 30 seconds.",
+        "NICHT_EINGERICHTET": "Leveling is not set up here yet.",
+        "FALSCHER_MODUS": "This output does not exist.",
+        "FALSCHER_KANAL": "This channel does not exist on the server.",
+        "MEILENSTEINE_FEHLEN": "“Only at milestones” needs at least one level from 1 to 1000.",
+        "FEHLER": "Saving failed. The reason is in the dashboard log.",
+        "MELDUNG_TITEL": "Leveling: no level channel selected",
+        "MELDUNG_TEXT": "Level-up messages go to the level channel, and none is selected here. Until then the bot announces no level-up.",
+        "MELDUNG_KNOPF": "Select channel"
+    },
+    "VORLAGEN": {
+        "AUFSTIEG": "Level-up message",
+        "PH_LEVEL": "New level",
+        "PH_LEVEL_VORHER": "Previous level",
+        "PH_LEVEL_NAME": "Name of the new level (its number if unnamed)",
+        "PH_XP": "Total XP",
+        "PH_XP_FEHLT": "XP to the next level",
+        "PH_RANG": "Position on the all-time leaderboard"
+    },
+    "BILDKARTEN": {
+        "WO_RANGKARTE": "With /rank and, if enabled, on the level-up message"
     }
 }

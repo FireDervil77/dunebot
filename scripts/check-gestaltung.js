@@ -210,7 +210,7 @@ async function main() {
         const f = formFehler(meta);
         assert(!f.length, f.join('\n'));
         const erklaert = Object.keys(meta).filter(p => meta[p].farben).sort();
-        gleich(erklaert, ['giveaway', 'moderation', 'music'], 'erste Nutzer');
+        gleich(erklaert, ['giveaway', 'leveling', 'moderation', 'music'], 'erste Nutzer (leveling seit LV-1g, 2026-11-15)');
     });
     await pruefe('1. Gegenprobe: falscher Wert, fremde Rolle, unbekanntes Recht rot', () => {
         const kaputt = { music: { farben: { recht: 'GIBT.ES.NICHT', seite: '/settings', rollen: { akzent: '#ABC', lila: '#000000' } } } };

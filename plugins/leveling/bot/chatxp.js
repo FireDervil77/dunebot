@@ -83,7 +83,7 @@ async function beiNachricht(message) {
         meldeFehler('Buchen der Chat-XP gescheitert', error);
         return { gebucht: false, grund: 'fehler' };
     }
-    await nachBuchung({ guildId, mitglied, ergebnis, guild: message.guild || null });
+    await nachBuchung({ guildId, mitglied, ergebnis, guild: message.guild || null, kanal: String(message.channelId) });
     return { gebucht: ergebnis.neu, ergebnis };
 }
 

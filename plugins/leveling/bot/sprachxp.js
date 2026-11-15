@@ -142,7 +142,7 @@ async function guildTakt(guild, jetzt) {
         }
         letzterTakt.set(merk, takt);
         if (ergebnis.neu) aus.gebucht++;
-        await nachBuchung({ guildId, mitglied: k.mitglied, ergebnis, guild });
+        await nachBuchung({ guildId, mitglied: k.mitglied, ergebnis, guild, kanal: k.kanal });
     }
     return aus;
 }

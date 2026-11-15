@@ -2,7 +2,8 @@
     "TITEL": "Leveling",
     "NAV": {
         "LEVELING": "Leveling",
-        "UEBERSICHT": "Übersicht"
+        "UEBERSICHT": "Übersicht",
+        "NACHRICHTEN": "Nachrichten"
     },
     "FORTSCHRITT": {
         "COMMUNITY": "Community-Level"
@@ -60,13 +61,58 @@
         "GEBEN": "bekommt",
         "NEHMEN": "verliert",
         "VORHERIGE": "Vorherige Levelrollen entfernen",
-        "ROLLENNAMEN_FEHLEN": "Der Bot hat nicht geantwortet, deshalb stehen hier IDs statt Rollennamen."
+        "ROLLENNAMEN_FEHLEN": "Der Bot hat nicht geantwortet, deshalb stehen hier IDs statt Rollennamen.",
+        "AUSGABE_TITEL": "Level-up-Nachricht",
+        "AUSGABE_EINSTELLEN": "Einstellen"
     },
     "FEHLER": {
         "SEITE": "Seite konnte nicht geladen werden",
-        "UEBERSICHT": "Die Übersicht des Leveling konnte nicht geladen werden."
+        "UEBERSICHT": "Die Übersicht des Leveling konnte nicht geladen werden.",
+        "NACHRICHTEN": "Die Seite Nachrichten des Leveling konnte nicht geladen werden."
     },
     "ROLLEN": {
         "BELOHNUNG": "Leveling: Belohnung je Stufe"
+    },
+    "NACHRICHTEN": {
+        "BESCHREIBUNG": "Wohin und wann der Bot einen Aufstieg meldet, und mit welcher Nachricht",
+        "MODUS": "Wohin",
+        "MODUS_AUS": "Keine Nachricht",
+        "MODUS_KANAL_DER_NACHRICHT": "In den Kanal, in dem die XP entstanden",
+        "MODUS_LEVEL_KANAL": "In den Level-Kanal",
+        "MODUS_DIREKTNACHRICHT": "Als Direktnachricht",
+        "MODUS_HINWEIS": "„Kanal, in dem die XP entstanden“ heißt bei Sprach-XP der Chat des Sprachkanals, bei /xp der Kanal des Befehls.",
+        "KANAL": "Level-Kanal",
+        "KANAL_KEINER": "Kein Kanal gewählt",
+        "KANAL_UNBEKANNT": "Unbekannter Kanal ({{id}})",
+        "KANAL_HINWEIS": "Bei „Kanal, in dem die XP entstanden“ gilt er als Ersatz, wenn die XP keinen Kanal haben.",
+        "KANAELE_FEHLEN": "Der Bot hat nicht geantwortet, deshalb fehlt die Kanalliste.",
+        "KANAL_FEHLT": "Es ist kein Level-Kanal gewählt. Solange gibt es keine Level-up-Nachricht.",
+        "NUR_MEILENSTEINE": "Nur bei Meilensteinen",
+        "MEILENSTEINE_HINWEIS": "Stufen mit Komma getrennt, zum Beispiel 5, 10, 25. Springt jemand über einen Meilenstein, zählt er auch.",
+        "RANGKARTE": "Rangkarte als Bild anhängen",
+        "RANGKARTE_HINWEIS": "Dieselbe Karte wie bei /rank. Ihr Aussehen stellst du unter Bildkarten ein.",
+        "RANGKARTE_AUSSEHEN": "Aussehen der Rangkarte",
+        "SPEICHERN": "Speichern",
+        "GESPEICHERT": "Gespeichert. Der Bot übernimmt es binnen 30 Sekunden.",
+        "NICHT_EINGERICHTET": "Leveling ist hier noch nicht eingerichtet.",
+        "FALSCHER_MODUS": "Diese Ausgabe gibt es nicht.",
+        "FALSCHER_KANAL": "Diesen Kanal gibt es auf dem Server nicht.",
+        "MEILENSTEINE_FEHLEN": "„Nur bei Meilensteinen“ braucht mindestens eine Stufe von 1 bis 1000.",
+        "FEHLER": "Speichern gescheitert. Der Grund steht im Dashboard-Log.",
+        "MELDUNG_TITEL": "Leveling: kein Level-Kanal gewählt",
+        "MELDUNG_TEXT": "Level-up-Nachrichten gehen in den Level-Kanal, und hier ist keiner gewählt. Solange meldet der Bot keinen Aufstieg.",
+        "MELDUNG_KNOPF": "Kanal wählen"
+    },
+    "VORLAGEN": {
+        "AUFSTIEG": "Level-up-Nachricht",
+        "PH_LEVEL": "Neue Stufe",
+        "PH_LEVEL_VORHER": "Stufe davor",
+        "PH_LEVEL_NAME": "Name der neuen Stufe (ohne Namen ihre Zahl)",
+        "PH_XP": "XP gesamt",
+        "PH_XP_FEHLT": "XP bis zur nächsten Stufe",
+        "PH_RANG": "Platz in der Gesamt-Rangliste"
+    },
+    "BILDKARTEN": {
+        "WO_RANGKARTE": "Bei /rank und, wenn eingeschaltet, an der Level-up-Nachricht"
     }
 }

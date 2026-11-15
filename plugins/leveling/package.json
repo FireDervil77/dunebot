@@ -59,6 +59,73 @@
             "seite": "/plugins/leveling/uebersicht"
         }
     ],
+    "vorlagen": {
+        "recht": "LEVELING.CONFIGURE",
+        "platzhalter": [
+            {
+                "name": "level",
+                "bedeutung": "leveling:VORLAGEN.PH_LEVEL",
+                "beispiel": "5"
+            },
+            {
+                "name": "level:vorher",
+                "bedeutung": "leveling:VORLAGEN.PH_LEVEL_VORHER",
+                "beispiel": "4"
+            },
+            {
+                "name": "level:name",
+                "bedeutung": "leveling:VORLAGEN.PH_LEVEL_NAME",
+                "beispiel": "5"
+            },
+            {
+                "name": "xp",
+                "bedeutung": "leveling:VORLAGEN.PH_XP",
+                "beispiel": "1325"
+            },
+            {
+                "name": "xp:fehlt",
+                "bedeutung": "leveling:VORLAGEN.PH_XP_FEHLT",
+                "beispiel": "230"
+            },
+            {
+                "name": "rang",
+                "bedeutung": "leveling:VORLAGEN.PH_RANG",
+                "beispiel": "3"
+            }
+        ],
+        "anlaesse": {
+            "aufstieg": {
+                "titel": "leveling:VORLAGEN.AUFSTIEG",
+                "kern": [
+                    "member",
+                    "guild",
+                    "gestaltung"
+                ],
+                "platzhalter": [
+                    "level",
+                    "level:vorher",
+                    "level:name",
+                    "xp",
+                    "xp:fehlt",
+                    "rang"
+                ]
+            }
+        }
+    },
+    "bildkarten": {
+        "kern:rangkarte": {
+            "wo": "leveling:BILDKARTEN.WO_RANGKARTE",
+            "seite": "nachrichten",
+            "stand": "shared/rangkarte.js"
+        }
+    },
+    "farben": {
+        "recht": "LEVELING.CONFIGURE",
+        "seite": "/nachrichten",
+        "rollen": {
+            "akzent": "#3498db"
+        }
+    },
     "fortschritt": [
         {
             "kennung": "leveling:community",

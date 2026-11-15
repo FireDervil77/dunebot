@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Leveling Stufe 1 (LV-1a bis LV-1e, K382, K394, 2026-11-15).
+ * Leveling Stufe 1 (LV-1a bis LV-1h, K382, K394, 2026-11-15).
  *
  * Geprüft wird:
  *
@@ -12,12 +12,20 @@
  *                   Belohnungen an), automod meldet das Ereignis mit festen
  *                   Gründen, der Kern löscht beim Abschalten die Fortschritte
  *                   des Plugins (nicht in der Kontroll-Guild), `/levels sync`
- *                   fragt das Recht LEVELING.REWARDS.MANAGE im Dashboard
+ *                   fragt das Recht LEVELING.REWARDS.MANAGE im Dashboard;
+ *                   nach jedem Aufstieg die Level-up-Nachricht mit dem Kanal
+ *                   der XP (LV-1f), `/xp` mit Recht LEVELING.XP.MANAGE,
+ *                   Akteur, Pflichtgrund, Ereignis und Bestätigung beim
+ *                   Zurücksetzen (LV-1h), `/rank` und `/leaderboard` über
+ *                   Bildkarte und Fortschritt (LV-1g), Speichern der
+ *                   Nachrichten mit CSRF und Recht, Hinweis „kein Level-Kanal“
  *   2  Regeln       Ausschluss, „nur diese“, Faktoren (Kanal genauester,
  *                   Rolle höchster), Kette Thread → Kanal → Kategorie,
  *                   Menge, Taktung und gleicher Text; Sprache (AFK, allein,
  *                   taub, stumm); Soll-Rollen je Stufe (geben, nehmen,
- *                   vorherige entfernen)
+ *                   vorherige entfernen); Level-up: Meilensteine, wann,
+ *                   wohin, Platzhalter, Vorgabe in beiden Sprachen;
+ *                   Rangkarte: Werte passen zur Schablone
  *   3  Läufe        an TEMPORARY-Kopien von `level_*`, `fortschritt_*` und
  *                   `ereignisbuch` mit echtem SQL: nicht eingerichtet →
  *                   nichts, Startwerte, Buchung `msg:<id>`, Taktung, gleicher
@@ -29,7 +37,10 @@
  *                   über `Rollen` (Discord als Attrappe, TEMPORARY-Kopie von
  *                   `rollen_vergaben`): geben, vorherige entfernen, Storno
  *                   nimmt, Rolle von Hand bleibt, `/levels sync` mit
- *                   ehrlichem Ergebnis
+ *                   ehrlichem Ergebnis; Level-up-Nachricht (Kanal, gesperrt,
+ *                   Vorlage, Meilenstein, Direktnachricht, aus), `/xp` mit
+ *                   Recht/Akteur/Grund/Ereignis/Kürzen/Bestätigung,
+ *                   `/leaderboard` mit Seiten, `/rank` mit Karte
  *   4  Gegenproben  jede Prüfung aus 1 wird an eingebauten Fehlern rot
  *
  * Geschrieben wird nur in TEMPORARY-Tabellen dieser Verbindung.
@@ -70,6 +81,12 @@ const DATEIEN = {
     sprachxp: 'plugins/leveling/bot/sprachxp.js',
     hoerer: 'plugins/leveling/dashboard/hoerer.js',
     levels: 'plugins/leveling/bot/commands/levels.js',
+    recht: 'plugins/leveling/bot/recht.js',
+    nachbuchung: 'plugins/leveling/bot/nachbuchung.js',
+    xp: 'plugins/leveling/bot/commands/xp.js',
+    rank: 'plugins/leveling/bot/commands/rank.js',
+    leaderboard: 'plugins/leveling/bot/commands/leaderboard.js',
+    router: 'plugins/leveling/dashboard/routes/guild.router.js',
     ipc: 'apps/dashboard/helpers/IPCServer.js',
     dashboard: 'plugins/leveling/dashboard/index.js',
     automod: 'plugins/automod/bot/events/messageCreate.js',
@@ -85,7 +102,25 @@ function pruefeVerdrahtung(t) {
     for (const k of ['chatxp', 'sprachxp']) if (!/nachBuchung\(\{/.test(t[k])) aus.push(`${k} geht nicht über nachBuchung`);
     if (!/storniere\([\s\S]*?if \(s\.wechsel\) await nachBuchung/.test(t.chatxp)) aus.push('Storno beim Löschen gleicht die Belohnungen nicht an');
     if (!/if \(s\.wechsel\)[\s\S]*?Belohnungen\.gleicheAb\(/.test(t.hoerer)) aus.push('automod-Storno gleicht die Belohnungen nicht an');
-    if (!/const RECHT = 'LEVELING\.REWARDS\.MANAGE'/.test(t.levels) || !/sendToDashboard\('core:RECHT_PRUEFEN'/.test(t.levels) || !/if \(!recht\.darf\) return/.test(t.levels)) aus.push('/levels sync fragt das Recht nicht im Dashboard');
+    if (!/sendToDashboard\('core:RECHT_PRUEFEN', \{ guild_id: guild\.id, actor_user_id: user\.id, recht \}/.test(t.recht)) aus.push('bot/recht.js fragt nicht core:RECHT_PRUEFEN mit dem verlangten Recht');
+    if (!/const RECHT = 'LEVELING\.REWARDS\.MANAGE'/.test(t.levels) || !/await darf\(guild, user, RECHT\)/.test(t.levels) || !/if \(!recht\.darf\) return/.test(t.levels)) aus.push('/levels sync fragt das Recht nicht im Dashboard');
+    // LV-1f: nach jedem Aufstieg im Bot die Level-up-Nachricht, mit dem Kanal der XP
+    if (!/if \(ergebnis\.aufstieg && ergebnis\.buchung_id\) \{[^}]*if \(guild\) await Ausgabe\.beiAufstieg\(\{ guild, mitglied, ergebnis, kanal \}\)/.test(t.nachbuchung)) aus.push('nachBuchung sendet nach dem Aufstieg keine Level-up-Nachricht');
+    if (!/nachBuchung\(\{[^}]*kanal: String\(message\.channelId\)/.test(t.chatxp)) aus.push('Chat-XP nennen den Kanal der Nachricht nicht');
+    if (!/nachBuchung\(\{[^}]*kanal: k\.kanal/.test(t.sprachxp)) aus.push('Sprach-XP nennen den Sprachkanal nicht');
+    // LV-1h: /xp nur mit Recht, Buchung mit Akteur und Grund, Zurücksetzen erst nach Bestätigung
+    if (!/const RECHT = 'LEVELING\.XP\.MANAGE'/.test(t.xp) || !/await darf\(guild, user, RECHT\)/.test(t.xp) || !/if \(!recht\.darf\) return/.test(t.xp)) aus.push('/xp fragt das Recht LEVELING.XP.MANAGE nicht');
+    const buchung = /Fortschritt\.buche\(\{([\s\S]*?)\}\)/.exec(t.xp);
+    if (!buchung || !/quelle: 'hand'/.test(buchung[1]) || !/akteur: user\.id/.test(buchung[1]) || !/grund: `\$\{art\}: \$\{grund\}`/.test(buchung[1])) aus.push('/xp bucht ohne Quelle hand, Akteur oder Grund');
+    if (!/required: true, maxLength: 255/.test(t.xp)) aus.push('/xp ohne Pflichtgrund');
+    if (!/if \(art === 'reset'\) \{\s*const ok = await bestaetige\([^)]*\);\s*if \(!ok\) return null;/.test(t.xp) || !/if \(!nameStimmt\(fenster\.fields\.getTextInputValue\('name'\), ziel\.username\)\)/.test(t.xp)) aus.push('/xp reset ohne Bestätigung mit eingetipptem Namen');
+    if (!/Ereignisse\.melde\('leveling\.xp\.korrigiert'/.test(t.xp) || !/await nachBuchung\(\{ guildId: guild\.id, mitglied: ziel\.id, ergebnis: e, guild/.test(t.xp)) aus.push('/xp meldet nichts oder lässt den Stufenwechsel liegen');
+    // LV-1g: Rangkarte nur über den Kern, Rangliste aus dem Kern
+    if (!/Karte\.zeichne\(member, s\)/.test(t.rank) || !/Fortschritt\.rangliste\(/.test(t.leaderboard) || !/Fortschritt\.position\(/.test(t.leaderboard)) aus.push('/rank oder /leaderboard rechnen nicht über Kern und Bildkarte');
+    // LV-1f: Speichern der Nachrichten mit CSRF und Recht, Vorlage über den Kern
+    if (!/router\.put\('\/nachrichten', csrfProtection, requirePermission\('LEVELING\.CONFIGURE'\)/.test(t.router) || !/Vorlage\.speichere\(guildId, Ausgabe\.ANLASS, vorlage\)/.test(t.router)) aus.push('Nachrichten speichern ohne CSRF, Recht oder Vorlage.speichere');
+    const meldung = /addFilter\('guild_notices'([\s\S]*?)return meldungen;\s*\}\);/.exec(t.dashboard);
+    if (!meldung || !/Ausgabe\.kanalFehlt\(e\)/.test(meldung[1]) || !/hasPermission\(user\.id, guildId, 'LEVELING\.CONFIGURE'\)/.test(meldung[1])) aus.push('Hinweis „kein Level-Kanal“ fehlt oder fragt das Recht nicht');
     const rechtFall = /case 'RECHT_PRUEFEN':([\s\S]*?)case '/.exec(t.ipc);
     if (!rechtFall || !/permissionManager\.hasPermission\(String\(actorId\), String\(guildId\), String\(recht\)\)/.test(rechtFall[1])) aus.push('Dashboard prüft RECHT_PRUEFEN nicht mit dem PermissionManager');
     if (!/Ereignisse\.hoere\(\s*'automod\.verstoss'\s*,\s*'leveling'\s*,\s*require\('\.\/hoerer'\)\.automodVerstoss\s*\)/.test(t.dashboard)) aus.push('Dashboard hört automod.verstoss nicht mit hoerer.automodVerstoss');
@@ -119,6 +154,16 @@ function pruefeVerdrahtung(t) {
         assert.deepStrictEqual([...p.guildInhalte.loeschen].sort(), [...tabellen].sort(), 'guildInhalte ≠ Tabellen der Migration');
         assert.ok(p.ereignisse.sendet.includes('leveling.level.erreicht') && p.ereignisse.sendet.includes('leveling.belohnung.vergeben') && p.ereignisse.hoert.includes('automod.verstoss'));
         assert.deepStrictEqual(p.rollen?.map((r) => r.besitzer), ['leveling:community'], 'Belohnungsrollen ohne Besitzer-Erklärung');
+        // LV-1f/LV-1g/LV-1h
+        assert.deepStrictEqual(Object.keys(p.vorlagen?.anlaesse || {}), ['aufstieg'], 'Vorlage leveling:aufstieg nicht erklärt');
+        assert.strictEqual(p.vorlagen.recht, 'LEVELING.CONFIGURE');
+        const ph = p.vorlagen.anlaesse.aufstieg.platzhalter;
+        assert.deepStrictEqual([...ph].sort(), Object.keys(require(L('shared/ausgabe')).platzhalter({})).sort(), 'erklärte Platzhalter ≠ gefüllte');
+        assert.ok(p.bildkarten?.['kern:rangkarte']?.stand === 'shared/rangkarte.js', 'Rangkarte nicht unter bildkarten erklärt');
+        assert.ok(p.ereignisse.sendet.includes('leveling.xp.korrigiert'));
+        const liste = JSON.parse(fs.readFileSync(path.join(WURZEL, 'packages/dunebot-sdk/ereignisse/liste.json'), 'utf8'));
+        const ev = (liste.ereignisse || liste).find?.((x) => x.name === 'leveling.xp.korrigiert');
+        assert.ok(ev?.stand === 'aktiv' && ev.felder.art && ev.felder.xp && ev.felder.grund, 'leveling.xp.korrigiert nicht aktiv oder ohne Felder');
     });
 
     // ── 2: Regeln ────────────────────────────────────────────────────────────
@@ -194,13 +239,56 @@ function pruefeVerdrahtung(t) {
         assert.deepStrictEqual([...Belohnungen.sollRollen([{ stufe: 2, art: 'rolle_geben', wert: '22222' }, { stufe: 2, art: 'rolle_nehmen', wert: '22222' }], 2, false)], [], 'gleiche Stufe: nehmen gilt');
     });
 
+    const Ausgabe = require(L('shared/ausgabe'));
+    const Rangkarte = require(L('shared/rangkarte'));
+    await pruefe('2e. Level-up: Meilensteine, wann, wohin, Hinweis, Platzhalter', () => {
+        assert.deepStrictEqual(Ausgabe.meilensteine('25, 5;10 5 x 0 1001'), [5, 10, 25]);
+        assert.deepStrictEqual(Ausgabe.meilensteine('[10, 5]'), [5, 10]);
+        assert.deepStrictEqual([Ausgabe.meilensteine(null), Ausgabe.meilensteine(''), Ausgabe.meilensteine([3])], [[], [], [3]]);
+        const e = (x = {}) => ({ ausgabe_modus: 'level_kanal', ausgabe_kanal: '500', nur_meilensteine: 0, meilensteine: null, ...x });
+        const v = (level, prestige = 0) => ({ level, prestige });
+        assert.ok(Ausgabe.sollMelden(e(), v(0), v(1)).ja);
+        assert.strictEqual(Ausgabe.sollMelden(e(), v(2), v(1)).grund, 'kein_aufstieg', 'Abstieg meldet nichts');
+        assert.strictEqual(Ausgabe.sollMelden(e({ ausgabe_modus: 'aus' }), v(0), v(1)).grund, 'aus');
+        const m = e({ nur_meilensteine: 1, meilensteine: '[5, 10]' });
+        assert.strictEqual(Ausgabe.sollMelden(m, v(0), v(4)).grund, 'kein_meilenstein');
+        assert.ok(Ausgabe.sollMelden(m, v(4), v(5)).ja, 'genau auf dem Meilenstein');
+        assert.ok(Ausgabe.sollMelden(m, v(3), v(7)).ja, 'über den Meilenstein gesprungen');
+        assert.strictEqual(Ausgabe.sollMelden(m, v(5), v(9)).grund, 'kein_meilenstein', 'Meilenstein schon vorher erreicht');
+        assert.ok(Ausgabe.sollMelden(m, v(12), v(6, 1)).ja, 'Prestige zählt ab Stufe 0');
+        assert.strictEqual(Ausgabe.sollMelden(e({ nur_meilensteine: 1 }), v(0), v(5)).grund, 'kein_meilenstein', 'ohne Liste nie');
+        assert.deepStrictEqual(Ausgabe.ziel(e(), { kanal: '200' }), { art: 'kanal', kanal: '500', grund: null }, 'Level-Kanal schlägt den Kanal der XP');
+        assert.strictEqual(Ausgabe.ziel(e({ ausgabe_kanal: null }), { kanal: '200' }).grund, 'kein_level_kanal', 'ohne Level-Kanal keine Nachricht (F-LV1)');
+        assert.deepStrictEqual(Ausgabe.ziel(e({ ausgabe_modus: 'kanal_der_nachricht' }), { kanal: '200' }).kanal, '200');
+        assert.deepStrictEqual(Ausgabe.ziel(e({ ausgabe_modus: 'kanal_der_nachricht' }), {}).kanal, '500', 'ohne Kanal der XP der Level-Kanal');
+        assert.strictEqual(Ausgabe.ziel(e({ ausgabe_modus: 'kanal_der_nachricht', ausgabe_kanal: null }), {}).grund, 'kein_kanal');
+        assert.strictEqual(Ausgabe.ziel(e({ ausgabe_modus: 'direktnachricht' }), {}).art, 'direkt');
+        assert.deepStrictEqual([Ausgabe.kanalFehlt(e({ ausgabe_kanal: null })), Ausgabe.kanalFehlt(e()), Ausgabe.kanalFehlt(e({ ausgabe_modus: 'aus', ausgabe_kanal: null })), Ausgabe.kanalFehlt(null)], [true, false, false, false]);
+        assert.deepStrictEqual(Ausgabe.platzhalter({ level: 3, xp: 400, vorher: { level: 2 }, stufe: { name: 'Bronze' }, naechste: { fehlt: 85 } }, { rang: 7 }),
+            { level: '3', 'level:vorher': '2', 'level:name': 'Bronze', xp: '400', 'xp:fehlt': '85', rang: '7' });
+        const de = Ausgabe.vorgabe(Ausgabe.texteAus('de-DE'));
+        const en = Ausgabe.vorgabe(Ausgabe.texteAus('en-GB'));
+        assert.ok(de.text.includes('{member:mention}') && de.text.includes('{level}') && en.text !== de.text, 'Vorgabe fehlt in einer Sprache');
+        assert.strictEqual(Ausgabe.vorgabe(Ausgabe.texteAus('xx-YY')).text, de.text, 'unbekannte Sprache: Deutsch');
+    });
+    await pruefe('2f. Rangkarte: Balken im Level, höchste Stufe voll, ohne Platz ein Strich', () => {
+        const w = Rangkarte.werte({ xp: 400, level: 3, stufe: { schwelle: 355 }, naechste: { schwelle: 520 } }, { platz: 2, system: 'Community' });
+        assert.deepStrictEqual([w.level, w.position, w.xp_level, w.xp_level_max, w.xp_gesamt], ['3', '2', '45', '165', '400']);
+        const oben = Rangkarte.werte({ xp: 9000, level: 100, stufe: { schwelle: 8000 }, naechste: null }, { platz: null, system: 'x' });
+        assert.deepStrictEqual([oben.position, oben.xp_level, oben.xp_level_max], ['–', '1000', '1000']);
+        const null0 = Rangkarte.werte({ xp: 0, level: 0, stufe: null, naechste: { schwelle: 100 } }, { system: 'x' });
+        assert.deepStrictEqual([null0.xp_level, null0.xp_level_max], ['0', '100']);
+        const karte = JSON.parse(fs.readFileSync(path.join(WURZEL, 'packages/dunebot-sdk/bildkarten/rangkarte.json'), 'utf8'));
+        assert.deepStrictEqual(Object.keys(w).sort(), karte.werte.filter((x) => !x.einstellbar).map((x) => x.name).sort(), 'Laufzeitwerte ≠ Schablone');
+    });
+
     // ── 3: Läufe an TEMPORARY-Kopien ─────────────────────────────────────────
     const mysql = require('mysql2/promise');
     const c = await mysql.createConnection({ host: process.env.MYSQL_HOST, port: process.env.MYSQL_PORT,
         user: process.env.MYSQL_USER, password: process.env.MYSQL_PASSWORD, database: process.env.MYSQL_DATABASE,
         supportBigNumbers: true, bigNumberStrings: true });
     const schreibt = /^\s*(INSERT|UPDATE|DELETE|REPLACE|TRUNCATE|CREATE|DROP|ALTER)\b/i;
-    const KOPIEN = /\b(fortschritt_|level_|ereignisbuch\b|rollen_vergaben\b)/;
+    const KOPIEN = /\b(fortschritt_|level_|ereignisbuch\b|rollen_vergaben\b|guild_vorlagen\b)/;
     async function q(sql, werte) {
         const s = String(sql);
         if (schreibt.test(s) && !/^\s*CREATE TEMPORARY TABLE/i.test(s) && !KOPIEN.test(s)) throw new Error(`nur lesend: ${s.slice(0, 60)}`);
@@ -227,6 +315,9 @@ function pruefeVerdrahtung(t) {
     for (const s of ddl.filter((x) => /CREATE TABLE IF NOT EXISTS (fortschritt_|level_|ereignisbuch\b|rollen_vergaben\b)/.test(x))) {
         await c.query(s.replace('CREATE TABLE IF NOT EXISTS', 'CREATE TEMPORARY TABLE').replace(/,\s*CONSTRAINT[\s\S]*?ON DELETE CASCADE/, ''));
     }
+    // Vorlagen (LV-1f): Schema wie in der Datenbank, als leere TEMPORARY-Kopie.
+    const [[vorlagenDdl]] = await c.query('SHOW CREATE TABLE guild_vorlagen');
+    await c.query(vorlagenDdl['Create Table'].replace(/^CREATE TABLE/, 'CREATE TEMPORARY TABLE').replace(/,\s*CONSTRAINT[^\n]*/g, ''));
 
     const { SnowflakeUtil } = require('discord.js');
     const Fortschritt = require(path.join(WURZEL, 'packages/dunebot-sdk/lib/Fortschritt.js'));
@@ -476,6 +567,176 @@ function pruefeVerdrahtung(t) {
         assert.ok(zweimal.some((z) => z.laeuftSchon), 'zwei Abgleiche gleichzeitig');
     });
 
+    // ── LV-1f, LV-1g, LV-1h: Discord als Attrappe ────────────────────────────
+    const deTexte = Ausgabe.texteAus('de-DE');
+    const getT = (k, w = {}) => deTexte(k).replace(/\{\{(\w+)\}\}/g, (x, n) => (w[n] !== undefined ? String(w[n]) : x));
+    const gesendet = [];
+    function attrappe(gid, { kanaele = {}, leute = {} } = {}) {
+        const guild = { id: gid, name: 'Probe', memberCount: 3, locale: 'de-DE', premiumSubscriptionCount: 0, premiumTier: 0, iconURL: () => null, getT,
+            members: { me: { id: '999' }, cache: new Map() }, channels: { cache: new Map() } };
+        for (const [kid, darf] of Object.entries(kanaele)) {
+            guild.channels.cache.set(kid, { id: kid, name: `k${kid}`, isTextBased: () => true,
+                permissionsFor: () => ({ has: (p) => (Array.isArray(p) ? darf.senden : darf.bilder) }),
+                send: async (n) => { gesendet.push({ wo: kid, n }); return {}; } });
+        }
+        for (const [mid, name] of Object.entries(leute)) {
+            guild.members.cache.set(mid, { id: mid, displayName: name, guild, joinedAt: new Date(), toString: () => `<@${mid}>`, displayAvatarURL: () => '',
+                user: { id: mid, username: name.toLowerCase(), tag: name.toLowerCase(), discriminator: '0', bot: false, createdAt: new Date() },
+                send: async (n) => { gesendet.push({ wo: 'dm', n }); return {}; } });
+        }
+        guild.members.fetch = async (x) => { const m = guild.members.cache.get(String(x?.user ?? x)); if (!m) throw new Error('Unknown Member'); return m; };
+        return guild;
+    }
+    const G4 = '100000000000000004';
+    const [M1, M2, ADMIN] = ['300000000000000041', '300000000000000042', '300000000000000049'];
+    const g4 = attrappe(G4, { kanaele: { 200: { senden: true, bilder: true }, 500: { senden: true, bilder: true }, 501: { senden: false, bilder: false } }, leute: { [M1]: 'Anna', [M2]: 'Bert', [ADMIN]: 'Chef' } });
+    const { nachBuchung } = require(L('bot/nachbuchung'));
+    const Vorlage = require(path.join(WURZEL, 'packages/dunebot-sdk/lib/Vorlage.js'));
+    const setze = async (spalten) => { await q(`UPDATE level_einstellungen SET ${Object.keys(spalten).map((k) => `${k} = ?`).join(', ')} WHERE guild_id = ?`, [...Object.values(spalten), G4]); Regeln.vergiss(); };
+    let schl = 0;
+    const steige = async (m, menge) => nachBuchung({ guildId: G4, mitglied: m, guild: g4, kanal: '200',
+        ergebnis: await Fortschritt.buche({ guildId: G4, kennung: K, mitglied: m, menge, quelle: 'nachricht', schluessel: `probe:${++schl}` }) });
+
+    await spieleStartwerteEin({ query: q }, G4);
+    Regeln.vergiss();
+    await pruefe('3o. Level-up: ohne Level-Kanal nichts, Level-Kanal, gesperrt, Kanal der XP, Vorlage, Meilenstein, Direktnachricht', async () => {
+        // Stufen nach „ansteigend“: 1 ab 100, 2 ab 255, 3 ab 475, 4 ab 770, 5 ab 1.150, 6 ab 1.625 XP.
+        await steige(M1, 120);
+        assert.strictEqual(gesendet.length, 0, 'Vorgabe ohne Level-Kanal sendet nichts (F-LV1)');
+        await setze({ ausgabe_kanal: '500' });
+        await steige(M1, 200);
+        assert.strictEqual(gesendet.length, 1, 'Aufstieg auf Stufe 2 nicht gemeldet');
+        assert.strictEqual(gesendet[0].wo, '500');
+        assert.strictEqual(gesendet[0].n.content, `🎉 <@${M1}> hat Level 2 erreicht!`);
+        assert.deepStrictEqual(gesendet[0].n.allowedMentions, { parse: [], users: [M1], repliedUser: false }, 'pingt mehr als das Mitglied');
+        await steige(M1, 1);
+        assert.strictEqual(gesendet.length, 1, 'ohne Aufstieg eine Nachricht');
+        await setze({ ausgabe_kanal: '501' });
+        await steige(M2, 120);
+        await setze({ ausgabe_kanal: '502' });
+        await steige(M2, 200);
+        assert.strictEqual(gesendet.length, 1, 'gesperrter oder fehlender Kanal sendete');
+        await setze({ ausgabe_modus: 'kanal_der_nachricht' });
+        await Vorlage.speichere(G4, 'leveling:aufstieg', { form: 'text', text: '{member:nick}: {level:vorher} → {level}, Platz {rang}, noch {xp:fehlt} XP, gesamt {xp}' });
+        await steige(M2, 200);
+        assert.strictEqual(gesendet[1]?.wo, '200', 'Kanal der XP');
+        const st = await Fortschritt.stand({ guildId: G4, kennung: K, mitglied: M2 });
+        assert.strictEqual(gesendet[1].n.content, `Bert: 2 → 3, Platz 1, noch ${st.naechste.fehlt} XP, gesamt 520`);
+        await setze({ nur_meilensteine: 1, meilensteine: '[5]' });
+        await steige(M2, 300);
+        assert.strictEqual(gesendet.length, 2, 'Stufe 4 ist kein Meilenstein');
+        await steige(M2, 900);
+        assert.strictEqual(gesendet.length, 3, 'von 4 auf 6 über Meilenstein 5 gesprungen');
+        await setze({ nur_meilensteine: 0, ausgabe_modus: 'direktnachricht' });
+        await Vorlage.loesche(G4, 'leveling:aufstieg');
+        await steige(M1, 200);
+        assert.strictEqual(gesendet[3]?.wo, 'dm', 'Direktnachricht');
+        await setze({ ausgabe_modus: 'aus' });
+        await steige(M1, 300);
+        assert.strictEqual(gesendet.length, 4, 'Modus aus sendete');
+    });
+
+    const xpBefehl = require(L('bot/commands/xp'));
+    let erlaubt = false;
+    const gefragt = [];
+    ServiceManager.register('ipcClient', { sendToDashboard: async (aktion, daten) => { gefragt.push([aktion, daten.recht, daten.actor_user_id]); return { success: true, data: { darf: erlaubt } }; } });
+    const antworten = [];
+    const befehl = (unter, { ziel = M2, amount = null, reason = 'Probe', name = null } = {}) => {
+        const zielUser = ziel === 'bot' ? { id: '300000000000000048', username: 'robo', bot: true } : g4.members.cache.get(ziel).user;
+        const fenster = { fields: { getTextInputValue: () => name }, update: async (n) => { antworten.push(n); } };
+        const klick = { id: id(), user: { id: ADMIN }, customId: null, showModal: async () => {}, awaitModalSubmit: async () => (name == null ? Promise.reject(new Error('Zeit')) : fenster) };
+        const antwort = { awaitMessageComponent: async ({ filter }) => { klick.customId = `leveling-xp-reset-${ia.id}`; return filter(klick) ? klick : null; } };
+        const ia = { id: id(), guild: g4, user: { id: ADMIN }, channelId: '200',
+            options: { getSubcommand: () => unter, getUser: () => zielUser, getString: () => reason, getInteger: () => amount },
+            editReply: async (n) => { antworten.push(n); return antwort; } };
+        return xpBefehl.interactionRun({ interaction: ia }).then(() => ia);
+    };
+    const stand = async (m) => (await Fortschritt.stand({ guildId: G4, kennung: K, mitglied: m })).xp;
+    const text = (n) => n?.content || n?.embeds?.[0]?.data?.description || '';
+    await pruefe('3p. /xp: Recht, add/remove/set mit Akteur und Grund, Ereignis, Kürzen, reset nur mit Namen, Bot nicht', async () => {
+        const vorher = await stand(M2);
+        await befehl('add', { amount: 50 });
+        assert.deepStrictEqual(gefragt.at(-1), ['core:RECHT_PRUEFEN', 'LEVELING.XP.MANAGE', ADMIN]);
+        assert.ok(text(antworten.at(-1)).includes('LEVELING.XP.MANAGE') && await stand(M2) === vorher, 'ohne Recht gebucht');
+        erlaubt = true;
+        const ia = await befehl('add', { amount: 50, reason: 'Turnier gewonnen' });
+        const [b] = await q('SELECT menge, quelle, akteur, grund, schluessel FROM fortschritt_buchungen WHERE guild_id = ? AND schluessel = ?', [G4, `hand:${ia.id}`]);
+        assert.deepStrictEqual([Number(b?.menge), b?.quelle, b?.akteur, b?.grund], [50, 'hand', ADMIN, 'add: Turnier gewonnen'], JSON.stringify(b));
+        const [ev] = await q("SELECT akteur, betroffen, daten FROM ereignisbuch WHERE guild_id = ? AND name = 'leveling.xp.korrigiert' ORDER BY id DESC LIMIT 1", [G4]);
+        const d = typeof ev?.daten === 'string' ? JSON.parse(ev.daten) : ev?.daten;
+        assert.ok(ev?.akteur === ADMIN && ev.betroffen === M2 && d?.art === 'add' && d.xp === 50 && d.grund === 'Turnier gewonnen' && d.fortschritt === K, JSON.stringify(ev));
+        await befehl('set', { amount: 1000 });
+        assert.strictEqual(await stand(M2), 1000);
+        await befehl('remove', { amount: 5000 });
+        assert.strictEqual(await stand(M2), 0, 'Abzug nicht auf den Stand gekürzt');
+        assert.ok(text(antworten.at(-1)).includes('bis 0'), 'Kürzen nicht gemeldet');
+        await befehl('set', { amount: 400 });
+        await befehl('reset', { name: 'falsch' });
+        assert.strictEqual(await stand(M2), 400, 'falscher Name setzte zurück');
+        await befehl('reset');
+        assert.strictEqual(await stand(M2), 400, 'ohne Fenster setzte zurück');
+        await befehl('reset', { name: ' BERT ' });
+        assert.strictEqual(await stand(M2), 0, 'richtiger Name setzte nicht zurück');
+        await befehl('add', { ziel: 'bot', amount: 5 });
+        assert.ok(text(antworten.at(-1)).includes('Bots'), 'Bot bekam XP');
+        const rechte = gefragt.filter((f) => f[0] === 'core:RECHT_PRUEFEN');
+        assert.ok(rechte.length === 8 && rechte.every((f) => f[1] === 'LEVELING.XP.MANAGE'), `anderes Recht gefragt: ${JSON.stringify(rechte)}`);
+    });
+    await pruefe('3q. /xp gibt einen Aufstieg weiter: Nachricht im Kanal des Befehls', async () => {
+        await setze({ ausgabe_modus: 'kanal_der_nachricht' });
+        const n = gesendet.length;
+        await befehl('add', { amount: 300 });
+        assert.strictEqual(gesendet.length, n + 1, 'kein Level-up nach /xp');
+        assert.strictEqual(gesendet.at(-1).wo, '200');
+        await setze({ ausgabe_modus: 'aus' });
+    });
+
+    const lb = require(L('bot/commands/leaderboard'));
+    await pruefe('3r. /leaderboard: zehn je Seite, Knöpfe, eigener Platz, Woche ohne Buchungen leer', async () => {
+        const G5 = '100000000000000005';
+        const leute = {};
+        const zeilen = [];
+        for (let i = 1; i <= 12; i++) {
+            const mid = `3000000000000005${String(i).padStart(2, '0')}`;
+            leute[mid] = `Leute${i}`;
+            zeilen.push(G5, K, mid, 1300 - i * 100, 1, 0);
+        }
+        await q(`INSERT INTO fortschritt_stand (guild_id, kennung, mitglied_id, xp, level, prestige) VALUES ${Array(12).fill('(?, ?, ?, ?, ?, ?)').join(', ')}`, zeilen);
+        const g5 = attrappe(G5, { leute });
+        const ich = Object.keys(leute)[11];
+        const fertig = [];
+        const lauf = (zeitraum) => lb.interactionRun({ interaction: { guild: g5, user: { id: ich }, options: { getString: () => zeitraum }, editReply: async (n) => { fertig.push(n); return {}; } } });
+        await lauf(null);
+        const e = fertig[0].embeds[0].data;
+        const z = e.description.split('\n');
+        assert.ok(z[0].includes('1.') && z[0].includes('Leute1') && z[0].includes('1.200 XP'), z[0]);
+        assert.strictEqual(z.filter((x) => /^`\s*\d+\.`/.test(x)).length, 10);
+        assert.ok(e.description.includes('Dein Platz: **12** von 12'), e.description);
+        assert.strictEqual(e.footer.text, 'Seite 1 von 2 · 12 Mitglieder');
+        const knoepfe = fertig[0].components[0].components.map((k) => k.data.disabled);
+        assert.deepStrictEqual(knoepfe, [true, false], 'Zurück auf Seite 1 nicht gesperrt');
+        assert.deepStrictEqual(fertig[0].allowedMentions, { parse: [] });
+        await lauf('woche');
+        assert.ok(fertig[1].embeds[0].data.description.startsWith('In diesem Zeitraum hat noch niemand'), fertig[1].embeds[0].data.description);
+        assert.deepStrictEqual(fertig[1].components, [], 'eine Seite braucht keine Knöpfe');
+    });
+
+    const rank = require(L('bot/commands/rank'));
+    await pruefe('3s. /rank zeichnet die Rangkarte über den Kern, Bots nicht', async () => {
+        const fertig = [];
+        const ia = { guild: g4, user: { id: M1 }, options: { getUser: () => null }, editReply: async (n) => { fertig.push(n); return {}; } };
+        await Promise.race([rank.interactionRun({ interaction: ia }), new Promise((_, nein) => setTimeout(() => nein(new Error('Rangkarte hängt')), 30_000))]);
+        const n = fertig[0];
+        const datei = n?.files?.[0];
+        // Ein Bild, kein Ersatztext: Schriften und Schablone sind auf der Anlage da (check-bildkarten).
+        assert.ok(datei && /^rank\.(png|jpe?g)$/.test(datei.name || ''), `kein Bild: ${JSON.stringify(n).slice(0, 300)}`);
+        assert.ok(Buffer.isBuffer(datei.attachment) && datei.attachment.length > 1000, 'Bild leer');
+        const botIa = { ...ia, options: { getUser: () => ({ id: '300000000000000048' }) } };
+        g4.members.cache.set('300000000000000048', { id: '300000000000000048', user: { bot: true }, guild: g4 });
+        await rank.interactionRun({ interaction: botIa });
+        assert.strictEqual(fertig[1].content, 'Bots sammeln keine XP.');
+    });
+
     await c.end();
     assert.deepStrictEqual(gesehen, [], `Fehler im Log: ${gesehen.join(' | ')}`);
 
@@ -499,6 +760,18 @@ function pruefeVerdrahtung(t) {
     await rot('/levels sync ohne Rechtefrage', mit('levels', 'if (!recht.darf) return', 'if (false) return'));
     await rot('/levels sync mit anderem Recht', mit('levels', "const RECHT = 'LEVELING.REWARDS.MANAGE'", "const RECHT = 'LEVELING.VIEW'"));
     await rot('Dashboard prüft das Recht nicht', mit('ipc', 'permissionManager.hasPermission(String(actorId)', 'Boolean(String(actorId)'));
+    await rot('bot/recht.js fragt ein festes Recht', mit('recht', 'actor_user_id: user.id, recht }', "actor_user_id: user.id, recht: 'LEVELING.VIEW' }"));
+    await rot('Aufstieg ohne Level-up-Nachricht', mit('nachbuchung', 'if (guild) await Ausgabe.beiAufstieg(', 'if (false) await Ausgabe.beiAufstieg('));
+    await rot('Chat-XP ohne Kanal', mit('chatxp', 'kanal: String(message.channelId)', 'kanal: null'));
+    await rot('/xp ohne Rechtefrage', mit('xp', 'if (!recht.darf) return', 'if (false) return'));
+    await rot('/xp mit anderem Recht', mit('xp', "const RECHT = 'LEVELING.XP.MANAGE'", "const RECHT = 'LEVELING.VIEW'"));
+    await rot('/xp ohne Akteur', mit('xp', 'akteur: user.id', 'akteur: null'));
+    await rot('/xp ohne Pflichtgrund', mit('xp', 'required: true, maxLength: 255', 'required: false, maxLength: 255'));
+    await rot('/xp reset ohne Bestätigung', mit('xp', 'if (!ok) return null;', ''));
+    await rot('/xp ohne Ereignis', mit('xp', "Ereignisse.melde('leveling.xp.korrigiert'", "Ereignisse.melde('leveling.xp.anders'"));
+    await rot('Nachrichten speichern ohne CSRF', mit('router', "router.put('/nachrichten', csrfProtection, ", "router.put('/nachrichten', "));
+    await rot('Hinweis ohne Rechtefrage', mit('dashboard', "hasPermission(user.id, guildId, 'LEVELING.CONFIGURE')", 'true'));
+    await rot('/rank ohne Rangkarte', mit('rank', 'Karte.zeichne(member, s)', 'null'));
 
     console.log(fehler ? `\n✗ ${fehler} Prüfung(en) rot` : '\n✓ alles grün');
     process.exit(fehler ? 1 : 0);
