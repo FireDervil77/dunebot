@@ -579,6 +579,54 @@ async enablePlugin(pluginName) {
 
     
     /**
+     * Welches Argument eines Discord-Ereignisses trägt die Guild?
+     *
+     * Meist das erste (Message, Interaction, GuildMember, VoiceState, Guild),
+     * bei `MessageReaction` die Nachricht darunter. Bei `messageDeleteBulk`
+     * ist das erste eine Sammlung (`Collection`, eine `Map`) und der Kanal
+     * kommt als zweites (K394, 2026-11-15): Bis dahin fand sich dort keine
+     * Guild, und das Ereignis erreichte nur den Kern — Leveling storniert
+     * deshalb die XP von `/clear` nicht, und der Handler von gameserver lief
+     * nie.
+     *
+     * @param {Array} args Argumente des Ereignisses
+     * @returns {Object|null}
+     */
+    static traegerAus(args) {
+        const erstes = args?.[0];
+        return erstes instanceof Map ? (args[1] ?? null) : (erstes ?? null);
+    }
+
+    /**
+     * Guild-Objekt des Ereignisses, bei direkten Guild-Events der Träger selbst.
+     *
+     * Der Träger gilt nur als Guild, wenn er ihre Verwalter hat (Mitglieder,
+     * Kanäle, Rollen). Bis 2026-11-15 stand hier `|| t`: Lieferte `.guild`
+     * nichts (DM, Nutzer bei `userUpdate`), galt die ID der Nachricht oder des
+     * Nutzers als Guild-ID — „GHOST-ID BLOCKIERT“ im Log, und das Ereignis
+     * erreichte gar niemanden, auch nicht den Kern.
+     */
+    static guildAus(args) {
+        const t = PluginManager.traegerAus(args);
+        const istGuild = (x) => Boolean(x?.members && x?.channels && x?.roles && x?.id);
+        // `guildAuditLogEntryCreate(eintrag, guild)`: Der Eintrag kennt seine
+        // Guild nicht, sie kommt als zweites Argument.
+        return t?.guild || t?.message?.guild || (istGuild(t) ? t : null) || (istGuild(args?.[1]) ? args[1] : null);
+    }
+
+    /**
+     * Guild-ID des Ereignisses. Getrennt gesucht, weil manche Objekte nur
+     * `guildId` kennen, ohne je ein Guild-Objekt mitzuliefern.
+     *
+     * @param {Array} args
+     * @returns {string|null}
+     */
+    static guildIdAus(args) {
+        const t = PluginManager.traegerAus(args);
+        return PluginManager.guildAus(args)?.id || t?.guildId || t?.message?.guildId || null;
+    }
+
+    /**
      * Calls the event handlers of all plugins.
      * @param {string} eventName
      * @param  {...any} args
@@ -613,17 +661,8 @@ async enablePlugin(pluginName) {
             // Plugin ausser dem Kern raus, lautlos und ohne Protokolleintrag.
             // Genau daran kamen die Reaktionen der Rollenmenues nie beim
             // `discord`-Plugin an: das Ereignis lief, der Handler nie.
-            const firstArg = args[0];
-            const guildPartial = firstArg?.guild
-                || firstArg?.message?.guild
-                || firstArg; // Fallback für direkte Guild-Events
-
-            // Die ID getrennt suchen: manche Objekte kennen nur `guildId`,
-            // ohne je ein Guild-Objekt mitzuliefern.
-            const ermittelteGuildId = guildPartial?.id
-                || firstArg?.guildId
-                || firstArg?.message?.guildId
-                || null;
+            const guildPartial = PluginManager.guildAus(args);
+            const ermittelteGuildId = PluginManager.guildIdAus(args);
 
             if (ermittelteGuildId && eventName !== "guildCreate") {
                 // =====================================================
