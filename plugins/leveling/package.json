@@ -50,13 +50,31 @@
         },
         "level_boosts": {
             "akteur": "anonymisieren"
+        },
+        "level_einstellungen": {
+            "ausgabe_kanal": {
+                "weg": "ausgenommen",
+                "grund": "Level-Kanal der Guild, nie ein Mitglied"
+            }
+        },
+        "level_regeln": {
+            "ziel_id": {
+                "weg": "ausgenommen",
+                "grund": "art ist ENUM(kanal, rolle), nie ein Mitglied"
+            }
+        },
+        "level_belohnungen": {
+            "wert": {
+                "weg": "ausgenommen",
+                "grund": "Rollen-ID der Belohnung, nie ein Mitglied"
+            }
         }
     },
     "rollen": [
         {
             "besitzer": "leveling:community",
             "titel": "leveling:ROLLEN.BELOHNUNG",
-            "seite": "/plugins/leveling/uebersicht"
+            "seite": "/plugins/leveling/belohnungen"
         }
     ],
     "vorlagen": {

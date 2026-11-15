@@ -3,10 +3,11 @@
 /**
  * Leveling - Dashboard-Plugin (LV-1a, LV-1c, K382, 2026-11-15).
  *
- * Stufe 1 bisher: eigene Navigation mit Übersicht und Nachrichten (LV-1f),
- * Startwerte beim Einschalten, Storno nach `automod.verstoss`, Hinweis „kein
- * Level-Kanal gewählt“ oben im Guild-Bereich (F-LV1). Die übrigen
- * Einstellseiten kommen mit LV-1i.
+ * Stufe 1 bisher: eigene Navigation mit Übersicht, XP-Regeln, Stufen,
+ * Belohnungen, Ausschlüssen (LV-1i) und Nachrichten (LV-1f), Startwerte beim
+ * Einschalten, Storno nach `automod.verstoss`, Hinweis „kein Level-Kanal
+ * gewählt“ oben im Guild-Bereich (F-LV1). Rangliste und Datenverwaltung
+ * kommen mit LV-1i Teil 2.
  *
  * Gelöscht wird beim Abschalten vom Kern: Tabellen nach `guildInhalte`, die
  * Fortschritte `leveling:*` über `Fortschritt.loeschePlugin`
@@ -153,10 +154,54 @@ class LevelingDashboardPlugin extends DashboardPlugin {
                 parent: basis
             },
             {
+                title: 'leveling:NAV.XP_REGELN',
+                url: `${basis}/xp-regeln`,
+                icon: 'fa-solid fa-sliders',
+                order: 20,
+                type: haupt,
+                capability: 'LEVELING.CONFIGURE',
+                visible: true,
+                guildId,
+                parent: basis
+            },
+            {
+                title: 'leveling:NAV.STUFEN',
+                url: `${basis}/stufen`,
+                icon: 'fa-solid fa-stairs',
+                order: 30,
+                type: haupt,
+                capability: 'LEVELING.VIEW',
+                visible: true,
+                guildId,
+                parent: basis
+            },
+            {
+                title: 'leveling:NAV.BELOHNUNGEN',
+                url: `${basis}/belohnungen`,
+                icon: 'fa-solid fa-gift',
+                order: 40,
+                type: haupt,
+                capability: 'LEVELING.REWARDS.MANAGE',
+                visible: true,
+                guildId,
+                parent: basis
+            },
+            {
+                title: 'leveling:NAV.AUSSCHLUESSE',
+                url: `${basis}/ausschluesse`,
+                icon: 'fa-solid fa-filter-circle-xmark',
+                order: 50,
+                type: haupt,
+                capability: 'LEVELING.CONFIGURE',
+                visible: true,
+                guildId,
+                parent: basis
+            },
+            {
                 title: 'leveling:NAV.NACHRICHTEN',
                 url: `${basis}/nachrichten`,
                 icon: 'fa-solid fa-bullhorn',
-                order: 20,
+                order: 60,
                 type: haupt,
                 capability: 'LEVELING.CONFIGURE',
                 visible: true,

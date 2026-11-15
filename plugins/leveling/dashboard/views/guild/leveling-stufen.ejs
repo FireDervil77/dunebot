@@ -1,0 +1,102 @@
+<%- include('shared/seitenkopf', {
+      plugin:       'leveling',
+      vortitel:     tr('leveling:TITEL'),
+      titel:        tr('leveling:NAV.STUFEN'),
+      beschreibung: tr('leveling:STUFEN.BESCHREIBUNG'),
+      icon:         'fa-solid fa-stairs',
+      guildId:      guildId
+}) %>
+
+<%# Stufen (LV-1i): Tabelle, Schablone und Rechner sind der Kern-Teil aus G-20. Darunter rechnet die Seite aus dessen Ereignis fortschritt-stufen:gezeichnet die Kontrolltabelle; die Raten kommen aus shared/einstellen.js raten. %>
+<%- include('shared/fortschritt-stufen', { guildId, tr, kennung: 'leveling:community' }) %>
+
+<div class="card mt-3" id="levelingKontrolle"
+     data-xp-nachricht="<%= raten.xpJeNachricht ?? '' %>"
+     data-sekunden-nachricht="<%= raten.sekundenJeNachricht ?? '' %>"
+     data-xp-sprachminute="<%= raten.xpJeSprachminute ?? '' %>"
+     data-text-minuten="<%= tr('leveling:STUFEN.MINUTEN') %>"
+     data-text-stunden="<%= tr('leveling:STUFEN.STUNDEN') %>"
+     data-text-tage="<%= tr('leveling:STUFEN.TAGE') %>"
+     data-text-leer="<%= tr('leveling:STUFEN.LEER') %>">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fa-solid fa-scale-balanced me-2"></i><%= tr('leveling:STUFEN.KONTROLLE_TITEL') %></h3>
+    <div class="card-actions"><span class="badge bg-warning-lt" data-ungespeichert hidden><%= tr('leveling:STUFEN.UNGESPEICHERT') %></span></div>
+  </div>
+  <div class="card-body">
+    <p class="text-secondary"><%= tr('leveling:STUFEN.KONTROLLE_TEXT') %></p>
+    <ul class="text-secondary small mb-3">
+      <li><%= raten.xpJeNachricht ? tr('leveling:STUFEN.RATE_CHAT', { xp: raten.xpJeNachricht, sekunden: raten.sekundenJeNachricht ?? 0 }) : tr('leveling:STUFEN.RATE_CHAT_AUS') %></li>
+      <li><%= raten.xpJeSprachminute ? tr('leveling:STUFEN.RATE_SPRACHE', { xp: Math.round(raten.xpJeSprachminute * 100) / 100 }) : tr('leveling:STUFEN.RATE_SPRACHE_AUS') %></li>
+    </ul>
+    <div class="table-responsive border rounded" style="max-height: 420px; overflow-y: auto;">
+      <table class="table table-sm table-vcenter mb-0">
+        <thead class="sticky-top bg-body">
+          <tr>
+            <th style="width: 5rem;"><%= tr('leveling:STUFEN.STUFE') %></th>
+            <th><%= tr('leveling:STUFEN.NAME') %></th>
+            <th class="text-end"><%= tr('leveling:STUFEN.AB_XP') %></th>
+            <th class="text-end"><%= tr('leveling:STUFEN.NACHRICHTEN') %></th>
+            <th class="text-end"><%= tr('leveling:STUFEN.ZEIT_CHAT') %></th>
+            <th class="text-end"><%= tr('leveling:STUFEN.ZEIT_SPRACHE') %></th>
+          </tr>
+        </thead>
+        <tbody data-zeilen><tr><td colspan="6" class="text-secondary"><i class="fa-solid fa-spinner fa-spin me-2"></i></td></tr></tbody>
+      </table>
+    </div>
+    <div class="form-hint mt-2"><%= tr('leveling:STUFEN.KONTROLLE_HINWEIS') %>
+      <a href="/guild/<%= guildId %>/plugins/leveling/xp-regeln"><%= tr('leveling:NAV.XP_REGELN') %></a>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  // Über die Kennung suchen, nicht über das laufende Skript (Skripte am Seitenende).
+  const karte = document.getElementById('levelingKontrolle');
+  if (!karte) return;
+  const d = karte.dataset;
+  const rate = (k) => (d[k] === '' ? null : Number(d[k]));
+  const xpN = rate('xpNachricht');
+  const sekN = rate('sekundenNachricht');
+  const xpS = rate('xpSprachminute');
+  const sprache = document.documentElement.lang || 'de-DE';
+  const zahl = (n) => Number(n).toLocaleString(sprache, { maximumFractionDigits: 0 });
+  const text = (name, n) => (d['text' + name] || '').split('{{n}}').join(zahl(n));
+  function dauer(minuten) {
+    if (minuten < 60) return text('Minuten', Math.max(1, Math.round(minuten)));
+    if (minuten < 48 * 60) return text('Stunden', Math.round(minuten / 6) / 10);
+    return text('Tage', Math.round(minuten / 1440));
+  }
+  function zelle(tr, inhalt, rechts) {
+    const td = document.createElement('td');
+    if (rechts) td.className = 'text-end';
+    td.textContent = inhalt;
+    tr.appendChild(td);
+  }
+  document.addEventListener('fortschritt-stufen:gezeichnet', (ev) => {
+    if (!ev.detail || ev.detail.kennung !== 'leveling:community') return;
+    karte.querySelector('[data-ungespeichert]').hidden = !ev.detail.ungespeichert;
+    const ziel = karte.querySelector('[data-zeilen]');
+    ziel.textContent = '';
+    if (!ev.detail.stufen.length) {
+      const tr = document.createElement('tr');
+      const td = document.createElement('td');
+      td.colSpan = 6; td.className = 'text-secondary'; td.textContent = d.textLeer;
+      tr.appendChild(td); ziel.appendChild(tr);
+      return;
+    }
+    ev.detail.stufen.forEach((s, i) => {
+      const tr = document.createElement('tr');
+      const xp = Number(s.schwelle) || 0;
+      const nachrichten = xpN ? Math.ceil(xp / xpN) : null;
+      zelle(tr, String(i + 1));
+      zelle(tr, s.name || '');
+      zelle(tr, zahl(xp), true);
+      zelle(tr, nachrichten == null ? '—' : zahl(nachrichten), true);
+      zelle(tr, nachrichten == null || !sekN ? '—' : dauer((nachrichten * sekN) / 60), true);
+      zelle(tr, xpS ? dauer(xp / xpS) : '—', true);
+      ziel.appendChild(tr);
+    });
+  });
+})();
+</script>

@@ -1,0 +1,198 @@
+<%- include('shared/seitenkopf', {
+      plugin:       'leveling',
+      vortitel:     tr('leveling:TITEL'),
+      titel:        tr('leveling:NAV.BELOHNUNGEN'),
+      beschreibung: tr('leveling:BELOHNUNGEN.BESCHREIBUNG'),
+      icon:         'fa-solid fa-gift',
+      guildId:      guildId
+}) %>
+
+<%# Belohnungen (LV-1i): Rolle je Stufe geben oder eine eigene Levelrolle ab einer Stufe abnehmen. Vergeben wird über den Kern (G-07, shared/belohnungen.js), nie hier. %>
+<% if (!regeln) { %>
+  <%- include('shared/leerzustand', {
+        icon:  'fa-solid fa-ranking-star',
+        titel: tr('leveling:UEBERSICHT.NICHT_EINGERICHTET'),
+        text:  tr('leveling:UEBERSICHT.NICHT_EINGERICHTET_TEXT')
+  }) %>
+<% } else { %>
+  <%
+    const rolleVon = (id) => rollen.find((r) => r.id === String(id)) || null;
+    const stufeVon = (n) => stufen[n - 1] || null;
+    const waehlbar = rollen.filter((r) => !r.managed);
+  %>
+  <% if (rollenFehlen) { %>
+    <div class="alert alert-warning"><i class="fa-solid fa-triangle-exclamation me-2"></i><%= tr('leveling:BELOHNUNGEN.ROLLEN_FEHLEN') %></div>
+  <% } %>
+
+  <div class="card">
+    <div class="card-status-top bg-primary"></div>
+    <div class="card-header">
+      <h3 class="card-title"><i class="fa-solid fa-plus me-2"></i><%= tr('leveling:BELOHNUNGEN.NEU_TITEL') %></h3>
+    </div>
+    <div class="card-body">
+      <form id="levelingBelohnungForm" onsubmit="return false;">
+        <div class="row g-2 align-items-start">
+          <div class="col-md-4">
+            <label class="form-label" for="levelingBelohnungStufe"><%= tr('leveling:BELOHNUNGEN.STUFE') %></label>
+            <select class="form-select" id="levelingBelohnungStufe" name="stufe">
+              <% stufen.forEach((s, i) => { %>
+                <option value="<%= i + 1 %>"><%= tr('leveling:BELOHNUNGEN.STUFE_WAHL', { n: i + 1, xp: Number(s.schwelle) }) %><%= s.name ? ' · ' + s.name : '' %></option>
+              <% }); %>
+            </select>
+            <% if (!stufen.length) { %><div class="text-warning small mt-1"><%= tr('leveling:BELOHNUNGEN.KEINE_STUFEN') %></div><% } %>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" for="levelingBelohnungArt"><%= tr('leveling:BELOHNUNGEN.ART') %></label>
+            <select class="form-select" id="levelingBelohnungArt" name="art">
+              <option value="rolle_geben"><%= tr('leveling:BELOHNUNGEN.ART_ROLLE_GEBEN') %></option>
+              <option value="rolle_nehmen"><%= tr('leveling:BELOHNUNGEN.ART_ROLLE_NEHMEN') %></option>
+            </select>
+          </div>
+          <div class="col-md-5">
+            <label class="form-label" for="levelingBelohnungRolle"><%= tr('leveling:BELOHNUNGEN.ROLLE') %></label>
+            <select class="form-select" id="levelingBelohnungRolle" name="wert">
+              <option value=""><%= tr('leveling:BELOHNUNGEN.ROLLE_WAEHLEN') %></option>
+              <% waehlbar.forEach((r) => { %>
+                <option value="<%= r.id %>"><%= r.name %><%= r.editable ? '' : ' · ' + tr('leveling:BELOHNUNGEN.ZU_HOCH') %></option>
+              <% }); %>
+            </select>
+            <%- include('shared/rollen-hinweis', { guildId, tr, besitzer: 'leveling:community', feld: '#levelingBelohnungRolle' }) %>
+          </div>
+        </div>
+        <div class="form-hint mt-2" data-art-hinweis="rolle_geben"><%= tr('leveling:BELOHNUNGEN.ART_ROLLE_GEBEN_HINWEIS') %></div>
+        <div class="form-hint mt-2" data-art-hinweis="rolle_nehmen" hidden><%= tr('leveling:BELOHNUNGEN.ART_ROLLE_NEHMEN_HINWEIS') %></div>
+        <div class="d-flex justify-content-end mt-3">
+          <button type="button" class="btn btn-primary" id="levelingBelohnungHinzu" <%= stufen.length ? '' : 'disabled' %>>
+            <i class="fa-solid fa-plus me-1"></i><%= tr('leveling:BELOHNUNGEN.HINZUFUEGEN') %>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fa-solid fa-gift me-2"></i><%= tr('leveling:BELOHNUNGEN.LISTE_TITEL') %></h3>
+      <div class="card-actions">
+        <label class="form-check form-switch mb-0">
+          <input class="form-check-input" type="checkbox" id="levelingVorherige" <%= vorherigeEntfernen ? 'checked' : '' %>>
+          <span class="form-check-label"><%= tr('leveling:BELOHNUNGEN.VORHERIGE') %></span>
+        </label>
+      </div>
+    </div>
+    <div class="card-body pb-0">
+      <p class="text-secondary small mb-2"><%= tr('leveling:BELOHNUNGEN.VORHERIGE_HINWEIS') %></p>
+    </div>
+    <% if (!belohnungen.length) { %>
+      <div class="card-body pt-0">
+        <%- include('shared/leerzustand', {
+              icon:  'fa-solid fa-gift',
+              titel: tr('leveling:BELOHNUNGEN.LEER'),
+              text:  tr('leveling:BELOHNUNGEN.LEER_TEXT')
+        }) %>
+      </div>
+    <% } else { %>
+      <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+          <thead>
+            <tr>
+              <th><%= tr('leveling:BELOHNUNGEN.STUFE') %></th>
+              <th><%= tr('leveling:BELOHNUNGEN.ART') %></th>
+              <th><%= tr('leveling:BELOHNUNGEN.ROLLE') %></th>
+              <th class="text-end"><%= tr('leveling:BELOHNUNGEN.ERREICHT') %></th>
+              <th class="w-1"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% belohnungen.forEach((b) => { const r = rolleVon(b.wert); const s = stufeVon(b.stufe); %>
+              <tr>
+                <td>
+                  <strong><%= b.stufe %></strong><% if (s && s.name) { %> <span class="text-secondary">· <%= s.name %></span><% } %>
+                  <% if (!s) { %><span class="badge bg-warning-lt ms-1"><%= tr('leveling:BELOHNUNGEN.STUFE_FEHLT') %></span><% } %>
+                </td>
+                <td><%= tr('leveling:BELOHNUNGEN.ART_' + b.art.toUpperCase()) %></td>
+                <td>
+                  <% if (r) { %>
+                    <span class="badge me-1" style="background-color: <%= r.hexColor && r.hexColor !== '#000000' ? r.hexColor : 'var(--tblr-secondary)' %>;">&nbsp;</span><%= r.name %>
+                    <% if (!r.editable) { %><span class="badge bg-danger-lt ms-1"><%= tr('leveling:BELOHNUNGEN.ZU_HOCH') %></span><% } %>
+                  <% } else { %>
+                    <span class="text-secondary"><%= rollenFehlen ? b.wert : tr('leveling:BELOHNUNGEN.ROLLE_WEG', { id: b.wert }) %></span>
+                  <% } %>
+                </td>
+                <td class="text-end"><%= b.erreicht %></td>
+                <td>
+                  <button type="button" class="btn btn-sm btn-ghost-danger" data-entfernen="<%= b.id %>"
+                          title="<%= tr('leveling:BELOHNUNGEN.ENTFERNEN') %>" aria-label="<%= tr('leveling:BELOHNUNGEN.ENTFERNEN') %>">
+                    <i class="fa-solid fa-trash"></i>
+                  </button>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+    <div class="card-footer text-secondary small">
+      <i class="fa-solid fa-circle-info me-1"></i><%= tr('leveling:BELOHNUNGEN.SYNC_HINWEIS') %>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    const form = document.getElementById('levelingBelohnungForm');
+    if (!form) return;
+    const adresse = '/guild/<%= guildId %>/plugins/leveling/belohnungen';
+    const meldung = (art, text) => (window.showToast ? window.showToast(art, text) : console[art === 'error' ? 'error' : 'log']('[Leveling]', text));
+    async function anfrage(weg, methode, daten) {
+      const antwort = await fetch(adresse + weg, { method: methode, headers: { 'Content-Type': 'application/json' }, body: daten === undefined ? undefined : JSON.stringify(daten) });
+      const a = await antwort.json().catch(() => ({}));
+      if (!antwort.ok || !a.success) throw new Error(a.message || antwort.statusText);
+      return a;
+    }
+    const art = form.querySelector('[name="art"]');
+    art.addEventListener('change', () => {
+      form.querySelectorAll('[data-art-hinweis]').forEach((h) => { h.hidden = h.dataset.artHinweis !== art.value; });
+    });
+
+    const hinzu = document.getElementById('levelingBelohnungHinzu');
+    hinzu.addEventListener('click', async () => {
+      hinzu.disabled = true;
+      try {
+        const a = await anfrage('', 'POST', {
+          stufe: form.querySelector('[name="stufe"]').value,
+          art: art.value,
+          wert: form.querySelector('[name="wert"]').value,
+        });
+        meldung(a.warnung ? 'warning' : 'success', a.message);
+        setTimeout(() => location.reload(), 600);
+      } catch (err) {
+        meldung('error', err.message);
+        hinzu.disabled = false;
+      }
+    });
+
+    document.querySelectorAll('[data-entfernen]').forEach((k) => k.addEventListener('click', async () => {
+      k.disabled = true;
+      try {
+        const a = await anfrage('/' + encodeURIComponent(k.dataset.entfernen), 'DELETE');
+        meldung('success', a.message);
+        k.closest('tr').remove();
+      } catch (err) {
+        meldung('error', err.message);
+        k.disabled = false;
+      }
+    }));
+
+    const vorherige = document.getElementById('levelingVorherige');
+    vorherige.addEventListener('change', async () => {
+      try {
+        const a = await anfrage('/einstellungen', 'PUT', { vorherige_rollen_entfernen: vorherige.checked });
+        meldung('success', a.message);
+      } catch (err) {
+        vorherige.checked = !vorherige.checked;
+        meldung('error', err.message);
+      }
+    });
+  })();
+  </script>
+<% } %>

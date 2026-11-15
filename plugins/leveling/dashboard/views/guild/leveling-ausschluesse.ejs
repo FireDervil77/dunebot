@@ -1,0 +1,246 @@
+<%- include('shared/seitenkopf', {
+      plugin:       'leveling',
+      vortitel:     tr('leveling:TITEL'),
+      titel:        tr('leveling:NAV.AUSSCHLUESSE'),
+      beschreibung: tr('leveling:AUSSCHLUESSE.BESCHREIBUNG'),
+      icon:         'fa-solid fa-filter-circle-xmark',
+      guildId:      guildId
+}) %>
+
+<%# Ausschlüsse (LV-1i): Kanal- und Rollenregeln aus level_regeln. Wirkung wie im Bot: shared/regeln.js pruefeRegeln; die Zählung je Kanal in shared/einstellen.js wirkungAufKanaele. %>
+<% if (!eingerichtet) { %>
+  <%- include('shared/leerzustand', {
+        icon:  'fa-solid fa-ranking-star',
+        titel: tr('leveling:UEBERSICHT.NICHT_EINGERICHTET'),
+        text:  tr('leveling:UEBERSICHT.NICHT_EINGERICHTET_TEXT')
+  }) %>
+<% } else { %>
+  <%
+    const kanalVon = (id) => kanaele.find((k) => k.id === String(id)) || null;
+    const rolleVon = (id) => rollen.find((r) => r.id === String(id)) || null;
+    const KATEGORIE = 4;
+    const kategorien = kanaele.filter((k) => k.type === KATEGORIE);
+    const ohneKategorie = kanaele.filter((k) => k.type !== KATEGORIE && !k.parentId);
+    const kinder = (id) => kanaele.filter((k) => k.type !== KATEGORIE && k.parentId === id);
+    const kanalName = (id) => {
+      const k = kanalVon(id);
+      if (!k) return null;
+      return k.type === KATEGORIE ? tr('leveling:AUSSCHLUESSE.KATEGORIE_NAME', { name: k.name }) : '#' + k.name;
+    };
+  %>
+
+  <% if (kanaeleFehlen || rollenFehlen) { %>
+    <div class="alert alert-warning"><i class="fa-solid fa-triangle-exclamation me-2"></i><%= tr('leveling:AUSSCHLUESSE.BOT_FEHLT') %></div>
+  <% } %>
+
+  <% if (wirkung) { %>
+    <div class="row row-cards mb-3">
+      <% quellen.forEach((q) => { const w = wirkung.quellen[q]; %>
+        <div class="col-md-6">
+          <div class="card card-sm">
+            <div class="card-body">
+              <div class="row align-items-center">
+                <div class="col-auto">
+                  <span class="avatar bg-<%= w.ohneXp.length ? 'warning' : 'success' %>-lt"><i class="fa-solid <%= q === 'sprache' ? 'fa-headset' : 'fa-comment-dots' %>"></i></span>
+                </div>
+                <div class="col">
+                  <div class="fw-medium"><%= tr('leveling:AUSSCHLUESSE.ZAEHLUNG_' + q.toUpperCase(), { mit: w.mitXp, gesamt: w.gesamt }) %></div>
+                  <div class="text-secondary small">
+                    <%= w.mitFaktor ? tr('leveling:AUSSCHLUESSE.ZAEHLUNG_FAKTOR', { n: w.mitFaktor }) : '' %>
+                    <% if (w.ohneXp.length) { %>
+                      <details class="d-inline">
+                        <summary class="d-inline"><%= tr('leveling:AUSSCHLUESSE.ZAEHLUNG_OHNE', { n: w.ohneXp.length }) %></summary>
+                        <%= w.ohneXp.map((id) => kanalName(id) || id).join(', ') %>
+                      </details>
+                    <% } %>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+    <p class="text-secondary small"><%= tr('leveling:AUSSCHLUESSE.ZAEHLUNG_HINWEIS') %></p>
+  <% } %>
+
+  <div class="card">
+    <div class="card-status-top bg-primary"></div>
+    <div class="card-header">
+      <h3 class="card-title"><i class="fa-solid fa-plus me-2"></i><%= tr('leveling:AUSSCHLUESSE.NEU_TITEL') %></h3>
+    </div>
+    <div class="card-body">
+      <form id="levelingRegelForm" onsubmit="return false;">
+        <div class="row g-2 align-items-start">
+          <div class="col-md-2">
+            <label class="form-label" for="levelingRegelArt"><%= tr('leveling:AUSSCHLUESSE.ART') %></label>
+            <select class="form-select" id="levelingRegelArt" name="art">
+              <option value="kanal"><%= tr('leveling:AUSSCHLUESSE.ART_KANAL') %></option>
+              <option value="rolle"><%= tr('leveling:AUSSCHLUESSE.ART_ROLLE') %></option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="levelingRegelKanal" data-ziel="kanal"><%= tr('leveling:AUSSCHLUESSE.ZIEL_KANAL') %></label>
+            <select class="form-select" id="levelingRegelKanal" data-ziel="kanal">
+              <option value=""><%= tr('leveling:AUSSCHLUESSE.WAEHLEN') %></option>
+              <% if (ohneKategorie.length) { %>
+                <optgroup label="<%= tr('leveling:AUSSCHLUESSE.OHNE_KATEGORIE') %>">
+                  <% ohneKategorie.forEach((k) => { %><option value="<%= k.id %>">#<%= k.name %></option><% }); %>
+                </optgroup>
+              <% } %>
+              <% kategorien.forEach((kat) => { const kk = kinder(kat.id); %>
+                <optgroup label="<%= kat.name %>">
+                  <option value="<%= kat.id %>"><%= tr('leveling:AUSSCHLUESSE.GANZE_KATEGORIE', { name: kat.name, n: kk.length }) %></option>
+                  <% kk.forEach((k) => { %><option value="<%= k.id %>">#<%= k.name %></option><% }); %>
+                </optgroup>
+              <% }); %>
+            </select>
+            <label class="form-label" for="levelingRegelRolle" data-ziel="rolle" hidden><%= tr('leveling:AUSSCHLUESSE.ZIEL_ROLLE') %></label>
+            <select class="form-select" id="levelingRegelRolle" data-ziel="rolle" hidden>
+              <option value=""><%= tr('leveling:AUSSCHLUESSE.WAEHLEN') %></option>
+              <% rollen.forEach((r) => { %><option value="<%= r.id %>"><%= r.name %></option><% }); %>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" for="levelingRegelWirkung"><%= tr('leveling:AUSSCHLUESSE.WIRKUNG') %></label>
+            <select class="form-select" id="levelingRegelWirkung" name="wirkung">
+              <% wirkungen.forEach((w) => { %><option value="<%= w %>"><%= tr('leveling:AUSSCHLUESSE.WIRKUNG_' + w.toUpperCase()) %></option><% }); %>
+            </select>
+          </div>
+          <div class="col-md-1" data-faktor hidden>
+            <label class="form-label" for="levelingRegelFaktor"><%= tr('leveling:AUSSCHLUESSE.FAKTOR') %></label>
+            <input class="form-control" id="levelingRegelFaktor" name="faktor" type="text" inputmode="decimal" value="2" maxlength="6">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label" for="levelingRegelQuelle"><%= tr('leveling:AUSSCHLUESSE.QUELLE') %></label>
+            <select class="form-select" id="levelingRegelQuelle" name="quelle">
+              <option value=""><%= tr('leveling:AUSSCHLUESSE.QUELLE_ALLE') %></option>
+              <% quellen.forEach((q) => { %><option value="<%= q %>"><%= tr('leveling:AUSSCHLUESSE.QUELLE_' + q.toUpperCase()) %></option><% }); %>
+            </select>
+          </div>
+        </div>
+        <% wirkungen.forEach((w) => { %>
+          <div class="form-hint mt-2" data-wirkung-hinweis="<%= w %>" <%= w === wirkungen[0] ? '' : 'hidden' %>><%= tr('leveling:AUSSCHLUESSE.WIRKUNG_' + w.toUpperCase() + '_HINWEIS') %></div>
+        <% }); %>
+        <div class="d-flex justify-content-end mt-3">
+          <button type="button" class="btn btn-primary" id="levelingRegelHinzu"><i class="fa-solid fa-plus me-1"></i><%= tr('leveling:AUSSCHLUESSE.HINZUFUEGEN') %></button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fa-solid fa-list me-2"></i><%= tr('leveling:AUSSCHLUESSE.LISTE_TITEL') %></h3>
+    </div>
+    <% if (!regeln.length) { %>
+      <div class="card-body">
+        <%- include('shared/leerzustand', {
+              icon:  'fa-solid fa-filter-circle-xmark',
+              titel: tr('leveling:AUSSCHLUESSE.LEER'),
+              text:  tr('leveling:AUSSCHLUESSE.LEER_TEXT')
+        }) %>
+      </div>
+    <% } else { %>
+      <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+          <thead>
+            <tr>
+              <th><%= tr('leveling:AUSSCHLUESSE.ZIEL') %></th>
+              <th><%= tr('leveling:AUSSCHLUESSE.WIRKUNG') %></th>
+              <th><%= tr('leveling:AUSSCHLUESSE.QUELLE') %></th>
+              <th class="text-end"><%= tr('leveling:AUSSCHLUESSE.BETROFFEN') %></th>
+              <th class="w-1"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% regeln.forEach((r) => {
+                 const istKanal = r.art === 'kanal';
+                 const name = istKanal ? kanalName(r.ziel_id) : (rolleVon(r.ziel_id) ? '@' + rolleVon(r.ziel_id).name : null);
+                 const betroffen = istKanal
+                   ? (wirkung ? tr('leveling:AUSSCHLUESSE.KANAELE_ZAHL', { n: wirkung.je[schluessel(r)] || 0 }) : '—')
+                   : (rolleVon(r.ziel_id) ? tr('leveling:AUSSCHLUESSE.MITGLIEDER_ZAHL', { n: rolleVon(r.ziel_id).mitglieder }) : '—');
+            %>
+              <tr>
+                <td>
+                  <i class="fa-solid <%= istKanal ? 'fa-hashtag' : 'fa-user-tag' %> text-secondary me-1"></i>
+                  <% if (name) { %><%= name %><% } else { %><span class="text-secondary"><%= (istKanal ? kanaeleFehlen : rollenFehlen) ? r.ziel_id : tr('leveling:AUSSCHLUESSE.WEG', { id: r.ziel_id }) %></span><% } %>
+                </td>
+                <td>
+                  <%= tr('leveling:AUSSCHLUESSE.WIRKUNG_' + r.wirkung.toUpperCase()) %><% if (r.wirkung === 'faktor') { %> × <%= r.faktor %><% } %>
+                </td>
+                <td><%= r.quelle ? tr('leveling:AUSSCHLUESSE.QUELLE_' + r.quelle.toUpperCase()) : tr('leveling:AUSSCHLUESSE.QUELLE_ALLE') %></td>
+                <td class="text-end text-secondary"><%= betroffen %></td>
+                <td>
+                  <button type="button" class="btn btn-sm btn-ghost-danger" data-entfernen="<%= r.id %>"
+                          title="<%= tr('leveling:AUSSCHLUESSE.ENTFERNEN') %>" aria-label="<%= tr('leveling:AUSSCHLUESSE.ENTFERNEN') %>">
+                    <i class="fa-solid fa-trash"></i>
+                  </button>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+    <div class="card-footer text-secondary small">
+      <i class="fa-solid fa-circle-info me-1"></i><%= tr('leveling:AUSSCHLUESSE.REIHENFOLGE') %>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    const form = document.getElementById('levelingRegelForm');
+    if (!form) return;
+    const adresse = '/guild/<%= guildId %>/plugins/leveling/ausschluesse';
+    const meldung = (art, text) => (window.showToast ? window.showToast(art, text) : console[art === 'error' ? 'error' : 'log']('[Leveling]', text));
+    async function anfrage(weg, methode, daten) {
+      const antwort = await fetch(adresse + weg, { method: methode, headers: { 'Content-Type': 'application/json' }, body: daten === undefined ? undefined : JSON.stringify(daten) });
+      const a = await antwort.json().catch(() => ({}));
+      if (!antwort.ok || !a.success) throw new Error(a.message || antwort.statusText);
+      return a;
+    }
+    const art = form.querySelector('[name="art"]');
+    const wirkung = form.querySelector('[name="wirkung"]');
+    function zeigen() {
+      form.querySelectorAll('[data-ziel]').forEach((e) => { e.hidden = e.dataset.ziel !== art.value; });
+      form.querySelector('[data-faktor]').hidden = wirkung.value !== 'faktor';
+      form.querySelectorAll('[data-wirkung-hinweis]').forEach((h) => { h.hidden = h.dataset.wirkungHinweis !== wirkung.value; });
+    }
+    art.addEventListener('change', zeigen);
+    wirkung.addEventListener('change', zeigen);
+    zeigen();
+
+    const hinzu = document.getElementById('levelingRegelHinzu');
+    hinzu.addEventListener('click', async () => {
+      hinzu.disabled = true;
+      try {
+        const a = await anfrage('', 'POST', {
+          art: art.value,
+          ziel_id: form.querySelector('select[data-ziel="' + art.value + '"]').value,
+          wirkung: wirkung.value,
+          faktor: wirkung.value === 'faktor' ? form.querySelector('[name="faktor"]').value : null,
+          quelle: form.querySelector('[name="quelle"]').value || null,
+        });
+        meldung('success', a.message);
+        setTimeout(() => location.reload(), 600);
+      } catch (err) {
+        meldung('error', err.message);
+        hinzu.disabled = false;
+      }
+    });
+
+    document.querySelectorAll('[data-entfernen]').forEach((k) => k.addEventListener('click', async () => {
+      k.disabled = true;
+      try {
+        const a = await anfrage('/' + encodeURIComponent(k.dataset.entfernen), 'DELETE');
+        meldung('success', a.message);
+        setTimeout(() => location.reload(), 600);
+      } catch (err) {
+        meldung('error', err.message);
+        k.disabled = false;
+      }
+    }));
+  })();
+  </script>
+<% } %>

@@ -1,0 +1,175 @@
+<%- include('shared/seitenkopf', {
+      plugin:       'leveling',
+      vortitel:     tr('leveling:TITEL'),
+      titel:        tr('leveling:NAV.XP_REGELN'),
+      beschreibung: tr('leveling:XP_REGELN.BESCHREIBUNG'),
+      icon:         'fa-solid fa-sliders',
+      guildId:      guildId
+}) %>
+
+<%# XP-Regeln (LV-1i): je Quelle XP von/bis und Taktung, darunter aufklappbar die Feinheiten. Prüfung in shared/einstellen.js pruefeXp. %>
+<% if (!regeln) { %>
+  <%- include('shared/leerzustand', {
+        icon:  'fa-solid fa-ranking-star',
+        titel: tr('leveling:UEBERSICHT.NICHT_EINGERICHTET'),
+        text:  tr('leveling:UEBERSICHT.NICHT_EINGERICHTET_TEXT')
+  }) %>
+<% } else { %>
+  <%
+    const e = regeln.einstellungen;
+    const q = (name) => regeln.quellen[name] || { xp_von: 0, xp_bis: 0, taktung_s: 60, aktiv: false };
+    const n = q('nachricht');
+    const sp = q('sprache');
+    const zahl = (name, wert, [min, max], einheit) => ({ name, wert, min, max, einheit });
+  %>
+  <form id="levelingXpForm" onsubmit="return false;"
+        data-text-chat="<%= tr('leveling:XP_REGELN.WIRKUNG_CHAT') %>"
+        data-text-chat-ohne="<%= tr('leveling:XP_REGELN.WIRKUNG_CHAT_OHNE_TAKT') %>"
+        data-text-sprache="<%= tr('leveling:XP_REGELN.WIRKUNG_SPRACHE') %>"
+        data-text-aus="<%= tr('leveling:XP_REGELN.WIRKUNG_AUS') %>">
+    <div class="row row-cards">
+      <% [
+           { quelle: 'nachricht', werte: n, icon: 'fa-comment-dots', titel: 'CHAT_TITEL', takt: grenzen.taktung_s },
+           { quelle: 'sprache', werte: sp, icon: 'fa-headset', titel: 'SPRACHE_TITEL', takt: grenzen.sprache_taktung_s },
+         ].forEach((k) => { %>
+        <div class="col-lg-6">
+          <div class="card" data-quelle="<%= k.quelle %>">
+            <div class="card-status-top bg-primary"></div>
+            <div class="card-header">
+              <h3 class="card-title"><i class="fa-solid <%= k.icon %> me-2"></i><%= tr('leveling:XP_REGELN.' + k.titel) %></h3>
+              <div class="card-actions">
+                <label class="form-check form-switch mb-0">
+                  <input class="form-check-input" type="checkbox" data-feld="aktiv" <%= k.werte.aktiv ? 'checked' : '' %>>
+                  <span class="form-check-label"><%= tr('leveling:XP_REGELN.AKTIV') %></span>
+                </label>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="row g-2">
+                <div class="col-4">
+                  <label class="form-label" for="lv-<%= k.quelle %>-von"><%= tr('leveling:XP_REGELN.XP_VON') %></label>
+                  <input class="form-control" id="lv-<%= k.quelle %>-von" type="number" step="1" min="<%= grenzen.xp[0] %>" max="<%= grenzen.xp[1] %>" value="<%= k.werte.xp_von %>" data-feld="xp_von">
+                </div>
+                <div class="col-4">
+                  <label class="form-label" for="lv-<%= k.quelle %>-bis"><%= tr('leveling:XP_REGELN.XP_BIS') %></label>
+                  <input class="form-control" id="lv-<%= k.quelle %>-bis" type="number" step="1" min="<%= grenzen.xp[0] %>" max="<%= grenzen.xp[1] %>" value="<%= k.werte.xp_bis %>" data-feld="xp_bis">
+                </div>
+                <div class="col-4">
+                  <label class="form-label" for="lv-<%= k.quelle %>-takt"><%= tr('leveling:XP_REGELN.TAKTUNG') %></label>
+                  <div class="input-group">
+                    <input class="form-control" id="lv-<%= k.quelle %>-takt" type="number" step="1" min="<%= k.takt[0] %>" max="<%= k.takt[1] %>" value="<%= k.werte.taktung_s %>" data-feld="taktung_s">
+                    <span class="input-group-text">s</span>
+                  </div>
+                </div>
+              </div>
+              <div class="form-hint mt-2"><%= tr('leveling:XP_REGELN.HINWEIS_' + k.quelle.toUpperCase()) %></div>
+              <div class="alert alert-info mt-3 mb-0 py-2" data-wirkung></div>
+
+              <details class="mt-3">
+                <summary class="text-secondary"><i class="fa-solid fa-sliders me-1"></i><%= tr('leveling:XP_REGELN.FEINHEITEN') %></summary>
+                <div class="mt-3">
+                <% if (k.quelle === 'nachricht') { %>
+                  <% [
+                       zahl('mindestlaenge', e.mindestlaenge, grenzen.mindestlaenge, 'ZEICHEN'),
+                       zahl('gleiche_fenster_s', e.gleiche_fenster_s, grenzen.gleiche_fenster_s, 'SEKUNDEN'),
+                       zahl('storno_loeschen_min', e.storno_loeschen_min, grenzen.storno_loeschen_min, 'MINUTEN'),
+                     ].forEach((f) => { %>
+                    <div class="mb-3">
+                      <label class="form-label" for="lv-<%= f.name %>"><%= tr('leveling:XP_REGELN.' + f.name.toUpperCase()) %></label>
+                      <div class="input-group">
+                        <input class="form-control" id="lv-<%= f.name %>" type="number" step="1" min="<%= f.min %>" max="<%= f.max %>" value="<%= f.wert %>" data-einstellung="<%= f.name %>">
+                        <span class="input-group-text"><%= tr('leveling:XP_REGELN.EINHEIT_' + f.einheit) %></span>
+                      </div>
+                      <div class="form-hint"><%= tr('leveling:XP_REGELN.' + f.name.toUpperCase() + '_HINWEIS') %></div>
+                    </div>
+                  <% }); %>
+                  <label class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" data-einstellung="storno_automod" <%= Number(e.storno_automod) ? 'checked' : '' %>>
+                    <span class="form-check-label"><%= tr('leveling:XP_REGELN.STORNO_AUTOMOD') %></span>
+                  </label>
+                  <div class="form-hint"><%= tr('leveling:XP_REGELN.STORNO_AUTOMOD_HINWEIS') %></div>
+                <% } else { %>
+                  <div class="mb-3">
+                    <label class="form-label" for="lv-sprache_min_menschen"><%= tr('leveling:XP_REGELN.SPRACHE_MIN_MENSCHEN') %></label>
+                    <input class="form-control" id="lv-sprache_min_menschen" type="number" step="1" min="<%= grenzen.sprache_min_menschen[0] %>" max="<%= grenzen.sprache_min_menschen[1] %>" value="<%= e.sprache_min_menschen %>" data-einstellung="sprache_min_menschen">
+                    <div class="form-hint"><%= tr('leveling:XP_REGELN.SPRACHE_MIN_MENSCHEN_HINWEIS') %></div>
+                  </div>
+                  <label class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" data-einstellung="sprache_stumm_zaehlt" <%= Number(e.sprache_stumm_zaehlt) ? 'checked' : '' %>>
+                    <span class="form-check-label"><%= tr('leveling:XP_REGELN.SPRACHE_STUMM') %></span>
+                  </label>
+                  <div class="form-hint"><%= tr('leveling:XP_REGELN.SPRACHE_STUMM_HINWEIS') %></div>
+                <% } %>
+                </div>
+              </details>
+            </div>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2 align-items-center mt-3">
+      <a class="btn btn-outline-secondary" href="/guild/<%= guildId %>/plugins/leveling/ausschluesse"><i class="fa-solid fa-filter-circle-xmark me-1"></i><%= tr('leveling:NAV.AUSSCHLUESSE') %></a>
+      <a class="btn btn-outline-secondary" href="/guild/<%= guildId %>/plugins/leveling/stufen"><i class="fa-solid fa-stairs me-1"></i><%= tr('leveling:NAV.STUFEN') %></a>
+      <button type="button" class="btn btn-primary ms-auto" id="levelingXpSpeichern"><i class="fa-solid fa-save me-1"></i><%= tr('leveling:XP_REGELN.SPEICHERN') %></button>
+    </div>
+  </form>
+
+  <script>
+  (function () {
+    const form = document.getElementById('levelingXpForm');
+    if (!form) return;
+    const adresse = '/guild/<%= guildId %>/plugins/leveling/xp-regeln';
+    const meldung = (art, text) => (window.showToast ? window.showToast(art, text) : console[art === 'error' ? 'error' : 'log']('[Leveling]', text));
+    const zahl = (n) => Number(n).toLocaleString(document.documentElement.lang || 'de-DE', { maximumFractionDigits: 1 });
+    const text = (name, werte) => {
+      let t = form.dataset['text' + name] || '';
+      Object.keys(werte || {}).forEach((k) => { t = t.split('{{' + k + '}}').join(String(werte[k])); });
+      return t;
+    };
+    const quelle = (karte) => {
+      const v = {};
+      karte.querySelectorAll('[data-feld]').forEach((f) => { v[f.dataset.feld] = f.type === 'checkbox' ? f.checked : f.value; });
+      return v;
+    };
+    // Wirkung je Karte: Mittel aus von…bis, höchstens eine Vergabe je Takt.
+    function wirkung(karte) {
+      const v = quelle(karte);
+      const ziel = karte.querySelector('[data-wirkung]');
+      const mittel = (Number(v.xp_von) + Number(v.xp_bis)) / 2;
+      const takt = Number(v.taktung_s);
+      if (!v.aktiv || !(mittel > 0)) { ziel.textContent = text('Aus'); return; }
+      if (karte.dataset.quelle === 'sprache') {
+        const jeMinute = mittel / (Math.max(60, takt || 60) / 60);
+        ziel.textContent = text('Sprache', { mittel: zahl(mittel), minute: zahl(jeMinute), stunde: zahl(jeMinute * 60) });
+      } else if (takt > 0) {
+        ziel.textContent = text('Chat', { mittel: zahl(mittel), takt: zahl(takt), stunde: zahl(mittel * 3600 / takt) });
+      } else {
+        ziel.textContent = text('ChatOhne', { mittel: zahl(mittel) });
+      }
+    }
+    form.querySelectorAll('[data-quelle]').forEach((karte) => {
+      wirkung(karte);
+      karte.querySelectorAll('[data-feld]').forEach((f) => f.addEventListener('input', () => wirkung(karte)));
+    });
+
+    const knopf = document.getElementById('levelingXpSpeichern');
+    knopf.addEventListener('click', async () => {
+      const daten = { einstellungen: {} };
+      form.querySelectorAll('[data-quelle]').forEach((karte) => { daten[karte.dataset.quelle] = quelle(karte); });
+      form.querySelectorAll('[data-einstellung]').forEach((f) => { daten.einstellungen[f.dataset.einstellung] = f.type === 'checkbox' ? f.checked : f.value; });
+      knopf.disabled = true;
+      try {
+        const antwort = await fetch(adresse, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(daten) });
+        const a = await antwort.json().catch(() => ({}));
+        if (!antwort.ok || !a.success) throw new Error(a.message || antwort.statusText);
+        meldung('success', a.message);
+      } catch (err) {
+        meldung('error', err.message);
+      } finally {
+        knopf.disabled = false;
+      }
+    });
+  })();
+  </script>
+<% } %>

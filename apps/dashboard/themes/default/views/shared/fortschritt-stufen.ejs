@@ -15,6 +15,10 @@
  *
  * Die Karte wird per Skript gefüllt (Skripte stehen am Seitenende, deshalb
  * über `data-fortschritt-stufen` gesucht, nie über das laufende Skript).
+ *
+ * Nach jedem Zeichnen meldet sie `fortschritt-stufen:gezeichnet` (steigt auf,
+ * `detail: { kennung, stufen: [{name, schwelle}], ungespeichert }`), damit
+ * die Seite daneben etwas daraus rechnen kann (Leveling LV-1i).
  */
 const _kennung = typeof kennung !== 'undefined' ? String(kennung) : '';
 const _t = (k, o) => tr('core:FORTSCHRITT.' + k, o);
@@ -206,6 +210,12 @@ const _texte = ['STUFE', 'NAME', 'AB_XP', 'SCHRITT', 'ENTFERNEN', 'HINZUFUEGEN',
       });
       stufen = sortiert;
       $('[data-fs-zahl]').textContent = text('stufen-zahl', { n: stufen.length });
+      // Für Seiten, die neben der Tabelle etwas daraus rechnen (Leveling:
+      // Kontrolltabelle). Auch ungespeicherte Änderungen, dann `ungespeichert`.
+      karte.dispatchEvent(new CustomEvent('fortschritt-stufen:gezeichnet', { bubbles: true, detail: {
+        kennung: karte.dataset.fortschrittStufen, ungespeichert: ungespeichert,
+        stufen: stufen.map(function (s) { return { name: s.name || '', schwelle: Number(s.schwelle) }; })
+      } }));
     }
     function kopf() {
       $('[data-fs-titel]').textContent = stand.titel;

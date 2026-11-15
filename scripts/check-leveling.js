@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Leveling Stufe 1 (LV-1a bis LV-1h, K382, K394, 2026-11-15).
+ * Leveling Stufe 1 (LV-1a bis LV-1i, K382, K394, 2026-11-15).
  *
  * Geprüft wird:
  *
@@ -18,14 +18,19 @@
  *                   Akteur, Pflichtgrund, Ereignis und Bestätigung beim
  *                   Zurücksetzen (LV-1h), `/rank` und `/leaderboard` über
  *                   Bildkarte und Fortschritt (LV-1g), Speichern der
- *                   Nachrichten mit CSRF und Recht, Hinweis „kein Level-Kanal“
+ *                   Nachrichten mit CSRF und Recht, Hinweis „kein Level-Kanal“;
+ *                   LV-1i: jede Einstellseite mit Recht, jedes Schreiben mit
+ *                   CSRF und Recht, Navigation mit demselben Recht wie die
+ *                   Seite, Prüfung über `shared/einstellen.js`, Stufen über
+ *                   den Kern-Teil mit Ereignis für die Kontrolltabelle
  *   2  Regeln       Ausschluss, „nur diese“, Faktoren (Kanal genauester,
  *                   Rolle höchster), Kette Thread → Kanal → Kategorie,
  *                   Menge, Taktung und gleicher Text; Sprache (AFK, allein,
  *                   taub, stumm); Soll-Rollen je Stufe (geben, nehmen,
  *                   vorherige entfernen); Level-up: Meilensteine, wann,
  *                   wohin, Platzhalter, Vorgabe in beiden Sprachen;
- *                   Rangkarte: Werte passen zur Schablone
+ *                   Rangkarte: Werte passen zur Schablone; Eingaben der
+ *                   Einstellseiten, Raten, Zählung je Kanal wie im Bot
  *   3  Läufe        an TEMPORARY-Kopien von `level_*`, `fortschritt_*` und
  *                   `ereignisbuch` mit echtem SQL: nicht eingerichtet →
  *                   nichts, Startwerte, Buchung `msg:<id>`, Taktung, gleicher
@@ -40,7 +45,8 @@
  *                   ehrlichem Ergebnis; Level-up-Nachricht (Kanal, gesperrt,
  *                   Vorlage, Meilenstein, Direktnachricht, aus), `/xp` mit
  *                   Recht/Akteur/Grund/Ereignis/Kürzen/Bestätigung,
- *                   `/leaderboard` mit Seiten, `/rank` mit Karte
+ *                   `/leaderboard` mit Seiten, `/rank` mit Karte; Seiten
+ *                   XP-Regeln, Belohnungen, Ausschlüsse speichern und lesen
  *   4  Gegenproben  jede Prüfung aus 1 wird an eingebauten Fehlern rot
  *
  * Geschrieben wird nur in TEMPORARY-Tabellen dieser Verbindung.
@@ -91,7 +97,24 @@ const DATEIEN = {
     dashboard: 'plugins/leveling/dashboard/index.js',
     automod: 'plugins/automod/bot/events/messageCreate.js',
     kern: 'apps/dashboard/helpers/PluginManager.js',
+    stufenSeite: 'plugins/leveling/dashboard/views/guild/leveling-stufen.ejs',
+    kernStufen: 'apps/dashboard/themes/default/views/shared/fortschritt-stufen.ejs',
 };
+
+/** LV-1i: Methode, Weg, Recht, schreibt (dann mit CSRF). */
+const SEITEN = [
+    ['get', '/xp-regeln', 'LEVELING.CONFIGURE', false],
+    ['put', '/xp-regeln', 'LEVELING.CONFIGURE', true],
+    ['get', '/stufen', 'LEVELING.VIEW', false],
+    ['get', '/belohnungen', 'LEVELING.REWARDS.MANAGE', false],
+    ['post', '/belohnungen', 'LEVELING.REWARDS.MANAGE', true],
+    ['delete', '/belohnungen/:id', 'LEVELING.REWARDS.MANAGE', true],
+    ['put', '/belohnungen/einstellungen', 'LEVELING.REWARDS.MANAGE', true],
+    ['get', '/ausschluesse', 'LEVELING.CONFIGURE', false],
+    ['post', '/ausschluesse', 'LEVELING.CONFIGURE', true],
+    ['delete', '/ausschluesse/:id', 'LEVELING.CONFIGURE', true],
+];
+const esc = (x) => x.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 
 function pruefeVerdrahtung(t) {
     const aus = [];
@@ -133,6 +156,25 @@ function pruefeVerdrahtung(t) {
     const felder = (t.automod.match(/fields\.push\(\{/g) || []).length;
     const gruende = (t.automod.match(/gruende\.push\('[a-z_]+'\);\s*\n\s*fields\.push\(\{/g) || []).length;
     if (felder !== gruende) aus.push(`automod: ${felder} Felder, aber nur ${gruende} mit festem Grund davor`);
+    // LV-1i: Seiten mit Recht, Schreiben mit CSRF, Navigation mit demselben Recht
+    for (const [m, weg, recht, schreibt] of SEITEN) {
+        const re = new RegExp(`router\\.${m}\\('${esc(weg)}', ${schreibt ? 'csrfProtection, ' : ''}requirePermission\\('${esc(recht)}'\\)`);
+        if (!re.test(t.router)) aus.push(`${m.toUpperCase()} ${weg} ohne ${schreibt ? 'CSRF und ' : ''}Recht ${recht}`);
+    }
+    const nav = {};
+    for (const x of t.dashboard.matchAll(/url: `\$\{basis\}\/([\w-]+)`,[^}]*?capability: '([\w.]+)'/g)) nav[`/${x[1]}`] = x[2];
+    for (const [m, weg, recht] of SEITEN) {
+        if (m === 'get' && nav[weg] !== recht) aus.push(`Navigation ${weg}: ${nav[weg] || 'fehlt'} statt ${recht}`);
+    }
+    if (!/Einstellen\.pruefeXp\(req\.body\)/.test(t.router) || !/Einstellen\.pruefeBelohnung\(req\.body/.test(t.router) || !/Einstellen\.pruefeRegel\(req\.body/.test(t.router)) aus.push('Seiten speichern ohne Prüfung aus shared/einstellen.js');
+    if (!/Einstellen\.istDoppelt\(regel, vorhanden\)/.test(t.router)) aus.push('Ausschlüsse ohne Doppelprüfung (NULL im Schlüssel)');
+    for (const weg of ['/xp-regeln', '/ausschluesse', '/ausschluesse/:id']) {
+        const b = new RegExp(`router\\.(put|post|delete)\\('${esc(weg)}'[\\s\\S]*?\\n\\}\\);`).exec(t.router);
+        if (!b || !/Regeln\.vergiss\(guildId\)/.test(b[0])) aus.push(`${weg} vergisst den Zwischenspeicher nicht`);
+    }
+    if (!/include\('shared\/fortschritt-stufen', \{ guildId, tr, kennung: 'leveling:community' \}\)/.test(t.stufenSeite)
+        || !/addEventListener\('fortschritt-stufen:gezeichnet'/.test(t.stufenSeite)) aus.push('Seite Stufen ohne Kern-Teil oder ohne Kontrolltabelle');
+    if (!/zeichne\(\) \{[\s\S]*?dispatchEvent\(new CustomEvent\('fortschritt-stufen:gezeichnet'/.test(t.kernStufen)) aus.push('Kern-Teil Stufen meldet fortschritt-stufen:gezeichnet nicht');
     const schritt = /if \(!inhalteBleiben\) \{([\s\S]*?)\} catch \(tabellenFehler\)/.exec(t.kern);
     if (!schritt || !/Fortschritt\.loeschePlugin\(\{\s*guildId,\s*plugin:\s*pluginName\s*\}\)/.test(schritt[1])) aus.push('Kern löscht beim Abschalten die Fortschritte nicht (Schritt 2, außerhalb der Kontroll-Guild)');
     return aus;
@@ -154,6 +196,7 @@ function pruefeVerdrahtung(t) {
         assert.deepStrictEqual([...p.guildInhalte.loeschen].sort(), [...tabellen].sort(), 'guildInhalte ≠ Tabellen der Migration');
         assert.ok(p.ereignisse.sendet.includes('leveling.level.erreicht') && p.ereignisse.sendet.includes('leveling.belohnung.vergeben') && p.ereignisse.hoert.includes('automod.verstoss'));
         assert.deepStrictEqual(p.rollen?.map((r) => r.besitzer), ['leveling:community'], 'Belohnungsrollen ohne Besitzer-Erklärung');
+        assert.strictEqual(p.rollen[0].seite, '/plugins/leveling/belohnungen', 'Rollenvergabe zeigt nicht auf die Seite Belohnungen');
         // LV-1f/LV-1g/LV-1h
         assert.deepStrictEqual(Object.keys(p.vorlagen?.anlaesse || {}), ['aufstieg'], 'Vorlage leveling:aufstieg nicht erklärt');
         assert.strictEqual(p.vorlagen.recht, 'LEVELING.CONFIGURE');
@@ -280,6 +323,93 @@ function pruefeVerdrahtung(t) {
         assert.deepStrictEqual([null0.xp_level, null0.xp_level_max], ['0', '100']);
         const karte = JSON.parse(fs.readFileSync(path.join(WURZEL, 'packages/dunebot-sdk/bildkarten/rangkarte.json'), 'utf8'));
         assert.deepStrictEqual(Object.keys(w).sort(), karte.werte.filter((x) => !x.einstellbar).map((x) => x.name).sort(), 'Laufzeitwerte ≠ Schablone');
+    });
+
+    const Einstellen = require(L('shared/einstellen'));
+    const wirft = (fn, schluessel) => {
+        try { fn(); } catch (e) {
+            assert.ok(e instanceof Einstellen.Eingabefehler, `kein Eingabefehler: ${e.message}`);
+            assert.strictEqual(e.schluessel, schluessel);
+            return e;
+        }
+        throw new Error(`nicht abgelehnt, erwartet ${schluessel}`);
+    };
+    await pruefe('2g. XP-Regeln: Zahlen, Grenzen, von ≤ bis, Schalter', () => {
+        const gut = { nachricht: { xp_von: '15', xp_bis: 25, taktung_s: 60, aktiv: true }, sprache: { xp_von: 10, xp_bis: 10, taktung_s: 60, aktiv: 'false' },
+            einstellungen: { mindestlaenge: 3, gleiche_fenster_s: 300, storno_loeschen_min: 10, storno_automod: false, sprache_min_menschen: 2, sprache_stumm_zaehlt: true } };
+        const r = Einstellen.pruefeXp(gut);
+        assert.deepStrictEqual(r.quellen.nachricht, { xp_von: 15, xp_bis: 25, taktung_s: 60, aktiv: 1 });
+        assert.strictEqual(r.quellen.sprache.aktiv, 0);
+        assert.deepStrictEqual([r.einstellungen.storno_automod, r.einstellungen.sprache_stumm_zaehlt], [0, 1]);
+        const mit = (q, feld, wert) => ({ ...gut, [q]: { ...gut[q], [feld]: wert } });
+        assert.strictEqual(wirft(() => Einstellen.pruefeXp(mit('nachricht', 'xp_von', 30)), 'VON_UEBER_BIS').werte.feld, 'nachricht');
+        assert.strictEqual(wirft(() => Einstellen.pruefeXp(mit('nachricht', 'xp_von', -1)), 'AUSSERHALB').werte.feld, 'nachricht.xp_von');
+        wirft(() => Einstellen.pruefeXp(mit('nachricht', 'xp_bis', '1.5')), 'KEINE_ZAHL');
+        wirft(() => Einstellen.pruefeXp(mit('nachricht', 'xp_bis', '')), 'KEINE_ZAHL');
+        wirft(() => Einstellen.pruefeXp(mit('sprache', 'taktung_s', 30)), 'AUSSERHALB');
+        assert.strictEqual(Einstellen.pruefeXp(mit('nachricht', 'taktung_s', 0)).quellen.nachricht.taktung_s, 0, 'Taktung 0 = jede Nachricht');
+        wirft(() => Einstellen.pruefeXp({ ...gut, einstellungen: { ...gut.einstellungen, sprache_min_menschen: 0 } }), 'AUSSERHALB');
+        wirft(() => Einstellen.pruefeXp({}), 'KEINE_ZAHL');
+    });
+    await pruefe('2h. Raten der Kontrolltabelle', () => {
+        const q = (n, s) => ({ nachricht: n, sprache: s });
+        assert.deepStrictEqual(Einstellen.raten(q({ xp_von: 15, xp_bis: 25, taktung_s: 60, aktiv: true }, { xp_von: 10, xp_bis: 10, taktung_s: 120, aktiv: true })),
+            { xpJeNachricht: 20, sekundenJeNachricht: 60, xpJeSprachminute: 5 });
+        assert.deepStrictEqual(Einstellen.raten(q({ xp_von: 15, xp_bis: 25, taktung_s: 0, aktiv: true }, { xp_von: 0, xp_bis: 0, taktung_s: 60, aktiv: true })),
+            { xpJeNachricht: 20, sekundenJeNachricht: null, xpJeSprachminute: null });
+        assert.deepStrictEqual(Einstellen.raten(q({ xp_von: 15, xp_bis: 25, taktung_s: 60, aktiv: false }, undefined)),
+            { xpJeNachricht: null, sekundenJeNachricht: null, xpJeSprachminute: null });
+        assert.deepStrictEqual(Einstellen.raten(undefined), { xpJeNachricht: null, sekundenJeNachricht: null, xpJeSprachminute: null });
+    });
+    await pruefe('2i. Belohnung: Stufe, Art, Rolle aus der Liste, verwaltet, über dem Bot', () => {
+        const R = [{ id: '200000000000000001', managed: false, editable: true }, { id: '200000000000000002', managed: true, editable: false }, { id: '200000000000000003', managed: false, editable: false }];
+        const o = { rollen: R, guildId: '100000000000000009' };
+        assert.deepStrictEqual(Einstellen.pruefeBelohnung({ stufe: '5', art: 'rolle_geben', wert: R[0].id }, o), { stufe: 5, art: 'rolle_geben', wert: R[0].id, warnung: null });
+        assert.strictEqual(Einstellen.pruefeBelohnung({ stufe: 5, art: 'rolle_nehmen', wert: R[2].id }, o).warnung, 'ROLLE_ZU_HOCH');
+        wirft(() => Einstellen.pruefeBelohnung({ stufe: 5, art: 'rolle_geben', wert: R[1].id }, o), 'ROLLE_VERWALTET');
+        wirft(() => Einstellen.pruefeBelohnung({ stufe: 5, art: 'rolle_geben', wert: '200000000000000099' }, o), 'FALSCHE_ROLLE');
+        wirft(() => Einstellen.pruefeBelohnung({ stufe: 5, art: 'rolle_geben', wert: o.guildId }, { guildId: o.guildId }), 'FALSCHE_ROLLE');
+        wirft(() => Einstellen.pruefeBelohnung({ stufe: 5, art: 'abzeichen', wert: R[0].id }, o), 'FALSCHE_ART');
+        wirft(() => Einstellen.pruefeBelohnung({ stufe: 0, art: 'rolle_geben', wert: R[0].id }, o), 'AUSSERHALB');
+        assert.strictEqual(Einstellen.pruefeBelohnung({ stufe: 1, art: 'rolle_geben', wert: '200000000000000099' }, {}).warnung, null, 'ohne Bot nur die Form');
+    });
+    await pruefe('2j. Regel: Faktor, Quelle, Ziel aus der Liste, @everyone nie, doppelt mit NULL', () => {
+        const K = [{ id: '100000000000000011' }];
+        const R = [{ id: '200000000000000001' }];
+        const o = { kanaele: K, rollen: R, guildId: '100000000000000009' };
+        assert.deepStrictEqual(Einstellen.pruefeRegel({ art: 'kanal', ziel_id: K[0].id, wirkung: 'faktor', faktor: '0,5', quelle: '' }, o),
+            { art: 'kanal', ziel_id: K[0].id, wirkung: 'faktor', faktor: 0.5, quelle: null });
+        assert.strictEqual(Einstellen.pruefeRegel({ art: 'rolle', ziel_id: R[0].id, wirkung: 'ausschliessen', faktor: 7, quelle: 'sprache' }, o).faktor, null, 'Faktor nur bei Wirkung faktor');
+        wirft(() => Einstellen.pruefeRegel({ art: 'kanal', ziel_id: K[0].id, wirkung: 'faktor', faktor: 1 }, o), 'FAKTOR_EINS');
+        wirft(() => Einstellen.pruefeRegel({ art: 'kanal', ziel_id: K[0].id, wirkung: 'faktor', faktor: '0' }, o), 'FALSCHER_FAKTOR');
+        wirft(() => Einstellen.pruefeRegel({ art: 'kanal', ziel_id: K[0].id, wirkung: 'faktor', faktor: '1.234' }, o), 'FALSCHER_FAKTOR');
+        wirft(() => Einstellen.pruefeRegel({ art: 'kanal', ziel_id: K[0].id, wirkung: 'faktor', faktor: '101' }, o), 'FALSCHER_FAKTOR');
+        wirft(() => Einstellen.pruefeRegel({ art: 'kanal', ziel_id: K[0].id, wirkung: 'nur', quelle: 'reaktion' }, o), 'FALSCHE_QUELLE');
+        wirft(() => Einstellen.pruefeRegel({ art: 'kanal', ziel_id: '100000000000000099', wirkung: 'nur' }, o), 'FALSCHER_KANAL');
+        wirft(() => Einstellen.pruefeRegel({ art: 'rolle', ziel_id: o.guildId, wirkung: 'faktor', faktor: 2 }, { guildId: o.guildId }), 'FALSCHE_ROLLE');
+        wirft(() => Einstellen.pruefeRegel({ art: 'thread', ziel_id: K[0].id, wirkung: 'nur' }, o), 'FALSCHE_ART');
+        wirft(() => Einstellen.pruefeRegel({ art: 'kanal', ziel_id: K[0].id, wirkung: 'verdoppeln' }, o), 'FALSCHE_WIRKUNG');
+        const r = Einstellen.pruefeRegel({ art: 'kanal', ziel_id: K[0].id, wirkung: 'nur' }, o);
+        assert.ok(Einstellen.istDoppelt(r, [{ art: 'kanal', ziel_id: K[0].id, wirkung: 'nur', quelle: null }]), 'NULL = NULL nicht erkannt');
+        assert.ok(!Einstellen.istDoppelt(r, [{ art: 'kanal', ziel_id: K[0].id, wirkung: 'nur', quelle: 'sprache' }]));
+    });
+    await pruefe('2k. Zählung je Kanal wie im Bot: Kategorie, nur, Faktor, Sprache nur in Sprachkanälen', () => {
+        const kanaele = [
+            { id: '1', type: 0, parentId: '9' }, { id: '2', type: 0, parentId: '9' }, { id: '3', type: 2, parentId: null },
+            { id: '4', type: 13, parentId: '8' }, { id: '9', type: 4, parentId: null }, { id: '8', type: 4, parentId: null },
+        ];
+        const aus = { art: 'kanal', ziel_id: '9', wirkung: 'ausschliessen', faktor: null, quelle: null };
+        const w = Einstellen.wirkungAufKanaele([aus, { art: 'kanal', ziel_id: '3', wirkung: 'faktor', faktor: 2, quelle: 'sprache' }, { art: 'rolle', ziel_id: '7', wirkung: 'nur', faktor: null, quelle: null }], kanaele);
+        assert.strictEqual(w.je[Einstellen.regelSchluessel(aus)], 2, 'Kategorie trifft ihre Kanäle');
+        assert.deepStrictEqual([w.quellen.nachricht.gesamt, w.quellen.nachricht.mitXp, w.quellen.nachricht.ohneXp], [4, 2, ['1', '2']]);
+        assert.deepStrictEqual([w.quellen.sprache.gesamt, w.quellen.sprache.mitXp, w.quellen.sprache.mitFaktor], [2, 2, 1], 'Sprache zählt nur Sprachkanäle und Bühnen; Rollenregel „nur“ zählt hier nicht');
+        const nur = Einstellen.wirkungAufKanaele([{ art: 'kanal', ziel_id: '8', wirkung: 'nur', faktor: null, quelle: 'nachricht' }], kanaele);
+        assert.deepStrictEqual(nur.quellen.nachricht.ohneXp, ['1', '2', '3'], '„nur“ für eine Kategorie sperrt die anderen');
+        assert.strictEqual(nur.quellen.sprache.ohneXp.length, 0, 'Regel nur für Chat');
+        for (const k of kanaele.filter((x) => x.type !== 4)) {
+            const kette = [k.id, ...(k.parentId ? [k.parentId] : [])];
+            assert.strictEqual(nur.quellen.nachricht.ohneXp.includes(k.id), !Regeln.pruefeRegeln([{ art: 'kanal', ziel_id: '8', wirkung: 'nur', faktor: null, quelle: 'nachricht' }], 'nachricht', kette, []).erlaubt, `Kanal ${k.id} anders als im Bot`);
+        }
     });
 
     // ── 3: Läufe an TEMPORARY-Kopien ─────────────────────────────────────────
@@ -737,6 +867,96 @@ function pruefeVerdrahtung(t) {
         assert.strictEqual(fertig[1].content, 'Bots sammeln keine XP.');
     });
 
+    await pruefe('3t. Seiten XP-Regeln, Belohnungen, Ausschlüsse speichern und lesen (LV-1i)', async () => {
+        const G6 = '100000000000000006';
+        const KAT = '400000000000000009';
+        const KANAELE = [
+            { id: '400000000000000001', name: 'allgemein', type: 0, parentId: KAT }, { id: '400000000000000002', name: 'spam', type: 0, parentId: KAT },
+            { id: '400000000000000003', name: 'Talk', type: 2, parentId: null }, { id: KAT, name: 'Text', type: 4, parentId: null },
+        ];
+        const ROLLEN = [{ id: '500000000000000001', name: 'VIP', managed: false, editable: true, position: 3, memberCount: 2 },
+            { id: '500000000000000002', name: 'Bot', managed: true, editable: false, position: 9, memberCount: 1 }];
+        const gefragt = [];
+        ServiceManager.register('ipcServer', { broadcast: async (aktion, daten) => {
+            gefragt.push([aktion, daten]);
+            if (aktion === 'dashboard:GET_GUILD_ROLES_DETAILED') return [{ success: true, roles: ROLLEN }];
+            if (aktion === 'dashboard:GET_GUILD_CHANNELS') return [{ success: true, channels: KANAELE.filter((k) => !daten.types || daten.types.includes(k.type)) }];
+            return [];
+        } });
+        const gerendert = [];
+        ServiceManager.register('themeManager', { renderView: async (res, view, daten) => { gerendert.push({ view, daten }); }, getLayout: () => null });
+        const router = require(L('dashboard/routes/guild.router'));
+        const ruf = async (methode, weg, body = {}, params = {}) => {
+            const schicht = router.stack.find((x) => x.route?.path === weg && x.route.methods[methode]);
+            assert.ok(schicht, `${methode} ${weg} fehlt`);
+            const res = { locals: { guildId: G6 }, statusCode: 200, body: null,
+                status(c) { this.statusCode = c; return this; }, json(b) { this.body = b; return this; }, render() { this.statusCode = 500; return this; } };
+            await schicht.route.stack.at(-1).handle({ body, params, translate: (k) => k }, res);
+            return res;
+        };
+
+        let r = await ruf('put', '/xp-regeln', {});
+        assert.ok(r.statusCode === 400 && r.body.message === 'leveling:EINSTELLEN.NICHT_EINGERICHTET', 'ohne Einrichtung gespeichert');
+        await spieleStartwerteEin(ServiceManager.get('dbService'), G6);
+        const xpBody = { nachricht: { xp_von: 5, xp_bis: 7, taktung_s: 30, aktiv: true }, sprache: { xp_von: 3, xp_bis: 3, taktung_s: 120, aktiv: false },
+            einstellungen: { mindestlaenge: 0, gleiche_fenster_s: 0, storno_loeschen_min: 60, storno_automod: false, sprache_min_menschen: 1, sprache_stumm_zaehlt: false } };
+        await Regeln.lade(G6);
+        r = await ruf('put', '/xp-regeln', xpBody);
+        assert.ok(r.statusCode === 200 && r.body.success, JSON.stringify(r.body));
+        const nachher = await Regeln.lade(G6);
+        assert.deepStrictEqual(nachher.quellen.nachricht, { xp_von: 5, xp_bis: 7, taktung_s: 30, aktiv: true }, 'Zwischenspeicher nicht vergessen oder nicht gespeichert');
+        assert.deepStrictEqual(nachher.quellen.sprache, { xp_von: 3, xp_bis: 3, taktung_s: 120, aktiv: false });
+        const e = nachher.einstellungen;
+        assert.deepStrictEqual([e.mindestlaenge, e.gleiche_fenster_s, e.storno_loeschen_min, e.storno_automod, e.sprache_min_menschen, e.sprache_stumm_zaehlt].map(Number), [0, 0, 60, 0, 1, 0]);
+        r = await ruf('put', '/xp-regeln', { ...xpBody, nachricht: { ...xpBody.nachricht, xp_von: 9 } });
+        assert.ok(r.statusCode === 400 && r.body.message === 'leveling:EINSTELLEN.VON_UEBER_BIS', JSON.stringify(r.body));
+        assert.strictEqual((await Regeln.lade(G6, { frisch: true })).quellen.nachricht.xp_von, 5, 'abgelehnt, aber geschrieben');
+        await ruf('get', '/stufen');
+        assert.deepStrictEqual(gerendert.at(-1).daten.raten, { xpJeNachricht: 6, sekundenJeNachricht: 30, xpJeSprachminute: null });
+
+        r = await ruf('post', '/belohnungen', { stufe: 2, art: 'rolle_geben', wert: ROLLEN[0].id });
+        assert.ok(r.body.success && r.body.warnung === null, JSON.stringify(r.body));
+        r = await ruf('post', '/belohnungen', { stufe: 2, art: 'rolle_geben', wert: ROLLEN[0].id });
+        assert.ok(r.statusCode === 400 && r.body.message === 'leveling:EINSTELLEN.SCHON_DA', JSON.stringify(r.body));
+        r = await ruf('post', '/belohnungen', { stufe: 2, art: 'rolle_geben', wert: ROLLEN[1].id });
+        assert.ok(r.statusCode === 400 && r.body.message === 'leveling:EINSTELLEN.ROLLE_VERWALTET', 'verwaltete Rolle angenommen');
+        await q('INSERT INTO fortschritt_stand (guild_id, kennung, mitglied_id, xp, level, prestige) VALUES (?, ?, ?, 400, 3, 0), (?, ?, ?, 50, 1, 0), (?, ?, ?, 0, 0, 1)',
+            [G6, K, '300000000000000061', G6, K, '300000000000000062', G6, K, '300000000000000063']);
+        await ruf('get', '/belohnungen');
+        const seite = gerendert.at(-1);
+        assert.strictEqual(seite.view, 'guild/leveling-belohnungen');
+        assert.deepStrictEqual(seite.daten.belohnungen.map((b) => [b.stufe, b.art, b.wert, b.erreicht]), [[2, 'rolle_geben', ROLLEN[0].id, 2]], 'erreicht: Stufe 3 und Prestige zählen, Stufe 1 nicht');
+        const bid = seite.daten.belohnungen[0].id;
+        r = await ruf('delete', '/belohnungen/:id', {}, { id: String(bid) });
+        assert.ok(r.body.success);
+        r = await ruf('delete', '/belohnungen/:id', {}, { id: String(bid) });
+        assert.strictEqual(r.statusCode, 404, 'zweimal gelöscht');
+        r = await ruf('put', '/belohnungen/einstellungen', { vorherige_rollen_entfernen: true });
+        assert.ok(r.body.success && (await Belohnungen.lade(G6)).vorherigeEntfernen, 'vorherige entfernen nicht gespeichert');
+
+        const kat = { art: 'kanal', ziel_id: KAT, wirkung: 'ausschliessen', quelle: '' };
+        r = await ruf('post', '/ausschluesse', kat);
+        assert.ok(r.body.success, JSON.stringify(r.body));
+        r = await ruf('post', '/ausschluesse', kat);
+        assert.ok(r.statusCode === 400 && r.body.message === 'leveling:EINSTELLEN.SCHON_DA', 'Regel mit NULL-Quelle doppelt angelegt');
+        r = await ruf('post', '/ausschluesse', { art: 'rolle', ziel_id: ROLLEN[0].id, wirkung: 'faktor', faktor: '1,5', quelle: 'nachricht' });
+        assert.ok(r.body.success, JSON.stringify(r.body));
+        r = await ruf('post', '/ausschluesse', { art: 'kanal', ziel_id: '400000000000000099', wirkung: 'nur' });
+        assert.ok(r.statusCode === 400 && r.body.message === 'leveling:EINSTELLEN.FALSCHER_KANAL', 'unbekannter Kanal angenommen');
+        assert.ok(gefragt.some(([a, d]) => a === 'dashboard:GET_GUILD_CHANNELS' && d.types?.includes(4) && d.types.includes(2)), 'Kanalliste ohne Kategorien oder Sprachkanäle');
+        const bot = await Regeln.lade(G6);
+        assert.ok(!Regeln.pruefeRegeln(bot.regeln, 'nachricht', ['400000000000000001', KAT], []).erlaubt, 'Bot sieht den Ausschluss nicht');
+        assert.strictEqual(Regeln.pruefeRegeln(bot.regeln, 'nachricht', ['400000000000000003'], [ROLLEN[0].id]).faktor, 1.5, 'DECIMAL nicht als Zahl');
+        await ruf('get', '/ausschluesse');
+        const a = gerendert.at(-1).daten;
+        assert.deepStrictEqual([a.wirkung.quellen.nachricht.mitXp, a.wirkung.quellen.nachricht.gesamt, a.wirkung.je[Einstellen.regelSchluessel(a.regeln[0])]], [1, 3, 2], JSON.stringify(a.wirkung));
+        assert.strictEqual(a.regeln.find((x) => x.art === 'rolle').faktor, 1.5);
+        for (const x of a.regeln) assert.ok((await ruf('delete', '/ausschluesse/:id', {}, { id: String(x.id) })).body.success);
+        assert.deepStrictEqual((await Regeln.lade(G6)).regeln, [], 'Zwischenspeicher nach dem Löschen nicht vergessen');
+        r = await ruf('delete', '/ausschluesse/:id', {}, { id: '1; DROP' });
+        assert.strictEqual(r.statusCode, 400);
+    });
+
     await c.end();
     assert.deepStrictEqual(gesehen, [], `Fehler im Log: ${gesehen.join(' | ')}`);
 
@@ -772,6 +992,14 @@ function pruefeVerdrahtung(t) {
     await rot('Nachrichten speichern ohne CSRF', mit('router', "router.put('/nachrichten', csrfProtection, ", "router.put('/nachrichten', "));
     await rot('Hinweis ohne Rechtefrage', mit('dashboard', "hasPermission(user.id, guildId, 'LEVELING.CONFIGURE')", 'true'));
     await rot('/rank ohne Rangkarte', mit('rank', 'Karte.zeichne(member, s)', 'null'));
+
+    await rot('XP-Regeln speichern ohne CSRF', mit('router', "router.put('/xp-regeln', csrfProtection, ", "router.put('/xp-regeln', "));
+    await rot('Belohnungen mit anderem Recht', mit('router', "router.post('/belohnungen', csrfProtection, requirePermission('LEVELING.REWARDS.MANAGE')", "router.post('/belohnungen', csrfProtection, requirePermission('LEVELING.VIEW')"));
+    await rot('Regel entfernen ohne Recht', mit('router', "router.delete('/ausschluesse/:id', csrfProtection, requirePermission('LEVELING.CONFIGURE'), ", "router.delete('/ausschluesse/:id', csrfProtection, "));
+    await rot('Navigation Belohnungen mit anderem Recht', mit('dashboard', "capability: 'LEVELING.REWARDS.MANAGE'", "capability: 'LEVELING.VIEW'"));
+    await rot('XP-Regeln ohne Prüfung', mit('router', 'Einstellen.pruefeXp(req.body)', 'req.body'));
+    await rot('Ausschlüsse ohne Doppelprüfung', mit('router', 'Einstellen.istDoppelt(regel, vorhanden)', 'false'));
+    await rot('Kern-Teil meldet kein Zeichnen', mit('kernStufen', "new CustomEvent('fortschritt-stufen:gezeichnet'", "new CustomEvent('anders'"));
 
     console.log(fehler ? `\n✗ ${fehler} Prüfung(en) rot` : '\n✓ alles grün');
     process.exit(fehler ? 1 : 0);
