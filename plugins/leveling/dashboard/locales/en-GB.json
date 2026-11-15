@@ -47,10 +47,26 @@
         "MITGLIED": "Member",
         "LEVEL": "Level",
         "XP": "XP",
-        "NAMEN_FEHLEN": "The bot did not answer, so IDs are shown instead of names."
+        "NAMEN_FEHLEN": "The bot did not answer, so IDs are shown instead of names.",
+        "SPRACHE_TITEL": "XP in voice channels",
+        "SPRACHE_XP": "XP per minute",
+        "SPRACHE_MIN": "Listening at least",
+        "MENSCHEN": "{{anzahl}} people",
+        "SPRACHE_STUMM": "Muted members get XP",
+        "SPRACHE_HINWEIS": "Never in the AFK channel, never while deafened; bots and deafened members are not counted.",
+        "BELOHNUNGEN": "Rewards",
+        "BELOHNUNGEN_LEER": "No roles per level are set up. The settings page is coming; /levels sync matches roles.",
+        "STUFE": "Level {{stufe}}",
+        "GEBEN": "gets",
+        "NEHMEN": "loses",
+        "VORHERIGE": "Remove previous level roles",
+        "ROLLENNAMEN_FEHLEN": "The bot did not answer, so role IDs are shown instead of names."
     },
     "FEHLER": {
         "SEITE": "Page could not be loaded",
         "UEBERSICHT": "The leveling overview could not be loaded."
+    },
+    "ROLLEN": {
+        "BELOHNUNG": "Leveling: reward per level"
     }
 }

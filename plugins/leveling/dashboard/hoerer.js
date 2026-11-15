@@ -8,13 +8,17 @@
  * @module leveling/dashboard/hoerer
  */
 
+const { ServiceManager } = require('dunebot-core');
 const { Fortschritt } = require('dunebot-sdk');
 const Regeln = require('../shared/regeln');
+const Belohnungen = require('../shared/belohnungen');
 
 /**
  * automod hat eine Nachricht beanstandet → ihre XP zurück. Fand das Storno
  * keine Buchung (Taktung, zu kurz, Leveling erst später an), ist nichts zu
- * tun. Wirft es, wiederholt der Zusteller.
+ * tun. Wirft es, wiederholt der Zusteller. Fällt dabei die Stufe, gehen
+ * Belohnungsrollen der höheren Stufe wieder (LV-1e, über IPC im Bot);
+ * scheitert das, bleibt das Storno, und `/levels sync` holt es nach.
  *
  * Grenze: Das Ereignis läuft über das Ereignisbuch und den Zusteller, die
  * Buchung im Bot direkt. Kommt das Ereignis vor der Buchung an, findet das
@@ -35,6 +39,13 @@ async function automodVerstoss(ereignis) {
         guildId: ereignis.guild_id, kennung: 'leveling:community', schluessel: `msg:${nachricht}`,
         grund: `automod: ${(ereignis.daten?.gruende || []).join(', ')}`.slice(0, 255),
     });
+    if (s.wechsel) {
+        try {
+            await Belohnungen.gleicheAb({ guildId: ereignis.guild_id, mitglied: s.mitglied, level: s.level, prestige: s.prestige });
+        } catch (error) {
+            ServiceManager.get('Logger').error(`[Leveling] Belohnungen nach automod-Storno nicht angeglichen (${s.mitglied}):`, error);
+        }
+    }
     return { storniert: Boolean(s.gefunden && !s.schon), grund: s.gefunden ? null : 'keine_buchung' };
 }
 

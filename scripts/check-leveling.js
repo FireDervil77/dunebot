@@ -1,24 +1,35 @@
 #!/usr/bin/env node
 /**
- * Leveling Stufe 1, erster Block (LV-1a, LV-1b, LV-1c, K382, 2026-11-15).
+ * Leveling Stufe 1 (LV-1a bis LV-1e, K382, K394, 2026-11-15).
  *
  * Geprüft wird:
  *
- *   1  Verdrahtung  Bot-Events messageCreate/messageDelete rufen die Chat-XP,
- *                   das Dashboard hört `automod.verstoss` mit dem Hörer aus
- *                   `dashboard/hoerer.js`, automod meldet das Ereignis mit
- *                   festen Gründen, der Kern löscht beim Abschalten die
- *                   Fortschritte des Plugins (nicht in der Kontroll-Guild)
+ *   1  Verdrahtung  Bot-Events messageCreate/messageDelete/messageDeleteBulk
+ *                   rufen die Chat-XP, der Minutentakt ruft die Sprach-XP,
+ *                   Chat und Sprache gehen über `nachbuchung.js`, das
+ *                   Dashboard hört `automod.verstoss` mit dem Hörer aus
+ *                   `dashboard/hoerer.js` (und gleicht danach die
+ *                   Belohnungen an), automod meldet das Ereignis mit festen
+ *                   Gründen, der Kern löscht beim Abschalten die Fortschritte
+ *                   des Plugins (nicht in der Kontroll-Guild), `/levels sync`
+ *                   fragt das Recht LEVELING.REWARDS.MANAGE im Dashboard
  *   2  Regeln       Ausschluss, „nur diese“, Faktoren (Kanal genauester,
  *                   Rolle höchster), Kette Thread → Kanal → Kategorie,
- *                   Menge, Taktung und gleicher Text
+ *                   Menge, Taktung und gleicher Text; Sprache (AFK, allein,
+ *                   taub, stumm); Soll-Rollen je Stufe (geben, nehmen,
+ *                   vorherige entfernen)
  *   3  Läufe        an TEMPORARY-Kopien von `level_*`, `fortschritt_*` und
  *                   `ereignisbuch` mit echtem SQL: nicht eingerichtet →
  *                   nichts, Startwerte, Buchung `msg:<id>`, Taktung, gleicher
  *                   Text, zu kurz, Bot, Ausschluss, Aufstieg meldet
  *                   `leveling.level.erreicht`, Löschen in der Frist storniert,
  *                   zu alt nicht, automod storniert, Zähler, Abschalten
- *                   löscht nur `leveling:*`
+ *                   löscht nur `leveling:*`; Sprach-XP `voice:<m>:<minute>`
+ *                   ohne Doppel; gesammeltes Löschen storniert; Belohnungen
+ *                   über `Rollen` (Discord als Attrappe, TEMPORARY-Kopie von
+ *                   `rollen_vergaben`): geben, vorherige entfernen, Storno
+ *                   nimmt, Rolle von Hand bleibt, `/levels sync` mit
+ *                   ehrlichem Ergebnis
  *   4  Gegenproben  jede Prüfung aus 1 wird an eingebauten Fehlern rot
  *
  * Geschrieben wird nur in TEMPORARY-Tabellen dieser Verbindung.
@@ -53,6 +64,13 @@ async function pruefe(was, tun) {
 const DATEIEN = {
     erstellt: 'plugins/leveling/bot/events/messageCreate.js',
     geloescht: 'plugins/leveling/bot/events/messageDelete.js',
+    gesammelt: 'plugins/leveling/bot/events/messageDeleteBulk.js',
+    botIndex: 'plugins/leveling/bot/index.js',
+    chatxp: 'plugins/leveling/bot/chatxp.js',
+    sprachxp: 'plugins/leveling/bot/sprachxp.js',
+    hoerer: 'plugins/leveling/dashboard/hoerer.js',
+    levels: 'plugins/leveling/bot/commands/levels.js',
+    ipc: 'apps/dashboard/helpers/IPCServer.js',
     dashboard: 'plugins/leveling/dashboard/index.js',
     automod: 'plugins/automod/bot/events/messageCreate.js',
     kern: 'apps/dashboard/helpers/PluginManager.js',
@@ -62,6 +80,14 @@ function pruefeVerdrahtung(t) {
     const aus = [];
     if (!/require\(['"]\.\.\/chatxp['"]\)/.test(t.erstellt) || !/beiNachricht\(message\)/.test(t.erstellt)) aus.push('messageCreate ruft beiNachricht nicht');
     if (!/require\(['"]\.\.\/chatxp['"]\)/.test(t.geloescht) || !/beiLoeschung\(message\)/.test(t.geloescht)) aus.push('messageDelete ruft beiLoeschung nicht');
+    if (!/require\(['"]\.\.\/chatxp['"]\)/.test(t.gesammelt) || !/nachrichten\?\.values\?\.\(\)/.test(t.gesammelt) || !/beiLoeschung\(message\)/.test(t.gesammelt)) aus.push('messageDeleteBulk ruft beiLoeschung nicht je Nachricht');
+    if (!/sprachxp\.takt\(\)/.test(t.botIndex)) aus.push('Minutentakt ruft sprachxp.takt nicht');
+    for (const k of ['chatxp', 'sprachxp']) if (!/nachBuchung\(\{/.test(t[k])) aus.push(`${k} geht nicht über nachBuchung`);
+    if (!/storniere\([\s\S]*?if \(s\.wechsel\) await nachBuchung/.test(t.chatxp)) aus.push('Storno beim Löschen gleicht die Belohnungen nicht an');
+    if (!/if \(s\.wechsel\)[\s\S]*?Belohnungen\.gleicheAb\(/.test(t.hoerer)) aus.push('automod-Storno gleicht die Belohnungen nicht an');
+    if (!/const RECHT = 'LEVELING\.REWARDS\.MANAGE'/.test(t.levels) || !/sendToDashboard\('core:RECHT_PRUEFEN'/.test(t.levels) || !/if \(!recht\.darf\) return/.test(t.levels)) aus.push('/levels sync fragt das Recht nicht im Dashboard');
+    const rechtFall = /case 'RECHT_PRUEFEN':([\s\S]*?)case '/.exec(t.ipc);
+    if (!rechtFall || !/permissionManager\.hasPermission\(String\(actorId\), String\(guildId\), String\(recht\)\)/.test(rechtFall[1])) aus.push('Dashboard prüft RECHT_PRUEFEN nicht mit dem PermissionManager');
     if (!/Ereignisse\.hoere\(\s*'automod\.verstoss'\s*,\s*'leveling'\s*,\s*require\('\.\/hoerer'\)\.automodVerstoss\s*\)/.test(t.dashboard)) aus.push('Dashboard hört automod.verstoss nicht mit hoerer.automodVerstoss');
     const m = /Ereignisse\.melde\(\s*'automod\.verstoss'[\s\S]*?\}\)\s*\.catch/.exec(t.automod);
     if (!m) aus.push('automod meldet automod.verstoss nicht');
@@ -91,7 +117,8 @@ function pruefeVerdrahtung(t) {
         const ddl = lies('plugins/leveling/migrations/20261115_130000_baseline.js');
         const tabellen = [...ddl.matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)].map((x) => x[1]);
         assert.deepStrictEqual([...p.guildInhalte.loeschen].sort(), [...tabellen].sort(), 'guildInhalte ≠ Tabellen der Migration');
-        assert.ok(p.ereignisse.sendet.includes('leveling.level.erreicht') && p.ereignisse.hoert.includes('automod.verstoss'));
+        assert.ok(p.ereignisse.sendet.includes('leveling.level.erreicht') && p.ereignisse.sendet.includes('leveling.belohnung.vergeben') && p.ereignisse.hoert.includes('automod.verstoss'));
+        assert.deepStrictEqual(p.rollen?.map((r) => r.besitzer), ['leveling:community'], 'Belohnungsrollen ohne Besitzer-Erklärung');
     });
 
     // ── 2: Regeln ────────────────────────────────────────────────────────────
@@ -134,13 +161,46 @@ function pruefeVerdrahtung(t) {
         t = 500_000; d.aufraeumen(10); assert.strictEqual(d.zuletzt.size + d.texte.size, 0, 'Altes geht');
     });
 
+    const sprachxp = require(L('bot/sprachxp'));
+    const Belohnungen = require(L('shared/belohnungen'));
+    await pruefe('2c. Sprache: AFK, allein, taub, stumm, Bots zählen nicht', () => {
+        const m = (id, x = {}) => ({ id, bot: false, taub: false, stumm: false, rollen: [], ...x });
+        const k = sprachxp.kandidaten([
+            { id: 'v1', parentId: 'kat', mitglieder: [m('a'), m('b', { stumm: true })] },
+            { id: 'v2', parentId: null, mitglieder: [m('c'), m('bot', { bot: true })] },
+            { id: 'v3', parentId: null, mitglieder: [m('d'), m('e', { taub: true })] },
+            { id: 'afk', parentId: null, mitglieder: [m('f'), m('g')] },
+        ], { afkKanal: 'afk', minMenschen: 2, stummZaehlt: true });
+        assert.deepStrictEqual(Object.fromEntries(k.map((x) => [x.mitglied, x.grund])),
+            { a: null, b: null, c: 'zu_wenige', d: 'zu_wenige', e: 'taub', f: 'afk', g: 'afk' });
+        assert.deepStrictEqual(k.find((x) => x.mitglied === 'a').kette, ['v1', 'kat']);
+        const ohneStumm = sprachxp.kandidaten([{ id: 'v1', parentId: null, mitglieder: [m('a'), m('b', { stumm: true })] }], { minMenschen: 2, stummZaehlt: false });
+        assert.deepStrictEqual(ohneStumm.map((x) => x.grund), [null, 'stumm'], 'stumm zählt mit, bekommt aber nichts');
+        assert.deepStrictEqual(sprachxp.kandidaten([{ id: 'v', parentId: null, mitglieder: [m('a')] }], { minMenschen: 1 }).map((x) => x.grund), [null], 'Mindestzahl 1 erlaubt allein');
+    });
+    await pruefe('2d. Soll-Rollen: höchste Stufe entscheidet, nehmen, vorherige entfernen', () => {
+        const B = [
+            { stufe: 1, art: 'rolle_geben', wert: '11111' }, { stufe: 5, art: 'rolle_geben', wert: '55555' },
+            { stufe: 10, art: 'rolle_geben', wert: '10101' }, { stufe: 10, art: 'rolle_nehmen', wert: '11111' },
+            { stufe: 5, art: 'rolle_geben', wert: '55556' }, { stufe: 3, art: 'abzeichen', wert: 'x' },
+        ];
+        const soll = (l, v = false) => [...Belohnungen.sollRollen(B, l, v)].sort();
+        assert.deepStrictEqual(soll(0), []);
+        assert.deepStrictEqual(soll(4), ['11111']);
+        assert.deepStrictEqual(soll(7), ['11111', '55555', '55556']);
+        assert.deepStrictEqual(soll(10), ['10101', '55555', '55556'], 'nehmen auf Stufe 10');
+        assert.deepStrictEqual(soll(7, true), ['55555', '55556'], 'vorherige entfernen: nur die der höchsten Stufe');
+        assert.deepStrictEqual(soll(12, true), ['10101']);
+        assert.deepStrictEqual([...Belohnungen.sollRollen([{ stufe: 2, art: 'rolle_geben', wert: '22222' }, { stufe: 2, art: 'rolle_nehmen', wert: '22222' }], 2, false)], [], 'gleiche Stufe: nehmen gilt');
+    });
+
     // ── 3: Läufe an TEMPORARY-Kopien ─────────────────────────────────────────
     const mysql = require('mysql2/promise');
     const c = await mysql.createConnection({ host: process.env.MYSQL_HOST, port: process.env.MYSQL_PORT,
         user: process.env.MYSQL_USER, password: process.env.MYSQL_PASSWORD, database: process.env.MYSQL_DATABASE,
         supportBigNumbers: true, bigNumberStrings: true });
     const schreibt = /^\s*(INSERT|UPDATE|DELETE|REPLACE|TRUNCATE|CREATE|DROP|ALTER)\b/i;
-    const KOPIEN = /\b(fortschritt_|level_|ereignisbuch\b)/;
+    const KOPIEN = /\b(fortschritt_|level_|ereignisbuch\b|rollen_vergaben\b)/;
     async function q(sql, werte) {
         const s = String(sql);
         if (schreibt.test(s) && !/^\s*CREATE TEMPORARY TABLE/i.test(s) && !KOPIEN.test(s)) throw new Error(`nur lesend: ${s.slice(0, 60)}`);
@@ -163,7 +223,8 @@ function pruefeVerdrahtung(t) {
     await require(path.join(WURZEL, 'migrations/kern/20261114_235000_fortschritt.js')).up(fange);
     await require(path.join(WURZEL, 'migrations/kern/20261113_200000_ereignisbuch.js')).up(fange);
     await require(L('migrations/20261115_130000_baseline.js')).up(fange);
-    for (const s of ddl.filter((x) => /CREATE TABLE IF NOT EXISTS (fortschritt_|level_|ereignisbuch\b)/.test(x))) {
+    await require(path.join(WURZEL, 'migrations/kern/20261114_230000_rollen_vergaben.js')).up(fange);
+    for (const s of ddl.filter((x) => /CREATE TABLE IF NOT EXISTS (fortschritt_|level_|ereignisbuch\b|rollen_vergaben\b)/.test(x))) {
         await c.query(s.replace('CREATE TABLE IF NOT EXISTS', 'CREATE TEMPORARY TABLE').replace(/,\s*CONSTRAINT[\s\S]*?ON DELETE CASCADE/, ''));
     }
 
@@ -282,6 +343,139 @@ function pruefeVerdrahtung(t) {
         assert.deepStrictEqual(rest.map((x) => [x.guild_id, x.kennung]), [[G, 'levelingx:probe'], [ANDERE, K]], 'fremde Kennung oder Guild gelöscht');
         await assert.rejects(() => Fortschritt.loeschePlugin({ guildId: G, plugin: "x'; DROP" }), /ungültig/);
     });
+    // ── LV-1d: Sprach-XP ─────────────────────────────────────────────────────
+    const S = ['300000000000000011', '300000000000000012', '300000000000000013', '300000000000000014', '300000000000000015', '300000000000000016'];
+    const vs = (id, kanal, x = {}) => [id, { id, channelId: kanal, channel: { parentId: 'kat' }, member: { user: { bot: Boolean(x.bot) }, roles: { cache: new Map() } },
+        selfDeaf: Boolean(x.taub), serverDeaf: false, selfMute: Boolean(x.stumm), serverMute: false, suppress: false }];
+    const sprachGuild = { id: G, afkChannelId: 'afk', voiceStates: { cache: new Map([
+        vs(S[0], 'v1'), vs(S[1], 'v1', { stumm: true }),
+        vs(S[2], 'v2'), vs('300000000000000099', 'v2', { bot: true }),
+        vs(S[3], 'afk'), vs(S[4], 'afk'),
+        vs(S[5], null),
+    ]) } };
+    const JETZT = 1_763_200_000_000;
+    const MIN = Math.floor(JETZT / 60_000);
+    await pruefe('3j. Sprach-XP: voice:<m>:<minute>, AFK/allein nicht, zweimal = einmal', async () => {
+        Regeln.vergiss();
+        const r = await sprachxp.guildTakt(sprachGuild, JETZT);
+        assert.deepStrictEqual(r, { gebucht: 2, minuten: 2 }, JSON.stringify(r));
+        const b = await q("SELECT mitglied_id, menge, schluessel FROM fortschritt_buchungen WHERE guild_id = ? AND quelle = 'sprache' ORDER BY mitglied_id", [G]);
+        assert.deepStrictEqual(b.map((x) => [x.mitglied_id, Number(x.menge), x.schluessel]), [[S[0], 10, `voice:${S[0]}:${MIN}`], [S[1], 10, `voice:${S[1]}:${MIN}`]]);
+        assert.deepStrictEqual(await sprachxp.guildTakt(sprachGuild, JETZT + 5_000), { gebucht: 0, minuten: 0 }, 'gleiche Minute');
+        sprachxp._letzterTakt.clear();
+        sprachxp._gezaehlt.clear();
+        assert.deepStrictEqual(await sprachxp.guildTakt(sprachGuild, JETZT + 10_000), { gebucht: 0, minuten: 2 }, 'nach Neustart: Schlüssel schützt (Zähler zählt die Minute neu, wie nach jedem Neustart)');
+        await q('UPDATE level_einstellungen SET sprache_stumm_zaehlt = 0 WHERE guild_id = ?', [G]);
+        Regeln.vergiss();
+        assert.deepStrictEqual(await sprachxp.guildTakt(sprachGuild, JETZT + 60_000), { gebucht: 1, minuten: 1 }, 'stumm ohne XP');
+        await q("UPDATE level_quellen SET aktiv = 0 WHERE guild_id = ? AND quelle = 'sprache'", [G]);
+        Regeln.vergiss();
+        assert.deepStrictEqual(await sprachxp.guildTakt(sprachGuild, JETZT + 120_000), { gebucht: 0, minuten: 0 }, 'Quelle aus');
+        await zaehler.schreibe({ query: q });
+        const z = await q('SELECT mitglied_id, sprachminuten FROM level_zaehler WHERE guild_id = ? AND sprachminuten > 0 ORDER BY mitglied_id', [G]);
+        assert.deepStrictEqual(z.map((x) => [x.mitglied_id, Number(x.sprachminuten)]), [[S[0], 3], [S[1], 2]], JSON.stringify(z));
+    });
+
+    // ── K394: gesammeltes Löschen ────────────────────────────────────────────
+    await pruefe('3k. messageDeleteBulk storniert jede junge Nachricht der Sammlung', async () => {
+        await q('UPDATE level_einstellungen SET storno_loeschen_min = 10 WHERE guild_id = ?', [G]);
+        Regeln.vergiss();
+        uhr += 120_000;
+        const n1 = nachricht(A, 'erste im stapel');
+        assert.ok((await chatxp.beiNachricht(n1)).gebucht);
+        const alt = { id: id(30 * 60_000), guildId: G };
+        const stapel = new Map([[n1.id, { id: n1.id, guildId: G }], [alt.id, alt], ['x', { id: id(), guildId: G }]]);
+        const r = await require(L('bot/events/messageDeleteBulk'))(stapel, { id: '200', guildId: G });
+        assert.deepStrictEqual(r, { storniert: 1, geprueft: 3 });
+        const [b] = await q('SELECT storniert_am FROM fortschritt_buchungen WHERE guild_id = ? AND schluessel = ?', [G, `msg:${n1.id}`]);
+        assert.ok(b?.storniert_am, 'nicht storniert');
+    });
+
+    // ── LV-1e: Belohnungen ───────────────────────────────────────────────────
+    const R1 = '400000000000000001';
+    const R2 = '400000000000000002';
+    const RH = '400000000000000003';
+    /** Discord als Attrappe: Rollen, Bot-Rang, Mitglieder mit ihren Rollen. */
+    function welt(gid, mitglieder) {
+        const rollen = new Map([
+            [R1, { id: R1, name: 'Eins', position: 2, managed: false }],
+            [R2, { id: R2, name: 'Zwei', position: 3, managed: false }],
+            [RH, { id: RH, name: 'Hoch', position: 20, managed: false }],
+        ]);
+        const guild = { id: gid, roles: { cache: rollen }, members: { me: { permissions: { has: () => true }, roles: { highest: { comparePositionTo: (r) => 10 - r.position } } } } };
+        const mm = new Map();
+        for (const [mid, set] of Object.entries(mitglieder)) {
+            mm.set(mid, { id: mid, guild, roles: { cache: { has: (r) => set.has(r) }, add: async (r) => { if (Array.isArray(r)) throw new Error('Liste'); set.add(r); }, remove: async (r) => { set.delete(r); } } });
+        }
+        guild.members.fetch = async ({ user }) => {
+            const m = mm.get(String(user));
+            if (!m) { const e = new Error('Unknown Member'); e.code = 10007; throw e; }
+            return m;
+        };
+        return guild;
+    }
+    const buch = async (gid, m) => (await q("SELECT rolle_id FROM rollen_vergaben WHERE guild_id = ? AND mitglied_id = ? AND besitzer = 'leveling:community' ORDER BY rolle_id", [gid, m])).map((z) => z.rolle_id);
+    const C = '300000000000000021';
+    const D = '300000000000000022';
+    const traegtC = new Set();
+    const traegtD = new Set();
+    const wG = welt(G, { [C]: traegtC, [D]: traegtD });
+    await pruefe('3l. Belohnungen: geben, vorherige entfernen, Abstieg nimmt, von Hand bleibt', async () => {
+        await q("INSERT INTO level_belohnungen (guild_id, stufe, art, wert) VALUES (?, 1, 'rolle_geben', ?), (?, 2, 'rolle_geben', ?)", [G, R1, G, R2]);
+        let e = await Belohnungen.gleicheAb({ guildId: G, mitglied: C, level: 1, guild: wG });
+        assert.deepStrictEqual([e.vergeben, [...traegtC], await buch(G, C)], [[R1], [R1], [R1]]);
+        const [ev] = await q("SELECT betroffen, daten FROM ereignisbuch WHERE guild_id = ? AND name = 'leveling.belohnung.vergeben'", [G]);
+        const daten = typeof ev?.daten === 'string' ? JSON.parse(ev.daten) : ev?.daten;
+        assert.ok(ev?.betroffen === C && daten?.stufe === 1 && daten?.art === 'rolle' && daten?.rollen?.[0] === R1, JSON.stringify(ev));
+        e = await Belohnungen.gleicheAb({ guildId: G, mitglied: C, level: 2, guild: wG });
+        assert.deepStrictEqual([e.vergeben, [...traegtC].sort()], [[R2], [R1, R2]], 'vorherige bleiben (aus)');
+        await q('UPDATE level_einstellungen SET vorherige_rollen_entfernen = 1 WHERE guild_id = ?', [G]);
+        e = await Belohnungen.gleicheAb({ guildId: G, mitglied: C, level: 2, guild: wG });
+        assert.deepStrictEqual([e.entzogen, [...traegtC], await buch(G, C)], [[R1], [R2], [R2]], 'vorherige entfernen');
+        e = await Belohnungen.gleicheAb({ guildId: G, mitglied: C, level: 0, guild: wG });
+        assert.deepStrictEqual([e.entzogen, [...traegtC], await buch(G, C)], [[R2], [], []], 'Abstieg');
+        traegtC.add(R1);
+        e = await Belohnungen.gleicheAb({ guildId: G, mitglied: C, level: 1, guild: wG });
+        assert.deepStrictEqual([e.vergeben, await buch(G, C)], [[], []], 'von Hand getragen: nichts gebucht (Regel 2)');
+        await Belohnungen.gleicheAb({ guildId: G, mitglied: C, level: 0, guild: wG });
+        assert.ok(traegtC.has(R1), 'Rolle von Hand genommen');
+        await q('UPDATE level_einstellungen SET vorherige_rollen_entfernen = 0 WHERE guild_id = ?', [G]);
+    });
+    await pruefe('3m. Chat: Aufstieg gibt die Rolle, Löschen der Nachricht nimmt sie wieder', async () => {
+        uhr += 120_000;
+        const n = { ...nachricht(D, 'mit faktor und rolle', { rollen: ['777'] }), guild: wG };
+        const r = await chatxp.beiNachricht(n);
+        assert.ok(r.gebucht && r.ergebnis.level === 1, JSON.stringify(r.ergebnis));
+        assert.deepStrictEqual([[...traegtD], await buch(G, D)], [[R1], [R1]]);
+        const s = await chatxp.beiLoeschung({ id: n.id, guildId: G, guild: wG });
+        assert.ok(s.storniert);
+        assert.deepStrictEqual([[...traegtD], await buch(G, D)], [[], []], 'Storno nahm die Rolle nicht');
+    });
+    await pruefe('3n. /levels sync: vergeben, entfernt, zu hoch, nicht mehr da, Prestige behält', async () => {
+        const G3 = '100000000000000003';
+        const [E, F, X, P] = ['300000000000000031', '300000000000000032', '300000000000000033', '300000000000000034'];
+        const tE = new Set(); const tF = new Set([R1]); const tP = new Set();
+        const w3 = welt(G3, { [E]: tE, [F]: tF, [P]: tP });
+        await q("INSERT INTO level_belohnungen (guild_id, stufe, art, wert) VALUES (?, 1, 'rolle_geben', ?), (?, 2, 'rolle_geben', ?), (?, 2, 'rolle_geben', ?)", [G3, R1, G3, R2, G3, RH]);
+        await Fortschritt.stufen({ guildId: G3, kennung: K });
+        await q('INSERT INTO fortschritt_stand (guild_id, kennung, mitglied_id, xp, level, prestige) VALUES (?, ?, ?, 300, 2, 0), (?, ?, ?, 0, 0, 0), (?, ?, ?, 300, 2, 0), (?, ?, ?, 5, 0, 1)',
+            [G3, K, E, G3, K, F, G3, K, X, G3, K, P]);
+        await q("INSERT INTO rollen_vergaben (guild_id, mitglied_id, rolle_id, besitzer) VALUES (?, ?, ?, 'leveling:community')", [G3, F, R1]);
+        const meldungen = [];
+        const { sync } = require(L('bot/sync'));
+        const e = await sync({ guild: w3, fortschritt: (s) => meldungen.push(s), abstandMs: 0 });
+        assert.strictEqual(e.gesamt, 4);
+        assert.strictEqual(e.vergeben, 4, 'E: R1, R2; P (Prestige → höchste Stufe): R1, R2');
+        assert.strictEqual(e.entzogen, 1, 'F: R1');
+        assert.strictEqual(e.fort, 1, 'X ist nicht mehr da');
+        assert.deepStrictEqual(e.fehlgeschlagen.map((f) => [f.mitglied, f.rolle, f.grund]).sort(), [[E, RH, 'ZU_HOCH'], [P, RH, 'ZU_HOCH']]);
+        assert.deepStrictEqual([[...tE].sort(), [...tF], [...tP].sort()], [[R1, R2], [], [R1, R2]]);
+        assert.strictEqual(meldungen.length, 4, 'Fortschritt je Mitglied (Abstand 0)');
+        assert.ok(!require(L('bot/sync'))._laufend.size, 'Sperre bleibt stehen');
+        const zweimal = await Promise.all([sync({ guild: w3 }), sync({ guild: w3 })]);
+        assert.ok(zweimal.some((z) => z.laeuftSchon), 'zwei Abgleiche gleichzeitig');
+    });
+
     await c.end();
     assert.deepStrictEqual(gesehen, [], `Fehler im Log: ${gesehen.join(' | ')}`);
 
@@ -297,6 +491,14 @@ function pruefeVerdrahtung(t) {
     await rot('ein Feld ohne Grund', mit('automod', "gruende.push('link');", ''));
     await rot('Kern löscht Fortschritte nicht', mit('kern', 'Fortschritt.loeschePlugin({ guildId, plugin: pluginName })', 'null'));
     await rot('Kern löscht auch in der Kontroll-Guild', mit('kern', 'if (!inhalteBleiben) {', 'if (true) {'));
+    await rot('messageDeleteBulk ohne Aufruf', mit('gesammelt', 'beiLoeschung(message)', 'null'));
+    await rot('Sprach-Takt nicht im Minutentakt', mit('botIndex', 'sprachxp.takt()', 'null'));
+    await rot('Sprach-XP ohne nachBuchung', mit('sprachxp', 'await nachBuchung({', 'await null; ({'));
+    await rot('Löschen ohne Belohnungen danach', mit('chatxp', 'if (s.wechsel) await nachBuchung', 'if (false) await nachBuchung'));
+    await rot('automod-Storno ohne Belohnungen danach', mit('hoerer', 'Belohnungen.gleicheAb(', 'Belohnungen.lade('));
+    await rot('/levels sync ohne Rechtefrage', mit('levels', 'if (!recht.darf) return', 'if (false) return'));
+    await rot('/levels sync mit anderem Recht', mit('levels', "const RECHT = 'LEVELING.REWARDS.MANAGE'", "const RECHT = 'LEVELING.VIEW'"));
+    await rot('Dashboard prüft das Recht nicht', mit('ipc', 'permissionManager.hasPermission(String(actorId)', 'Boolean(String(actorId)'));
 
     console.log(fehler ? `\n✗ ${fehler} Prüfung(en) rot` : '\n✓ alles grün');
     process.exit(fehler ? 1 : 0);

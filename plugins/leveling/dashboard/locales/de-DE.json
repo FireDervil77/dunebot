@@ -47,10 +47,26 @@
         "MITGLIED": "Mitglied",
         "LEVEL": "Level",
         "XP": "XP",
-        "NAMEN_FEHLEN": "Der Bot hat nicht geantwortet, deshalb stehen hier IDs statt Namen."
+        "NAMEN_FEHLEN": "Der Bot hat nicht geantwortet, deshalb stehen hier IDs statt Namen.",
+        "SPRACHE_TITEL": "XP im Sprachkanal",
+        "SPRACHE_XP": "XP je Minute",
+        "SPRACHE_MIN": "Mindestens zuhörend",
+        "MENSCHEN": "{{anzahl}} Menschen",
+        "SPRACHE_STUMM": "Stumm Geschaltete bekommen XP",
+        "SPRACHE_HINWEIS": "Nie im AFK-Kanal, nie taub Geschaltete; Bots und taub Geschaltete zählen nicht mit.",
+        "BELOHNUNGEN": "Belohnungen",
+        "BELOHNUNGEN_LEER": "Keine Rollen je Stufe eingestellt. Die Einstellseite kommt; abgeglichen wird mit /levels sync.",
+        "STUFE": "Stufe {{stufe}}",
+        "GEBEN": "bekommt",
+        "NEHMEN": "verliert",
+        "VORHERIGE": "Vorherige Levelrollen entfernen",
+        "ROLLENNAMEN_FEHLEN": "Der Bot hat nicht geantwortet, deshalb stehen hier IDs statt Rollennamen."
     },
     "FEHLER": {
         "SEITE": "Seite konnte nicht geladen werden",
         "UEBERSICHT": "Die Übersicht des Leveling konnte nicht geladen werden."
+    },
+    "ROLLEN": {
+        "BELOHNUNG": "Leveling: Belohnung je Stufe"
     }
 }

@@ -3,14 +3,16 @@
 /**
  * Leveling - Bot-Plugin (LV-1a, LV-1c, K382, 2026-11-15).
  *
- * Stufe 1 bisher: Chat-XP über den Kern (G-20), Storno beim Löschen, Zähler
- * je Mitglied. Sprach-XP (LV-1d), Belohnungen (LV-1e), Level-up-Ausgabe
- * (LV-1f) und die Befehle (LV-1g, LV-1h) folgen.
+ * Stufe 1 bisher: Chat-XP über den Kern (G-20), Storno beim Löschen (auch
+ * gesammelt), Sprach-XP (LV-1d), Belohnungsrollen und `/levels sync`
+ * (LV-1e), Zähler je Mitglied. Level-up-Ausgabe (LV-1f) und die übrigen
+ * Befehle (LV-1g, LV-1h) folgen.
  */
 
 const { BotPlugin, VersionHelper } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
 const chatxp = require('./chatxp');
+const sprachxp = require('./sprachxp');
 
 const TAKT_MS = 60_000;
 
@@ -30,12 +32,13 @@ class LevelingBotPlugin extends BotPlugin {
     }
 
     async onEnable() {
-        // Prozessweit, wie jeder Takt eines Plugins (K366): Zähler schreiben,
-        // Drossel aufräumen. Läuft auch, wenn Leveling in keiner Guild mehr an
-        // ist; dann gibt es nichts zu schreiben.
+        // Prozessweit, wie jeder Takt eines Plugins (K366): Sprach-XP vergeben,
+        // dann Zähler schreiben und Drossel aufräumen. Läuft auch, wenn
+        // Leveling in keiner Guild mehr an ist; dann gibt es nichts zu tun.
         if (!this.uhr) {
-            this.uhr = setInterval(() => {
-                chatxp.takt().catch((err) => ServiceManager.get('Logger').error('[Leveling] Takt gescheitert:', err));
+            this.uhr = setInterval(async () => {
+                await sprachxp.takt().catch((err) => ServiceManager.get('Logger').error('[Leveling] Sprach-Takt gescheitert:', err));
+                await chatxp.takt().catch((err) => ServiceManager.get('Logger').error('[Leveling] Takt gescheitert:', err));
             }, TAKT_MS);
             this.uhr.unref?.();
         }

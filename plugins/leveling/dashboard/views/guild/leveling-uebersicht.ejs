@@ -17,6 +17,12 @@
   <%
     const e = regeln.einstellungen;
     const n = regeln.quellen.nachricht;
+    const sp = regeln.quellen.sprache;
+    // Neu mit LV-1e: bis zum Dashboard-Neustart gibt die alte Route sie nicht mit.
+    const bel = typeof belohnungen !== 'undefined' && belohnungen ? belohnungen : { belohnungen: [], vorherigeEntfernen: false };
+    const rNamen = typeof rollenNamen !== 'undefined' && rollenNamen ? rollenNamen : {};
+    const rFehlen = typeof rollenNamenFehlen !== 'undefined' && rollenNamenFehlen;
+    const belSortiert = [...bel.belohnungen].sort((a, b) => a.stufe - b.stufe || a.art.localeCompare(b.art));
     const ausgeschlossen = regeln.regeln.filter((r) => r.wirkung === 'ausschliessen').length;
     const nur = regeln.regeln.filter((r) => r.wirkung === 'nur').length;
     const faktoren = regeln.regeln.filter((r) => r.wirkung === 'faktor').length;
@@ -44,6 +50,46 @@
             <dt class="col-7"><%= tr('leveling:UEBERSICHT.STUFEN') %></dt>
             <dd class="col-5"><%= stufenAnzahl %><%= schablone ? ' (' + schablone + ')' : '' %></dd>
           </dl>
+        </div>
+      </div>
+
+      <div class="card mt-3">
+        <div class="card-header">
+          <h3 class="card-title"><i class="fa-solid fa-headset me-2"></i><%= tr('leveling:UEBERSICHT.SPRACHE_TITEL') %></h3>
+        </div>
+        <div class="card-body">
+          <dl class="row mb-0">
+            <dt class="col-7"><%= tr('leveling:UEBERSICHT.SPRACHE_XP') %></dt>
+            <dd class="col-5"><%= sp && sp.aktiv ? tr('leveling:UEBERSICHT.XP_JE', { von: sp.xp_von, bis: sp.xp_bis, sekunden: Math.max(60, sp.taktung_s) }) : tr('leveling:UEBERSICHT.AUS') %></dd>
+            <dt class="col-7"><%= tr('leveling:UEBERSICHT.SPRACHE_MIN') %></dt>
+            <dd class="col-5"><%= tr('leveling:UEBERSICHT.MENSCHEN', { anzahl: e.sprache_min_menschen }) %></dd>
+            <dt class="col-7"><%= tr('leveling:UEBERSICHT.SPRACHE_STUMM') %></dt>
+            <dd class="col-5"><%= Number(e.sprache_stumm_zaehlt) ? tr('leveling:UEBERSICHT.AN') : tr('leveling:UEBERSICHT.AUS') %></dd>
+          </dl>
+          <div class="text-secondary small mt-2"><%= tr('leveling:UEBERSICHT.SPRACHE_HINWEIS') %></div>
+        </div>
+      </div>
+
+      <div class="card mt-3">
+        <div class="card-header">
+          <h3 class="card-title"><i class="fa-solid fa-gift me-2"></i><%= tr('leveling:UEBERSICHT.BELOHNUNGEN') %></h3>
+        </div>
+        <div class="card-body">
+          <% if (!belSortiert.length) { %>
+            <div class="text-secondary"><%= tr('leveling:UEBERSICHT.BELOHNUNGEN_LEER') %></div>
+          <% } else { %>
+            <dl class="row mb-0">
+              <% belSortiert.forEach((b) => { %>
+                <dt class="col-5"><%= tr('leveling:UEBERSICHT.STUFE', { stufe: b.stufe }) %></dt>
+                <dd class="col-7"><%= tr(b.art === 'rolle_nehmen' ? 'leveling:UEBERSICHT.NEHMEN' : 'leveling:UEBERSICHT.GEBEN') %> @<%= rNamen[b.wert] || b.wert %></dd>
+              <% }); %>
+              <dt class="col-7"><%= tr('leveling:UEBERSICHT.VORHERIGE') %></dt>
+              <dd class="col-5"><%= bel.vorherigeEntfernen ? tr('leveling:UEBERSICHT.AN') : tr('leveling:UEBERSICHT.AUS') %></dd>
+            </dl>
+            <% if (rFehlen) { %>
+              <div class="text-secondary small mt-2"><%= tr('leveling:UEBERSICHT.ROLLENNAMEN_FEHLEN') %></div>
+            <% } %>
+          <% } %>
         </div>
       </div>
     </div>

@@ -9,21 +9,23 @@
  *   3. Zähler „Nachrichten“ +1 (auch in der Taktung, ohne Inhalt).
  *   4. Mindestlänge, Taktung je Mitglied, gleicher Text im Fenster.
  *   5. Buchung über den Kern (G-20) mit Schlüssel `msg:<nachricht>`.
- *   6. Neue Stufe → `leveling.level.erreicht` (das meldet das Plugin selbst).
+ *   6. Neue Stufe → `leveling.level.erreicht` und Belohnungen angleichen
+ *      (`nachbuchung.js`, auch für Sprach-XP).
  *
  * Zurückgenommen wird eine Buchung, wenn die Nachricht binnen
- * `storno_loeschen_min` Minuten gelöscht wird (hier) oder automod sie
- * beanstandet (`automod.verstoss`, Hörer im Dashboard).
+ * `storno_loeschen_min` Minuten gelöscht wird (hier, einzeln oder gesammelt)
+ * oder automod sie beanstandet (`automod.verstoss`, Hörer im Dashboard).
+ * Fällt dabei die Stufe, gehen Belohnungsrollen der höheren Stufe wieder.
  *
  * @module leveling/bot/chatxp
  */
 
 const { ServiceManager } = require('dunebot-core');
-const { Fortschritt, Ereignisse } = require('dunebot-sdk');
+const { Fortschritt } = require('dunebot-sdk');
 const { SnowflakeUtil } = require('discord.js');
 const Regeln = require('../shared/regeln');
-const { KENNUNG } = require('../shared/vorgaben');
 const zaehler = require('./zaehler');
+const { nachBuchung } = require('./nachbuchung');
 
 const drossel = new Regeln.Drossel();
 const MINUTE_MS = 60_000;
@@ -81,23 +83,8 @@ async function beiNachricht(message) {
         meldeFehler('Buchen der Chat-XP gescheitert', error);
         return { gebucht: false, grund: 'fehler' };
     }
-    if (ergebnis.aufstieg) await meldeAufstieg(guildId, mitglied, ergebnis);
+    await nachBuchung({ guildId, mitglied, ergebnis, guild: message.guild || null });
     return { gebucht: ergebnis.neu, ergebnis };
-}
-
-/** `leveling.level.erreicht`; der Schlüssel hängt an der Buchung, die den Aufstieg brachte. */
-async function meldeAufstieg(guildId, mitglied, e) {
-    try {
-        await Ereignisse.melde('leveling.level.erreicht', {
-            guild_id: guildId,
-            schluessel: `leveling:aufstieg:${e.buchung_id}`,
-            akteur: 'system',
-            betroffen: mitglied,
-            daten: { fortschritt: KENNUNG, stufe: e.level, vorher: e.vorher.level },
-        });
-    } catch (error) {
-        log().error('[Leveling] leveling.level.erreicht nicht gemeldet:', error);
-    }
 }
 
 /**
@@ -117,6 +104,7 @@ async function beiLoeschung(message) {
     if (alter > minuten * MINUTE_MS) return { storniert: false, grund: 'zu_alt' };
     try {
         const s = await Fortschritt.storniere({ guildId, kennung: 'leveling:community', schluessel: `msg:${message.id}`, grund: 'Nachricht gelöscht' });
+        if (s.wechsel) await nachBuchung({ guildId, mitglied: s.mitglied, ergebnis: s, guild: message.guild || null });
         return { storniert: Boolean(s.gefunden && !s.schon), grund: s.gefunden ? null : 'keine_buchung' };
     } catch (error) {
         meldeFehler('Storno nach Löschen gescheitert', error);

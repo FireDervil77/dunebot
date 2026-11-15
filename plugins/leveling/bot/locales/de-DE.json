@@ -1,1 +1,29 @@
-{}
+{
+    "LEVELS": {
+        "DESCRIPTION": "Leveling verwalten",
+        "SYNC_DESCRIPTION": "Belohnungsrollen aller Mitglieder an ihre Stufe angleichen",
+        "UNBEKANNT": "Diesen Unterbefehl gibt es nicht.",
+        "KEIN_DASHBOARD": "Das Dashboard hat nicht geantwortet, deshalb läuft nichts ({{grund}}).",
+        "KEIN_RECHT": "Dir fehlt das Recht {{recht}}. Es wird im Dashboard unter Rechte vergeben.",
+        "LAEUFT": "Gleiche ab …",
+        "FORTSCHRITT": "Gleiche ab … {{fertig}} von {{gesamt}} Mitgliedern",
+        "LAEUFT_SCHON": "In dieser Guild läuft schon ein Abgleich. Bitte warte, bis er fertig ist.",
+        "KEINE_BELOHNUNGEN": "Es sind keine Belohnungsrollen eingestellt, und Leveling hat niemandem eine Rolle gegeben. Nichts zu tun.",
+        "ERG_TITEL": "Abgleich fertig",
+        "ERG_TITEL_TEILWEISE": "Abgleich fertig, nicht alles ging",
+        "ERG_GEPRUEFT": "Geprüft: {{n}} Mitglieder",
+        "ERG_VERGEBEN": "Vergeben: {{n}} Rollen",
+        "ERG_ENTFERNT": "Entfernt: {{n}} Rollen",
+        "ERG_GEHALTEN": "Geblieben, weil ein anderes System sie hält: {{n}} Rollen",
+        "ERG_FORT": "Nicht mehr auf dem Server: {{n}} Mitglieder (ihr Eintrag ist gelöscht)",
+        "ERG_OHNE_BELOHNUNGEN": "Es sind keine Belohnungsrollen mehr eingestellt; Rollen, die Leveling gegeben hatte, wurden entfernt.",
+        "ERG_FEHLGESCHLAGEN": "Fehlgeschlagen: {{n}}",
+        "ERG_WEITERE": "… und {{n}} weitere",
+        "ERG_IM_KANAL": "Ergebnis des Abgleichs von {{nutzer}} (die Antwort war nach 15 Minuten nicht mehr änderbar):",
+        "GRUND_KEIN_RECHT": "Dem Bot fehlt das Recht „Rollen verwalten“",
+        "GRUND_ZU_HOCH": "Die Rolle steht über der höchsten Rolle des Bots",
+        "GRUND_VERWALTET": "Die Rolle verwaltet eine Integration (Bot, Booster)",
+        "GRUND_WEG": "Die Rolle gibt es nicht mehr",
+        "GRUND_FEHLER": "Discord lehnte ab: {{fehler}}"
+    }
+}

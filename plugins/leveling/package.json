@@ -52,6 +52,13 @@
             "akteur": "anonymisieren"
         }
     },
+    "rollen": [
+        {
+            "besitzer": "leveling:community",
+            "titel": "leveling:ROLLEN.BELOHNUNG",
+            "seite": "/plugins/leveling/uebersicht"
+        }
+    ],
     "fortschritt": [
         {
             "kennung": "leveling:community",

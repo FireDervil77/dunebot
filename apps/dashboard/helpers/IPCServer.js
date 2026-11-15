@@ -264,7 +264,7 @@ class IPCServer {
     /**
      * Core-Events vom Bot verarbeiten (Bot→Dashboard)
      * Aktuell: UPDATE_PLUGIN_STATUS – Discord `/plugin status` schaltet über das Dashboard ein und ab;
-     * PRAEFIX_SETZEN, EREIGNISSE_ANSTOSS, VERLASSEN_ANSTOSS, MEINEDATEN_*
+     * PRAEFIX_SETZEN, RECHT_PRUEFEN, EREIGNISSE_ANSTOSS, VERLASSEN_ANSTOSS, MEINEDATEN_*
      * @private
      */
     async _handleCoreEvent(action, payload, message) {
@@ -306,6 +306,30 @@ class IPCServer {
                 }
 
                 return message.reply({ success: ergebnisse.every(e => e.ok), data: { ergebnisse } });
+            }
+            case 'RECHT_PRUEFEN': {
+                // Ein Bot-Befehl fragt, ob der Auslöser ein Recht des
+                // Rechtesystems hat (`/levels sync` → LEVELING.REWARDS.MANAGE,
+                // LV-1e). Entschieden wird hier, mit demselben PermissionManager
+                // wie im Web; der Bot entscheidet nicht selbst
+                // (discord-funktionen-abbilden). Ohne Rechtesystem: nein.
+                const { guild_id: guildId, actor_user_id: actorId, recht } = payload || {};
+                if (!/^\d{17,20}$/.test(String(guildId || '')) || !/^\d{17,20}$/.test(String(actorId || ''))) {
+                    return message.reply({ success: false, error: 'guild_id oder actor_user_id fehlt' });
+                }
+                if (!/^[A-Z0-9_]+(\.[A-Z0-9_]+)+$/.test(String(recht || ''))) {
+                    return message.reply({ success: false, error: 'recht ungültig' });
+                }
+                const permissionManager = ServiceManager.get('permissionManager');
+                if (!permissionManager) return message.reply({ success: false, error: 'Rechteprüfung nicht verfügbar' });
+                try {
+                    const darf = Boolean(await permissionManager.hasPermission(String(actorId), String(guildId), String(recht)));
+                    if (!darf) Logger.info(`[IPC/core] RECHT_PRUEFEN: User ${actorId} ohne ${recht} in Guild ${guildId}`);
+                    return message.reply({ success: true, data: { darf } });
+                } catch (err) {
+                    Logger.error(`[IPC/core] RECHT_PRUEFEN ${recht} für ${actorId} in ${guildId} gescheitert:`, err);
+                    return message.reply({ success: false, error: err.message });
+                }
             }
             case 'PRAEFIX_SETZEN': {
                 // Discord `/setprefix` (K372, Betreiber 2026-11-11): Der Befehl

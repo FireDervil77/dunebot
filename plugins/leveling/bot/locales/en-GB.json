@@ -1,1 +1,29 @@
-{}
+{
+    "LEVELS": {
+        "DESCRIPTION": "Manage leveling",
+        "SYNC_DESCRIPTION": "Match every member's reward roles to their level",
+        "UNBEKANNT": "This subcommand does not exist.",
+        "KEIN_DASHBOARD": "The dashboard did not answer, so nothing was done ({{grund}}).",
+        "KEIN_RECHT": "You lack the permission {{recht}}. It is granted in the dashboard under permissions.",
+        "LAEUFT": "Syncing …",
+        "FORTSCHRITT": "Syncing … {{fertig}} of {{gesamt}} members",
+        "LAEUFT_SCHON": "A sync is already running in this server. Please wait until it has finished.",
+        "KEINE_BELOHNUNGEN": "No reward roles are set up, and leveling has not given anyone a role. Nothing to do.",
+        "ERG_TITEL": "Sync finished",
+        "ERG_TITEL_TEILWEISE": "Sync finished, not everything worked",
+        "ERG_GEPRUEFT": "Checked: {{n}} members",
+        "ERG_VERGEBEN": "Given: {{n}} roles",
+        "ERG_ENTFERNT": "Removed: {{n}} roles",
+        "ERG_GEHALTEN": "Kept because another system holds them: {{n}} roles",
+        "ERG_FORT": "No longer on the server: {{n}} members (their entry was deleted)",
+        "ERG_OHNE_BELOHNUNGEN": "No reward roles are set up any more; roles leveling had given were removed.",
+        "ERG_FEHLGESCHLAGEN": "Failed: {{n}}",
+        "ERG_WEITERE": "… and {{n}} more",
+        "ERG_IM_KANAL": "Result of the sync started by {{nutzer}} (the reply could no longer be edited after 15 minutes):",
+        "GRUND_KEIN_RECHT": "The bot lacks the “Manage Roles” permission",
+        "GRUND_ZU_HOCH": "The role is above the bot's highest role",
+        "GRUND_VERWALTET": "The role is managed by an integration (bot, booster)",
+        "GRUND_WEG": "The role no longer exists",
+        "GRUND_FEHLER": "Discord refused: {{fehler}}"
+    }
+}

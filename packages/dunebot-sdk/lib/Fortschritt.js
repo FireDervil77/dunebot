@@ -514,8 +514,9 @@ async function buche({ guildId, kennung, mitglied, menge, quelle, schluessel = n
 
 /**
  * Eine Buchung zurücknehmen (z. B. automod verwirft die Nachricht).
+ * `mitglied` nennt, wessen Stand sich änderte (für Belohnungen danach, LV-1e).
  *
- * @returns {Promise<{gefunden: boolean, schon: boolean, menge, xp, level, prestige, vorher, wechsel}>}
+ * @returns {Promise<{gefunden: boolean, schon: boolean, mitglied, menge, xp, level, prestige, vorher, wechsel}>}
  */
 async function storniere({ guildId, kennung, schluessel, akteur = null, grund = null }) {
     const g = pruefeGuild(guildId);
@@ -549,7 +550,7 @@ async function storniere({ guildId, kennung, schluessel, akteur = null, grund = 
             [b.id, menge, g, kennung, m]);
         }
         const nachher = { xp, level, prestige: vorher.prestige };
-        return { gefunden: true, schon: false, menge, ...nachher, vorher, wechsel: vergleiche(nachher, vorher) !== 0 };
+        return { gefunden: true, schon: false, mitglied: m, menge, ...nachher, vorher, wechsel: vergleiche(nachher, vorher) !== 0 };
     });
 }
 

@@ -3,7 +3,7 @@
 /**
  * Leveling: Zähler je Mitglied (LV-1c, 2026-11-15).
  *
- * Nachrichten (später Sprachminuten und Reaktionen) für Abzeichen und
+ * Nachrichten und Sprachminuten (später Reaktionen) für Abzeichen und
  * Profil, ohne Inhalt. Gezählt wird im Speicher, geschrieben einmal je
  * Minute als Zuwachs, wie bei der Messprobe G-18: eine Zeile je aktivem
  * Mitglied und Minute statt einer je Nachricht. Ein Neustart verliert
@@ -40,6 +40,11 @@ class Zaehler {
         const e = this._eintrag(guildId, mitglied);
         e.nachrichten++;
         if (!e.erste) e.erste = new Date(this.uhr());
+    }
+
+    /** Eine Minute im Sprachkanal, die die Bedingungen erfüllt (LV-1d). */
+    sprachminute(guildId, mitglied) {
+        this._eintrag(guildId, mitglied).sprachminuten++;
     }
 
     /** Schreibt die Zuwächse; was währenddessen dazukommt, bleibt für das nächste Mal. */

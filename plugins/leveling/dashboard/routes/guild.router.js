@@ -4,7 +4,8 @@
  * Leveling - Seiten (LV-1a, 2026-11-15).
  *
  *   /             → Weiterleitung auf /uebersicht
- *   /uebersicht   Regeln, die gerade gelten, und die ersten zehn der Rangliste
+ *   /uebersicht   Regeln, die gerade gelten (Chat, Sprache, Belohnungen), und
+ *                 die ersten zehn der Rangliste
  *
  * Die Einstellseiten (XP-Regeln, Stufen, Belohnungen, Nachrichten,
  * Ausschlüsse, Datenverwaltung) kommen mit LV-1i.
@@ -18,6 +19,7 @@ const { ServiceManager } = require('dunebot-core');
 const { Fortschritt } = require('dunebot-sdk');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 const Regeln = require('../../shared/regeln');
+const Belohnungen = require('../../shared/belohnungen');
 
 function makeTranslator(req, res) {
     return (key, options = {}) => {
@@ -48,6 +50,25 @@ async function namenVon(guildId, ids) {
     }
 }
 
+/**
+ * Rollennamen über den Bot (wie im discord-Plugin). Ohne Antwort bleiben die
+ * IDs stehen, und die Seite sagt es.
+ *
+ * @returns {Promise<{namen: Object<string, string>, fehlen: boolean}>}
+ */
+async function rollenNamen(guildId, ids) {
+    if (!ids.length) return { namen: {}, fehlen: false };
+    try {
+        const antworten = await ServiceManager.get('ipcServer').broadcast('dashboard:GET_GUILD_ROLES_DETAILED', { guildId });
+        const gut = (antworten || []).map((a) => a?.data ?? a).find((a) => a?.success && Array.isArray(a.roles));
+        if (!gut) return { namen: {}, fehlen: true };
+        return { namen: Object.fromEntries(gut.roles.map((r) => [String(r.id), r.name])), fehlen: false };
+    } catch (error) {
+        ServiceManager.get('Logger').warn(`[Leveling] Rollennamen nicht geladen: ${error.message}`);
+        return { namen: {}, fehlen: true };
+    }
+}
+
 router.get('/', requirePermission('LEVELING.VIEW'), (req, res) => {
     res.redirect(`/guild/${res.locals.guildId}/plugins/leveling/uebersicht`);
 });
@@ -62,9 +83,12 @@ router.get('/uebersicht', requirePermission('LEVELING.VIEW'), async (req, res) =
             Fortschritt.stufen({ guildId, kennung: 'leveling:community' }),
         ]);
         const { namen, fehlen } = await namenVon(guildId, rangliste.eintraege.map((e) => String(e.mitglied_id)));
+        const belohnungen = regeln ? await Belohnungen.lade(guildId) : { belohnungen: [], vorherigeEntfernen: false };
+        const rollen = await rollenNamen(guildId, belohnungen.belohnungen.map((b) => b.wert));
         await ServiceManager.get('themeManager').renderView(res, 'guild/leveling-uebersicht', {
             tr, guildId, regeln, rangliste, namen, namenFehlen: fehlen,
             stufenAnzahl: stufen.stufen.length, schablone: stufen.schablone,
+            belohnungen, rollenNamen: rollen.namen, rollenNamenFehlen: rollen.fehlen,
         });
     } catch (error) {
         ServiceManager.get('Logger').error('[Leveling] Übersicht nicht geladen:', error);
