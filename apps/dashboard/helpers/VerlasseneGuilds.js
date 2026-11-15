@@ -120,8 +120,10 @@ async function eine(g) {
             `Grund: ${erg.fehler}. Abgeschaltet: ${abgeschaltetText(erg.abgeschaltet)}`);
         return 'gescheitert';
     }
+    // Tabellen, deren Migration noch nicht lief, hatten keine Zeilen (K392).
+    const fehlend = erg.fehlend?.length ? `. Tabellen noch nicht angelegt, übersprungen: ${erg.fehlend.join(', ')}` : '';
     log().info(`[Verlassen] Guild ${name} gelöscht. Abgeschaltet: ${abgeschaltetText(erg.abgeschaltet)}. ` +
-        `Zeilen: ${geloeschtText(erg.geloescht)}`);
+        `Zeilen: ${geloeschtText(erg.geloescht)}${fehlend}`);
     return 'geloescht';
 }
 

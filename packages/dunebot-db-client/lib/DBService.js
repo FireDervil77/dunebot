@@ -159,11 +159,20 @@ class DBService extends DBClient {
      * Mit `verbindung` läuft es in der Transaktion des Aufrufers (Datenauskunft,
      * auch als Probelauf mit Rollback), sonst in einer eigenen.
      *
+     * **Eine Tabelle, die es noch gar nicht gibt, wird übersprungen** (Wert
+     * `null`, K392). Die Erklärungen lesen die Aufrufer frisch aus dem
+     * Arbeitsbaum, die Tabelle legt erst eine Migration an: die des Kerns beim
+     * nächsten Neustart, die eines Plugins beim ersten Einschalten. Bis dahin
+     * scheiterte „Guild löschen“ für jede Guild, stündlich neu versucht
+     * (gemessen 2026-11-15: Guild „Test“ sechsmal). Wo keine Tabelle ist, sind
+     * auch keine Zeilen. Eine Tabelle, die es gibt, aber ohne Guild-Spalte,
+     * bleibt ein Fehler: Dort stimmt die Erklärung nicht.
+     *
      * @param {string[]} tabellen Tabellennamen mit einer Guild-Spalte
      * @param {string} guildId Discord-Guild-ID
      * @param {Object} [optionen]
      * @param {Object} [optionen.verbindung] offene Verbindung in einer Transaktion
-     * @returns {Promise<Object<string, number>>} gelöschte Zeilen je Tabelle
+     * @returns {Promise<Object<string, number|null>>} gelöschte Zeilen je Tabelle, `null` = Tabelle fehlt
      */
     async loescheGuildZeilen(tabellen, guildId, { verbindung = null } = {}) {
         // Ohne Guild hieße `WHERE guild_id = NULL` nichts, `= 'undefined'`
@@ -174,16 +183,34 @@ class DBService extends DBClient {
         }
         const tun = async (v) => {
             const spalten = await this.guildSpalten(tabellen, v);
-            const ohne = tabellen.filter(t => !spalten[t]);
+            const da = await this.#vorhandeneTabellen(tabellen, v);
+            const ohne = tabellen.filter(t => da.has(t) && !spalten[t]);
             if (ohne.length) throw new Error(`loescheGuildZeilen: keine Guild-Spalte in ${ohne.join(', ')}`);
             const geloescht = {};
             for (const t of tabellen) {
+                if (!da.has(t)) { geloescht[t] = null; continue; }
                 const [ergebnis] = await v.query(`DELETE FROM \`${t}\` WHERE \`${spalten[t]}\` = ?`, [String(guildId)]);
                 geloescht[t] = ergebnis.affectedRows;
             }
             return geloescht;
         };
         return verbindung ? tun(verbindung) : this.transaction(tun);
+    }
+
+    /**
+     * Welche dieser Tabellen gibt es im Schema? Wie `guildSpalten` aus
+     * `information_schema`; TEMPORARY-Kopien stehen dort nicht.
+     *
+     * @param {string[]} tabellen geprüfte Namen
+     * @param {Object} verbindung offene Verbindung
+     * @returns {Promise<Set<string>>}
+     */
+    async #vorhandeneTabellen(tabellen, verbindung) {
+        if (!tabellen.length) return new Set();
+        const [zeilen] = await verbindung.query(
+            `SELECT TABLE_NAME AS t FROM information_schema.TABLES
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (${tabellen.map(() => '?').join(', ')})`, tabellen);
+        return new Set(zeilen.map(z => z.t));
     }
 
     /**

@@ -210,6 +210,17 @@ function abschalter(plugin) {
             await assert.rejects(db.loescheGuildZeilen(['configs; DROP TABLE x'], '1'), /ungültiger Tabellenname/);
         });
 
+        await pruefe('K392: eine Tabelle, die es noch nicht gibt, wird übersprungen; eine ohne Guild-Spalte bleibt Fehler', async () => {
+            const fehlt = 'k392_gibt_es_nicht';
+            assert.ok(!vorhanden.has(fehlt), `${fehlt} gibt es doch`);
+            const [{ n }] = await db.query('SELECT COUNT(*) AS n FROM configs WHERE guild_id = ?', ['0']);
+            assert.strictEqual(Number(n), 0, 'configs hat Zeilen mit guild_id 0 — die Probe würde sie löschen');
+            assert.deepStrictEqual(await db.loescheGuildZeilen(['configs', fehlt], '0'), { configs: 0, [fehlt]: null });
+            // `migrations` hat keine Guild-Spalte: Die Prüfung wirft, bevor etwas gelöscht wird.
+            assert.ok(vorhanden.has('migrations') && !mitGuild.has('migrations'), 'migrations taugt nicht mehr als Probe');
+            await assert.rejects(db.loescheGuildZeilen(['configs', 'migrations'], '0'), /keine Guild-Spalte in migrations/);
+        });
+
         await pruefe('Ein Weg: kein onGuildDisable löscht Zeilen einer Tabelle seiner Liste', async () => {
             const meldungen = [];
             for (const p of plugins) {

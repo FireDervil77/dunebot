@@ -1150,7 +1150,10 @@ class PluginManager extends BasePluginManager {
                         // nimmt nur ein Error-Objekt, ein Objekt dort fällt weg.
                         const zeilen = Object.entries(geloescht).filter(([, n]) => n > 0)
                             .map(([t, n]) => `${t} ${n}`).join(', ');
-                        Logger.info(`Plugin ${pluginName}: Inhalte der Guild ${guildId} gelöscht (${zeilen || 'keine Zeilen'})`);
+                        // `null`: Die Tabelle gibt es noch nicht (Migration offen, K392).
+                        const fehlen = Object.entries(geloescht).filter(([, n]) => n === null).map(([t]) => t);
+                        Logger.info(`Plugin ${pluginName}: Inhalte der Guild ${guildId} gelöscht (${zeilen || 'keine Zeilen'})`
+                            + (fehlen.length ? `; noch nicht angelegt: ${fehlen.join(', ')}` : ''));
                     }
                     await dbService.query(
                         "DELETE FROM configs WHERE plugin_name = ? AND guild_id = ?",

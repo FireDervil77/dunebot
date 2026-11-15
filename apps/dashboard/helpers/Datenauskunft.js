@@ -506,7 +506,12 @@ async function mitgliedLoeschen(userId, { guildId = null, trocken = false, anlas
  * @param {boolean} [optionen.trocken] Probelauf: nicht abschalten, Zeilen zählen mit Rollback
  * @param {{userId?: string, userName?: string}} [optionen.wer] wer es ausgelöst hat
  * @param {string} [optionen.anlass] für das Log
- * @returns {Promise<{guildId, trocken, ok, abgeschaltet: Object[], geloescht: Object, fehler: string|null}>}
+ * `fehlend` nennt erklärte Tabellen, die es noch nicht gibt (`plugin: tabelle`):
+ * Ihre Migration ist noch nicht gelaufen, Zeilen kann es dort nicht geben
+ * (K392). Gelöscht wird trotzdem, sonst scheiterte jede Guild bis zum nächsten
+ * Neustart bzw. bis das Plugin irgendwo eingeschaltet wird.
+ *
+ * @returns {Promise<{guildId, trocken, ok, abgeschaltet: Object[], geloescht: Object, fehlend: string[], fehler: string|null}>}
  */
 async function guildLoeschen(guildId, { trocken = false, wer = {}, anlass = 'unbekannt' } = {}) {
     if (!/^\d+$/.test(String(guildId ?? ''))) throw new Error(`Datenauskunft: ungültige Guild-ID „${guildId}“`);
@@ -515,7 +520,7 @@ async function guildLoeschen(guildId, { trocken = false, wer = {}, anlass = 'unb
     const pm = ServiceManager.has('pluginManager') ? ServiceManager.get('pluginManager') : null;
     if (!trocken && !pm) throw new Error('Datenauskunft: PluginManager fehlt, Plugins ließen sich nicht abschalten');
     const meta = erklaerungen();
-    const aus = { guildId, trocken, ok: true, abgeschaltet: [], geloescht: {}, fehler: null };
+    const aus = { guildId, trocken, ok: true, abgeschaltet: [], geloescht: {}, fehlend: [], fehler: null };
 
     if (!trocken) {
         // masterserver lässt sich nicht abschalten, solange gameserver an ist
@@ -540,13 +545,16 @@ async function guildLoeschen(guildId, { trocken = false, wer = {}, anlass = 'unb
     try {
         aus.geloescht = await inTransaktion(trocken, async (v) => {
             const geloescht = {};
+            const fehlend = [];
             for (const p of reihe) {
                 const tabellen = meta[p].guildInhalte?.loeschen || [];
                 if (!tabellen.length) continue;
                 const n = await db().loescheGuildZeilen(tabellen, guildId, { verbindung: v });
                 const mit = Object.fromEntries(Object.entries(n).filter(([, z]) => z > 0));
                 if (Object.keys(mit).length) geloescht[p] = mit;
+                for (const [t, z] of Object.entries(n)) if (z === null) fehlend.push(`${p}: ${t}`);
             }
+            aus.fehlend = fehlend;
             return geloescht;
         });
     } catch (e) {
@@ -557,7 +565,8 @@ async function guildLoeschen(guildId, { trocken = false, wer = {}, anlass = 'unb
     }
     if (!trocken) {
         const kurz = Object.entries(aus.geloescht).map(([p, t]) => `${p} ${Object.values(t).reduce((a, b) => a + b, 0)}`).join(', ');
-        log().info(`[Datenauskunft] Guild ${guildId} gelöscht (${anlass}): ${aus.abgeschaltet.length} Plugin(s) abgeschaltet, Zeilen: ${kurz || 'keine'}`);
+        const ohne = aus.fehlend.length ? `; Tabellen noch nicht angelegt, übersprungen: ${aus.fehlend.join(', ')}` : '';
+        log().info(`[Datenauskunft] Guild ${guildId} gelöscht (${anlass}): ${aus.abgeschaltet.length} Plugin(s) abgeschaltet, Zeilen: ${kurz || 'keine'}${ohne}`);
     }
     return aus;
 }
