@@ -1,0 +1,95 @@
+<%- include('shared/seitenkopf', {
+      plugin:       'leveling',
+      vortitel:     tr('leveling:TITEL'),
+      titel:        tr('leveling:NAV.UEBERSICHT'),
+      beschreibung: tr('leveling:UEBERSICHT.BESCHREIBUNG'),
+      icon:         'fa-solid fa-gauge-high',
+      guildId:      guildId
+}) %>
+
+<% if (!regeln) { %>
+  <%- include('shared/leerzustand', {
+        icon:  'fa-solid fa-ranking-star',
+        titel: tr('leveling:UEBERSICHT.NICHT_EINGERICHTET'),
+        text:  tr('leveling:UEBERSICHT.NICHT_EINGERICHTET_TEXT')
+  }) %>
+<% } else { %>
+  <%
+    const e = regeln.einstellungen;
+    const n = regeln.quellen.nachricht;
+    const ausgeschlossen = regeln.regeln.filter((r) => r.wirkung === 'ausschliessen').length;
+    const nur = regeln.regeln.filter((r) => r.wirkung === 'nur').length;
+    const faktoren = regeln.regeln.filter((r) => r.wirkung === 'faktor').length;
+  %>
+  <div class="row row-cards">
+    <div class="col-lg-5">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title"><i class="fa-solid fa-comment-dots me-2"></i><%= tr('leveling:UEBERSICHT.CHAT_TITEL') %></h3>
+        </div>
+        <div class="card-body">
+          <dl class="row mb-0">
+            <dt class="col-7"><%= tr('leveling:UEBERSICHT.CHAT_XP') %></dt>
+            <dd class="col-5"><%= n ? (n.aktiv ? tr('leveling:UEBERSICHT.XP_JE', { von: n.xp_von, bis: n.xp_bis, sekunden: n.taktung_s }) : tr('leveling:UEBERSICHT.AUS')) : tr('leveling:UEBERSICHT.AUS') %></dd>
+            <dt class="col-7"><%= tr('leveling:UEBERSICHT.MINDESTLAENGE') %></dt>
+            <dd class="col-5"><%= Number(e.mindestlaenge) > 0 ? tr('leveling:UEBERSICHT.ZEICHEN', { anzahl: e.mindestlaenge }) : tr('leveling:UEBERSICHT.AUS') %></dd>
+            <dt class="col-7"><%= tr('leveling:UEBERSICHT.GLEICHER_TEXT') %></dt>
+            <dd class="col-5"><%= Number(e.gleiche_fenster_s) > 0 ? tr('leveling:UEBERSICHT.SEKUNDEN', { anzahl: e.gleiche_fenster_s }) : tr('leveling:UEBERSICHT.AUS') %></dd>
+            <dt class="col-7"><%= tr('leveling:UEBERSICHT.STORNO_LOESCHEN') %></dt>
+            <dd class="col-5"><%= Number(e.storno_loeschen_min) > 0 ? tr('leveling:UEBERSICHT.MINUTEN', { anzahl: e.storno_loeschen_min }) : tr('leveling:UEBERSICHT.AUS') %></dd>
+            <dt class="col-7"><%= tr('leveling:UEBERSICHT.STORNO_AUTOMOD') %></dt>
+            <dd class="col-5"><%= Number(e.storno_automod) ? tr('leveling:UEBERSICHT.AN') : tr('leveling:UEBERSICHT.AUS') %></dd>
+            <dt class="col-7"><%= tr('leveling:UEBERSICHT.REGELN') %></dt>
+            <dd class="col-5"><%= tr('leveling:UEBERSICHT.REGELN_ZAHL', { aus: ausgeschlossen, nur: nur, faktor: faktoren }) %></dd>
+            <dt class="col-7"><%= tr('leveling:UEBERSICHT.STUFEN') %></dt>
+            <dd class="col-5"><%= stufenAnzahl %><%= schablone ? ' (' + schablone + ')' : '' %></dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-7">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title"><i class="fa-solid fa-ranking-star me-2"></i><%= tr('leveling:UEBERSICHT.RANGLISTE') %></h3>
+          <div class="card-actions text-secondary small"><%= tr('leveling:UEBERSICHT.MITGLIEDER_MIT_XP', { anzahl: rangliste.gesamt }) %></div>
+        </div>
+        <% if (!rangliste.eintraege.length) { %>
+          <div class="card-body">
+            <%- include('shared/leerzustand', {
+                  icon:  'fa-solid fa-ranking-star',
+                  titel: tr('leveling:UEBERSICHT.LEER'),
+                  text:  tr('leveling:UEBERSICHT.LEER_TEXT')
+            }) %>
+          </div>
+        <% } else { %>
+          <div class="table-responsive">
+            <table class="table card-table table-vcenter">
+              <thead>
+                <tr>
+                  <th style="width: 3rem;">#</th>
+                  <th><%= tr('leveling:UEBERSICHT.MITGLIED') %></th>
+                  <th class="text-end"><%= tr('leveling:UEBERSICHT.LEVEL') %></th>
+                  <th class="text-end"><%= tr('leveling:UEBERSICHT.XP') %></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% rangliste.eintraege.forEach((z) => { %>
+                  <tr>
+                    <td><%= z.platz %></td>
+                    <td><%= namen[String(z.mitglied_id)] || String(z.mitglied_id) %></td>
+                    <td class="text-end"><%= z.prestige > 0 ? z.level + ' (P' + z.prestige + ')' : z.level %></td>
+                    <td class="text-end"><%= Number(z.xp).toLocaleString('de-DE') %></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+          <% if (namenFehlen) { %>
+            <div class="card-footer text-secondary small"><%= tr('leveling:UEBERSICHT.NAMEN_FEHLEN') %></div>
+          <% } %>
+        <% } %>
+      </div>
+    </div>
+  </div>
+<% } %>

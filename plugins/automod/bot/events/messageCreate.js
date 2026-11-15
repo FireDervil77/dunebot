@@ -4,6 +4,7 @@ const { pruefeSpam, ohneEinladungen, istBefehlsnachricht, merkeEigeneLoeschung, 
 const { AutoModSettings, AutoModStrikes, AutoModLogs, AutoModEscalation, AutoModExemptions, AutoModRegexRules, AutoModCompoundRules } = require("../../shared/models");
 const { getGuildKeywordLists } = require("../keywordLoader");
 const { findeTreffer } = require("../../shared/stichwortTreffer");
+const { Ereignisse } = require("dunebot-sdk");
 
 // Moderation Integration - Optional dependency
 let addModAction;
@@ -87,6 +88,8 @@ module.exports = async (message) => {
     let strikesTotal = 0;
 
     const fields = [];
+    // Feste Gründe je Feld für `automod.verstoss` (die Feldnamen oben sind übersetzt).
+    const gruende = [];
 
     // ════════════════════════════════════════════════════════════════════════
     // Erwaehnungsgrenzen
@@ -100,6 +103,7 @@ module.exports = async (message) => {
 
     // Max mentions
     if (settings.max_mentions > 0 && mentions.members.size > settings.max_mentions) {
+        gruende.push('erwaehnungen');
         fields.push({
             name: guild.getT("automod:HANDLER.FIELD_MENTIONS"),
             value: `${mentions.members.size}/${settings.max_mentions}`,
@@ -110,6 +114,7 @@ module.exports = async (message) => {
 
     // Maxrole mentions
     if (settings.max_role_mentions > 0 && mentions.roles.size > settings.max_role_mentions) {
+        gruende.push('rollen_erwaehnungen');
         fields.push({
             name: guild.getT("automod:HANDLER.FIELD_ROLE_MENTIONS"),
             value: `${mentions.roles.size}/${settings.max_role_mentions}`,
@@ -121,6 +126,7 @@ module.exports = async (message) => {
     if (settings.anti_massmention) {
         // check everyone mention
         if (mentions.everyone) {
+            gruende.push('everyone');
             fields.push({
                 name: guild.getT("automod:HANDLER.FIELD_EVERYONE"),
                 value: "✓",
@@ -131,6 +137,7 @@ module.exports = async (message) => {
 
         // check user/role mentions
         if (mentions.users.size + mentions.roles.size > settings.anti_massmention_threshold) {
+            gruende.push('massen_erwaehnung');
             fields.push({
                 name: guild.getT("automod:HANDLER.FIELD_ROLE_USER_MENTIONS"),
                 value: `${mentions.users.size + mentions.roles.size}/${settings.anti_massmention_threshold}`,
@@ -145,6 +152,7 @@ module.exports = async (message) => {
     if (settings.max_lines > 0) {
         const count = content.split("\n").length;
         if (count > settings.max_lines) {
+            gruende.push('zeilen');
             fields.push({
                 name: guild.getT("automod:HANDLER.FIELD_MAX_LINES"),
                 value: `${count}/${settings.max_lines}`,
@@ -159,6 +167,7 @@ module.exports = async (message) => {
     // Anti Attachments
     if (settings.anti_attachments) {
         if (message.attachments.size > 0) {
+            gruende.push('anhaenge');
             fields.push({
                 name: guild.getT("automod:HANDLER.FIELD_ATTACH"),
                 value: "✓",
@@ -187,6 +196,7 @@ module.exports = async (message) => {
     const hatEinladung = MiscUtils.containsDiscordInvite(content);
 
     if (settings.anti_invites && hatEinladung) {
+        gruende.push('einladung');
         fields.push({
             name: guild.getT("automod:HANDLER.FIELD_INVITES"),
             value: "✓",
@@ -197,6 +207,7 @@ module.exports = async (message) => {
     }
 
     if (settings.anti_links && MiscUtils.containsLink(ohneEinladungen(content))) {
+        gruende.push('link');
         fields.push({
             name: guild.getT("automod:HANDLER.FIELD_LINKS"),
             value: "✓",
@@ -216,6 +227,7 @@ module.exports = async (message) => {
     if (settings.anti_spam) {
         const spam = pruefeSpam(message, settings);
         if (spam.getroffen) {
+            gruende.push('spam');
             fields.push({
                 name: guild.getT("automod:HANDLER.FIELD_ANTISPAM"),
                 value: spam.grund === 'RATE'
@@ -251,6 +263,7 @@ module.exports = async (message) => {
         const treffer = findeTreffer(content, liste.keywords);
         if (!treffer) continue;
 
+        gruende.push('stichwort');
         fields.push({
             name: guild.getT("automod:HANDLER.FIELD_KEYWORD", { list: liste.name }),
             value: `||${treffer}||`,
@@ -265,6 +278,7 @@ module.exports = async (message) => {
     try {
         const matchedRule = await AutoModRegexRules.testMessage(guild.id, content);
         if (matchedRule) {
+            gruende.push('regex');
             fields.push({
                 name: guild.getT("automod:HANDLER.FIELD_REGEX", { rule: matchedRule.name }),
                 value: "✓",
@@ -286,6 +300,7 @@ module.exports = async (message) => {
     try {
         const matchedCompound = await AutoModCompoundRules.checkMessage(message);
         if (matchedCompound) {
+            gruende.push('regel');
             fields.push({
                 name: guild.getT("automod:HANDLER.FIELD_COMPOUND", { rule: matchedCompound.name }),
                 value: "✓",
@@ -316,6 +331,21 @@ module.exports = async (message) => {
         }
     } catch (err) {
         Logger.error('[AutoMod] Compound-Rules-Check Fehler:', err);
+    }
+
+    // Beanstandet: Fachereignis für Logging und Leveling (G-01, LV-1c). Leveling
+    // storniert damit die XP der Nachricht (`msg:<id>`). Auch ohne Strike
+    // (Regel mit Aktion DELETE), denn beanstandet ist sie trotzdem. Scheitert
+    // das Melden, läuft automod weiter; der Fehler steht im Log.
+    if (gruende.length > 0) {
+        Ereignisse.melde('automod.verstoss', {
+            guild_id: guild.id,
+            schluessel: `automod:verstoss:${message.id}`,
+            akteur: 'system',
+            betroffen: author.id,
+            bezug: { kanal: channel.id, objekt: `nachricht:${message.id}` },
+            daten: { kanal: channel.id, nachricht: message.id, gruende: [...new Set(gruende)], strikes: strikesTotal },
+        }).catch((err) => Logger.error('[AutoMod] automod.verstoss nicht gemeldet:', err));
     }
 
     // delete message if deletable

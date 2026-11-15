@@ -1,1 +1,56 @@
-{}
+{
+    "TITEL": "Leveling",
+    "NAV": {
+        "LEVELING": "Leveling",
+        "UEBERSICHT": "Overview"
+    },
+    "FORTSCHRITT": {
+        "COMMUNITY": "Community level"
+    },
+    "PERMS": {
+        "VIEW": "View leveling",
+        "VIEW_DESC": "See the leveling overview, rules and leaderboard",
+        "CONFIGURE": "Configure leveling",
+        "CONFIGURE_DESC": "Change XP rules, levels, exclusions and messages",
+        "XP_MANAGE": "Change XP by hand",
+        "XP_MANAGE_DESC": "Give, take or set a member's XP with a reason",
+        "REWARDS_MANAGE": "Manage rewards",
+        "REWARDS_MANAGE_DESC": "Set roles and other rewards per level",
+        "DATA_EXPORT": "Export leveling data",
+        "DATA_EXPORT_DESC": "Download standings and bookings as CSV",
+        "DATA_RESET": "Reset leveling",
+        "DATA_RESET_DESC": "Delete all XP and levels of this guild"
+    },
+    "UEBERSICHT": {
+        "BESCHREIBUNG": "Which rules apply right now and who is ahead",
+        "NICHT_EINGERICHTET": "Leveling is not set up here yet",
+        "NICHT_EINGERICHTET_TEXT": "The starting values are created when the plugin is switched on and on every dashboard start. If this message stays after a restart, the reason is in the dashboard log.",
+        "CHAT_TITEL": "XP for messages",
+        "CHAT_XP": "XP per message",
+        "XP_JE": "{{von}}–{{bis}}, at most every {{sekunden}} s",
+        "MINDESTLAENGE": "Minimum length",
+        "ZEICHEN": "{{anzahl}} characters",
+        "GLEICHER_TEXT": "Same text does not count",
+        "SEKUNDEN": "for {{anzahl}} s",
+        "STORNO_LOESCHEN": "XP back on deletion",
+        "MINUTEN": "within {{anzahl}} min",
+        "STORNO_AUTOMOD": "XP back on automod",
+        "REGELN": "Channel and role rules",
+        "REGELN_ZAHL": "{{aus}} excluded, {{nur}} only these, {{faktor}} multipliers",
+        "STUFEN": "Levels",
+        "AN": "on",
+        "AUS": "off",
+        "RANGLISTE": "Leaderboard",
+        "MITGLIEDER_MIT_XP": "{{anzahl}} members with XP",
+        "LEER": "No XP given yet",
+        "LEER_TEXT": "As soon as someone writes here, they appear on the leaderboard.",
+        "MITGLIED": "Member",
+        "LEVEL": "Level",
+        "XP": "XP",
+        "NAMEN_FEHLEN": "The bot did not answer, so IDs are shown instead of names."
+    },
+    "FEHLER": {
+        "SEITE": "Page could not be loaded",
+        "UEBERSICHT": "The leveling overview could not be loaded."
+    }
+}

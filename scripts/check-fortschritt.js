@@ -211,7 +211,11 @@ const K = 'kern:probe';
         assert.ok(Fortschritt.erklaerungFuer('clan:12', { meta: { clan: { fortschritt: [{ kennung: 'clan:*', titel: 'clan:X.Y', recht: 'CLAN.X', schablone: 'flach', gesamt: { schablone: 'flach' } }] } } })?.plugin === 'clan', 'clan:* trifft clan:12 nicht');
         assert.ok(Fortschritt.erklaerungFuer('clan:12:gesamt', { meta: { clan: { fortschritt: [{ kennung: 'clan:*', titel: 'clan:X.Y', recht: 'CLAN.X', schablone: 'flach', gesamt: { schablone: 'steil' } }] } } })?.schablone === 'steil');
         assert.strictEqual(Fortschritt.erklaerungFuer('clan:12:gesamt', { meta: { clan: { fortschritt: [{ kennung: 'clan:*', titel: 'clan:X.Y', recht: 'CLAN.X', schablone: 'flach' }] } } }), null, 'gesamt ohne Erklärung');
-        assert.strictEqual(Fortschritt.erklaerungFuer('leveling:community'), liste.find((e) => e.kennung === 'leveling:community') ? Fortschritt.erklaerungFuer('leveling:community') : null);
+        // Bis LV-1a (2026-11-15) war `leveling:community` nicht erklärt, und hier
+        // stand ein strictEqual zweier frischer Objekte: grün nur bei null === null.
+        const lv = Fortschritt.erklaerungFuer('leveling:community');
+        if (liste.some((e) => e.kennung === 'leveling:community')) assert.ok(lv?.plugin === 'leveling' && lv.kennung === 'leveling:community' && !lv.gesamt_gefragt, JSON.stringify(lv));
+        else assert.strictEqual(lv, null);
     });
 
     const mysql = require('mysql2/promise');

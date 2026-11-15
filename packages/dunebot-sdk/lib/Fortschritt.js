@@ -799,6 +799,40 @@ async function loescheKennung({ guildId, kennung }) {
 }
 
 /**
+ * Alle Fortschritte eines Plugins in einer Guild löschen, auch die zur
+ * Laufzeit entstandenen (`clan:<id>`) samt Gesamt-Tabellen. Ruft der Kern beim
+ * Abschalten des Plugins in dieser Guild (`PluginManager.disableInGuild`,
+ * Schritt 2), wie das Buch der Rollenvergabe: Ein abgeschaltetes Plugin hält
+ * keinen Stand mehr. Die Kontroll-Guild behält ihre Inhalte, dort ruft der
+ * Kern das nicht. Saisonstände gehen über den Fremdschlüssel mit der Saison.
+ *
+ * @param {{guildId: string, plugin: string}} a Pluginname (`core` → `kern`)
+ * @returns {Promise<Object<string, number>>} gelöschte Zeilen je Tabelle
+ */
+async function loeschePlugin({ guildId, plugin }) {
+    const g = pruefeGuild(guildId);
+    if (!/^[a-z0-9_-]{1,32}$/.test(String(plugin || ''))) throw new Error(`Fortschritt: Plugin "${plugin}" ungültig`);
+    const v = vorsilbe(String(plugin));
+    // LEFT statt LIKE: `_` im Pluginnamen wäre bei LIKE ein Platzhalter.
+    const passt = 'LEFT(kennung, CHAR_LENGTH(?) + 1) = CONCAT(?, \':\')';
+    return transaktion(async (q) => {
+        const n = async (tabelle) => Number((await q(`DELETE FROM ${tabelle} WHERE guild_id = ? AND ${passt}`, [g, v, v]))?.affectedRows || 0);
+        // Saisonstand vor der Saison und ausdrücklich, nicht nur über den
+        // Fremdschlüssel: So zählt der Bericht ihn mit.
+        const saisonstand = Number((await q(`DELETE ss FROM fortschritt_saison_stand ss JOIN fortschritt_saisons s ON s.id = ss.saison_id
+                                             WHERE s.guild_id = ? AND LEFT(s.kennung, CHAR_LENGTH(?) + 1) = CONCAT(?, ':')`, [g, v, v]))?.affectedRows || 0);
+        return {
+            fortschritt_saison_stand: saisonstand,
+            fortschritt_saisons: await n('fortschritt_saisons'),
+            fortschritt_buchungen: await n('fortschritt_buchungen'),
+            fortschritt_stand: await n('fortschritt_stand'),
+            fortschritt_stufen: await n('fortschritt_stufen'),
+            fortschritt_einstellungen: await n('fortschritt_einstellungen'),
+        };
+    });
+}
+
+/**
  * Alte Buchungen zu Monatssummen je Mitglied verdichten (Aufbewahrung G-05,
  * Frist `core:fortschritt-buchungen`). Der Stand bleibt gleich, Wochen- und
  * Monatsranglisten der verdichteten Zeit gehen verloren, Stornieren geht dort
@@ -873,7 +907,7 @@ module.exports = {
     // Saisons
     legeSaisonAn, saisons, beendeSaison, beendeFaellige, loescheSaison,
     // Aufräumen
-    entferneMitglied, loescheKennung, verdichte, pruefe,
+    entferneMitglied, loescheKennung, loeschePlugin, verdichte, pruefe,
     // Erklärungen
     erklaerungen, erklaerungFuer, pruefeForm,
     Eingabefehler, SCHABLONEN, QUELLEN, STUFEN_MAX, KENNUNG, MUSTER,

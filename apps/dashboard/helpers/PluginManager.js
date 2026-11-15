@@ -1163,6 +1163,16 @@ class PluginManager extends BasePluginManager {
                         "DELETE FROM rollen_vergaben WHERE guild_id = ? AND LEFT(besitzer, CHAR_LENGTH(?) + 1) = CONCAT(?, ':')",
                         [guildId, pluginName, pluginName]
                     );
+                    // Seine Fortschritte (G-20, LV-1a): Stand, Buchungen, Stufen
+                    // und Saisons jeder Kennung, die mit seinem Namen beginnt.
+                    // Sonst bliebe `leveling:community` nach dem Abschalten
+                    // stehen, und die Tabellen des Plugins wären schon leer.
+                    if (this.loadPluginMeta(pluginName)?.fortschritt?.length) {
+                        const { Fortschritt } = require('dunebot-sdk');
+                        const weg = await Fortschritt.loeschePlugin({ guildId, plugin: pluginName });
+                        const zeilen = Object.entries(weg).filter(([, n]) => n > 0).map(([t, n]) => `${t} ${n}`).join(', ');
+                        Logger.info(`Plugin ${pluginName}: Fortschritte der Guild ${guildId} gelöscht (${zeilen || 'keine Zeilen'})`);
+                    }
                 } catch (tabellenFehler) {
                     await brichAb('Löschen der Inhalte', tabellenFehler);
                 }

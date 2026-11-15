@@ -1,0 +1,58 @@
+{
+    "plugin": "leveling",
+    "version": "1.0.0",
+    "permissions": [
+        {
+            "key": "LEVELING.VIEW",
+            "name": "leveling:PERMS.VIEW",
+            "description": "leveling:PERMS.VIEW_DESC",
+            "category": "leveling",
+            "is_dangerous": 0,
+            "requires": null
+        },
+        {
+            "key": "LEVELING.CONFIGURE",
+            "name": "leveling:PERMS.CONFIGURE",
+            "description": "leveling:PERMS.CONFIGURE_DESC",
+            "category": "leveling",
+            "is_dangerous": 0,
+            "requires": "LEVELING.VIEW"
+        },
+        {
+            "key": "LEVELING.XP.MANAGE",
+            "name": "leveling:PERMS.XP_MANAGE",
+            "description": "leveling:PERMS.XP_MANAGE_DESC",
+            "category": "leveling",
+            "is_dangerous": 0,
+            "requires": "LEVELING.VIEW"
+        },
+        {
+            "key": "LEVELING.REWARDS.MANAGE",
+            "name": "leveling:PERMS.REWARDS_MANAGE",
+            "description": "leveling:PERMS.REWARDS_MANAGE_DESC",
+            "category": "leveling",
+            "is_dangerous": 0,
+            "requires": "LEVELING.VIEW"
+        },
+        {
+            "key": "LEVELING.DATA.EXPORT",
+            "name": "leveling:PERMS.DATA_EXPORT",
+            "description": "leveling:PERMS.DATA_EXPORT_DESC",
+            "category": "leveling",
+            "is_dangerous": 0,
+            "requires": "LEVELING.VIEW"
+        },
+        {
+            "key": "LEVELING.DATA.RESET",
+            "name": "leveling:PERMS.DATA_RESET",
+            "description": "leveling:PERMS.DATA_RESET_DESC",
+            "category": "leveling",
+            "is_dangerous": 1,
+            "requires": "LEVELING.CONFIGURE"
+        }
+    ],
+    "default_groups": {
+        "Administrator": ["LEVELING.VIEW", "LEVELING.CONFIGURE", "LEVELING.XP.MANAGE", "LEVELING.REWARDS.MANAGE", "LEVELING.DATA.EXPORT", "LEVELING.DATA.RESET"],
+        "Moderator": ["LEVELING.VIEW", "LEVELING.XP.MANAGE"]
+    }
+}

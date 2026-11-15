@@ -14,7 +14,14 @@
         "dunebot-sdk": "*"
     },
     "guildInhalte": {
-        "loeschen": []
+        "loeschen": [
+            "level_einstellungen",
+            "level_quellen",
+            "level_regeln",
+            "level_zaehler",
+            "level_belohnungen",
+            "level_boosts"
+        ]
     },
     "ereignisse": {
         "sendet": [
@@ -37,5 +44,20 @@
             "gameserver.spieler.getrennt"
         ]
     },
-    "mitgliedInhalte": {}
+    "mitgliedInhalte": {
+        "level_zaehler": {
+            "mitglied_id": "loeschen"
+        },
+        "level_boosts": {
+            "akteur": "anonymisieren"
+        }
+    },
+    "fortschritt": [
+        {
+            "kennung": "leveling:community",
+            "titel": "leveling:FORTSCHRITT.COMMUNITY",
+            "recht": "LEVELING.CONFIGURE",
+            "schablone": "ansteigend"
+        }
+    ]
 }

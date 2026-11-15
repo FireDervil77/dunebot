@@ -1,1 +1,56 @@
-{}
+{
+    "TITEL": "Leveling",
+    "NAV": {
+        "LEVELING": "Leveling",
+        "UEBERSICHT": "Übersicht"
+    },
+    "FORTSCHRITT": {
+        "COMMUNITY": "Community-Level"
+    },
+    "PERMS": {
+        "VIEW": "Leveling ansehen",
+        "VIEW_DESC": "Übersicht, Regeln und Rangliste des Leveling sehen",
+        "CONFIGURE": "Leveling einstellen",
+        "CONFIGURE_DESC": "XP-Regeln, Stufen, Ausschlüsse und Nachrichten ändern",
+        "XP_MANAGE": "XP von Hand ändern",
+        "XP_MANAGE_DESC": "XP eines Mitglieds mit Grund geben, nehmen oder setzen",
+        "REWARDS_MANAGE": "Belohnungen verwalten",
+        "REWARDS_MANAGE_DESC": "Rollen und andere Belohnungen je Stufe festlegen",
+        "DATA_EXPORT": "Leveling-Daten exportieren",
+        "DATA_EXPORT_DESC": "Stände und Buchungen als CSV herunterladen",
+        "DATA_RESET": "Leveling zurücksetzen",
+        "DATA_RESET_DESC": "Alle XP und Stufen dieser Guild löschen"
+    },
+    "UEBERSICHT": {
+        "BESCHREIBUNG": "Welche Regeln gerade gelten und wer vorne liegt",
+        "NICHT_EINGERICHTET": "Leveling ist hier noch nicht eingerichtet",
+        "NICHT_EINGERICHTET_TEXT": "Die Startwerte entstehen beim Einschalten und bei jedem Start des Dashboards. Bleibt diese Meldung nach einem Neustart, steht der Grund im Dashboard-Log.",
+        "CHAT_TITEL": "XP für Nachrichten",
+        "CHAT_XP": "XP je Nachricht",
+        "XP_JE": "{{von}}–{{bis}}, höchstens alle {{sekunden}} s",
+        "MINDESTLAENGE": "Mindestlänge",
+        "ZEICHEN": "{{anzahl}} Zeichen",
+        "GLEICHER_TEXT": "Gleicher Text zählt nicht",
+        "SEKUNDEN": "{{anzahl}} s lang",
+        "STORNO_LOESCHEN": "XP zurück beim Löschen",
+        "MINUTEN": "binnen {{anzahl}} min",
+        "STORNO_AUTOMOD": "XP zurück bei automod",
+        "REGELN": "Kanal- und Rollenregeln",
+        "REGELN_ZAHL": "{{aus}} ausgeschlossen, {{nur}} nur diese, {{faktor}} Faktoren",
+        "STUFEN": "Stufen",
+        "AN": "an",
+        "AUS": "aus",
+        "RANGLISTE": "Rangliste",
+        "MITGLIEDER_MIT_XP": "{{anzahl}} Mitglieder mit XP",
+        "LEER": "Noch keine XP vergeben",
+        "LEER_TEXT": "Sobald jemand hier schreibt, erscheint er in der Rangliste.",
+        "MITGLIED": "Mitglied",
+        "LEVEL": "Level",
+        "XP": "XP",
+        "NAMEN_FEHLEN": "Der Bot hat nicht geantwortet, deshalb stehen hier IDs statt Namen."
+    },
+    "FEHLER": {
+        "SEITE": "Seite konnte nicht geladen werden",
+        "UEBERSICHT": "Die Übersicht des Leveling konnte nicht geladen werden."
+    }
+}
