@@ -1,0 +1,28 @@
+{
+  "titel": { "de": "Kompakt", "en": "Compact" },
+  "breite": 934,
+  "hoehe": 160,
+  "ecken": 20,
+  "werte": [
+    { "name": "level", "beispiel": "12" },
+    { "name": "position", "beispiel": "3" },
+    { "name": "xp_level", "beispiel": "750" },
+    { "name": "xp_level_max", "beispiel": "1200" },
+    { "name": "hintergrund", "beispiel": "", "einstellbar": "bild", "titel": { "de": "Hintergrundbild", "en": "Background image" } }
+  ],
+  "texte": {
+    "level": { "de": "Level", "en": "Level" },
+    "xp": { "de": "XP", "en": "XP" }
+  },
+  "ebenen": [
+    { "art": "flaeche", "x": 0, "y": 0, "b": 934, "h": 160, "verlauf": ["#161922", "#202536"], "richtung": "waagrecht" },
+    { "art": "bild", "x": 0, "y": 0, "b": 934, "h": 160, "quelle": "{hintergrund}", "passung": "fuellen", "abdunkeln": 0.6 },
+    { "art": "flaeche", "x": 0, "y": 152, "b": 934, "h": 8, "farbe": "{farbe:akzent}" },
+    { "art": "avatar", "x": 28, "y": 24, "groesse": 104, "ersatz_farbe": "{farbe:akzent}",
+      "ringe": [ { "abstand": 3, "breite": 4, "farbe": "{farbe:akzent}" } ] },
+    { "art": "text", "x": 160, "y": 66, "text": "{member:nick}", "fett": true, "groesse": 30, "min_groesse": 18, "farbe": "#ffffff", "max_breite": 470 },
+    { "art": "text", "x": 906, "y": 66, "text": "#{position} · {text:level} {level}", "schrift": "anzeige", "groesse": 28, "min_groesse": 18, "farbe": "{farbe:akzent}", "ausrichtung": "rechts", "max_breite": 260 },
+    { "art": "balken", "x": 160, "y": 88, "b": 746, "h": 18, "wert": "{xp_level}", "max": "{xp_level_max}", "farbe": "{farbe:akzent}", "grund": "rgba(255, 255, 255, 0.10)" },
+    { "art": "text", "x": 160, "y": 132, "text": "{xp_level} / {xp_level_max} {text:xp}", "schrift": "mono", "groesse": 15, "farbe": "rgba(255, 255, 255, 0.75)", "max_breite": 400 }
+  ]
+}

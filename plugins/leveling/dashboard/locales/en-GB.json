@@ -113,7 +113,13 @@
         "FEHLER": "Saving failed. The reason is in the dashboard log.",
         "MELDUNG_TITEL": "Leveling: no level channel selected",
         "MELDUNG_TEXT": "Level-up messages go to the level channel, and none is selected here. Until then the bot announces no level-up.",
-        "MELDUNG_KNOPF": "Select channel"
+        "MELDUNG_KNOPF": "Select channel",
+        "RANGLISTE_FORM": "Leaderboard in Discord (/leaderboard)",
+        "RANGLISTE_LISTE": "As a message (list with the server banner)",
+        "RANGLISTE_BILD": "As an image (ten places with avatars)",
+        "RANGLISTE_HINWEIS": "The banner comes from the server design. You set the look of the image under Image cards.",
+        "RANGLISTE_AUSSEHEN": "Leaderboard card look",
+        "FALSCHE_FORM": "This leaderboard form does not exist."
     },
     "VORLAGEN": {
         "AUFSTIEG": "Level-up message",
@@ -125,7 +131,9 @@
         "PH_RANG": "Position on the all-time leaderboard"
     },
     "BILDKARTEN": {
-        "WO_RANGKARTE": "With /rank and, if enabled, on the level-up message"
+        "WO_RANGKARTE": "With /rank and, if enabled, on the level-up message",
+        "TITEL_RANGLISTE": "Leaderboard",
+        "WO_RANGLISTE": "With /leaderboard, if “As an image” is chosen under Leveling → Messages"
     },
     "EINSTELLEN": {
         "NICHT_EINGERICHTET": "Leveling is not set up in this guild yet. Turn it off and on again once.",

@@ -250,6 +250,10 @@ function pruefe(roh, wo = 'Vorlage') {
         if (!Number.isInteger(roh[k]) || roh[k] < GRENZEN.seiteMin || roh[k] > GRENZEN.seiteMax) f(`${k} muss eine ganze Zahl von ${GRENZEN.seiteMin} bis ${GRENZEN.seiteMax} sein`);
     }
     if (roh.ecken !== undefined && (!istZahl(roh.ecken) || roh.ecken < 0)) f('ecken muss eine Zahl ≥ 0 sein');
+    if (roh.titel !== undefined && typeof roh.titel !== 'string'
+        && !(roh.titel && typeof roh.titel === 'object' && typeof roh.titel.de === 'string' && typeof roh.titel.en === 'string' && roh.titel.de && roh.titel.en)) {
+        f('titel ist Text oder { de, en }');
+    }
 
     const werte = roh.werte || [];
     if (!Array.isArray(werte)) f('werte muss eine Liste sein');
@@ -335,6 +339,20 @@ function pruefe(roh, wo = 'Vorlage') {
         f(`Platzhalter {${n}} ist weder Kern, Wert, Farbe noch Text dieser Vorlage`);
     }
     return Object.freeze(roh);
+}
+
+/**
+ * Titel einer Vorlage in einer Sprache. Ältere Vorlagen haben einen Text,
+ * Schablonen zum Wählen `{ de, en }` (Leveling LV-2a).
+ * @param {Object} v geprüfte Vorlage
+ * @param {'de'|'en'} [sprache]
+ * @returns {string|null}
+ */
+function titelVon(v, sprache = 'de') {
+    const t = v?.titel;
+    if (!t) return null;
+    if (typeof t === 'string') return t;
+    return t[sprache === 'en' ? 'en' : 'de'] || t.de || null;
 }
 
 const vorlagen = new Map();
@@ -474,6 +492,8 @@ function legeBild(ctx, bild, x, y, b, h, passung) {
  * @param {string} optionen.guildId Palette, Logo, Medienablage
  * @param {string} [optionen.plugin] wer fragt (Farben des Plugins, G-09)
  * @param {string} [optionen.sprache] `de-DE`/`en-GB`; sonst `guild.locale`, sonst Deutsch
+ * @param {Object<string,string>} [optionen.farben] Rollen der Palette überschreiben, `{ akzent: '#rrggbb' }`
+ *        (die Farbe, die ein Mitglied für seine Karte gewählt hat, LV-2b)
  * @returns {Promise<{puffer: Buffer, typ: 'png'|'jpeg', breite: number, hoehe: number, bytes: number, ms: number, hinweise: string[], dateiname: Function}>}
  */
 async function zeichne(vorlageOderName, kontext = {}, optionen = {}) {
@@ -504,6 +524,9 @@ async function zeichne(vorlageOderName, kontext = {}, optionen = {}) {
         } catch (err) {
             hinweise.push(`Palette nicht lesbar, nehme die Vorgabe: ${err.message}`);
             for (const r of Gestaltung.ROLLEN) extra[`farbe:${r}`] = Gestaltung.erklaerung(optionen.plugin)?.rollen[r] || Gestaltung.KERN_VORGABE[r];
+        }
+        for (const [r, hex] of Object.entries(optionen.farben || {})) {
+            if (Gestaltung.ROLLEN.includes(r) && HEX6.test(String(hex))) extra[`farbe:${r}`] = String(hex).toLowerCase();
         }
     }
     if (quelltext.includes('{gestaltung:')) {
@@ -824,10 +847,17 @@ function nutzungen() {
             karten.get(name).push({ plugin: p, karte: name, titel: e.titel || null, wo: e.wo, seite: e.seite || null, stand: e.stand || null, schablonen });
         }
     }
+    // Eine eigene Karte ist erklärt, wenn sie selbst unter `bildkarten` steht
+    // oder als Schablone einer eigenen Nutzung (Leveling LV-2a: drei
+    // Rangkarten-Schablonen zur Wahl für `kern:rangkarte`).
+    const alsSchablone = new Set();
+    for (const liste of karten.values()) {
+        for (const n of liste) for (const s of n.schablonen) if (s.split(':')[0] === n.plugin) alsSchablone.add(s);
+    }
     for (const name of vorhanden) {
         const besitzer = name.split(':')[0];
-        if (besitzer !== 'kern' && !(karten.get(name) || []).some((n) => n.plugin === besitzer)) {
-            fehler.push(`${name}: steht nicht unter bildkarten in plugins/${besitzer}/package.json`);
+        if (besitzer !== 'kern' && !alsSchablone.has(name) && !(karten.get(name) || []).some((n) => n.plugin === besitzer)) {
+            fehler.push(`${name}: steht nicht unter bildkarten in plugins/${besitzer}/package.json (weder als Karte noch als Schablone)`);
         }
     }
     nutzungenGelesen = { karten, fehler };
@@ -866,6 +896,15 @@ async function nutzungStand(nutzung, guildId) {
 // Eingestellt wird nur im Bereich „Bildkarten“ (F-G11 Punkt 2). Der Bot
 // zeichnet über `zeichneNutzung`, die Seiten über `beispielNutzung`: dieselbe
 // Rechnung, keine Kopie im Plugin.
+//
+// Mitglieder gestalten mit (Leveling LV-2b, 2026-11-15): Die Guild gibt je
+// Nutzung frei, ob Mitglieder die Schablone (`mitglied_schablone`) und die
+// Akzentfarbe (`mitglied_farbe`) ihrer eigenen Karte wählen dürfen; Vorgabe
+// aus. Die Wahl steht in `mitglied_bildkarten`, eine Zeile je Guild,
+// Mitglied und Nutzung. Ein Bild wählen Mitglieder nie: Das Hintergrundbild
+// bleibt das der Guild. `zeichneNutzung` legt die Wahl über die Einstellung
+// der Guild, sobald es ein Mitglied gibt; nimmt die Guild die Freigabe
+// zurück, zeichnet die Karte wieder ihre Einstellung (die Wahl bleibt stehen).
 
 function db() {
     return require('dunebot-core').ServiceManager.get('dbService');
@@ -901,6 +940,11 @@ function alsJson(roh) {
  */
 async function einstellungAufloesen(nutzung, guildId, gespeichert = {}) {
     const hinweise = [];
+    const kann = waehlbar(nutzung);
+    const mitglieder = {
+        schablone: kann.schablone && Boolean(gespeichert.mitglieder?.schablone),
+        farbe: kann.farbe && Boolean(gespeichert.mitglieder?.farbe),
+    };
     let name = nutzung.karte;
     if (gespeichert.vorlage && gespeichert.vorlage !== nutzung.karte) {
         if (nutzung.schablonen.includes(gespeichert.vorlage)) name = gespeichert.vorlage;
@@ -932,7 +976,22 @@ async function einstellungAufloesen(nutzung, guildId, gespeichert = {}) {
             else hinweise.push(`${n}: Das Bild liegt nicht mehr in der Medienablage, nehme keins`);
         }
     }
-    return { vorlage: name, werte, gespeichert: { vorlage: name === nutzung.karte ? null : name, werte: behalten }, hinweise };
+    return { vorlage: name, werte, mitglieder, gespeichert: { vorlage: name === nutzung.karte ? null : name, werte: behalten, mitglieder }, hinweise };
+}
+
+/**
+ * Was Mitglieder an einer Nutzung überhaupt wählen könnten: eine Schablone
+ * nur, wenn es mehr als eine gibt, die Farbe nur, wenn eine Schablone die
+ * Akzentfarbe der Palette zeichnet (`{farbe:akzent}`).
+ * @returns {{schablone: boolean, farbe: boolean}}
+ */
+function waehlbar(nutzung) {
+    const schablonen = nutzung?.schablonen || [];
+    let farbe = false;
+    for (const s of schablonen) {
+        try { if (JSON.stringify(vorlage(s).ebenen).includes('{farbe:akzent}')) { farbe = true; break; } } catch { /* fehlt: Wächter */ }
+    }
+    return { schablone: schablonen.length > 1, farbe };
 }
 
 /**
@@ -942,11 +1001,14 @@ async function einstellungAufloesen(nutzung, guildId, gespeichert = {}) {
 async function einstellung(plugin, karte, guildId) {
     const n = nutzungVon(plugin, karte);
     const zeilen = await db().query(
-        'SELECT vorlage, werte FROM guild_bildkarten WHERE guild_id = ? AND plugin = ? AND karte = ?',
+        'SELECT vorlage, werte, mitglied_schablone, mitglied_farbe FROM guild_bildkarten WHERE guild_id = ? AND plugin = ? AND karte = ?',
         [String(guildId), n.plugin, n.karte]
     );
     const z = zeilen?.[0];
-    return einstellungAufloesen(n, guildId, z ? { vorlage: z.vorlage, werte: z.werte } : {});
+    return einstellungAufloesen(n, guildId, z ? {
+        vorlage: z.vorlage, werte: z.werte,
+        mitglieder: { schablone: Number(z.mitglied_schablone) === 1, farbe: Number(z.mitglied_farbe) === 1 },
+    } : {});
 }
 
 /** Adresse aus der Medienwahl → `guild_media.id` dieser Guild (wie Logo und Banner, G-09). */
@@ -980,9 +1042,10 @@ function fremdePlatzhalter(text) {
  *
  * @param {Object} nutzung
  * @param {string} guildId
- * @param {{vorlage?: string, werte?: Object<string,string>}} eingabe Bilder als Adresse aus der Medienwahl
+ * @param {{vorlage?: string, werte?: Object<string,string>, mitglieder?: {schablone?: boolean, farbe?: boolean}}} eingabe
+ *        Bilder als Adresse aus der Medienwahl; `mitglieder` = Freigaben (LV-2b), fehlt es, bleiben sie aus
  * @param {'de'|'en'} [sprache] für die Titel in Meldungen
- * @returns {Promise<{vorlage: string|null, werte: Object}>}
+ * @returns {Promise<{vorlage: string|null, werte: Object, mitglieder: {schablone: boolean, farbe: boolean}}>}
  */
 async function eingabePruefen(nutzung, guildId, eingabe = {}, sprache = 'de') {
     const gewaehlt = String(eingabe.vorlage || '') || nutzung.karte;
@@ -1011,7 +1074,13 @@ async function eingabePruefen(nutzung, guildId, eingabe = {}, sprache = 'de') {
             if (id !== null) werte[w.name] = id;
         }
     }
-    return { vorlage: gewaehlt === nutzung.karte ? null : gewaehlt, werte };
+    const m = eingabe.mitglieder && typeof eingabe.mitglieder === 'object' ? eingabe.mitglieder : {};
+    for (const k of ['schablone', 'farbe']) {
+        if (m[k] !== undefined && typeof m[k] !== 'boolean') throw new Eingabefehler(`Freigabe ${k}: nur ja oder nein.`);
+    }
+    const kann = waehlbar(nutzung);
+    const mitglieder = { schablone: kann.schablone && m.schablone === true, farbe: kann.farbe && m.farbe === true };
+    return { vorlage: gewaehlt === nutzung.karte ? null : gewaehlt, werte, mitglieder };
 }
 
 /**
@@ -1022,13 +1091,14 @@ async function eingabePruefen(nutzung, guildId, eingabe = {}, sprache = 'de') {
 async function speichereEinstellung(plugin, karte, guildId, eingabe, sprache) {
     const n = nutzungVon(plugin, karte);
     const g = await eingabePruefen(n, guildId, eingabe, sprache);
-    if (!g.vorlage && !Object.keys(g.werte).length) {
+    if (!g.vorlage && !Object.keys(g.werte).length && !g.mitglieder.schablone && !g.mitglieder.farbe) {
         await db().query('DELETE FROM guild_bildkarten WHERE guild_id = ? AND plugin = ? AND karte = ?', [String(guildId), n.plugin, n.karte]);
     } else {
         await db().query(
-            `INSERT INTO guild_bildkarten (guild_id, plugin, karte, vorlage, werte) VALUES (?, ?, ?, ?, ?)
-             ON DUPLICATE KEY UPDATE vorlage = VALUES(vorlage), werte = VALUES(werte)`,
-            [String(guildId), n.plugin, n.karte, g.vorlage, JSON.stringify(g.werte)]
+            `INSERT INTO guild_bildkarten (guild_id, plugin, karte, vorlage, werte, mitglied_schablone, mitglied_farbe) VALUES (?, ?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE vorlage = VALUES(vorlage), werte = VALUES(werte),
+                                     mitglied_schablone = VALUES(mitglied_schablone), mitglied_farbe = VALUES(mitglied_farbe)`,
+            [String(guildId), n.plugin, n.karte, g.vorlage, JSON.stringify(g.werte), g.mitglieder.schablone ? 1 : 0, g.mitglieder.farbe ? 1 : 0]
         );
     }
     return einstellung(plugin, karte, guildId);
@@ -1069,16 +1139,181 @@ async function zeichneNutzung(plugin, karte, kontext = {}, optionen = {}) {
             e.hinweise.push(`Einstellung nicht lesbar, nehme die Vorgabe: ${err.message}`);
         }
     }
-    const bild = await zeichne(e.vorlage, { ...kontext, werte: werteZusammen(e, kontext.werte) }, { guildId, plugin: n.plugin, sprache: optionen.sprache });
+    let farben;
+    const mitglied = String(kontext.member?.id || kontext.member?.user?.id || '');
+    if (optionen.wahl !== null && mitglied && (e.mitglieder?.schablone || e.mitglieder?.farbe)) {
+        let w = optionen.wahl;
+        if (w === undefined) {
+            try {
+                w = await gespeicherteWahl(n, guildId, mitglied);
+            } catch (err) {
+                w = null;
+                e.hinweise.push(`Wahl des Mitglieds nicht lesbar, nehme die der Guild: ${err.message}`);
+            }
+        }
+        if (w) ({ e, farben } = await wahlAnwenden(n, guildId, e, w));
+    }
+    const bild = await zeichne(e.vorlage, { ...kontext, werte: werteZusammen(e, kontext.werte) }, { guildId, plugin: n.plugin, sprache: optionen.sprache, farben });
     bild.hinweise.unshift(...e.hinweise);
     return bild;
 }
 
-/** Wie `beispiel`, aber für eine Nutzung samt Einstellung (Seiten im Bereich). */
-async function beispielNutzung(plugin, karte, { guildId, guildName, nutzer, werte, sprache, einstellung: e } = {}) {
+/**
+ * Wie `beispiel`, aber für eine Nutzung samt Einstellung (Seiten im Bereich).
+ * Ohne `wahl` ohne die Wahl eines Mitglieds: Die Seiten im Bereich zeigen,
+ * was die Guild eingestellt hat; die Profilseite gibt die Wahl mit.
+ */
+async function beispielNutzung(plugin, karte, { guildId, guildName, nutzer, werte, sprache, einstellung: e, wahl = null } = {}) {
     const { beispielKontext } = require('./Vorlage');
     const { member, guild } = beispielKontext(nutzer, { id: guildId, name: guildName });
-    return zeichneNutzung(plugin, karte, { member, guild, werte }, { guildId, sprache, einstellung: e });
+    return zeichneNutzung(plugin, karte, { member, guild, werte }, { guildId, sprache, einstellung: e, wahl });
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Wahl der Mitglieder (Leveling LV-2b, 2026-11-15)
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * Die Wahl eines Mitglieds über die Einstellung der Guild legen, soweit die
+ * Guild sie freigibt. Eine Schablone, die das Plugin nicht mehr anbietet,
+ * fällt weg (Hinweis); die Werte der Guild (Hintergrundbild) gelten auch in
+ * der gewählten Schablone, soweit sie den Wert kennt.
+ * @returns {Promise<{e: Object, farben: Object<string,string>|undefined}>}
+ */
+async function wahlAnwenden(nutzung, guildId, e, w) {
+    let neu = e;
+    if (e.mitglieder?.schablone && w.vorlage && w.vorlage !== e.vorlage) {
+        if (nutzung.schablonen.includes(w.vorlage)) {
+            neu = await einstellungAufloesen(nutzung, guildId, { vorlage: w.vorlage, werte: e.gespeichert.werte, mitglieder: e.mitglieder });
+            neu.hinweise.unshift(...e.hinweise);
+        } else {
+            e.hinweise.push(`Schablone ${w.vorlage} des Mitglieds bietet ${nutzung.plugin} nicht mehr an, nehme die der Guild`);
+        }
+    }
+    const farben = e.mitglieder?.farbe && HEX6.test(String(w.akzent || '')) ? { akzent: String(w.akzent).toLowerCase() } : undefined;
+    return { e: neu, farben };
+}
+
+/** Gespeicherte Wahl eines Mitglieds, roh, oder null. */
+async function gespeicherteWahl(nutzung, guildId, mitgliedId) {
+    const zeilen = await db().query(
+        'SELECT vorlage, akzent FROM mitglied_bildkarten WHERE guild_id = ? AND mitglied_id = ? AND plugin = ? AND karte = ?',
+        [String(guildId), String(mitgliedId), nutzung.plugin, nutzung.karte]
+    );
+    const z = zeilen?.[0];
+    return z ? { vorlage: z.vorlage || null, akzent: z.akzent || null } : null;
+}
+
+/**
+ * Was ein Mitglied an einer Nutzung wählen darf und gewählt hat. Für die
+ * Profilseite und `/levels style`.
+ *
+ * @param {string} plugin
+ * @param {string} karte die erklärte Karte
+ * @param {string} guildId
+ * @param {string} mitgliedId
+ * @param {'de'|'en'} [sprache] für die Titel der Schablonen
+ * @returns {Promise<{darf: {schablone: boolean, farbe: boolean}, schablonen: Array<{name: string, titel: string}>,
+ *                    gewaehlt: {vorlage: string|null, akzent: string|null}, guildVorlage: string}>}
+ */
+async function mitgliedWahl(plugin, karte, guildId, mitgliedId, sprache = 'de') {
+    const n = nutzungVon(plugin, karte);
+    const e = await einstellung(plugin, karte, guildId);
+    const w = (await gespeicherteWahl(n, guildId, mitgliedId)) || { vorlage: null, akzent: null };
+    const schablonen = n.schablonen.map((name) => {
+        let titel = name;
+        try { titel = titelVon(vorlage(name), sprache) || name; } catch { /* Wächter */ }
+        return { name, titel };
+    });
+    return {
+        darf: { schablone: Boolean(e.mitglieder?.schablone), farbe: Boolean(e.mitglieder?.farbe) },
+        schablonen,
+        gewaehlt: {
+            vorlage: w.vorlage && n.schablonen.includes(w.vorlage) ? w.vorlage : null,
+            akzent: w.akzent && HEX6.test(w.akzent) ? w.akzent : null,
+        },
+        guildVorlage: e.vorlage,
+    };
+}
+
+/**
+ * Wahl eines Mitglieds prüfen (ohne zu speichern). Leer heißt „wie die
+ * Guild“. Was die Guild nicht (mehr) freigibt, darf nur stehen bleiben, wenn
+ * es schon gespeichert war; es fällt dann weg statt zu scheitern.
+ *
+ * @param {{vorlage?: string|null, akzent?: string|null}} eingabe
+ * @param {{vorlage: string|null, akzent: string|null}|null} [bisher]
+ * @returns {Promise<{vorlage: string|null, akzent: string|null}>}
+ */
+async function wahlPruefen(plugin, karte, guildId, eingabe = {}, bisher = null) {
+    const n = nutzungVon(plugin, karte);
+    const e = await einstellung(plugin, karte, guildId);
+    const roh = eingabe && typeof eingabe === 'object' ? eingabe : {};
+    for (const k of ['vorlage', 'akzent']) {
+        if (roh[k] !== undefined && roh[k] !== null && typeof roh[k] !== 'string') throw new Eingabefehler(`${k}: kein Text.`);
+    }
+    let v = String(roh.vorlage || '').trim() || null;
+    let a = String(roh.akzent || '').trim().toLowerCase() || null;
+    if (v && !n.schablonen.includes(v)) throw new Eingabefehler(`Die Schablone ${v} gibt es für diese Karte nicht.`);
+    if (a && !HEX6.test(a)) throw new Eingabefehler(`„${a.slice(0, 20)}“ ist kein Farbwert wie #3498db.`);
+    if (v && !e.mitglieder?.schablone) {
+        if (v !== bisher?.vorlage) throw new Eingabefehler('Die Schablone wählen dürfen Mitglieder auf diesem Server nicht.');
+        v = null;
+    }
+    if (a && !e.mitglieder?.farbe) {
+        if (a !== bisher?.akzent) throw new Eingabefehler('Die Farbe wählen dürfen Mitglieder auf diesem Server nicht.');
+        a = null;
+    }
+    return { vorlage: v, akzent: a };
+}
+
+/**
+ * Wahl eines Mitglieds speichern; leer löscht die Zeile (dann gilt wieder
+ * die Karte der Guild). Wer das darf (nur das Mitglied selbst), prüft der
+ * Aufrufer: die Profilseite über die Anmeldung, `/levels style` über die
+ * Interaktion.
+ * @returns {Promise<{vorlage: string|null, akzent: string|null}>} was jetzt gilt
+ */
+async function speichereWahl(plugin, karte, guildId, mitgliedId, eingabe) {
+    if (!/^\d{5,25}$/.test(String(mitgliedId || ''))) throw new Eingabefehler('Kein Mitglied.');
+    const n = nutzungVon(plugin, karte);
+    const bisher = await gespeicherteWahl(n, guildId, mitgliedId);
+    const w = await wahlPruefen(plugin, karte, guildId, eingabe, bisher);
+    if (!w.vorlage && !w.akzent) {
+        await db().query('DELETE FROM mitglied_bildkarten WHERE guild_id = ? AND mitglied_id = ? AND plugin = ? AND karte = ?',
+            [String(guildId), String(mitgliedId), n.plugin, n.karte]);
+    } else {
+        await db().query(
+            `INSERT INTO mitglied_bildkarten (guild_id, mitglied_id, plugin, karte, vorlage, akzent) VALUES (?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE vorlage = VALUES(vorlage), akzent = VALUES(akzent)`,
+            [String(guildId), String(mitgliedId), n.plugin, n.karte, w.vorlage, w.akzent]
+        );
+    }
+    return w;
+}
+
+/**
+ * Nutzungen, an denen Mitglieder dieser Guild etwas wählen dürfen: Plugin in
+ * der Guild an, Freigabe gesetzt. Für die Profilseite.
+ * @returns {Promise<Array<Object>>} Nutzungen wie `nutzungen()`, dazu `darf`
+ */
+async function freigegebeneNutzungen(guildId) {
+    const zeilen = await db().query(
+        'SELECT plugin, karte, mitglied_schablone, mitglied_farbe FROM guild_bildkarten WHERE guild_id = ? AND (mitglied_schablone = 1 OR mitglied_farbe = 1)',
+        [String(guildId)]
+    );
+    if (!zeilen?.length) return [];
+    const an = new Set((await db().query('SELECT plugin_name FROM guild_plugins WHERE guild_id = ? AND is_enabled = 1', [String(guildId)]) || []).map((z) => z.plugin_name));
+    const aus = [];
+    for (const z of zeilen) {
+        if (!an.has(z.plugin)) continue;
+        const n = (nutzungen().karten.get(z.karte) || []).find((x) => x.plugin === z.plugin);
+        if (!n) continue;
+        const kann = waehlbar(n);
+        const darf = { schablone: kann.schablone && Number(z.mitglied_schablone) === 1, farbe: kann.farbe && Number(z.mitglied_farbe) === 1 };
+        if (darf.schablone || darf.farbe) aus.push({ ...n, darf });
+    }
+    return aus;
 }
 
 /** Gelesene Vorlagen und Erklärungen vergessen (Wächter, nach dem Bearbeiten einer Datei). */
@@ -1089,7 +1324,8 @@ function vergiss() {
 
 module.exports = {
     ARTEN, PFLICHT, GRENZEN, PNG_MAX_BYTES, SYSTEM, EINSTELLBAR, TEXT_EINSTELLBAR_MAX, Kartenfehler, Eingabefehler,
-    pruefe, vorlage, liste, zeichne, beispiel, schriftStand, nutzungen, nutzungStand, vergiss,
+    pruefe, vorlage, liste, zeichne, beispiel, schriftStand, nutzungen, nutzungStand, vergiss, titelVon,
     einstellbar, einstellung, einstellungAufloesen, eingabePruefen, speichereEinstellung, zeichneNutzung, beispielNutzung,
-    schablonenFehler, wertFalsch,
+    schablonenFehler, wertFalsch, waehlbar,
+    mitgliedWahl, wahlPruefen, speichereWahl, freigegebeneNutzungen,
 };

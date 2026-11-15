@@ -24,7 +24,8 @@
         "GRUND_ZU_HOCH": "Die Rolle steht über der höchsten Rolle des Bots",
         "GRUND_VERWALTET": "Die Rolle verwaltet eine Integration (Bot, Booster)",
         "GRUND_WEG": "Die Rolle gibt es nicht mehr",
-        "GRUND_FEHLER": "Discord lehnte ab: {{fehler}}"
+        "GRUND_FEHLER": "Discord lehnte ab: {{fehler}}",
+        "STYLE_DESCRIPTION": "Deine Rangkarte gestalten, wenn der Server es erlaubt"
     },
     "AUSGABE": {
         "VORGABE_TEXT": "🎉 {member:mention} hat Level {level} erreicht!"
@@ -61,7 +62,10 @@
         "LEER": "Noch hat niemand XP gesammelt.",
         "LEER_ZEITRAUM": "In diesem Zeitraum hat noch niemand XP gesammelt.",
         "SEITE": "Seite {{seite}} von {{seiten}} · {{gesamt}} Mitglieder",
-        "NUR_DU": "Blättern kann nur, wer die Rangliste geöffnet hat. Nutze selbst /leaderboard."
+        "NUR_DU": "Blättern kann nur, wer die Rangliste geöffnet hat. Nutze selbst /leaderboard.",
+        "DEIN_PLATZ_BILD": "Dein Platz: {{platz}} von {{von}} · {{xp}} XP",
+        "ZEILE_LEVEL_BILD": "Lv. {{level}}",
+        "UNBEKANNT": "Unbekannt"
     },
     "XP": {
         "DESCRIPTION": "XP eines Mitglieds von Hand ändern (mit Grund)",
@@ -100,5 +104,36 @@
         "ERG_GEKUERZT": "Es war weniger da als verlangt; abgezogen wurde bis 0.",
         "ERG_PRESTIGE": "Prestige {{n}} bleibt stehen.",
         "ERG_GRUND": "**Grund:** {{grund}}"
+    },
+    "STIL": {
+        "TITEL": "Deine Rangkarte",
+        "TEXT": "Wähle, wie deine Rangkarte auf diesem Server aussieht. Jede Wahl gilt sofort, bei /rank und an Level-up-Nachrichten.",
+        "NICHT_FREI": "Auf diesem Server dürfen Mitglieder ihre Rangkarte nicht selbst gestalten. Das stellt die Serverleitung im Dashboard unter Bildkarten ein.",
+        "SCHABLONE": "Schablone wählen",
+        "WIE_SERVER": "Wie der Server",
+        "FARBE": "Akzentfarbe wählen",
+        "FARBE_SERVER": "Farbe des Servers",
+        "FARBE_EIGEN": "Eigene Farbe {{hex}}",
+        "EIGENE_FARBE": "Eigene Farbe …",
+        "ZURUECKSETZEN": "Wie der Server",
+        "MODAL_TITEL": "Eigene Farbe",
+        "MODAL_FELD": "Farbe als #rrggbb, zum Beispiel #3498db",
+        "FEHLER": "Nicht gespeichert: {{grund}}",
+        "KEIN_BILD": "Die Karte ließ sich gerade nicht zeichnen. Deine Wahl ist trotzdem gespeichert.",
+        "ABGELAUFEN": "Diese Auswahl ist abgelaufen. Öffne sie mit /levels style neu.",
+        "FARBEN": {
+            "ROT": "Rot",
+            "ORANGE": "Orange",
+            "GELB": "Gelb",
+            "GRUEN": "Grün",
+            "TUERKIS": "Türkis",
+            "BLAU": "Blau",
+            "INDIGO": "Indigo",
+            "LILA": "Lila",
+            "PINK": "Pink",
+            "WEISS": "Weiß",
+            "GRAU": "Grau"
+        },
+        "STANDARD": "Standard"
     }
 }

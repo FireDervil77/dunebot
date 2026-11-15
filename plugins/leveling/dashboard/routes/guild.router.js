@@ -215,6 +215,9 @@ router.get('/nachrichten', requirePermission('LEVELING.CONFIGURE'), async (req, 
     }
 });
 
+/** Formen der Rangliste in Discord (LV-2c), wie die Spalte `rangliste_form`. */
+const RANGLISTE_FORMEN = Object.freeze(['liste', 'bild']);
+
 /**
  * Speichern: Einstellungen in `level_einstellungen`, Vorlage über
  * `Vorlage.speichere` (G-08). Erst alles prüfen, dann schreiben.
@@ -239,13 +242,16 @@ router.put('/nachrichten', csrfProtection, requirePermission('LEVELING.CONFIGURE
         const meilensteine = Ausgabe.meilensteine(String(body.meilensteine ?? ''));
         if (nurMeilensteine && !meilensteine.length) return nein('MEILENSTEINE_FEHLEN');
         const karte = body.rangkarte_anhaengen === true || body.rangkarte_anhaengen === 'true';
+        const form = String(body.rangliste_form || 'liste');
+        if (!RANGLISTE_FORMEN.includes(form)) return nein('FALSCHE_FORM');
         const vorlage = Vorlage.pruefe(body.vorlage);
 
         await Vorlage.speichere(guildId, Ausgabe.ANLASS, vorlage);
         await ServiceManager.get('dbService').query(
-            `UPDATE level_einstellungen SET ausgabe_modus = ?, ausgabe_kanal = ?, nur_meilensteine = ?, meilensteine = ?, rangkarte_anhaengen = ?
+            `UPDATE level_einstellungen SET ausgabe_modus = ?, ausgabe_kanal = ?, nur_meilensteine = ?, meilensteine = ?, rangkarte_anhaengen = ?,
+                    rangliste_form = ?
              WHERE guild_id = ?`,
-            [modus, kanal, nurMeilensteine ? 1 : 0, meilensteine.length ? JSON.stringify(meilensteine) : null, karte ? 1 : 0, guildId]
+            [modus, kanal, nurMeilensteine ? 1 : 0, meilensteine.length ? JSON.stringify(meilensteine) : null, karte ? 1 : 0, form, guildId]
         );
         Regeln.vergiss(guildId);
         return res.json({ success: true, message: tr('leveling:NACHRICHTEN.GESPEICHERT'), kanalFehlt: modus === 'level_kanal' && !kanal });

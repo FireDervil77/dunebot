@@ -1,10 +1,14 @@
 'use strict';
 
 const {
-    ApplicationCommandOptionType, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, EmbedBuilder, MessageFlags,
+    ApplicationCommandOptionType, ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags,
+    ContainerBuilder, TextDisplayBuilder, SeparatorBuilder, SeparatorSpacingSize, MediaGalleryBuilder, MediaGalleryItemBuilder,
+    SectionBuilder, ThumbnailBuilder,
 } = require('discord.js');
 const { ServiceManager } = require('dunebot-core');
-const { Fortschritt, Gestaltung } = require('dunebot-sdk');
+const { Bildkarte, Fortschritt, Gestaltung } = require('dunebot-sdk');
+const Regeln = require('../../shared/regeln');
+const Rangliste = require('../../shared/rangliste');
 
 /**
  * `/leaderboard [zeitraum]` — Rangliste (LV-1g, 2026-11-15).
@@ -15,8 +19,17 @@ const { Fortschritt, Gestaltung } = require('dunebot-sdk');
  * gefragt hat (andere bekommen einen Hinweis nur für sich). Darunter der
  * eigene Platz.
  *
- * Namen kommen aus dem Speicher des Bots; wer dort fehlt, steht als
- * Erwähnung da (Erwähnungen pingen in Embeds nicht).
+ * Zwei Formen, je Guild gewählt unter Leveling → Nachrichten (LV-2c,
+ * `level_einstellungen.rangliste_form`):
+ *   - `liste` (Vorgabe): Components V2, Kopf mit dem Banner der Guild aus der
+ *     Gestaltung (G-09), sonst Titel mit Servericon. Namen aus dem Speicher
+ *     des Bots; wer dort fehlt, steht als Erwähnung da (pingt nicht,
+ *     `allowedMentions` leer).
+ *   - `bild`: Bildkarte `leveling:rangliste` (zehn Plätze mit Avatar). Wer
+ *     nicht im Speicher ist, wird einzeln bei Discord nachgefragt (REST,
+ *     höchstens zehn je Seite); scheitert das, steht „Unbekannt“ da.
+ *     Scheitert das Bild, kommt die Liste.
+ * Bis LV-2c war es ein Embed.
  *
  * Auch als Präfix-Befehl: `leaderboard [gesamt|woche|monat]`.
  *
@@ -74,23 +87,65 @@ const KNOEPFE_MS = 5 * 60 * 1000;
 const KNOPF = Object.freeze({ ZURUECK: 'leveling-lb-zurueck', WEITER: 'leveling-lb-weiter' });
 
 /**
- * Eine Seite der Rangliste als Nachricht.
+ * Eine Seite der Rangliste als Nachricht, in der Form der Guild.
  *
- * @returns {Promise<{nachricht: object, seite: number, seiten: number}>}
+ * @returns {Promise<{nachricht: object, ohneKnoepfe: object, seite: number, seiten: number}>}
  */
 async function baue(guild, user, zeitraum, seite) {
-    const t = (k, w) => guild.getT(`leveling:RANGLISTE.${k}`, w);
-    const zahl = (n) => Number(n).toLocaleString(guild.locale || 'de-DE');
-    const [liste, ich] = await Promise.all([
+    const [liste, ich, form] = await Promise.all([
         Fortschritt.rangliste({ guildId: guild.id, kennung: 'leveling:community', zeitraum, seite, proSeite: PRO_SEITE }),
         Fortschritt.position({ guildId: guild.id, kennung: 'leveling:community', mitglied: user.id, zeitraum }),
+        formDerGuild(guild.id),
     ]);
     // Seite hinter dem Ende (die Liste schrumpfte beim Blättern): die letzte.
     if (!liste.eintraege.length && liste.gesamt && seite > liste.seiten) return baue(guild, user, zeitraum, liste.seiten);
 
+    const knoepfe = liste.seiten > 1 ? [new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(KNOPF.ZURUECK).setStyle(ButtonStyle.Secondary).setEmoji('◀️').setDisabled(liste.seite <= 1),
+        new ButtonBuilder().setCustomId(KNOPF.WEITER).setStyle(ButtonStyle.Secondary).setEmoji('▶️').setDisabled(liste.seite >= liste.seiten),
+    )] : [];
+    const aus = { seite: liste.seite, seiten: liste.seiten };
+
+    if (form === 'bild' && liste.eintraege.length) {
+        const bild = await alsBild(guild, zeitraum, liste, ich);
+        if (bild) {
+            const datei = new AttachmentBuilder(bild.puffer, { name: bild.dateiname('rangliste') });
+            return {
+                ...aus,
+                nachricht: { content: '', files: [datei], attachments: [], components: knoepfe, allowedMentions: { parse: [] } },
+                ohneKnoepfe: { components: [] },
+            };
+        }
+    }
+    const container = await alsListe(guild, zeitraum, liste, ich);
+    return {
+        ...aus,
+        nachricht: { flags: MessageFlags.IsComponentsV2, files: [], attachments: [], components: [container, ...knoepfe], allowedMentions: { parse: [] } },
+        ohneKnoepfe: { flags: MessageFlags.IsComponentsV2, components: [container] },
+    };
+}
+
+/** Form der Rangliste (Vorgabe `liste`, auch wenn die Regeln nicht lesbar sind). */
+async function formDerGuild(guildId) {
+    try {
+        const r = await Regeln.lade(guildId);
+        return r?.einstellungen?.rangliste_form === 'bild' ? 'bild' : 'liste';
+    } catch (error) {
+        ServiceManager.get('Logger').warn(`[Leveling] Form der Rangliste in ${guildId} nicht lesbar, nehme die Liste: ${error.message}`);
+        return 'liste';
+    }
+}
+
+/**
+ * Components V2: Kopf (Banner oder Titel mit Icon), zehn Zeilen, eigener
+ * Platz, Seitenzahl.
+ */
+async function alsListe(guild, zeitraum, liste, ich) {
+    const t = (k, w) => guild.getT(`leveling:RANGLISTE.${k}`, w);
+    const zahl = (n) => Number(n).toLocaleString(guild.locale || 'de-DE');
     const zeilen = liste.eintraege.map((e) => {
         const m = guild.members.cache.get(e.mitglied_id);
-        const name = m ? `**${m.displayName.replace(/[*_`~|>]/g, '\\$&')}**` : `<@${e.mitglied_id}>`;
+        const name = m ? `**${m.displayName.replace(/[*_`~|>#\-]/g, '\\$&')}**` : `<@${e.mitglied_id}>`;
         const prestige = e.prestige > 0 ? ` · ${t('PRESTIGE', { n: e.prestige })}` : '';
         const xp = zeitraum === 'gesamt' ? t('ZEILE_XP', { xp: zahl(e.xp) }) : t('ZEILE_XP_ZEITRAUM', { xp: zahl(e.xp) });
         return `\`${String(e.platz).padStart(2, ' ')}.\` ${name} · ${t('ZEILE_LEVEL', { level: e.level })}${prestige} · ${xp}`;
@@ -98,19 +153,88 @@ async function baue(guild, user, zeitraum, seite) {
     const unten = ich.platz
         ? t('DEIN_PLATZ', { platz: ich.platz, von: ich.von, xp: zahl(ich.xp) })
         : t(zeitraum === 'gesamt' ? 'DU_OHNE' : 'DU_OHNE_ZEITRAUM');
+    const titel = `## ${t('TITEL', { zeitraum: t(zeitraum.toUpperCase()), guild: guild.name })}`.slice(0, 300);
 
-    const embed = new EmbedBuilder()
-        .setTitle(t('TITEL', { zeitraum: t(zeitraum.toUpperCase()), guild: guild.name }).slice(0, 256))
-        .setDescription(zeilen.length ? `${zeilen.join('\n')}\n\n${unten}` : `${t(zeitraum === 'gesamt' ? 'LEER' : 'LEER_ZEITRAUM')}\n\n${unten}`)
-        .setFooter({ text: t('SEITE', { seite: liste.seite, seiten: liste.seiten, gesamt: liste.gesamt }) })
-        .setColor(await Gestaltung.farbe(guild.id, 'akzent', 'leveling'));
-    if (guild.iconURL()) embed.setThumbnail(guild.iconURL());
+    const container = new ContainerBuilder().setAccentColor(await Gestaltung.farbe(guild.id, 'akzent', 'leveling'));
+    const { banner } = await Gestaltung.bilder(guild.id);
+    if (banner) {
+        container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(banner)));
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(titel));
+    } else if (guild.iconURL()) {
+        container.addSectionComponents(new SectionBuilder()
+            .addTextDisplayComponents(new TextDisplayBuilder().setContent(titel))
+            .setThumbnailAccessory(new ThumbnailBuilder().setURL(guild.iconURL({ extension: 'png', size: 128 }))));
+    } else {
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(titel));
+    }
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+        zeilen.length ? zeilen.join('\n') : t(zeitraum === 'gesamt' ? 'LEER' : 'LEER_ZEITRAUM')));
+    container.addSeparatorComponents(new SeparatorBuilder().setDivider(true).setSpacing(SeparatorSpacingSize.Small));
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+        `${unten}\n-# ${t('SEITE', { seite: liste.seite, seiten: liste.seiten, gesamt: liste.gesamt })}`));
+    return container;
+}
 
-    const components = liste.seiten > 1 ? [new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId(KNOPF.ZURUECK).setStyle(ButtonStyle.Secondary).setEmoji('◀️').setDisabled(liste.seite <= 1),
-        new ButtonBuilder().setCustomId(KNOPF.WEITER).setStyle(ButtonStyle.Secondary).setEmoji('▶️').setDisabled(liste.seite >= liste.seiten),
-    )] : [];
-    return { nachricht: { embeds: [embed], components, allowedMentions: { parse: [] } }, seite: liste.seite, seiten: liste.seiten };
+/**
+ * Bildkarte `leveling:rangliste`, oder null (Grund im Log).
+ */
+async function alsBild(guild, zeitraum, liste, ich) {
+    const t = (k, w) => guild.getT(`leveling:RANGLISTE.${k}`, w);
+    const zahl = (n) => Number(n).toLocaleString(guild.locale || 'de-DE');
+    try {
+        const personen = await namen(guild, liste.eintraege.map((e) => e.mitglied_id), t('UNBEKANNT'));
+        const eintraege = liste.eintraege.map((e) => {
+            const p = personen.get(e.mitglied_id);
+            const prestige = e.prestige > 0 ? ` · ${t('PRESTIGE', { n: e.prestige })}` : '';
+            return {
+                platz: e.platz,
+                name: p.name,
+                avatar: p.avatar,
+                level: `${t('ZEILE_LEVEL_BILD', { level: e.level })}${prestige}`,
+                xp: t('ZEILE_XP', { xp: zahl(e.xp) }),
+            };
+        });
+        const unten = ich.platz
+            ? t('DEIN_PLATZ_BILD', { platz: ich.platz, von: ich.von, xp: zahl(ich.xp) })
+            : t(zeitraum === 'gesamt' ? 'DU_OHNE' : 'DU_OHNE_ZEITRAUM');
+        const werte = Rangliste.werte({
+            titel: t('TITEL', { zeitraum: t(zeitraum.toUpperCase()), guild: guild.name }),
+            untertitel: guild.name,
+            seite: t('SEITE', { seite: liste.seite, seiten: liste.seiten, gesamt: liste.gesamt }),
+            unten,
+            eintraege,
+        });
+        const bild = await Bildkarte.zeichneNutzung('leveling', Rangliste.KARTE, { guild, werte }, { guildId: guild.id });
+        if (bild.hinweise.length) ServiceManager.get('Logger').warn(`[Leveling] Ranglisten-Bild in ${guild.id}: ${bild.hinweise.slice(0, 5).join('; ')}`);
+        return bild;
+    } catch (error) {
+        ServiceManager.get('Logger').error(`[Leveling] Ranglisten-Bild in ${guild.id} nicht gezeichnet:`, error);
+        return null;
+    }
+}
+
+/**
+ * Anzeigename und Avatar je Mitglied: aus dem Speicher des Bots, sonst
+ * einzeln bei Discord (REST, Nutzer statt Mitglied: kein Gateway-Abruf).
+ * @returns {Promise<Map<string, {name: string, avatar: string}>>}
+ */
+async function namen(guild, ids, unbekannt) {
+    const aus = new Map();
+    await Promise.all(ids.map(async (id) => {
+        const m = guild.members.cache.get(id);
+        if (m) {
+            aus.set(id, { name: m.displayName, avatar: m.displayAvatarURL({ extension: 'png', size: 128, forceStatic: true }) });
+            return;
+        }
+        try {
+            const u = await guild.client.users.fetch(id);
+            aus.set(id, { name: u.globalName || u.username, avatar: u.displayAvatarURL({ extension: 'png', size: 128, forceStatic: true }) });
+        } catch (error) {
+            ServiceManager.get('Logger').debug(`[Leveling] Nutzer ${id} für die Rangliste nicht abrufbar: ${error.message}`);
+            aus.set(id, { name: unbekannt, avatar: '' });
+        }
+    }));
+    return aus;
 }
 
 /**
@@ -122,6 +246,7 @@ async function baue(guild, user, zeitraum, seite) {
 async function blaettern(nachricht, guild, user, zeitraum, start, interaction = null) {
     if (start.seiten <= 1 || !nachricht?.createMessageComponentCollector) return;
     let seite = start.seite;
+    let letzte = start;
     const sammler = nachricht.createMessageComponentCollector({ componentType: ComponentType.Button, time: KNOEPFE_MS });
     sammler.on('collect', async (klick) => {
         try {
@@ -132,13 +257,15 @@ async function blaettern(nachricht, guild, user, zeitraum, start, interaction = 
             seite += klick.customId === KNOPF.WEITER ? 1 : -1;
             const neu = await baue(guild, user, zeitraum, Math.max(1, seite));
             seite = neu.seite;
+            letzte = neu;
             await klick.update(neu.nachricht);
         } catch (error) {
             ServiceManager.get('Logger').warn(`[Leveling] Rangliste blättern in ${guild.id}: ${error.message}`);
         }
     });
     sammler.on('end', () => {
-        const weg = { components: [] };
+        // V2: nur die Knöpfe weg, der Inhalt steckt selbst in components.
+        const weg = letzte.ohneKnoepfe;
         const ende = interaction ? interaction.editReply(weg) : nachricht.edit(weg);
         Promise.resolve(ende).catch((e) => ServiceManager.get('Logger').debug(`[Leveling] Knöpfe der Rangliste nicht entfernt: ${e.message}`));
     });

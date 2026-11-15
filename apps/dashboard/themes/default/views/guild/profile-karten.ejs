@@ -1,0 +1,167 @@
+<%#
+  Meine Karten (Leveling LV-2b, K382, 2026-11-15)
+
+  Jede Karte, an der die Guild Mitgliedern etwas freigibt (Bereich
+  „Bildkarten“ → Mitglieder gestalten mit): Schablone und Akzentfarbe der
+  eigenen Karte. Die Vorschau zeichnet der Server mit der Wahl aus dem
+  Formular (GET …/vorschau?e=JSON), gespeichert wird mit PUT. Leer heißt
+  „wie der Server“.
+
+  context: guildId, karten (profile.router)
+%>
+<%
+const _t = (k, o) => tr('core:BILDKARTEN.' + k, o);
+const _id = typeof guildId !== 'undefined' ? guildId : '';
+const _karten = typeof karten !== 'undefined' && Array.isArray(karten) ? karten : [];
+const _kernTitel = (name) => _t('KARTE_' + String(name.split(':')[1] || '').toUpperCase());
+const _titel = (k) => String(k.karte).startsWith('kern:') ? _kernTitel(k.karte) : (k.titel ? tr(k.titel) : k.karte);
+const _schabloneTitel = (s) => s.name.startsWith('kern:') ? _kernTitel(s.name) : s.titel;
+%>
+<div class="container-fluid" id="meineKarten" data-gespeichert="<%= _t('MEINE_GESPEICHERT') %>" data-fehler="<%= _t('VORSCHAU_FEHLER') %>">
+  <div class="mb-3">
+    <a href="/guild/<%= _id %>/profile" class="btn btn-ghost-secondary btn-sm"><i class="fa-solid fa-arrow-left me-1"></i><%= _t('MEINE_ZURUECK') %></a>
+  </div>
+  <p class="text-secondary"><%= _t('MEINE_EINLEITUNG') %></p>
+
+  <% if (!_karten.length) { %>
+    <div class="alert alert-info"><%= _t('MEINE_LEER') %></div>
+  <% } %>
+
+  <% _karten.forEach(function (k) { %>
+    <div class="card mb-3" data-mk-karte data-adresse="/guild/<%= _id %>/profile/karten/<%= encodeURIComponent(k.plugin) %>/<%= encodeURIComponent(k.karte) %>">
+      <div class="card-header">
+        <h3 class="card-title mb-0">
+          <i class="fa-solid fa-id-card me-2"></i><%= _titel(k) %>
+          <span class="text-secondary fw-normal small ms-2"><%= _t('VON_PLUGIN', { plugin: k.pluginName || k.plugin }) %></span>
+        </h3>
+      </div>
+      <div class="card-body">
+        <p class="text-secondary"><%= k.wo ? tr(k.wo) : '' %></p>
+        <div class="row g-3">
+          <div class="col-lg-4">
+            <% if (k.darf.schablone) { %>
+              <div class="mb-3">
+                <label class="form-label"><%= _t('MEINE_SCHABLONE') %></label>
+                <select class="form-select" data-mk-schablone>
+                  <option value="" <%= !k.gewaehlt.vorlage ? 'selected' : '' %>><%= _t('MEINE_WIE_SERVER') %></option>
+                  <% k.schablonen.forEach(function (s) { %>
+                    <option value="<%= s.name %>" <%= s.name === k.gewaehlt.vorlage ? 'selected' : '' %>><%= _schabloneTitel(s) %></option>
+                  <% }) %>
+                </select>
+              </div>
+            <% } %>
+            <% if (k.darf.farbe) { %>
+              <div class="mb-3">
+                <div class="form-label"><%= _t('MEINE_FARBE') %></div>
+                <label class="form-check form-switch mb-2">
+                  <input class="form-check-input" type="checkbox" data-mk-eigen <%= k.gewaehlt.akzent ? 'checked' : '' %>>
+                  <span class="form-check-label"><%= _t('MEINE_FARBE_EIGEN') %></span>
+                </label>
+                <div class="d-flex align-items-center gap-2">
+                  <input type="color" class="form-control form-control-color" data-mk-farbe value="<%= k.gewaehlt.akzent || k.serverFarbe %>" data-server="<%= k.serverFarbe %>" <%= k.gewaehlt.akzent ? '' : 'disabled' %>>
+                  <code class="small" data-mk-hex><%= k.gewaehlt.akzent || k.serverFarbe %></code>
+                  <span class="small text-secondary <%= k.gewaehlt.akzent ? 'd-none' : '' %>" data-mk-server-hinweis><%= _t('MEINE_FARBE_SERVER') %></span>
+                </div>
+              </div>
+            <% } %>
+            <div class="d-flex flex-wrap gap-2 justify-content-end">
+              <button type="button" class="btn" data-mk-zuruecksetzen><i class="fa-solid fa-rotate-left me-1"></i><%= _t('MEINE_ZURUECKSETZEN') %></button>
+              <button type="button" class="btn btn-primary" data-mk-speichern><i class="fa-solid fa-save me-1"></i><%= _t('SPEICHERN') %></button>
+            </div>
+          </div>
+          <div class="col-lg-8">
+            <img alt="<%= _titel(k) %>" class="img-fluid rounded border" data-mk-vorschau style="max-width: 100%; height: auto;">
+            <div class="text-red small mt-2 d-none" data-mk-vorschau-fehler></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% }) %>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var wurzel = document.getElementById('meineKarten');
+  if (!wurzel) return;
+  wurzel.querySelectorAll('[data-mk-karte]').forEach(function (karte) {
+    var adresse = karte.dataset.adresse;
+    var schablone = karte.querySelector('[data-mk-schablone]');
+    var eigen = karte.querySelector('[data-mk-eigen]');
+    var farbe = karte.querySelector('[data-mk-farbe]');
+    var hex = karte.querySelector('[data-mk-hex]');
+    var serverHinweis = karte.querySelector('[data-mk-server-hinweis]');
+    var bild = karte.querySelector('[data-mk-vorschau]');
+    var fehler = karte.querySelector('[data-mk-vorschau-fehler]');
+    var altesBild = null;
+    var warte = null;
+    var lauf = 0;
+
+    function lies() {
+      return {
+        vorlage: schablone ? schablone.value : '',
+        akzent: eigen && eigen.checked && farbe ? farbe.value : ''
+      };
+    }
+    function zeigeFarbe() {
+      if (!farbe) return;
+      farbe.disabled = !eigen.checked;
+      if (!eigen.checked) farbe.value = farbe.dataset.server;
+      hex.textContent = farbe.value;
+      serverHinweis.classList.toggle('d-none', eigen.checked);
+    }
+    async function vorschau() {
+      var nummer = ++lauf;
+      try {
+        var antwort = await fetch(adresse + '/vorschau?' + new URLSearchParams({ e: JSON.stringify(lies()) }));
+        if (nummer !== lauf) return;
+        if (!antwort.ok) throw new Error(await antwort.text());
+        var url = URL.createObjectURL(await antwort.blob());
+        bild.src = url;
+        if (altesBild) URL.revokeObjectURL(altesBild);
+        altesBild = url;
+        fehler.classList.add('d-none');
+      } catch (err) {
+        if (nummer !== lauf) return;
+        fehler.textContent = wurzel.dataset.fehler + ' ' + err.message;
+        fehler.classList.remove('d-none');
+      }
+    }
+    function spaeter() { clearTimeout(warte); warte = setTimeout(vorschau, 350); }
+
+    if (schablone) schablone.addEventListener('change', spaeter);
+    if (eigen) eigen.addEventListener('change', function () { zeigeFarbe(); spaeter(); });
+    if (farbe) farbe.addEventListener('input', function () { hex.textContent = farbe.value; spaeter(); });
+
+    karte.querySelector('[data-mk-zuruecksetzen]').addEventListener('click', function () {
+      if (schablone) schablone.value = '';
+      if (eigen) { eigen.checked = false; zeigeFarbe(); }
+      spaeter();
+    });
+
+    var speichern = karte.querySelector('[data-mk-speichern]');
+    speichern.addEventListener('click', async function () {
+      speichern.disabled = true;
+      try {
+        var antwort = await fetch(adresse, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': (document.querySelector('meta[name="csrf-token"]') || {}).content || ''
+          },
+          body: JSON.stringify(lies())
+        });
+        var d = await antwort.json().catch(function () { return {}; });
+        if (!antwort.ok || !d.success) throw new Error(d.message || ('HTTP ' + antwort.status));
+        window.showToast && window.showToast('success', wurzel.dataset.gespeichert);
+        vorschau();
+      } catch (err) {
+        window.showToast && window.showToast('error', err.message);
+      } finally {
+        speichern.disabled = false;
+      }
+    });
+
+    vorschau();
+  });
+});
+</script>

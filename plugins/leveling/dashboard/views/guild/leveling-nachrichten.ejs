@@ -74,6 +74,24 @@
           </div>
         </div>
 
+        <%# LV-2c: Form von /leaderboard. Vor der Migration fehlt die Spalte, dann gilt die Vorgabe. %>
+        <% const _form = einstellungen.rangliste_form === 'bild' ? 'bild' : 'liste'; %>
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label" for="levelingRanglisteForm"><%= tr('leveling:NACHRICHTEN.RANGLISTE_FORM') %></label>
+            <select class="form-select" id="levelingRanglisteForm" name="rangliste_form">
+              <option value="liste" <%= _form === 'liste' ? 'selected' : '' %>><%= tr('leveling:NACHRICHTEN.RANGLISTE_LISTE') %></option>
+              <option value="bild" <%= _form === 'bild' ? 'selected' : '' %>><%= tr('leveling:NACHRICHTEN.RANGLISTE_BILD') %></option>
+            </select>
+            <div class="form-hint"><%= tr('leveling:NACHRICHTEN.RANGLISTE_HINWEIS') %></div>
+          </div>
+          <div class="col-md-6 mb-3 d-flex align-items-end">
+            <a class="btn btn-outline-primary btn-sm" href="/guild/<%= guildId %>/bildkarten/einstellen/leveling/<%= encodeURIComponent('leveling:rangliste') %>">
+              <i class="fa-solid fa-ranking-star me-1"></i> <%= tr('leveling:NACHRICHTEN.RANGLISTE_AUSSEHEN') %>
+            </a>
+          </div>
+        </div>
+
         <hr>
         <%- include('shared/vorlage', { guildId, tr, teil }) %>
 
@@ -105,6 +123,7 @@
         nur_meilensteine: form.querySelector('[name="nur_meilensteine"]').checked,
         meilensteine: form.querySelector('[name="meilensteine"]').value,
         rangkarte_anhaengen: form.querySelector('[name="rangkarte_anhaengen"]').checked,
+        rangliste_form: form.querySelector('[name="rangliste_form"]').value,
         vorlage: window.FBVorlage ? window.FBVorlage.lies('leveling:aufstieg') : null,
       };
       knopf.disabled = true;

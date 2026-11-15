@@ -5,9 +5,12 @@
  *
  * Gezeichnet wird die Schablone des Kerns `kern:rangkarte` (G-10) über
  * `Bildkarte.zeichneNutzung('leveling', 'kern:rangkarte', …)`. Aussehen
- * (Hintergrund, Farben, später weitere Schablonen aus LV-2a) stellt die Guild
- * nur im Kern-Bereich „Bildkarten“ ein (G-22); erklärt in der package.json
- * unter `bildkarten`. Hier stehen nur die Laufzeitwerte.
+ * (Schablone, Hintergrundbild) stellt die Guild nur im Kern-Bereich
+ * „Bildkarten“ ein (G-22); erklärt in der package.json unter `bildkarten`
+ * samt drei eigenen Schablonen (`plugins/leveling/bildkarten/rang-*.json`,
+ * LV-2a). Gibt die Guild es frei, wählen Mitglieder Schablone und
+ * Akzentfarbe ihrer eigenen Karte (LV-2b, `/levels style`, Profilseite);
+ * `zeichneNutzung` beachtet das von selbst. Hier stehen nur die Laufzeitwerte.
  *
  * `/rank` und die Level-up-Nachricht (mit „Rangkarte anhängen“) zeichnen
  * dieselbe Karte.
@@ -41,7 +44,6 @@ function werte(s, { platz = null, system }) {
         xp_level: String(bis == null ? spanne : imLevel),
         xp_level_max: String(spanne),
         xp_gesamt: String(xp),
-        hintergrund: '',
         abzeichen: [],
     };
 }

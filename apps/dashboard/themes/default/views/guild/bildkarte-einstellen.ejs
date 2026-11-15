@@ -7,8 +7,13 @@
   Werten wie der Bot (GET …/vorschau?e=JSON), gespeichert wird mit PUT.
   Leere Felder heißen Vorgabe; gespeichert wird nur, was abweicht.
 
+  Darunter die Freigaben für Mitglieder (Leveling LV-2b): ob sie Schablone
+  und Akzentfarbe ihrer eigenen Karte wählen dürfen (Profilseite, bei der
+  Rangkarte auch /levels style). Nur angeboten, was die Karte hergibt
+  (`waehlbar`).
+
   context: guildId, nutzung, gewaehlt, hinweise, felder, schablonen,
-           vorschlaege, darf, gesperrt (bildkarten.router)
+           vorschlaege, darf, gesperrt, mitglieder, waehlbar (bildkarten.router)
 %>
 <%
 const _t = (k, o) => tr('core:BILDKARTEN.' + k, o);
@@ -27,6 +32,8 @@ const _titel = String(_n.karte).startsWith('kern:') ? _kernTitel(_n.karte) : (_n
 const _basis = '/guild/' + _id + '/bildkarten/einstellen/' + encodeURIComponent(_n.plugin) + '/' + encodeURIComponent(_n.karte);
 const _bildDatei = (adresse) => { try { return decodeURIComponent(String(adresse || '').split('/').pop() || ''); } catch (e) { return ''; } };
 const _hatBild = _felder.some((f) => f.art === 'bild');
+const _mitglieder = typeof mitglieder !== 'undefined' && mitglieder ? mitglieder : { schablone: false, farbe: false };
+const _waehlbar = typeof waehlbar !== 'undefined' && waehlbar ? waehlbar : { schablone: false, farbe: false };
 %>
 <div class="container-fluid" id="bildkarteEinstellen"
      data-adresse="<%= _basis %>" data-darf="<%= _darf ? '1' : '' %>"
@@ -123,6 +130,25 @@ const _hatBild = _felder.some((f) => f.art === 'bild');
             </div>
           <% }) %>
 
+          <% if (_waehlbar.schablone || _waehlbar.farbe) { %>
+            <div class="mb-3 border-top pt-3">
+              <div class="form-label"><%= _t('MITGLIEDER_TITEL') %></div>
+              <% if (_waehlbar.schablone) { %>
+                <label class="form-check form-switch mb-1">
+                  <input class="form-check-input" type="checkbox" data-bk-mitglieder="schablone" <%= _mitglieder.schablone ? 'checked' : '' %> <%= _aus %>>
+                  <span class="form-check-label"><%= _t('MITGLIEDER_SCHABLONE') %></span>
+                </label>
+              <% } %>
+              <% if (_waehlbar.farbe) { %>
+                <label class="form-check form-switch mb-1">
+                  <input class="form-check-input" type="checkbox" data-bk-mitglieder="farbe" <%= _mitglieder.farbe ? 'checked' : '' %> <%= _aus %>>
+                  <span class="form-check-label"><%= _t('MITGLIEDER_FARBE') %></span>
+                </label>
+              <% } %>
+              <div class="form-hint"><%= _t('MITGLIEDER_HINWEIS') %></div>
+            </div>
+          <% } %>
+
           <div class="d-flex flex-wrap gap-2 justify-content-end">
             <button type="button" class="btn" data-bk-vorgabe-knopf <%= _aus %>><i class="fa-solid fa-rotate-left me-1"></i><%= _t('VORGABE_KNOPF') %></button>
             <button type="button" class="btn btn-primary" data-bk-speichern <%= _aus %>><i class="fa-solid fa-save me-1"></i><%= _t('SPEICHERN') %></button>
@@ -180,6 +206,9 @@ document.addEventListener('DOMContentLoaded', function () {
     felder.filter(gilt).forEach(function (f) { werte[f.dataset.bkFeld] = eingabe(f).value; });
     var aus = { werte: werte };
     if (gewaehlt()) aus.vorlage = gewaehlt();
+    var mitglieder = {};
+    wurzel.querySelectorAll('[data-bk-mitglieder]').forEach(function (k) { mitglieder[k.dataset.bkMitglieder] = k.checked; });
+    aus.mitglieder = mitglieder;
     return aus;
   }
 

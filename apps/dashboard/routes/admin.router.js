@@ -472,7 +472,7 @@ router.get('/bildkarten', async (req, res) => {
             const v = Bildkarte.vorlage(name);
             const k = await Bildkarte.beispiel(name, { guildId, guildName, nutzer, sprache });
             karten.push({
-                name, titel: v.titel || name, breite: v.breite, hoehe: v.hoehe, ebenen: v.ebenen.length,
+                name, titel: Bildkarte.titelVon(v, 'de') || name, breite: v.breite, hoehe: v.hoehe, ebenen: v.ebenen.length,
                 genutzt: (erklaert.karten.get(name) || []).map((n) => n.plugin),
                 werte: (v.werte || []).map((w) => w.name),
                 ms: k.ms, bytes: k.bytes, typ: k.typ, hinweise: k.hinweise,

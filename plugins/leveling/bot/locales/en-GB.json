@@ -24,7 +24,8 @@
         "GRUND_ZU_HOCH": "The role is above the bot's highest role",
         "GRUND_VERWALTET": "The role is managed by an integration (bot, booster)",
         "GRUND_WEG": "The role no longer exists",
-        "GRUND_FEHLER": "Discord refused: {{fehler}}"
+        "GRUND_FEHLER": "Discord refused: {{fehler}}",
+        "STYLE_DESCRIPTION": "Design your rank card, if the server allows it"
     },
     "AUSGABE": {
         "VORGABE_TEXT": "🎉 {member:mention} reached level {level}!"
@@ -61,7 +62,10 @@
         "LEER": "Nobody has collected XP yet.",
         "LEER_ZEITRAUM": "Nobody has collected XP in this period yet.",
         "SEITE": "Page {{seite}} of {{seiten}} · {{gesamt}} members",
-        "NUR_DU": "Only whoever opened the leaderboard can turn pages. Use /leaderboard yourself."
+        "NUR_DU": "Only whoever opened the leaderboard can turn pages. Use /leaderboard yourself.",
+        "DEIN_PLATZ_BILD": "Your place: {{platz}} of {{von}} · {{xp}} XP",
+        "ZEILE_LEVEL_BILD": "Lv. {{level}}",
+        "UNBEKANNT": "Unknown"
     },
     "XP": {
         "DESCRIPTION": "Change a member's XP by hand (with a reason)",
@@ -100,5 +104,36 @@
         "ERG_GEKUERZT": "There was less than requested; removed down to 0.",
         "ERG_PRESTIGE": "Prestige {{n}} stays.",
         "ERG_GRUND": "**Reason:** {{grund}}"
+    },
+    "STIL": {
+        "TITEL": "Your rank card",
+        "TEXT": "Choose what your rank card looks like on this server. Every choice applies at once, with /rank and on level-up messages.",
+        "NICHT_FREI": "On this server members may not design their own rank card. The server staff set this in the dashboard under Image cards.",
+        "SCHABLONE": "Choose a template",
+        "WIE_SERVER": "Like the server",
+        "FARBE": "Choose an accent colour",
+        "FARBE_SERVER": "Server colour",
+        "FARBE_EIGEN": "Own colour {{hex}}",
+        "EIGENE_FARBE": "Own colour …",
+        "ZURUECKSETZEN": "Like the server",
+        "MODAL_TITEL": "Own colour",
+        "MODAL_FELD": "Colour as #rrggbb, for example #3498db",
+        "FEHLER": "Not saved: {{grund}}",
+        "KEIN_BILD": "The card could not be drawn just now. Your choice is saved anyway.",
+        "ABGELAUFEN": "This selection has expired. Open it again with /levels style.",
+        "FARBEN": {
+            "ROT": "Red",
+            "ORANGE": "Orange",
+            "GELB": "Yellow",
+            "GRUEN": "Green",
+            "TUERKIS": "Turquoise",
+            "BLAU": "Blue",
+            "INDIGO": "Indigo",
+            "LILA": "Purple",
+            "PINK": "Pink",
+            "WEISS": "White",
+            "GRAU": "Grey"
+        },
+        "STANDARD": "Standard"
     }
 }

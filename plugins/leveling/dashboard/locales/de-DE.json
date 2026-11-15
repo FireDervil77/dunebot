@@ -113,7 +113,13 @@
         "FEHLER": "Speichern gescheitert. Der Grund steht im Dashboard-Log.",
         "MELDUNG_TITEL": "Leveling: kein Level-Kanal gewählt",
         "MELDUNG_TEXT": "Level-up-Nachrichten gehen in den Level-Kanal, und hier ist keiner gewählt. Solange meldet der Bot keinen Aufstieg.",
-        "MELDUNG_KNOPF": "Kanal wählen"
+        "MELDUNG_KNOPF": "Kanal wählen",
+        "RANGLISTE_FORM": "Rangliste in Discord (/leaderboard)",
+        "RANGLISTE_LISTE": "Als Nachricht (Liste mit Banner des Servers)",
+        "RANGLISTE_BILD": "Als Bild (zehn Plätze mit Avatar)",
+        "RANGLISTE_HINWEIS": "Das Banner kommt aus der Gestaltung des Servers. Das Aussehen des Bilds stellst du unter Bildkarten ein.",
+        "RANGLISTE_AUSSEHEN": "Aussehen der Ranglisten-Karte",
+        "FALSCHE_FORM": "Diese Form der Rangliste gibt es nicht."
     },
     "VORLAGEN": {
         "AUFSTIEG": "Level-up-Nachricht",
@@ -125,7 +131,9 @@
         "PH_RANG": "Platz in der Gesamt-Rangliste"
     },
     "BILDKARTEN": {
-        "WO_RANGKARTE": "Bei /rank und, wenn eingeschaltet, an der Level-up-Nachricht"
+        "WO_RANGKARTE": "Bei /rank und, wenn eingeschaltet, an der Level-up-Nachricht",
+        "TITEL_RANGLISTE": "Rangliste",
+        "WO_RANGLISTE": "Bei /leaderboard, wenn unter Leveling → Nachrichten „Als Bild“ gewählt ist"
     },
     "EINSTELLEN": {
         "NICHT_EINGERICHTET": "Leveling ist in dieser Guild noch nicht eingerichtet. Schalte es einmal aus und wieder ein.",

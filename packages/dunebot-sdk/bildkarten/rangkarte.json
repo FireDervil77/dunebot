@@ -10,7 +10,7 @@
     { "name": "xp_level", "beispiel": "750" },
     { "name": "xp_level_max", "beispiel": "1200" },
     { "name": "xp_gesamt", "beispiel": "14250" },
-    { "name": "hintergrund", "beispiel": "" },
+    { "name": "hintergrund", "beispiel": "", "einstellbar": "bild", "titel": { "de": "Hintergrundbild", "en": "Background image" } },
     { "name": "abzeichen", "beispiel": [] }
   ],
   "texte": {

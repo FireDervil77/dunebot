@@ -497,7 +497,7 @@ function pruefeVerdrahtung(t) {
         user: process.env.MYSQL_USER, password: process.env.MYSQL_PASSWORD, database: process.env.MYSQL_DATABASE,
         supportBigNumbers: true, bigNumberStrings: true });
     const schreibt = /^\s*(INSERT|UPDATE|DELETE|REPLACE|TRUNCATE|CREATE|DROP|ALTER)\b/i;
-    const KOPIEN = /\b(fortschritt_|level_|ereignisbuch\b|rollen_vergaben\b|guild_vorlagen\b)/;
+    const KOPIEN = /\b(fortschritt_|level_|ereignisbuch\b|rollen_vergaben\b|guild_vorlagen\b|guild_bildkarten\b|mitglied_bildkarten\b)/;
     async function q(sql, werte) {
         const s = String(sql);
         if (schreibt.test(s) && !/^\s*CREATE TEMPORARY TABLE/i.test(s) && !KOPIEN.test(s)) throw new Error(`nur lesend: ${s.slice(0, 60)}`);
@@ -524,12 +524,34 @@ function pruefeVerdrahtung(t) {
     await require(L('migrations/20261115_200000_verlassen.js')).up(fange);
     const spalte = /ALTER TABLE level_einstellungen ADD COLUMN (verlassen_tage [^"]*?) AFTER verlassen/.exec(ddl.join('\n'));
     if (!spalte) throw new Error('Migration verlassen: ALTER für verlassen_tage nicht gefunden');
+    // LV-2c: dasselbe für rangliste_form.
+    await require(L('migrations/20261115_210000_rangliste_form.js')).up(fange);
+    const form = /ALTER TABLE level_einstellungen ADD COLUMN (rangliste_form [^"]*?) AFTER rangkarte_anhaengen/.exec(ddl.join('\n'));
+    if (!form) throw new Error('Migration rangliste_form: ALTER für rangliste_form nicht gefunden');
     for (let i = 0; i < ddl.length; i++) {
-        if (/CREATE TABLE IF NOT EXISTS level_einstellungen/.test(ddl[i])) ddl[i] = ddl[i].replace(/(verlassen\s+ENUM\('behalten','loeschen'\) NOT NULL DEFAULT 'behalten',)/, `$1 ${spalte[1]},`);
+        if (/CREATE TABLE IF NOT EXISTS level_einstellungen/.test(ddl[i])) {
+            ddl[i] = ddl[i].replace(/(verlassen\s+ENUM\('behalten','loeschen'\) NOT NULL DEFAULT 'behalten',)/, `$1 ${spalte[1]},`);
+            ddl[i] = ddl[i].replace(/(rangkarte_anhaengen\s+TINYINT\(1\)\s+NOT NULL DEFAULT 0,)/, `$1 ${form[1]},`);
+            if (!ddl[i].includes(form[1])) throw new Error('rangliste_form nicht in die Kopie eingesetzt');
+        }
     }
     await require(path.join(WURZEL, 'migrations/kern/20261114_230000_rollen_vergaben.js')).up(fange);
     for (const s of ddl.filter((x) => /CREATE TABLE IF NOT EXISTS (fortschritt_|level_|ereignisbuch\b|rollen_vergaben\b)/.test(x))) {
         await c.query(s.replace('CREATE TABLE IF NOT EXISTS', 'CREATE TEMPORARY TABLE').replace(/,\s*CONSTRAINT[\s\S]*?ON DELETE CASCADE/, ''));
+    }
+    // Bildkarten (LV-2b): guild_bildkarten mit den Freigaben, mitglied_bildkarten.
+    // Die Spalten kommen per ALTER; hier gleich ins CREATE der Kopie, nie ALTER
+    // auf einen Namen der echten Datenbank.
+    const bk = [];
+    const bkFange = { query: async (x) => { bk.push(String(x)); return []; } };
+    await require(path.join(WURZEL, 'migrations/kern/20261114_210000_bildkarten_einstellungen.js')).up(bkFange);
+    await require(path.join(WURZEL, 'migrations/kern/20261115_210000_bildkarten_mitglieder.js')).up(bkFange);
+    const bkSpalten = bk.map((x) => /ALTER TABLE guild_bildkarten ADD COLUMN (\w+ TINYINT\(1\) NOT NULL DEFAULT 0)/.exec(x)?.[1]).filter(Boolean);
+    if (bkSpalten.length !== 2) throw new Error(`Migration bildkarten_mitglieder: ${bkSpalten.length} statt 2 Spalten gefunden`);
+    for (const x of bk.filter((y) => /CREATE TABLE IF NOT EXISTS (guild_bildkarten|mitglied_bildkarten)\b/.test(y))) {
+        let t = x.replace('CREATE TABLE IF NOT EXISTS', 'CREATE TEMPORARY TABLE');
+        if (/guild_bildkarten/.test(t)) t = t.replace(/(\s+PRIMARY KEY \(guild_id, plugin, karte\))/, `\n${bkSpalten.join(',\n')},$1`);
+        await c.query(t);
     }
     // Vorlagen (LV-1f): Schema wie in der Datenbank, als leere TEMPORARY-Kopie.
     const [[vorlagenDdl]] = await c.query('SHOW CREATE TABLE guild_vorlagen');
@@ -908,7 +930,7 @@ function pruefeVerdrahtung(t) {
     });
 
     const lb = require(L('bot/commands/leaderboard'));
-    await pruefe('3r. /leaderboard: zehn je Seite, Knöpfe, eigener Platz, Woche ohne Buchungen leer', async () => {
+    await pruefe('3r. /leaderboard: zehn je Seite, Knöpfe, eigener Platz, Woche ohne Buchungen leer; Liste (V2) oder Bild (LV-2c)', async () => {
         const G5 = '100000000000000005';
         const leute = {};
         const zeilen = [];
@@ -922,19 +944,45 @@ function pruefeVerdrahtung(t) {
         const ich = Object.keys(leute)[11];
         const fertig = [];
         const lauf = (zeitraum) => lb.interactionRun({ interaction: { guild: g5, user: { id: ich }, options: { getString: () => zeitraum }, editReply: async (n) => { fertig.push(n); return {}; } } });
+        // Components V2: alle Texte im Container, der Reihe nach (auch in Abschnitten).
+        const V2 = 1 << 15;
+        const texteIn = (n) => {
+            const aus = [];
+            const geh = (k) => { if (k.type === 10) aus.push(k.content); for (const x of k.components || []) geh(x); };
+            geh(n.components[0].toJSON());
+            return aus;
+        };
         await lauf(null);
-        const e = fertig[0].embeds[0].data;
-        const z = e.description.split('\n');
+        assert.strictEqual(fertig[0].flags, V2, 'Liste nicht als Components V2');
+        assert.ok(!fertig[0].embeds, 'noch ein Embed');
+        const t0 = texteIn(fertig[0]);
+        assert.ok(t0[0].startsWith('## Rangliste · Gesamt'), t0[0]);
+        const z = t0[1].split('\n');
         assert.ok(z[0].includes('1.') && z[0].includes('Leute1') && z[0].includes('1.200 XP'), z[0]);
         assert.strictEqual(z.filter((x) => /^`\s*\d+\.`/.test(x)).length, 10);
-        assert.ok(e.description.includes('Dein Platz: **12** von 12'), e.description);
-        assert.strictEqual(e.footer.text, 'Seite 1 von 2 · 12 Mitglieder');
-        const knoepfe = fertig[0].components[0].components.map((k) => k.data.disabled);
+        assert.ok(t0[2].includes('Dein Platz: **12** von 12') && t0[2].includes('-# Seite 1 von 2 · 12 Mitglieder'), t0[2]);
+        const knoepfe = fertig[0].components[1].components.map((k) => k.data.disabled);
         assert.deepStrictEqual(knoepfe, [true, false], 'Zurück auf Seite 1 nicht gesperrt');
         assert.deepStrictEqual(fertig[0].allowedMentions, { parse: [] });
         await lauf('woche');
-        assert.ok(fertig[1].embeds[0].data.description.startsWith('In diesem Zeitraum hat noch niemand'), fertig[1].embeds[0].data.description);
-        assert.deepStrictEqual(fertig[1].components, [], 'eine Seite braucht keine Knöpfe');
+        assert.ok(texteIn(fertig[1])[1].startsWith('In diesem Zeitraum hat noch niemand'), texteIn(fertig[1])[1]);
+        assert.strictEqual(fertig[1].components.length, 1, 'eine Seite braucht keine Knöpfe');
+
+        // Bild: Form der Guild, zehn Plätze; ohne Einträge bleibt es die Liste.
+        await q("INSERT INTO level_einstellungen (guild_id, rangliste_form) VALUES (?, 'bild')", [G5]);
+        require(L('shared/regeln')).vergiss(G5);
+        g5.client = { users: { fetch: async (id) => { throw new Error(`kein Netz in der Probe (${id})`); } } };
+        await Promise.race([lauf(null), new Promise((_, nein) => setTimeout(() => nein(new Error('Ranglisten-Bild hängt')), 30_000))]);
+        const b = fertig[2];
+        const datei = b?.files?.[0];
+        assert.ok(datei && /^rangliste\.(png|jpe?g)$/.test(datei.name || ''), `kein Bild: ${JSON.stringify(b).slice(0, 300)}`);
+        assert.ok(Buffer.isBuffer(datei.attachment) && datei.attachment.length > 1000, 'Bild leer');
+        assert.ok(!b.flags && b.components.length === 1, 'Bild mit V2 oder ohne Knöpfe');
+        assert.deepStrictEqual(b.attachments, [], 'altes Bild bliebe beim Blättern hängen');
+        const w = require(L('shared/rangliste')).werte({ titel: 'T', untertitel: 'U', seite: 'S', unten: 'D', eintraege: [{ platz: 1, name: 'A', level: 'Lv. 3', xp: '5 XP', avatar: '' }] });
+        assert.ok(w.z1_name === 'A' && w.z2_name === '' && w.z10_platz === '' && Object.keys(w).length === 4 + 50, JSON.stringify(w));
+        await lauf('woche');
+        assert.strictEqual(fertig[3].flags, V2, 'leere Rangliste nicht als Liste');
     });
 
     const rank = require(L('bot/commands/rank'));
@@ -1170,6 +1218,59 @@ function pruefeVerdrahtung(t) {
         assert.ok((await q('SELECT xp FROM fortschritt_stand WHERE guild_id = ? AND mitglied_id = ?', [ANDERE, M0]))[0]?.xp >= 7, 'andere Guild mit zurückgesetzt');
         r = await ruf('post', '/daten/import', { body: csv, query: { modus: 'setzen', probe: '1' } });
         assert.ok(r.body.success && r.body.aendern === 2, 'nach dem Zurücksetzen nicht wieder benutzbar');
+    });
+
+    await pruefe('3v. /levels style: ohne Freigabe nichts, Auswahlen nach Freigabe, Wahl gespeichert und gezeichnet (LV-2b)', async () => {
+        const G8 = '100000000000000008';
+        const M8 = '300000000000000081';
+        const g8 = attrappe(G8, { leute: { [M8]: 'Dora' } });
+        const stil = require(L('bot/stil'));
+        const KARTE = 'kern:rangkarte';
+        let sammelt = null;
+        const fertig = [];
+        const ia = { guild: g8, user: { id: M8 }, editReply: async (n) => { fertig.push(n); return { createMessageComponentCollector: () => ({ on: (art, fn) => { if (art === 'collect') sammelt = fn; } }) }; } };
+        await stil.stilRun(ia);
+        assert.strictEqual(fertig[0].content, g8.getT('leveling:STIL.NICHT_FREI'), 'ohne Freigabe nicht abgewiesen');
+        assert.ok(!fertig[0].components, 'ohne Freigabe Auswahlen');
+
+        await q("INSERT INTO guild_bildkarten (guild_id, plugin, karte, vorlage, werte, mitglied_schablone, mitglied_farbe) VALUES (?, 'leveling', ?, NULL, '{}', 1, 1)", [G8, KARTE]);
+        await Promise.race([stil.stilRun(ia), new Promise((_, nein) => setTimeout(() => nein(new Error('Rangkarte hängt')), 30_000))]);
+        const n = fertig[1];
+        const arten = n.components.map((r) => r.components.map((k) => k.data.custom_id));
+        assert.deepStrictEqual(arten, [[stil.ID.SCHABLONE], [stil.ID.FARBE], [stil.ID.EIGEN, stil.ID.ZURUECK]], JSON.stringify(arten));
+        const schablonen = n.components[0].components[0].options.map((o) => o.data.value);
+        assert.deepStrictEqual(schablonen, ['-', 'kern:rangkarte', 'leveling:rang-hell', 'leveling:rang-kompakt', 'leveling:rang-neon']);
+        assert.strictEqual(n.components[1].components[0].options.length, 1 + stil.FARBEN.length);
+        assert.ok(n.files?.[0]?.attachment?.length > 1000, 'keine Karte');
+        assert.ok(typeof sammelt === 'function', 'keine Auswahl bedienbar');
+
+        // Wählen: Schablone, dann Farbe; jede Wahl gespeichert, die Karte danach so gezeichnet.
+        const klick = (customId, values) => {
+            const k = { customId, values, user: { id: M8 }, deferUpdate: async () => {}, editReply: async (x) => { k.antwort = x; } };
+            return k;
+        };
+        const k1 = klick(stil.ID.SCHABLONE, ['leveling:rang-kompakt']);
+        await sammelt(k1);
+        const k2 = klick(stil.ID.FARBE, ['#e74c3c']);
+        await sammelt(k2);
+        const zeile = (await q('SELECT vorlage, akzent FROM mitglied_bildkarten WHERE guild_id = ? AND mitglied_id = ?', [G8, M8]))[0];
+        assert.deepStrictEqual({ ...zeile }, { vorlage: 'leveling:rang-kompakt', akzent: '#e74c3c' }, 'Wahl nicht gespeichert');
+        const { Bildkarte } = require('dunebot-sdk');
+        const groesse = (await Bildkarte.zeichneNutzung('leveling', KARTE, { member: g8.members.cache.get(M8), werte: {} }, { guildId: G8 })).hoehe;
+        assert.strictEqual(groesse, 160, 'gewählte Schablone nicht gezeichnet');
+        assert.ok(k2.antwort?.files?.length, 'nach der Wahl keine neue Karte');
+
+        // Guild nimmt die Freigabe zurück: Wahl bleibt gespeichert, wirkt nicht, neue Wahl abgewiesen.
+        await q('UPDATE guild_bildkarten SET mitglied_schablone = 0, mitglied_farbe = 0 WHERE guild_id = ?', [G8]);
+        assert.strictEqual((await Bildkarte.zeichneNutzung('leveling', KARTE, { member: g8.members.cache.get(M8), werte: {} }, { guildId: G8 })).hoehe, 282, 'Wahl wirkt ohne Freigabe');
+        const k3 = klick(stil.ID.FARBE, ['#3498db']);
+        await sammelt(k3);
+        assert.ok(String(k3.antwort?.content).includes('Nicht gespeichert'), `keine Meldung: ${k3.antwort?.content}`);
+        assert.strictEqual((await q('SELECT akzent FROM mitglied_bildkarten WHERE guild_id = ?', [G8]))[0].akzent, '#e74c3c', 'ohne Freigabe gespeichert');
+        // Zurücksetzen löscht die Zeile.
+        await q('UPDATE guild_bildkarten SET mitglied_schablone = 1, mitglied_farbe = 1 WHERE guild_id = ?', [G8]);
+        await sammelt(klick(stil.ID.ZURUECK));
+        assert.strictEqual(Number((await q('SELECT COUNT(*) AS n FROM mitglied_bildkarten WHERE guild_id = ?', [G8]))[0].n), 0, 'Zurücksetzen lässt eine Zeile');
     });
 
     await c.end();

@@ -598,8 +598,9 @@ function stubMember(nick = 'Anna') {
         const g = await Bildkarte.eingabePruefen(n, MEDIEN_GUILD, { werte: {
             akzent: '#5865F2', text: 'Welcome to the server!', hintergrund1: '#ABCDEF', hintergrund2: '', hintergrundbild: `/uploads/media/${MEDIEN_GUILD}/a.png`, member: 'x',
         } });
-        assert.deepStrictEqual(g, { vorlage: null, werte: { hintergrund1: '#abcdef', hintergrundbild: 7 } });
-        assert.deepStrictEqual(await Bildkarte.eingabePruefen(n, MEDIEN_GUILD, { vorlage: 'greeting:willkommen', werte: { text: '  ' } }), { vorlage: null, werte: {} });
+        const aus = { schablone: false, farbe: false };
+        assert.deepStrictEqual(g, { vorlage: null, werte: { hintergrund1: '#abcdef', hintergrundbild: 7 }, mitglieder: aus });
+        assert.deepStrictEqual(await Bildkarte.eingabePruefen(n, MEDIEN_GUILD, { vorlage: 'greeting:willkommen', werte: { text: '  ' } }), { vorlage: null, werte: {}, mitglieder: aus });
         assert.deepStrictEqual((await Bildkarte.eingabePruefen(n, MEDIEN_GUILD, { werte: { text: 'Hi {member:nick} auf {guild:name}' } })).werte, { text: 'Hi {member:nick} auf {guild:name}' });
         await abgelehntAsync(() => Bildkarte.eingabePruefen(n, MEDIEN_GUILD, { werte: { akzent: 'rot' } }), /^Akzentfarbe: „rot“ ist kein Farbwert/);
         await abgelehntAsync(() => Bildkarte.eingabePruefen(n, MEDIEN_GUILD, { werte: { akzent: 'rot' } }, 'en'), /^Accent colour:/);
@@ -749,6 +750,89 @@ function stubMember(nick = 'Anna') {
         assert.deepStrictEqual(sql.filter(([q]) => /DROP COLUMN/.test(q)).map(([q]) => q.split(' ').pop()), ['welcome_image_bg', 'welcome_image_text', 'welcome_image_color']);
         assert.strictEqual((await lauf([], ['guild_id', 'welcome_image_enabled'])).length, 1, 'zweiter Lauf tut etwas');
         await assert.rejects(lauf([{ guild_id: '3', welcome_image_text: 'x'.repeat(256) }], alle), /länger als 255/);
+        ServiceManager.register('dbService', { async query() { return []; } });
+    });
+
+    await pruefe('13j. Mitglieder gestalten mit (LV-2b): Freigabe, Wahl, Zeichnen, Profilseite', async () => {
+        const L_NUTZ = () => Bildkarte.nutzungen().karten.get('kern:rangkarte').find((n) => n.plugin === 'leveling');
+        const n = L_NUTZ();
+        // Was wählbar ist, ergibt sich aus der Karte.
+        assert.deepStrictEqual(Bildkarte.waehlbar(W_NUTZ()), { schablone: false, farbe: false }, 'greeting: eine Schablone, eigene Akzentfarbe');
+        assert.deepStrictEqual(Bildkarte.waehlbar(n), { schablone: true, farbe: true }, 'Rangkarte: Schablonen und {farbe:akzent}');
+        // Eigene Schablonen eines Plugins gelten als erklärt (LV-2a).
+        assert(!Bildkarte.nutzungen().fehler.some((f) => /leveling:rang-/.test(f)), 'Schablonen des Leveling gelten als unerklärt');
+        // Freigabe: nur Ja/Nein, nur was wählbar ist; allein reicht für eine Zeile.
+        dbMit();
+        assert.deepStrictEqual((await Bildkarte.eingabePruefen(n, '1', { mitglieder: { schablone: true, farbe: true } })).mitglieder, { schablone: true, farbe: true });
+        assert.deepStrictEqual((await Bildkarte.eingabePruefen(W_NUTZ(), MEDIEN_GUILD, { mitglieder: { schablone: true, farbe: true } })).mitglieder, { schablone: false, farbe: false });
+        await abgelehntAsync(() => Bildkarte.eingabePruefen(n, '1', { mitglieder: { farbe: 'ja' } }), /nur ja oder nein/);
+        let sql = dbMit();
+        await Bildkarte.speichereEinstellung('leveling', 'kern:rangkarte', '1', { mitglieder: { farbe: true } });
+        const ein = sql.find(([q]) => /INSERT INTO guild_bildkarten/.test(q));
+        assert(ein && ein[1][5] === 0 && ein[1][6] === 1, `Freigabe allein nicht gespeichert: ${JSON.stringify(ein)}`);
+
+        // Datenbank mit Freigabe und gespeicherter Wahl.
+        const mitWahl = ({ frei = { s: 1, f: 1 }, wahl = null } = {}) => {
+            const q2 = [];
+            ServiceManager.register('dbService', { async query(q, p = []) {
+                q2.push([q.replace(/\s+/g, ' ').trim(), p]);
+                if (/FROM guild_bildkarten WHERE guild_id = \? AND plugin/.test(q)) return [{ vorlage: null, werte: '{}', mitglied_schablone: frei.s, mitglied_farbe: frei.f }];
+                if (/FROM mitglied_bildkarten/.test(q)) return wahl ? [wahl] : [];
+                if (/FROM guild_bildkarten WHERE guild_id = \? AND \(mitglied_schablone/.test(q)) return [{ plugin: 'leveling', karte: 'kern:rangkarte', mitglied_schablone: frei.s, mitglied_farbe: frei.f }];
+                if (/FROM guild_plugins/.test(q)) return [{ plugin_name: 'leveling' }];
+                return [];
+            } });
+            return q2;
+        };
+        // Wahl prüfen: Schablone muss angeboten sein, Farbe #rrggbb, ohne Freigabe nur Altes (fällt weg).
+        mitWahl();
+        assert.deepStrictEqual(await Bildkarte.wahlPruefen('leveling', 'kern:rangkarte', '1', { vorlage: 'leveling:rang-neon', akzent: '#ABCDEF' }), { vorlage: 'leveling:rang-neon', akzent: '#abcdef' });
+        await abgelehntAsync(() => Bildkarte.wahlPruefen('leveling', 'kern:rangkarte', '1', { vorlage: 'kern:profil' }), /gibt es für diese Karte nicht/);
+        await abgelehntAsync(() => Bildkarte.wahlPruefen('leveling', 'kern:rangkarte', '1', { akzent: 'rot' }), /kein Farbwert/);
+        mitWahl({ frei: { s: 0, f: 1 } });
+        await abgelehntAsync(() => Bildkarte.wahlPruefen('leveling', 'kern:rangkarte', '1', { vorlage: 'leveling:rang-neon' }), /Schablone wählen dürfen Mitglieder/);
+        assert.deepStrictEqual(await Bildkarte.wahlPruefen('leveling', 'kern:rangkarte', '1', { vorlage: 'leveling:rang-neon', akzent: '#123456' }, { vorlage: 'leveling:rang-neon', akzent: null }),
+            { vorlage: null, akzent: '#123456' }, 'alte Schablone ohne Freigabe bleibt stehen');
+        // Speichern: leer löscht, sonst eine Zeile je Mitglied; nur gültige Mitglieds-ID.
+        sql = mitWahl({ wahl: { vorlage: 'leveling:rang-hell', akzent: null } });
+        await Bildkarte.speichereWahl('leveling', 'kern:rangkarte', '1', '222222', { vorlage: '', akzent: '' });
+        assert(sql.some(([q, p]) => /^DELETE FROM mitglied_bildkarten WHERE guild_id = \? AND mitglied_id = \?/.test(q) && p.join() === '1,222222,leveling,kern:rangkarte'), 'leere Wahl nicht gelöscht');
+        sql = mitWahl();
+        await Bildkarte.speichereWahl('leveling', 'kern:rangkarte', '1', '222222', { vorlage: 'leveling:rang-neon', akzent: '#00ff00' });
+        const w = sql.find(([q]) => /INSERT INTO mitglied_bildkarten/.test(q));
+        assert(w && w[1].join() === '1,222222,leveling,kern:rangkarte,leveling:rang-neon,#00ff00', `Wahl: ${JSON.stringify(w)}`);
+        await abgelehntAsync(() => Bildkarte.speichereWahl('leveling', 'kern:rangkarte', '1', 'abc', {}), /Kein Mitglied/);
+
+        // Zeichnen: Wahl wirkt nur mit Freigabe; ohne Mitglied oder mit wahl:null nie.
+        const werte = { level: '3', position: '1', xp_level: '5', xp_level_max: '10', xp_gesamt: '50', system: 'C' };
+        const zeichne = (opt) => Bildkarte.zeichneNutzung('leveling', 'kern:rangkarte', { member: stubMember(), werte }, { guildId: '1', ...opt });
+        mitWahl();
+        const ohne = await zeichne({ wahl: null });
+        mitWahl({ wahl: { vorlage: 'leveling:rang-kompakt', akzent: null } });
+        const kompakt = await zeichne({});
+        assert.strictEqual(kompakt.hoehe, 160, 'gespeicherte Schablone des Mitglieds nicht gezeichnet');
+        mitWahl({ frei: { s: 0, f: 0 }, wahl: { vorlage: 'leveling:rang-kompakt', akzent: '#ff0000' } });
+        const zurueck = await zeichne({});
+        assert(zurueck.hoehe === 282 && zurueck.puffer.equals(ohne.puffer), 'Wahl wirkt ohne Freigabe');
+        mitWahl({ frei: { s: 0, f: 1 } });
+        const farbig = await zeichne({ wahl: { vorlage: null, akzent: '#ff0000' } });
+        assert(!farbig.puffer.equals(ohne.puffer), 'Farbe des Mitglieds wirkt nicht');
+        const sql2 = mitWahl();
+        await Bildkarte.beispielNutzung('leveling', 'kern:rangkarte', { guildId: '1', guildName: 'G', nutzer: { id: '222222', username: 'a' }, werte });
+        assert(!sql2.some(([q]) => /mitglied_bildkarten/.test(q)), 'Seiten im Bereich zeigen die Wahl eines Mitglieds');
+
+        // Profilseite: kein Guild-Recht, Mitglied aus der Sitzung, CSRF, Kern rechnet.
+        const r = ohneKommentare(lies('apps/dashboard/routes/guild/profile.router.js'));
+        assert(/router\.put\('\/karten\/:plugin\/:karte', csrfProtection, async/.test(r), 'Speichern ohne CSRF');
+        assert(!/requirePermission\(/.test(r), 'Profil verlangt ein Guild-Recht');
+        assert(/Bildkarte\.speichereWahl\(n\.plugin, n\.karte, guildId, userId,/.test(r) && /const userId = req\.session\?\.user\?\.info\?\.id/.test(r), 'Mitglied nicht aus der Sitzung');
+        assert(/Bildkarte\.freigegebeneNutzungen\(guildId\)/.test(r) && !/INSERT|DELETE FROM/.test(r), 'Router rechnet selbst');
+        // Tabelle und Löschorte.
+        const mig = ohneKommentare(lies('migrations/kern/20261115_210000_bildkarten_mitglieder.js'));
+        assert(/CREATE TABLE IF NOT EXISTS mitglied_bildkarten/.test(mig) && /PRIMARY KEY \(guild_id, mitglied_id, plugin, karte\)/.test(mig) && /mitglied_schablone/.test(mig) && /mitglied_farbe/.test(mig), 'Migration');
+        const core = JSON.parse(lies('plugins/core/package.json'));
+        assert(core.guildInhalte.loeschen.includes('mitglied_bildkarten'), 'mitglied_bildkarten geht nicht mit der Guild');
+        assert.strictEqual(core.mitgliedInhalte.mitglied_bildkarten?.mitglied_id, 'loeschen', 'mitglied_bildkarten geht nicht mit dem Mitglied');
         ServiceManager.register('dbService', { async query() { return []; } });
     });
 

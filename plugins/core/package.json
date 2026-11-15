@@ -35,6 +35,7 @@
       "guild_gestaltung",
       "guild_vorlagen",
       "guild_bildkarten",
+      "mitglied_bildkarten",
       "rollen_vergaben",
       "fortschritt_saison_stand",
       "fortschritt_saisons",
@@ -79,6 +80,9 @@
       "user_id": "loeschen"
     },
     "rollen_vergaben": {
+      "mitglied_id": "loeschen"
+    },
+    "mitglied_bildkarten": {
       "mitglied_id": "loeschen"
     },
     "user_feedback": {

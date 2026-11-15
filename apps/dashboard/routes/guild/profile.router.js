@@ -35,8 +35,9 @@
 const express = require('express');
 const router = express.Router({ mergeParams: true });
 const { ServiceManager } = require('dunebot-core');
-const { VerbindungsRegistry } = require('dunebot-sdk');
+const { VerbindungsRegistry, Bildkarte, Gestaltung } = require('dunebot-sdk');
 const { rueckrufUrl } = require('../verbindungen.router');
+const { csrfProtection } = require('../../middlewares/security/csrf-protection.middleware');
 
 /**
  * Die eigene Zeile aus `users`.
@@ -102,7 +103,17 @@ router.get('/', async (req, res) => {
 
     const rechte = res.locals.userPermissions || { permissions: {}, groups: [], is_owner: false };
 
+    // Karten, an denen Mitglieder hier etwas wählen dürfen (LV-2b). Scheitert
+    // das Lesen, fehlt nur der Abschnitt; der Grund steht im Log.
+    let kartenFrei = 0;
+    try {
+        kartenFrei = (await Bildkarte.freigegebeneNutzungen(guildId)).length;
+    } catch (error) {
+        Logger.warn(`[Profil] Freigegebene Bildkarten in ${guildId} nicht lesbar: ${error.message}`);
+    }
+
     await themeManager.renderView(res, 'guild/profile', {
+        kartenFrei,
         title: 'Profil',
         activeMenu: `/guild/${guildId}/profile`,
         guildId,
@@ -317,6 +328,116 @@ router.post('/verbindungen/:anbieter/wahl', async (req, res) => {
     } catch (error) {
         Logger.error(`[Profil] Auswahl bei "${anbieterName}" fehlgeschlagen:`, error);
         return res.redirect(`${zurueck}?fehler=technisch`);
+    }
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// Meine Karten (Leveling LV-2b, K382, 2026-11-15)
+// ─────────────────────────────────────────────────────────────────────────
+//
+//   GET /profile/karten                          → jede Karte, an der die Guild
+//                                                  Mitgliedern etwas freigibt
+//   GET /profile/karten/:plugin/:karte/vorschau?e=JSON
+//                                                → die eigene Karte mit der Wahl
+//                                                  aus dem Formular, nicht gespeichert
+//   PUT /profile/karten/:plugin/:karte            → { vorlage, akzent } speichern,
+//                                                  leer = wie der Server
+//
+// **Kein Guild-Recht, wie beim übrigen Profil.** Gewählt wird nur für die
+// eigene Karte (Mitglied = die Anmeldung), und was erlaubt ist, entscheidet
+// die Guild mit der Freigabe im Bereich „Bildkarten“. Auch in der
+// Kontroll-Guild: Die Freigabe setzt dort ohnehin nur ihr Besitzer.
+// Prüfen, Speichern und Zeichnen macht `Bildkarte` im SDK, dieselbe
+// Rechnung wie `/levels style` im Bot.
+
+/** Freigegebene Nutzung aus der Adresse, oder null. */
+async function freieNutzung(req, guildId) {
+    const plugin = String(req.params.plugin || '');
+    const karte = String(req.params.karte || '');
+    return (await Bildkarte.freigegebeneNutzungen(guildId)).find((n) => n.plugin === plugin && n.karte === karte) || null;
+}
+
+function seitenSprache(res) {
+    return String(res.locals.locale || 'de-DE').toLowerCase().startsWith('de') ? 'de' : 'en';
+}
+
+/** Eingabe aus `?e=` oder dem Rumpf. */
+function wahlAus(roh) {
+    if (roh && typeof roh === 'object') return roh;
+    const s = String(roh || '');
+    if (s.length > 2000) throw new Bildkarte.Eingabefehler('Eingabe zu lang.');
+    try { return JSON.parse(s || '{}') || {}; } catch { throw new Bildkarte.Eingabefehler('Eingabe ist kein JSON.'); }
+}
+
+// GET /profile/karten
+router.get('/karten', async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const guildId = res.locals.guildId;
+    const userId = req.session?.user?.info?.id || null;
+    try {
+        const { pluginName } = require('./bildkarten.router');
+        const sprache = seitenSprache(res);
+        const karten = [];
+        for (const n of userId ? await Bildkarte.freigegebeneNutzungen(guildId) : []) {
+            const w = await Bildkarte.mitgliedWahl(n.plugin, n.karte, guildId, userId, sprache);
+            const palette = await Gestaltung.farben(guildId, n.plugin);
+            karten.push({
+                plugin: n.plugin, karte: n.karte, titel: n.titel, wo: n.wo, pluginName: pluginName(n.plugin),
+                darf: w.darf, schablonen: w.schablonen, gewaehlt: w.gewaehlt, guildVorlage: w.guildVorlage,
+                serverFarbe: palette.akzent.hex,
+            });
+        }
+        await ServiceManager.get('themeManager').renderView(res, 'guild/profile-karten', {
+            title: 'Meine Karten',
+            activeMenu: `/guild/${guildId}/profile`,
+            guildId,
+            karten,
+        });
+    } catch (error) {
+        Logger.error(`[Profil] Meine Karten in ${guildId}:`, error);
+        res.status(500).send('Deine Karten konnten nicht geladen werden.');
+    }
+});
+
+// GET /profile/karten/:plugin/:karte/vorschau?e=JSON
+router.get('/karten/:plugin/:karte/vorschau', async (req, res) => {
+    const guildId = res.locals.guildId;
+    const userId = req.session?.user?.info?.id || null;
+    try {
+        const n = await freieNutzung(req, guildId);
+        if (!n || !userId) return res.status(404).type('text').send('Diese Karte gibt es hier nicht.');
+        const { spracheDerGuild, guildName } = require('./bildkarten.router');
+        const bisher = (await Bildkarte.mitgliedWahl(n.plugin, n.karte, guildId, userId)).gewaehlt;
+        const wahl = await Bildkarte.wahlPruefen(n.plugin, n.karte, guildId, wahlAus(req.query?.e), bisher);
+        const s = await Bildkarte.nutzungStand(n, guildId);
+        const bild = await Bildkarte.beispielNutzung(n.plugin, n.karte, {
+            guildId, guildName: await guildName(guildId), nutzer: req.session.user.info,
+            sprache: await spracheDerGuild(guildId), werte: s.werte || undefined, wahl,
+        });
+        res.set('Cache-Control', 'no-store');
+        res.type(bild.typ === 'png' ? 'png' : 'jpeg').send(bild.puffer);
+    } catch (error) {
+        if (error instanceof Bildkarte.Eingabefehler) return res.status(400).type('text').send(error.message);
+        ServiceManager.get('Logger').error(`[Profil] Vorschau ${req.params.plugin}/${req.params.karte} in ${guildId}:`, error);
+        res.status(500).type('text').send(error.message);
+    }
+});
+
+// PUT /profile/karten/:plugin/:karte { vorlage, akzent }
+router.put('/karten/:plugin/:karte', csrfProtection, async (req, res) => {
+    const Logger = ServiceManager.get('Logger');
+    const guildId = res.locals.guildId;
+    const userId = req.session?.user?.info?.id || null;
+    try {
+        const n = await freieNutzung(req, guildId);
+        if (!n || !userId) return res.status(404).json({ success: false, message: 'Diese Karte gibt es hier nicht.' });
+        const w = await Bildkarte.speichereWahl(n.plugin, n.karte, guildId, userId, wahlAus(req.body));
+        Logger.info(`[Profil] Karte ${n.plugin}/${n.karte} von ${userId} in ${guildId} gespeichert`);
+        res.json({ success: true, data: w });
+    } catch (error) {
+        if (error instanceof Bildkarte.Eingabefehler) return res.status(400).json({ success: false, message: error.message });
+        Logger.error(`[Profil] Karte ${req.params.plugin}/${req.params.karte} in ${guildId} nicht gespeichert:`, error);
+        res.status(500).json({ success: false, message: error.message });
     }
 });
 

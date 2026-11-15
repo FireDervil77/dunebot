@@ -16,7 +16,7 @@ const _karten = typeof karten !== 'undefined' && Array.isArray(karten) ? karten 
 const _id = typeof guildId !== 'undefined' ? guildId : '';
 const _titel = (k) => {
   if (k.besitzer === 'kern') return _t('KARTE_' + String(k.name.split(':')[1] || '').toUpperCase());
-  return k.titel ? tr(k.titel) : k.name;
+  return k.titel ? tr(k.titel) : (k.vorlageTitel || k.name);
 };
 %>
 <div class="container-fluid">

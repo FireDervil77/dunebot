@@ -137,7 +137,18 @@
         "kern:rangkarte": {
             "wo": "leveling:BILDKARTEN.WO_RANGKARTE",
             "seite": "nachrichten",
-            "stand": "shared/rangkarte.js"
+            "stand": "shared/rangkarte.js",
+            "schablonen": [
+                "leveling:rang-hell",
+                "leveling:rang-kompakt",
+                "leveling:rang-neon"
+            ]
+        },
+        "leveling:rangliste": {
+            "titel": "leveling:BILDKARTEN.TITEL_RANGLISTE",
+            "wo": "leveling:BILDKARTEN.WO_RANGLISTE",
+            "seite": "nachrichten",
+            "stand": "shared/rangliste.js"
         }
     },
     "farben": {

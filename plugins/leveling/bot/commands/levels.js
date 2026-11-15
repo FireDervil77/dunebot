@@ -4,10 +4,16 @@ const { ApplicationCommandOptionType } = require('discord.js');
 const { EmbedUtils } = require('dunebot-sdk/utils');
 const { sync } = require('../sync');
 const { darf } = require('../recht');
+const { stilRun } = require('../stil');
 
 /**
  * `/levels sync` — Belohnungsrollen aller Mitglieder an ihre Stufe angleichen
  * (LV-1e, 2026-11-15).
+ *
+ * `/levels style` — eigene Rangkarte gestalten, wenn die Guild es freigibt
+ * (LV-2b, `bot/stil.js`). Für jedes Mitglied, kein Recht nötig. Im Konzept
+ * hieß es `/rank style`; `/rank` hat aber schon die Option `user`, und
+ * Discord erlaubt Optionen und Unterbefehle nicht nebeneinander.
  *
  * Wer darf: das Recht `LEVELING.REWARDS.MANAGE` aus dem Rechtesystem, nicht
  * eine Discord-Berechtigung (Konzept §11). Entschieden wird im Dashboard
@@ -34,12 +40,18 @@ module.exports = {
                 description: 'leveling:LEVELS.SYNC_DESCRIPTION',
                 type: ApplicationCommandOptionType.Subcommand,
             },
+            {
+                name: 'style',
+                description: 'leveling:LEVELS.STYLE_DESCRIPTION',
+                type: ApplicationCommandOptionType.Subcommand,
+            },
         ],
     },
 
     async interactionRun({ interaction }) {
         const unter = interaction.options.getSubcommand();
         if (unter === 'sync') return levelsSync(interaction);
+        if (unter === 'style') return stilRun(interaction);
         return interaction.editReply({ content: interaction.guild.getT('leveling:LEVELS.UNBEKANNT') });
     },
 };

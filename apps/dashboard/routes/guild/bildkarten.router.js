@@ -12,8 +12,9 @@
  *   GET /einstellen/:plugin/:karte     → Einstellseite einer Nutzung (G-22)
  *   GET /einstellen/:plugin/:karte/vorschau?e=JSON
  *                                      → Bild mit den Werten aus dem Formular, nicht gespeichert
- *   PUT /einstellen/:plugin/:karte     → speichern { vorlage, werte } (CORE.BILDKARTEN.EDIT,
- *                                        in der Kontroll-Guild nur deren Besitzer)
+ *   PUT /einstellen/:plugin/:karte     → speichern { vorlage, werte, mitglieder } (CORE.BILDKARTEN.EDIT,
+ *                                        in der Kontroll-Guild nur deren Besitzer); `mitglieder`
+ *                                        = was Mitglieder an ihrer Karte wählen dürfen (LV-2b)
  *
  * Wo eine Karte benutzt wird, erklärt das Plugin in seiner package.json unter
  * `bildkarten` (`Bildkarte.nutzungen`). Ein Plugin, das in dieser Guild aus
@@ -145,6 +146,9 @@ router.get('/', requirePermission('CORE.BILDKARTEN.VIEW'), async (req, res) => {
                 const v = Bildkarte.vorlage(k.name);
                 k.breite = v.breite;
                 k.hoehe = v.hoehe;
+                // Schablonen eines Plugins (Leveling LV-2a) haben keine eigene
+                // Erklärung und damit keinen Übersetzungsschlüssel: Titel der Vorlage.
+                k.vorlageTitel = Bildkarte.titelVon(v, seitenSprache(res));
             } catch (err) {
                 k.fehler = err.message;
             }
@@ -195,7 +199,7 @@ function seitenFelder(nutzung, e, sprache) {
     const vorschlaege = [];
     for (const name of nutzung.schablonen) {
         const v = Bildkarte.vorlage(name);
-        schablonen.push({ name, titel: v.titel || name, breite: v.breite, hoehe: v.hoehe });
+        schablonen.push({ name, titel: Bildkarte.titelVon(v, sprache) || name, breite: v.breite, hoehe: v.hoehe });
         for (const w of Bildkarte.einstellbar(v)) {
             if (!felder.has(w.name)) {
                 let wert = w.beispiel;
@@ -230,6 +234,8 @@ router.get('/einstellen/:plugin/:karte', requirePermission('CORE.BILDKARTEN.VIEW
             nutzung: { ...n, pluginName: pluginName(n.plugin), an: stand.an },
             gewaehlt: e.vorlage,
             hinweise: e.hinweise,
+            mitglieder: e.mitglieder,
+            waehlbar: Bildkarte.waehlbar(n),
             ...seitenFelder(n, e, sprache),
             darf: Boolean(hat) && !gesperrt,
             gesperrt,
@@ -290,3 +296,6 @@ router.put('/einstellen/:plugin/:karte', csrfProtection, requirePermission('CORE
 module.exports = router;
 module.exports.kartenDerGuild = kartenDerGuild;
 module.exports.seitenFelder = seitenFelder;
+module.exports.spracheDerGuild = spracheDerGuild;
+module.exports.guildName = guildName;
+module.exports.pluginName = pluginName;
