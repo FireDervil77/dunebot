@@ -145,14 +145,16 @@ async function registerKernNavigation(guildId) {
                 guildId,
                 parent: null
             },
-            // ── Bildkarten (G-21, F-G11): Karten dieser Guild ansehen, später einstellen ──
+            // ── Bildkarten (G-21, F-G11): Karten dieser Guild ansehen und einstellen ──
+            // Sichtbar mit CORE.BILDKARTEN.VIEW oder dem Recht einer Karte
+            // (Weg A, 2026-11-15: wer die Nachricht bearbeiten darf, darf ihre Karte).
             {
                 title: 'NAV.BILDKARTEN',
                 url: `/guild/${guildId}/bildkarten`,
                 icon: 'fa-solid fa-id-card',
                 order: 2950,
                 type: navigationManager.menuTypes.MAIN,
-                capability: 'CORE.BILDKARTEN.VIEW',
+                capability: require('./BildkartenRecht').menuRecht(),
                 visible: true,
                 guildId,
                 parent: null

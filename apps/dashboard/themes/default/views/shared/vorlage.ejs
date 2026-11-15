@@ -19,6 +19,12 @@
  *
  * und schickt sie mit. Die Route des Plugins speichert mit
  * `Vorlage.speichere`.
+ *
+ * Hängt das Plugin eine Bildkarte an den Anlass (`bildkarte` in der
+ * Erklärung, 2026-11-15), zeigt die Vorschau das gezeichnete Bild dort, wo
+ * Discord es zeigt, und folgt dem Schalter `bildkarte.schalter` der Seite
+ * (auch ungespeichert). Ohne Recht auf die Karte bleibt der gestrichelte
+ * Platzhalter.
  */
 const _a = teil.anlass;
 const _v = teil.vorlage;
@@ -36,6 +42,7 @@ const _hatAvatar = _a.platzhalter.some(p => p.name === 'member:avatar');
 %>
 <div class="fb-vorlage border rounded p-3 mb-3" id="<%= _id %>"
      data-vorlage="<%= _a.anlass %>"
+     data-vorlage-schalter="<%= (_a.bildkarte && _a.bildkarte.schalter) || '' %>"
      data-vorschau="/guild/<%= guildId %>/vorlagen/vorschau"
      data-text-wird-gesendet="<%= _t('VORSCHAU_WIRD_GESENDET') %>"
      data-text-leer="<%= _t('VORSCHAU_LEER') %>"
@@ -191,7 +198,9 @@ const _hatAvatar = _a.platzhalter.some(p => p.name === 'member:avatar');
     }).join('');
   }
   function farbe(n) { return typeof n === 'number' ? '#' + n.toString(16).padStart(6, '0') : '#1e1f22'; }
-  function bild(url, el, stil) {
+  function bild(url, el, stil, echtStil) {
+    var echt = /^attachment:\/\//.test(url) && el.fbBilder ? el.fbBilder[url.slice(13)] : null;
+    if (echt) return '<img src="' + esc(echt) + '" alt="" style="' + (echtStil || 'display:block;max-width:100%;height:auto') + ';border-radius:4px" onerror="this.style.opacity=.2">';
     if (/^attachment:\/\//.test(url)) return '<div style="' + stil + ';background:#2b2d31;border:1px dashed #4e5058;display:flex;align-items:center;justify-content:center;font-size:.8rem;color:#949ba4">' + esc(el.dataset.textAnhang.replace('{{name}}', url.slice(13))) + '</div>';
     if (!bildOk(url)) return '';
     return '<img src="' + esc(url) + '" alt="" style="' + stil + ';object-fit:cover" onerror="this.style.opacity=.2">';
@@ -211,14 +220,14 @@ const _hatAvatar = _a.platzhalter.some(p => p.name === 'member:avatar');
       if (e.thumbnail) h += '<div style="margin-left:12px">' + bild(e.thumbnail.url, el, 'width:80px;height:80px;border-radius:4px') + '</div>';
       h += '</div>';
     });
-    (n.dateien || []).forEach(function (d) { h += '<div class="mt-2">' + bild('attachment://' + d, el, 'width:240px;height:90px;border-radius:4px') + '</div>'; });
+    (n.dateien || []).forEach(function (d) { h += '<div class="mt-2">' + bild('attachment://' + d, el, 'width:240px;height:90px;border-radius:4px', 'display:block;max-width:400px;width:100%;height:auto') + '</div>'; });
     return h;
   }
 
   function zeichneTeil(c, namen, el) {
     if (c.type === 10) return md(c.content, namen);
     if (c.type === 14) return '<hr style="border-color:#4e5058;margin:8px 0;opacity:1">';
-    if (c.type === 12) return '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">' + c.items.map(function (i) { return bild(i.media.url, el, 'max-width:100%;height:160px;flex:1 1 45%;border-radius:4px'); }).join('') + '</div>';
+    if (c.type === 12) return '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">' + c.items.map(function (i) { return bild(i.media.url, el, 'max-width:100%;height:160px;flex:1 1 45%;border-radius:4px', 'display:block;width:100%;height:auto;flex:1 1 100%'); }).join('') + '</div>';
     if (c.type === 9) return '<div style="display:flex;gap:12px"><div style="flex:1;min-width:0">' + c.components.map(function (t) { return zeichneTeil(t, namen, el); }).join('') + '</div><div>' + bild(c.accessory.media.url, el, 'width:80px;height:80px;border-radius:6px') + '</div></div>';
     if (c.type === 17) return '<div style="max-width:520px;margin-top:4px;background:#2b2d31;border-radius:8px;border-left:4px solid ' + farbe(c.accent_color) + ';padding:12px 14px">' + c.components.map(function (t) { return zeichneTeil(t, namen, el); }).join('') + '</div>';
     return '';
@@ -247,6 +256,7 @@ const _hatAvatar = _a.platzhalter.some(p => p.name === 'member:avatar');
         wahlLeiste.appendChild(b);
       });
       var n = stand.formen[form];
+      el.fbBilder = stand.bilder || {};
       if (!n) { box.innerHTML = '<span style="color:#949ba4">' + esc(el.dataset.textLeer) + '</span>'; }
       else if (form === 'v2') { box.innerHTML = n.components.map(function (c) { return zeichneTeil(c, stand.namen, el); }).join(''); }
       else { box.innerHTML = zeichneEmbed(n, stand.namen, el); }
@@ -270,7 +280,7 @@ const _hatAvatar = _a.platzhalter.some(p => p.name === 'member:avatar');
             'Content-Type': 'application/json', 'Accept': 'application/json',
             'X-CSRF-Token': (document.querySelector('meta[name="csrf-token"]') || {}).content || ''
           },
-          body: JSON.stringify({ anlass: el.dataset.vorlage, vorlage: lies(el) })
+          body: JSON.stringify({ anlass: el.dataset.vorlage, vorlage: lies(el), mitKarte: mitKarte() })
         });
         var a = await r.json().catch(function () { return { success: false, message: 'HTTP ' + r.status }; });
         if (meins !== nr) return;
@@ -289,6 +299,10 @@ const _hatAvatar = _a.platzhalter.some(p => p.name === 'member:avatar');
       }
     }
     function spaeter() { clearTimeout(uhr); uhr = setTimeout(rechne, 300); }
+    // Schalter der Seite, der die Karte anhängt (z. B. rangkarte_anhaengen).
+    var schalter = el.dataset.vorlageSchalter ? document.querySelector('input[name="' + el.dataset.vorlageSchalter + '"]') : null;
+    function mitKarte() { return schalter ? !!schalter.checked : true; }
+    if (schalter) schalter.addEventListener('change', spaeter);
 
     el.querySelectorAll('[data-vorlage-feld]').forEach(function (i) {
       i.addEventListener('focus', function () { zuletzt = i; });

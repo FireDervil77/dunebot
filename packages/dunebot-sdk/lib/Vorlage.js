@@ -263,11 +263,29 @@ function erklaerung(plugin) {
 }
 
 /**
+ * Die Bildkarte, die das Plugin an diesen Anlass hängt, oder null:
+ *
+ *     "aufstieg": { …, "bildkarte": { "karte": "kern:rangkarte", "schalter": "rangkarte_anhaengen" } }
+ *
+ * `karte` ist die Nutzung unter `bildkarten` desselben Plugins, `schalter` der
+ * Name des Kontrollkästchens auf der Seite, das das Anhängen ein- und
+ * ausschaltet. Die Vorschau zeigt die Karte dort, wo Discord sie zeigt
+ * (Betreiber 2026-11-15: „wir versprechen sonst etwas, was in Discord ganz
+ * anders aussieht“).
+ * @returns {{karte: string, schalter: string|null}|null}
+ */
+function bildkarteVon(a) {
+    const b = a?.bildkarte;
+    if (!b || typeof b !== 'object' || typeof b.karte !== 'string') return null;
+    return { karte: b.karte, schalter: typeof b.schalter === 'string' && /^[a-z0-9_]{1,64}$/.test(b.schalter) ? b.schalter : null };
+}
+
+/**
  * Ein Anlass mit allem, was der Editor braucht. Wirft, wenn ihn kein Plugin
  * erklärt: Ein Aufruf mit einem Tippfehler soll laut scheitern, nicht still
  * nichts senden.
  * @param {string} anlass z. B. `greeting:willkommen`
- * @returns {{anlass: string, plugin: string, name: string, recht: string|null, titel: string|null, je: string|null, platzhalter: Object[]}}
+ * @returns {{anlass: string, plugin: string, name: string, recht: string|null, titel: string|null, je: string|null, platzhalter: Object[], bildkarte: {karte: string, schalter: string|null}|null}}
  */
 function anlass(anlassName) {
     const m = ANLASS.exec(String(anlassName || ''));
@@ -288,7 +306,7 @@ function anlass(anlassName) {
         const p = eigene.get(n);
         if (p) liste.push({ name: p.name, gruppe: plugin, bedeutung: p.bedeutung || null, alias: null, beispiel: p.beispiel ?? '' });
     }
-    return { anlass: anlassName, plugin, name, recht: e.recht, titel: a.titel || null, je: a.je || null, platzhalter: liste };
+    return { anlass: anlassName, plugin, name, recht: e.recht, titel: a.titel || null, je: a.je || null, platzhalter: liste, bildkarte: bildkarteVon(a) };
 }
 
 /**
@@ -551,7 +569,8 @@ async function fuelle(vorlage, kontext = {}, optionen = {}) {
  * Ein Mitglied zum Ansehen: der angemeldete Nutzer in dieser Guild. Hat
  * dieselben Eigenschaften, die `parsePlaceholders` liest.
  * @param {{id: string, username: string, global_name?: string, avatar?: string}} nutzer
- * @param {{id: string, name: string}} guildDaten
+ * @param {{id: string, name: string, icon?: string|null}} guildDaten `icon` = Hash
+ *        des Servericons aus der Sitzung (sonst ein Platzhalterbild)
  */
 function beispielKontext(nutzer, guildDaten) {
     const id = String(nutzer?.id || '0');
@@ -567,7 +586,9 @@ function beispielKontext(nutzer, guildDaten) {
         memberCount: Number(KERN_BEISPIEL['guild:memberCount']),
         premiumSubscriptionCount: Number(KERN_BEISPIEL['guild:boostCount']),
         premiumTier: Number(KERN_BEISPIEL['guild:boostLevel']),
-        iconURL: () => 'https://cdn.discordapp.com/embed/avatars/1.png',
+        iconURL: () => (/^(a_)?[0-9a-f]{32}$/.test(String(guildDaten?.icon || ''))
+            ? `https://cdn.discordapp.com/icons/${String(guildDaten.id)}/${guildDaten.icon}.png?size=256`
+            : 'https://cdn.discordapp.com/embed/avatars/1.png'),
     };
     const user = { id, username: name, discriminator: '0', tag: name, createdAt: heute, displayAvatarURL: () => avatar };
     const member = {
@@ -580,12 +601,14 @@ function beispielKontext(nutzer, guildDaten) {
 /**
  * Vorschau eines Anlasses: prüft die Eingabe und baut alle drei Formen mit
  * Beispielwerten. Die Seite zeichnet daraus, was der Bot senden würde.
+ * `anhaenge` (nur `name`) stehen dort, wo Discord die Dateien zeigt; das Bild
+ * dazu holt die Seite selbst (Route der Vorlagen).
  * @returns {Promise<{vorlage: Object, formen: Object, hinweise: Object[], unbekannt: string[], namen: Object}>}
  */
-async function vorschau(anlassName, roh, { guildId, guildName, nutzer } = {}) {
+async function vorschau(anlassName, roh, { guildId, guildName, guildIcon, nutzer, anhaenge = [] } = {}) {
     const a = anlass(anlassName);
     const v = pruefe(roh);
-    const { member, guild, namen } = beispielKontext(nutzer, { id: guildId, name: guildName });
+    const { member, guild, namen } = beispielKontext(nutzer, { id: guildId, name: guildName, icon: guildIcon });
     const extra = {};
     for (const p of a.platzhalter) if (p.gruppe === a.plugin) extra[p.name] = p.beispiel ?? '';
     const bekannt = new Set(a.platzhalter.map((p) => p.name));
@@ -595,7 +618,7 @@ async function vorschau(anlassName, roh, { guildId, guildName, nutzer } = {}) {
     const formen = {};
     let hinweise = [];
     for (const form of FORMEN) {
-        const r = await fuelle(v, { member, guild, extra }, { guildId, form, erwaehnen: [member.id] });
+        const r = await fuelle(v, { member, guild, extra }, { guildId, form, erwaehnen: [member.id], anhaenge });
         formen[form] = r.nachricht ? { ...r.nachricht, files: undefined, dateien: (r.nachricht.files || []).map((f) => f.name) } : null;
         if (form === v.form) hinweise = r.hinweise;
     }

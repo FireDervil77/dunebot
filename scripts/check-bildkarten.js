@@ -389,7 +389,8 @@ function stubMember(nick = 'Anna') {
         const nav = ohneKommentare(lies('apps/dashboard/helpers/KernNavigation.js'));
         const eintrag = nav.slice(nav.indexOf("title: 'NAV.BILDKARTEN'"), nav.indexOf('},', nav.indexOf("title: 'NAV.BILDKARTEN'")));
         assert(eintrag.length > 20, 'Navigationseintrag fehlt');
-        assert(/capability: 'CORE\.BILDKARTEN\.VIEW'/.test(eintrag) && /parent: null/.test(eintrag) && /\/bildkarten`/.test(eintrag), 'Eintrag: Recht, Hauptmenü oder Adresse');
+        // Weg A (2026-11-15): sichtbar mit dem Bereichsrecht oder dem Recht einer Karte.
+        assert(/capability: require\('\.\/BildkartenRecht'\)\.menuRecht\(\)/.test(eintrag) && /parent: null/.test(eintrag) && /\/bildkarten`/.test(eintrag), 'Eintrag: Recht, Hauptmenü oder Adresse');
         for (const loc of ['de-DE', 'en-GB']) assert(JSON.parse(lies(`apps/dashboard/locales/${loc}.json`)).NAV?.BILDKARTEN, `NAV.BILDKARTEN fehlt in ${loc}`);
         const katalog = JSON.parse(lies('packages/dunebot-core/config/permissions.json')).permissions;
         const ansehen = katalog.find((p) => p.key === 'CORE.BILDKARTEN.VIEW');
@@ -405,8 +406,9 @@ function stubMember(nick = 'Anna') {
     });
     await pruefe('12c. Router mit Recht, eingehängt', () => {
         const r = ohneKommentare(lies('apps/dashboard/routes/guild/bildkarten.router.js'));
-        assert(/router\.get\('\/', requirePermission\('CORE\.BILDKARTEN\.VIEW'\)/.test(r), 'Übersicht ohne Recht');
-        assert(/router\.get\('\/bild\/:name', requirePermission\('CORE\.BILDKARTEN\.VIEW'\)/.test(r), 'Bild ohne Recht');
+        assert(/router\.get\('\/', bereichOffen, /.test(r) && /kartenFuer\(guildId, req\.session\.user\.info\.id\)/.test(r), 'Übersicht ohne Recht');
+        assert(/router\.get\('\/bild\/:name', bereichOffen, /.test(r), 'Bild ohne Recht');
+        assert(!/requirePermission\(/.test(r), 'Router prüft am Recht der Karte vorbei');
         assert(/Bildkarte\.beispiel\(/.test(r) && !/createCanvas|@napi-rs/.test(r), 'Bild nicht über Bildkarte');
         const g = ohneKommentare(lies('apps/dashboard/routes/guild.router.js'));
         assert(/router\.use\("\/:guildId\/bildkarten", CheckAuth, CheckGuildAccess, bildkartenRouter\)/.test(g), 'nicht eingehängt');
@@ -648,10 +650,11 @@ function stubMember(nick = 'Anna') {
 
     await pruefe('13g. Router: Rechte, CSRF, Kontroll-Guild, Nutzung unter der gewählten Schablone', async () => {
         const r = ohneKommentare(lies('apps/dashboard/routes/guild/bildkarten.router.js'));
-        assert(/router\.get\('\/einstellen\/:plugin\/:karte', requirePermission\('CORE\.BILDKARTEN\.VIEW'\)/.test(r), 'Einstellseite ohne Recht');
-        assert(/router\.get\('\/einstellen\/:plugin\/:karte\/vorschau', requirePermission\('CORE\.BILDKARTEN\.VIEW'\)/.test(r), 'Vorschau ohne Recht');
-        assert(/router\.put\('\/einstellen\/:plugin\/:karte', csrfProtection, requirePermission\('CORE\.BILDKARTEN\.EDIT'\), requireBesitzerInKontrollGuild\(\)/.test(r), 'Speichern ohne CSRF, Recht oder Kontroll-Guild-Schutz');
-        assert(/istKontrollGuildGesperrt\(/.test(r) && /'CORE\.BILDKARTEN\.EDIT'\);/.test(r), 'Seite weiß nicht, ob nur lesen');
+        const route = (anfang) => { const i = r.indexOf(anfang); assert(i >= 0, `Route fehlt: ${anfang}`); return r.slice(i, r.indexOf('\n});', i)); };
+        assert(/BildkartenRecht\.darf\(userId, guildId, n, 'sehen'\)/.test(route("router.get('/einstellen/:plugin/:karte', bereichOffen,")), 'Einstellseite ohne Recht');
+        assert(/BildkartenRecht\.darf\(req\.session\.user\.info\.id, guildId, n, 'sehen'\)/.test(route("router.get('/einstellen/:plugin/:karte/vorschau', bereichOffen,")), 'Vorschau ohne Recht');
+        assert(/BildkartenRecht\.darf\(req\.session\?\.user\?\.info\?\.id, guildId, n, 'aendern'\)/.test(route("router.put('/einstellen/:plugin/:karte', csrfProtection, requireBesitzerInKontrollGuild(),")), 'Speichern ohne CSRF, Recht oder Kontroll-Guild-Schutz');
+        assert(/istKontrollGuildGesperrt\(/.test(r) && /const hat = await BildkartenRecht\.darf\(userId, guildId, n, 'aendern'\);/.test(r), 'Seite weiß nicht, ob nur lesen');
         assert(/Bildkarte\.speichereEinstellung\(/.test(r) && /Bildkarte\.eingabePruefen\(/.test(r) && /Bildkarte\.beispielNutzung\(/.test(r), 'Router rechnet selbst');
         assert(!/INSERT|UPDATE guild_bildkarten|DELETE/.test(r), 'Router schreibt selbst in die Tabelle');
         const nutzAn = /if \(!\(await eingeschaltet\(guildId\)\)\.has\(plugin\)\) return null;/.test(r);
@@ -856,6 +859,81 @@ function stubMember(nick = 'Anna') {
         const img = app.match(/imgSrc:\s*\[([^\]]*)\]/);
         assert(img, 'imgSrc nicht gefunden');
         assert(/"blob:"|'blob:'/.test(img[1]), `imgSrc ohne blob:, Vorschau bleibt leer in ${ansichten.join(', ')}`);
+    });
+
+    await pruefe('13l. Recht wandert mit der Karte (Weg A), Karte in der Nachrichten-Vorschau, Logo-Rückfall', async () => {
+        // Betreiber 2026-11-15: Wer die Nachricht bearbeiten darf, darf auch
+        // ihre Karte sehen und einstellen; die Vorschau zeigt die Karte dort,
+        // wo Discord sie zeigt; ohne eigenes Logo das Servericon.
+        const { karten, fehler } = Bildkarte.nutzungen();
+        assert.deepStrictEqual(fehler, [], `Erklärung: ${fehler.join('; ')}`);
+        const nutz = (karte, plugin) => (karten.get(karte) || []).find((n) => n.plugin === plugin);
+        for (const [karte, plugin] of [['kern:rangkarte', 'leveling'], ['leveling:rangliste', 'leveling'], ['greeting:willkommen', 'greeting']]) {
+            const pkg = JSON.parse(lies(`plugins/${plugin}/package.json`));
+            assert.strictEqual(nutz(karte, plugin)?.recht, pkg.bildkarten[karte].recht || pkg.vorlagen.recht, `${plugin}/${karte}: Recht nicht das der Nachricht`);
+        }
+
+        const rechte = new Set();
+        ServiceManager.register('permissionManager', {
+            async hasPermission(u, g, k) { return rechte.has(k); },
+            async hasAnyPermission(u, g, ks) { return ks.some((k) => rechte.has(k)); },
+        });
+        const BR = require(path.join(WURZEL, 'apps/dashboard/helpers/BildkartenRecht.js'));
+        const rang = nutz('kern:rangkarte', 'leveling');
+        const willkommen = nutz('greeting:willkommen', 'greeting');
+        rechte.add('LEVELING.CONFIGURE');
+        assert(await BR.darf('u', 'g', rang, 'sehen') && await BR.darf('u', 'g', rang, 'aendern'), 'Recht der Nachricht öffnet die Karte nicht');
+        assert(!(await BR.darf('u', 'g', willkommen, 'sehen')), 'Recht von Leveling öffnet die Karte von greeting');
+        assert(await BR.bereichOffen('u', 'g') && !(await BR.siehtAlle('u', 'g')), 'Bereich: offen, aber nicht alle');
+        rechte.clear();
+        assert(!(await BR.bereichOffen('u', 'g')), 'Bereich ohne jedes Recht offen');
+        rechte.add('CORE.BILDKARTEN.VIEW');
+        assert(await BR.darf('u', 'g', willkommen, 'sehen') && !(await BR.darf('u', 'g', willkommen, 'aendern')), 'Bereichsrecht: sehen ja, ändern nein');
+        const menu = BR.menuRecht().split('|');
+        assert(menu[0] === 'CORE.BILDKARTEN.VIEW' && menu.includes('LEVELING.CONFIGURE') && menu.includes('GREETING.SETTINGS.EDIT'), `Menürecht: ${menu}`);
+
+        // Übersicht: nur erlaubte Nutzungen, ungenutzte Kern-Schablonen nur mit Bereichsrecht.
+        const { kartenFuer } = require(path.join(WURZEL, 'apps/dashboard/routes/guild/bildkarten.router.js'));
+        mitPlugins(['core', 'greeting', 'leveling']);
+        rechte.clear();
+        rechte.add('LEVELING.CONFIGURE');
+        const nurLeveling = (await kartenFuer('1', 'u')).map((k) => k.name);
+        assert(nurLeveling.includes('kern:rangkarte') && nurLeveling.includes('leveling:rangliste') && !nurLeveling.includes('greeting:willkommen') && !nurLeveling.includes('kern:profil'), `Übersicht mit LEVELING.CONFIGURE: ${nurLeveling}`);
+        rechte.add('CORE.BILDKARTEN.VIEW');
+        assert((await kartenFuer('1', 'u')).some((k) => k.name === 'greeting:willkommen'), 'Bereichsrecht sieht nicht alle');
+        ServiceManager.register('dbService', { async query() { return []; } });
+
+        // Menü: `A|B` heißt eines davon.
+        const NM = require(path.join(WURZEL, 'packages/dunebot-sdk/lib/NavigationManager.js'));
+        ServiceManager.register('permissionManager', { async getUserPermissions() { return { permissions: { 'LEVELING.CONFIGURE': true }, is_owner: false }; } });
+        const gezeigt = await NM.prototype._filterByPermissions.call({}, [
+            { title: 'a', capability: 'CORE.BILDKARTEN.VIEW|LEVELING.CONFIGURE' },
+            { title: 'b', capability: 'CORE.BILDKARTEN.VIEW|GREETING.SETTINGS.EDIT' },
+            { title: 'c', capability: 'LEVELING.CONFIGURE' },
+        ], 'g', 'u');
+        assert.deepStrictEqual(gezeigt.map((i) => i.title), ['a', 'c'], 'Menü liest | nicht als „eines davon“');
+        ServiceManager.register('permissionManager', { async hasPermission() { return false; }, async hasAnyPermission() { return false; } });
+
+        // Nachrichten-Vorschau: Anlass nennt Karte und Schalter, die es gibt.
+        const { Vorlage } = require('dunebot-sdk');
+        for (const [anlass, ansicht] of [['leveling:aufstieg', 'plugins/leveling/dashboard/views/guild/leveling-nachrichten.ejs'], ['greeting:willkommen', 'plugins/greeting/dashboard/views/guild/greeting-content.ejs']]) {
+            const a = Vorlage.anlass(anlass);
+            assert(a.bildkarte && nutz(a.bildkarte.karte, a.plugin), `${anlass}: keine Karte des Plugins`);
+            assert(ohneKommentareEjs(lies(ansicht)).includes(`name="${a.bildkarte.schalter}"`), `${anlass}: Schalter ${a.bildkarte.schalter} steht nicht auf der Seite`);
+        }
+        const mitAnhang = await Vorlage.vorschau('leveling:aufstieg', { form: 'v2', text: 'x' }, { guildId: '1', nutzer: { id: '2', username: 'a' }, anhaenge: [{ name: 'k.png' }] });
+        assert(JSON.stringify(mitAnhang.formen.v2).includes('attachment://k.png') && mitAnhang.formen.embed.dateien[0] === 'k.png', 'Vorschau zeigt den Anhang nicht');
+        const vr = ohneKommentare(lies('apps/dashboard/routes/guild/vorlagen.router.js'));
+        assert(/req\.body\?\.mitKarte === false/.test(vr) && /BildkartenRecht\.darf\(/.test(vr) && /anhaenge: karte\.anhaenge/.test(vr) && /bilder: karte\.bilder/.test(vr), 'Vorlagen-Route hängt die Karte nicht oder ohne Recht an');
+        const ve = ohneKommentareEjs(lies('apps/dashboard/themes/default/views/shared/vorlage.ejs'));
+        assert(/mitKarte: mitKarte\(\)/.test(ve) && /el\.fbBilder = stand\.bilder/.test(ve) && /schalter\.addEventListener\('change', spaeter\)/.test(ve), 'Kern-Teil schickt den Schalter nicht oder zeigt das Bild nicht');
+
+        // Logo: ohne Gestaltungs-Logo das Servericon.
+        const bk = ohneKommentare(lies('packages/dunebot-sdk/lib/Bildkarte.js'));
+        assert(/extra\['gestaltung:logo'\] = b\.logo \|\| String\(guild\?\.iconURL\?\./.test(bk), 'kein Rückfall auf das Servericon');
+        const icon = Vorlage.beispielKontext({ id: '2' }, { id: '9', icon: '0123456789abcdef0123456789abcdef' }).guild.iconURL();
+        assert(icon === 'https://cdn.discordapp.com/icons/9/0123456789abcdef0123456789abcdef.png?size=256', `Beispiel-Guild ohne echtes Icon: ${icon}`);
+        assert(!/icons\/9\//.test(Vorlage.beispielKontext({ id: '2' }, { id: '9', icon: '../x' }).guild.iconURL()), 'Icon-Hash ungeprüft in der Adresse');
     });
 
     console.log(`\n${gruen} grün, ${rot} rot`);

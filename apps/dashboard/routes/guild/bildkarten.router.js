@@ -12,9 +12,18 @@
  *   GET /einstellen/:plugin/:karte     → Einstellseite einer Nutzung (G-22)
  *   GET /einstellen/:plugin/:karte/vorschau?e=JSON
  *                                      → Bild mit den Werten aus dem Formular, nicht gespeichert
- *   PUT /einstellen/:plugin/:karte     → speichern { vorlage, werte, mitglieder } (CORE.BILDKARTEN.EDIT,
- *                                        in der Kontroll-Guild nur deren Besitzer); `mitglieder`
+ *   GET /einstellen/:plugin/:karte/vorschau  (ohne `e`)
+ *                                      → Bild, wie die Guild es gespeichert hat (Nachrichten-
+ *                                        Vorschau, shared/vorlage)
+ *   PUT /einstellen/:plugin/:karte     → speichern { vorlage, werte, mitglieder } (in der
+ *                                        Kontroll-Guild nur deren Besitzer); `mitglieder`
  *                                        = was Mitglieder an ihrer Karte wählen dürfen (LV-2b)
+ *
+ * Rechte (Weg A, Betreiber 2026-11-15, helpers/BildkartenRecht): sehen und
+ * einstellen darf, wer `CORE.BILDKARTEN.VIEW`/`.EDIT` hat ODER das Recht der
+ * Nutzung (Vorgabe: das Recht der Nachrichten des Plugins). Die Übersicht
+ * zeigt nur Karten, die man darf; ungenutzte Schablonen des Kerns nur mit
+ * `CORE.BILDKARTEN.VIEW`.
  *
  * Wo eine Karte benutzt wird, erklärt das Plugin in seiner package.json unter
  * `bildkarten` (`Bildkarte.nutzungen`). Ein Plugin, das in dieser Guild aus
@@ -36,7 +45,8 @@ const path = require('path');
 const router = express.Router({ mergeParams: true });
 const { ServiceManager } = require('dunebot-core');
 const { Bildkarte } = require('dunebot-sdk');
-const { requirePermission, requireBesitzerInKontrollGuild, istKontrollGuildGesperrt } = require('../../middlewares/permissions.middleware');
+const { requireBesitzerInKontrollGuild, istKontrollGuildGesperrt } = require('../../middlewares/permissions.middleware');
+const BildkartenRecht = require('../../helpers/BildkartenRecht');
 const { csrfProtection } = require('../../middlewares/security/csrf-protection.middleware');
 
 const PLUGINS = path.join(__dirname, '..', '..', '..', '..', 'plugins');
@@ -102,6 +112,33 @@ async function kartenDerGuild(guildId) {
     });
 }
 
+/**
+ * Die Karten, die dieser Nutzer sieht: mit `CORE.BILDKARTEN.VIEW` alle,
+ * sonst nur Nutzungen mit seinem Recht und die Schablonen ihrer Plugins.
+ */
+async function kartenFuer(guildId, userId) {
+    const alle = await kartenDerGuild(guildId);
+    if (await BildkartenRecht.siehtAlle(userId, guildId)) return alle;
+    const plugins = new Set();
+    for (const k of alle) {
+        const erlaubt = [];
+        for (const n of k.nutzungen) if (await BildkartenRecht.darf(userId, guildId, n)) erlaubt.push(n);
+        k.nutzungen = erlaubt;
+        for (const n of erlaubt) plugins.add(n.plugin);
+    }
+    return alle.filter((k) => k.nutzungen.length > 0 || (k.besitzer !== 'kern' && plugins.has(k.besitzer)));
+}
+
+/** Gate des Bereichs: irgendein Recht, das eine Karte öffnet. */
+async function bereichOffen(req, res, next) {
+    try {
+        if (await BildkartenRecht.bereichOffen(req.session?.user?.info?.id, res.locals.guildId)) return next();
+        return res.status(403).send('Dir fehlt das Recht für Bildkarten auf diesem Server.');
+    } catch (err) {
+        return next(err);
+    }
+}
+
 /** Sprache der Guild wie im Bot (`guild.locale` = core `LOCALE`). */
 async function spracheDerGuild(guildId) {
     const zeilen = await ServiceManager.get('dbService').query(
@@ -114,6 +151,12 @@ async function spracheDerGuild(guildId) {
 /** Sprache der Seite für Titel aus der Vorlage und Meldungen. */
 function seitenSprache(res) {
     return String(res.locals.locale || 'de-DE').toLowerCase().startsWith('de') ? 'de' : 'en';
+}
+
+/** Hash des Servericons aus der Sitzung (Discord-Login), für Beispielbilder. */
+function guildIcon(req, guildId) {
+    const g = (req.session?.user?.guilds || []).find((x) => String(x.id) === String(guildId));
+    return g?.icon || null;
 }
 
 async function guildName(guildId) {
@@ -135,11 +178,11 @@ async function nutzungAusAdresse(req, guildId) {
 }
 
 // GET /bildkarten
-router.get('/', requirePermission('CORE.BILDKARTEN.VIEW'), async (req, res) => {
+router.get('/', bereichOffen, async (req, res) => {
     const guildId = res.locals.guildId;
     const Logger = ServiceManager.get('Logger');
     try {
-        const karten = await kartenDerGuild(guildId);
+        const karten = await kartenFuer(guildId, req.session.user.info.id);
         for (const k of karten) {
             for (const n of k.nutzungen) Object.assign(n, await Bildkarte.nutzungStand(n, guildId));
             try {
@@ -166,13 +209,13 @@ router.get('/', requirePermission('CORE.BILDKARTEN.VIEW'), async (req, res) => {
 });
 
 // GET /bildkarten/bild/:name
-router.get('/bild/:name', requirePermission('CORE.BILDKARTEN.VIEW'), async (req, res) => {
+router.get('/bild/:name', bereichOffen, async (req, res) => {
     const guildId = res.locals.guildId;
     const name = String(req.params.name || '');
     try {
-        const karte = (await kartenDerGuild(guildId)).find((k) => k.name === name);
+        const karte = (await kartenFuer(guildId, req.session.user.info.id)).find((k) => k.name === name);
         if (!karte) return res.status(404).type('text').send('Diese Karte gibt es auf diesem Server nicht.');
-        const allgemein = { guildId, guildName: await guildName(guildId), nutzer: req.session.user.info, sprache: await spracheDerGuild(guildId) };
+        const allgemein = { guildId, guildName: await guildName(guildId), guildIcon: guildIcon(req, guildId), nutzer: req.session.user.info, sprache: await spracheDerGuild(guildId) };
         const n = karte.nutzungen[0];
         let bild;
         if (n) {
@@ -215,18 +258,19 @@ function seitenFelder(nutzung, e, sprache) {
 }
 
 // GET /bildkarten/einstellen/:plugin/:karte
-router.get('/einstellen/:plugin/:karte', requirePermission('CORE.BILDKARTEN.VIEW'), async (req, res) => {
+router.get('/einstellen/:plugin/:karte', bereichOffen, async (req, res) => {
     const guildId = res.locals.guildId;
     const Logger = ServiceManager.get('Logger');
     try {
         const n = await nutzungAusAdresse(req, guildId);
         if (!n) return res.status(404).send('Diese Karte gibt es auf diesem Server nicht.');
+        const userId = req.session.user?.info?.id;
+        if (!(await BildkartenRecht.darf(userId, guildId, n, 'sehen'))) return res.status(403).send('Dir fehlt das Recht für diese Karte.');
         const sprache = seitenSprache(res);
         const e = await Bildkarte.einstellung(n.plugin, n.karte, guildId);
         const stand = await Bildkarte.nutzungStand(n, guildId);
-        const userId = req.session.user?.info?.id;
         const gesperrt = await istKontrollGuildGesperrt(guildId, userId);
-        const hat = await ServiceManager.get('permissionManager').hasPermission(userId, guildId, 'CORE.BILDKARTEN.EDIT');
+        const hat = await BildkartenRecht.darf(userId, guildId, n, 'aendern');
         await ServiceManager.get('themeManager').renderView(res, 'guild/bildkarte-einstellen', {
             title: 'Bildkarten',
             activeMenu: `/guild/${guildId}/bildkarten`,
@@ -255,16 +299,22 @@ function eingabeAus(roh) {
 }
 
 // GET /bildkarten/einstellen/:plugin/:karte/vorschau?e=JSON
-router.get('/einstellen/:plugin/:karte/vorschau', requirePermission('CORE.BILDKARTEN.VIEW'), async (req, res) => {
+router.get('/einstellen/:plugin/:karte/vorschau', bereichOffen, async (req, res) => {
     const guildId = res.locals.guildId;
     try {
         const n = await nutzungAusAdresse(req, guildId);
         if (!n) return res.status(404).type('text').send('Diese Karte gibt es auf diesem Server nicht.');
-        const g = await Bildkarte.eingabePruefen(n, guildId, eingabeAus(req.query?.e), seitenSprache(res));
-        const e = await Bildkarte.einstellungAufloesen(n, guildId, g);
+        if (!(await BildkartenRecht.darf(req.session.user.info.id, guildId, n, 'sehen'))) return res.status(403).type('text').send('Dir fehlt das Recht für diese Karte.');
+        // Ohne `e`: so, wie die Guild es gespeichert hat (zeichneNutzung liest
+        // die Einstellung selbst). Mit `e`: die Werte aus dem Formular.
+        let e;
+        if (req.query?.e !== undefined) {
+            const g = await Bildkarte.eingabePruefen(n, guildId, eingabeAus(req.query.e), seitenSprache(res));
+            e = await Bildkarte.einstellungAufloesen(n, guildId, g);
+        }
         const s = await Bildkarte.nutzungStand(n, guildId);
         const bild = await Bildkarte.beispielNutzung(n.plugin, n.karte, {
-            guildId, guildName: await guildName(guildId), nutzer: req.session.user.info,
+            guildId, guildName: await guildName(guildId), guildIcon: guildIcon(req, guildId), nutzer: req.session.user.info,
             sprache: await spracheDerGuild(guildId), werte: s.werte || undefined, einstellung: e,
         });
         res.set('Cache-Control', 'no-store');
@@ -277,12 +327,15 @@ router.get('/einstellen/:plugin/:karte/vorschau', requirePermission('CORE.BILDKA
 });
 
 // PUT /bildkarten/einstellen/:plugin/:karte { vorlage, werte }
-router.put('/einstellen/:plugin/:karte', csrfProtection, requirePermission('CORE.BILDKARTEN.EDIT'), requireBesitzerInKontrollGuild(), async (req, res) => {
+router.put('/einstellen/:plugin/:karte', csrfProtection, requireBesitzerInKontrollGuild(), async (req, res) => {
     const guildId = res.locals.guildId;
     const Logger = ServiceManager.get('Logger');
     try {
         const n = await nutzungAusAdresse(req, guildId);
         if (!n) return res.status(404).json({ success: false, message: 'Diese Karte gibt es auf diesem Server nicht.' });
+        if (!(await BildkartenRecht.darf(req.session?.user?.info?.id, guildId, n, 'aendern'))) {
+            return res.status(403).json({ success: false, message: 'Dir fehlt das Recht, diese Karte einzustellen.' });
+        }
         const e = await Bildkarte.speichereEinstellung(n.plugin, n.karte, guildId, eingabeAus(req.body), seitenSprache(res));
         Logger.info(`[Bildkarten] ${n.plugin}/${n.karte} in ${guildId} gespeichert (von ${req.session.user.info.id})`);
         res.json({ success: true, data: { vorlage: e.vorlage, hinweise: e.hinweise } });
@@ -295,6 +348,8 @@ router.put('/einstellen/:plugin/:karte', csrfProtection, requirePermission('CORE
 
 module.exports = router;
 module.exports.kartenDerGuild = kartenDerGuild;
+module.exports.kartenFuer = kartenFuer;
+module.exports.guildIcon = guildIcon;
 module.exports.seitenFelder = seitenFelder;
 module.exports.spracheDerGuild = spracheDerGuild;
 module.exports.guildName = guildName;

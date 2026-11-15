@@ -531,7 +531,9 @@ async function zeichne(vorlageOderName, kontext = {}, optionen = {}) {
     }
     if (quelltext.includes('{gestaltung:')) {
         const b = await Gestaltung.bilder(guildId);
-        extra['gestaltung:logo'] = b.logo || '';
+        // Ohne eigenes Logo das Servericon, wie die Rangliste in V2
+        // (Betreiber 2026-11-15); sonst bliebe die Fläche leer.
+        extra['gestaltung:logo'] = b.logo || String(guild?.iconURL?.({ extension: 'png', size: 256 }) || '');
         extra['gestaltung:banner'] = b.banner || '';
     }
     const fuell = (t) => String(parsePlaceholders(String(t ?? ''), { member, guild, extra }) ?? '');
@@ -728,9 +730,9 @@ function zeichneEbene(ctx, e, bild, { v, fuell, farbe, member, hinweise }) {
  * Karte mit den Beispielwerten der Vorlage, für Seiten und Wächter.
  * Mitglied ist der angemeldete Nutzer (wie `Vorlage.beispielKontext`).
  */
-async function beispiel(name, { guildId, guildName, nutzer, werte, sprache, plugin } = {}) {
+async function beispiel(name, { guildId, guildName, guildIcon, nutzer, werte, sprache, plugin } = {}) {
     const { beispielKontext } = require('./Vorlage');
-    const { member, guild } = beispielKontext(nutzer, { id: guildId, name: guildName });
+    const { member, guild } = beispielKontext(nutzer, { id: guildId, name: guildName, icon: guildIcon });
     const besitzer = String(name).split(':')[0];
     return zeichne(name, { member, guild, werte }, { guildId, sprache, plugin: plugin || (besitzer === 'kern' ? undefined : besitzer) });
 }
@@ -739,7 +741,8 @@ async function beispiel(name, { guildId, guildName, nutzer, werte, sprache, plug
 // Wer welche Karte nutzt (G-21, F-G11)
 // ─────────────────────────────────────────────────────────────────────────
 
-const NUTZUNG_FELDER = new Set(['titel', 'wo', 'seite', 'stand', 'schablonen']);
+const NUTZUNG_FELDER = new Set(['titel', 'wo', 'seite', 'stand', 'schablonen', 'recht']);
+const RECHT = /^[A-Z0-9_]+(\.[A-Z0-9_]+)+$/;
 const SEITE = /^[a-z0-9_-]{1,32}(\/[a-z0-9_-]{1,32}){0,3}$/;
 const STAND = /^[a-z0-9_-]{1,32}(\/[a-z0-9_-]{1,32}){0,3}\.js$/;
 
@@ -797,7 +800,8 @@ let nutzungenGelesen = null;
  *         "wo":    "greeting:BILDKARTEN.WO_WILLKOMMEN",     // wo der Bot sie zeigt
  *         "seite": "nachrichten",                           // /guild/<id>/plugins/<p>/<seite>
  *         "stand": "shared/willkommensbild.js",             // exportiert stand(guildId) → {an, werte}
- *         "schablonen": ["greeting:willkommen-schlicht"]     // optional: weitere zur Wahl (G-22)
+ *         "schablonen": ["greeting:willkommen-schlicht"],    // optional: weitere zur Wahl (G-22)
+ *         "recht": "GREETING.SETTINGS.EDIT"                  // optional, Vorgabe: vorlagen.recht
  *       }
  *     }
  *
@@ -809,7 +813,11 @@ let nutzungenGelesen = null;
  * sie ohne Ort. Einmal je Prozess gelesen; Fehler stehen in `fehler` (Wächter),
  * die Seite zeigt den Rest.
  *
- * @returns {{karten: Map<string, Array<{plugin: string, titel: string|null, wo: string, seite: string|null, stand: string|null}>>, fehler: string[]}}
+ * `recht`: wer diese Nutzung sehen und einstellen darf, neben
+ * `CORE.BILDKARTEN.*` (Weg A, 2026-11-15). Vorgabe ist `vorlagen.recht` des
+ * Plugins, also dasselbe Recht wie für die Nachricht, in der die Karte steht.
+ *
+ * @returns {{karten: Map<string, Array<{plugin: string, titel: string|null, wo: string, seite: string|null, stand: string|null, recht: string|null}>>, fehler: string[]}}
  */
 function nutzungen() {
     if (nutzungenGelesen) return nutzungenGelesen;
@@ -843,8 +851,13 @@ function nutzungen() {
             }
             const schablonen = schablonenFehler(p, name, e.schablonen, vorhanden);
             if (typeof schablonen === 'string') { fehler.push(`${ort}: ${schablonen}`); continue; }
+            // Wer die Nachricht des Plugins bearbeiten darf, darf auch seine
+            // Karte sehen und einstellen (Betreiber 2026-11-15, Weg A): Vorgabe
+            // ist das Recht der Vorlagen, eine Karte kann ein eigenes nennen.
+            const recht = e.recht !== undefined ? e.recht : (pkg.vorlagen?.recht ?? null);
+            if (recht !== null && (typeof recht !== 'string' || !RECHT.test(recht))) { fehler.push(`${ort}: recht ist kein Rechteschlüssel (${recht})`); continue; }
             if (!karten.has(name)) karten.set(name, []);
-            karten.get(name).push({ plugin: p, karte: name, titel: e.titel || null, wo: e.wo, seite: e.seite || null, stand: e.stand || null, schablonen });
+            karten.get(name).push({ plugin: p, karte: name, titel: e.titel || null, wo: e.wo, seite: e.seite || null, stand: e.stand || null, schablonen, recht });
         }
     }
     // Eine eigene Karte ist erklärt, wenn sie selbst unter `bildkarten` steht
@@ -1163,9 +1176,9 @@ async function zeichneNutzung(plugin, karte, kontext = {}, optionen = {}) {
  * Ohne `wahl` ohne die Wahl eines Mitglieds: Die Seiten im Bereich zeigen,
  * was die Guild eingestellt hat; die Profilseite gibt die Wahl mit.
  */
-async function beispielNutzung(plugin, karte, { guildId, guildName, nutzer, werte, sprache, einstellung: e, wahl = null } = {}) {
+async function beispielNutzung(plugin, karte, { guildId, guildName, guildIcon, nutzer, werte, sprache, einstellung: e, wahl = null } = {}) {
     const { beispielKontext } = require('./Vorlage');
-    const { member, guild } = beispielKontext(nutzer, { id: guildId, name: guildName });
+    const { member, guild } = beispielKontext(nutzer, { id: guildId, name: guildName, icon: guildIcon });
     return zeichneNutzung(plugin, karte, { member, guild, werte }, { guildId, sprache, einstellung: e, wahl });
 }
 

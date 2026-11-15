@@ -3,11 +3,17 @@
  *
  * Routes: /guild/:guildId/vorlagen/*
  *
- *   POST /vorschau { anlass, vorlage } → alle drei Formen, mit dem
+ *   POST /vorschau { anlass, vorlage, mitKarte } → alle drei Formen, mit dem
  *        angemeldeten Nutzer als Mitglied und den Beispielwerten aus dem
  *        Register gefüllt. Die Seite zeichnet daraus, was der Bot senden
  *        würde. Dieselbe Rechnung wie im Bot (`Vorlage.fuelle`), keine Kopie
  *        im Browser.
+ *
+ *        Hängt das Plugin an diesen Anlass eine Bildkarte (`bildkarte` in der
+ *        Erklärung) und ist `mitKarte` nicht false, steht sie als Anhang dort,
+ *        wo Discord sie zeigt; `bilder` nennt die Adresse des gezeichneten
+ *        Bildes (Bereich Bildkarten, gespeicherter Stand). Ohne Recht auf die
+ *        Karte (helpers/BildkartenRecht) bleibt der Platzhalter.
  *
  * Gespeichert wird nicht hier, sondern über die Route des Plugins, dem der
  * Anlass gehört (`Vorlage.speichere`), zusammen mit dessen übrigen
@@ -23,6 +29,24 @@ const { ServiceManager } = require('dunebot-core');
 const { Vorlage } = require('dunebot-sdk');
 const { requirePermission } = require('../../middlewares/permissions.middleware');
 const { csrfProtection } = require('../../middlewares/security/csrf-protection.middleware');
+const BildkartenRecht = require('../../helpers/BildkartenRecht');
+const { Bildkarte } = require('dunebot-sdk');
+
+/**
+ * Die Karte, die das Plugin an den Anlass hängt, als Anhang für die Vorschau
+ * samt Bildadresse; leer, wenn keine erklärt, ausgeschaltet oder ohne Recht.
+ */
+async function kartenAnhang(a, req, guildId) {
+    if (!a.bildkarte || req.body?.mitKarte === false) return { anhaenge: [], bilder: {} };
+    const n = (Bildkarte.nutzungen().karten.get(a.bildkarte.karte) || []).find((x) => x.plugin === a.plugin);
+    if (!n) return { anhaenge: [], bilder: {} };
+    const name = `${a.bildkarte.karte.replace(/[^a-z0-9]+/gi, '-')}.png`;
+    if (!(await BildkartenRecht.darf(req.session?.user?.info?.id, guildId, n, 'sehen'))) {
+        return { anhaenge: [{ name }], bilder: {} };
+    }
+    const adresse = `/guild/${guildId}/bildkarten/einstellen/${encodeURIComponent(n.plugin)}/${encodeURIComponent(n.karte)}/vorschau`;
+    return { anhaenge: [{ name }], bilder: { [name]: adresse } };
+}
 
 /** Kern-Text übersetzen, mit Rückfall auf den Schlüssel. */
 function uebersetzer(req) {
@@ -56,10 +80,13 @@ router.post('/vorschau', csrfProtection, async (req, res) => {
                 return res.status(404).json({ success: false, message: `${a.plugin} ist auf diesem Server nicht eingeschaltet.` });
             }
             const zeilen = await dbService.query('SELECT guild_name FROM guilds WHERE _id = ?', [guildId]);
+            const karte = await kartenAnhang(a, req, guildId);
             const v = await Vorlage.vorschau(a.anlass, req.body?.vorlage, {
                 guildId,
                 guildName: zeilen?.[0]?.guild_name || '',
+                guildIcon: (req.session.user.guilds || []).find((g) => String(g.id) === String(guildId))?.icon || null,
                 nutzer: req.session.user.info,
+                anhaenge: karte.anhaenge,
             });
             res.json({
                 success: true,
@@ -67,6 +94,7 @@ router.post('/vorschau', csrfProtection, async (req, res) => {
                     form: v.vorlage.form,
                     formen: v.formen,
                     namen: v.namen,
+                    bilder: karte.bilder,
                     hinweise: v.hinweise.map((h) => alsText(tr, 'HINWEIS', h)),
                     unbekannt: v.unbekannt,
                 },

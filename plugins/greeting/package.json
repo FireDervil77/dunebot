@@ -59,6 +59,10 @@
     "anlaesse": {
       "willkommen": {
         "titel": "greeting:TAB_WELCOME",
+        "bildkarte": {
+          "karte": "greeting:willkommen",
+          "schalter": "welcome_image_enabled"
+        },
         "kern": [
           "member",
           "guild",

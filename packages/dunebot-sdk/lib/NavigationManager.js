@@ -644,19 +644,21 @@ class NavigationManager {
                 
                 // WICHTIG: NUR exakter UPPERCASE Match - keine Konvertierung!
                 // Capabilities MÜSSEN bereits in UPPERCASE in der DB sein!
-                
-                // Exakter Match
-                if (permissionKeys.includes(item.capability)) {
-                    return true;
-                }
-                
-                // Wildcard-Match (z.B. GAMESERVER.* erlaubt GAMESERVER.START)
-                const parts = item.capability.split('.');
-                for (let i = parts.length - 1; i > 0; i--) {
-                    const wildcard = parts.slice(0, i).join('.') + '.*';
-                    if (permissionKeys.includes(wildcard)) {
-                        return true;
+                //
+                // `A|B|C` = eines davon genügt (2026-11-15, Menüpunkt
+                // „Bildkarten“: Bereichsrecht oder das Recht einer Karte).
+                const passt = (cap) => {
+                    // Exakter Match
+                    if (permissionKeys.includes(cap)) return true;
+                    // Wildcard-Match (z.B. GAMESERVER.* erlaubt GAMESERVER.START)
+                    const parts = cap.split('.');
+                    for (let i = parts.length - 1; i > 0; i--) {
+                        if (permissionKeys.includes(parts.slice(0, i).join('.') + '.*')) return true;
                     }
+                    return false;
+                };
+                if (item.capability.split('|').some((cap) => cap && passt(cap))) {
+                    return true;
                 }
                 
                 // Keine Permission → verstecken
