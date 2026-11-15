@@ -231,7 +231,8 @@ function pruefeVerdrahtung(t) {
     await pruefe('1b. package.json: Kennung, Tabellen, Mitglied, Ereignisse', () => {
         const p = require(L('package.json'));
         assert.deepStrictEqual(p.fortschritt?.map((e) => e.kennung), ['leveling:community']);
-        assert.ok(p.nurKontrollGuild === true, 'nurKontrollGuild fehlt, Stufe 1 ist nicht fertig');
+        // Freigegeben für alle Guilds seit Stufe 1 fertig ist (LV-1i, Betreiber 2026-11-15).
+        assert.ok(p.nurKontrollGuild === undefined, 'nurKontrollGuild steht wieder drin: Leveling ist für alle Guilds freigegeben');
         const ddl = fs.readdirSync(L('migrations')).filter((f) => f.endsWith('.js')).map((f) => lies(`plugins/leveling/migrations/${f}`)).join('\n');
         const tabellen = [...ddl.matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)].map((x) => x[1]);
         assert.deepStrictEqual(p.mitgliedInhalte.level_verlassen, { mitglied_id: 'loeschen' }, 'level_verlassen nennt Mitglieder, ohne Erklärung');

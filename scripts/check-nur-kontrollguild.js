@@ -58,10 +58,10 @@ pruefe('ohne gesetzte Kontroll-Guild gibt es sie nirgends', () => mitKontrolle(n
 /**
  * Wer außer der Werkbank intern ist, steht hier mit Grund. Ein Schalter, der
  * still in einer weiteren package.json auftaucht, macht diese Prüfung rot.
+ * Leveling stand hier bis 2026-11-15 (Stufe 1 fertig, LV-1i, Betreiber gab frei).
  */
 const INTERN = {
     werkbank: 'W-2, vorerst nur wir',
-    leveling: 'Gerüst ohne Code bis Leveling Stufe 1 (K382, G-01 2026-11-13); einschalten schlüge fehl',
     logging: 'Gerüst ohne Code bis Logging Stufe 1 (K382, G-01 2026-11-13); einschalten schlüge fehl',
     clan: 'Gerüst ohne Code bis Clan Stufe 1 (K382, G-01 2026-11-13); einschalten schlüge fehl',
 };

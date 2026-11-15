@@ -393,6 +393,7 @@
     "DISABLE_GOES_AUTOMOD": "Alle Regeln, Wortlisten, Ausnahmen, Verwarnungen, Einstellungen und das Protokoll",
     "DISABLE_GOES_MODERATION": "Einstellungen, Kanalregeln, geschützte Rollen, Notizen und das Protokoll",
     "DISABLE_GOES_DISCORD": "Alle Rollenmenüs (die Nachrichten in Discord bleiben stehen)",
+    "DISABLE_GOES_LEVELING": "Alle XP, Stände und der Verlauf, die Zähler, Regeln, Belohnungen und Einstellungen (vergebene Rollen bleiben in Discord)",
     "SETTINGS_ACTION": "Einstellungen",
     "CONFIGURE_ACTION": "Konfigurieren",
     "CARD_VIEW": "Karten",

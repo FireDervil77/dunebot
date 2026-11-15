@@ -377,6 +377,7 @@
     "DISABLE_GOES_AUTOMOD": "All rules, word lists, exemptions, strikes, settings and the log",
     "DISABLE_GOES_MODERATION": "Settings, channel rules, protected roles, notes and the log",
     "DISABLE_GOES_DISCORD": "All role menus (the messages in Discord stay)",
+    "DISABLE_GOES_LEVELING": "All XP, levels and history, counters, rules, rewards and settings (roles already given stay in Discord)",
     "SETTINGS_ACTION": "Settings",
     "CONFIGURE_ACTION": "Configure",
     "CARD_VIEW": "Cards",
