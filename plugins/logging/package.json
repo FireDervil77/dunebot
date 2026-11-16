@@ -14,7 +14,20 @@
         "dunebot-sdk": "*"
     },
     "guildInhalte": {
-        "loeschen": []
+        "loeschen": [
+            "log_einstellungen",
+            "log_regeln",
+            "log_ereignisse",
+            "log_namen",
+            "log_inhalte",
+            "log_nachrichten",
+            "log_anhaenge",
+            "log_ziele",
+            "log_zustellungen",
+            "log_zugriffe",
+            "log_filter",
+            "log_alarme"
+        ]
     },
     "ereignisse": {
         "sendet": [],
@@ -22,5 +35,145 @@
             "*"
         ]
     },
-    "mitgliedInhalte": {}
+    "mitgliedInhalte": {
+        "log_ereignisse": {
+            "akteur_id": {
+                "weg": "frist",
+                "grund": "Protokoll der Guild (Sicherheits- und Moderationsnachweis, F-G2 A): bleibt bis zum Ende der Frist für Metadaten"
+            },
+            "betroffen_id": {
+                "weg": "frist",
+                "grund": "Protokoll der Guild (Sicherheits- und Moderationsnachweis, F-G2 A): bleibt bis zum Ende der Frist für Metadaten"
+            },
+            "objekt_id": {
+                "weg": "frist",
+                "grund": "Bei Mitglieds-Ereignissen das Mitglied selbst, sonst Kanal oder Rolle; gehört zur Zeile, Protokoll der Guild (Sicherheits- und Moderationsnachweis, F-G2 A): bleibt bis zum Ende der Frist für Metadaten"
+            },
+            "vorher": {
+                "weg": "frist",
+                "grund": "Kann Mitglieds-IDs tragen (Rechte-Überschreibung, Besitzer); Protokoll der Guild (Sicherheits- und Moderationsnachweis, F-G2 A): bleibt bis zum Ende der Frist für Metadaten"
+            },
+            "nachher": {
+                "weg": "frist",
+                "grund": "Kann Mitglieds-IDs tragen (Rechte-Überschreibung, Besitzer); Protokoll der Guild (Sicherheits- und Moderationsnachweis, F-G2 A): bleibt bis zum Ende der Frist für Metadaten"
+            }
+        },
+        "log_namen": {
+            "mitglied_id": "loeschen"
+        },
+        "log_inhalte": {
+            "autor_id": "loeschen"
+        },
+        "log_nachrichten": {
+            "autor_id": "loeschen"
+        },
+        "log_anhaenge": {
+            "autor_id": "loeschen"
+        },
+        "log_zugriffe": {
+            "nutzer_id": {
+                "weg": "frist",
+                "grund": "Nachweis, wer Inhalte ansah oder exportierte (Idee §3.16, §10)"
+            }
+        },
+        "log_filter": {
+            "nutzer_id": "loeschen"
+        },
+        "log_regeln": {
+            "ziel": "loeschen"
+        },
+        "log_ziele": {
+            "webhook_id": {
+                "weg": "ausgenommen",
+                "grund": "ID des Webhooks, den Logging im Log-Kanal anlegt, nie ein Mitglied"
+            }
+        },
+        "log_zustellungen": {
+            "nachricht_id": {
+                "weg": "ausgenommen",
+                "grund": "ID der Log-Nachricht, die der Webhook schrieb, nie ein Mitglied"
+            }
+        }
+    },
+    "aufbewahrung": [
+        {
+            "name": "ereignisse",
+            "tabelle": "log_ereignisse",
+            "zeitspalte": "zeit",
+            "vorgabe_tage": 90,
+            "hoechstens_tage": 365,
+            "guild": true,
+            "recht": "LOGGING.RETENTION",
+            "titel": "logging:AUFBEWAHRUNG.EREIGNISSE"
+        },
+        {
+            "name": "namen",
+            "tabelle": "log_namen",
+            "zeitspalte": "zuletzt",
+            "vorgabe_tage": 90,
+            "hoechstens_tage": 365,
+            "guild": true,
+            "recht": "LOGGING.RETENTION",
+            "titel": "logging:AUFBEWAHRUNG.NAMEN"
+        },
+        {
+            "name": "inhalte",
+            "tabelle": "log_inhalte",
+            "zeitspalte": "angelegt_am",
+            "vorgabe_tage": 30,
+            "hoechstens_tage": 90,
+            "guild": true,
+            "recht": "LOGGING.RETENTION",
+            "titel": "logging:AUFBEWAHRUNG.INHALTE"
+        },
+        {
+            "name": "nachrichten",
+            "tabelle": "log_nachrichten",
+            "zeitspalte": "zeit",
+            "vorgabe_tage": 30,
+            "hoechstens_tage": 90,
+            "guild": true,
+            "recht": "LOGGING.RETENTION",
+            "titel": "logging:AUFBEWAHRUNG.NACHRICHTEN"
+        },
+        {
+            "name": "anhaenge",
+            "tabelle": "log_anhaenge",
+            "zeitspalte": "zeit",
+            "vorgabe_tage": 90,
+            "hoechstens_tage": 365,
+            "guild": true,
+            "recht": "LOGGING.RETENTION",
+            "titel": "logging:AUFBEWAHRUNG.ANHAENGE"
+        },
+        {
+            "name": "zugriffe",
+            "tabelle": "log_zugriffe",
+            "zeitspalte": "zeit",
+            "vorgabe_tage": 365,
+            "hoechstens_tage": 365,
+            "guild": true,
+            "recht": "LOGGING.RETENTION",
+            "titel": "logging:AUFBEWAHRUNG.ZUGRIFFE"
+        },
+        {
+            "name": "alarme",
+            "tabelle": "log_alarme",
+            "zeitspalte": "angelegt_am",
+            "vorgabe_tage": 90,
+            "hoechstens_tage": 365,
+            "guild": true,
+            "recht": "LOGGING.RETENTION",
+            "titel": "logging:AUFBEWAHRUNG.ALARME"
+        },
+        {
+            "name": "zustellungen",
+            "tabelle": "log_zustellungen",
+            "zeitspalte": "angelegt_am",
+            "vorgabe_tage": 7,
+            "hoechstens_tage": 30,
+            "guild": false,
+            "titel": "logging:AUFBEWAHRUNG.ZUSTELLUNGEN"
+        }
+    ]
 }

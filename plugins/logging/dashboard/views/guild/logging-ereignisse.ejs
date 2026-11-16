@@ -1,0 +1,142 @@
+<%- include('shared/seitenkopf', {
+      plugin:       'logging',
+      vortitel:     tr('logging:TITEL'),
+      titel:        tr('logging:NAV.EREIGNISSE'),
+      beschreibung: tr('logging:EREIGNISSE.BESCHREIBUNG'),
+      icon:         'fa-solid fa-list',
+      guildId:      guildId
+}) %>
+
+<%# Ereignisse (LG-1b Teil 1): neueste zuerst. Namen aus log_namen (auch nach Austritt), Rollen über den Bot. Ausgabe nur escapt. %>
+<%
+  const basis = '/guild/' + guildId + '/plugins/logging/ereignisse';
+  const link = (s) => {
+    const q = [];
+    if (filter.kategorie) q.push('kategorie=' + encodeURIComponent(filter.kategorie));
+    if (filter.schwere) q.push('schwere=' + encodeURIComponent(filter.schwere));
+    if (filter.mitglied) q.push('mitglied=' + encodeURIComponent(filter.mitglied));
+    if (s > 1) q.push('seite=' + s);
+    return basis + (q.length ? '?' + q.join('&') : '');
+  };
+  const wer = (id) => {
+    if (!id) return null;
+    const n = namen[String(id)];
+    return n ? (n.anzeigename && n.anzeigename !== n.name ? n.anzeigename + ' (@' + n.name + ')' : '@' + n.name) : id;
+  };
+  const rolle = (id) => rollenNamen[String(id)] ? '@' + rollenNamen[String(id)] : id;
+  const farbe = { info: 'secondary', warnung: 'warning', kritisch: 'danger' };
+  const zeit = (t) => new Date(t).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'medium' });
+%>
+
+<div class="alert alert-info">
+  <i class="fa-solid fa-circle-info me-2"></i><%= tr('logging:EREIGNISSE.STUFE_HINWEIS') %>
+</div>
+<% if (rollenNamenFehlen) { %>
+  <div class="alert alert-warning"><%= tr('logging:EREIGNISSE.ROLLEN_FEHLEN') %></div>
+<% } %>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <form class="row g-2 align-items-end" method="get" action="<%= basis %>">
+      <div class="col-sm-4 col-lg-3">
+        <label class="form-label" for="lg-kategorie"><%= tr('logging:EREIGNISSE.KATEGORIE') %></label>
+        <select class="form-select" id="lg-kategorie" name="kategorie">
+          <option value=""><%= tr('logging:EREIGNISSE.ALLE') %></option>
+          <% kategorien.forEach((k) => { %>
+            <option value="<%= k %>" <%= filter.kategorie === k ? 'selected' : '' %>><%= tr('logging:KATEGORIEN.' + k.toUpperCase()) %></option>
+          <% }); %>
+        </select>
+      </div>
+      <div class="col-sm-4 col-lg-2">
+        <label class="form-label" for="lg-schwere"><%= tr('logging:EREIGNISSE.SCHWERE') %></label>
+        <select class="form-select" id="lg-schwere" name="schwere">
+          <option value=""><%= tr('logging:EREIGNISSE.ALLE') %></option>
+          <% schweren.forEach((s) => { %>
+            <option value="<%= s %>" <%= filter.schwere === s ? 'selected' : '' %>><%= tr('logging:SCHWEREN.' + s.toUpperCase()) %></option>
+          <% }); %>
+        </select>
+      </div>
+      <div class="col-sm-4 col-lg-3">
+        <label class="form-label" for="lg-mitglied"><%= tr('logging:EREIGNISSE.MITGLIED') %></label>
+        <input class="form-control" id="lg-mitglied" name="mitglied" inputmode="numeric" pattern="\d{17,20}" value="<%= filter.mitglied %>" placeholder="<%= tr('logging:EREIGNISSE.MITGLIED_PLATZHALTER') %>">
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-primary" type="submit"><i class="fa-solid fa-filter me-1"></i><%= tr('logging:EREIGNISSE.FILTERN') %></button>
+        <a class="btn btn-link" href="<%= basis %>"><%= tr('logging:EREIGNISSE.ZURUECKSETZEN') %></a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fa-solid fa-clipboard-list me-2"></i><%= tr('logging:NAV.EREIGNISSE') %></h3>
+    <div class="card-actions text-secondary small"><%= tr('logging:EREIGNISSE.GESAMT', { anzahl: Number(gesamt).toLocaleString('de-DE') }) %></div>
+  </div>
+  <% if (!liste.length) { %>
+    <div class="card-body">
+      <%- include('shared/leerzustand', {
+            icon:  'fa-solid fa-clipboard-list',
+            titel: tr(gesamt ? 'logging:EREIGNISSE.FILTER_LEER' : 'logging:EREIGNISSE.LEER'),
+            text:  tr(gesamt ? 'logging:EREIGNISSE.FILTER_LEER_TEXT' : 'logging:EREIGNISSE.LEER_TEXT')
+      }) %>
+    </div>
+  <% } else { %>
+    <div class="table-responsive">
+      <table class="table table-vcenter card-table">
+        <thead>
+          <tr>
+            <th><%= tr('logging:EREIGNISSE.ZEIT') %></th>
+            <th><%= tr('logging:EREIGNISSE.WAS') %></th>
+            <th><%= tr('logging:EREIGNISSE.WER') %></th>
+            <th><%= tr('logging:EREIGNISSE.AENDERUNG') %></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% liste.forEach((e) => { %>
+            <tr>
+              <td class="text-nowrap text-secondary small"><%= zeit(e.zeit) %></td>
+              <td>
+                <span class="badge bg-<%= farbe[e.schwere] || 'secondary' %>-lt me-1"><%= tr('logging:SCHWEREN.' + String(e.schwere).toUpperCase()) %></span>
+                <%= tr('logging:ARTEN.' + e.art.replace('.', '_').toUpperCase()) %>
+                <% if (e.objekt_name) { %><div class="small text-secondary"><%= e.objekt_typ === 'kanal' ? '#' : '' %><%= e.objekt_name %></div><% } %>
+                <% if (e.kanal_id && e.objekt_typ !== 'kanal') { %><div class="small text-secondary"><%= tr('logging:EREIGNISSE.KANAL', { id: e.kanal_id }) %></div><% } %>
+              </td>
+              <td class="small">
+                <% if (e.betroffen_id) { %><div><%= tr('logging:EREIGNISSE.BETROFFEN') %>: <%= wer(e.betroffen_id) %></div><% } %>
+                <div class="text-secondary">
+                  <%= tr('logging:EREIGNISSE.AKTEUR') %>:
+                  <%= e.akteur_id ? wer(e.akteur_id) : tr('logging:EREIGNISSE.AKTEUR_UNBEKANNT') %>
+                  <% if (e.akteur_id) { %><span class="badge bg-secondary-lt ms-1"><%= tr('logging:ZUORDNUNG.' + String(e.zuordnung).toUpperCase()) %></span><% } %>
+                </div>
+              </td>
+              <td class="small">
+                <% e.zeilen.forEach((z) => { %>
+                  <% if (z.art === 'feld') { %>
+                    <div><span class="text-secondary"><%= tr('logging:FELDER.' + z.feld.toUpperCase()) %>:</span>
+                      <% if (z.vorher !== null) { %><del><%= z.vorher %></del> → <% } %><%= z.nachher === null ? '–' : z.nachher %></div>
+                  <% } else if (z.art === 'rollen') { %>
+                    <% z.dazu.forEach((r) => { %><div class="text-success">+ <%= rolle(r) %></div><% }); %>
+                    <% z.weg.forEach((r) => { %><div class="text-danger">− <%= rolle(r) %></div><% }); %>
+                  <% } else if (z.art === 'rechte') { %>
+                    <div>
+                      <% if (z.ziel) { %><span class="text-secondary"><%= z.typ === 'mitglied' ? wer(z.ziel) : (String(z.ziel) === String(guildId) ? '@everyone' : rolle(z.ziel)) %><% if (z.zustand !== 'geaendert') { %> (<%= tr('logging:RECHTE.' + z.zustand.toUpperCase()) %>)<% } %>:</span><% } %>
+                      <% (z.erlaubt?.neu || []).forEach((r) => { %><span class="badge bg-success-lt me-1">+ <%= r %></span><% }); %>
+                      <% (z.erlaubt?.weg || []).forEach((r) => { %><span class="badge bg-secondary-lt me-1">− <%= r %></span><% }); %>
+                      <% (z.verboten?.neu || []).forEach((r) => { %><span class="badge bg-danger-lt me-1"><%= tr('logging:RECHTE.VERBOTEN') %> <%= r %></span><% }); %>
+                      <% (z.verboten?.weg || []).forEach((r) => { %><span class="badge bg-secondary-lt me-1"><%= tr('logging:RECHTE.NICHT_MEHR_VERBOTEN') %> <%= r %></span><% }); %>
+                    </div>
+                  <% } %>
+                <% }); %>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+    <div class="card-footer d-flex justify-content-between">
+      <% if (seite > 1) { %><a class="btn btn-outline-secondary btn-sm" href="<%= link(seite - 1) %>"><i class="fa-solid fa-chevron-left me-1"></i><%= tr('logging:EREIGNISSE.NEUER') %></a><% } else { %><span></span><% } %>
+      <% if (weiter) { %><a class="btn btn-outline-secondary btn-sm" href="<%= link(seite + 1) %>"><%= tr('logging:EREIGNISSE.AELTER') %><i class="fa-solid fa-chevron-right ms-1"></i></a><% } %>
+    </div>
+  <% } %>
+</div>

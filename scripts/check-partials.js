@@ -95,6 +95,19 @@ const HANDLER = {
         vermerk: true,
         partialAlt: 'Verlassen vermerkt (Mitglied 4 in Guild 1), ohne Fehler, nichts gesendet',
     },
+    // Logging (LG-1b): schreibt ein Ereignis in `log_ereignisse`, sendet nichts.
+    // Ohne Vorher-Stand ist eine Aenderung nicht zu beschreiben → nichts.
+    'plugins/logging/bot/events/guildMemberUpdate.js': {
+        ereignis: 'guildMemberUpdate',
+        protokoll: true,
+        partialAlt: 'keine Abfrage, kein Ereignis (Vorher-Stand unbekannt)',
+        gegenprobe: 'Rolle 880…88 und Boost weg: Ereignisse mitglied.rollen und mitglied.boost',
+    },
+    'plugins/logging/bot/events/guildMemberRemove.js': {
+        ereignis: 'guildMemberRemove',
+        protokoll: true,
+        partialAlt: 'ein Ereignis mitglied.verlassen ohne Vorher-Stand, ohne Fehler, nichts gesendet',
+    },
 };
 
 /** Ein Client, eine Gilde mit Ziel-Kanal, Attrappen fuer DB und Logger. */
@@ -113,6 +126,7 @@ function aufbau(partials) {
     const geloescht = [];
     const vermerkt = [];
     const verlassen = [];
+    const protokolliert = [];
     const fehlerLog = [];
     ServiceManager.register('dbService', {
         query: async (sql, werte) => {
@@ -142,6 +156,14 @@ function aufbau(partials) {
                 verlassen.push({ sql, werte });
                 return { affectedRows: 1 };
             }
+            // Logging (LG-1b): in Guild 1 an, keine Regeln (Vorgaben), Ereignis und Name.
+            if (/FROM guild_plugins WHERE plugin_name = 'logging'/.test(sql)) return [{ guild_id: '1' }];
+            if (/FROM log_regeln /.test(sql)) return [];
+            if (/^INSERT INTO log_ereignisse/.test(sql)) {
+                protokolliert.push({ sql, werte });
+                return { affectedRows: 1 };
+            }
+            if (/^\s*INSERT INTO log_namen /.test(sql)) return { affectedRows: 1 };
             if (/^SELECT art, einladung, einlader_id, sicherheit, beigetreten_am, verlassen_am FROM mitglied_beitritte WHERE guild_id = \? AND mitglied_id = \?$/.test(sql)) {
                 return [];
             }
@@ -152,7 +174,7 @@ function aufbau(partials) {
         info() {}, warn() {}, debug() {},
         error: (...a) => fehlerLog.push(a.map((x) => (x && x.message) || String(x)).join(' ')),
     });
-    return { client, guild, gesendet, abfragen, geloescht, vermerkt, verlassen, fehlerLog };
+    return { client, guild, gesendet, abfragen, geloescht, vermerkt, verlassen, protokolliert, fehlerLog };
 }
 
 /** Laesst discord.js selbst ein Ereignis erzeugen und gibt dessen Argumente zurueck. */
@@ -215,7 +237,7 @@ const updateDaten = (premium) => ({
     });
 
     for (const datei of gefunden.filter((f) => HANDLER[f])) {
-        const { ereignis, partialAlt, gegenprobe, buch, vermerk } = HANDLER[datei];
+        const { ereignis, partialAlt, gegenprobe, buch, vermerk, protokoll } = HANDLER[datei];
         const handler = require(path.join(WURZEL, datei));
         const kurz = datei.replace(/^plugins\//, '').replace('/bot/events/', ': ');
 
@@ -230,6 +252,47 @@ const updateDaten = (premium) => ({
                 assert.deepStrictEqual(gesendet, []);
                 assert.strictEqual(vermerkt.length, 1, `vermerkt: ${vermerkt.length}`);
                 assert.deepStrictEqual(vermerkt[0].werte, ['4', '1']);
+            });
+            continue;
+        }
+
+        if (protokoll && ereignis === 'guildMemberUpdate') {
+            await pruefe(`${kurz} — ungecacht: ${partialAlt}`, async () => {
+                const { client, gesendet, abfragen, protokolliert, fehlerLog } = aufbau(partials);
+                const args = erzeuge(client, ereignis, () =>
+                    client.actions.GuildMemberUpdate.handle(updateDaten(true), { status: Status.Ready }));
+                assert.strictEqual(args[0].partial, true);
+                await handler(...args);
+                assert.deepStrictEqual(abfragen, [], 'hat die Datenbank gefragt');
+                assert.deepStrictEqual(protokolliert, []);
+                assert.deepStrictEqual(gesendet, []);
+                assert.deepStrictEqual(fehlerLog, []);
+            });
+            await pruefe(`${kurz} — Gegenprobe: ${gegenprobe}`, async () => {
+                const { client, guild, protokolliert, gesendet, fehlerLog } = aufbau(partials);
+                guild.members._add(updateDaten(true));
+                const args = erzeuge(client, ereignis, () =>
+                    client.actions.GuildMemberUpdate.handle(updateDaten(false), { status: Status.Ready }));
+                assert.strictEqual(args[0].partial, false);
+                await handler(...args);
+                assert.deepStrictEqual(fehlerLog, []);
+                assert.deepStrictEqual(gesendet, []);
+                // Mit der Booster-Rolle endet auch der Boost (premium_since → null): zwei Ereignisse.
+                assert.deepStrictEqual(protokolliert.map((p) => p.werte[3]), ['mitglied.rollen', 'mitglied.boost'], `Ereignisse: ${protokolliert.map((p) => p.werte[3]).join(', ')}`);
+                assert.deepStrictEqual(JSON.parse(protokolliert[0].werte[13]), { dazu: [], weg: ['880000000000000088'] });
+            });
+            continue;
+        }
+        if (protokoll) {
+            await pruefe(`${kurz} — ungecacht: ${partialAlt}`, async () => {
+                const { client, gesendet, protokolliert, fehlerLog } = aufbau(partials);
+                const args = erzeuge(client, ereignis, () =>
+                    client.actions.GuildMemberRemove.handle({ guild_id: '1', user: NUTZER }, { status: Status.Ready }));
+                assert.strictEqual(args[0].partial, true);
+                await handler(...args);
+                assert.deepStrictEqual(fehlerLog, []);
+                assert.deepStrictEqual(gesendet, []);
+                assert.deepStrictEqual(protokolliert.map((p) => [p.werte[3], p.werte[12]]), [['mitglied.verlassen', null]]);
             });
             continue;
         }

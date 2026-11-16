@@ -1,0 +1,85 @@
+<%- include('shared/seitenkopf', {
+      plugin:       'logging',
+      vortitel:     tr('logging:TITEL'),
+      titel:        tr('logging:NAV.EINSTELLUNGEN'),
+      beschreibung: tr('logging:EINSTELLUNGEN.BESCHREIBUNG'),
+      icon:         'fa-solid fa-sliders',
+      guildId:      guildId
+}) %>
+
+<%# Einstellungen (LG-1b Teil 1): Kategorien und Arten an/aus, Bots ausschließen. Prüfung in routes/guild.router.js pruefeEinstellungen. Ziele, Ausschlüsse je Mitglied/Rolle/Kanal und Darstellung kommen mit LG-1d/LG-1f. %>
+<form id="loggingForm" onsubmit="return false;">
+  <div class="row row-cards">
+    <% Object.entries(katalog).forEach(([k, v]) => { %>
+      <div class="col-lg-6">
+        <div class="card" data-kategorie="<%= k %>">
+          <div class="card-header">
+            <h3 class="card-title"><i class="<%= v.icon %> me-2"></i><%= tr('logging:KATEGORIEN.' + k.toUpperCase()) %></h3>
+            <div class="card-actions">
+              <label class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" data-feld="kategorie" <%= an[k] ? 'checked' : '' %>>
+                <span class="form-check-label"><%= tr('logging:EINSTELLUNGEN.AN') %></span>
+              </label>
+            </div>
+          </div>
+          <div class="card-body">
+            <p class="text-secondary small"><%= tr('logging:KATEGORIEN.' + k.toUpperCase() + '_TEXT') %></p>
+            <% v.arten.forEach((a) => { %>
+              <label class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" data-art="<%= a %>" <%= artenAus.includes(a) ? '' : 'checked' %>>
+                <span class="form-check-label"><%= tr('logging:ARTEN.' + a.replace('.', '_').toUpperCase()) %></span>
+              </label>
+            <% }); %>
+          </div>
+        </div>
+      </div>
+    <% }); %>
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header"><h3 class="card-title"><i class="fa-solid fa-filter-circle-xmark me-2"></i><%= tr('logging:EINSTELLUNGEN.AUSSCHLUESSE') %></h3></div>
+        <div class="card-body">
+          <label class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="loggingBots" <%= bots ? 'checked' : '' %>>
+            <span class="form-check-label"><%= tr('logging:EINSTELLUNGEN.BOTS') %></span>
+          </label>
+          <p class="text-secondary small mb-0"><i class="fa-solid fa-shield-halved me-1"></i><%= tr('logging:EINSTELLUNGEN.KRITISCH_HINWEIS') %></p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="mt-3">
+    <button class="btn btn-primary" type="button" id="loggingSpeichern"><i class="fa-solid fa-floppy-disk me-1"></i><%= tr('logging:EINSTELLUNGEN.SPEICHERN') %></button>
+  </div>
+</form>
+
+<div class="mt-4">
+  <%- include('shared/aufbewahrung', { guildId, tr, plugin: 'logging' }) %>
+</div>
+
+<script>
+(function () {
+  const form = document.getElementById('loggingForm');
+  if (!form) return;
+  const adresse = '/guild/<%= guildId %>/plugins/logging/einstellungen';
+  const meldung = (art, text) => (window.showToast ? window.showToast(art, text) : console[art === 'error' ? 'error' : 'log']('[Logging]', text));
+  const knopf = document.getElementById('loggingSpeichern');
+  knopf.addEventListener('click', async () => {
+    const daten = { kategorien: {}, arten: {}, bots: document.getElementById('loggingBots').checked };
+    form.querySelectorAll('[data-kategorie]').forEach((karte) => {
+      daten.kategorien[karte.dataset.kategorie] = karte.querySelector('[data-feld="kategorie"]').checked;
+    });
+    form.querySelectorAll('[data-art]').forEach((f) => { daten.arten[f.dataset.art] = f.checked; });
+    knopf.disabled = true;
+    try {
+      const antwort = await fetch(adresse, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(daten) });
+      const a = await antwort.json().catch(() => ({}));
+      if (!antwort.ok || !a.success) throw new Error(a.message || antwort.statusText);
+      meldung('success', a.message);
+    } catch (err) {
+      meldung('error', err.message);
+    } finally {
+      knopf.disabled = false;
+    }
+  });
+})();
+</script>

@@ -1,0 +1,17 @@
+{
+    "plugin": "logging",
+    "version": "1.0.0",
+    "permissions": [
+        { "key": "LOGGING.VIEW", "name": "logging:PERMS.VIEW", "description": "logging:PERMS.VIEW_DESC", "category": "logging", "is_dangerous": 0, "requires": null },
+        { "key": "LOGGING.CONTENT.VIEW", "name": "logging:PERMS.CONTENT_VIEW", "description": "logging:PERMS.CONTENT_VIEW_DESC", "category": "logging", "is_dangerous": 1, "requires": "LOGGING.VIEW" },
+        { "key": "LOGGING.MODERATION.VIEW", "name": "logging:PERMS.MODERATION_VIEW", "description": "logging:PERMS.MODERATION_VIEW_DESC", "category": "logging", "is_dangerous": 0, "requires": "LOGGING.VIEW" },
+        { "key": "LOGGING.SECURITY.VIEW", "name": "logging:PERMS.SECURITY_VIEW", "description": "logging:PERMS.SECURITY_VIEW_DESC", "category": "logging", "is_dangerous": 0, "requires": "LOGGING.VIEW" },
+        { "key": "LOGGING.EXPORT", "name": "logging:PERMS.EXPORT", "description": "logging:PERMS.EXPORT_DESC", "category": "logging", "is_dangerous": 1, "requires": "LOGGING.VIEW" },
+        { "key": "LOGGING.CONFIGURE", "name": "logging:PERMS.CONFIGURE", "description": "logging:PERMS.CONFIGURE_DESC", "category": "logging", "is_dangerous": 0, "requires": "LOGGING.VIEW" },
+        { "key": "LOGGING.RETENTION", "name": "logging:PERMS.RETENTION", "description": "logging:PERMS.RETENTION_DESC", "category": "logging", "is_dangerous": 1, "requires": "LOGGING.CONFIGURE" }
+    ],
+    "default_groups": {
+        "Administrator": ["LOGGING.VIEW", "LOGGING.CONTENT.VIEW", "LOGGING.MODERATION.VIEW", "LOGGING.SECURITY.VIEW", "LOGGING.EXPORT", "LOGGING.CONFIGURE", "LOGGING.RETENTION"],
+        "Moderator": ["LOGGING.VIEW", "LOGGING.MODERATION.VIEW"]
+    }
+}
