@@ -7,7 +7,10 @@
       guildId:      guildId
 }) %>
 
-<%# Einstellungen (LG-1b Teil 1): Kategorien und Arten an/aus, Bots ausschließen. Prüfung in routes/guild.router.js pruefeEinstellungen. Ziele, Ausschlüsse je Mitglied/Rolle/Kanal und Darstellung kommen mit LG-1d/LG-1f. %>
+<%# Einstellungen (LG-1b Teil 1 und 2): Kategorien und Arten an/aus (manche Arten ohne Zeile aus: Katalog aus, Marke Vorgabe aus), Bots ausschließen. Prüfung in routes/guild.router.js pruefeEinstellungen. Ziele, Ausschlüsse je Mitglied/Rolle/Kanal und Darstellung kommen mit LG-1d/LG-1f. %>
+<%# artAn/vorgabeAus seit LG-1b Teil 2; bis zum Dashboard-Neustart liefert der alte Router artenAus %>
+<% const istAn = (a) => (typeof artAn !== 'undefined' ? Boolean(artAn[a]) : !(typeof artenAus !== 'undefined' && artenAus.includes(a)));
+   const vorgabeAusListe = typeof vorgabeAus !== 'undefined' ? vorgabeAus : []; %>
 <form id="loggingForm" onsubmit="return false;">
   <div class="row row-cards">
     <% Object.entries(katalog).forEach(([k, v]) => { %>
@@ -26,8 +29,8 @@
             <p class="text-secondary small"><%= tr('logging:KATEGORIEN.' + k.toUpperCase() + '_TEXT') %></p>
             <% v.arten.forEach((a) => { %>
               <label class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" data-art="<%= a %>" <%= artenAus.includes(a) ? '' : 'checked' %>>
-                <span class="form-check-label"><%= tr('logging:ARTEN.' + a.replace('.', '_').toUpperCase()) %></span>
+                <input class="form-check-input" type="checkbox" data-art="<%= a %>" <%= istAn(a) ? 'checked' : '' %>>
+                <span class="form-check-label"><%= tr('logging:ARTEN.' + a.replace('.', '_').toUpperCase()) %><% if (vorgabeAusListe.includes(a)) { %> <span class="badge bg-secondary-lt ms-1"><%= tr('logging:EINSTELLUNGEN.VORGABE_AUS') %></span><% } %></span>
               </label>
             <% }); %>
           </div>

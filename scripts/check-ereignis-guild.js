@@ -12,7 +12,8 @@
  *
  *   1  Formen      `PluginManager.guildIdAus` findet die Guild an Message,
  *                  Interaction, Reaktion (an der Nachricht), VoiceState,
- *                  Guild selbst, Sammlung + Kanal, Sammlung + Guild
+ *                  Guild selbst, Sammlung + Kanal, Sammlung + Guild,
+ *                  zwei Sammlungen + Thread (`threadMembersUpdate`, 2026-11-16)
  *                  (`guildMembersChunk`), Protokolleintrag + Guild
  *                  (`guildAuditLogEntryCreate`); ohne Guild `null`, nie die ID der
  *                  Nachricht, des Kanals oder des Nutzers
@@ -20,6 +21,11 @@
  *   3  Handler     jeder `messageDeleteBulk`-Handler eines Plugins nimmt die
  *                  Sammlung als erstes Argument (nicht eine Nachricht)
  *   4  Gegenprobe  ohne die Sammlungs-Regel ist 1 rot
+ *   5  Anmelden    jedes Plugin-Ereignis kommt am Client an, auch wenn das
+ *                  Plugin erst nach dem Start zum ersten Mal eingeschaltet
+ *                  wird (2026-11-16, gefunden an Logging: `roleCreate` kam
+ *                  bis zum Neustart nie an); je Ereignis einmal, `ready` nie;
+ *                  `bot.js` meldet über `meldeEreignisseAn`, nicht mehr selbst
  *
  *   node scripts/check-ereignis-guild.js
  */
@@ -53,6 +59,7 @@ const FORMEN = [
     ['messageDeleteBulk (Sammlung + Kanal)', [new Map([['1', { id: '1', guildId: G }]]), { id: '4', guildId: G, guild }]],
     ['messageDeleteBulk (leere Sammlung + Kanal)', [new Map(), { id: '4', guildId: G }]],
     ['guildMembersChunk (Sammlung + Guild)', [new Map(), guild, {}]],
+    ['threadMembersUpdate (zwei Sammlungen + Thread)', [new Map(), new Map([['9', { id: '9' }]]), { id: '10', guildId: G, guild }]],
     ['guildAuditLogEntryCreate (Eintrag ohne Guild + Guild)', [{ id: '7', action: 1, targetId: '8' }, guild]],
 ];
 
@@ -73,6 +80,18 @@ function pruefeFormen(PM) {
         if (id != null) aus.push(`${was}: ${id} statt null`);
     }
     return aus;
+}
+
+/** Startstand anmelden, danach ein neues Plugin aufnehmen: alles muss am Client ankommen. */
+function pruefeAnmelden(Klasse) {
+    const pm = new Klasse({}, path.join(WURZEL, 'plugins'));
+    const angemeldet = [];
+    pm.nimmEreignisseAuf({ name: 'alt', eventHandlers: new Map([['guildMemberUpdate', () => {}], ['ready', () => {}]]) });
+    pm.meldeEreignisseAn({}, (e) => angemeldet.push(e));
+    pm.nimmEreignisseAuf({ name: 'neu', eventHandlers: new Map([['roleCreate', () => {}], ['guildMemberUpdate', () => {}]]) });
+    pm.nimmEreignisseAuf({ name: 'noch', eventHandlers: new Map([['roleCreate', () => {}]]) });
+    pm.meldeEreignisseAn({}, (e) => angemeldet.push('doppelt:' + e));
+    assert.deepStrictEqual(angemeldet, ['guildMemberUpdate', 'roleCreate'], 'je Ereignis einmal, ready nie, spätere sofort');
 }
 
 console.log('\nBot-Ereignisse und ihre Guild (K394)');
@@ -107,6 +126,17 @@ pruefe('3. jeder messageDeleteBulk-Handler nimmt die Sammlung als erstes Argumen
     assert.deepStrictEqual(aus, []);
 });
 
+pruefe('5. Ereignisse eines später eingeschalteten Plugins kommen am Client an, je einmal', () => {
+    const { ServiceManager } = require('dunebot-core');
+    if (!ServiceManager.has?.('Logger')) ServiceManager.register('Logger', { debug() {}, info() {}, warn() {}, error() {}, success() {} });
+    pruefeAnmelden(PM);
+    const bot = ohneKommentare(fs.readFileSync(path.join(WURZEL, 'apps/bot/bot.js'), 'utf8'));
+    assert.match(bot, /pluginManager\.meldeEreignisseAn\(client,/, 'bot.js meldet nicht über meldeEreignisseAn');
+    assert.doesNotMatch(bot, /listeningEvents\.forEach/, 'bot.js meldet wieder selbst nur den Startstand an');
+    const pmCode = ohneKommentare(quelle);
+    assert.match(pmCode, /this\.nimmEreignisseAuf\(plugin\)/, 'Anmeldeweg ruft nimmEreignisseAuf nicht');
+});
+
 console.log('\nGegenprobe');
 pruefe('rot: ohne die Sammlungs-Regel', () => {
     const alt = {
@@ -125,6 +155,23 @@ pruefe('rot: Rückfall auf den Träger selbst (alter Stand)', () => {
     };
     const rot = pruefeFormen(alt);
     assert.ok(rot.some((z) => z.startsWith('DM-Nachricht')) && rot.some((z) => z.startsWith('userUpdate')), `bleibt grün: ${JSON.stringify(rot)}`);
+});
+
+pruefe('rot: nach einer Sammlung nur das zweite Argument (Stand K394)', () => {
+    const alt = {
+        traegerAus: (args) => (args?.[0] instanceof Map ? args[1] : args?.[0]) ?? null,
+        guildAus: PM.guildAus,
+        guildIdAus(args) { const t = this.traegerAus(args); return t?.guild?.id || t?.guildId || null; },
+    };
+    const rot = pruefeFormen(alt);
+    assert.ok(rot.some((z) => z.startsWith('threadMembersUpdate')), `bleibt grün: ${JSON.stringify(rot)}`);
+});
+
+pruefe('rot: Anmelden nur mit dem Startstand (alter Stand)', () => {
+    class Alt extends PM { nimmEreignisseAuf(plugin) { plugin.eventHandlers?.forEach((h, e) => this.listeningEvents.add(e)); } }
+    let rot = false;
+    try { pruefeAnmelden(Alt); } catch { rot = true; }
+    assert.ok(rot, 'bleibt grün');
 });
 
 console.log(fehler ? `\n✗ ${fehler} Prüfung(en) rot` : '\n✓ alles grün');

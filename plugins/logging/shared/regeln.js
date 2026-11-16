@@ -11,7 +11,7 @@
  * @module logging/shared/regeln
  */
 
-const { KATEGORIEN } = require('./katalog');
+const { KATEGORIEN, VORGABE_AUS } = require('./katalog');
 
 // ---------------------------------------------------------------------------
 // Reine Entscheidungen
@@ -21,15 +21,18 @@ const { KATEGORIEN } = require('./katalog');
  * Regelzeilen einer Guild in eine Form, die `darf` schnell fragt.
  *
  * @param {Array<{regel: string, ziel: string, aktiv: number|boolean}>} zeilen
- * @returns {{kategorien: Object<string, boolean>, artenAus: Set<string>, mitglieder: Set<string>, rollen: Set<string>, kanaele: Set<string>, bots: boolean}}
+ * Eine Art-Zeile gibt es nur, wo die Guild von der Vorgabe abweicht:
+ * `aktiv = 0` schaltet eine Art aus, `aktiv = 1` eine aus `VORGABE_AUS` an.
+ *
+ * @returns {{kategorien: Object<string, boolean>, artenAus: Set<string>, artenAn: Set<string>, mitglieder: Set<string>, rollen: Set<string>, kanaele: Set<string>, bots: boolean}}
  */
 function ordne(zeilen) {
-    const r = { kategorien: {}, artenAus: new Set(), mitglieder: new Set(), rollen: new Set(), kanaele: new Set(), bots: false };
+    const r = { kategorien: {}, artenAus: new Set(), artenAn: new Set(), mitglieder: new Set(), rollen: new Set(), kanaele: new Set(), bots: false };
     for (const z of zeilen || []) {
         const an = Boolean(Number(z.aktiv));
         const ziel = String(z.ziel || '');
         if (z.regel === 'kategorie') r.kategorien[ziel] = an;
-        else if (z.regel === 'art' && !an) r.artenAus.add(ziel);
+        else if (z.regel === 'art') (an ? r.artenAn : r.artenAus).add(ziel);
         else if (z.regel === 'mitglied' && an) r.mitglieder.add(ziel);
         else if (z.regel === 'rolle' && an) r.rollen.add(ziel);
         else if (z.regel === 'kanal' && an) r.kanaele.add(ziel);
@@ -43,6 +46,13 @@ function kategorieAn(regeln, kategorie) {
     if (!KATEGORIEN[kategorie]) return false;
     const wert = regeln?.kategorien?.[kategorie];
     return wert === undefined ? Boolean(KATEGORIEN[kategorie].vorgabe) : wert;
+}
+
+/** Ist die Art an? Ohne Zeile gilt `VORGABE_AUS` aus dem Katalog. */
+function artAn(regeln, art) {
+    if (regeln?.artenAus?.has(art)) return false;
+    if (regeln?.artenAn?.has(art)) return true;
+    return !VORGABE_AUS.has(art);
 }
 
 /**
@@ -68,7 +78,7 @@ function kategorieAn(regeln, kategorie) {
  */
 function darf(regeln, e) {
     if (!kategorieAn(regeln, e.kategorie)) return { erlaubt: false, grund: 'kategorie_aus' };
-    if (regeln?.artenAus?.has(e.art)) return { erlaubt: false, grund: 'art_aus' };
+    if (!artAn(regeln, e.art)) return { erlaubt: false, grund: 'art_aus' };
     if (e.schwere === 'kritisch') return { erlaubt: true, grund: null };
     const m = regeln?.mitglieder || new Set();
     if ((e.akteur && m.has(String(e.akteur))) || (e.betroffen && m.has(String(e.betroffen)))) {
@@ -170,4 +180,4 @@ function vergissGlobal() {
     global = { zeit: 0, menge: new Set(), laeuft: null };
 }
 
-module.exports = { ordne, kategorieAn, darf, mengeAus, lade, vergiss, irgendwoAn, vergissGlobal, ZWISCHENSPEICHER_MS };
+module.exports = { ordne, kategorieAn, artAn, darf, mengeAus, lade, vergiss, irgendwoAn, vergissGlobal, ZWISCHENSPEICHER_MS };

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Logging Stufe 1 (LG-1a, LG-1b Teil 1, K382, 2026-11-16).
+ * Logging Stufe 1 (LG-1a, LG-1b Teil 1 und 2, K382, 2026-11-16).
  *
  * Geprüft wird:
  *
@@ -19,13 +19,18 @@
  *                   (Rolle, Überschreibung, @everyone), Schweren; Erfasser
  *                   für Mitglieder, Bots, Kanäle, Rollen, Server, Einladungen
  *                   mit Attrappen aus discord.js-Werten; Zeile, Schlüssel;
- *                   Eingaben der Einstellseite; Anzeige
+ *                   Eingaben der Einstellseite; Anzeige. Teil 2: Nachrichten
+ *                   (nur Merkmale, Link-Vorschau zählt nicht), Sprache,
+ *                   Emojis/Sticker, Threads/Foren, Termine; Arten mit
+ *                   Vorgabe „aus“
  *   3  Läufe        an TEMPORARY-Kopien aller `log_*`-Tabellen mit echtem
  *                   SQL: Ereignis landet mit allen Spalten, dasselbe zweimal
  *                   ergibt eine Zeile, Kategorie aus → nichts, Kategorie
  *                   nirgends an → keine Abfrage der Regeln, Ausschluss
  *                   Mitglied → nichts, kritisch trotzdem, neuer Name → neue
- *                   Zeile in `log_namen`
+ *                   Zeile in `log_namen`; Art mit Vorgabe „aus“ erst nach
+ *                   einer Zeile `aktiv = 1`; neue Nachricht ohne @everyone
+ *                   → keine Abfrage
  *
  * Gegenproben: Jede Prüfung in 1 läuft einmal gegen eine eingebaute
  * Verletzung und muss dort rot werden.
@@ -67,6 +72,12 @@ const Anzeige = require(L('shared/anzeige'));
 const Erfasser = require(L('bot/erfasser'));
 const M = require(L('bot/mitglieder'));
 const S = require(L('bot/struktur'));
+const N = require(L('bot/nachrichten'));
+const Sp = require(L('bot/sprache'));
+const Ad = require(L('bot/ausdruck'));
+const T = require(L('bot/threads'));
+const Te = require(L('bot/termine'));
+const MODULE = 'mitglieder|struktur|nachrichten|sprache|ausdruck|threads|termine';
 
 const GUILD = '100000000000000001';
 const A = '200000000000000002';
@@ -82,8 +93,8 @@ function pruefeEreignisDateien(dateien) {
     const bekannt = new Set(Object.values(Events));
     const falsch = dateien.filter((d) => !bekannt.has(d.name));
     assert.deepStrictEqual(falsch.map((d) => d.name), [], 'kein Ereignis von discord.js');
-    const ohneWeg = dateien.filter((d) => !/require\('\.\.\/(mitglieder|struktur)'\)/.test(d.quelle) || !/\.melde\(/.test(d.quelle));
-    assert.deepStrictEqual(ohneWeg.map((d) => d.name), [], 'geht nicht über mitglieder.js/struktur.js zum Erfasser');
+    const ohneWeg = dateien.filter((d) => !new RegExp(`require\\('\\.\\./(${MODULE})'\\)`).test(d.quelle) || !/\.melde\(/.test(d.quelle));
+    assert.deepStrictEqual(ohneWeg.map((d) => d.name), [], `geht nicht über ${MODULE} zum Erfasser`);
 }
 
 function pruefeTexte(katalog, de, en, felder) {
@@ -130,6 +141,12 @@ function pruefeGuildInhalte(migration, paket) {
         pruefeEreignisDateien(dateien);
         rot('falscher Name', () => pruefeEreignisDateien([...dateien, { name: 'memberJoin', quelle: dateien[0].quelle }]));
         rot('ohne Erfasser', () => pruefeEreignisDateien([{ name: 'roleCreate', quelle: 'module.exports = () => {};' }]));
+        rot('fremdes Modul', () => pruefeEreignisDateien([{ name: 'roleCreate', quelle: "const X = require('../anderes'); X.melde();" }]));
+        const erwartet = ['messageDelete', 'messageUpdate', 'messageDeleteBulk', 'messageCreate', 'voiceStateUpdate', 'emojiCreate', 'emojiDelete',
+            'emojiUpdate', 'stickerCreate', 'stickerDelete', 'stickerUpdate', 'threadCreate', 'threadDelete', 'threadUpdate', 'threadMembersUpdate',
+            'guildScheduledEventCreate', 'guildScheduledEventDelete', 'guildScheduledEventUpdate', 'guildScheduledEventUserAdd', 'guildScheduledEventUserRemove'];
+        const fehlt = erwartet.filter((n) => !dateien.some((d) => d.name === n));
+        assert.deepStrictEqual(fehlt, [], 'Teil 2: Ereignis-Datei fehlt');
     });
 
     const de = JSON.parse(lies(L('dashboard/locales/de-DE.json')));
@@ -190,6 +207,16 @@ function pruefeGuildInhalte(migration, paket) {
         assert.strictEqual(Regeln.darf(r, { ...e, rollen: [], kanaele: [], akteurIstBot: true }).grund, 'bots');
         assert.deepStrictEqual(Regeln.darf(r, { ...e, betroffen: B, schwere: 'kritisch', akteurIstBot: true }), { erlaubt: true, grund: null }, 'kritisch geht nie verloren');
         assert.ok(Regeln.kategorieAn(Regeln.ordne([{ regel: 'kategorie', ziel: 'mitglieder', aktiv: 0 }]), 'mitglieder') === false);
+        // Arten mit Vorgabe „aus“ (Teil 2)
+        assert.ok(Katalog.VORGABE_AUS.has('sprache.selbst_stumm') && !Katalog.VORGABE_AUS.has('sprache.beigetreten'));
+        for (const a of Katalog.VORGABE_AUS) assert.ok(Katalog.kategorieVon(a), `Vorgabe aus: ${a} steht in keiner Kategorie`);
+        const v = { kategorie: 'sprache', art: 'sprache.selbst_stumm', schwere: 'info' };
+        assert.strictEqual(Regeln.darf(leer, v).grund, 'art_aus', 'Vorgabe aus ohne Zeile');
+        assert.strictEqual(Regeln.darf(leer, { ...v, art: 'sprache.beigetreten' }).erlaubt, true);
+        const an = Regeln.ordne([{ regel: 'art', ziel: 'sprache.selbst_stumm', aktiv: 1 }, { regel: 'art', ziel: 'sprache.beigetreten', aktiv: 0 }]);
+        assert.strictEqual(Regeln.darf(an, v).erlaubt, true, 'Zeile aktiv=1 schaltet an');
+        assert.strictEqual(Regeln.artAn(an, 'sprache.beigetreten'), false);
+        assert.strictEqual(Regeln.darf(an, { ...v, schwere: 'kritisch', art: 'sprache.beigetreten' }).grund, 'art_aus');
     });
 
     await pruefe('Menge „irgendwo an“: nur Guilds mit Logging, Vorgabe zählt, abgeschaltet zählt nicht', () => {
@@ -299,6 +326,119 @@ function pruefeGuildInhalte(migration, paket) {
         assert.deepStrictEqual([inv[0].akteur, inv[0].zuordnung, inv[0].objekt.name], [A, 'sicher', 'abc']);
         assert.strictEqual(S.einladungGeloescht({ code: 'abc', channelId: KANAL })[0].akteur, undefined);
         assert.deepStrictEqual(S.kette(kanal({ parentId: '500000000000000007' })), [KANAL, '500000000000000007']);
+    });
+
+
+    // ── Teil 2: Nachrichten, Sprache, Emojis/Sticker, Threads/Foren, Termine ──
+    const sammlung = (ids) => new Map(ids.map((id) => [id, { id }]));
+    const nachricht = (o = {}) => ({
+        id: '600000000000000008', guildId: GUILD, channelId: KANAL, partial: false, createdTimestamp: Date.parse('2026-11-16T09:00:00Z'),
+        editedTimestamp: null, pinned: false, webhookId: null, author: { id: A, username: 'anna', bot: false },
+        attachments: sammlung([]), embeds: [], mentions: { users: sammlung([]), roles: sammlung([]), everyone: false }, ...o,
+    });
+
+    await pruefe('Nachrichten: nur Merkmale, Partial ehrlich, Link-Vorschau zählt nicht, Massenlöschung, @everyone', () => {
+        const g = sammle(N.geloescht(nachricht({ attachments: sammlung(['1', '2']), mentions: { users: sammlung([B]), roles: sammlung([ROLLE]), everyone: true } })));
+        assert.deepStrictEqual([g[0].art, g[0].betroffen, g[0].akteur, g[0].kanal], ['nachricht.geloescht', A, undefined, KANAL]);
+        assert.deepStrictEqual(g[0].vorher, { erstellt_am: '2026-11-16T09:00:00.000Z', anhaenge: 2, embeds: 0, erwaehnungen: 2, everyone: true,
+            bot: false, webhook: false, angeheftet: false }, 'Merkmale (Geisterping erkennbar), kein Text');
+        const p = sammle(N.geloescht({ id: '1', guildId: GUILD, channelId: KANAL, partial: true, author: null }));
+        assert.deepStrictEqual([p[0].betroffen, p[0].vorher], [null, { im_speicher: false }], 'Partial → unbekannt, nicht geraten');
+        assert.deepStrictEqual(N.geloescht({ id: '1', guildId: null }), [], 'DM → nichts');
+        const t = Date.parse('2026-11-16T10:00:00Z');
+        assert.deepStrictEqual(N.bearbeitet(nachricht({ editedTimestamp: t }), nachricht({ editedTimestamp: t, embeds: [{}] }), t + 5000), [], 'Link-Vorschau → nichts');
+        const b = sammle(N.bearbeitet(nachricht(), nachricht({ editedTimestamp: t, attachments: sammlung(['1']) }), t + 1000));
+        assert.deepStrictEqual([b[0].art, b[0].akteur, b[0].zuordnung], ['nachricht.bearbeitet', A, 'sicher'], 'nur der Autor bearbeitet');
+        assert.deepStrictEqual([b[0].vorher.anhaenge, b[0].nachher.anhaenge], [0, 1]);
+        const altPartial = { id: '1', partial: true };
+        assert.deepStrictEqual(N.bearbeitet(altPartial, nachricht({ editedTimestamp: t }), t + N.FRISCH_MS + 1), [], 'ungecacht, alte Bearbeitung → nichts');
+        const f = sammle(N.bearbeitet(altPartial, nachricht({ editedTimestamp: t }), t + 1000));
+        assert.deepStrictEqual([f[0].art, f[0].vorher.im_speicher], ['nachricht.bearbeitet', false]);
+        assert.deepStrictEqual(N.bearbeitet(nachricht(), nachricht({ pinned: true })).map((x) => x.art), ['nachricht.angeheftet']);
+        assert.deepStrictEqual(N.bearbeitet(nachricht({ pinned: true }), nachricht()).map((x) => x.art), ['nachricht.losgeheftet']);
+        const m = sammle(N.massenloeschung([nachricht({ id: '1', author: { id: B } }), nachricht({ id: '2' }), nachricht({ id: '3', author: { id: B } }),
+            { id: '4', partial: true }], { id: KANAL, guildId: GUILD, name: 'allgemein' }));
+        assert.deepStrictEqual([m[0].art, m[0].schwere, m[0].vorher.anzahl, m[0].vorher.im_speicher, m[0].vorher.autoren], ['nachricht.massenloeschung', 'warnung', 4, 3, [A, B]]);
+        assert.deepStrictEqual(N.everyone(nachricht()), [], 'ohne @everyone nichts');
+        const e = sammle(N.everyone(nachricht({ mentions: { users: sammlung([]), roles: sammlung([]), everyone: true } })));
+        assert.deepStrictEqual([e[0].art, e[0].akteur, e[0].zuordnung], ['nachricht.everyone', A, 'sicher']);
+        assert.deepStrictEqual(N.ketteVon({ id: '7', parentId: KANAL, parent: { parentId: '500000000000000007' } }), ['7', KANAL, '500000000000000007'], 'Thread → Kanal → Kategorie');
+    });
+
+    await pruefe('Sprache: Beitritt (sicher), Verlassen/Wechsel (offen), Schalter, Bühne', () => {
+        const vs = (o = {}) => ({ id: A, channelId: KANAL, serverMute: false, serverDeaf: false, selfMute: false, selfDeaf: false, selfVideo: false,
+            streaming: false, suppress: false, requestToSpeakTimestamp: null, ...o });
+        const j = sammle(Sp.aenderungen(vs({ channelId: null }), vs()));
+        assert.deepStrictEqual([j[0].art, j[0].akteur, j[0].zuordnung, j[0].kanal], ['sprache.beigetreten', A, 'sicher', KANAL]);
+        const l = sammle(Sp.aenderungen(vs(), vs({ channelId: null })));
+        assert.deepStrictEqual([l[0].art, l[0].akteur], ['sprache.verlassen', undefined], 'Trennen kann ein Moderator sein');
+        const w = sammle(Sp.aenderungen(vs(), vs({ channelId: '7' })));
+        assert.deepStrictEqual([w[0].art, w[0].vorher.kanal, w[0].nachher.kanal], ['sprache.gewechselt', KANAL, '7']);
+        assert.deepStrictEqual(Sp.aenderungen(vs(), vs()), [], 'nichts geändert');
+        const s = sammle(Sp.aenderungen(vs(), vs({ serverMute: true, selfDeaf: true, selfVideo: true, streaming: true, serverDeaf: true, selfMute: true })));
+        assert.deepStrictEqual(s.map((x) => [x.art, x.akteur || null]), [['sprache.server_stumm', null], ['sprache.server_taub', null],
+            ['sprache.selbst_stumm', A], ['sprache.selbst_taub', A], ['sprache.kamera', A], ['sprache.bildschirm', A]]);
+        const b = sammle(Sp.aenderungen(vs({ suppress: true }), vs({ suppress: false, requestToSpeakTimestamp: Date.now() })));
+        assert.deepStrictEqual(b.map((x) => x.art), ['sprache.buehne', 'sprache.meldung']);
+        assert.deepStrictEqual(b[0].nachher, { sprecher: true });
+    });
+
+    await pruefe('Emojis und Sticker: anlegen, ändern (nur Unterschied), löschen', () => {
+        const emoji = (o = {}) => ({ id: '700000000000000009', name: 'feuer', animated: false, managed: false, roles: { cache: new Map() }, guild, ...o });
+        assert.deepStrictEqual(sammle(Ad.emojiAngelegt(emoji())).map((x) => [x.art, x.objekt.typ]), [['emoji.angelegt', 'emoji']]);
+        assert.deepStrictEqual(Ad.emojiGeaendert(emoji(), emoji()), []);
+        const g = sammle(Ad.emojiGeaendert(emoji(), emoji({ name: 'flamme', roles: { cache: new Map([[ROLLE, {}]]) } })));
+        assert.deepStrictEqual([g[0].vorher, g[0].nachher], [{ name: 'feuer', rollen: [] }, { name: 'flamme', rollen: [ROLLE] }]);
+        sammle(Ad.emojiGeaendert(emoji(), emoji({ animated: true, managed: true })));
+        sammle(Ad.emojiGeloescht(emoji()));
+        const st = (o = {}) => ({ id: '700000000000000010', guildId: GUILD, name: 'hallo', description: 'winkt', tags: 'wave', format: 1, ...o });
+        sammle(Ad.stickerAngelegt(st()));
+        const sg = sammle(Ad.stickerGeaendert(st(), st({ tags: 'hi', description: 'x', name: 'h', format: 2 })));
+        assert.strictEqual(sg[0].art, 'sticker.geaendert');
+        assert.deepStrictEqual(Ad.stickerGeaendert(st(), st()), []);
+        sammle(Ad.stickerGeloescht(st()));
+    });
+
+    await pruefe('Threads und Foren: nur neu angelegte, Forum getrennt, Tags mit Namen, Archiv allein eigene Art, Mitglieder', () => {
+        const forum = { id: KANAL, type: 15, parentId: '500000000000000007', availableTags: [{ id: '11', name: 'Hilfe' }, { id: '12', name: 'Gelöst' }] };
+        const textkanal = { id: KANAL, type: 0, parentId: null };
+        const th = (o = {}) => ({ id: '800000000000000011', guildId: GUILD, name: 'Frage', type: 11, archived: false, locked: false,
+            autoArchiveDuration: 1440, rateLimitPerUser: 0, invitable: null, ownerId: A, parentId: KANAL, parent: textkanal, appliedTags: [], ...o });
+        assert.deepStrictEqual(T.angelegt(th(), false), [], 'beim ersten Sehen → nichts');
+        const a = sammle(T.angelegt(th(), true));
+        assert.deepStrictEqual([a[0].art, a[0].akteur, a[0].zuordnung, a[0].nachher.tags], ['thread.angelegt', A, 'sicher', null]);
+        const fa = sammle(T.angelegt(th({ parent: forum, appliedTags: ['12', '11'] }), true));
+        assert.deepStrictEqual([fa[0].art, fa[0].nachher.tags], ['forum.beitrag_angelegt', ['Gelöst', 'Hilfe']]);
+        assert.deepStrictEqual(sammle(T.geaendert(th(), th({ archived: true }))).map((x) => x.art), ['thread.archiviert'], 'nur archiviert → eigene Art');
+        const g = sammle(T.geaendert(th(), th({ archived: true, name: 'Frage (gelöst)', locked: true, autoArchiveDuration: 60, rateLimitPerUser: 5 })));
+        assert.deepStrictEqual(g.map((x) => x.art), ['thread.geaendert']);
+        const pt = sammle(T.geaendert(th({ type: 12, invitable: true }), th({ type: 12, invitable: false })));
+        assert.deepStrictEqual(pt[0].nachher, { einladbar: false });
+        const ft = sammle(T.geaendert(th({ parent: forum, appliedTags: ['11'] }), th({ parent: forum, appliedTags: ['12'] })));
+        assert.deepStrictEqual([ft[0].art, ft[0].vorher.tags, ft[0].nachher.tags], ['forum.beitrag_geaendert', ['Hilfe'], ['Gelöst']]);
+        assert.deepStrictEqual(T.geaendert(null, th()), [], 'ohne alten Stand nichts');
+        assert.deepStrictEqual(sammle(T.geloescht(th({ parent: forum }))).map((x) => x.art), ['forum.beitrag_geloescht']);
+        const mi = T.mitglieder(new Map([[B, { id: B }]]), new Map([[A, { id: A }]]), th());
+        assert.deepStrictEqual(mi.map((x) => [x.art, x.betroffen]), [['thread.mitglied_dazu', B], ['thread.mitglied_weg', A]]);
+        const tags = sammle(T.forumTags({ ...forum, name: 'hilfe' }, { ...forum, name: 'hilfe', availableTags: [{ id: '11', name: 'Hilfe' }] }));
+        assert.deepStrictEqual([tags[0].art, tags[0].vorher.tags, tags[0].nachher.tags], ['forum.tags_geaendert', ['Gelöst', 'Hilfe'], ['Hilfe']]);
+        assert.deepStrictEqual(T.forumTags(kanal(), kanal({ name: 'x' })), [], 'kein Forum → nichts');
+    });
+
+    await pruefe('Termine: angelegt (Anleger sicher), Status eigene Art, Änderung, Interesse', () => {
+        const te = (o = {}) => ({ id: '900000000000000012', guildId: GUILD, name: 'Spieleabend', scheduledStartTimestamp: Date.parse('2026-11-20T18:00:00Z'),
+            scheduledEndTimestamp: null, channelId: KANAL, entityMetadata: null, entityType: 2, privacyLevel: 2, status: 1, creatorId: A, ...o });
+        const a = sammle(Te.angelegt(te()));
+        assert.deepStrictEqual([a[0].art, a[0].akteur, a[0].zuordnung, a[0].nachher.start], ['termin.angelegt', A, 'sicher', '2026-11-20T18:00:00.000Z']);
+        assert.ok(!('beschreibung' in a[0].nachher), 'Beschreibung ist freier Text, bleibt draußen');
+        assert.deepStrictEqual(sammle(Te.geaendert(te(), te({ status: 2 }))).map((x) => x.art), ['termin.gestartet']);
+        assert.deepStrictEqual(Te.geaendert(te({ status: 2 }), te({ status: 3 })).map((x) => x.art), ['termin.beendet']);
+        assert.deepStrictEqual(Te.geaendert(te(), te({ status: 4, name: 'Abgesagt' })).map((x) => x.art), ['termin.abgesagt', 'termin.geaendert']);
+        sammle(Te.geaendert(te(), te({ scheduledEndTimestamp: Date.now(), channelId: null, entityMetadata: { location: 'Draußen' }, entityType: 3, privacyLevel: 1 })));
+        assert.deepStrictEqual(Te.geaendert(te(), te()), []);
+        assert.deepStrictEqual(Te.interesse(te(), { id: B }, true).map((x) => [x.art, x.betroffen, x.zuordnung]), [['termin.interessiert', B, 'sicher']]);
+        assert.deepStrictEqual(Te.interesse(te(), { id: B }, false).map((x) => x.art), ['termin.nicht_interessiert']);
+        sammle(Te.geloescht(te()));
     });
 
     await pruefe('Texte: jede Kategorie, Art und jedes geschriebene Feld in beiden Sprachen', () => {
@@ -413,6 +553,26 @@ function pruefeGuildInhalte(migration, paket) {
             assert.strictEqual((await Erfasser.erfasse(GUILD, inv, { akteurIstBot: false })).gespeichert, true);
             const z = await zeilen();
             assert.deepStrictEqual(z.map((x) => [x.art, x.akteur_id, x.zuordnung]), [['mitglied.rollen', null, 'unbekannt'], ['einladung.angelegt', B, 'sicher']]);
+            assert.deepStrictEqual(gesehen, [], 'keine Fehler im Log');
+        });
+
+        await pruefe('Lauf: Art mit Vorgabe „aus“ erst nach Zeile aktiv=1; neue Nachricht ohne @everyone fragt nichts', async () => {
+            await q('DELETE FROM log_ereignisse');
+            await q('DELETE FROM log_regeln');
+            neu();
+            const vs = (o) => ({ id: B, channelId: KANAL, selfMute: false, ...o });
+            await Sp.melde(GUILD, Sp.aenderungen(vs(), vs({ selfMute: true })), vs(), vs({ selfMute: true }));
+            assert.strictEqual((await zeilen()).length, 0, 'selbst stumm ohne Zeile gespeichert');
+            await q("INSERT INTO log_regeln (guild_id, regel, ziel, aktiv) VALUES (?, 'art', 'sprache.selbst_stumm', 1)", [GUILD]);
+            neu();
+            await Sp.melde(GUILD, Sp.aenderungen(vs(), vs({ selfMute: true })), vs(), vs({ selfMute: true }));
+            assert.deepStrictEqual((await zeilen()).map((x) => [x.kategorie, x.art, x.akteur_id, x.zuordnung]), [['sprache', 'sprache.selbst_stumm', B, 'sicher']]);
+            neu();
+            const r = await require(L('bot/events/messageCreate.js'))(nachricht());
+            assert.strictEqual(r, undefined);
+            assert.deepStrictEqual(abfragen, [], 'neue Nachricht ohne @everyone hat abgefragt');
+            await require(L('bot/events/messageCreate.js'))(nachricht({ mentions: { users: sammlung([]), roles: sammlung([]), everyone: true } }));
+            assert.ok((await zeilen()).some((x) => x.art === 'nachricht.everyone'), '@everyone nicht gespeichert');
             assert.deepStrictEqual(gesehen, [], 'keine Fehler im Log');
         });
 

@@ -10,8 +10,12 @@
  *
  * Hier stehen nur Kategorien, deren Erfasser gebaut ist. Eine Kategorie ohne
  * Erfasser in der Liste wäre ein Schalter, der nichts tut. Teil 2 von LG-1b
- * trägt Sprache, Emojis, Threads, Foren, Discord-Ereignisse und Nachrichten
- * (Metadaten) nach.
+ * (2026-11-16) trug Nachrichten (nur Metadaten), Sprache, Emojis und
+ * Sticker, Threads, Foren und Discord-Ereignisse nach.
+ *
+ * `aus` nennt Arten, die ohne Zeile in `log_regeln` aus sind: Dinge, die oft
+ * und ohne Folgen geschehen (sich selbst stumm schalten, Thread von Discord
+ * archiviert). Wer sie will, schaltet sie auf der Einstellseite an.
  *
  * `vorgabe` gilt, solange die Guild für die Kategorie keine Zeile in
  * `log_regeln` hat. Neue Kategorien späterer Stufen brauchen so keine
@@ -44,6 +48,39 @@ const KATEGORIEN = {
         nummer: '3.7', icon: 'fa-solid fa-robot', vorgabe: true,
         arten: ['bot.beigetreten', 'bot.verlassen', 'bot.rollen', 'bot.spitzname'],
     },
+    nachrichten: {
+        nummer: '3.1', icon: 'fa-solid fa-message', vorgabe: true,
+        arten: ['nachricht.geloescht', 'nachricht.bearbeitet', 'nachricht.massenloeschung',
+            'nachricht.angeheftet', 'nachricht.losgeheftet', 'nachricht.everyone'],
+    },
+    sprache: {
+        nummer: '3.2', icon: 'fa-solid fa-microphone', vorgabe: true,
+        arten: ['sprache.beigetreten', 'sprache.verlassen', 'sprache.gewechselt', 'sprache.server_stumm',
+            'sprache.server_taub', 'sprache.selbst_stumm', 'sprache.selbst_taub', 'sprache.kamera',
+            'sprache.bildschirm', 'sprache.buehne', 'sprache.meldung'],
+        aus: ['sprache.selbst_stumm', 'sprache.selbst_taub', 'sprache.kamera', 'sprache.bildschirm', 'sprache.meldung'],
+    },
+    emojis: {
+        nummer: '3.8', icon: 'fa-solid fa-face-smile', vorgabe: true,
+        arten: ['emoji.angelegt', 'emoji.geloescht', 'emoji.geaendert', 'sticker.angelegt', 'sticker.geloescht', 'sticker.geaendert'],
+    },
+    threads: {
+        nummer: '3.9', icon: 'fa-solid fa-code-branch', vorgabe: true,
+        arten: ['thread.angelegt', 'thread.geloescht', 'thread.geaendert', 'thread.archiviert',
+            'thread.mitglied_dazu', 'thread.mitglied_weg'],
+        aus: ['thread.archiviert', 'thread.mitglied_dazu', 'thread.mitglied_weg'],
+    },
+    foren: {
+        nummer: '3.10', icon: 'fa-solid fa-comments', vorgabe: true,
+        arten: ['forum.beitrag_angelegt', 'forum.beitrag_geloescht', 'forum.beitrag_geaendert', 'forum.beitrag_archiviert',
+            'forum.tags_geaendert'],
+        aus: ['forum.beitrag_archiviert'],
+    },
+    termine: {
+        nummer: '3.11', icon: 'fa-solid fa-calendar-days', vorgabe: true,
+        arten: ['termin.angelegt', 'termin.geloescht', 'termin.geaendert', 'termin.gestartet', 'termin.beendet',
+            'termin.abgesagt', 'termin.interessiert', 'termin.nicht_interessiert'],
+    },
 };
 
 /** Schweren aus der Ereignisliste des Kerns (G-01), gleiche Bedeutung. */
@@ -62,8 +99,11 @@ const KATEGORIE_VON = Object.fromEntries(
 const GEFAEHRLICHE_RECHTE = ['Administrator', 'ManageGuild', 'ManageRoles', 'ManageChannels', 'ManageWebhooks',
     'BanMembers', 'KickMembers', 'ModerateMembers', 'MentionEveryone', 'ManageMessages'];
 
+/** Arten, die ohne Zeile aus sind. */
+const VORGABE_AUS = new Set(Object.values(KATEGORIEN).flatMap((v) => v.aus || []));
+
 function kategorieVon(art) {
     return KATEGORIE_VON[art] || null;
 }
 
-module.exports = { KATEGORIEN, SCHWEREN, GEFAEHRLICHE_RECHTE, kategorieVon };
+module.exports = { KATEGORIEN, SCHWEREN, GEFAEHRLICHE_RECHTE, VORGABE_AUS, kategorieVon };

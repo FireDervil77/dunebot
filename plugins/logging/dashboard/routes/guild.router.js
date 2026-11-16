@@ -12,6 +12,9 @@
  * Suche, Details, Zeitachse, Ziele und Ausschlüsse je Mitglied/Rolle/Kanal
  * bauen LG-1d und LG-1f aus. Der Bot liest die Regeln 30 s zwischengespeichert.
  *
+ * Seit LG-1b Teil 2 (2026-11-16) gibt es Arten, die ohne Zeile aus sind
+ * (Katalog `aus`); die Seite zeigt sie mit „Vorgabe: aus“.
+ *
  * @module logging/routes/guild
  */
 
@@ -20,7 +23,7 @@ const router = express.Router();
 const { ServiceManager } = require('dunebot-core');
 const { requirePermission } = require('../../../../apps/dashboard/middlewares/permissions.middleware');
 const { csrfProtection } = require('../../../../apps/dashboard/middlewares/security/csrf-protection.middleware');
-const { KATEGORIEN, SCHWEREN } = require('../../shared/katalog');
+const { KATEGORIEN, SCHWEREN, VORGABE_AUS } = require('../../shared/katalog');
 const Regeln = require('../../shared/regeln');
 const Anzeige = require('../../shared/anzeige');
 
@@ -135,7 +138,8 @@ router.get('/einstellungen', requirePermission('LOGGING.CONFIGURE'), async (req,
         await ServiceManager.get('themeManager').renderView(res, 'guild/logging-einstellungen', {
             tr, guildId, katalog: KATEGORIEN,
             an: Object.fromEntries(Object.keys(KATEGORIEN).map((k) => [k, Regeln.kategorieAn(regeln, k)])),
-            artenAus: [...regeln.artenAus], bots: regeln.bots,
+            artAn: Object.fromEntries(Object.values(KATEGORIEN).flatMap((v) => v.arten).map((a) => [a, Regeln.artAn(regeln, a)])),
+            vorgabeAus: [...VORGABE_AUS], bots: regeln.bots,
         });
     } catch (error) {
         ServiceManager.get('Logger').error('[Logging] Einstellungen nicht geladen:', error);
@@ -178,10 +182,10 @@ router.put('/einstellungen', csrfProtection, requirePermission('LOGGING.CONFIGUR
             `INSERT INTO log_regeln (guild_id, regel, ziel, aktiv) VALUES (?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE aktiv = VALUES(aktiv)`, [guildId, regel, ziel, aktiv ? 1 : 0]);
         for (const [k, an] of e.kategorien) await setze('kategorie', k, an);
-        // Arten: nur „aus“ braucht eine Zeile; wieder an → Zeile weg.
+        // Arten: Eine Zeile nur, wo die Wahl von der Vorgabe abweicht; zurück auf die Vorgabe → Zeile weg.
         for (const [a, an] of e.arten) {
-            if (an) await db.query("DELETE FROM log_regeln WHERE guild_id = ? AND regel = 'art' AND ziel = ?", [guildId, a]);
-            else await setze('art', a, false);
+            if (an === !VORGABE_AUS.has(a)) await db.query("DELETE FROM log_regeln WHERE guild_id = ? AND regel = 'art' AND ziel = ?", [guildId, a]);
+            else await setze('art', a, an);
         }
         if (e.bots !== null) await setze('bots', '', e.bots);
         Regeln.vergiss(guildId);

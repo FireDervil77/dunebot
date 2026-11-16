@@ -157,9 +157,10 @@ ServiceManager.register("bootHooks", bootHooks);
                 }
             });
 
-        // WICHTIG: Alle anderen Events registrieren
-        client.pluginManager.listeningEvents.forEach((event) => {
-            if (event !== "ready") {
+        // WICHTIG: Alle anderen Events registrieren – die beim Start bekannten
+        // sofort, spätere, sobald ein Plugin sie mitbringt (erstes Einschalten
+        // nach dem Start; vorher kamen die nie an, Logging 2026-11-16).
+        client.pluginManager.meldeEreignisseAn(client, (event) => {
                 client.on(event, async (...args) => {
                     // Die Argumente gehen unveraendert weiter — bewusst.
                     //
@@ -185,7 +186,6 @@ ServiceManager.register("bootHooks", bootHooks);
                     // Treffer verheerend.
                     await client.pluginManager.emit(event, ...args);
                 });
-            }
         });
 
         // **Ab hier hoeren wir Discords Ratenbremse zu.**

@@ -12,6 +12,8 @@ const { BotPlugin, Config } = require("dunebot-sdk");
  */
 class PluginManager extends BasePluginManager {
     #listeningEvents = new Set();
+    /** Ab `meldeEreignisseAn(client)`: meldet neue Ereignisse sofort am Client an. */
+    #anmelden = null;
     #hooks = null;
     #config = null;
 
@@ -132,6 +134,46 @@ class PluginManager extends BasePluginManager {
      */
     get listeningEvents() {
         return this.#listeningEvents;
+    }
+
+    /**
+     * Meldet jedes Plugin-Ereignis am Discord-Client an: alle bisherigen
+     * sofort, jedes spätere in dem Moment, in dem ein Plugin es mitbringt.
+     *
+     * Bis 2026-11-16 meldete `bot.js` die Liste einmal beim Start an. Ein
+     * Plugin, das erst danach zum ersten Mal irgendwo eingeschaltet wurde,
+     * kam zwar in `#listeningEvents`, aber sein Ereignis nie am Client an –
+     * es sei denn, ein anderes Plugin hörte zufällig schon darauf. Gefunden an
+     * Logging: `guildMemberUpdate` kam an (greeting hört mit), `roleCreate`,
+     * `roleUpdate`, `channelUpdate` nicht, bis zum nächsten Neustart.
+     *
+     * @param {import('discord.js').Client} client
+     * @param {(event: string) => void} anmelden hängt den Hörer an (aus bot.js)
+     */
+    meldeEreignisseAn(client, anmelden) {
+        if (this.#anmelden) return;
+        const gemeldet = new Set();
+        this.#anmelden = (event) => {
+            if (event === 'ready' || gemeldet.has(event)) return;
+            gemeldet.add(event);
+            anmelden(event);
+        };
+        this.#listeningEvents.forEach((event) => this.#anmelden(event));
+    }
+
+    /**
+     * Ereignisse eines Plugins aufnehmen; läuft der Bot schon, gleich am
+     * Client anmelden (siehe `meldeEreignisseAn`).
+     *
+     * @param {{name: string, eventHandlers?: Map<string, Function>}} plugin
+     */
+    nimmEreignisseAuf(plugin) {
+        const Logger = ServiceManager.get("Logger");
+        plugin.eventHandlers?.forEach((handler, eventName) => {
+            this.#listeningEvents.add(eventName);
+            if (this.#anmelden) this.#anmelden(eventName);
+            Logger?.debug?.(`Event "${eventName}" aus Plugin "${plugin.name}" registriert`);
+        });
     }
 
     /**
@@ -306,10 +348,7 @@ async enablePlugin(pluginName) {
 
         // Events aus dem Plugin registrieren und zum #listeningEvents-Set hinzufügen
         if (plugin.eventHandlers && plugin.eventHandlers.size > 0) {
-            plugin.eventHandlers.forEach((handler, eventName) => {
-                this.#listeningEvents.add(eventName);
-                Logger.debug(`Event "${eventName}" aus Plugin "${pluginName}" registriert`);
-            });
+            this.nimmEreignisseAuf(plugin);
 
             // Debug-Log für wichtige Events
             const importantEvents = ['guildCreate', 'guildDelete'];
@@ -589,12 +628,18 @@ async enablePlugin(pluginName) {
      * deshalb die XP von `/clear` nicht, und der Handler von gameserver lief
      * nie.
      *
+     * Bei `threadMembersUpdate(dazu, weg, thread)` sind die ersten beiden
+     * Sammlungen und der Thread kommt als drittes (Logging LG-1b, K382,
+     * 2026-11-16). Deshalb: nach einer Sammlung vorn das erste Argument, das
+     * keine Sammlung ist.
+     *
      * @param {Array} args Argumente des Ereignisses
      * @returns {Object|null}
      */
     static traegerAus(args) {
         const erstes = args?.[0];
-        return erstes instanceof Map ? (args[1] ?? null) : (erstes ?? null);
+        if (!(erstes instanceof Map)) return erstes ?? null;
+        return args.find((a) => !(a instanceof Map)) ?? null;
     }
 
     /**
