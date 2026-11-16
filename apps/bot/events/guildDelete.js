@@ -1,4 +1,5 @@
 const { ServiceManager } = require("dunebot-core");
+const Einladungen = require("dunebot-sdk/lib/Einladungen");
 
 /**
  * Kern-Event: guildDelete
@@ -11,6 +12,7 @@ module.exports = async (guild) => {
     const Logger = ServiceManager.get("Logger");
     const guildManager = ServiceManager.get("guildManager");
 
+    Einladungen.vergiss(guild.id);
     try {
         await guildManager.removeGuild(guild);
     } catch (error) {

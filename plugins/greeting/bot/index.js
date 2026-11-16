@@ -6,7 +6,6 @@
 const path = require('path');
 const { BotPlugin, VersionHelper } = require('dunebot-sdk');
 const { ServiceManager } = require('dunebot-core');
-const { inviteCache, cacheGuildInvites, removeGuildCache } = require('./inviteTracker');
 
 /**
  * Greeting-Plugin für den Bot-Teil von FireBot
@@ -52,13 +51,9 @@ class GreetingBotPlugin extends BotPlugin {
     async onGuildEnable(guildId) {
         const Logger = ServiceManager.get("Logger");
         Logger.info(`Greeting-Plugin für Guild ${guildId} aktiviert`);
-
-        // Vergleichsstand für die Einladungs-Zuordnung (inviteTracker.js).
-        // Läuft beim Start (aus dem clientReady-Handler) und beim Einschalten.
-        const guild = ServiceManager.get('client')?.guilds.cache.get(guildId);
-        if (guild && await cacheGuildInvites(guild)) {
-            Logger.info(`[Greeting] Einladungs-Speicher für ${guild.name} angelegt (${inviteCache.get(guildId).size} Einladungen)`);
-        }
+        // Die Einladungs-Erkennung macht seit G-16 (2026-11-16) der Kern für
+        // jede Guild (`Einladungen` im SDK); bis dahin stand hier der eigene
+        // Speicher aus `inviteTracker.js`.
     }
     
     /**
@@ -72,7 +67,6 @@ class GreetingBotPlugin extends BotPlugin {
     async onGuildDisable(guildId) {
         const Logger = ServiceManager.get("Logger");
         Logger.info(`Greeting-Plugin für Guild ${guildId} deaktiviert`);
-        removeGuildCache(guildId);
     }
 
      /**

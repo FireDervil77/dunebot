@@ -1,8 +1,7 @@
 const { baueNachricht, ANLAESSE } = require("../utils");
 const Willkommensbild = require("../../shared/willkommensbild");
-const { detectUsedInvite } = require("../inviteTracker");
 const { ServiceManager } = require('dunebot-core');
-const { Rollen } = require('dunebot-sdk');
+const { Rollen, Einladungen } = require('dunebot-sdk');
 const { autorollen } = require('../../shared/rollen');
 
 /** Was `Rollen.vergib` nicht setzen konnte, mit Grund ins Log. */
@@ -19,16 +18,19 @@ module.exports = async (member) => {
     const logger = ServiceManager.get('Logger');
 
     try {
-        // Invite-Detection parallel mit Settings laden
-        const [rows, usedInviteCode] = await Promise.all([
+        // Die Einladung erkennt der Kern (G-16); dasselbe Versprechen wie im
+        // Kern-Ereignis, erkannt wird einmal.
+        const [rows, beitritt] = await Promise.all([
             dbService.query('SELECT * FROM greeting_settings WHERE guild_id = ?', [member.guild.id]),
-            detectUsedInvite(member.guild)
+            Einladungen.beitritt(member)
         ]);
 
         const settings = rows?.[0];
         if (!settings) return;
 
-        // Invite-Mapping laden falls ein Invite-Code erkannt wurde
+        // Eigener Text je Einladung nur, wenn sie sicher erkannt ist.
+        const usedInviteCode = beitritt.sicherheit === Einladungen.SICHERHEIT.EINDEUTIG && beitritt.art === Einladungen.ART.EINLADUNG
+            ? beitritt.einladung : null;
         let inviteMapping = null;
         if (usedInviteCode) {
             const mappingRows = await dbService.query(
@@ -58,8 +60,6 @@ module.exports = async (member) => {
         if (settings.welcome_enabled) {
             const channel = member.guild.channels.cache.get(settings.welcome_channel);
             if (channel) {
-                const inviterData = member.inviterData || {};
-
                 // Das Willkommensbild hängt als Datei an (Kern-Renderer, G-10; Aussehen
                 // stellt die Guild unter Bildkarten ein, G-22).
                 // In Components V2 steht es in der Galerie (`attachment://…`).
@@ -72,7 +72,7 @@ module.exports = async (member) => {
                 // Eine Einladung mit eigenem Text ersetzt nur den Nachrichtentext
                 // der Willkommensvorlage, der Rest bleibt (so war es vor G-08).
                 const response = await baueNachricht(member, ANLAESSE.welcome, {
-                    inviterData,
+                    beitritt,
                     textStatt: inviteMapping?.welcome_content || null,
                     anhaenge
                 });
@@ -84,7 +84,7 @@ module.exports = async (member) => {
 
         // ===== DM WELCOME =====
         if (settings.dm_welcome_enabled) {
-            const dmResponse = await baueNachricht(member, ANLAESSE.dm_welcome, { inviterData: member.inviterData || {} });
+            const dmResponse = await baueNachricht(member, ANLAESSE.dm_welcome, { beitritt });
 
             try {
                 await member.send(dmResponse);

@@ -166,7 +166,7 @@
   "VORLAGEN": {
     "PH_INVITER_NAME": "Name dessen, der eingeladen hat",
     "PH_INVITER_TAG": "Benutzername dessen, der eingeladen hat",
-    "PH_INVITES": "Zahl seiner Einladungen"
+    "PH_INVITES": "Wie viele über seine Einladungen kamen und noch da sind (gezählt ab dem 16.11.2026)"
   },
   "BILDKARTEN": {
     "TITEL_WILLKOMMEN": "Willkommensbild",

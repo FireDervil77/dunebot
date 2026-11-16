@@ -112,6 +112,7 @@ function aufbau(partials) {
     const abfragen = [];
     const geloescht = [];
     const vermerkt = [];
+    const verlassen = [];
     const fehlerLog = [];
     ServiceManager.register('dbService', {
         query: async (sql, werte) => {
@@ -134,6 +135,16 @@ function aufbau(partials) {
                 geloescht.push({ sql, werte });
                 return { affectedRows: 1 };
             }
+            // Kern (G-16): Beitritt mit Einladung. Beim Verlassen setzt der
+            // Kern `verlassen_am`; greeting liest den Beitritt für den Abschied
+            // (ein Mitglied von vor G-16 hat keine Zeile).
+            if (/^UPDATE mitglied_beitritte SET verlassen_am /.test(sql)) {
+                verlassen.push({ sql, werte });
+                return { affectedRows: 1 };
+            }
+            if (/^SELECT art, einladung, einlader_id, sicherheit, beigetreten_am, verlassen_am FROM mitglied_beitritte WHERE guild_id = \? AND mitglied_id = \?$/.test(sql)) {
+                return [];
+            }
             throw new Error(`Attrappe kennt die Abfrage nicht: ${sql.slice(0, 80)}`);
         },
     });
@@ -141,7 +152,7 @@ function aufbau(partials) {
         info() {}, warn() {}, debug() {},
         error: (...a) => fehlerLog.push(a.map((x) => (x && x.message) || String(x)).join(' ')),
     });
-    return { client, guild, gesendet, abfragen, geloescht, vermerkt, fehlerLog };
+    return { client, guild, gesendet, abfragen, geloescht, vermerkt, verlassen, fehlerLog };
 }
 
 /** Laesst discord.js selbst ein Ereignis erzeugen und gibt dessen Argumente zurueck. */
@@ -251,7 +262,7 @@ const updateDaten = (premium) => ({
         }
         if (buch) {
             await pruefe(`${kurz} — ungecacht: ${partialAlt}`, async () => {
-                const { client, gesendet, geloescht, fehlerLog } = aufbau(partials);
+                const { client, gesendet, geloescht, verlassen, fehlerLog } = aufbau(partials);
                 const args = erzeuge(client, ereignis, () =>
                     client.actions.GuildMemberRemove.handle({ guild_id: '1', user: NUTZER }, { status: Status.Ready }));
                 assert.strictEqual(args[0].partial, true);
@@ -261,6 +272,9 @@ const updateDaten = (premium) => ({
                 assert.strictEqual(geloescht.length, 1, `geloescht: ${geloescht.length}`);
                 assert.deepStrictEqual(geloescht[0].werte, ['1', '4']);
                 assert.match(geloescht[0].sql, /guild_id = \? AND mitglied_id = \?$/);
+                // G-16: der Beitritt bekommt `verlassen_am`, ab dann läuft die Frist.
+                assert.strictEqual(verlassen.length, 1, `verlassen vermerkt: ${verlassen.length}`);
+                assert.deepStrictEqual(verlassen[0].werte, ['1', '4']);
             });
             continue;
         }

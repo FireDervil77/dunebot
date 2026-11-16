@@ -1,6 +1,7 @@
 const { ServiceManager } = require("dunebot-core");
 const { ActivityType } = require("discord.js");
 const SpieleUpdates = require("../helpers/SpieleUpdates");
+const Einladungen = require("dunebot-sdk/lib/Einladungen");
 
 /**
  * Kern-Event: clientReady (discord.js 14.22 benennt `ready` um; der alte Name entfällt in v15)
@@ -66,6 +67,12 @@ module.exports = async (client) => {
     }
 
     Logger.success("Bot ist bereit!");
+
+    // Vergleichsstand für die Einladungs-Erkennung (G-16), alle Guilds
+    // nacheinander. Nicht abgewartet; ein Beitritt davor bleibt `unbekannt`.
+    Einladungen.fuelleAlle(client)
+        .then((e) => Logger.info(`[Einladungen] Stand gelesen in ${e.gelesen} Guilds, ohne Recht in ${e.ohne}`))
+        .catch((fehler) => Logger.error(`[Einladungen] Stand nicht gelesen: ${fehler.message}`, fehler));
 
     // Spiele-Updates: nachholen, was während der Pause im Kanal einging.
     // Nicht abgewartet — der Bot ist bereit, auch wenn Discord hier trödelt.

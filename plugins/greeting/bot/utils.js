@@ -1,4 +1,4 @@
-const { Vorlage } = require("dunebot-sdk");
+const { Vorlage, Einladungen } = require("dunebot-sdk");
 
 /**
  * Greeting - Nachrichten aus den Vorlagen bauen (G-08, 2026-11-14).
@@ -49,40 +49,46 @@ const VORGABE = Object.freeze({
  * Werte der greeting-eigenen Platzhalter: `{inviter:name}`, `{inviter:tag}`,
  * `{invites}`. Nur wenn einer davon vorkommt, wird der Einladende geholt.
  *
- * `member.inviterData` setzt heute niemand (Fund bei G-13, behoben mit G-16).
- * Bis dahin stehen die Werte auf „NA“ bzw. 0, wie vor G-08.
+ * Woher: der Beitritt aus dem Kern (G-16, `Einladungen` im SDK). Bis
+ * 2026-11-16 las das hier `member.inviterData`, das niemand setzte; die Werte
+ * standen immer auf „NA“ bzw. 0.
+ *
+ *   {inviter:name}/{inviter:tag}  Name des Einladers; „VANITY“ über die
+ *                                 Vanity-URL, „OAuth“ bei einem Bot, „NA“ wenn
+ *                                 unbekannt oder nicht sicher
+ *   {invites}                     wie viele über Einladungen des Einladers
+ *                                 kamen und noch da sind (seit G-16 gezählt)
  *
  * @param {import('discord.js').GuildMember} member
  * @param {Object} vorlage
- * @param {Object} inviterData
+ * @param {Object|null} beitritt aus `Einladungen.beitritt` oder `vonMitglied`
  */
-async function eigeneWerte(member, vorlage, inviterData = {}) {
+async function eigeneWerte(member, vorlage, beitritt = null) {
     const text = Object.keys(Vorlage.FELDER).map((f) => vorlage?.[f] || "").join(" ");
     const extra = {};
+    const sicher = beitritt?.sicherheit === Einladungen.SICHERHEIT.EINDEUTIG;
+    const einlader = sicher ? beitritt.einlader : null;
     if (text.includes("{inviter:")) {
-        const inviterId = inviterData.member_id || "NA";
-        let name = inviterId;
-        let tag = inviterId;
-        if (inviterId !== "VANITY" && inviterId !== "NA") {
+        let name = "NA";
+        let tag = "NA";
+        if (sicher && beitritt.art === Einladungen.ART.VANITY) {
+            name = tag = "VANITY";
+        } else if (sicher && beitritt.art === Einladungen.ART.OAUTH) {
+            name = tag = "OAuth";
+        } else if (einlader) {
             try {
-                const inviter = await member.client.users.fetch(inviterId);
+                const inviter = await member.client.users.fetch(einlader);
                 name = inviter.username;
                 tag = inviter.tag;
             } catch (ex) {
-                member.client.logger.error(`Parsing inviterId: ${inviterId}`, ex);
-                name = "NA";
-                tag = "NA";
+                member.client.logger.warn(`[Greeting] Einlader ${einlader} nicht abrufbar: ${ex.message}`);
             }
-        } else if (member.user.bot) {
-            name = "OAuth";
-            tag = "OAuth";
         }
         extra["inviter:name"] = name;
         extra["inviter:tag"] = tag;
     }
     if (text.includes("{invites}")) {
-        const d = inviterData.invite_data || {};
-        extra.invites = d.tracked + d.added - d.fake - d.left || 0;
+        extra.invites = einlader ? await Einladungen.anzahl(member.guild.id, einlader) : 0;
     }
     return extra;
 }
@@ -93,7 +99,7 @@ async function eigeneWerte(member, vorlage, inviterData = {}) {
  * @param {import('discord.js').GuildMember} member
  * @param {string} anlass einer aus ANLAESSE
  * @param {Object} [optionen]
- * @param {Object} [optionen.inviterData]
+ * @param {Object|null} [optionen.beitritt] Beitritt aus dem Kern (G-16)
  * @param {string} [optionen.textStatt] anderer Nachrichtentext (Einladung mit eigenem Text)
  * @param {{name: string, attachment: *}[]} [optionen.anhaenge] z. B. das Willkommensbild
  * @returns {Promise<Object>} Nachricht für `send()`
@@ -101,7 +107,7 @@ async function eigeneWerte(member, vorlage, inviterData = {}) {
 async function baueNachricht(member, anlass, optionen = {}) {
     let vorlage = (await Vorlage.lade(member.guild.id, anlass)) || Vorlage.leer();
     if (optionen.textStatt) vorlage = { ...vorlage, text: optionen.textStatt };
-    const extra = await eigeneWerte(member, vorlage, optionen.inviterData);
+    const extra = await eigeneWerte(member, vorlage, optionen.beitritt);
     const kontext = { member, guild: member.guild, extra };
     const mit = { guildId: member.guild.id, erwaehnen: [member.id], anhaenge: optionen.anhaenge };
 

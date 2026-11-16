@@ -1,5 +1,6 @@
 const { ServiceManager } = require("dunebot-core");
 const { willkommenSenden } = require("../helpers/Willkommen");
+const Einladungen = require("dunebot-sdk/lib/Einladungen");
 
 /**
  * Kern-Event: guildCreate
@@ -29,6 +30,9 @@ module.exports = async (guild) => {
     } catch (error) {
         Logger.error(`Fehler im guildCreate-Event für Guild ${guild.id}:`, error);
     }
+
+    // Vergleichsstand für die Einladungs-Erkennung (G-16); schreibt selbst ins Log.
+    await Einladungen.fuelle(guild);
 
     // Begrüßung getrennt abgesichert: Scheitert sie, ist die Guild trotzdem
     // registriert — und umgekehrt soll ein Fehler oben die Begrüßung nicht

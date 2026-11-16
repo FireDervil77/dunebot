@@ -427,6 +427,7 @@
     "EREIGNISBUCH": "Fachereignisse, fertig zugestellt",
     "EREIGNISBUCH_SPAETESTENS": "Fachereignisse, spätestens (auch liegen gebliebene)",
     "SPENDEN": "Spenden (Zahlungsbelege)",
+    "BEITRITTE": "Beitritte mit erkannter Einladung, gezählt ab dem Verlassen der Guild",
     "FORTSCHRITT_BUCHUNGEN": "Buchungen der Fortschritte (Leveling, Clan): ältere werden zu Monatssummen je Mitglied verdichtet, der Stand bleibt"
   },
   "GESTALTUNG": {

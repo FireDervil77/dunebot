@@ -166,7 +166,7 @@
   "VORLAGEN": {
     "PH_INVITER_NAME": "Name of the person who invited",
     "PH_INVITER_TAG": "Username of the person who invited",
-    "PH_INVITES": "Number of their invites"
+    "PH_INVITES": "How many joined through their invites and are still here (counted from 16 Nov 2026)"
   },
   "BILDKARTEN": {
     "TITEL_WILLKOMMEN": "Welcome image",

@@ -427,6 +427,7 @@
     "EREIGNISBUCH": "Domain events, fully delivered",
     "EREIGNISBUCH_SPAETESTENS": "Domain events, at the latest (including stuck ones)",
     "SPENDEN": "Donations (payment records)",
+    "BEITRITTE": "Joins with the detected invite, counted from leaving the guild",
     "FORTSCHRITT_BUCHUNGEN": "Progress bookings (levelling, clan): older ones are compacted into monthly totals per member, the total stays"
   },
   "GESTALTUNG": {

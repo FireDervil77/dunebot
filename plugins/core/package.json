@@ -44,6 +44,7 @@
       "fortschritt_stufen",
       "fortschritt_einstellungen",
       "messprobe_nachrichten",
+      "mitglied_beitritte",
       "guilds"
     ],
     "bleiben": {
@@ -81,6 +82,10 @@
     },
     "rollen_vergaben": {
       "mitglied_id": "loeschen"
+    },
+    "mitglied_beitritte": {
+      "mitglied_id": "loeschen",
+      "einlader_id": "anonymisieren"
     },
     "mitglied_bildkarten": {
       "mitglied_id": "loeschen"
@@ -232,6 +237,15 @@
       "hoechstens_tage": 3653,
       "guild": false,
       "titel": "core:AUFBEWAHRUNG.SPENDEN"
+    },
+    {
+      "name": "beitritte",
+      "tabelle": "mitglied_beitritte",
+      "zeitspalte": "verlassen_am",
+      "vorgabe_tage": 30,
+      "hoechstens_tage": 365,
+      "guild": false,
+      "titel": "core:AUFBEWAHRUNG.BEITRITTE"
     },
     {
       "name": "fortschritt-buchungen",
