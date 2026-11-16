@@ -30,7 +30,7 @@
 const KATEGORIEN = {
     mitglieder: {
         nummer: '3.3', icon: 'fa-solid fa-users', vorgabe: true,
-        arten: ['mitglied.beigetreten', 'mitglied.verlassen', 'mitglied.spitzname', 'mitglied.avatar',
+        arten: ['mitglied.beigetreten', 'mitglied.verlassen', 'mitglied.gekickt', 'mitglied.spitzname', 'mitglied.avatar',
             'mitglied.rollen', 'mitglied.timeout', 'mitglied.timeout_ende', 'mitglied.boost',
             'mitglied.gebannt', 'mitglied.entbannt'],
     },
@@ -46,7 +46,7 @@ const KATEGORIEN = {
     },
     bots: {
         nummer: '3.7', icon: 'fa-solid fa-robot', vorgabe: true,
-        arten: ['bot.beigetreten', 'bot.verlassen', 'bot.rollen', 'bot.spitzname'],
+        arten: ['bot.beigetreten', 'bot.verlassen', 'bot.gekickt', 'bot.rollen', 'bot.spitzname'],
     },
     nachrichten: {
         nummer: '3.1', icon: 'fa-solid fa-message', vorgabe: true,

@@ -6,7 +6,11 @@
  * 
  * @param {object} payload - { guildId }
  * @param {import('discord.js').Client} client
- * @returns {object} { success, roles, botHighestPosition }
+ * @returns {object} { success, roles, botHighestPosition, botHasManageRoles, botHasViewAuditLog }
+ *
+ * `botHasViewAuditLog` (Logging LG-1c, K382, 2026-11-16): Ohne das Recht
+ * schickt Discord dem Bot keine Audit-Einträge, und Logging kennt keinen
+ * Täter. Die Seite „Ereignisse“ sagt es mit diesem Feld.
  */
 const { PermissionsBitField } = require('discord.js');
 const { ServiceManager } = require('dunebot-core');
@@ -27,6 +31,7 @@ module.exports = async (payload, client) => {
     const botMember = guild.members.me;
     const botHighestPosition = botMember ? botMember.roles.highest.position : 0;
     const botHasManageRoles = botMember ? botMember.permissions.has(PermissionsBitField.Flags.ManageRoles) : false;
+    const botHasViewAuditLog = botMember ? botMember.permissions.has(PermissionsBitField.Flags.ViewAuditLog) : false;
 
     // Alle Permissions-Flags als lesbares Array
     const permissionFlags = Object.keys(PermissionsBitField.Flags);
@@ -65,6 +70,7 @@ module.exports = async (payload, client) => {
         roles,
         botHighestPosition,
         botHasManageRoles,
+        botHasViewAuditLog,
         permissionFlags
     };
 };

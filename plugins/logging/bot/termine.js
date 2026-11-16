@@ -67,7 +67,7 @@ function interesse(e, user, dabei) {
 async function melde(guildId, ereignisse, user) {
     const n = nameVon(user);
     const kontext = { kanaele: [], akteurIstBot: Boolean(user?.bot), namen: n ? [n] : [] };
-    for (const e of ereignisse) await erfasse(guildId, e, { ...kontext, kanaele: e.kanal ? [String(e.kanal)] : [] });
+    await Promise.all(ereignisse.map((e) => erfasse(guildId, e, { ...kontext, kanaele: e.kanal ? [String(e.kanal)] : [] })));
 }
 
 module.exports = { angelegt, geloescht, geaendert, interesse, melde };

@@ -31,6 +31,9 @@
 <div class="alert alert-info">
   <i class="fa-solid fa-circle-info me-2"></i><%= tr('logging:EREIGNISSE.STUFE_HINWEIS') %>
 </div>
+<% if (typeof auditFehlt !== 'undefined' && auditFehlt) { %>
+  <div class="alert alert-warning"><i class="fa-solid fa-triangle-exclamation me-2"></i><%= tr('logging:EREIGNISSE.AUDIT_FEHLT') %></div>
+<% } %>
 <% if (rollenNamenFehlen) { %>
   <div class="alert alert-warning"><%= tr('logging:EREIGNISSE.ROLLEN_FEHLEN') %></div>
 <% } %>
@@ -106,6 +109,7 @@
                 <% if (e.betroffen_id) { %><div><%= tr('logging:EREIGNISSE.BETROFFEN') %>: <%= wer(e.betroffen_id) %></div><% } %>
                 <div class="text-secondary">
                   <%= tr('logging:EREIGNISSE.AKTEUR') %>:
+                  <% if (e.akteur_id && e.zuordnung === 'wahrscheinlich') { %><%= tr('logging:EREIGNISSE.VERMUTLICH') %> <% } %>
                   <%= e.akteur_id ? wer(e.akteur_id) : tr('logging:EREIGNISSE.AKTEUR_UNBEKANNT') %>
                   <% if (e.akteur_id) { %><span class="badge bg-secondary-lt ms-1"><%= tr('logging:ZUORDNUNG.' + String(e.zuordnung).toUpperCase()) %></span><% } %>
                 </div>

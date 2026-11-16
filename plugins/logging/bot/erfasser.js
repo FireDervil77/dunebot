@@ -15,8 +15,11 @@
  *      Ausschlüsse, „kritisch geht nie verloren“ (`Regeln.darf`)
  *   4. Zeile in `log_ereignisse`, Namen in `log_namen`
  *
- * Der Täter ist hier meist unbekannt (`zuordnung: unbekannt`). Den liefert
- * LG-1c aus dem Audit-Log nach. Zugestellt wird mit LG-1d.
+ * Zwischen 1 und 3 fragt der Zuordner (LG-1c, `zuordner.js`) nach dem
+ * Täter: Arten, zu denen Discord einen Audit-Eintrag schreibt, warten bis zu
+ * 5 s darauf. Die Zeit der Zeile ist die Ankunft des Ereignisses, nicht das
+ * Ende des Wartens. Ein Täter aus dem Audit-Log zählt für die Ausschlüsse
+ * (Mitglied, Bots) wie jeder andere. Zugestellt wird mit LG-1d.
  *
  * Fehler landen im Log und nie beim Aufrufer: Ein Logging-Fehler darf kein
  * anderes Plugin stören, das auf dasselbe Gateway-Ereignis hört.
@@ -27,6 +30,7 @@
 const crypto = require('crypto');
 const { ServiceManager } = require('dunebot-core');
 const Regeln = require('../shared/regeln');
+const { zuordner } = require('./zuordner');
 const { kategorieVon, SCHWEREN } = require('../shared/katalog');
 
 const ID = /^\d{5,20}$/;
@@ -92,14 +96,27 @@ async function merkeNamen(db, guildId, namen) {
  * @param {string} guildId
  * @param {object} e Ereignis: art, schwere, akteur, betroffen, kanal, objekt {typ, id, name}, vorher, nachher, zuordnung
  * @param {{rollen?: string[], kanaele?: string[], akteurIstBot?: boolean, namen?: Array}} [kontext]
+ * @param {{zuordnen?: object}} [o] Zuordner (Wächter setzt einen eigenen)
  * @returns {Promise<{gespeichert: boolean, grund: string|null}>}
  */
-async function erfasse(guildId, e, kontext = {}) {
+async function erfasse(guildId, e, kontext = {}, { zuordnen = zuordner } = {}) {
+    const zeit = new Date();
     try {
         if (!guildId) return { gespeichert: false, grund: 'keine_guild' };
+        if (!kategorieVon(e.art)) throw new Error(`Art ${e.art} steht in keiner Kategorie (shared/katalog.js)`);
+        if (!await Regeln.irgendwoAn(kategorieVon(e.art))) return { gespeichert: false, grund: 'nirgends_an' };
+        const z = await zuordnen.ordneZu(String(guildId), e);
+        if (z.akteur) {
+            e = z.e;
+            kontext = {
+                ...kontext,
+                akteurIstBot: z.akteur.bot ?? kontext.akteurIstBot,
+                namen: [...(kontext.namen || []), z.akteur.name].filter(Boolean),
+            };
+        }
+        // Ein Kick benennt die Art um (mitglied.verlassen → mitglied.gekickt), Kategorie bleibt.
         const kategorie = kategorieVon(e.art);
         if (!kategorie) throw new Error(`Art ${e.art} steht in keiner Kategorie (shared/katalog.js)`);
-        if (!await Regeln.irgendwoAn(kategorie)) return { gespeichert: false, grund: 'nirgends_an' };
         const regeln = await Regeln.lade(String(guildId));
         const urteil = Regeln.darf(regeln, {
             kategorie, art: e.art, schwere: e.schwere, akteur: e.akteur, betroffen: e.betroffen,
@@ -107,7 +124,7 @@ async function erfasse(guildId, e, kontext = {}) {
         });
         if (!urteil.erlaubt) return { gespeichert: false, grund: urteil.grund };
         const db = ServiceManager.get('dbService');
-        await db.query(EINFUEGEN, zeile(guildId, e));
+        await db.query(EINFUEGEN, zeile(guildId, e, zeit));
         await merkeNamen(db, guildId, kontext.namen);
         return { gespeichert: true, grund: null };
     } catch (error) {

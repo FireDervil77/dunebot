@@ -115,7 +115,7 @@ function entbannt(ban) {
 async function melde(guildId, ereignisse, mitglied) {
     const n = nameVon(mitglied);
     const kontext = { rollen: rollenVon(mitglied), namen: n ? [n] : [] };
-    for (const e of ereignisse) await erfasse(guildId, e, kontext);
+    await Promise.all(ereignisse.map((e) => erfasse(guildId, e, kontext)));
 }
 
 module.exports = { beigetreten, verlassen, geaendert, gebannt, entbannt, rollenSchwere, melde };

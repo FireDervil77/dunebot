@@ -51,7 +51,7 @@ function stickerGeaendert(alt, neu) {
 }
 
 async function melde(guildId, ereignisse) {
-    for (const e of ereignisse) await erfasse(guildId, e, {});
+    await Promise.all(ereignisse.map((e) => erfasse(guildId, e, {})));
 }
 
 module.exports = { emojiAngelegt, emojiGeloescht, emojiGeaendert, stickerAngelegt, stickerGeloescht, stickerGeaendert, melde };

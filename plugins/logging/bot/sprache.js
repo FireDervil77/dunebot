@@ -72,7 +72,7 @@ async function melde(guildId, ereignisse, alt, neu) {
         rollen: rollenVon(mitglied), kanaele: ketteVon(zustand?.channel || { id: zustand?.channelId }),
         akteurIstBot: Boolean(mitglied?.user?.bot), namen: n ? [n] : [],
     };
-    for (const e of ereignisse) await erfasse(guildId, e, kontext);
+    await Promise.all(ereignisse.map((e) => erfasse(guildId, e, kontext)));
 }
 
 module.exports = { aenderungen, melde };

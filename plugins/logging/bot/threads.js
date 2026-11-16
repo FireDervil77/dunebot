@@ -94,7 +94,7 @@ function forumTags(alt, neu) {
 
 async function melde(guildId, ereignisse, t) {
     const kontext = { kanaele: ketteVon(t) };
-    for (const e of ereignisse) await erfasse(guildId, e, kontext);
+    await Promise.all(ereignisse.map((e) => erfasse(guildId, e, kontext)));
 }
 
 module.exports = { angelegt, geloescht, geaendert, mitglieder, forumTags, imForum, melde };

@@ -56,6 +56,7 @@
     "ARTEN": {
         "MITGLIED_BEIGETRETEN": "Mitglied beigetreten",
         "MITGLIED_VERLASSEN": "Mitglied gegangen",
+        "MITGLIED_GEKICKT": "Mitglied gekickt",
         "MITGLIED_SPITZNAME": "Spitzname geändert",
         "MITGLIED_AVATAR": "Server-Avatar geändert",
         "MITGLIED_ROLLEN": "Rollen geändert",
@@ -78,6 +79,7 @@
         "EINLADUNG_GELOESCHT": "Einladung gelöscht",
         "BOT_BEIGETRETEN": "Bot hinzugefügt",
         "BOT_VERLASSEN": "Bot entfernt",
+        "BOT_GEKICKT": "Bot gekickt",
         "BOT_ROLLEN": "Rollen eines Bots geändert",
         "BOT_SPITZNAME": "Spitzname eines Bots geändert",
         "NACHRICHT_GELOESCHT": "Nachricht gelöscht",
@@ -215,7 +217,7 @@
     },
     "EREIGNISSE": {
         "BESCHREIBUNG": "Was in dieser Guild geschah, neueste zuerst",
-        "STUFE_HINWEIS": "Logging speichert zurzeit nur Metadaten, keine Nachrichtentexte. Wer etwas getan hat, steht erst fest, wenn die Zuordnung aus dem Audit-Log dazukommt; bis dahin steht dort „unbekannt“. In Log-Kanäle wird noch nichts geschickt.",
+        "STUFE_HINWEIS": "Logging speichert zurzeit nur Metadaten, keine Nachrichtentexte. Wer etwas getan hat, kommt aus dem Audit-Log von Discord: „sicher“, wenn der Eintrag genau dieses Ereignis nennt, „vermutlich“, wenn Discord es nur ungefähr sagt (gelöschte Nachrichten, Verschieben im Sprachkanal). Ohne Eintrag steht „unbekannt“, etwa wenn jemand seine eigene Nachricht löscht. In Log-Kanäle wird noch nichts geschickt.",
         "ROLLEN_FEHLEN": "Der Bot hat keine Rollennamen geliefert. Rollen stehen deshalb als ID da.",
         "KATEGORIE": "Kategorie",
         "SCHWERE": "Schwere",
@@ -238,7 +240,9 @@
         "AKTEUR": "Von",
         "AKTEUR_UNBEKANNT": "unbekannt",
         "NEUER": "Neuere",
-        "AELTER": "Ältere"
+        "AELTER": "Ältere",
+        "AUDIT_FEHLT": "Der Bot hat in diesem Server das Recht „Audit-Log anzeigen“ nicht. Ohne das schickt Discord keine Audit-Einträge, und bei neuen Ereignissen steht als Täter „unbekannt“. Gib der Rolle des Bots das Recht in den Servereinstellungen.",
+        "VERMUTLICH": "vermutlich"
     },
     "EINSTELLUNGEN": {
         "BESCHREIBUNG": "Was Logging in dieser Guild erfasst",

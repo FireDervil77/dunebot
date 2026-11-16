@@ -156,7 +156,7 @@ function kette(k) {
 }
 
 async function melde(guildId, ereignisse, kontext = {}) {
-    for (const e of ereignisse) await erfasse(guildId, e, kontext);
+    await Promise.all(ereignisse.map((e) => erfasse(guildId, e, kontext)));
 }
 
 module.exports = {

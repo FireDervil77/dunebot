@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Logging Stufe 1 (LG-1a, LG-1b Teil 1 und 2, K382, 2026-11-16).
+ * Logging Stufe 1 (LG-1a, LG-1b Teil 1 und 2, LG-1c, K382, 2026-11-16).
  *
  * Geprüft wird:
  *
@@ -23,6 +23,12 @@
  *                   (nur Merkmale, Link-Vorschau zählt nicht), Sprache,
  *                   Emojis/Sticker, Threads/Foren, Termine; Arten mit
  *                   Vorgabe „aus“
+ *   2c Zuordnung    (LG-1c) jede Art der Audit-Tabelle steht im Katalog,
+ *                   jede Aktion gibt es in discord.js; Aufteilung nach
+ *                   geänderten Feldern; Ziel und Kanal; Kick benennt um;
+ *                   Zuordner: ohne Recht kein Warten, Ereignis zuerst,
+ *                   Eintrag zuerst, zwei Täter → wahrscheinlich, Ablauf ohne
+ *                   Eintrag, Bündel nur mit bekanntem Bündel nachgefragt
  *   3  Läufe        an TEMPORARY-Kopien aller `log_*`-Tabellen mit echtem
  *                   SQL: Ereignis landet mit allen Spalten, dasselbe zweimal
  *                   ergibt eine Zeile, Kategorie aus → nichts, Kategorie
@@ -30,7 +36,8 @@
  *                   Mitglied → nichts, kritisch trotzdem, neuer Name → neue
  *                   Zeile in `log_namen`; Art mit Vorgabe „aus“ erst nach
  *                   einer Zeile `aktiv = 1`; neue Nachricht ohne @everyone
- *                   → keine Abfrage
+ *                   → keine Abfrage; Kick mit Täter landet als
+ *                   „gekickt“ mit Ankunftszeit, ausgeschlossener Täter → nichts
  *
  * Gegenproben: Jede Prüfung in 1 läuft einmal gegen eine eingebaute
  * Verletzung und muss dort rot werden.
@@ -93,7 +100,11 @@ function pruefeEreignisDateien(dateien) {
     const bekannt = new Set(Object.values(Events));
     const falsch = dateien.filter((d) => !bekannt.has(d.name));
     assert.deepStrictEqual(falsch.map((d) => d.name), [], 'kein Ereignis von discord.js');
-    const ohneWeg = dateien.filter((d) => !new RegExp(`require\\('\\.\\./(${MODULE})'\\)`).test(d.quelle) || !/\.melde\(/.test(d.quelle));
+    // guildAuditLogEntryCreate schreibt keine Zeile, es beantwortet „wer war's“ (LG-1c).
+    const weg = (d) => (d.name === 'guildAuditLogEntryCreate'
+        ? /require\('\.\.\/zuordner'\)/.test(d.quelle) && /\.eintrag\(/.test(d.quelle)
+        : new RegExp(`require\\('\\.\\./(${MODULE})'\\)`).test(d.quelle) && /\.melde\(/.test(d.quelle));
+    const ohneWeg = dateien.filter((d) => !weg(d));
     assert.deepStrictEqual(ohneWeg.map((d) => d.name), [], `geht nicht über ${MODULE} zum Erfasser`);
 }
 
@@ -125,6 +136,20 @@ function pruefeOhneInhalt(quellen) {
     assert.deepStrictEqual(treffer, [], 'liest Nachrichteninhalt (Stufe 1 speichert nur Metadaten)');
 }
 
+function pruefeAuditTabelle(tabelle, katalog) {
+    const { AuditLogEvent } = require('discord.js');
+    const fehlt = [];
+    for (const [name, z] of Object.entries(tabelle)) {
+        if (typeof AuditLogEvent[name] !== 'number') fehlt.push(`Aktion ${name} gibt es in discord.js nicht`);
+        for (const a of z.arten) if (!katalog.kategorieVon(a)) fehlt.push(`${name}: Art ${a} steht in keiner Kategorie`);
+        for (const [k, arten] of Object.entries(z.schluessel || {})) {
+            for (const a of arten) if (!z.arten.includes(a)) fehlt.push(`${name}.${k}: ${a} nicht unter arten`);
+        }
+        if (z.wird) for (const a of z.arten) if (/\.verlassen$/.test(a) && !katalog.kategorieVon(a.replace(/\.verlassen$/, `.${z.wird}`))) fehlt.push(`${name}: ${a} → ${z.wird} steht in keiner Kategorie`);
+    }
+    assert.deepStrictEqual(fehlt, [], 'Audit-Tabelle passt nicht zum Katalog');
+}
+
 function pruefeGuildInhalte(migration, paket) {
     const tabellen = [...migration.matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)].map((m) => m[1]).sort();
     assert.deepStrictEqual([...(paket.guildInhalte?.loeschen || [])].sort(), tabellen, 'guildInhalte.loeschen ≠ Tabellen der Migration');
@@ -142,6 +167,8 @@ function pruefeGuildInhalte(migration, paket) {
         rot('falscher Name', () => pruefeEreignisDateien([...dateien, { name: 'memberJoin', quelle: dateien[0].quelle }]));
         rot('ohne Erfasser', () => pruefeEreignisDateien([{ name: 'roleCreate', quelle: 'module.exports = () => {};' }]));
         rot('fremdes Modul', () => pruefeEreignisDateien([{ name: 'roleCreate', quelle: "const X = require('../anderes'); X.melde();" }]));
+        rot('Audit ohne Zuordner', () => pruefeEreignisDateien([{ name: 'guildAuditLogEntryCreate', quelle: "const S = require('../struktur'); S.melde();" }]));
+        assert.ok(dateien.some((d) => d.name === 'guildAuditLogEntryCreate'), 'LG-1c: guildAuditLogEntryCreate fehlt');
         const erwartet = ['messageDelete', 'messageUpdate', 'messageDeleteBulk', 'messageCreate', 'voiceStateUpdate', 'emojiCreate', 'emojiDelete',
             'emojiUpdate', 'stickerCreate', 'stickerDelete', 'stickerUpdate', 'threadCreate', 'threadDelete', 'threadUpdate', 'threadMembersUpdate',
             'guildScheduledEventCreate', 'guildScheduledEventDelete', 'guildScheduledEventUpdate', 'guildScheduledEventUserAdd', 'guildScheduledEventUserRemove'];
@@ -480,6 +507,133 @@ function pruefeGuildInhalte(migration, paket) {
         assert.deepStrictEqual(Anzeige.zeilen({ vorher: null, nachher: '{kaputt' }), [], 'kaputtes JSON → nichts, kein Wurf');
     });
 
+    // ── 2c: Zuordnung (LG-1c) ────────────────────────────────────────────────
+    const Au = require(L('bot/audit'));
+    const { Zuordner } = require(L('bot/zuordner'));
+    const { AuditLogEvent: AE, PermissionFlagsBits } = require('discord.js');
+    const C = '200000000000000009';
+    const eintrag = (aktion, o = {}) => ({ action: AE[aktion], id: o.id || '900000000000000001', executorId: 'von' in o ? o.von : C,
+        targetId: o.ziel ?? null, changes: o.changes || [], extra: o.extra ?? null });
+    /** Attrappe einer Guild: Recht ja/nein, Mitglieder-Speicher, Abruf zählt mit. */
+    function attrappe({ recht = true, abruf = [] } = {}) {
+        const g = {
+            abrufe: 0,
+            members: {
+                me: { permissions: { has: (f) => recht && f === PermissionFlagsBits.ViewAuditLog } },
+                cache: new Map([[C, { displayName: 'Mod', user: { id: C, username: 'mod', bot: false } }]]),
+            },
+            fetchAuditLogs: async () => { g.abrufe++; return { entries: new Map(abruf.map((x) => [x.id, x])) }; },
+        };
+        return g;
+    }
+    const warte = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    await pruefe('Audit-Tabelle: jede Art im Katalog, jede Aktion in discord.js, Schlüssel unter arten', () => {
+        pruefeAuditTabelle(Au.TABELLE, Katalog);
+        rot('fremde Art', () => pruefeAuditTabelle({ RoleCreate: { arten: ['rolle.erfunden'] } }, Katalog));
+        rot('falsche Aktion', () => pruefeAuditTabelle({ RoleErfunden: { arten: ['rolle.angelegt'] } }, Katalog));
+        rot('Schlüssel außerhalb', () => pruefeAuditTabelle({ RoleUpdate: { arten: ['rolle.geaendert'], schluessel: { permissions: ['rolle.rechte'] } } }, Katalog));
+        assert.ok(Au.ARTEN_MIT_AUDIT.has('mitglied.verlassen') && !Au.ARTEN_MIT_AUDIT.has('mitglied.avatar') && !Au.ARTEN_MIT_AUDIT.has('sprache.selbst_stumm'));
+        assert.ok(Katalog.kategorieVon('mitglied.gekickt') === 'mitglieder' && Katalog.kategorieVon('bot.gekickt') === 'bots');
+    });
+
+    await pruefe('Audit-Eintrag → Kandidaten: Felder teilen auf, Ziel und Kanal, Güte, Kick benennt um', () => {
+        const k1 = Au.kandidaten(eintrag('RoleUpdate', { ziel: ROLLE, changes: [{ key: 'permissions' }] }))[0];
+        assert.deepStrictEqual([...k1.arten], ['rolle.rechte']);
+        assert.deepStrictEqual([...Au.kandidaten(eintrag('RoleUpdate', { ziel: ROLLE, changes: [{ key: 'name' }, { key: 'permissions' }] }))[0].arten].sort(), ['rolle.geaendert', 'rolle.rechte']);
+        const mu = (key) => [...Au.kandidaten(eintrag('MemberUpdate', { ziel: A, changes: [{ key }] }))[0].arten];
+        assert.deepStrictEqual(mu('nick'), ['mitglied.spitzname', 'bot.spitzname']);
+        assert.deepStrictEqual(mu('communication_disabled_until'), ['mitglied.timeout', 'mitglied.timeout_ende']);
+        assert.deepStrictEqual(mu('avatar_hash'), [], 'unbekanntes Feld ohne * → keine Art');
+        assert.deepStrictEqual(Au.kandidaten(eintrag('RoleUpdate', { von: null })), [], 'ohne Täter kein Kandidat');
+        assert.deepStrictEqual(Au.kandidaten({ action: 9999, executorId: C }), [], 'unbekannte Aktion');
+        const rolleE = S.rolleGeaendert(rolle(), rolle({ permissions: { bitfield: bits('ManageRoles') } }))[0];
+        assert.ok(Au.passt(k1, rolleE), 'Rolle mit Rechten passt');
+        assert.ok(!Au.passt({ ...k1, ziel: ADMIN }, rolleE), 'andere Rolle passt nicht');
+        const md = Au.kandidaten(eintrag('MessageDelete', { ziel: A, extra: { channel: { id: KANAL }, count: 1 } }))[0];
+        assert.ok(md.guete === 'wahrscheinlich' && md.buendel && md.kanal === KANAL);
+        const geloescht = { art: 'nachricht.geloescht', betroffen: A, kanal: KANAL, objekt: { typ: 'nachricht', id: '1' } };
+        assert.ok(Au.passt(md, geloescht));
+        assert.ok(!Au.passt(md, { ...geloescht, kanal: '400000000000000099' }), 'anderer Kanal');
+        assert.ok(!Au.passt(md, { ...geloescht, betroffen: B }), 'anderer Autor');
+        assert.ok(Au.passt(md, { ...geloescht, betroffen: null }), 'ungecacht: Kanal genügt');
+        const pin = Au.kandidaten(eintrag('MessagePin', { ziel: A, extra: { channel: { id: KANAL }, messageId: '77' } }))[0];
+        assert.ok(Au.passt(pin, { art: 'nachricht.angeheftet', betroffen: A, kanal: KANAL, objekt: { id: '77' } }));
+        assert.ok(!Au.passt(pin, { art: 'nachricht.angeheftet', betroffen: A, kanal: KANAL, objekt: { id: '78' } }));
+        const inv = Au.kandidaten(eintrag('InviteDelete', { changes: [{ key: 'code', old: 'abc' }] }))[0];
+        assert.ok(Au.passt(inv, S.einladungGeloescht({ code: 'abc', channelId: KANAL })[0]));
+        const kick = Au.kandidaten(eintrag('MemberKick', { ziel: A }))[0];
+        const weg = M.verlassen(mitglied())[0];
+        assert.ok(Au.passt(kick, weg));
+        const w = Au.wende(weg, kick);
+        assert.deepStrictEqual([w.art, w.schwere, w.akteur, w.zuordnung], ['mitglied.gekickt', 'warnung', C, 'sicher']);
+        const ban = Au.wende(weg, Au.kandidaten(eintrag('MemberBanAdd', { ziel: A }))[0]);
+        assert.deepStrictEqual([ban.art, ban.akteur], ['mitglied.verlassen', C], 'Bann benennt nicht um');
+    });
+
+    await pruefe('Zuordner: ohne Recht sofort; Ereignis zuerst; Eintrag zuerst; zwei Täter → wahrscheinlich; Ablauf ohne Eintrag', async () => {
+        const rolleE = () => S.rolleGeloescht(rolle())[0];
+        const ohne = new Zuordner({ guild: () => attrappe({ recht: false }), fenster: 30 });
+        const t0 = Date.now();
+        const r0 = await ohne.ordneZu(GUILD, rolleE());
+        assert.ok(r0.akteur === null && Date.now() - t0 < 20, 'ohne Recht gewartet');
+        assert.strictEqual(ohne.anzahlWartend, 0);
+
+        const z = new Zuordner({ guild: () => attrappe(), fenster: 200 });
+        const p = z.ordneZu(GUILD, rolleE());
+        assert.strictEqual(z.anzahlWartend, 1);
+        assert.strictEqual(z.eintrag(GUILD, eintrag('RoleDelete', { ziel: ROLLE })), 1);
+        const r1 = await p;
+        assert.deepStrictEqual([r1.e.akteur, r1.e.zuordnung, r1.akteur.name?.name], [C, 'sicher', 'mod']);
+        assert.strictEqual(z.anzahlWartend, 0);
+
+        const z2 = new Zuordner({ guild: () => attrappe(), fenster: 200 });
+        z2.eintrag(GUILD, eintrag('RoleDelete', { ziel: ROLLE }));
+        const t1 = Date.now();
+        const r2 = await z2.ordneZu(GUILD, rolleE());
+        assert.ok(r2.e.akteur === C && Date.now() - t1 < 20, 'Eintrag zuerst: sofort');
+        z2.eintrag(GUILD, eintrag('RoleDelete', { ziel: ROLLE, von: B, id: '900000000000000002' }));
+        const r3 = await z2.ordneZu(GUILD, rolleE());
+        assert.strictEqual(r3.e.zuordnung, 'wahrscheinlich', 'zwei Täter');
+
+        const z3 = new Zuordner({ guild: () => attrappe(), fenster: 30 });
+        const r4 = await z3.ordneZu(GUILD, rolleE());
+        assert.ok(r4.akteur === null && r4.e.akteur == null, 'Ablauf ohne Eintrag');
+        const r5 = await z3.ordneZu(GUILD, M.geaendert(mitglied(), mitglied({ avatar: 'x' }))[0]);
+        assert.strictEqual(r5.akteur, null, 'Avatar hat keinen Audit-Eintrag');
+        assert.strictEqual(z3.anzahlWartend, 0);
+        const sicher = await z3.ordneZu(GUILD, S.einladungAngelegt({ code: 'z', inviter: { id: B }, channelId: KANAL })[0]);
+        assert.strictEqual(sicher.e.akteur, B, 'schon sicher bleibt');
+
+        await warte(40);
+        const t2 = Date.now();
+        const z4 = new Zuordner({ guild: () => attrappe(), fenster: 30 });
+        z4.eintrag(GUILD, eintrag('RoleDelete', { ziel: ROLLE }));
+        await warte(45);
+        const r6 = await z4.ordneZu(GUILD, rolleE());
+        assert.ok(r6.akteur === null && Date.now() - t2 >= 45, 'alter Eintrag gilt nach dem Fenster nicht mehr');
+    });
+
+    await pruefe('Zuordner: Bündel nur nachgefragt, wenn eins bekannt ist; Zähler höher → wahrscheinlich, gleich → unbekannt', async () => {
+        const geloescht = () => ({ art: 'nachricht.geloescht', schwere: 'info', betroffen: A, kanal: KANAL, objekt: { typ: 'nachricht', id: String(Math.random()).slice(2, 12) } });
+        const roh = eintrag('MessageDelete', { ziel: A, extra: { channel: { id: KANAL }, count: 1 } });
+        const g = attrappe({ abruf: [{ ...roh, extra: { channel: { id: KANAL }, count: 2 } }] });
+        const z = new Zuordner({ guild: () => g, fenster: 25 });
+        const ohneBuendel = await z.ordneZu(GUILD, geloescht());
+        assert.ok(ohneBuendel.akteur === null && g.abrufe === 0, 'ohne bekanntes Bündel abgefragt');
+        const p1 = z.ordneZu(GUILD, geloescht());
+        z.eintrag(GUILD, roh);
+        assert.strictEqual((await p1).e.zuordnung, 'wahrscheinlich');
+        await warte(30);
+        const r2 = await z.ordneZu(GUILD, geloescht());
+        assert.deepStrictEqual([r2.e.akteur, r2.e.zuordnung, g.abrufe], [C, 'wahrscheinlich', 1], 'zweite Löschung im Bündel');
+        await warte(1100);
+        const r3 = await z.ordneZu(GUILD, geloescht());
+        assert.deepStrictEqual([r3.akteur, g.abrufe], [null, 2], 'Zähler unverändert → eigene Löschung');
+        const anders = await z.ordneZu(GUILD, { ...geloescht(), betroffen: B });
+        assert.deepStrictEqual([anders.akteur, g.abrufe], [null, 2], 'anderer Autor: kein Bündel, keine Abfrage');
+    });
+
     // ── 3: Läufe an TEMPORARY-Kopien ─────────────────────────────────────────
     const mysql = require('mysql2/promise');
     const c = await mysql.createConnection({ host: process.env.MYSQL_HOST, port: process.env.MYSQL_PORT,
@@ -573,6 +727,31 @@ function pruefeGuildInhalte(migration, paket) {
             assert.deepStrictEqual(abfragen, [], 'neue Nachricht ohne @everyone hat abgefragt');
             await require(L('bot/events/messageCreate.js'))(nachricht({ mentions: { users: sammlung([]), roles: sammlung([]), everyone: true } }));
             assert.ok((await zeilen()).some((x) => x.art === 'nachricht.everyone'), '@everyone nicht gespeichert');
+            assert.deepStrictEqual(gesehen, [], 'keine Fehler im Log');
+        });
+
+        await pruefe('Lauf: Kick mit Täter → „gekickt“ mit Ankunftszeit und Namen; ausgeschlossener Täter → nichts', async () => {
+            await q('DELETE FROM log_ereignisse');
+            await q('DELETE FROM log_regeln');
+            neu();
+            const g = attrappe();
+            const z = new Zuordner({ guild: () => g, fenster: 2000 });
+            const vorher = Date.now();
+            const lauf = Erfasser.erfasse(GUILD, M.verlassen(mitglied())[0], { rollen: [] }, { zuordnen: z });
+            await warte(1100);
+            z.eintrag(GUILD, eintrag('MemberKick', { ziel: A }));
+            assert.deepStrictEqual(await lauf, { gespeichert: true, grund: null });
+            const [x] = await zeilen();
+            assert.deepStrictEqual([x.kategorie, x.art, x.schwere, x.akteur_id, x.zuordnung], ['mitglieder', 'mitglied.gekickt', 'warnung', C, 'sicher']);
+            assert.ok(new Date(x.zeit).getTime() - vorher < 1000, `Zeit ist das Ende des Wartens, nicht die Ankunft (${x.zeit})`);
+            const n = await q('SELECT name FROM log_namen WHERE guild_id = ? AND mitglied_id = ?', [GUILD, C]);
+            assert.deepStrictEqual(n.map((y) => y.name), ['mod'], 'Täter nicht in log_namen');
+            await q("INSERT INTO log_regeln (guild_id, regel, ziel, aktiv) VALUES (?, 'mitglied', ?, 1)", [GUILD, C]);
+            neu();
+            z.eintrag(GUILD, eintrag('RoleDelete', { ziel: ROLLE }));
+            const r = await Erfasser.erfasse(GUILD, S.rolleGeloescht(rolle())[0], {}, { zuordnen: z });
+            assert.deepStrictEqual(r, { gespeichert: false, grund: 'mitglied' }, 'Täter aus dem Audit-Log ausgeschlossen, trotzdem gespeichert');
+            await q('DELETE FROM log_regeln');
             assert.deepStrictEqual(gesehen, [], 'keine Fehler im Log');
         });
 

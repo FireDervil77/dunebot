@@ -45,6 +45,10 @@
                 "weg": "frist",
                 "grund": "Protokoll der Guild (Sicherheits- und Moderationsnachweis, F-G2 A): bleibt bis zum Ende der Frist für Metadaten"
             },
+            "kanal_id": {
+                "weg": "ausgenommen",
+                "grund": "ID des Kanals, in dem das Ereignis geschah (Text-, Sprach-, Forenkanal), nie ein Mitglied"
+            },
             "objekt_id": {
                 "weg": "frist",
                 "grund": "Bei Mitglieds-Ereignissen das Mitglied selbst, sonst Kanal oder Rolle; gehört zur Zeile, Protokoll der Guild (Sicherheits- und Moderationsnachweis, F-G2 A): bleibt bis zum Ende der Frist für Metadaten"

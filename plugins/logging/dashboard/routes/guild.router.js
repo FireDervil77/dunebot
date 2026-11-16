@@ -15,6 +15,10 @@
  * Seit LG-1b Teil 2 (2026-11-16) gibt es Arten, die ohne Zeile aus sind
  * (Katalog `aus`); die Seite zeigt sie mit „Vorgabe: aus“.
  *
+ * Seit LG-1c (2026-11-16) steht bei „wahrscheinlich“ „vermutlich X“, und die
+ * Seite warnt, wenn der Bot „Audit-Log anzeigen“ nicht hat (Feld
+ * `botHasViewAuditLog` aus `dashboard:GET_GUILD_ROLES_DETAILED`).
+ *
  * @module logging/routes/guild
  */
 
@@ -38,17 +42,23 @@ function makeTranslator(req, res) {
     };
 }
 
-/** Rollen-Namen über den Bot; ohne Antwort bleiben die IDs, und die Seite sagt es. */
-async function rollenNamen(guildId, ids) {
-    if (!ids.length) return { namen: {}, fehlen: false };
+/**
+ * Rollen-Namen und das Recht „Audit-Log anzeigen“ über den Bot, ein Aufruf.
+ * Ohne Antwort bleiben die IDs, und die Seite sagt es; das Recht gilt dann
+ * als unbekannt (`null`), nicht als fehlend.
+ */
+async function vomBot(guildId) {
     try {
         const antworten = await ServiceManager.get('ipcServer').broadcast('dashboard:GET_GUILD_ROLES_DETAILED', { guildId });
         const gut = (antworten || []).map((a) => a?.data ?? a).find((a) => a?.success && Array.isArray(a.roles));
-        if (!gut) return { namen: {}, fehlen: true };
-        return { namen: Object.fromEntries(gut.roles.map((r) => [String(r.id), r.name])), fehlen: false };
+        if (!gut) return { namen: {}, fehlen: true, audit: null };
+        return {
+            namen: Object.fromEntries(gut.roles.map((r) => [String(r.id), r.name])), fehlen: false,
+            audit: typeof gut.botHasViewAuditLog === 'boolean' ? gut.botHasViewAuditLog : null,
+        };
     } catch (error) {
         ServiceManager.get('Logger').warn(`[Logging] Rollen nicht geladen: ${error.message}`);
-        return { namen: {}, fehlen: true };
+        return { namen: {}, fehlen: true, audit: null };
     }
 }
 
@@ -113,11 +123,12 @@ router.get('/ereignisse', requirePermission('LOGGING.VIEW'), async (req, res) =>
         ])];
         const [namen, rollen, gesamt] = await Promise.all([
             mitgliedNamen(db, guildId, mitglieder),
-            rollenNamen(guildId, Anzeige.rollenIds(listen)),
+            vomBot(guildId),
             db.query('SELECT COUNT(*) AS n FROM log_ereignisse WHERE guild_id = ?', [guildId]),
         ]);
         await ServiceManager.get('themeManager').renderView(res, 'guild/logging-ereignisse', {
-            tr, guildId, liste, namen, rollenNamen: rollen.namen, rollenNamenFehlen: rollen.fehlen,
+            tr, guildId, liste, namen, rollenNamen: rollen.namen,
+            rollenNamenFehlen: rollen.fehlen && Anzeige.rollenIds(listen).length > 0, auditFehlt: rollen.audit === false,
             filter, kategorien, schweren: SCHWEREN, seite, weiter, gesamt: Number(gesamt[0]?.n || 0),
         });
     } catch (error) {

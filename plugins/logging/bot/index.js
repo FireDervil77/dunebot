@@ -7,7 +7,11 @@
  * Einladungen. Jedes Ereignis geht durch `bot/erfasser.js` (Kategorie
  * irgendwo an → Regeln der Guild → Zeile). Nur Metadaten; Inhalte erst mit
  * Stufe 2 nach der Pflichtentscheidung (F-LG2). Zustellung in Kanäle kommt
- * mit LG-1d, der Täter aus dem Audit-Log mit LG-1c.
+ * mit LG-1d.
+ *
+ * Den Täter liefert seit LG-1c (2026-11-16) der Zuordner (`bot/zuordner.js`)
+ * aus `guildAuditLogEntryCreate`: Ereignisse, zu denen Discord einen
+ * Audit-Eintrag schreibt, warten bis zu 5 s darauf.
  */
 
 const { BotPlugin, VersionHelper } = require('dunebot-sdk');

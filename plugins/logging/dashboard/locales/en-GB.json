@@ -56,6 +56,7 @@
     "ARTEN": {
         "MITGLIED_BEIGETRETEN": "Member joined",
         "MITGLIED_VERLASSEN": "Member left",
+        "MITGLIED_GEKICKT": "Member kicked",
         "MITGLIED_SPITZNAME": "Nickname changed",
         "MITGLIED_AVATAR": "Server avatar changed",
         "MITGLIED_ROLLEN": "Roles changed",
@@ -78,6 +79,7 @@
         "EINLADUNG_GELOESCHT": "Invite deleted",
         "BOT_BEIGETRETEN": "Bot added",
         "BOT_VERLASSEN": "Bot removed",
+        "BOT_GEKICKT": "Bot kicked",
         "BOT_ROLLEN": "Roles of a bot changed",
         "BOT_SPITZNAME": "Nickname of a bot changed",
         "NACHRICHT_GELOESCHT": "Message deleted",
@@ -215,7 +217,7 @@
     },
     "EREIGNISSE": {
         "BESCHREIBUNG": "What happened in this guild, newest first",
-        "STUFE_HINWEIS": "Logging currently stores metadata only, no message text. Who did something is only known once matching against the audit log is added; until then it says \"unknown\". Nothing is sent to log channels yet.",
+        "STUFE_HINWEIS": "Logging currently stores metadata only, no message text. Who did something comes from the Discord audit log: \"certain\" when the entry names exactly this event, \"presumably\" when Discord only gives an approximate answer (deleted messages, moves in voice channels). Without an entry it says \"unknown\", for example when someone deletes their own message. Nothing is sent to log channels yet.",
         "ROLLEN_FEHLEN": "The bot did not return role names, so roles are shown as IDs.",
         "KATEGORIE": "Category",
         "SCHWERE": "Severity",
@@ -238,7 +240,9 @@
         "AKTEUR": "By",
         "AKTEUR_UNBEKANNT": "unknown",
         "NEUER": "Newer",
-        "AELTER": "Older"
+        "AELTER": "Older",
+        "AUDIT_FEHLT": "The bot lacks the \"View Audit Log\" permission on this server. Without it Discord sends no audit entries, and new events show \"unknown\" as the actor. Grant the permission to the bot's role in the server settings.",
+        "VERMUTLICH": "presumably"
     },
     "EINSTELLUNGEN": {
         "BESCHREIBUNG": "What logging records in this guild",
